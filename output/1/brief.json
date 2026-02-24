@@ -1,0 +1,65 @@
+{
+  "order_id": "1",
+  "source": "cli-test-run",
+  "source_theme": "light",
+  "industry": "salon",
+  "audience": "klanten die stijlvol resultaat willen en direct online willen boeken",
+  "primary_action": "Vraag offerte",
+  "secondary_action": "Bekijk aanpak",
+  "price_band": "starter",
+  "tone": "persoonlijk, premium, praktisch",
+  "top_pains": [
+    "Bezoekers begrijpen het aanbod niet snel genoeg.",
+    "De route naar contact is te lang of te vaag.",
+    "Belangrijke bezwaren worden niet vooraf behandeld.",
+    "Mobiele bezoekers haken af vóór ze actie nemen.",
+    "De website ondersteunt groei onvoldoende."
+  ],
+  "desired_outcomes": [
+    "Sneller begrip van het aanbod bij nieuwe bezoekers.",
+    "Meer contactaanvragen met betere intentie.",
+    "Sterkere merkbeleving zonder visuele ruis.",
+    "Duidelijke beslisroute met sterke CTA-momenten.",
+    "Een schaalbare contentbasis voor toekomstige groei."
+  ],
+  "differentiator_angle": "Van eerste interesse naar concrete aanvraag met duidelijke verwachtingen.",
+  "forbidden_claims": [
+    "Geen verzonnen klantlogo’s of testimonials.",
+    "Geen certificaten of keurmerken zonder bron in order-data.",
+    "Geen harde volumecijfers of percentages zonder onderbouwing.",
+    "Geen beloftes over responstijd buiten 1 werkdag tenzij expliciet bekend."
+  ],
+  "objections": [
+    [
+      "Wordt dit niet te standaard?",
+      "Nee. De opbouw wordt per opdracht bepaald met een eigen stijlseed en branchegerichte copy."
+    ],
+    [
+      "Is dit vooral visueel of ook commercieel sterk?",
+      "Commercieel sterk. Elke sectie ondersteunt een concrete vervolgstap."
+    ],
+    [
+      "Kunnen we later onderdelen aanpassen?",
+      "Ja. De site is opgezet in heldere secties die eenvoudig aanpasbaar zijn."
+    ],
+    [
+      "Hoe snel kunnen we live?",
+      "Zodra inhoud en richting akkoord zijn, staat er direct een volledige statische basis klaar."
+    ],
+    [
+      "Hoe voorkomen we onduidelijke aanvragen?",
+      "Door keuzehulp en gerichte formulieren die bezoekers vooraf structureren."
+    ],
+    [
+      "Wat is de volgende stap na oplevering?",
+      "Je gebruikt dezelfde structuur om campagnes, pagina’s of nieuwe proposities door te trekken."
+    ]
+  ],
+  "sitemap": [
+    "index.html",
+    "diensten.html",
+    "projecttypes.html",
+    "about.html",
+    "contact.html"
+  ]
+}

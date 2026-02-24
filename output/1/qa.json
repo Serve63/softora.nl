@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "attempt": 1,
+  "checks": [
+    "Geen verboden placeholder-termen in output",
+    "HTML pagina-aantal binnen 3-5",
+    "Alle pagina’s zijn volledige HTML documenten",
+    "FAQ >= 6",
+    "Hero bevat 2 CTA’s",
+    "Signature sections A en B aanwezig",
+    "layoutVariant aantoonbaar toegepast",
+    "Section order gebruikt seed-variatie",
+    "Typography pairing aanwezig",
+    "Signature section-configuratie aanwezig"
+  ],
+  "findings": [],
+  "fail_reason": null
+}

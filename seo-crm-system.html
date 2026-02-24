@@ -1,0 +1,2818 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Softora | SEO CRM System — Software</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="assets/personnel-theme.css">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
+                var storageKey = isPremiumPersonnel
+                    ? "softora_premium_personnel_theme_mode"
+                    : "softora_software_personnel_theme_mode";
+                var mode = localStorage.getItem(storageKey);
+                if (mode === "light" || mode === "dark") {
+                    document.documentElement.setAttribute("data-theme-mode", mode);
+                    document.documentElement.setAttribute("data-theme", mode);
+                }
+            } catch (error) {
+                /* ignore storage errors */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #f8f7f4;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #efeee9;
+            --accent: #1a1a2e;
+            --accent-light: #2d2d5e;
+            --accent-glow: rgba(26, 26, 46, 0.15);
+            --accent-color: #4a5fd7;
+            --accent-color-light: #5b6ee0;
+            --accent-color-glow: rgba(74, 95, 215, 0.2);
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b6b7b;
+            --text-tertiary: #a0a0b0;
+            --border: rgba(0, 0, 0, 0.07);
+            --green: #27ae60;
+            --green-glow: rgba(39, 174, 96, 0.1);
+            --yellow: #e67e22;
+
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .cursor {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.1s var(--ease-out-expo),
+                        background 0.2s ease,
+                        width 0.3s var(--ease-out-expo),
+                        height 0.3s var(--ease-out-expo);
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+        }
+
+        .cursor.hover {
+            width: 80px;
+            height: 80px;
+            background: var(--accent);
+            border-color: transparent;
+        }
+
+        .cursor-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10001;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Layout */
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 2.5rem 0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 100;
+            box-shadow: 4px 0 30px rgba(0,0,0,0.03);
+        }
+
+        .sidebar-logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 0 2rem;
+            margin-bottom: 3rem;
+            display: block;
+        }
+
+        .sidebar-logo span { color: var(--accent-color); }
+        .sidebar-nav { flex: 1; }
+        .sidebar-section { margin-bottom: 2rem; }
+
+        .sidebar-section-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--text-tertiary);
+            padding: 0 2rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.8rem 2rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 400;
+            transition: all 0.2s;
+            cursor: none;
+            position: relative;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--accent-color);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar-link:hover {
+            color: var(--text-primary);
+            background: rgba(0,0,0,0.02);
+        }
+
+        .sidebar-link.active {
+            color: var(--accent-color);
+            background: rgba(74, 95, 215, 0.04);
+            font-weight: 500;
+        }
+
+        .sidebar-link.active::before { opacity: 1; }
+
+        .sidebar-link svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.4;
+            flex-shrink: 0;
+        }
+
+        .sidebar-link.active svg,
+        .sidebar-link:hover svg { opacity: 0.85; }
+
+        .sidebar-footer {
+            padding: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .sidebar-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .sidebar-user-info { flex: 1; min-width: 0; }
+
+        .sidebar-user-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .sidebar-user-role {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: none;
+            padding: 0.3rem;
+            transition: color 0.2s;
+        }
+
+        .logout-btn:hover { color: #e74c3c; }
+        .logout-btn svg { width: 18px; height: 18px; }
+
+        /* Main */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 3rem;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            gap: 1rem;
+        }
+
+        .topbar-left h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+
+        .topbar-left p {
+            color: var(--text-tertiary);
+            font-size: 0.9rem;
+            font-weight: 300;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 0.5rem 1.2rem;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            user-select: none;
+        }
+
+        .status-pill .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-tertiary);
+        }
+
+        /* Module tabs */
+        .module-nav {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .module-tab {
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            padding: 0.65rem 1rem;
+            cursor: none;
+            transition: all 0.2s var(--ease-out-expo);
+        }
+
+        .module-tab:hover {
+            color: var(--text-primary);
+            border-color: rgba(74, 95, 215, 0.25);
+        }
+
+        .module-tab.active {
+            color: var(--accent-color);
+            border-color: rgba(74, 95, 215, 0.25);
+            background: rgba(74, 95, 215, 0.04);
+        }
+
+        .module-section {
+            display: none;
+        }
+
+        .module-section.active {
+            display: block;
+        }
+
+        /* Shared panels + forms */
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 2.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        }
+
+        .panel + .panel {
+            margin-top: 1.5rem;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .panel-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .panel-badge {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent-color);
+            padding: 0.3rem 0.8rem;
+            border: 1px solid rgba(74,95,215,0.2);
+            white-space: nowrap;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group:last-child { margin-bottom: 0; }
+
+        .form-label {
+            display: block;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.7rem;
+        }
+
+        .form-input, .form-textarea, .form-select {
+            width: 100%;
+            padding: 0.95rem 1.1rem;
+            background: var(--bg-primary);
+            border: 2px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 400;
+            outline: none;
+            transition: all 0.2s var(--ease-out-expo);
+            cursor: none;
+        }
+
+        .form-input::placeholder,
+        .form-textarea::placeholder {
+            color: var(--text-tertiary);
+            font-weight: 300;
+        }
+
+        .form-input:focus, .form-textarea:focus, .form-select:focus {
+            border-color: var(--accent-color);
+            background: var(--bg-secondary);
+            box-shadow: 0 0 30px rgba(74, 95, 215, 0.06);
+        }
+
+        .form-textarea {
+            min-height: 140px;
+            resize: vertical;
+            line-height: 1.7;
+        }
+
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23a0a0b0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1.1rem center;
+            padding-right: 2.8rem;
+        }
+
+        .row-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .action-btn {
+            padding: 0.9rem 1.1rem;
+            background: var(--accent-color);
+            color: white;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: none;
+            cursor: none;
+            transition: all 0.2s var(--ease-out-expo);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+            white-space: nowrap;
+        }
+
+        .action-btn:hover {
+            background: #3a4fc7;
+            box-shadow: 0 0 40px var(--accent-color-glow);
+            transform: translateY(-1px);
+        }
+
+        .action-btn.secondary {
+            background: transparent;
+            border: 1px solid rgba(74,95,215,0.25);
+            color: var(--accent-color);
+            box-shadow: none;
+        }
+
+        .action-btn.secondary:hover {
+            background: rgba(74,95,215,0.04);
+            transform: translateY(-1px);
+            box-shadow: none;
+        }
+
+        .action-btn.danger {
+            background: transparent;
+            border: 1px solid rgba(231, 76, 60, 0.25);
+            color: #e74c3c;
+        }
+
+        .action-btn.danger:hover {
+            background: rgba(231, 76, 60, 0.06);
+            box-shadow: none;
+        }
+
+        .action-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Stats */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stats-bar.four {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1.8rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+        }
+
+        .stat-card-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--text-primary);
+        }
+
+        .stat-card-value.accent { color: var(--accent-color); }
+        .stat-card-value.crit { color: #e74c3c; }
+        .stat-card-value.warn { color: var(--yellow); }
+        .stat-card-value.good { color: var(--green); }
+
+        /* Images module */
+        .seo-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1rem;
+            align-items: end;
+            margin-bottom: 1.5rem;
+        }
+
+        .toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            user-select: none;
+            cursor: none;
+            padding-bottom: 0.6rem;
+        }
+
+        .toggle input {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border);
+            background: var(--bg-secondary);
+            cursor: none;
+            position: relative;
+        }
+
+        .toggle input:checked {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .toggle input:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .toggle label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            cursor: none;
+        }
+
+        .image-list {
+            border-top: 1px solid var(--border);
+        }
+
+        .image-row {
+            display: grid;
+            grid-template-columns: 62px 1.2fr 1.4fr 1fr 110px;
+            gap: 1rem;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .thumb {
+            width: 62px;
+            height: 42px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            overflow: hidden;
+        }
+
+        .thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .img-meta {
+            min-width: 0;
+        }
+
+        .img-src {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .img-file {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            margin-top: 0.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .row-input {
+            padding: 0.75rem 0.9rem;
+            font-size: 0.9rem;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.35rem 0.7rem;
+            border: 1px solid var(--border);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        .status-badge.ok {
+            color: var(--green);
+            border-color: rgba(39,174,96,0.2);
+            background: rgba(39,174,96,0.06);
+        }
+
+        .status-badge.warn {
+            color: var(--yellow);
+            border-color: rgba(230, 126, 34, 0.25);
+            background: rgba(230, 126, 34, 0.06);
+        }
+
+        .hint {
+            color: var(--text-tertiary);
+            font-size: 0.9rem;
+            font-weight: 300;
+            line-height: 1.6;
+        }
+
+        .hint strong {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .scan-progressbar {
+            height: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            margin-top: 0.9rem;
+            overflow: hidden;
+        }
+
+        .scan-progressbar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-color), var(--accent-color-light));
+            transition: width 0.25s var(--ease-out-expo);
+        }
+
+        /* Content (blogs/kb) */
+        .editor-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 1.5rem;
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            border-top: 1px solid var(--border);
+            margin-top: 1rem;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+            cursor: none;
+            transition: padding 0.2s var(--ease-out-expo);
+        }
+
+        .list-item:hover {
+            padding-left: 0.35rem;
+        }
+
+        .list-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .list-sub {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            margin-top: 0.15rem;
+        }
+
+        .pill {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 0.25rem 0.6rem;
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            white-space: nowrap;
+        }
+
+        .pill.published {
+            color: var(--green);
+            border-color: rgba(39,174,96,0.2);
+            background: rgba(39,174,96,0.06);
+        }
+
+        .pill.draft {
+            color: var(--yellow);
+            border-color: rgba(230,126,34,0.25);
+            background: rgba(230,126,34,0.06);
+        }
+
+        .pill.crit {
+            color: #e74c3c;
+            border-color: rgba(231, 76, 60, 0.25);
+            background: rgba(231, 76, 60, 0.06);
+        }
+
+        .pill.warn {
+            color: var(--yellow);
+            border-color: rgba(230,126,34,0.25);
+            background: rgba(230,126,34,0.06);
+        }
+
+        .pill.ok {
+            color: var(--green);
+            border-color: rgba(39,174,96,0.2);
+            background: rgba(39,174,96,0.06);
+        }
+
+        .metrics {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .metric {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border: 1px solid var(--border);
+            padding: 0.35rem 0.7rem;
+            color: var(--text-tertiary);
+            background: var(--bg-secondary);
+        }
+
+        .preview {
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            padding: 1.2rem;
+        }
+
+        .preview-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            margin-bottom: 0.25rem;
+        }
+
+        .preview-url {
+            font-size: 0.78rem;
+            color: var(--text-tertiary);
+            margin-bottom: 0.45rem;
+            word-break: break-all;
+        }
+
+        .preview-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            line-height: 1.55;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .seo-grid { grid-template-columns: 1fr; }
+            .editor-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 1024px) {
+            body { cursor: auto; }
+            .cursor, .cursor-dot { display: none; }
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+        }
+
+        @media (max-width: 768px) {
+            .main-content { padding: 1.5rem; }
+            .stats-bar { grid-template-columns: 1fr; }
+            .topbar { flex-direction: column; align-items: flex-start; }
+            .filter-row { grid-template-columns: 1fr; }
+            .image-row { grid-template-columns: 62px 1fr; grid-auto-rows: auto; }
+            .image-row > *:nth-child(3),
+            .image-row > *:nth-child(4),
+            .image-row > *:nth-child(5) { grid-column: 2 / -1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="noise-overlay"></div>
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+
+    <div class="dashboard-layout">
+
+        <aside class="sidebar">
+            <a href="maatwerk-platform.html" class="sidebar-logo magnetic">Softora.nl</a>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="personeel-dashboard.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="personeel-agenda.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        Agenda
+                    </a>
+                    <a href="actieve-opdrachten.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Actieve Opdrachten
+                    </a>
+                    <a href="ai-lead-generator.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
+                        AI Coldcalling
+                    </a>
+                    <a href="ai-coldmailing.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                        AI Coldmailing
+                    </a>
+                    <a href="#" class="sidebar-link active magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L7 20l-3-3 3-2.75m2.75 2.75L20 7l-3-3L6.75 14.25m3 3L6.75 14.25m3 3L17 10"/></svg>
+                        SEO
+                    </a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Systeem</div>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
+                        Servers
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Klanten
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                        Instellingen
+                    </a>
+                <div class="sidebar-theme">
+                    <div class="sidebar-theme-label">Thema</div>
+                    <div class="sidebar-theme-options" role="group" aria-label="Thema kiezen">
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="dark" aria-pressed="false">Donker</button>
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="light" aria-pressed="false">Licht</button>
+                    </div>
+                </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">SS</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">Softora Software</div>
+                        <div class="sidebar-user-role">Administrator</div>
+                    </div>
+                    <a href="personeel-login.html" class="logout-btn magnetic" title="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+
+            <div class="topbar">
+                <div class="topbar-left">
+                    <h1>SEO CRM System</h1>
+                    <p>Beheer afbeeldingen, blogs en kennisbank voor maximale SEO</p>
+                </div>
+                <div class="topbar-right">
+                    <div class="status-pill" title="Alle data wordt lokaal opgeslagen (in je browser).">
+                        <span class="dot"></span>
+                        Lokaal
+                    </div>
+                </div>
+            </div>
+
+            <div class="module-nav" role="tablist" aria-label="SEO modules">
+                <button class="module-tab magnetic active" type="button" data-module="images" role="tab" aria-selected="true">Afbeeldingen</button>
+                <button class="module-tab magnetic" type="button" data-module="blogs" role="tab" aria-selected="false">Blogs</button>
+                <button class="module-tab magnetic" type="button" data-module="kb" role="tab" aria-selected="false">Kennisbank</button>
+                <button class="module-tab magnetic" type="button" data-module="settings" role="tab" aria-selected="false">Instellingen</button>
+                <button class="module-tab magnetic" type="button" data-module="scan" role="tab" aria-selected="false">SEO Scan</button>
+            </div>
+
+            <!-- IMAGES -->
+            <section class="module-section active" id="module-images" data-module="images">
+                <div class="stats-bar">
+                    <div class="stat-card">
+                        <div class="stat-card-label">Afbeeldingen (totaal)</div>
+                        <div class="stat-card-value" id="imgTotal">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">Alt ontbreekt</div>
+                        <div class="stat-card-value warn" id="imgMissingAlt">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">Geoptimaliseerd</div>
+                        <div class="stat-card-value good" id="imgOptimized">0</div>
+                    </div>
+                </div>
+
+                <div class="seo-grid">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span class="panel-title">Afbeeldingen</span>
+                            <span class="panel-badge" id="imgCountBadge">0 items</span>
+                        </div>
+
+                        <div class="filter-row">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" for="imgSearch">Zoeken</label>
+                                <input class="form-input magnetic" id="imgSearch" placeholder="Zoek op alt, pagina of URL..." autocomplete="off">
+                            </div>
+                            <div class="toggle">
+                                <input type="checkbox" id="onlyMissingAlt" class="magnetic">
+                                <label for="onlyMissingAlt">Alleen zonder alt</label>
+                            </div>
+                        </div>
+
+                        <div class="image-list" id="imageList" aria-live="polite"></div>
+                    </div>
+
+                    <div>
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">SEO Checklist</span>
+                                <span class="panel-badge">Afbeeldingen</span>
+                            </div>
+                            <p class="hint">
+                                <strong>Alt-tekst:</strong> beschrijvend, kort, relevant (geen keyword-stuffing).<br>
+                                <strong>Bestandsnaam:</strong> leesbaar, met koppeltekens (bijv. <em>premium-webdesign-tilburg.webp</em>).<br>
+                                <strong>Formaat:</strong> WebP waar mogelijk en vaste <strong>width/height</strong> in HTML.
+                            </p>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">Data</span>
+                                <span class="panel-badge">Export/Import</span>
+                            </div>
+                            <div class="row-actions">
+                                <button class="action-btn magnetic" type="button" id="exportAllBtn">
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 12l-4-4m4 4l4-4M4 20h16"/></svg>
+                                    Export
+                                </button>
+                                <label class="action-btn secondary magnetic" for="importFile">
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v12m0-12l-4 4m4-4l4 4M4 4h16"/></svg>
+                                    Import
+                                </label>
+                                <input id="importFile" type="file" accept="application/json" style="display:none;">
+                                <button class="action-btn danger magnetic" type="button" id="resetAllBtn">
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    Reset
+                                </button>
+                            </div>
+                            <p class="hint" style="margin-top: 1rem;">Export is een JSON bestand met je SEO-instellingen (lokaal opgeslagen in de browser).</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- BLOGS -->
+            <section class="module-section" id="module-blogs" data-module="blogs">
+                <div class="editor-grid">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span class="panel-title">Blogs</span>
+                            <span class="panel-badge" id="blogCountBadge">0</span>
+                        </div>
+
+                        <div class="row-actions">
+                            <button class="action-btn magnetic" type="button" id="newBlogBtn">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5"/></svg>
+                                Nieuwe blog
+                            </button>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1.25rem;">
+                            <label class="form-label" for="blogSearch">Zoeken</label>
+                            <input class="form-input magnetic" id="blogSearch" placeholder="Zoek op titel of slug..." autocomplete="off">
+                        </div>
+
+                        <div class="list" id="blogList"></div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span class="panel-title">Editor</span>
+                            <span class="panel-badge" id="blogStatusBadge">Concept</span>
+                        </div>
+
+                        <div class="metrics" id="blogMetrics"></div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="blogTitle">Titel</label>
+                            <input class="form-input magnetic" id="blogTitle" placeholder="Bijv. Waarom premium webdesign het verschil maakt">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="blogSlug">Slug (URL)</label>
+                            <input class="form-input magnetic" id="blogSlug" placeholder="bijv-premium-webdesign-tilburg">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="blogMetaTitle">Meta title</label>
+                            <input class="form-input magnetic" id="blogMetaTitle" placeholder="Max 60 tekens (aanbevolen)">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="blogMetaDesc">Meta description</label>
+                            <textarea class="form-textarea magnetic" id="blogMetaDesc" placeholder="Richt op ~150-160 tekens."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="blogKeyword">Focus keyword</label>
+                            <input class="form-input magnetic" id="blogKeyword" placeholder="bijv. premium webdesign Tilburg">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="blogContent">Content</label>
+                            <textarea class="form-textarea magnetic" id="blogContent" placeholder="Schrijf je blog content hier..."></textarea>
+                        </div>
+
+                        <div class="row-actions">
+                            <button class="action-btn magnetic" type="button" id="saveBlogBtn">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                Opslaan
+                            </button>
+                            <button class="action-btn secondary magnetic" type="button" id="togglePublishBlogBtn">Publiceren</button>
+                            <button class="action-btn secondary magnetic" type="button" id="exportBlogBtn">Export HTML</button>
+                        </div>
+
+                        <div class="panel" style="margin-top: 1.5rem; padding: 1.5rem;">
+                            <div class="panel-header" style="margin-bottom: 1rem;">
+                                <span class="panel-title">Snippet preview</span>
+                                <span class="panel-badge">Google</span>
+                            </div>
+                            <div class="preview">
+                                <div class="preview-title" id="previewTitle">Titel van je pagina</div>
+                                <div class="preview-url" id="previewUrl">https://softora.nl/blog/jouw-slug</div>
+                                <div class="preview-desc" id="previewDesc">Meta description verschijnt hier.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- KNOWLEDGE BASE -->
+            <section class="module-section" id="module-kb" data-module="kb">
+                <div class="editor-grid">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span class="panel-title">Kennisbank</span>
+                            <span class="panel-badge" id="kbCountBadge">0</span>
+                        </div>
+
+                        <div class="row-actions">
+                            <button class="action-btn magnetic" type="button" id="newKbBtn">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5"/></svg>
+                                Nieuw artikel
+                            </button>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1.25rem;">
+                            <label class="form-label" for="kbSearch">Zoeken</label>
+                            <input class="form-input magnetic" id="kbSearch" placeholder="Zoek op titel of categorie..." autocomplete="off">
+                        </div>
+
+                        <div class="list" id="kbList"></div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span class="panel-title">Editor</span>
+                            <span class="panel-badge" id="kbStatusBadge">Concept</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="kbTitle">Titel</label>
+                            <input class="form-input magnetic" id="kbTitle" placeholder="Bijv. SEO checklist voor webdesign">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="kbCategory">Categorie</label>
+                            <select class="form-select magnetic" id="kbCategory">
+                                <option value="seo" selected>SEO</option>
+                                <option value="content">Content</option>
+                                <option value="techniek">Techniek</option>
+                                <option value="strategie">Strategie</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="kbSlug">Slug (URL)</label>
+                            <input class="form-input magnetic" id="kbSlug" placeholder="bijv-seo-checklist-webdesign">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="kbContent">Content</label>
+                            <textarea class="form-textarea magnetic" id="kbContent" placeholder="Schrijf je kennisbank artikel hier..."></textarea>
+                        </div>
+
+                        <div class="row-actions">
+                            <button class="action-btn magnetic" type="button" id="saveKbBtn">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                Opslaan
+                            </button>
+                            <button class="action-btn secondary magnetic" type="button" id="togglePublishKbBtn">Publiceren</button>
+                            <button class="action-btn secondary magnetic" type="button" id="exportKbBtn">Export HTML</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SETTINGS -->
+            <section class="module-section" id="module-settings" data-module="settings">
+                <div class="seo-grid">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span class="panel-title">Sitemap / Robots</span>
+                            <span class="panel-badge">Generator</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="baseUrl">Basis URL</label>
+                            <input class="form-input magnetic" id="baseUrl" placeholder="https://softora.nl/" value="https://softora.nl/">
+                        </div>
+
+                        <div class="row-actions" style="margin-bottom: 1.25rem;">
+                            <button class="action-btn magnetic" type="button" id="generateSitemapBtn">Genereer</button>
+                            <button class="action-btn secondary magnetic" type="button" id="copySitemapBtn">Kopieer sitemap</button>
+                            <button class="action-btn secondary magnetic" type="button" id="copyRobotsBtn">Kopieer robots</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="sitemapOut">sitemap.xml</label>
+                            <textarea class="form-textarea magnetic" id="sitemapOut" readonly></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="robotsOut">robots.txt</label>
+                            <textarea class="form-textarea magnetic" id="robotsOut" readonly></textarea>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span class="panel-title">SEO Targets</span>
+                            <span class="panel-badge">Basis</span>
+                        </div>
+                        <p class="hint">
+                            <strong>Meta title</strong>: 50-60 tekens.<br>
+                            <strong>Meta description</strong>: 150-160 tekens.<br>
+                            <strong>Content</strong>: schrijf voor intent, gebruik duidelijke H2's en interne links.<br>
+                            <strong>Techniek</strong>: snelle laadtijd, correcte alt-teksten, en consistente URL-structuur.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEO SCAN -->
+            <section class="module-section" id="module-scan" data-module="scan">
+                <div class="stats-bar four">
+                    <div class="stat-card">
+                        <div class="stat-card-label">Pagina's gescand</div>
+                        <div class="stat-card-value" id="scanStatPages">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">Gem. score</div>
+                        <div class="stat-card-value accent" id="scanStatAvg">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">Critical</div>
+                        <div class="stat-card-value crit" id="scanStatCritical">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">Warnings</div>
+                        <div class="stat-card-value" id="scanStatWarnings">0</div>
+                    </div>
+                </div>
+
+                <div class="seo-grid">
+                    <div>
+                        <div class="panel">
+	                            <div class="panel-header">
+	                                <span class="panel-title">SEO Rapport</span>
+	                                <span class="panel-badge" id="scanBadge">Nog niet gescand</span>
+	                            </div>
+	                            <div class="list" id="scanPageList">
+	                                <div class="hint" style="padding-top: 0.5rem;">Nog geen scan uitgevoerd.</div>
+	                            </div>
+	                        </div>
+
+	                        <div class="panel">
+	                            <div class="panel-header">
+	                                <span class="panel-title">Issues Overzicht</span>
+	                                <span class="panel-badge" id="scanIssuesBadge">0 issues</span>
+	                            </div>
+	                            <div class="list" id="scanIssueList">
+	                                <div class="hint" style="padding-top: 0.5rem;">Start een scan om issues te zien.</div>
+	                            </div>
+	                        </div>
+	                    </div>
+
+                    <div>
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">Scan Instellingen</span>
+                                <span class="panel-badge">Ubersuggest-style</span>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="scanMode">Scan methode</label>
+                                <select class="form-select magnetic" id="scanMode">
+                                    <option value="folder" selected>Lokale map (aanbevolen)</option>
+                                    <option value="urls">URL lijst</option>
+                                </select>
+                            </div>
+
+                            <div id="scanFolderWrap">
+                                <div class="form-group">
+                                    <label class="form-label" for="scanFolder">Kies map</label>
+                                    <input class="form-input magnetic" id="scanFolder" type="file" webkitdirectory directory multiple>
+                                    <p class="hint" style="margin-top: 0.9rem;">Selecteer de `Softora.nl` map om alle HTML pagina's te scannen.</p>
+                                </div>
+                            </div>
+
+                            <div id="scanUrlsWrap" style="display:none;">
+                                <div class="form-group">
+                                    <label class="form-label" for="scanBaseUrl">Basis URL</label>
+                                    <input class="form-input magnetic" id="scanBaseUrl" value="https://softora.nl/" placeholder="https://softora.nl/">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="scanUrlList">Pagina's (1 per regel)</label>
+                                    <textarea class="form-textarea magnetic" id="scanUrlList">/index.html
+/premium-website.html
+/maatwerk-platform.html</textarea>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="toggle">
+                                    <input type="checkbox" id="scanPublicOnly" class="magnetic" checked>
+                                    <label for="scanPublicOnly">Alleen publieke pagina's</label>
+                                </div>
+                            </div>
+
+                            <div class="row-actions">
+                                <button class="action-btn magnetic" type="button" id="startScanBtn">
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M10 4H6a2 2 0 00-2 2v4m14-6h-4m4 0a2 2 0 012 2v4m-2 10h-4m4 0a2 2 0 002-2v-4M6 20h4m-4 0a2 2 0 01-2-2v-4m6-4l2-2m0 0l2 2m-2-2v8"/></svg>
+                                    Start scan
+                                </button>
+                                <button class="action-btn secondary magnetic" type="button" id="downloadReportBtn" disabled>
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 12l-4-4m4 4l4-4M4 20h16"/></svg>
+                                    Download
+                                </button>
+                            </div>
+
+	                            <p class="hint" id="scanProgress" style="margin-top: 1rem;">Tip: via URL scan werkt het pas goed als de site online of via een lokale server draait.</p>
+	                            <div class="scan-progressbar" aria-hidden="true">
+	                                <div class="scan-progressbar-fill" id="scanProgressFill" style="width:0%;"></div>
+	                            </div>
+	                        </div>
+
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">Pagina Details</span>
+                                <span class="panel-badge" id="scanDetailsBadge">Selecteer pagina</span>
+                            </div>
+
+                            <div class="metrics" id="scanDetailsMetrics"></div>
+
+                            <div class="preview">
+                                <div class="preview-title" id="scanDetailsTitle">Titel</div>
+                                <div class="preview-url" id="scanDetailsUrl">URL</div>
+                                <div class="preview-desc" id="scanDetailsDesc">Meta description</div>
+                            </div>
+
+                            <p class="hint" id="scanDetailsHints" style="margin-top: 1rem;"></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        const STORAGE_KEYS = {
+            images: 'softora_seo_images_v1',
+            blogs: 'softora_seo_blogs_v1',
+            kb: 'softora_seo_kb_v1'
+        };
+
+        const PUBLIC_PAGES = ['index.html', 'premium-website.html', 'maatwerk-platform.html'];
+
+        const SITE_IMAGE_OCCURRENCES = [
+          {
+            "file": "index.html",
+            "src": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80",
+            "alt": "Premium webdesign",
+            "width": "800",
+            "height": "533"
+          },
+          {
+            "file": "index.html",
+            "src": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800&q=80",
+            "alt": "Software & databases",
+            "width": "800",
+            "height": "533"
+          },
+          {
+            "file": "maatwerk-platform.html",
+            "src": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80",
+            "alt": "Data visualization",
+            "width": "1600",
+            "height": "900"
+          },
+          {
+            "file": "maatwerk-platform.html",
+            "src": "https://images.unsplash.com/photo-1504639725590-34d0984388bd?auto=format&fit=crop&w=1000&q=80",
+            "alt": "Code on screen",
+            "width": "1000",
+            "height": "667"
+          },
+          {
+            "file": "maatwerk-platform.html",
+            "src": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1600&q=80",
+            "alt": "Technology infrastructure",
+            "width": "1600",
+            "height": "900"
+          },
+          {
+            "file": "maatwerk-platform.html",
+            "src": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80",
+            "alt": "Server infrastructure",
+            "width": "1200",
+            "height": "800"
+          },
+          {
+            "file": "personeel-login.html",
+            "src": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80",
+            "alt": "Server infrastructure",
+            "width": "",
+            "height": ""
+          },
+          {
+            "file": "premium-personeel-login.html",
+            "src": "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80",
+            "alt": "Office workspace",
+            "width": "",
+            "height": ""
+          },
+          {
+            "file": "premium-website.html",
+            "src": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80",
+            "alt": "Premium webdesign workspace",
+            "width": "1200",
+            "height": "800"
+          },
+          {
+            "file": "premium-website.html",
+            "src": "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1000&q=80",
+            "alt": "Developer at work",
+            "width": "1000",
+            "height": "667"
+          },
+          {
+            "file": "premium-website.html",
+            "src": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80",
+            "alt": "Team working",
+            "width": "1600",
+            "height": "900"
+          },
+          {
+            "file": "premium-website.html",
+            "src": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1600&q=80",
+            "alt": "Digital design",
+            "width": "1600",
+            "height": "900"
+          }
+        ];
+
+        function safeJsonParse(value, fallback) {
+            try { return JSON.parse(value); } catch { return fallback; }
+        }
+
+        function loadStore(key, fallback) {
+            return safeJsonParse(localStorage.getItem(key) || '', fallback);
+        }
+
+        function saveStore(key, value) {
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+
+        function downloadText(filename, text, type = 'application/json') {
+            const blob = new Blob([text], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text);
+            }
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+            return Promise.resolve();
+        }
+
+        function slugify(input) {
+            return String(input || '')
+                .toLowerCase()
+                .trim()
+                .replace(/[\s_]+/g, '-')
+                .replace(/[^a-z0-9-]/g, '')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+        }
+
+        function imgKey(item) {
+            return `${item.file}::${item.src}`;
+        }
+
+        function buildThumbUrl(src) {
+            if (!src || typeof src !== 'string') return src;
+            if (!src.includes('images.unsplash.com/')) return src;
+            try {
+                const u = new URL(src);
+                u.searchParams.set('w', '360');
+                u.searchParams.set('q', '60');
+                u.searchParams.set('auto', u.searchParams.get('auto') || 'format');
+                u.searchParams.set('fit', u.searchParams.get('fit') || 'crop');
+                return u.toString();
+            } catch {
+                return src;
+            }
+        }
+
+        // Tabs
+        const tabs = Array.from(document.querySelectorAll('.module-tab'));
+        const sections = Array.from(document.querySelectorAll('.module-section'));
+
+        function setActiveModule(name) {
+            tabs.forEach((t) => {
+                const active = t.dataset.module === name;
+                t.classList.toggle('active', active);
+                t.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            sections.forEach((s) => s.classList.toggle('active', s.dataset.module === name));
+        }
+
+        tabs.forEach((t) => {
+            t.addEventListener('click', () => setActiveModule(t.dataset.module));
+        });
+
+        // IMAGES
+        const imageOverrides = loadStore(STORAGE_KEYS.images, {});
+        const imgSearch = document.getElementById('imgSearch');
+        const onlyMissingAlt = document.getElementById('onlyMissingAlt');
+        const imageList = document.getElementById('imageList');
+
+        function getImageValue(key, fallbackAlt) {
+            const item = imageOverrides[key] || {};
+            return {
+                alt: typeof item.alt === 'string' ? item.alt : fallbackAlt || '',
+                filename: typeof item.filename === 'string' ? item.filename : ''
+            };
+        }
+
+        function setImageOverride(key, patch) {
+            const current = imageOverrides[key] || {};
+            imageOverrides[key] = { ...current, ...patch };
+            saveStore(STORAGE_KEYS.images, imageOverrides);
+        }
+
+        function renderImages() {
+            const summary = computeImageSummary();
+            const filtered = summary.filtered;
+            updateImageSummaryUI(summary);
+
+            imageList.innerHTML = '';
+            if (filtered.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'hint';
+                empty.style.paddingTop = '1.25rem';
+                empty.textContent = 'Geen afbeeldingen gevonden voor deze filter.';
+                imageList.appendChild(empty);
+                return;
+            }
+
+            filtered.forEach((it) => {
+                const key = imgKey(it);
+                const v = getImageValue(key, it.alt);
+                const effectiveAlt = (v.alt || '').trim();
+                const status = effectiveAlt ? { cls: 'ok', text: 'OK' } : { cls: 'warn', text: 'Alt ontbreekt' };
+
+                const row = document.createElement('div');
+                row.className = 'image-row';
+                row.dataset.key = key;
+
+                row.innerHTML = `
+                    <div class="thumb">
+                        <img src="${buildThumbUrl(it.src)}" alt="" loading="lazy" decoding="async">
+                    </div>
+                    <div class="img-meta">
+                        <div class="img-src" title="${it.src}">${it.src}</div>
+                        <div class="img-file">in ${it.file}</div>
+                    </div>
+                    <div>
+                        <input class="form-input row-input magnetic" data-field="alt" value="${escapeHtml(v.alt)}" placeholder="Alt tekst" aria-label="Alt tekst">
+                    </div>
+                    <div>
+                        <input class="form-input row-input magnetic" data-field="filename" value="${escapeHtml(v.filename)}" placeholder="Bestandsnaam (optioneel)" aria-label="Bestandsnaam">
+                    </div>
+                    <div>
+                        <span class="status-badge ${status.cls}">${status.text}</span>
+                    </div>
+                `;
+
+                imageList.appendChild(row);
+            });
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;');
+        }
+
+        function computeImageSummary() {
+            const q = (imgSearch.value || '').trim().toLowerCase();
+            const missingOnly = !!onlyMissingAlt.checked;
+
+            let missingAltCount = 0;
+            let optimizedCount = 0;
+            const filtered = [];
+
+            SITE_IMAGE_OCCURRENCES.forEach((it) => {
+                const key = imgKey(it);
+                const v = getImageValue(key, it.alt);
+                const effectiveAlt = (v.alt || '').trim();
+                const isMissing = effectiveAlt.length === 0;
+                if (isMissing) missingAltCount++;
+                else optimizedCount++;
+
+                if (missingOnly && !isMissing) return;
+                if (q) {
+                    const hay = `${it.file} ${it.src} ${effectiveAlt}`.toLowerCase();
+                    if (!hay.includes(q)) return;
+                }
+                filtered.push(it);
+            });
+
+            return { missingAltCount, optimizedCount, filtered };
+        }
+
+        function updateImageSummaryUI(summary) {
+            document.getElementById('imgTotal').textContent = String(SITE_IMAGE_OCCURRENCES.length);
+            document.getElementById('imgMissingAlt').textContent = String(summary.missingAltCount);
+            document.getElementById('imgOptimized').textContent = String(summary.optimizedCount);
+            document.getElementById('imgCountBadge').textContent = `${summary.filtered.length} items`;
+        }
+
+        imageList.addEventListener('input', (e) => {
+            const input = e.target;
+            if (!(input instanceof HTMLInputElement)) return;
+            const row = input.closest('.image-row');
+            if (!row) return;
+            const key = row.dataset.key;
+            const field = input.dataset.field;
+            if (!key || !field) return;
+            setImageOverride(key, { [field]: input.value });
+
+            // Update only this row's status badge
+            const altInput = row.querySelector('input[data-field=\"alt\"]');
+            const badge = row.querySelector('.status-badge');
+            if (altInput instanceof HTMLInputElement && badge) {
+                const ok = altInput.value.trim().length > 0;
+                badge.classList.toggle('ok', ok);
+                badge.classList.toggle('warn', !ok);
+                badge.textContent = ok ? 'OK' : 'Alt ontbreekt';
+            }
+
+            // Update summary without rerendering the whole list (keeps typing smooth)
+            updateImageSummaryUI(computeImageSummary());
+        });
+
+        imageList.addEventListener('change', () => {
+            // Apply filters (e.g. "alleen zonder alt") after editing is done
+            renderImages();
+        });
+
+        imgSearch.addEventListener('input', () => renderImages());
+        onlyMissingAlt.addEventListener('change', () => renderImages());
+
+        // BLOGS
+        let blogs = loadStore(STORAGE_KEYS.blogs, []);
+        let activeBlogId = null;
+
+        const blogList = document.getElementById('blogList');
+        const blogSearch = document.getElementById('blogSearch');
+        const blogStatusBadge = document.getElementById('blogStatusBadge');
+        const blogMetrics = document.getElementById('blogMetrics');
+        const blogTitle = document.getElementById('blogTitle');
+        const blogSlug = document.getElementById('blogSlug');
+        const blogMetaTitle = document.getElementById('blogMetaTitle');
+        const blogMetaDesc = document.getElementById('blogMetaDesc');
+        const blogKeyword = document.getElementById('blogKeyword');
+        const blogContent = document.getElementById('blogContent');
+        const togglePublishBlogBtn = document.getElementById('togglePublishBlogBtn');
+        const previewTitle = document.getElementById('previewTitle');
+        const previewUrl = document.getElementById('previewUrl');
+        const previewDesc = document.getElementById('previewDesc');
+
+        function ensureBlogDefaults(b) {
+            return {
+                id: b.id || cryptoRandomId(),
+                title: b.title || '',
+                slug: b.slug || '',
+                metaTitle: b.metaTitle || '',
+                metaDesc: b.metaDesc || '',
+                keyword: b.keyword || '',
+                content: b.content || '',
+                published: !!b.published,
+                updatedAt: b.updatedAt || Date.now()
+            };
+        }
+
+        function cryptoRandomId() {
+            if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+                const arr = new Uint32Array(2);
+                crypto.getRandomValues(arr);
+                return `${arr[0].toString(16)}${arr[1].toString(16)}`;
+            }
+            return String(Date.now()) + String(Math.random()).slice(2);
+        }
+
+        blogs = Array.isArray(blogs) ? blogs.map(ensureBlogDefaults) : [];
+        saveStore(STORAGE_KEYS.blogs, blogs);
+
+        function setActiveBlog(id) {
+            activeBlogId = id;
+            const b = blogs.find((x) => x.id === id);
+            if (!b) return;
+            blogTitle.value = b.title;
+            blogSlug.value = b.slug;
+            blogMetaTitle.value = b.metaTitle;
+            blogMetaDesc.value = b.metaDesc;
+            blogKeyword.value = b.keyword;
+            blogContent.value = b.content;
+            blogStatusBadge.textContent = b.published ? 'Gepubliceerd' : 'Concept';
+            togglePublishBlogBtn.textContent = b.published ? 'Depubliceren' : 'Publiceren';
+            updateBlogUI();
+            renderBlogList();
+        }
+
+        function updateBlogUI() {
+            const titleVal = blogTitle.value.trim();
+            const slugVal = blogSlug.value.trim() || slugify(titleVal);
+            const metaTitleVal = blogMetaTitle.value.trim() || titleVal;
+            const metaDescVal = blogMetaDesc.value.trim();
+            const words = blogContent.value.trim() ? blogContent.value.trim().split(/\s+/).length : 0;
+
+            blogSlug.value = slugVal;
+            previewTitle.textContent = metaTitleVal || 'Titel van je pagina';
+            previewUrl.textContent = `https://softora.nl/blog/${slugVal || 'jouw-slug'}`;
+            previewDesc.textContent = metaDescVal || 'Meta description verschijnt hier.';
+
+            blogMetrics.innerHTML = '';
+            const items = [
+                `Woorden: ${words}`,
+                `Meta title: ${metaTitleVal.length}/60`,
+                `Meta desc: ${metaDescVal.length}/160`
+            ];
+            items.forEach((t) => {
+                const el = document.createElement('div');
+                el.className = 'metric';
+                el.textContent = t;
+                blogMetrics.appendChild(el);
+            });
+        }
+
+        function renderBlogList() {
+            const q = (blogSearch.value || '').trim().toLowerCase();
+            const filtered = blogs
+                .slice()
+                .sort((a, b) => b.updatedAt - a.updatedAt)
+                .filter((b) => {
+                    if (!q) return true;
+                    return `${b.title} ${b.slug}`.toLowerCase().includes(q);
+                });
+
+            document.getElementById('blogCountBadge').textContent = String(blogs.length);
+            blogList.innerHTML = '';
+
+            if (filtered.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'hint';
+                empty.style.paddingTop = '0.5rem';
+                empty.textContent = 'Nog geen blogs. Maak je eerste blog aan.';
+                blogList.appendChild(empty);
+                return;
+            }
+
+            filtered.forEach((b) => {
+                const item = document.createElement('div');
+                item.className = 'list-item magnetic';
+                item.dataset.id = b.id;
+                item.innerHTML = `
+                    <div style="min-width:0;">
+                        <div class="list-title">${escapeHtml(b.title || '(Zonder titel)')}</div>
+                        <div class="list-sub">/${escapeHtml(b.slug || 'slug')}</div>
+                    </div>
+                    <span class="pill ${b.published ? 'published' : 'draft'}">${b.published ? 'Gepubliceerd' : 'Concept'}</span>
+                `;
+                item.addEventListener('click', () => setActiveBlog(b.id));
+                blogList.appendChild(item);
+            });
+        }
+
+        document.getElementById('newBlogBtn').addEventListener('click', () => {
+            const b = ensureBlogDefaults({ title: 'Nieuwe blog', slug: '', published: false });
+            blogs.push(b);
+            saveStore(STORAGE_KEYS.blogs, blogs);
+            setActiveBlog(b.id);
+        });
+
+        document.getElementById('saveBlogBtn').addEventListener('click', () => {
+            if (!activeBlogId) return;
+            const idx = blogs.findIndex((x) => x.id === activeBlogId);
+            if (idx < 0) return;
+            blogs[idx] = ensureBlogDefaults({
+                ...blogs[idx],
+                title: blogTitle.value,
+                slug: blogSlug.value,
+                metaTitle: blogMetaTitle.value,
+                metaDesc: blogMetaDesc.value,
+                keyword: blogKeyword.value,
+                content: blogContent.value,
+                updatedAt: Date.now()
+            });
+            saveStore(STORAGE_KEYS.blogs, blogs);
+            renderBlogList();
+        });
+
+        document.getElementById('togglePublishBlogBtn').addEventListener('click', (e) => {
+            if (!activeBlogId) return;
+            const idx = blogs.findIndex((x) => x.id === activeBlogId);
+            if (idx < 0) return;
+            const next = !blogs[idx].published;
+            blogs[idx].published = next;
+            blogs[idx].updatedAt = Date.now();
+            saveStore(STORAGE_KEYS.blogs, blogs);
+            blogStatusBadge.textContent = next ? 'Gepubliceerd' : 'Concept';
+            e.target.textContent = next ? 'Depubliceren' : 'Publiceren';
+            renderBlogList();
+        });
+
+        document.getElementById('exportBlogBtn').addEventListener('click', () => {
+            if (!activeBlogId) return;
+            const b = blogs.find((x) => x.id === activeBlogId);
+            if (!b) return;
+            const slugVal = b.slug || slugify(b.title);
+            const html = buildContentExportHtml({
+                title: b.title,
+                metaTitle: b.metaTitle || b.title,
+                metaDesc: b.metaDesc,
+                slug: slugVal,
+                content: b.content
+            });
+            downloadText(`blog-${slugVal || 'post'}.html`, html, 'text/html');
+        });
+
+        function buildContentExportHtml({ title, metaTitle, metaDesc, slug, content }) {
+            const safeTitle = escapeHtml(metaTitle || title || 'Blog');
+            const safeDesc = escapeHtml(metaDesc || '');
+            const safeSlug = escapeHtml(slug || '');
+            const safeBody = escapeHtml(content || '').replace(/\n/g, '<br>\n');
+            return `<!DOCTYPE html>\n<html lang="nl">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${safeTitle}</title>\n  <meta name="description" content="${safeDesc}">\n</head>\n<body>\n  <article>\n    <h1>${escapeHtml(title || 'Blog')}</h1>\n    <p style="color:#6b6b7b;">Slug: ${safeSlug}</p>\n    <div>${safeBody}</div>\n  </article>\n</body>\n</html>`;
+        }
+
+        blogSearch.addEventListener('input', renderBlogList);
+        [blogTitle, blogSlug, blogMetaTitle, blogMetaDesc, blogKeyword, blogContent].forEach((el) => {
+            el.addEventListener('input', updateBlogUI);
+        });
+
+        if (blogs.length) setActiveBlog(blogs[0].id);
+        else renderBlogList();
+        updateBlogUI();
+
+        // KB
+        let kbItems = loadStore(STORAGE_KEYS.kb, []);
+        let activeKbId = null;
+
+        const kbList = document.getElementById('kbList');
+        const kbSearch = document.getElementById('kbSearch');
+        const kbStatusBadge = document.getElementById('kbStatusBadge');
+        const kbTitle = document.getElementById('kbTitle');
+        const kbCategory = document.getElementById('kbCategory');
+        const kbSlug = document.getElementById('kbSlug');
+        const kbContent = document.getElementById('kbContent');
+        const togglePublishKbBtn = document.getElementById('togglePublishKbBtn');
+
+        function ensureKbDefaults(k) {
+            return {
+                id: k.id || cryptoRandomId(),
+                title: k.title || '',
+                category: k.category || 'seo',
+                slug: k.slug || '',
+                content: k.content || '',
+                published: !!k.published,
+                updatedAt: k.updatedAt || Date.now()
+            };
+        }
+
+        kbItems = Array.isArray(kbItems) ? kbItems.map(ensureKbDefaults) : [];
+        saveStore(STORAGE_KEYS.kb, kbItems);
+
+        function renderKbList() {
+            const q = (kbSearch.value || '').trim().toLowerCase();
+            const filtered = kbItems
+                .slice()
+                .sort((a, b) => b.updatedAt - a.updatedAt)
+                .filter((k) => {
+                    if (!q) return true;
+                    return `${k.title} ${k.category} ${k.slug}`.toLowerCase().includes(q);
+                });
+
+            document.getElementById('kbCountBadge').textContent = String(kbItems.length);
+            kbList.innerHTML = '';
+
+            if (filtered.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'hint';
+                empty.style.paddingTop = '0.5rem';
+                empty.textContent = 'Nog geen artikelen. Maak je eerste kennisbank item aan.';
+                kbList.appendChild(empty);
+                return;
+            }
+
+            filtered.forEach((k) => {
+                const item = document.createElement('div');
+                item.className = 'list-item magnetic';
+                item.dataset.id = k.id;
+                item.innerHTML = `
+                    <div style="min-width:0;">
+                        <div class="list-title">${escapeHtml(k.title || '(Zonder titel)')}</div>
+                        <div class="list-sub">${escapeHtml(k.category)} / ${escapeHtml(k.slug || 'slug')}</div>
+                    </div>
+                    <span class="pill ${k.published ? 'published' : 'draft'}">${k.published ? 'Gepubliceerd' : 'Concept'}</span>
+                `;
+                item.addEventListener('click', () => setActiveKb(k.id));
+                kbList.appendChild(item);
+            });
+        }
+
+        function setActiveKb(id) {
+            activeKbId = id;
+            const k = kbItems.find((x) => x.id === id);
+            if (!k) return;
+            kbTitle.value = k.title;
+            kbCategory.value = k.category;
+            kbSlug.value = k.slug;
+            kbContent.value = k.content;
+            kbStatusBadge.textContent = k.published ? 'Gepubliceerd' : 'Concept';
+            togglePublishKbBtn.textContent = k.published ? 'Depubliceren' : 'Publiceren';
+            renderKbList();
+        }
+
+        document.getElementById('newKbBtn').addEventListener('click', () => {
+            const k = ensureKbDefaults({ title: 'Nieuw artikel', category: 'seo', slug: '', published: false });
+            kbItems.push(k);
+            saveStore(STORAGE_KEYS.kb, kbItems);
+            setActiveKb(k.id);
+        });
+
+        document.getElementById('saveKbBtn').addEventListener('click', () => {
+            if (!activeKbId) return;
+            const idx = kbItems.findIndex((x) => x.id === activeKbId);
+            if (idx < 0) return;
+            kbItems[idx] = ensureKbDefaults({
+                ...kbItems[idx],
+                title: kbTitle.value,
+                category: kbCategory.value,
+                slug: kbSlug.value || slugify(kbTitle.value),
+                content: kbContent.value,
+                updatedAt: Date.now()
+            });
+            saveStore(STORAGE_KEYS.kb, kbItems);
+            renderKbList();
+        });
+
+        document.getElementById('togglePublishKbBtn').addEventListener('click', (e) => {
+            if (!activeKbId) return;
+            const idx = kbItems.findIndex((x) => x.id === activeKbId);
+            if (idx < 0) return;
+            const next = !kbItems[idx].published;
+            kbItems[idx].published = next;
+            kbItems[idx].updatedAt = Date.now();
+            saveStore(STORAGE_KEYS.kb, kbItems);
+            kbStatusBadge.textContent = next ? 'Gepubliceerd' : 'Concept';
+            e.target.textContent = next ? 'Depubliceren' : 'Publiceren';
+            renderKbList();
+        });
+
+        document.getElementById('exportKbBtn').addEventListener('click', () => {
+            if (!activeKbId) return;
+            const k = kbItems.find((x) => x.id === activeKbId);
+            if (!k) return;
+            const slugVal = k.slug || slugify(k.title);
+            const html = buildContentExportHtml({
+                title: k.title,
+                metaTitle: k.title,
+                metaDesc: '',
+                slug: slugVal,
+                content: k.content
+            });
+            downloadText(`kennisbank-${slugVal || 'artikel'}.html`, html, 'text/html');
+        });
+
+        kbSearch.addEventListener('input', renderKbList);
+        [kbTitle, kbCategory, kbSlug, kbContent].forEach((el) => el.addEventListener('input', () => {
+            if (kbTitle.value && !kbSlug.value) kbSlug.value = slugify(kbTitle.value);
+        }));
+
+        if (kbItems.length) setActiveKb(kbItems[0].id);
+        else renderKbList();
+
+        // SETTINGS: sitemap/robots
+        const baseUrlInput = document.getElementById('baseUrl');
+        const sitemapOut = document.getElementById('sitemapOut');
+        const robotsOut = document.getElementById('robotsOut');
+
+        function normalizeBaseUrl(input) {
+            const raw = (input || '').trim();
+            if (!raw) return '';
+            try {
+                const u = new URL(raw.endsWith('/') ? raw : raw + '/');
+                return u.toString();
+            } catch {
+                return raw.endsWith('/') ? raw : raw + '/';
+            }
+        }
+
+        function pageToLoc(base, page) {
+            if (page === 'index.html') return base;
+            return base + page;
+        }
+
+        function generateSitemapAndRobots() {
+            const base = normalizeBaseUrl(baseUrlInput.value || 'https://softora.nl/');
+            const urls = PUBLIC_PAGES.map((p) => pageToLoc(base, p));
+            const xml = [
+                '<?xml version=\"1.0\" encoding=\"UTF-8\"?>',
+                '<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">',
+                ...urls.map((loc) => `  <url><loc>${escapeXml(loc)}</loc></url>`),
+                '</urlset>'
+            ].join('\\n');
+
+            const robots = [
+                'User-agent: *',
+                'Allow: /',
+                `Sitemap: ${base}sitemap.xml`
+            ].join('\\n');
+
+            sitemapOut.value = xml;
+            robotsOut.value = robots;
+        }
+
+        function escapeXml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        }
+
+        document.getElementById('generateSitemapBtn').addEventListener('click', generateSitemapAndRobots);
+        document.getElementById('copySitemapBtn').addEventListener('click', () => copyToClipboard(sitemapOut.value || ''));
+        document.getElementById('copyRobotsBtn').addEventListener('click', () => copyToClipboard(robotsOut.value || ''));
+        generateSitemapAndRobots();
+
+        // SEO SCAN
+        const scanMode = document.getElementById('scanMode');
+        const scanFolder = document.getElementById('scanFolder');
+        const scanFolderWrap = document.getElementById('scanFolderWrap');
+        const scanUrlsWrap = document.getElementById('scanUrlsWrap');
+        const scanBaseUrlInput = document.getElementById('scanBaseUrl');
+        const scanUrlList = document.getElementById('scanUrlList');
+        const scanPublicOnly = document.getElementById('scanPublicOnly');
+        const startScanBtn = document.getElementById('startScanBtn');
+        const downloadReportBtn = document.getElementById('downloadReportBtn');
+        const scanProgress = document.getElementById('scanProgress');
+        const scanProgressFill = document.getElementById('scanProgressFill');
+        const scanBadge = document.getElementById('scanBadge');
+        const scanIssuesBadge = document.getElementById('scanIssuesBadge');
+        const scanPageList = document.getElementById('scanPageList');
+        const scanIssueList = document.getElementById('scanIssueList');
+        const scanStatPages = document.getElementById('scanStatPages');
+        const scanStatAvg = document.getElementById('scanStatAvg');
+        const scanStatCritical = document.getElementById('scanStatCritical');
+        const scanStatWarnings = document.getElementById('scanStatWarnings');
+        const scanDetailsBadge = document.getElementById('scanDetailsBadge');
+        const scanDetailsMetrics = document.getElementById('scanDetailsMetrics');
+        const scanDetailsTitle = document.getElementById('scanDetailsTitle');
+        const scanDetailsUrl = document.getElementById('scanDetailsUrl');
+        const scanDetailsDesc = document.getElementById('scanDetailsDesc');
+        const scanDetailsHints = document.getElementById('scanDetailsHints');
+
+        const ISSUE_LABELS = {
+            missing_title: 'Geen <title>',
+            title_too_long: 'Title te lang',
+            title_too_short: 'Title te kort',
+            duplicate_title: 'Dubbele title',
+            missing_meta_desc: 'Meta description ontbreekt',
+            meta_desc_too_long: 'Meta description te lang',
+            meta_desc_too_short: 'Meta description te kort',
+            duplicate_meta_desc: 'Dubbele meta description',
+            missing_h1: 'Geen H1',
+            multiple_h1: 'Meerdere H1',
+            thin_content: 'Weinig content',
+            missing_alt: 'Alt ontbreekt',
+            missing_img_dimensions: 'Afbeelding mist width/height',
+            missing_canonical: 'Canonical ontbreekt'
+        };
+
+        function updateScanModeUI() {
+            const mode = scanMode.value;
+            scanFolderWrap.style.display = mode === 'folder' ? 'block' : 'none';
+            scanUrlsWrap.style.display = mode === 'urls' ? 'block' : 'none';
+        }
+
+        scanMode.addEventListener('change', updateScanModeUI);
+        updateScanModeUI();
+
+        function readFileText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result || ''));
+                reader.onerror = () => reject(reader.error || new Error('File read error'));
+                reader.readAsText(file);
+            });
+        }
+
+        function clamp(num, min, max) {
+            return Math.max(min, Math.min(max, num));
+        }
+
+        function getBaseHost(baseUrl) {
+            if (!baseUrl) return '';
+            try { return new URL(baseUrl).host; } catch { return ''; }
+        }
+
+        function normalizePathInput(line) {
+            const v = String(line || '').trim();
+            if (!v) return '';
+            return v;
+        }
+
+        function derivePageIdFromUrl(url) {
+            try {
+                const u = new URL(url);
+                const parts = u.pathname.split('/').filter(Boolean);
+                if (parts.length === 0) return 'index.html';
+                const last = parts[parts.length - 1];
+                return last.includes('.') ? last : `${last}.html`;
+            } catch {
+                const tail = String(url || '').split('/').filter(Boolean).pop() || 'index.html';
+                return tail.includes('.') ? tail : `${tail}.html`;
+            }
+        }
+
+        function severityRank(sev) {
+            if (sev === 'crit') return 0;
+            if (sev === 'warn') return 1;
+            return 2;
+        }
+
+        function scoreClass(score) {
+            if (score >= 85) return 'ok';
+            if (score >= 70) return 'warn';
+            return 'crit';
+        }
+
+        function analyzePage({ html, pageId, pageUrl, baseHost }) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Remove heavy nodes for text analysis
+            doc.querySelectorAll('script, style, noscript').forEach((el) => el.remove());
+
+            const title = String(doc.title || '').trim();
+            const metaDesc = String(doc.querySelector('meta[name=\"description\"]')?.getAttribute('content') || '').trim();
+            const canonical = String(doc.querySelector('link[rel=\"canonical\"]')?.getAttribute('href') || '').trim();
+            const robots = String(doc.querySelector('meta[name=\"robots\"]')?.getAttribute('content') || '').trim();
+
+            const h1s = Array.from(doc.querySelectorAll('h1'))
+                .map((h) => String(h.textContent || '').trim())
+                .filter(Boolean);
+
+            const rawText = String(doc.body ? doc.body.textContent : '').replace(/\s+/g, ' ').trim();
+            const wordCount = rawText ? rawText.split(' ').length : 0;
+
+            const images = Array.from(doc.querySelectorAll('img'));
+            let missingAlt = 0;
+            let missingSize = 0;
+
+            images.forEach((img) => {
+                const src = String(img.getAttribute('src') || '').trim();
+                if (!src) return;
+                const key = imgKey({ file: pageId, src });
+                const override = imageOverrides[key] || {};
+                const effectiveAlt = String((typeof override.alt === 'string' ? override.alt : img.getAttribute('alt')) || '').trim();
+
+                if (!effectiveAlt) missingAlt++;
+
+                const w = String(img.getAttribute('width') || '').trim();
+                const h = String(img.getAttribute('height') || '').trim();
+                if (!w || !h) missingSize++;
+            });
+
+            const links = Array.from(doc.querySelectorAll('a[href]'));
+            let internalLinks = 0;
+            let externalLinks = 0;
+
+            links.forEach((a) => {
+                const href = String(a.getAttribute('href') || '').trim();
+                if (!href) return;
+                if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) return;
+
+                if (/^https?:\/\//i.test(href)) {
+                    try {
+                        const u = new URL(href);
+                        if (baseHost && u.host === baseHost) internalLinks++;
+                        else externalLinks++;
+                    } catch {
+                        externalLinks++;
+                    }
+                    return;
+                }
+
+                internalLinks++;
+            });
+
+            const issues = [];
+            let score = 100;
+
+            function addIssue(sev, code, message, penalty) {
+                if (typeof penalty === 'number') score -= penalty;
+                issues.push({ sev, code, message });
+            }
+
+            if (!title) addIssue('crit', 'missing_title', 'Geen <title> gevonden.', 20);
+            if (title) {
+                if (title.length > 60) addIssue('warn', 'title_too_long', `Title is ${title.length} tekens (max ~60).`, 4);
+                if (title.length < 15) addIssue('warn', 'title_too_short', `Title is ${title.length} tekens (min ~15).`, 3);
+            }
+
+            if (!metaDesc) addIssue('warn', 'missing_meta_desc', 'Meta description ontbreekt.', 10);
+            if (metaDesc) {
+                if (metaDesc.length > 160) addIssue('warn', 'meta_desc_too_long', `Meta description is ${metaDesc.length} tekens (max ~160).`, 3);
+                if (metaDesc.length < 70) addIssue('warn', 'meta_desc_too_short', `Meta description is ${metaDesc.length} tekens (min ~70).`, 2);
+            }
+
+            if (h1s.length === 0) addIssue('crit', 'missing_h1', 'Geen H1 gevonden.', 12);
+            if (h1s.length > 1) addIssue('warn', 'multiple_h1', `Meerdere H1's gevonden (${h1s.length}).`, 5);
+
+            if (wordCount < 200) addIssue('warn', 'thin_content', `Weinig content (${wordCount} woorden).`, 3);
+
+            if (missingAlt > 0) addIssue('warn', 'missing_alt', `${missingAlt} afbeelding(en) missen alt-tekst.`, clamp(missingAlt, 1, 10));
+            if (missingSize > 0) addIssue('warn', 'missing_img_dimensions', `${missingSize} afbeelding(en) missen width/height.`, clamp(Math.round(missingSize / 2), 1, 6));
+
+            if (!canonical) addIssue('warn', 'missing_canonical', 'Canonical ontbreekt (aanbevolen).', 2);
+
+            score = clamp(Math.round(score), 0, 100);
+            issues.sort((a, b) => severityRank(a.sev) - severityRank(b.sev));
+
+            return {
+                id: pageId,
+                url: pageUrl,
+                title,
+                metaDesc,
+                canonical,
+                robots,
+                h1s,
+                wordCount,
+                imagesTotal: images.length,
+                missingAlt,
+                missingSize,
+                internalLinks,
+                externalLinks,
+                score,
+                issues
+            };
+        }
+
+        function applyDuplicateIssues(pages) {
+            const byTitle = new Map();
+            const byDesc = new Map();
+
+            pages.forEach((p) => {
+                const t = (p.title || '').trim();
+                const d = (p.metaDesc || '').trim();
+                if (t) byTitle.set(t, (byTitle.get(t) || []).concat([p]));
+                if (d) byDesc.set(d, (byDesc.get(d) || []).concat([p]));
+            });
+
+            byTitle.forEach((list) => {
+                if (list.length < 2) return;
+                list.forEach((p) => {
+                    p.score = clamp(p.score - 3, 0, 100);
+                    p.issues.push({ sev: 'warn', code: 'duplicate_title', message: "Dubbele title op meerdere pagina's." });
+                });
+            });
+
+            byDesc.forEach((list) => {
+                if (list.length < 2) return;
+                list.forEach((p) => {
+                    p.score = clamp(p.score - 2, 0, 100);
+                    p.issues.push({ sev: 'warn', code: 'duplicate_meta_desc', message: "Dubbele meta description op meerdere pagina's." });
+                });
+            });
+
+            pages.forEach((p) => p.issues.sort((a, b) => severityRank(a.sev) - severityRank(b.sev)));
+        }
+
+        function summarizeScan(pages) {
+            const total = pages.length;
+            const avg = total ? Math.round(pages.reduce((acc, p) => acc + p.score, 0) / total) : 0;
+            let critical = 0;
+            let warnings = 0;
+            let totalIssues = 0;
+
+            pages.forEach((p) => {
+                p.issues.forEach((i) => {
+                    totalIssues++;
+                    if (i.sev === 'crit') critical++;
+                    else warnings++;
+                });
+            });
+
+            return { total, avg, critical, warnings, totalIssues };
+        }
+
+        function aggregateIssues(pages) {
+            const map = new Map();
+            pages.forEach((p) => {
+                p.issues.forEach((i) => {
+                    const key = i.code;
+                    const entry = map.get(key) || { code: key, sev: i.sev, count: 0, pages: [] };
+                    entry.count++;
+                    if (entry.pages.length < 4) entry.pages.push(p.id);
+                    map.set(key, entry);
+                });
+            });
+            return Array.from(map.values()).sort((a, b) => {
+                const sevA = severityRank(a.sev);
+                const sevB = severityRank(b.sev);
+                if (sevA !== sevB) return sevA - sevB;
+                return b.count - a.count;
+            });
+        }
+
+        function renderScanReport(report) {
+            const pages = report.pages.slice().sort((a, b) => a.score - b.score);
+            const summary = report.summary;
+            const issuesAgg = report.issuesAgg;
+
+            scanStatPages.textContent = String(summary.total);
+            scanStatAvg.textContent = String(summary.avg);
+            scanStatCritical.textContent = String(summary.critical);
+            scanStatWarnings.textContent = String(summary.warnings);
+
+            scanIssuesBadge.textContent = `${summary.totalIssues} issues`;
+            scanBadge.textContent = report.scannedAt;
+            downloadReportBtn.disabled = false;
+
+            scanPageList.innerHTML = '';
+            if (pages.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'hint';
+                empty.style.paddingTop = '0.5rem';
+                empty.textContent = 'Nog geen scan uitgevoerd.';
+                scanPageList.appendChild(empty);
+            } else {
+                pages.forEach((p) => {
+                    const critCount = p.issues.filter((x) => x.sev === 'crit').length;
+                    const warnCount = p.issues.filter((x) => x.sev !== 'crit').length;
+                    const scorePill = scoreClass(p.score);
+                    const issuesPill = critCount > 0 ? 'crit' : (warnCount > 0 ? 'warn' : 'ok');
+
+                    const item = document.createElement('div');
+                    item.className = 'list-item magnetic';
+                    item.dataset.pageId = p.id;
+                    item.innerHTML = `
+                        <div style="min-width:0;">
+                            <div class="list-title">${escapeHtml(p.id)}</div>
+                            <div class="list-sub">Title: ${escapeHtml(p.title || '(leeg)')} • H1: ${escapeHtml(p.h1s[0] || '(geen)')}</div>
+                        </div>
+                        <div style="display:flex; gap:0.5rem; align-items:center;">
+                            <span class="pill ${scorePill}">Score ${p.score}</span>
+                            <span class="pill ${issuesPill}">${critCount + warnCount} issues</span>
+                        </div>
+                    `;
+                    item.addEventListener('click', () => setScanDetails(p));
+                    scanPageList.appendChild(item);
+                });
+
+                // Auto-select worst page
+                setScanDetails(pages[0]);
+            }
+
+            scanIssueList.innerHTML = '';
+            if (issuesAgg.length === 0) {
+                const ok = document.createElement('div');
+                ok.className = 'hint';
+                ok.style.paddingTop = '0.5rem';
+                ok.textContent = 'Geen issues gevonden. Dit is zeldzaam, maar mooi.';
+                scanIssueList.appendChild(ok);
+            } else {
+                issuesAgg.forEach((it) => {
+                    const pill = it.sev === 'crit' ? 'crit' : 'warn';
+                    const title = ISSUE_LABELS[it.code] || it.code;
+                    const item = document.createElement('div');
+                    item.className = 'list-item';
+                    item.innerHTML = `
+                        <div style="min-width:0;">
+                            <div class="list-title">${escapeHtml(title)}</div>
+                            <div class="list-sub">Voorbeeld: ${escapeHtml(it.pages.join(', '))}</div>
+                        </div>
+                        <span class="pill ${pill}">${it.count}</span>
+                    `;
+                    scanIssueList.appendChild(item);
+                });
+            }
+        }
+
+        function setScanDetails(page) {
+            if (!page) return;
+            scanDetailsBadge.textContent = page.id;
+            scanDetailsTitle.textContent = page.title || 'Titel ontbreekt';
+            scanDetailsUrl.textContent = page.url || page.id;
+            scanDetailsDesc.textContent = page.metaDesc || 'Meta description ontbreekt';
+
+            scanDetailsMetrics.innerHTML = '';
+            const metrics = [
+                `Score: ${page.score}`,
+                `Woorden: ${page.wordCount}`,
+                `H1: ${page.h1s.length}`,
+                `Afbeeldingen: ${page.imagesTotal}`,
+                `Alt ontbreekt: ${page.missingAlt}`,
+                `Links: ${page.internalLinks} intern / ${page.externalLinks} extern`
+            ];
+            metrics.forEach((t) => {
+                const el = document.createElement('div');
+                el.className = 'metric';
+                el.textContent = t;
+                scanDetailsMetrics.appendChild(el);
+            });
+
+            const topIssues = page.issues.slice(0, 4).map((i) => `• ${i.message}`).join('\\n');
+            scanDetailsHints.textContent = topIssues || 'Geen issues voor deze pagina.';
+        }
+
+        function buildScanTargetsFromFolder(files) {
+            const byName = new Map();
+            files.forEach((f) => {
+                const name = String(f.name || '').trim();
+                if (!name.toLowerCase().endsWith('.html')) return;
+                if (!byName.has(name)) byName.set(name, f);
+            });
+
+            let list = Array.from(byName.entries()).map(([name, file]) => ({ type: 'file', id: name, file }));
+            if (scanPublicOnly.checked) {
+                list = list.filter((t) => PUBLIC_PAGES.includes(t.id));
+            }
+
+            return list.sort((a, b) => a.id.localeCompare(b.id));
+        }
+
+        function buildScanTargetsFromUrls() {
+            const base = normalizeBaseUrl(scanBaseUrlInput.value || '');
+            const baseHost = getBaseHost(base);
+            const lines = String(scanUrlList.value || '').split(/\r?\n/).map(normalizePathInput).filter(Boolean);
+
+            let urls = lines.map((line) => {
+                if (/^https?:\/\//i.test(line)) return line;
+                if (!base) return line;
+                if (line.startsWith('/')) return base.replace(/\/$/, '') + line;
+                return base + line;
+            });
+
+            if (scanPublicOnly.checked) {
+                const allowed = new Set(PUBLIC_PAGES);
+                urls = urls.filter((u) => allowed.has(derivePageIdFromUrl(u)));
+            }
+
+            const targets = urls.map((url) => ({ type: 'url', url, id: derivePageIdFromUrl(url), baseHost }));
+            return { base, baseHost, targets };
+        }
+
+        let lastScanReport = null;
+
+        async function startSeoScan() {
+            const startBtnOriginal = startScanBtn.innerHTML;
+            startScanBtn.disabled = true;
+            startScanBtn.innerHTML = `
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 4H6a2 2 0 00-2 2v4m14-6h-4m4 0a2 2 0 012 2v4m-2 10h-4m4 0a2 2 0 002-2v-4M6 20h4m-4 0a2 2 0 01-2-2v-4m6-4l2-2m0 0l2 2m-2-2v8"/>
+                </svg>
+                Scannen...
+            `;
+
+            downloadReportBtn.disabled = true;
+            scanProgress.textContent = 'Scan wordt voorbereid...';
+            if (scanProgressFill) scanProgressFill.style.width = '0%';
+            scanPageList.innerHTML = '';
+            scanIssueList.innerHTML = '';
+            scanBadge.textContent = 'Scannen...';
+            scanIssuesBadge.textContent = '...';
+
+            const mode = scanMode.value;
+            const scannedAt = new Date().toLocaleString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+
+            let pages = [];
+            let baseHost = '';
+            let base = '';
+            let finalProgressText = '';
+
+            try {
+                if (mode === 'folder') {
+                    const files = Array.from(scanFolder.files || []);
+                    const targets = buildScanTargetsFromFolder(files);
+                    if (targets.length === 0) {
+                        // Fallback: try scanning the public pages via fetch (works when hosted or when file:// allows it).
+                        const autoTargets = (scanPublicOnly.checked ? PUBLIC_PAGES : PUBLIC_PAGES).map((id) => ({ id, url: id }));
+                        scanProgress.textContent = "Geen map geselecteerd. Probeer publieke pagina's te scannen...";
+
+                        const baseDir = (() => {
+                            try { return new URL('.', window.location.href).toString(); } catch { return ''; }
+                        })();
+
+                        for (let i = 0; i < autoTargets.length; i++) {
+                            const t = autoTargets[i];
+                            const pageUrl = baseDir ? new URL(t.url, baseDir).toString() : t.url;
+                            scanProgress.textContent = `Scannen (${i + 1}/${autoTargets.length}): ${t.id}`;
+                            if (scanProgressFill) scanProgressFill.style.width = `${Math.round(((i + 1) / autoTargets.length) * 100)}%`;
+                            try {
+                                const res = await fetch(pageUrl, { cache: 'no-store' });
+                                const html = await res.text();
+                                pages.push(analyzePage({ html, pageId: t.id, pageUrl, baseHost: '' }));
+                            } catch (err) {
+                                pages.push({
+                                    id: t.id,
+                                    url: pageUrl,
+                                    title: '',
+                                    metaDesc: '',
+                                    canonical: '',
+                                    robots: '',
+                                    h1s: [],
+                                    wordCount: 0,
+                                    imagesTotal: 0,
+                                    missingAlt: 0,
+                                    missingSize: 0,
+                                    internalLinks: 0,
+                                    externalLinks: 0,
+                                    score: 0,
+                                    issues: [{ sev: 'crit', code: 'scan_error', message: 'Kon pagina niet laden. Kies de map om lokaal te scannen.' }]
+                                });
+                            }
+                        }
+
+                        if (pages.every((p) => p.issues.some((i) => i.code === 'scan_error'))) {
+                            finalProgressText = "Lokale scan via fetch is geblokkeerd. Kies de `Softora.nl` map om te scannen.";
+                        }
+                    }
+
+                    if (targets.length > 0) {
+                        for (let i = 0; i < targets.length; i++) {
+                            const t = targets[i];
+                            scanProgress.textContent = `Scannen (${i + 1}/${targets.length}): ${t.id}`;
+                            if (scanProgressFill) scanProgressFill.style.width = `${Math.round(((i + 1) / targets.length) * 100)}%`;
+                            try {
+                                const html = await readFileText(t.file);
+                                pages.push(analyzePage({ html, pageId: t.id, pageUrl: t.id, baseHost: '' }));
+                            } catch (err) {
+                                pages.push({
+                                    id: t.id,
+                                    url: t.id,
+                                    title: '',
+                                    metaDesc: '',
+                                    canonical: '',
+                                    robots: '',
+                                    h1s: [],
+                                    wordCount: 0,
+                                    imagesTotal: 0,
+                                    missingAlt: 0,
+                                    missingSize: 0,
+                                    internalLinks: 0,
+                                    externalLinks: 0,
+                                    score: 0,
+                                    issues: [{ sev: 'crit', code: 'scan_error', message: 'Kon pagina niet lezen.' }]
+                                });
+                            }
+                        }
+                    }
+                } else {
+                    const built = buildScanTargetsFromUrls();
+                    base = built.base;
+                    baseHost = built.baseHost;
+                    const targets = built.targets;
+
+                    if (targets.length === 0) {
+                        scanProgress.textContent = "Geen URL's ingevuld om te scannen.";
+                        if (scanProgressFill) scanProgressFill.style.width = '0%';
+                        scanBadge.textContent = 'Nog niet gescand';
+                        scanIssuesBadge.textContent = '0 issues';
+                        scanPageList.innerHTML = '<div class="hint" style="padding-top: 0.5rem;">Vul minimaal 1 URL in (1 per regel) of gebruik Lokale map.</div>';
+                        scanIssueList.innerHTML = '<div class="hint" style="padding-top: 0.5rem;">Geen scan uitgevoerd.</div>';
+                        return;
+                    }
+
+                    for (let i = 0; i < targets.length; i++) {
+                        const t = targets[i];
+                        scanProgress.textContent = `Scannen (${i + 1}/${targets.length}): ${t.url}`;
+                        if (scanProgressFill) scanProgressFill.style.width = `${Math.round(((i + 1) / targets.length) * 100)}%`;
+                        try {
+                            const res = await fetch(t.url, { cache: 'no-store' });
+                            const html = await res.text();
+                            pages.push(analyzePage({ html, pageId: t.id, pageUrl: t.url, baseHost }));
+                        } catch (err) {
+                            pages.push({
+                                id: t.id,
+                                url: t.url,
+                                title: '',
+                                metaDesc: '',
+                                canonical: '',
+                                robots: '',
+                                h1s: [],
+                                wordCount: 0,
+                                imagesTotal: 0,
+                                missingAlt: 0,
+                                missingSize: 0,
+                                internalLinks: 0,
+                                externalLinks: 0,
+                                score: 0,
+                                issues: [{ sev: 'crit', code: 'scan_error', message: 'Kon pagina niet laden (CORS/offline?).' }]
+                            });
+                        }
+                    }
+                }
+
+                applyDuplicateIssues(pages);
+                const summary = summarizeScan(pages);
+                const issuesAgg = aggregateIssues(pages);
+
+                lastScanReport = { scannedAt, summary, pages, issuesAgg, base };
+                scanProgress.textContent = finalProgressText || `Klaar. ${summary.total} pagina's gescand.`;
+                if (scanProgressFill) scanProgressFill.style.width = '100%';
+                renderScanReport(lastScanReport);
+            } catch (err) {
+                scanProgress.textContent = 'Scan mislukt door een fout. Open de console voor details.';
+                if (scanProgressFill) scanProgressFill.style.width = '0%';
+                // eslint-disable-next-line no-console
+                console.error(err);
+            } finally {
+                startScanBtn.innerHTML = startBtnOriginal;
+                startScanBtn.disabled = false;
+            }
+        }
+
+        startScanBtn.addEventListener('click', () => {
+            startSeoScan();
+        });
+
+        downloadReportBtn.addEventListener('click', () => {
+            if (!lastScanReport) return;
+            downloadText('softora-seo-scan-report.json', JSON.stringify(lastScanReport, null, 2));
+        });
+
+        // EXPORT / IMPORT / RESET
+        document.getElementById('exportAllBtn').addEventListener('click', () => {
+            const payload = {
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                images: loadStore(STORAGE_KEYS.images, {}),
+                blogs: loadStore(STORAGE_KEYS.blogs, []),
+                kb: loadStore(STORAGE_KEYS.kb, [])
+            };
+            downloadText('softora-seo-crm-export.json', JSON.stringify(payload, null, 2));
+        });
+
+        document.getElementById('importFile').addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const text = await file.text();
+            const data = safeJsonParse(text, null);
+            if (!data || typeof data !== 'object') return;
+
+            if (data.images) saveStore(STORAGE_KEYS.images, data.images);
+            if (Array.isArray(data.blogs)) saveStore(STORAGE_KEYS.blogs, data.blogs);
+            if (Array.isArray(data.kb)) saveStore(STORAGE_KEYS.kb, data.kb);
+
+            window.location.reload();
+        });
+
+        document.getElementById('resetAllBtn').addEventListener('click', () => {
+            localStorage.removeItem(STORAGE_KEYS.images);
+            localStorage.removeItem(STORAGE_KEYS.blogs);
+            localStorage.removeItem(STORAGE_KEYS.kb);
+            window.location.reload();
+        });
+
+        // Initial render
+        renderImages();
+        renderBlogList();
+        renderKbList();
+
+	        // Cursor
+	        const cursor = document.querySelector('.cursor');
+	        const cursorDot = document.querySelector('.cursor-dot');
+	        const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+	        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	        const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+
+	        if (enablePointerFx) {
+	            let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0, dotX = 0, dotY = 0;
+	            let cursorRafId = null;
+	            let isHoveringMagnetic = false;
+
+	            // One listener that works for dynamic DOM (lists, scan results, etc.)
+	            document.addEventListener('mousemove', (e) => {
+	                mouseX = e.clientX;
+	                mouseY = e.clientY;
+	                const hovering = !!(e.target && e.target.closest && e.target.closest('.magnetic'));
+	                if (hovering !== isHoveringMagnetic) {
+	                    isHoveringMagnetic = hovering;
+	                    cursor.classList.toggle('hover', hovering);
+	                }
+	            }, { passive: true });
+
+	            window.addEventListener('blur', () => {
+	                isHoveringMagnetic = false;
+	                cursor.classList.remove('hover');
+	            });
+
+	            function animateCursor() {
+	                cursorX += (mouseX - cursorX) * 0.15;
+	                cursorY += (mouseY - cursorY) * 0.15;
+	                cursor.style.left = cursorX + 'px';
+	                cursor.style.top = cursorY + 'px';
+	                dotX += (mouseX - dotX) * 0.5;
+	                dotY += (mouseY - dotY) * 0.5;
+	                cursorDot.style.left = dotX + 'px';
+	                cursorDot.style.top = dotY + 'px';
+	                cursorRafId = requestAnimationFrame(animateCursor);
+	            }
+
+	            function startCursorLoop() {
+	                if (cursorRafId === null) {
+	                    cursorRafId = requestAnimationFrame(animateCursor);
+	                }
+	            }
+
+	            function stopCursorLoop() {
+	                if (cursorRafId !== null) {
+	                    cancelAnimationFrame(cursorRafId);
+	                    cursorRafId = null;
+	                }
+	            }
+
+	            startCursorLoop();
+
+	            document.addEventListener('visibilitychange', () => {
+	                if (document.hidden) stopCursorLoop();
+	                else startCursorLoop();
+	            });
+	        } else {
+	            cursor.style.display = 'none';
+	            cursorDot.style.display = 'none';
+	            document.body.style.cursor = 'auto';
+	            document.querySelectorAll('.magnetic').forEach((elem) => { elem.style.cursor = 'pointer'; });
+	        }
+	    </script>
+	</body>
+</html>

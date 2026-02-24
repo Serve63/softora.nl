@@ -1,0 +1,96 @@
+{
+  "seed": 2348405419,
+  "run_id": "cli-1770826496912-zdzpks",
+  "layoutVariant": 9,
+  "layout_variant": 9,
+  "layoutVariantKey": "minimal-authority",
+  "layout_pattern": "minimal-authority",
+  "sectionOrder": [
+    "hero",
+    "process",
+    "benefits",
+    "trust",
+    "signatureA",
+    "faq",
+    "pain",
+    "value",
+    "signatureB",
+    "cta"
+  ],
+  "section_order": [
+    "hero",
+    "process",
+    "benefits",
+    "trust",
+    "signatureA",
+    "faq",
+    "pain",
+    "value",
+    "signatureB",
+    "cta"
+  ],
+  "typePair": 3,
+  "type_pair": 3,
+  "typography_pairing": {
+    "name": "humanist-clean",
+    "headings": "\"Gill Sans\", \"Trebuchet MS\", sans-serif",
+    "body": "\"Segoe UI\", Tahoma, sans-serif"
+  },
+  "spacingScale": "wide",
+  "spacing_scale": "wide",
+  "borderRadius": "20px",
+  "border_radius": "20px",
+  "gridStyle": "editorial",
+  "grid_style": "editorial",
+  "buttonStyle": "underline",
+  "button_style": "underline",
+  "cardStyle": "glass",
+  "card_style": "glass",
+  "signatureSections": [
+    "Demo Qualifier Flow",
+    "Product Tour Cards met Beslispunten"
+  ],
+  "signature_sections": [
+    "Demo Qualifier Flow",
+    "Product Tour Cards met Beslispunten"
+  ],
+  "signature_payload": {
+    "a": {
+      "id": "demo-qualifier",
+      "title": "Demo Qualifier Flow",
+      "lead": "Filtert intentie vooraf zodat gesprekken sneller inhoudelijk worden.",
+      "bullets": [
+        "Vooraf kernvragen in de contactflow.",
+        "Minder algemene aanvragen, meer bruikbare context.",
+        "Kortere route naar beslisinformatie."
+      ]
+    },
+    "b": {
+      "id": "product-tour",
+      "title": "Product Tour Cards met Beslispunten",
+      "lead": "Geen featuredump, wel een route waarin elke stap eindigt in een concrete actie.",
+      "bullets": [
+        "Start met context en pijn, niet met losse functionaliteit.",
+        "Koppel capability aan een zakelijke uitkomst.",
+        "Sluit af met één heldere vervolgstap."
+      ]
+    }
+  },
+  "microinteractions": "subtiele reveal, duidelijke focus, functionele hover-feedback",
+  "animation_rules": "subtiel, functioneel, geen circus",
+  "palette": {
+    "bg": "#f7f6f2",
+    "surface": "#ffffff",
+    "text": "#111426",
+    "muted": "#5f647d",
+    "border": "rgba(17,20,38,0.12)",
+    "accent": "#6477f0",
+    "accentAlt": "#4a5fd7"
+  },
+  "concept_id": "authority-atelier",
+  "mood_words": [
+    "high-trust",
+    "disciplined",
+    "strategic"
+  ]
+}

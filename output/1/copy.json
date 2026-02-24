@@ -1,0 +1,190 @@
+{
+  "brand": "Kapsalon Mooi",
+  "city": "Breda",
+  "businessType": "Website Kapper met Online Booking",
+  "conceptName": "Authority Atelier",
+  "conceptVibe": "strak, strategisch, beslisgericht",
+  "toneDirection": "premium en kalm",
+  "hero": {
+    "kicker": "Breda",
+    "titleTop": "Website Kapper",
+    "titleAccent": "met Online Booking",
+    "claim": "Van eerste indruk naar aanvraag, zonder ruis in het beslismoment.",
+    "subtitle": "Sneller begrip van het aanbod bij nieuwe bezoekers. Voor klanten die stijlvol resultaat willen en direct online willen boeken.",
+    "primaryCta": "Vraag offerte",
+    "secondaryCta": "Bekijk aanpak"
+  },
+  "valueLadder": [
+    "Heldere propositie die direct vertrouwen opbouwt.",
+    "Praktische route van interesse naar intake.",
+    "Commerciële copy die bezoekers laat kiezen in plaats van twijfelen."
+  ],
+  "challengeCards": [
+    {
+      "title": "Van knelpunt naar richting 1",
+      "problem": "Bezoekers begrijpen het aanbod niet snel genoeg.",
+      "outcome": "Sneller begrip van het aanbod bij nieuwe bezoekers."
+    },
+    {
+      "title": "Van knelpunt naar richting 2",
+      "problem": "De route naar contact is te lang of te vaag.",
+      "outcome": "Meer contactaanvragen met betere intentie."
+    },
+    {
+      "title": "Van knelpunt naar richting 3",
+      "problem": "Belangrijke bezwaren worden niet vooraf behandeld.",
+      "outcome": "Sterkere merkbeleving zonder visuele ruis."
+    },
+    {
+      "title": "Van knelpunt naar richting 4",
+      "problem": "Mobiele bezoekers haken af vóór ze actie nemen.",
+      "outcome": "Duidelijke beslisroute met sterke CTA-momenten."
+    },
+    {
+      "title": "Van knelpunt naar richting 5",
+      "problem": "De website ondersteunt groei onvoldoende.",
+      "outcome": "Een schaalbare contentbasis voor toekomstige groei."
+    }
+  ],
+  "benefits": [
+    "Boodschap en UX wijzen direct naar de juiste demo-actie.",
+    "Use-case inhoud per beslisser voorkomt algemene productpraat.",
+    "CTA-hiërarchie verlaagt frictie tussen interesse en gesprek.",
+    "Commerciële copy en productinhoud blijven consistent over alle pagina’s.",
+    "Navigatie is ontworpen voor snelle evaluatie op mobiel én desktop.",
+    "Elke sectie behandelt een echt bezwaar vóór het salesgesprek."
+  ],
+  "localBenefits": [
+    "Bezoekers zien direct wat je levert en waarom dat relevant is.",
+    "Keuzehulp-secties zetten twijfel om in een concrete vervolgstap.",
+    "Structuur en copy sturen naar kwalitatieve aanvragen, niet losse vragen.",
+    "Mobiele flow is leidend zodat lokale zoekers direct kunnen handelen.",
+    "Procesuitleg en verwachtingen bouwen vertrouwen vóór contact.",
+    "CTA-momenten liggen op natuurlijke beslispunten in de pagina."
+  ],
+  "selectedBenefits": [
+    "Bezoekers zien direct wat je levert en waarom dat relevant is.",
+    "Keuzehulp-secties zetten twijfel om in een concrete vervolgstap.",
+    "Structuur en copy sturen naar kwalitatieve aanvragen, niet losse vragen.",
+    "Mobiele flow is leidend zodat lokale zoekers direct kunnen handelen.",
+    "Procesuitleg en verwachtingen bouwen vertrouwen vóór contact.",
+    "CTA-momenten liggen op natuurlijke beslispunten in de pagina."
+  ],
+  "process": [
+    {
+      "step": "01",
+      "title": "Intake",
+      "text": "Context, doelgroep en gewenste aanvragen scherp maken."
+    },
+    {
+      "step": "02",
+      "title": "Richting",
+      "text": "Visuele en tekstuele lijn bepalen op basis van klantbeslissingen."
+    },
+    {
+      "step": "03",
+      "title": "Keuzehulp",
+      "text": "Aanbod structureren zodat bezoekers sneller een route kiezen."
+    },
+    {
+      "step": "04",
+      "title": "Uitwerking",
+      "text": "Complete paginastructuur bouwen met duidelijke CTA-momenten."
+    },
+    {
+      "step": "05",
+      "title": "Oplevering",
+      "text": "Kwaliteitscontrole op inhoud, techniek en gebruiksgemak."
+    }
+  ],
+  "trust": [
+    "Heldere verwachtingen over aanpak en vervolg.",
+    "Transparante scope zodat intakegesprekken direct inhoudelijk zijn.",
+    "Geen ruis in contactflow: elke CTA heeft een duidelijk doel.",
+    "Modulaire opbouw die meegroeit met nieuw aanbod."
+  ],
+  "faq": [
+    {
+      "q": "Wordt dit niet te standaard?",
+      "a": "Nee. De opbouw wordt per opdracht bepaald met een eigen stijlseed en branchegerichte copy."
+    },
+    {
+      "q": "Is dit vooral visueel of ook commercieel sterk?",
+      "a": "Commercieel sterk. Elke sectie ondersteunt een concrete vervolgstap."
+    },
+    {
+      "q": "Kunnen we later onderdelen aanpassen?",
+      "a": "Ja. De site is opgezet in heldere secties die eenvoudig aanpasbaar zijn."
+    },
+    {
+      "q": "Hoe snel kunnen we live?",
+      "a": "Zodra inhoud en richting akkoord zijn, staat er direct een volledige statische basis klaar."
+    },
+    {
+      "q": "Hoe voorkomen we onduidelijke aanvragen?",
+      "a": "Door keuzehulp en gerichte formulieren die bezoekers vooraf structureren."
+    },
+    {
+      "q": "Wat is de volgende stap na oplevering?",
+      "a": "Je gebruikt dezelfde structuur om campagnes, pagina’s of nieuwe proposities door te trekken."
+    }
+  ],
+  "signatureA": {
+    "title": "Aanpak Transparant in Fases",
+    "lead": "Maakt de route van eerste contact tot oplevering helder en voorspelbaar.",
+    "bullets": [
+      "Iedere fase heeft een concreet doel.",
+      "Verwachtingen staan vooraf duidelijk.",
+      "Meer rust in samenwerking."
+    ]
+  },
+  "signatureB": {
+    "title": "Scope Besliskader",
+    "lead": "Geeft bezoekers houvast in keuzes en voorkomt losse aanvragen zonder context.",
+    "bullets": [
+      "Aanbod vertaald naar praktische opties.",
+      "Duidelijk verschil tussen routes.",
+      "Snellere intakekwaliteit."
+    ]
+  },
+  "featureCards": [
+    {
+      "title": "Aanbodstructuur",
+      "text": "Diensten en keuzes staan in logische volgorde voor snelle beslissing."
+    },
+    {
+      "title": "Lokale Conversieflow",
+      "text": "Contactmomenten sluiten aan op intentie van lokale bezoekers."
+    },
+    {
+      "title": "Vertrouwensopbouw",
+      "text": "Proces en voorwaarden zijn helder vóór het eerste gesprek."
+    },
+    {
+      "title": "Mobiel Eerst",
+      "text": "Belangrijkste keuzes en CTA’s zijn direct bereikbaar op telefoon."
+    },
+    {
+      "title": "Bezwaarafhandeling",
+      "text": "FAQ en secties beantwoorden echte vragen die aanvragen blokkeren."
+    },
+    {
+      "title": "Uitbreidbare Basis",
+      "text": "Nieuwe diensten of acties zijn later zonder breuk toe te voegen."
+    }
+  ],
+  "aboutPoints": [
+    "We combineren commerciële copy met strakke visuele hiërarchie.",
+    "Elke pagina is gebouwd rondom beslismomenten, niet rondom opvulling.",
+    "We sturen op duidelijkheid, snelheid en kwalitatieve opvolgacties.",
+    "De structuur blijft beheersbaar wanneer je aanbod groeit."
+  ],
+  "contactPromise": "Binnen 1 werkdag reactie.",
+  "pages": [
+    "index.html",
+    "diensten.html",
+    "projecttypes.html",
+    "about.html",
+    "contact.html"
+  ]
+}

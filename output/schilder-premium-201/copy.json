@@ -1,0 +1,189 @@
+{
+  "brand": "Van Loon Schilderwerken",
+  "city": "Breda",
+  "businessType": "Schilder Website met Offerteflow",
+  "conceptName": "Campaign Laboratory",
+  "conceptVibe": "creative-marketing, bold-hooks, premium rhythm",
+  "hero": {
+    "kicker": "Breda",
+    "titleTop": "Schilder Website",
+    "titleAccent": "met Offerteflow",
+    "claim": "Zet schilderwerk om naar vertrouwen en concrete offerte-aanvragen zonder prijsraces.",
+    "subtitle": "Voor opdrachtgevers die kwaliteit, planning en afwerking vooraf helder willen hebben. Meer serieuze aanvragen met duidelijke projectcontext..",
+    "primaryCta": "Plan Opname",
+    "secondaryCta": "Bekijk Werkwijze"
+  },
+  "valueLadder": [
+    "Meer serieuze aanvragen met duidelijke projectcontext.",
+    "Heldere voorbereiding en opleverafspraken voorkomen verrassingen in uitvoering.",
+    "Keuzehulp voor binnenwerk, buitenwerk en houtafwerking."
+  ],
+  "painCards": [
+    {
+      "title": "Knelpunt 1",
+      "text": "Aanvragen komen binnen zonder duidelijke scope of timing.",
+      "outcome": "Meer serieuze aanvragen met duidelijke projectcontext."
+    },
+    {
+      "title": "Knelpunt 2",
+      "text": "Bezoekers twijfelen over afwerking en materiaalkeuze.",
+      "outcome": "Sneller vertrouwen door transparante aanpak en voorbereiding."
+    },
+    {
+      "title": "Knelpunt 3",
+      "text": "Kwaliteit is online niet concreet genoeg zichtbaar.",
+      "outcome": "Minder losse vragen door praktische keuzehulp."
+    },
+    {
+      "title": "Knelpunt 4",
+      "text": "Mobiele bezoekers haken af vóór ze contact opnemen.",
+      "outcome": "Sterkere lokale conversie op mobiel en desktop."
+    },
+    {
+      "title": "Knelpunt 5",
+      "text": "Verwachtingen over voorbereiding en planning blijven vaag.",
+      "outcome": "Premium uitstraling die vakmanschap inhoudelijk onderbouwt."
+    }
+  ],
+  "benefits": [
+    "Je website filtert beter op serieuze aanvragen in plaats van prijs-shoppers.",
+    "Bezoekers zien direct welke route past bij hun type klus.",
+    "Kwaliteit en werkwijze worden tastbaar zonder lange lappen tekst.",
+    "Veelgestelde vragen nemen twijfel over planning en overlast weg.",
+    "CTA's staan op logische punten waar bezoekers bereid zijn om te plannen.",
+    "Lokale uitstraling blijft professioneel en onderscheidend."
+  ],
+  "process": [
+    {
+      "step": "01",
+      "title": "Opname",
+      "text": "Situatie en ondergrond beoordelen, inclusief gewenste uitstraling en timing."
+    },
+    {
+      "step": "02",
+      "title": "Advies",
+      "text": "Materiaal, afwerking en aanpak kiezen op basis van gebruik en onderhoud."
+    },
+    {
+      "step": "03",
+      "title": "Planning",
+      "text": "Fases en randvoorwaarden vastzetten zodat uitvoering voorspelbaar blijft."
+    },
+    {
+      "step": "04",
+      "title": "Uitvoering",
+      "text": "Nette werkroutine met duidelijke communicatie per dagdeel."
+    },
+    {
+      "step": "05",
+      "title": "Oplevering",
+      "text": "Controle op afwerking, puntenlijst en overdracht van onderhoudsadvies."
+    }
+  ],
+  "trust": [
+    "Geen loze kwaliteitsclaims, wel transparantie over proces en keuzes.",
+    "Vooraf duidelijk over planning, voorbereiding en oplevermomenten.",
+    "Scope en verwachtingen zijn expliciet om discussie achteraf te voorkomen.",
+    "Informatie is geschreven voor woningeigenaren én zakelijke opdrachtgevers.",
+    "Keuzehulp voor binnenwerk, buitenwerk en houtafwerking.",
+    "Materiaalkeuze uitgelegd: primer, lak, dekking en onderhoud."
+  ],
+  "faq": [
+    {
+      "q": "Hoe houden jullie het project strak zonder eindeloze revisierondes?",
+      "a": "We werken met vaste beslismomenten per fase. Je krijgt per fase een heldere keuze met impact, zodat feedback concreet blijft en doorlooptijd voorspelbaar is."
+    },
+    {
+      "q": "Hoe voorkomen we dat de site mooi is maar niet converteert?",
+      "a": "Elke sectie krijgt een commerciële functie: aandacht pakken, bezwaar wegnemen of actie uitlokken. We schrijven eerst op basis van intentie, daarna pas op stijl."
+    },
+    {
+      "q": "Wat als onze input nog niet compleet is?",
+      "a": "We starten met een compacte intake en vullen gaten pragmatisch op met marktlogica. Onzekere punten worden expliciet gemaakt zodat je gericht kunt beslissen."
+    },
+    {
+      "q": "Hoe zit het met uitbreiding na livegang?",
+      "a": "De structuur is modulair opgezet. Nieuwe diensten, proposities of campagnes kunnen worden toegevoegd zonder volledige herbouw."
+    },
+    {
+      "q": "Wat gebeurt er als timing kritisch is?",
+      "a": "Planning wordt opgesplitst in harde opleverpunten met duidelijke afhankelijkheden. Zo weet je precies wat wanneer nodig is om livegang te halen."
+    },
+    {
+      "q": "Hoe borgen jullie kwaliteit op mobiel?",
+      "a": "De layout en copy worden mobile-first gecontroleerd op hiërarchie, leesritme en CTA-bereik, inclusief hover/focus/active states waar relevant."
+    },
+    {
+      "q": "Kunnen we vooraf weten wat onder voorbereiding valt?",
+      "a": "Ja, de website en intakeflow benoemen precies welke voorbereidingen wij uitvoeren en welke input van de klant nodig is."
+    },
+    {
+      "q": "Hoe gaan jullie om met veranderingen tijdens de klus?",
+      "a": "Wij werken met een duidelijke scope en beslismomenten. Wijzigingen worden besproken voordat uitvoering doorgaat."
+    }
+  ],
+  "signatureA": {
+    "id": "werkvolgorde",
+    "title": "Werkvolgorde van Opname tot Oplevering",
+    "lead": "Verwachtingen staan vooraf scherp waardoor trajecten rustiger verlopen.",
+    "bullets": [
+      "Vaste fases met beslismomenten.",
+      "Geen vage overgangen in planning.",
+      "Duidelijke route naar oplevering."
+    ]
+  },
+  "signatureB": {
+    "id": "planning-voorbereiding",
+    "title": "Planning & Voorbereiding in 5 Stappen",
+    "lead": "Laat exact zien wat jij regelt en wat de klant voorbereidt voor een soepele start.",
+    "bullets": [
+      "Heldere startvolgorde per projecttype.",
+      "Minder vertraging door concrete voorbereiding.",
+      "Transparante communicatiemomenten per fase."
+    ]
+  },
+  "featureCards": [
+    {
+      "title": "Kleur & Afwerking Keuzehulp",
+      "text": "Helpt bezoekers sneller kiezen op stijl, slijtvastheid en onderhoud."
+    },
+    {
+      "title": "Projecttype Routing",
+      "text": "Leidt woning, VvE en zakelijk vastgoed naar de juiste intakeflow."
+    },
+    {
+      "title": "Planningsoverzicht",
+      "text": "Toont een heldere fasestructuur met beslismomenten en doorlooptijdcontext."
+    },
+    {
+      "title": "Voorbereidingschecklist",
+      "text": "Maakt verantwoordelijkheden vooraf duidelijk voor minder ruis tijdens uitvoering."
+    },
+    {
+      "title": "Risico-reversal FAQ",
+      "text": "Beantwoordt vragen over overlast, kwaliteit en garanties in begrijpelijke taal."
+    },
+    {
+      "title": "Lokale Conversieblokken",
+      "text": "CTA's en copy sluiten aan op bezoekers die direct een opname willen plannen."
+    }
+  ],
+  "aboutPoints": [
+    "De site stuurt op vertrouwen door duidelijkheid, niet door opgeblazen claims.",
+    "Copy helpt opdrachtgevers beslissen op kwaliteit en aanpak, niet alleen op prijs.",
+    "Visuele hiërarchie houdt focus op de volgende logische actie.",
+    "Structuur is klaar voor uitbreiding met extra diensten of regio's.",
+    "Differentiator-hoek: Van vrijblijvende interesse naar concrete aanvraag met duidelijke voorbereiding en planning.",
+    "Praktische specifics: Materiaalkeuze uitgelegd: primer, lak, dekking en onderhoud."
+  ],
+  "directSpecifics": [
+    "Keuzehulp voor binnenwerk, buitenwerk en houtafwerking.",
+    "Materiaalkeuze uitgelegd: primer, lak, dekking en onderhoud.",
+    "Voorbereidingschecklist: wat wij doen en wat de klant regelt.",
+    "Planning per fase: opname, voorbereiding, uitvoering, oplevering.",
+    "Schriftelijke scope zodat meerwerk vooraf bespreekbaar wordt.",
+    "Contactformulier kwalificeert type object en gewenste termijn."
+  ],
+  "riskReversal": "Heldere voorbereiding en opleverafspraken voorkomen verrassingen in uitvoering.",
+  "contactPromise": "Binnen 1 werkdag reactie."
+}

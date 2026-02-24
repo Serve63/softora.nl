@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Softora | Waar Kom Je Voor?</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #f8f7f4;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #efeee9;
+            --accent: #1a1a2e;
+            --accent-light: #2d2d5e;
+            --accent-color: #4a5fd7;
+            --accent-color-glow: rgba(74, 95, 215, 0.2);
+            --accent-warm: #8B2252;
+            --accent-warm-glow: rgba(139, 34, 82, 0.2);
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b6b7b;
+            --text-tertiary: #a0a0b0;
+            --border: rgba(0, 0, 0, 0.08);
+            
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-power: cubic-bezier(0.87, 0, 0.13, 1);
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            cursor: none;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 0.95;
+        }
+
+        /* Noise */
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* Cursor */
+        .cursor {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.1s var(--ease-out-expo), 
+                        background 0.2s ease,
+                        width 0.3s var(--ease-out-expo),
+                        height 0.3s var(--ease-out-expo),
+                        border-color 0.3s ease;
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+        }
+
+        .cursor.hover {
+            width: 80px;
+            height: 80px;
+            background: var(--accent);
+            border-color: transparent;
+            mix-blend-mode: difference;
+        }
+
+        .cursor-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10001;
+            transform: translate(-50%, -50%);
+            transition: transform 0.02s linear;
+        }
+
+        /* Ambient */
+        .ambient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .ambient-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(150px);
+            opacity: 0.1;
+            transition: opacity 1s ease;
+        }
+
+        .blob-left {
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, var(--accent-warm-glow), transparent 60%);
+            bottom: -200px;
+            left: -200px;
+        }
+
+        .blob-right {
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, var(--accent-color-glow), transparent 60%);
+            top: -200px;
+            right: -200px;
+        }
+
+        /* Nav */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 2rem 4rem;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Oswald', sans-serif;
+        }
+
+        .logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            letter-spacing: -0.02em;
+            position: relative;
+        }
+
+        .logo::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--accent-color);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.4s var(--ease-out-expo);
+        }
+
+        .logo:hover::after {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+
+        /* Main content */
+        .decision-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 4.9rem 3rem 1.5rem;
+            min-height: 0;
+        }
+
+        .decision-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            opacity: 0;
+            transform: translateY(40px);
+            animation: fadeInUp 1s var(--ease-power) forwards;
+        }
+
+        .eyebrow {
+            display: inline-block;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.8rem;
+        }
+
+        .decision-header h1 {
+            font-size: clamp(1.1rem, 5.4vw, 4.2rem);
+            font-weight: 700;
+            line-height: 0.95;
+            margin-bottom: 0.8rem;
+            white-space: nowrap;
+        }
+
+        .decision-header p {
+            font-size: 0.96rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            max-width: none;
+            margin: 0 auto;
+            line-height: 1.55;
+            white-space: nowrap;
+        }
+
+        /* Cards */
+        .decision-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.4rem;
+            width: 100%;
+            max-width: 980px;
+            opacity: 0;
+            transform: translateY(40px);
+            animation: fadeInUp 1s var(--ease-power) 0.3s forwards;
+        }
+
+        .decision-card {
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            text-decoration: none;
+            color: var(--text-primary);
+            cursor: none;
+            transition: all 0.5s var(--ease-out-expo);
+            display: flex;
+            flex-direction: column;
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%);
+        }
+
+        .decision-card:hover {
+            transform: translateY(-8px);
+        }
+
+        .decision-card.card-websites:hover {
+            border-color: var(--accent-warm);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.08), 0 0 80px var(--accent-warm-glow);
+        }
+
+        .decision-card.card-software:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.08), 0 0 80px var(--accent-color-glow);
+        }
+
+        .card-software.is-locked {
+            border-color: rgba(74,95,215,0.2);
+            cursor: default;
+        }
+
+        .card-software.is-locked:hover {
+            transform: none;
+            border-color: rgba(74,95,215,0.2);
+            box-shadow: none;
+        }
+
+        /* Card image */
+        .card-image {
+            position: relative;
+            height: clamp(150px, 21vh, 220px);
+            overflow: hidden;
+        }
+
+        .card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: contrast(1.05) brightness(0.9);
+            transition: all 0.6s var(--ease-out-expo);
+        }
+
+        .decision-card:hover .card-image img {
+            transform: scale(1.05);
+            filter: contrast(1.05) brightness(0.85);
+        }
+
+        .card-software.is-locked .card-image img {
+            filter: grayscale(0.4) contrast(0.95) brightness(0.6);
+            transform: none;
+        }
+
+        .card-image-overlay {
+            position: absolute;
+            inset: 0;
+            transition: all 0.5s ease;
+        }
+
+        .card-websites .card-image-overlay {
+            background: linear-gradient(to bottom, transparent 30%, rgba(139,34,82,0.15) 100%),
+                        linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.6) 100%);
+        }
+
+        .card-software .card-image-overlay {
+            background: linear-gradient(to bottom, transparent 30%, rgba(74,95,215,0.15) 100%),
+                        linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.6) 100%);
+        }
+
+        .card-image-label {
+            position: absolute;
+            bottom: 0.9rem;
+            left: 1.2rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.55rem;
+            font-weight: 700;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+        }
+
+        .card-software-lock {
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.2rem;
+            pointer-events: none;
+            background: linear-gradient(to bottom, rgba(26, 26, 46, 0.1), rgba(26, 26, 46, 0.5));
+        }
+
+        .card-software-lock-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.84rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            color: #fff;
+            padding: 0.6rem 0.95rem;
+            background: rgba(26, 26, 46, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            backdrop-filter: blur(4px);
+        }
+
+        .card-software-lock-badge svg {
+            width: 15px;
+            height: 15px;
+            flex-shrink: 0;
+        }
+
+        /* Card body */
+        .card-body {
+            padding: 1.35rem 1.35rem 1.2rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-body p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.55;
+            font-weight: 300;
+            margin-bottom: 1.1rem;
+        }
+
+        .card-software.is-locked .card-body {
+            opacity: 0.42;
+        }
+
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .card-tag {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.66rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.26rem 0.62rem;
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            transition: all 0.3s;
+        }
+
+        .card-websites:hover .card-tag {
+            border-color: rgba(139,34,82,0.2);
+            color: var(--accent-warm);
+        }
+
+        .card-software:hover .card-tag {
+            border-color: rgba(74,95,215,0.2);
+            color: var(--accent-color);
+        }
+
+        .card-software.is-locked:hover .card-tag {
+            border-color: var(--border);
+            color: var(--text-tertiary);
+        }
+
+        .card-cta {
+            margin-top: auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 0.95rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .card-cta-text {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.92rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.3s;
+        }
+
+        .card-websites .card-cta-text { color: var(--accent-warm); }
+        .card-software .card-cta-text { color: var(--accent-color); }
+
+        .card-cta-arrow {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--border);
+            transition: all 0.4s var(--ease-out-expo);
+            flex-shrink: 0;
+        }
+
+        .card-cta-arrow svg {
+            width: 16px;
+            height: 16px;
+            transition: all 0.3s var(--ease-out-expo);
+        }
+
+        .card-websites .card-cta-arrow svg { color: var(--accent-warm); }
+        .card-software .card-cta-arrow svg { color: var(--accent-color); }
+
+        .card-websites:hover .card-cta-arrow {
+            background: var(--accent-warm);
+            border-color: var(--accent-warm);
+        }
+        .card-websites:hover .card-cta-arrow svg {
+            color: white;
+            transform: translateX(4px);
+        }
+
+        .card-software:hover .card-cta-arrow {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+        .card-software:hover .card-cta-arrow svg {
+            color: white;
+            transform: translateX(4px);
+        }
+
+        .card-software.is-locked:hover .card-cta-arrow {
+            background: transparent;
+            border-color: var(--border);
+        }
+
+        .card-software.is-locked:hover .card-cta-arrow svg {
+            color: var(--accent-color);
+            transform: none;
+        }
+
+        /* Sweep animation on hover */
+        .decision-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        .card-websites::before {
+            background: linear-gradient(135deg, rgba(139,34,82,0.03), transparent 50%);
+        }
+
+        .card-software::before {
+            background: linear-gradient(135deg, rgba(74,95,215,0.03), transparent 50%);
+        }
+
+        .decision-card:hover::before {
+            opacity: 1;
+        }
+
+        .card-software.is-locked:hover::before {
+            opacity: 0;
+        }
+
+        /* Footer line */
+        .footer-line {
+            text-align: center;
+            padding: 0.9rem 2rem 1.15rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-tertiary);
+            opacity: 0;
+            animation: fadeInUp 1s var(--ease-power) 0.6s forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .decision-grid {
+                grid-template-columns: 1fr;
+                max-width: 520px;
+            }
+
+            .decision-wrapper {
+                padding: 4.8rem 1.25rem 1.2rem;
+            }
+
+            .decision-header {
+                margin-bottom: 2rem;
+            }
+
+            .decision-header p {
+                white-space: normal;
+            }
+
+            .card-software-lock-badge {
+                font-size: 0.77rem;
+                letter-spacing: 0.07em;
+                gap: 0.45rem;
+            }
+
+            nav {
+                padding: 1.5rem 2rem;
+            }
+
+            body { cursor: auto; }
+            .cursor, .cursor-dot { display: none; }
+        }
+
+        @media (max-width: 480px) {
+            .decision-header h1 {
+                font-size: clamp(1.1rem, 6vw, 1.7rem);
+            }
+
+            .card-image {
+                height: 170px;
+            }
+
+            .card-software-lock-badge {
+                font-size: 0.7rem;
+                padding: 0.52rem 0.78rem;
+            }
+        }
+
+        @media (max-height: 860px) and (min-width: 901px) {
+            nav {
+                padding-top: 1.15rem;
+                padding-bottom: 1.15rem;
+            }
+
+            .decision-wrapper {
+                padding-top: 5.2rem;
+                padding-bottom: 0.8rem;
+            }
+
+            .decision-header {
+                margin-bottom: 1.7rem;
+            }
+
+            .card-body p {
+                margin-bottom: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="noise-overlay"></div>
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+
+    <div class="ambient-bg">
+        <div class="ambient-blob blob-left"></div>
+        <div class="ambient-blob blob-right"></div>
+    </div>
+
+    <main class="decision-wrapper">
+        <div class="decision-header">
+            <span class="eyebrow">Welkom bij Softora</span>
+            <h1>Hoe kunnen we je helpen?</h1>
+            <p>We focussen nu volledig op websites. Onze software-tak staat tijdelijk op coming soon.</p>
+        </div>
+
+        <div class="decision-grid">
+            <!-- WEBSITES -->
+            <a href="premium-website.html" class="decision-card card-websites magnetic">
+                <div class="card-image">
+                    <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80" alt="Premium webdesign" width="800" height="533" decoding="async" fetchpriority="high">
+                    <div class="card-image-overlay"></div>
+                    <span class="card-image-label">Websites</span>
+                </div>
+                <div class="card-body">
+                    <p>Premium webdesign & development voor bedrijven die online willen opvallen. Custom designs, geen templates, focus op conversie.</p>
+                    <div class="card-tags">
+                        <span class="card-tag">Webdesign</span>
+                        <span class="card-tag">Development</span>
+                        <span class="card-tag">Branding</span>
+                        <span class="card-tag">SEO</span>
+                    </div>
+                    <div class="card-cta">
+                        <span class="card-cta-text">Bekijk Websites</span>
+                        <div class="card-cta-arrow">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </a>
+
+            <!-- SOFTWARE -->
+            <div class="decision-card card-software is-locked">
+                <div class="card-image">
+                    <img src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800&q=80" alt="Software & databases" width="800" height="533" decoding="async" loading="lazy">
+                    <div class="card-image-overlay"></div>
+                    <span class="card-image-label">Software</span>
+                    <div class="card-software-lock">
+                        <span class="card-software-lock-badge">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-5 4h10a2 2 0 002-2v-7a2 2 0 00-2-2h-1V7a4 4 0 00-8 0v3H7a2 2 0 00-2 2v7a2 2 0 002 2zm3-11V7a2 2 0 114 0v3h-4z" />
+                            </svg>
+                            Coming Soon
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p>Custom software, database-architectuur en high-performance platforms. Voor bedrijven die serieuze technologie nodig hebben.</p>
+                    <div class="card-tags">
+                        <span class="card-tag">Software</span>
+                        <span class="card-tag">Databases</span>
+                        <span class="card-tag">API's</span>
+                        <span class="card-tag">Cloud</span>
+                    </div>
+                    <div class="card-cta">
+                        <span class="card-cta-text">Coming Soon</span>
+                        <div class="card-cta-arrow">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="footer-line">
+        <p>&copy; 2025 Softora — Piusplein 25, Tilburg</p>
+    </div>
+
+    <script>
+        const cursor = document.querySelector(".cursor");
+        const cursorDot = document.querySelector(".cursor-dot");
+        const magneticElements = document.querySelectorAll(".magnetic");
+        const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+
+        if (!enablePointerFx) {
+            document.body.style.cursor = "auto";
+            cursor.style.display = "none";
+            cursorDot.style.display = "none";
+        } else {
+            let mouseX = 0;
+            let mouseY = 0;
+            let cursorX = 0;
+            let cursorY = 0;
+            let dotX = 0;
+            let dotY = 0;
+            let cursorRafId = null;
+
+            document.addEventListener(
+                "mousemove",
+                function (event) {
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                },
+                { passive: true }
+            );
+
+            function animateCursor() {
+                cursorX += (mouseX - cursorX) * 0.15;
+                cursorY += (mouseY - cursorY) * 0.15;
+                cursor.style.left = cursorX + "px";
+                cursor.style.top = cursorY + "px";
+                dotX += (mouseX - dotX) * 0.5;
+                dotY += (mouseY - dotY) * 0.5;
+                cursorDot.style.left = dotX + "px";
+                cursorDot.style.top = dotY + "px";
+                cursorRafId = requestAnimationFrame(animateCursor);
+            }
+
+            function startCursorLoop() {
+                if (cursorRafId === null) {
+                    cursorRafId = requestAnimationFrame(animateCursor);
+                }
+            }
+
+            function stopCursorLoop() {
+                if (cursorRafId !== null) {
+                    cancelAnimationFrame(cursorRafId);
+                    cursorRafId = null;
+                }
+            }
+
+            startCursorLoop();
+
+            document.addEventListener("visibilitychange", function () {
+                if (document.hidden) {
+                    stopCursorLoop();
+                } else {
+                    startCursorLoop();
+                }
+            });
+
+            magneticElements.forEach(function (element) {
+                element.addEventListener("mouseenter", function () {
+                    cursor.classList.add("hover");
+                });
+                element.addEventListener("mouseleave", function () {
+                    cursor.classList.remove("hover");
+                });
+            });
+        }
+    </script>
+</body>
+</html>

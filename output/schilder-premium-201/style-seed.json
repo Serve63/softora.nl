@@ -1,0 +1,96 @@
+{
+  "seed": 1384839711,
+  "run_id": "cli-1770826487051-6ot4o9",
+  "layoutVariant": 11,
+  "layout_variant": 11,
+  "layoutVariantKey": "product-tour-cabinet",
+  "layout_pattern": "product-tour-cabinet",
+  "sectionOrder": [
+    "hero",
+    "process",
+    "faq",
+    "signatureA",
+    "trust",
+    "value",
+    "pain",
+    "benefits",
+    "signatureB",
+    "cta"
+  ],
+  "section_order": [
+    "hero",
+    "process",
+    "faq",
+    "signatureA",
+    "trust",
+    "value",
+    "pain",
+    "benefits",
+    "signatureB",
+    "cta"
+  ],
+  "typePair": 7,
+  "type_pair": 7,
+  "typography_pairing": {
+    "name": "garamond-sharp",
+    "headings": "Garamond, \"Times New Roman\", serif",
+    "body": "\"Segoe UI\", Arial, sans-serif"
+  },
+  "spacingScale": "wide",
+  "spacing_scale": "wide",
+  "borderRadius": "20px",
+  "border_radius": "20px",
+  "gridStyle": "12-col",
+  "grid_style": "12-col",
+  "buttonStyle": "underline",
+  "button_style": "underline",
+  "cardStyle": "glass",
+  "card_style": "glass",
+  "signatureSections": [
+    "Werkvolgorde van Opname tot Oplevering",
+    "Planning & Voorbereiding in 5 Stappen"
+  ],
+  "signature_sections": [
+    "Werkvolgorde van Opname tot Oplevering",
+    "Planning & Voorbereiding in 5 Stappen"
+  ],
+  "signature_payload": {
+    "a": {
+      "id": "werkvolgorde",
+      "title": "Werkvolgorde van Opname tot Oplevering",
+      "lead": "Verwachtingen staan vooraf scherp waardoor trajecten rustiger verlopen.",
+      "bullets": [
+        "Vaste fases met beslismomenten.",
+        "Geen vage overgangen in planning.",
+        "Duidelijke route naar oplevering."
+      ]
+    },
+    "b": {
+      "id": "planning-voorbereiding",
+      "title": "Planning & Voorbereiding in 5 Stappen",
+      "lead": "Laat exact zien wat jij regelt en wat de klant voorbereidt voor een soepele start.",
+      "bullets": [
+        "Heldere startvolgorde per projecttype.",
+        "Minder vertraging door concrete voorbereiding.",
+        "Transparante communicatiemomenten per fase."
+      ]
+    }
+  },
+  "microinteractions": "subtiele reveal, duidelijke focus, functionele hover-feedback",
+  "animation_rules": "subtiel, functioneel, geen circus",
+  "palette": {
+    "bg": "#f7f6f2",
+    "surface": "#ffffff",
+    "text": "#111426",
+    "muted": "#5f647d",
+    "border": "rgba(17,20,38,0.12)",
+    "accent": "#4a5fd7",
+    "accentAlt": "#2f5bd4"
+  },
+  "concept_id": "campaign-laboratory",
+  "mood_words": [
+    "creative-marketing",
+    "bold-hooks",
+    "premium rhythm"
+  ]
+}

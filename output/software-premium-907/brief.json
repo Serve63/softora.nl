@@ -1,0 +1,107 @@
+{
+  "order_id": "software-premium-907",
+  "source": "cli-custom-order",
+  "run_id": "cli-1770826496912-zdzpks",
+  "theme": "light",
+  "industry": "software",
+  "offer": "B2B Software Platform Site met Demo Flow",
+  "location": "Utrecht",
+  "audience": "B2B beslissers die productwaarde snel willen toetsen",
+  "primary_action": "Plan een technische demo",
+  "secondary_action": "Bekijk implementatie-aanpak",
+  "top_pains": [
+    "Bezoekers zien losse features maar begrijpen te laat de zakelijke impact.",
+    "Demo-aanvragen missen context waardoor sales veel tijd verliest in de eerste call.",
+    "Verschillende doelgroepen vinden niet direct hun eigen route.",
+    "Copy is te algemeen en adresseert bezwaren pas laat.",
+    "De overgang van interesse naar afspraak bevat te veel frictie."
+  ],
+  "desired_outcomes": [
+    "Snellere route van eerste bezoek naar gekwalificeerde demo.",
+    "Duidelijke positionering per doelgroep zonder technische ruis.",
+    "Consistente direct-response copy over alle kernpagina's.",
+    "Bezwaren worden behandeld vóór de afspraakfase.",
+    "Schaalbare inhoudsstructuur voor nieuwe proposities."
+  ],
+  "differentiator_angle": "Productverhaal wordt vertaald naar beslisacties in plaats van feature-overzichten.",
+  "forbidden_claims": [
+    "Geen verzonnen aantallen of groeicijfers.",
+    "Geen klantlogo's of testimonials zonder brondata.",
+    "Geen certificeringen of keurmerken zonder bewijs in opdrachtdata.",
+    "Geen fictieve SLA- of responstijdclaims buiten expliciete input."
+  ],
+  "faq": [
+    [
+      "Past dit naast onze huidige stack?",
+      "Ja. We schrijven de website rond je bestaande processen, zodat je huidige tooling logisch blijft aansluiten."
+    ],
+    [
+      "Wordt dit een marketinglaag zonder diepgang?",
+      "Nee. Elke sectie koppelt productwaarde aan een concrete zakelijke uitkomst en vervolgstap."
+    ],
+    [
+      "Kunnen meerdere beslissers tegelijk landen?",
+      "Ja. De structuur splitst routes per rol zodat operations, management en commercie direct relevante informatie zien."
+    ],
+    [
+      "Moeten we eerst alles technisch uitwerken?",
+      "Nee. We starten met kernpropositie, bezwaren en besliskaders en verdiepen daarna gericht."
+    ],
+    [
+      "Hoe voorkomen we generieke B2B-taal?",
+      "Door copy te bouwen op echte salesvragen, risico's en keuzecriteria in je funnel."
+    ],
+    [
+      "Wat gebeurt er na livegang?",
+      "Je houdt een modulaire basis waarmee je nieuwe use-cases toevoegt zonder de conversielogica te breken."
+    ]
+  ],
+  "signature_pool": [
+    {
+      "id": "use-case-matrix",
+      "title": "Use-case Matrix per Beslisser",
+      "lead": "Per rol een eigen route van probleem naar volgende stap.",
+      "bullets": [
+        "Commercie: sneller van bezoek naar gekwalificeerde demo.",
+        "Operations: minder handmatig uitlegwerk in het voortraject.",
+        "Management: snellere toets op impact, risico en prioriteit."
+      ]
+    },
+    {
+      "id": "product-tour",
+      "title": "Product Tour Cards met Beslispunten",
+      "lead": "Geen featuredump, wel een route waarin elke stap eindigt in een concrete actie.",
+      "bullets": [
+        "Start met context en pijn, niet met losse functionaliteit.",
+        "Koppel capability aan een zakelijke uitkomst.",
+        "Sluit af met één heldere vervolgstap."
+      ]
+    },
+    {
+      "id": "integration-approach",
+      "title": "Integratie-aanpak zonder Lock-in Taal",
+      "lead": "Legt uit hoe je oplossing aansluit op bestaande processen zonder opgeblazen claims.",
+      "bullets": [
+        "Heldere rolverdeling tussen teams.",
+        "Realistische adoptiestappen in begrijpelijke taal.",
+        "Transparante verwachting rond implementatie."
+      ]
+    },
+    {
+      "id": "demo-qualifier",
+      "title": "Demo Qualifier Flow",
+      "lead": "Filtert intentie vooraf zodat gesprekken sneller inhoudelijk worden.",
+      "bullets": [
+        "Vooraf kernvragen in de contactflow.",
+        "Minder algemene aanvragen, meer bruikbare context.",
+        "Kortere route naar beslisinformatie."
+      ]
+    }
+  ],
+  "sitemap": [
+    "index.html",
+    "features.html",
+    "about.html",
+    "contact.html"
+  ]
+}

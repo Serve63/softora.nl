@@ -1,0 +1,88 @@
+{
+  "brand_archetype": "Trusted Craft Operator",
+  "mood_words": [
+    "helder",
+    "premium",
+    "toegankelijk",
+    "concreet",
+    "vertrouwd"
+  ],
+  "layoutVariant": "precision-minimal",
+  "layout_pattern": "minimal premium shell with disciplined copy focus",
+  "sectionOrder": [
+    "hero",
+    "faq",
+    "localPlanner",
+    "offerStrip",
+    "signatureA",
+    "problemFrame",
+    "process",
+    "benefits",
+    "signatureB",
+    "proof",
+    "cta"
+  ],
+  "typographyPairing": {
+    "id": "modern-contrast",
+    "headings": "\"Trebuchet MS\", \"Segoe UI\", Arial, sans-serif",
+    "body": "\"Verdana\", \"Segoe UI\", Arial, sans-serif"
+  },
+  "type_scale": "hero-xl",
+  "spacing_scale": "wide",
+  "border_radius": "md",
+  "grid_style": "masonry",
+  "icon_style": "outlined",
+  "imagery_style": "editorial-context",
+  "button_style": "pill",
+  "card_style": "elevated",
+  "component_set": [
+    "insight-panels",
+    "offer-strip",
+    "cta-banner"
+  ],
+  "signatureSections": [
+    "Aanpak Transparant in Fases",
+    "Scope Besliskader"
+  ],
+  "signaturePayload": {
+    "a": {
+      "id": "aanpak-transparant",
+      "title": "Aanpak Transparant in Fases",
+      "lead": "Maakt de route van eerste contact tot oplevering helder en voorspelbaar.",
+      "bullets": [
+        "Iedere fase heeft een concreet doel.",
+        "Verwachtingen staan vooraf duidelijk.",
+        "Meer rust in samenwerking."
+      ]
+    },
+    "b": {
+      "id": "scope-besliskader",
+      "title": "Scope Besliskader",
+      "lead": "Geeft bezoekers houvast in keuzes en voorkomt losse aanvragen zonder context.",
+      "bullets": [
+        "Aanbod vertaald naar praktische opties.",
+        "Duidelijk verschil tussen routes.",
+        "Snellere intakekwaliteit."
+      ]
+    }
+  },
+  "signature_visual": "minimal-tiles",
+  "microinteractions": "section parallax subtle + focus rings",
+  "animation_rules": "subtiel, functioneel, geen circus",
+  "palette": {
+    "bg": "#f7f6f2",
+    "surface": "#ffffff",
+    "text": "#111426",
+    "muted": "#5f637a",
+    "border": "rgba(17,20,38,0.11)",
+    "accent": "#b83280",
+    "accent_alt": "#c43a78"
+  },
+  "seed": 873244444,
+  "seed_meta": {
+    "order_id": "1",
+    "mode": "premium",
+    "theme": "light",
+    "attempt": 1
+  }
+}

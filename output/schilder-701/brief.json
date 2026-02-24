@@ -1,0 +1,65 @@
+{
+  "order_id": "schilder-701",
+  "source": "cli-custom-order",
+  "run_id": "cli-1770824740502-juvrfu",
+  "theme": "light",
+  "industry": "contractor",
+  "audience": "huiseigenaren en ondernemers die strak gepland vakwerk zoeken",
+  "primary_action": "Vraag een opname aan",
+  "secondary_action": "Bekijk de werkwijze",
+  "offer": "Schilder Website met offerteflow",
+  "location": "Eindhoven",
+  "top_pains": [
+    "Aanvragen komen binnen zonder duidelijke scope of gewenste planning.",
+    "Bezoekers twijfelen over afwerking en materiaalkeuze.",
+    "Kwaliteit is moeilijk zichtbaar vóór het intakegesprek.",
+    "Mobiele bezoekers haken af als de route niet direct duidelijk is.",
+    "Veel vragen worden pas laat gesteld waardoor trajecten vertragen."
+  ],
+  "desired_outcomes": [
+    "Meer serieuze aanvragen met duidelijke projectcontext.",
+    "Sneller vertrouwen door transparante aanpak en voorbereiding.",
+    "Minder losse vragen door praktische keuzehulpen.",
+    "Sterkere lokale conversie op mobiel en desktop.",
+    "Een premium uitstraling die vakmanschap direct onderbouwt."
+  ],
+  "differentiator_angle": "Van eerste indruk naar concrete aanvraag met duidelijke verwachtingen.",
+  "forbidden_claims": [
+    "Geen verzonnen aantallen of groeicijfers.",
+    "Geen klantlogo's of testimonials zonder brondata.",
+    "Geen certificeringen of keurmerken zonder bewijs in opdrachtdata.",
+    "Geen fictieve SLA- of responstijdclaims buiten expliciete input."
+  ],
+  "faq": [
+    [
+      "Moet ik alles al exact weten voor ik contact opneem?",
+      "Nee. De intake is juist bedoeld om scope, timing en prioriteiten samen scherp te maken."
+    ],
+    [
+      "Hoe snel krijg ik duidelijkheid over de aanpak?",
+      "Na je aanvraag krijg je een concrete vervolgstap met heldere route, zonder vaag voortraject."
+    ],
+    [
+      "Wat als ik nog twijfel over opties?",
+      "De keuzehulp-secties maken verschillen praktisch, zodat je gericht kunt beslissen zonder druk."
+    ],
+    [
+      "Is de site alleen mooi of ook commercieel sterk?",
+      "Commercie staat centraal: elke sectie ondersteunt een logische stap richting aanvraag."
+    ],
+    [
+      "Werkt dit goed op mobiel?",
+      "Ja. Navigatie, contentvolgorde en CTA's zijn mobiel eerst opgebouwd."
+    ],
+    [
+      "Kan ik later uitbreiden zonder opnieuw te beginnen?",
+      "Ja. De structuur is ontworpen om nieuwe diensten en pagina's gecontroleerd toe te voegen."
+    ]
+  ],
+  "sitemap": [
+    "index.html",
+    "services.html",
+    "about.html",
+    "contact.html"
+  ]
+}

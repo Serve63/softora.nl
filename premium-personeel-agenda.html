@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Servé Digital | Agenda</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="assets/personnel-theme.css">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
+                var storageKey = isPremiumPersonnel
+                    ? "softora_premium_personnel_theme_mode"
+                    : "softora_software_personnel_theme_mode";
+                var mode = localStorage.getItem(storageKey);
+                if (mode === "light" || mode === "dark") {
+                    document.documentElement.setAttribute("data-theme-mode", mode);
+                    document.documentElement.setAttribute("data-theme", mode);
+                }
+            } catch (error) {
+                /* ignore storage errors */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #080808;
+            --bg-secondary: #0d0d0d;
+            --bg-tertiary: #111;
+            --accent: #8B2252;
+            --accent-dark: #6B1A3F;
+            --accent-glow: rgba(139, 34, 82, 0.4);
+            --accent-light: #A62D65;
+            --text-primary: #f5f5f5;
+            --text-secondary: #888;
+            --text-tertiary: #555;
+            --border: rgba(255, 255, 255, 0.06);
+            --green: #2ecc71;
+            --green-glow: rgba(46, 204, 113, 0.15);
+            --yellow: #f39c12;
+            --yellow-glow: rgba(243, 156, 18, 0.15);
+            --blue: #3498db;
+            --blue-glow: rgba(52, 152, 219, 0.15);
+            --red: #e74c3c;
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9999; opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .cursor {
+            width: 24px; height: 24px; border: 2px solid var(--accent-light);
+            border-radius: 50%; position: fixed; pointer-events: none; z-index: 10000;
+            transition: transform 0.1s var(--ease-out-expo), background 0.2s ease, width 0.3s var(--ease-out-expo), height 0.3s var(--ease-out-expo);
+            transform: translate(-50%, -50%); mix-blend-mode: difference;
+        }
+        .cursor.hover { width: 80px; height: 80px; background: var(--accent-light); border-color: transparent; }
+
+        .cursor-dot {
+            width: 6px; height: 6px; background: var(--accent-light);
+            border-radius: 50%; position: fixed; pointer-events: none;
+            z-index: 10001; transform: translate(-50%, -50%);
+        }
+
+        /* Layout */
+        .dashboard-layout { display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px; background: var(--bg-secondary); border-right: 1px solid var(--border);
+            padding: 2.5rem 0; display: flex; flex-direction: column;
+            position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
+        }
+        .sidebar-logo {
+            font-family: 'Oswald', sans-serif; font-size: 1.5rem; font-weight: 700;
+            color: var(--text-primary); text-decoration: none; padding: 0 2rem;
+            margin-bottom: 3rem; display: block;
+        }
+        .sidebar-logo span { color: var(--accent-light); }
+        .sidebar-nav { flex: 1; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-section-label {
+            font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.2em; color: var(--text-tertiary);
+            padding: 0 2rem; margin-bottom: 0.8rem;
+        }
+        .sidebar-link {
+            display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem 2rem;
+            color: var(--text-secondary); text-decoration: none; font-size: 0.9rem;
+            font-weight: 400; transition: all 0.2s; cursor: none; position: relative;
+        }
+        .sidebar-link::before {
+            content: ''; position: absolute; left: 0; top: 0; width: 3px; height: 100%;
+            background: var(--accent); opacity: 0; transition: opacity 0.2s;
+        }
+        .sidebar-link:hover { color: var(--text-primary); background: rgba(255,255,255,0.02); }
+        .sidebar-link.active { color: var(--text-primary); background: rgba(139,34,82,0.06); }
+        .sidebar-link.active::before { opacity: 1; }
+        .sidebar-link svg { width: 18px; height: 18px; opacity: 0.5; flex-shrink: 0; }
+        .sidebar-link.active svg, .sidebar-link:hover svg { opacity: 1; }
+        .sidebar-footer { padding: 2rem; border-top: 1px solid var(--border); }
+        .sidebar-user { display: flex; align-items: center; gap: 0.8rem; }
+        .sidebar-avatar {
+            width: 36px; height: 36px; background: var(--accent); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Oswald', sans-serif; font-size: 0.85rem; font-weight: 600; color: white;
+        }
+        .sidebar-user-info { flex: 1; min-width: 0; }
+        .sidebar-user-name { font-size: 0.85rem; font-weight: 500; color: var(--text-primary); }
+        .sidebar-user-role { font-size: 0.75rem; color: var(--text-tertiary); }
+        .logout-btn { background: none; border: none; color: var(--text-tertiary); cursor: none; padding: 0.3rem; transition: color 0.2s; }
+        .logout-btn:hover { color: var(--red); }
+        .logout-btn svg { width: 18px; height: 18px; }
+
+        /* Main */
+        .main-content { flex: 1; margin-left: 280px; padding: 3rem; }
+
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
+        .topbar-left h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.3rem; }
+        .topbar-left p { color: var(--text-tertiary); font-size: 0.9rem; font-weight: 300; }
+
+        /* Month nav */
+        .month-nav {
+            display: flex; align-items: center; gap: 1.5rem;
+            opacity: 0; transform: translateY(15px);
+            animation: fadeUp 0.5s var(--ease-out-expo) 0.1s forwards;
+        }
+        .month-nav-btn {
+            width: 40px; height: 40px; border: 1px solid var(--border);
+            background: var(--bg-secondary); color: var(--text-tertiary);
+            display: flex; align-items: center; justify-content: center;
+            cursor: none; transition: all 0.2s;
+        }
+        .month-nav-btn:hover { border-color: var(--accent-light); color: var(--accent-light); }
+        .month-nav-btn svg { width: 16px; height: 16px; }
+        .month-label {
+            font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em; min-width: 220px; text-align: center;
+        }
+        .today-btn {
+            font-family: 'Oswald', sans-serif; font-size: 0.75rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-light);
+            border: 1px solid rgba(139,34,82,0.3); background: transparent;
+            padding: 0.5rem 1rem; cursor: none; transition: all 0.2s;
+        }
+        .today-btn:hover { background: rgba(139,34,82,0.08); border-color: var(--accent-light); }
+
+        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+        /* Calendar */
+        .calendar-wrapper {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            max-width: 1240px; margin: 0 auto;
+            opacity: 0; transform: translateY(15px);
+            animation: fadeUp 0.5s var(--ease-out-expo) 0.2s forwards;
+        }
+
+        .calendar-header {
+            display: grid; grid-template-columns: repeat(7, 1fr);
+            border-bottom: 1px solid var(--border);
+        }
+        .calendar-header-day {
+            padding: 0.8rem; text-align: center;
+            font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-tertiary);
+        }
+
+        .calendar-grid {
+            display: grid; grid-template-columns: repeat(7, 1fr);
+        }
+
+        .calendar-day {
+            min-height: 102px; border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border); padding: 0.5rem;
+            position: relative; transition: background 0.2s;
+        }
+        .calendar-day:nth-child(7n) { border-right: none; }
+        .calendar-day:hover { background: rgba(255,255,255,0.01); }
+        .calendar-day.other-month { opacity: 0.25; }
+        .calendar-day.today { background: rgba(139,34,82,0.04); }
+        .calendar-day.today .day-number { color: var(--accent-light); font-weight: 700; }
+
+        .day-number {
+            font-family: 'Oswald', sans-serif; font-size: 0.78rem; font-weight: 500;
+            color: var(--text-secondary); margin-bottom: 0.3rem;
+        }
+
+        /* Appointments */
+        .appointment {
+            padding: 0.3rem 0.45rem; margin-bottom: 0.22rem;
+            font-size: 0.65rem; font-weight: 400; border-radius: 2px;
+            cursor: none; transition: all 0.2s; line-height: 1.3;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .appointment:hover { transform: translateX(2px); }
+
+        .appointment.meeting {
+            background: rgba(139,34,82,0.12); color: var(--accent-light);
+            border-left: 2px solid var(--accent);
+        }
+
+        .appointment .apt-time {
+            font-family: 'Oswald', sans-serif; font-weight: 600;
+            font-size: 0.6rem; letter-spacing: 0.05em;
+        }
+
+        /* Legend */
+        .calendar-legend {
+            display: flex; gap: 1.2rem; padding: 1rem 1.2rem;
+            border-top: 1px solid var(--border);
+        }
+        .legend-item {
+            display: flex; align-items: center; gap: 0.4rem;
+            font-size: 0.7rem; color: var(--text-tertiary);
+            font-family: 'Oswald', sans-serif; text-transform: uppercase;
+            letter-spacing: 0.1em; font-weight: 500;
+        }
+        .legend-dot {
+            width: 8px; height: 8px; border-radius: 1px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px); z-index: 5000;
+            display: none; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .modal-overlay.show { display: flex; opacity: 1; }
+
+        .modal {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            width: 90%; max-width: 520px; padding: 0;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+            transform: translateY(20px); transition: transform 0.4s var(--ease-out-expo);
+        }
+        .modal-overlay.show .modal { transform: translateY(0); }
+
+        .modal-top {
+            padding: 2.5rem 2.5rem 0;
+            display: flex; justify-content: space-between; align-items: flex-start;
+        }
+        .modal-close {
+            width: 36px; height: 36px; border: 1px solid var(--border);
+            background: none; color: var(--text-tertiary); cursor: none;
+            display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .modal-close:hover { border-color: var(--red); color: var(--red); }
+        .modal-close svg { width: 16px; height: 16px; }
+
+        .modal-type-badge {
+            font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            padding: 0.3rem 0.8rem; display: inline-block; margin-bottom: 1rem;
+        }
+        .modal-type-badge.meeting { background: rgba(139,34,82,0.12); color: var(--accent-light); }
+
+        .modal-company {
+            font-family: 'Oswald', sans-serif; font-size: 1.6rem; font-weight: 700;
+            text-transform: uppercase; margin-bottom: 0.3rem;
+        }
+        .modal-contact {
+            font-size: 0.9rem; color: var(--text-secondary); font-weight: 300;
+        }
+
+        .modal-body { padding: 2rem 2.5rem; }
+
+        .modal-details {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .modal-detail-item {}
+        .modal-detail-label {
+            font-family: 'Oswald', sans-serif; font-size: 0.65rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.15em;
+            color: var(--text-tertiary); margin-bottom: 0.3rem;
+        }
+        .modal-detail-value {
+            font-size: 0.95rem; font-weight: 400; color: var(--text-primary);
+        }
+
+        .modal-summary-label {
+            font-family: 'Oswald', sans-serif; font-size: 0.75rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.12em;
+            color: var(--text-tertiary); margin-bottom: 0.6rem;
+        }
+        .modal-summary {
+            font-size: 0.9rem; color: var(--text-secondary); font-weight: 300;
+            line-height: 1.8; padding: 1.2rem 1.5rem;
+            background: var(--bg-primary); border: 1px solid var(--border);
+        }
+
+        .modal-footer {
+            padding: 0 2.5rem 2.5rem;
+            display: flex; gap: 0.5rem;
+        }
+        .modal-btn {
+            flex: 1; padding: 1rem;
+            font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            border: none; cursor: none; transition: all 0.3s var(--ease-out-expo);
+        }
+        .modal-btn.primary { background: var(--accent); color: white; }
+        .modal-btn.primary:hover { background: var(--accent-light); box-shadow: 0 0 30px var(--accent-glow); }
+        .modal-btn.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+        .modal-btn.secondary:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .calendar-day { min-height: 82px; }
+            .appointment { font-size: 0.65rem; padding: 0.25rem 0.4rem; }
+        }
+        @media (max-width: 1024px) {
+            body { cursor: auto; }
+            .cursor, .cursor-dot { display: none; }
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+        }
+        @media (max-width: 768px) {
+            .main-content { padding: 1.5rem; }
+            .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
+            .calendar-day { min-height: 64px; }
+            .appointment { font-size: 0.6rem; }
+            .day-number { font-size: 0.75rem; }
+            .modal-details { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="noise-overlay"></div>
+<div class="cursor"></div>
+<div class="cursor-dot"></div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+    <div class="modal">
+        <div class="modal-top">
+            <div>
+                <div class="modal-type-badge" id="modalBadge">Meeting</div>
+                <div class="modal-company" id="modalCompany">Bedrijf</div>
+                <div class="modal-contact" id="modalContact">Contact</div>
+            </div>
+            <button class="modal-close magnetic" onclick="closeModal()" type="button">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-details">
+                <div class="modal-detail-item">
+                    <div class="modal-detail-label">Datum & Tijd</div>
+                    <div class="modal-detail-value" id="modalDate">-</div>
+                </div>
+                <div class="modal-detail-item">
+                    <div class="modal-detail-label">Geschatte Waarde</div>
+                    <div class="modal-detail-value" id="modalValue">-</div>
+                </div>
+                <div class="modal-detail-item">
+                    <div class="modal-detail-label">Branche</div>
+                    <div class="modal-detail-value" id="modalBranche">-</div>
+                </div>
+                <div class="modal-detail-item">
+                    <div class="modal-detail-label">Bron</div>
+                    <div class="modal-detail-value" id="modalSource">-</div>
+                </div>
+            </div>
+            <div class="modal-summary-label">AI Samenvatting van Lead</div>
+            <div class="modal-summary" id="modalSummary">-</div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn primary magnetic" onclick="closeModal()" type="button">Opvolgen</button>
+            <button class="modal-btn secondary magnetic" onclick="closeModal()" type="button">Sluiten</button>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-layout">
+
+    <!-- Sidebar -->
+        <aside class="sidebar">
+            <a href="premium-website.html" class="sidebar-logo magnetic">Softora.nl</a>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="premium-personeel-dashboard.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="premium-personeel-agenda.html" class="sidebar-link active magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        Agenda
+                    </a>
+                    <a href="premium-actieve-opdrachten.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Actieve Opdrachten
+                    </a>
+                    <a href="premium-ai-lead-generator.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
+                        AI Coldcalling
+                    </a>
+                    <a href="premium-ai-coldmailing.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                        AI Coldmailing
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5V21h4.5L21 7.5l-4.5-4.5L3 16.5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9"/></svg>
+                        SEO
+                    </a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Beheer</div>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Klanten
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                        Instellingen
+                    </a>
+                <div class="sidebar-theme">
+                    <div class="sidebar-theme-label">Thema</div>
+                    <div class="sidebar-theme-options" role="group" aria-label="Thema kiezen">
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="dark" aria-pressed="false">Donker</button>
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="light" aria-pressed="false">Licht</button>
+                    </div>
+                </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">SP</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">Softora Premium</div>
+                        <div class="sidebar-user-role">Administrator</div>
+                    </div>
+                    <a href="premium-personeel-login.html" class="logout-btn magnetic" title="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+    <!-- Main -->
+    <main class="main-content">
+
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1>Agenda</h1>
+                <p>Meetings ingepland door AI Lead Generator</p>
+            </div>
+            <div class="month-nav">
+                <button class="month-nav-btn magnetic" onclick="changeMonth(-1)" type="button">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <span class="month-label" id="monthLabel"></span>
+                <button class="month-nav-btn magnetic" onclick="changeMonth(1)" type="button">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </button>
+                <button class="today-btn magnetic" onclick="goToday()" type="button">Vandaag</button>
+            </div>
+        </div>
+
+        <!-- Calendar -->
+        <div class="calendar-wrapper">
+            <div class="calendar-header">
+                <div class="calendar-header-day">Maandag</div>
+                <div class="calendar-header-day">Dinsdag</div>
+                <div class="calendar-header-day">Woensdag</div>
+                <div class="calendar-header-day">Donderdag</div>
+                <div class="calendar-header-day">Vrijdag</div>
+                <div class="calendar-header-day">Zaterdag</div>
+                <div class="calendar-header-day">Zondag</div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <div class="calendar-legend">
+                <div class="legend-item"><div class="legend-dot" style="background: var(--accent);"></div> Meeting</div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    // Appointments data
+    const appointments = [
+        {
+            id: 1, company: 'Bakkerij De Gouden Oven', contact: 'Peter Bakker', phone: '06-12345678',
+            type: 'meeting', date: '2025-02-03', time: '09:30', value: '€3.200',
+            branche: 'Horeca & Food', source: 'AI Cold Calling',
+            summary: 'Peter heeft momenteel een verouderde website die niet mobielvriendelijk is. Hij wil een nieuwe website met online bestelmogelijkheid voor brood en gebak. Hoge urgentie - concurrent heeft net een nieuwe site gelanceerd. Budget is flexibel, geinteresseerd in het Premium pakket. Wil binnen 4 weken live.'
+        },
+        {
+            id: 2, company: 'Autoservice Tilburg', contact: 'Marco de Vries', phone: '06-98765432',
+            type: 'meeting', date: '2025-02-05', time: '14:00', value: '€2.800',
+            branche: 'Automotive', source: 'AI Cold Calling',
+            summary: 'Marco zoekt een professionele website met online afspraak-planner voor APK en onderhoud. Huidige site is een gratis Wix-pagina. Wil reviews van klanten prominent in beeld. Heeft 3 vestigingen, wil allemaal op 1 site. Demo gevraagd om te zien wat wij kunnen leveren.'
+        },
+        {
+            id: 3, company: 'Yoga Studio Zen', contact: 'Lisa Jansen', phone: '06-11223344',
+            type: 'meeting', date: '2025-02-06', time: '11:00', value: '€4.500',
+            branche: 'Gezondheid & Wellness', source: 'AI Cold Calling',
+            summary: 'Lisa runt een yoga studio met 200+ leden. Wil een premium website met lesrooster-integratie, online inschrijving voor workshops, en een blog. Heeft al een sterk Instagram-profiel en wil die content integreren. Zoekt een zen, minimalistisch design. Bereid te investeren in kwaliteit.'
+        },
+        {
+            id: 4, company: 'Advocatenkantoor Recht & Partners', contact: 'Mr. Van Dongen', phone: '06-55667788',
+            type: 'meeting', date: '2025-02-10', time: '10:00', value: '€5.500',
+            branche: 'Zakelijke Dienstverlening', source: 'AI Cold Calling',
+            summary: 'Tweede gesprek na positieve intake vorige week. Kantoor met 8 advocaten wil een betrouwbare, strakke website die vertrouwen uitstraalt. Nodig: teamprofielen, expertisegebieden, blog/nieuws sectie, en contact met routebeschrijving. Privacy en GDPR-compliance belangrijk. Offerte is verstuurd, wacht op akkoord.'
+        },
+        {
+            id: 5, company: 'Bloemist Flora Belle', contact: 'Anna Bloem', phone: '06-99887766',
+            type: 'meeting', date: '2025-02-11', time: '13:30', value: '€3.800',
+            branche: 'Retail', source: 'AI Cold Calling',
+            summary: 'Deal getekend! Anna wil een visueel rijke website met bloemarrangementen-galerij, seizoensaanbiedingen, en de mogelijkheid om online boeketten te bestellen voor bezorging. Betaling aanbetaling 50% ontvangen. Start development volgende week. Oplevering gepland over 3 weken.'
+        },
+        {
+            id: 6, company: 'Tandartspraktijk Smeets', contact: 'Dr. Smeets', phone: '06-44332211',
+            type: 'meeting', date: '2025-02-12', time: '15:30', value: '€3.500',
+            branche: 'Gezondheidszorg', source: 'AI Cold Calling',
+            summary: 'Dr. Smeets heeft een praktijk met 3 tandartsen en zoekt een moderne, geruststellende website. Wil online afspraken, behandeloverzicht met uitleg, teamfoto\'s en een noodgevallen-sectie. Huidige website is 8 jaar oud. Wil graag snel schakelen.'
+        },
+        {
+            id: 7, company: 'FitZone Sportschool', contact: 'Dennis Kuijpers', phone: '06-77665544',
+            type: 'meeting', date: '2025-02-14', time: '10:30', value: '€4.200',
+            branche: 'Sport & Fitness', source: 'AI Cold Calling',
+            summary: 'Dennis opent een nieuwe sportschool in Eindhoven en heeft een complete online aanwezigheid nodig. Wil een energieke website met lesrooster, tarieven, trainer profielen, en een proefles-aanmeldformulier. Wil ook koppeling met zijn toekomstige app. Demo van vergelijkbare projecten aangevraagd.'
+        },
+        {
+            id: 8, company: 'Makelaar Wonen+', contact: 'Sandra Willems', phone: '06-33221100',
+            type: 'meeting', date: '2025-02-18', time: '09:00', value: '€6.800',
+            branche: 'Vastgoed', source: 'AI Cold Calling',
+            summary: 'Follow-up na demo. Sandra was zeer enthousiast over het portfolio-design. Wil een makelaarssite met woningaanbod (koppeling met Funda API), virtuele rondleidingen, en een waardebepaling-tool. Groot project, bespreken of we in fases werken. Beslissing verwacht deze week.'
+        },
+        {
+            id: 9, company: 'Cafe De Kroeg', contact: 'Jan Pietersen', phone: '06-12312312',
+            type: 'meeting', date: '2025-02-19', time: '16:00', value: '€2.500',
+            branche: 'Horeca', source: 'AI Cold Calling',
+            summary: 'Jan wil een simpele maar sfeervolle website voor zijn cafe. Openingstijden, menukaart, foto\'s van het interieur, en een evenementenkalender. Heeft geen haast maar wil het wel goed doen. Budget is beperkt, Starter pakket past het beste.'
+        },
+        {
+            id: 10, company: 'Installatiebedrijf Volt', contact: 'Rick Hendriks', phone: '06-45645645',
+            type: 'meeting', date: '2025-02-21', time: '11:00', value: '€3.200',
+            branche: 'Bouw & Installatie', source: 'AI Cold Calling',
+            summary: 'Contract getekend na snel traject. Rick wil een zakelijke site met diensten (elektra, loodgieter, CV), een noodservice-knop, klantervaringen, en een offerte-aanvraagformulier. Aanbetaling binnen. Oplevering in 2 weken.'
+        },
+        {
+            id: 11, company: 'Kapsalon Mooi', contact: 'Samira El Amrani', phone: '06-78978978',
+            type: 'meeting', date: '2025-02-24', time: '14:00', value: '€2.800',
+            branche: 'Persoonlijke Verzorging', source: 'AI Cold Calling',
+            summary: 'Samira runt een succesvolle kapsalon in Breda en wil een premium website met online booking-systeem. Wil haar portfolio tonen met before/after foto\'s, teamleden en prijslijst. Design moet luxe en modern aanvoelen. Past perfect bij ons Premium pakket.'
+        },
+        {
+            id: 12, company: 'Drukkerij Offset Plus', contact: 'Henk de Groot', phone: '06-65465465',
+            type: 'meeting', date: '2025-02-26', time: '10:00', value: '€4.000',
+            branche: 'Zakelijke Dienstverlening', source: 'AI Cold Calling',
+            summary: 'Henk zoekt een website met online bestelmodule voor drukwerk (visitekaartjes, flyers, posters). Wil een upload-functie voor designs en een offerte-calculator. Complexer project, demo gevraagd om technische mogelijkheden te bespreken.'
+        }
+    ];
+
+    // State
+    let currentDate = appointments.length ? new Date(`${appointments[0].date}T00:00:00`) : new Date();
+    const today = new Date();
+
+    const monthNames = ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'];
+
+    function renderCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const grid = document.getElementById('calendarGrid');
+        const label = document.getElementById('monthLabel');
+
+        label.textContent = `${monthNames[month]} ${year}`;
+
+        // First day of month (Monday = 0)
+        const firstDay = new Date(year, month, 1);
+        let startDay = firstDay.getDay() - 1;
+        if (startDay < 0) startDay = 6;
+
+        // Days in month
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+        // Total cells (6 rows)
+        const totalCells = Math.ceil((startDay + daysInMonth) / 7) * 7;
+
+        let html = '';
+
+        for (let i = 0; i < totalCells; i++) {
+            let day;
+            let dateStr;
+            let isOtherMonth = false;
+            let isToday = false;
+
+            if (i < startDay) {
+                day = daysInPrevMonth - startDay + i + 1;
+                const m = month === 0 ? 12 : month;
+                const y = month === 0 ? year - 1 : year;
+                dateStr = `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                isOtherMonth = true;
+            } else if (i >= startDay + daysInMonth) {
+                day = i - startDay - daysInMonth + 1;
+                const m = month + 2 > 12 ? 1 : month + 2;
+                const y = month + 2 > 12 ? year + 1 : year;
+                dateStr = `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                isOtherMonth = true;
+            } else {
+                day = i - startDay + 1;
+                dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                isToday = (day === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+            }
+
+            const dayAppointments = appointments.filter((a) => a.date === dateStr);
+
+            let classes = 'calendar-day';
+            if (isOtherMonth) classes += ' other-month';
+            if (isToday) classes += ' today';
+
+            html += `<div class="${classes}">`;
+            html += `<div class="day-number">${day}</div>`;
+
+            dayAppointments.forEach((apt) => {
+                html += `<div class="appointment meeting magnetic" onclick="openAppointment(${apt.id})">
+                    <span class="apt-time">${apt.time}</span> ${apt.company}
+                </div>`;
+            });
+
+            html += '</div>';
+        }
+
+        grid.innerHTML = html;
+
+        // Re-attach magnetic
+        document.querySelectorAll('.appointment.magnetic').forEach((elem) => {
+            elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+            elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        });
+    }
+
+    function changeMonth(dir) {
+        currentDate.setMonth(currentDate.getMonth() + dir);
+        renderCalendar();
+    }
+
+    function goToday() {
+        currentDate = new Date();
+        renderCalendar();
+    }
+
+    function openAppointment(id) {
+        const apt = appointments.find((a) => a.id === id);
+        if (!apt) return;
+
+        document.getElementById('modalBadge').textContent = 'Meeting';
+        document.getElementById('modalBadge').className = 'modal-type-badge meeting';
+        document.getElementById('modalCompany').textContent = apt.company;
+        document.getElementById('modalContact').textContent = `${apt.contact}  ·  ${apt.phone}`;
+        document.getElementById('modalDate').textContent = `${apt.date.split('-').reverse().join('-')}  om  ${apt.time}`;
+        document.getElementById('modalValue').textContent = apt.value;
+        document.getElementById('modalBranche').textContent = apt.branche;
+        document.getElementById('modalSource').textContent = apt.source;
+        document.getElementById('modalSummary').textContent = apt.summary;
+
+        document.getElementById('modal').classList.add('show');
+    }
+
+    function closeModal() {
+        document.getElementById('modal').classList.remove('show');
+    }
+
+    // Init
+    renderCalendar();
+
+    // Cursor
+    const cursor = document.querySelector('.cursor');
+    const cursorDot = document.querySelector('.cursor-dot');
+    let mouseX = 0;
+    let mouseY = 0;
+    let cursorX = 0;
+    let cursorY = 0;
+    let dotX = 0;
+    let dotY = 0;
+
+    document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+
+    function animateCursor() {
+        cursorX += (mouseX - cursorX) * 0.15;
+        cursorY += (mouseY - cursorY) * 0.15;
+        cursor.style.left = `${cursorX}px`;
+        cursor.style.top = `${cursorY}px`;
+        dotX += (mouseX - dotX) * 0.5;
+        dotY += (mouseY - dotY) * 0.5;
+        cursorDot.style.left = `${dotX}px`;
+        cursorDot.style.top = `${dotY}px`;
+        requestAnimationFrame(animateCursor);
+    }
+    animateCursor();
+
+    document.querySelectorAll('.magnetic').forEach((elem) => {
+        elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+        elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+    });
+</script>
+</body>
+</html>

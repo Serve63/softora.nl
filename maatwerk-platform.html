@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Softora | Software & Database Oplossingen</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #f8f7f4;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #efeee9;
+            --bg-card: rgba(0, 0, 0, 0.02);
+            --accent: #1a1a2e;
+            --accent-dark: #0f0f1a;
+            --accent-glow: rgba(26, 26, 46, 0.15);
+            --accent-light: #2d2d5e;
+            --accent-color: #4a5fd7;
+            --accent-color-glow: rgba(74, 95, 215, 0.2);
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b6b7b;
+            --text-tertiary: #a0a0b0;
+            --border: rgba(0, 0, 0, 0.08);
+            --border-hover: rgba(74, 95, 215, 0.4);
+            
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-power: cubic-bezier(0.87, 0, 0.13, 1);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 0.95;
+        }
+
+        h1 { 
+            font-size: clamp(3.5rem, 10vw, 8rem); 
+            font-weight: 700;
+        }
+        h2 { 
+            font-size: clamp(2.5rem, 6vw, 5rem); 
+        }
+        h3 { 
+            font-size: clamp(1.5rem, 3vw, 2.5rem); 
+            font-weight: 500;
+        }
+
+        .text-accent {
+            color: var(--accent-color);
+            position: relative;
+            font-weight: 700;
+        }
+
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .cursor {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.1s var(--ease-out-expo), 
+                        background 0.2s ease,
+                        width 0.3s var(--ease-out-expo),
+                        height 0.3s var(--ease-out-expo);
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+        }
+
+        .cursor.hover {
+            width: 80px;
+            height: 80px;
+            background: var(--accent);
+            border-color: transparent;
+            mix-blend-mode: difference;
+        }
+
+        .cursor-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10001;
+            transform: translate(-50%, -50%);
+            transition: transform 0.02s linear;
+        }
+
+        .scroll-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-color), var(--accent));
+            z-index: 10000;
+            transform-origin: left;
+            transform: scaleX(0);
+            box-shadow: 0 0 20px var(--accent-color-glow);
+        }
+
+        .ambient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .ambient-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.15;
+        }
+
+        .blob-1 {
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, var(--accent-color-glow), transparent 60%);
+            top: -300px;
+            right: -300px;
+            animation: pulse 8s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.15; }
+            50% { transform: scale(1.2); opacity: 0.25; }
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 2rem 4rem;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.6s var(--ease-out-expo);
+            text-transform: uppercase;
+            font-family: 'Oswald', sans-serif;
+            letter-spacing: 0.1em;
+        }
+
+        nav.scrolled {
+            padding: 1rem 4rem;
+            background: rgba(248, 247, 244, 0.92);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 4px 30px rgba(0,0,0,0.04);
+        }
+
+        .logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            letter-spacing: -0.02em;
+            position: relative;
+        }
+
+        .logo::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--accent-color);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.4s var(--ease-out-expo);
+        }
+
+        .logo:hover::after {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 3rem;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            position: relative;
+            padding: 0.5rem 0;
+            cursor: none;
+            transition: color 0.3s;
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent-color);
+            transition: width 0.3s var(--ease-out-expo);
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        /* Buttons */
+        .magnetic-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1.2rem 3rem;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            border: none;
+            cursor: none;
+            overflow: hidden;
+            transition: all 0.3s var(--ease-out-expo);
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+        }
+
+        .magnetic-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+            transition: left 0.6s;
+        }
+
+        .magnetic-btn:hover {
+            box-shadow: 0 0 40px var(--accent-glow);
+            transform: translateY(-2px);
+            background: var(--accent-light);
+        }
+
+        .magnetic-btn:hover::before {
+            left: 100%;
+        }
+
+        .magnetic-btn.secondary {
+            background: transparent;
+            border: 2px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        .magnetic-btn.secondary:hover {
+            border-color: var(--accent-color);
+            background: rgba(74, 95, 215, 0.05);
+            box-shadow: 0 0 30px var(--accent-color-glow);
+        }
+
+        .magnetic-btn.accent-btn {
+            background: var(--accent-color);
+        }
+
+        .magnetic-btn.accent-btn:hover {
+            box-shadow: 0 0 40px var(--accent-color-glow);
+            background: #3a4fc7;
+        }
+
+        /* Hero */
+        .hero {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: center;
+            padding: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            padding: 0 4rem;
+            max-width: 700px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-image {
+            position: relative;
+            height: 100vh;
+            clip-path: polygon(15% 0, 100% 0, 100% 100%, 0% 100%);
+        }
+
+        .hero-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: contrast(1.05) brightness(0.95);
+        }
+
+        .hero-image::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to right, var(--bg-primary), transparent 30%),
+                        linear-gradient(135deg, rgba(74,95,215,0.1), transparent 50%);
+        }
+
+        .eyebrow {
+            display: inline-block;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--accent-color);
+            margin-bottom: 2rem;
+            padding: 0.5rem 1rem;
+            border: 2px solid var(--accent-color);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 0.8s var(--ease-out-expo) forwards;
+        }
+
+        .hero h1 {
+            margin-bottom: 2rem;
+            font-size: clamp(2.2rem, 5.4vw, 4.2rem);
+            opacity: 0;
+            transform: translateY(60px);
+            animation: fadeInUp 1s var(--ease-power) 0.2s forwards;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin-bottom: 3rem;
+            line-height: 1.8;
+            font-weight: 300;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 1s var(--ease-out-expo) 0.4s forwards;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 1s var(--ease-out-expo) 0.6s forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Marquee */
+        .marquee-container {
+            overflow: hidden;
+            padding: 3rem 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .marquee {
+            display: flex;
+            gap: 4rem;
+            animation: marquee 25s linear infinite;
+            white-space: nowrap;
+        }
+
+        .marquee-item {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: transparent;
+            -webkit-text-stroke: 1px var(--text-tertiary);
+            flex-shrink: 0;
+            transition: all 0.3s;
+            letter-spacing: 0.05em;
+        }
+
+        .marquee-item:hover {
+            color: var(--accent-color);
+            -webkit-text-stroke: 1px var(--accent-color);
+        }
+
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* Sections */
+        section {
+            position: relative;
+            padding: 10rem 4rem;
+        }
+
+        @supports (content-visibility: auto) {
+            section:not(.hero) {
+                content-visibility: auto;
+                contain-intrinsic-size: 1000px;
+            }
+
+            footer {
+                content-visibility: auto;
+                contain-intrinsic-size: 560px;
+            }
+        }
+
+        .section-header {
+            margin-bottom: 6rem;
+        }
+
+        .section-header h2 {
+            margin-top: 1rem;
+            position: relative;
+            display: inline-block;
+        }
+
+        .section-header h2::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: var(--accent-color);
+        }
+
+        .section-header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            line-height: 1.8;
+            margin-top: 2rem;
+            max-width: 600px;
+            font-weight: 300;
+        }
+
+        /* Cards */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+
+        .tilt-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            padding: 3rem;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: perspective(1000px);
+            transition: all 0.4s var(--ease-out-expo);
+            overflow: hidden;
+            clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+        }
+
+        .tilt-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 40%, rgba(74,95,215,0.05), transparent 60%);
+            opacity: 0;
+            transform: translateX(-100%);
+            transition: all 0.6s;
+        }
+
+        .tilt-card:hover::before {
+            opacity: 1;
+            transform: translateX(100%);
+        }
+
+        .tilt-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08), 0 0 60px var(--accent-color-glow);
+        }
+
+        .card-number {
+            font-family: 'Oswald', sans-serif;
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            opacity: 0.12;
+            line-height: 1;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+
+        .tilt-card:hover .card-number {
+            opacity: 0.3;
+            transform: scale(1.1);
+            text-shadow: 0 0 30px var(--accent-color-glow);
+        }
+
+        .tilt-card h3 {
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .tilt-card p {
+            color: var(--text-secondary);
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6rem;
+            align-items: center;
+        }
+
+        /* Quote */
+        .quote-section {
+            padding: 15rem 4rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            min-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .quote-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+        }
+
+        .quote-bg img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(0.25) contrast(1.2);
+        }
+
+        .quote-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, var(--bg-primary) 0%, transparent 15%, transparent 85%, var(--bg-primary) 100%),
+                        linear-gradient(135deg, rgba(74,95,215,0.15), transparent);
+        }
+
+        .quote-text {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2rem, 5vw, 4rem);
+            font-weight: 600;
+            text-transform: uppercase;
+            line-height: 1.2;
+            max-width: 900px;
+            position: relative;
+            z-index: 2;
+            letter-spacing: 0.02em;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 1.2s var(--ease-out-expo);
+            text-shadow: 0 4px 30px rgba(0,0,0,0.5);
+            color: #ffffff;
+        }
+
+        .quote-text.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .quote-accent {
+            color: #7b8ef8;
+            font-weight: 700;
+        }
+
+        /* Stats */
+        .stat-item {
+            padding: 2rem;
+            border-left: 4px solid var(--border);
+            transition: all 0.4s var(--ease-out-expo);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 0;
+            background: var(--accent-color);
+            transition: height 0.4s var(--ease-out-expo);
+        }
+
+        .stat-item:hover {
+            background: linear-gradient(90deg, rgba(74,95,215,0.04), transparent);
+            padding-left: 3rem;
+        }
+
+        .stat-item:hover::before {
+            height: 100%;
+        }
+
+        .stat-number {
+            font-family: 'Oswald', sans-serif;
+            font-size: 4rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            display: block;
+            margin-bottom: 0.5rem;
+            line-height: 1;
+            transition: transform 0.4s;
+        }
+
+        .stat-item:hover .stat-number {
+            transform: translateX(10px);
+            text-shadow: 0 0 20px var(--accent-color-glow);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            font-family: 'Oswald', sans-serif;
+        }
+
+        /* Image + Text */
+        .image-text-section {
+            display: grid;
+            grid-template-columns: 45% 55%;
+            gap: 0;
+            align-items: stretch;
+            min-height: 80vh;
+        }
+
+        .image-side {
+            position: relative;
+            clip-path: polygon(0 0, 100% 0, 85% 100%, 0% 100%);
+            overflow: hidden;
+        }
+
+        .image-side img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: contrast(1.05) brightness(0.95);
+        }
+
+        .image-side::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to right, transparent 60%, var(--bg-tertiary)),
+                        linear-gradient(135deg, rgba(74,95,215,0.1), transparent);
+        }
+
+        .content-side {
+            padding: 6rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: var(--bg-tertiary);
+        }
+
+        /* Pricing */
+        .pricing-grid {
+            display: flex;
+            gap: 2rem;
+            perspective: 1000px;
+        }
+
+        .pricing-card {
+            flex: 1;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            padding: 4rem 3rem;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: all 0.5s var(--ease-out-expo);
+            display: flex;
+            flex-direction: column;
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%);
+        }
+
+        .pricing-card.featured {
+            background: linear-gradient(135deg, rgba(74,95,215,0.08), rgba(74,95,215,0.01));
+            border-color: var(--accent-color);
+            transform: translateY(-20px) scale(1.05);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.1), 0 0 100px var(--accent-color-glow);
+            z-index: 2;
+        }
+
+        .pricing-card.featured::before {
+            content: 'POPULAIR';
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: var(--accent-color);
+            color: white;
+            padding: 0.5rem 2rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 10% 100%);
+        }
+
+        .pricing-card:not(.featured):hover {
+            transform: translateY(-10px);
+            border-color: var(--text-tertiary);
+        }
+
+        .pricing-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 2rem;
+        }
+
+        .sessions {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-tertiary);
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+
+        .price {
+            font-family: 'Oswald', sans-serif;
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+            margin: 1rem 0;
+        }
+
+        .price-currency {
+            font-size: 2rem;
+            vertical-align: top;
+            color: var(--accent-color);
+        }
+
+        .price-note {
+            font-size: 1.2rem;
+            color: var(--text-tertiary);
+        }
+
+        .pricing-features {
+            list-style: none;
+            margin: 2rem 0;
+            flex-grow: 1;
+        }
+
+        .pricing-features li {
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-weight: 300;
+            transition: all 0.3s;
+        }
+
+        .pricing-features li::before {
+            content: '✓';
+            color: var(--accent-color);
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .pricing-features li:hover {
+            color: var(--text-primary);
+            padding-left: 10px;
+        }
+
+        /* FAQ */
+        .faq-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .faq-item {
+            border-bottom: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .faq-question {
+            width: 100%;
+            padding: 2.5rem 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 500;
+            text-align: left;
+            cursor: none;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            transition: color 0.3s;
+        }
+
+        .faq-question:hover {
+            color: var(--accent-color);
+        }
+
+        .faq-icon {
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.4s var(--ease-out-expo);
+            flex-shrink: 0;
+            margin-left: 2rem;
+        }
+
+        .faq-icon::before,
+        .faq-icon::after {
+            content: '';
+            position: absolute;
+            background: currentColor;
+            transition: all 0.4s var(--ease-out-expo);
+        }
+
+        .faq-icon::before {
+            width: 14px;
+            height: 2px;
+        }
+
+        .faq-icon::after {
+            width: 2px;
+            height: 14px;
+        }
+
+        .faq-item.active .faq-icon {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            transform: rotate(45deg);
+        }
+
+        .faq-item.active .faq-icon::before,
+        .faq-item.active .faq-icon::after {
+            background: white;
+        }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.6s var(--ease-out-expo), padding 0.6s var(--ease-out-expo);
+            color: var(--text-secondary);
+            line-height: 1.8;
+            padding-right: 60px;
+            font-weight: 300;
+        }
+
+        .faq-item.active .faq-answer {
+            max-height: 300px;
+            padding-bottom: 2.5rem;
+        }
+
+        /* CTA */
+        .cta-section {
+            padding: 12rem 4rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            min-height: 60vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cta-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+        }
+
+        .cta-bg img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(0.2) contrast(1.1);
+        }
+
+        .cta-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, transparent 0%, rgba(26,26,46,0.9) 70%),
+                        linear-gradient(135deg, rgba(74,95,215,0.1), transparent);
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .cta-title {
+            font-size: clamp(3rem, 8vw, 6rem);
+            margin-bottom: 2rem;
+            line-height: 0.9;
+            color: white;
+        }
+
+        /* Footer */
+        footer {
+            padding: 6rem 4rem 3rem;
+            border-top: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            background: var(--accent);
+            color: #ffffff;
+        }
+
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 6rem;
+            margin-bottom: 6rem;
+        }
+
+        .footer-brand .logo {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #ffffff;
+        }
+
+        .footer-brand p {
+            color: rgba(255,255,255,0.4);
+            line-height: 1.8;
+            max-width: 300px;
+            font-weight: 300;
+        }
+
+        .footer-links h4 {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 2rem;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .footer-links a {
+            display: block;
+            color: rgba(255,255,255,0.4);
+            text-decoration: none;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            cursor: none;
+            font-weight: 300;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-family: 'Oswald', sans-serif;
+        }
+
+        .footer-links a:hover {
+            color: #7b8ef8;
+            transform: translateX(5px);
+        }
+
+        .footer-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 3rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.3);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-family: 'Oswald', sans-serif;
+        }
+
+        /* Utilities */
+        .fade-up {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 0.8s var(--ease-out-expo);
+        }
+
+        .fade-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (max-width: 1024px) {
+            .hero { grid-template-columns: 1fr; }
+            .hero-image { display: none; }
+            .hero-content { padding: 10rem 2rem; max-width: 100%; }
+            .grid-3, .pricing-grid { grid-template-columns: 1fr; flex-direction: column; }
+            .grid-2, .image-text-section { grid-template-columns: 1fr; }
+            .image-side { clip-path: none; height: 400px; }
+            .content-side { padding: 4rem 2rem; }
+            .footer-grid { grid-template-columns: 1fr 1fr; gap: 3rem; }
+            .pricing-card.featured { transform: none; order: -1; }
+            nav, section, footer { padding-left: 2rem; padding-right: 2rem; }
+            body { cursor: auto; }
+            .cursor, .cursor-dot { display: none; }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .footer-grid { grid-template-columns: 1fr; }
+            h1 { font-size: 3rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="noise-overlay"></div>
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+    <div class="scroll-progress"></div>
+
+    <div class="ambient-bg">
+        <div class="ambient-blob blob-1"></div>
+    </div>
+
+    <nav id="navbar">
+        <a href="#" class="logo">SOFTORA.</a>
+        <div class="nav-links">
+            <a href="#diensten" class="nav-link magnetic">Diensten</a>
+            <a href="#werkwijze" class="nav-link magnetic">Werkwijze</a>
+            <a href="#over" class="nav-link magnetic">Over</a>
+            <a href="#prijzen" class="nav-link magnetic">Prijzen</a>
+            <a href="#contact" class="magnetic-btn accent-btn magnetic" style="padding: 0.8rem 1.5rem; font-size: 0.85rem;">Start Project</a>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="hero-content">
+            <span class="eyebrow">Enterprise Solutions</span>
+            <h1>Persoonlijke <span class="text-accent">Software</span></h1>
+            <p>Custom software, database-architectuur en high-performance webplatformen. Voor bedrijven die miljoenen datapunten verwerken en 99.9% uptime eisen.</p>
+            <div class="hero-buttons">
+                <a href="#contact" class="magnetic-btn accent-btn magnetic">Plan Gesprek</a>
+                <a href="#werkwijze" class="magnetic-btn magnetic secondary">Onze Aanpak</a>
+            </div>
+        </div>
+        <div class="hero-image">
+            <img src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80" alt="Server infrastructure" width="1200" height="800" decoding="async" fetchpriority="high">
+        </div>
+    </section>
+
+    <div class="marquee-container">
+        <div class="marquee">
+            <span class="marquee-item">Software</span>
+            <span class="marquee-item">•</span>
+            <span class="marquee-item">Databases</span>
+            <span class="marquee-item">•</span>
+            <span class="marquee-item">API's</span>
+            <span class="marquee-item">•</span>
+            <span class="marquee-item">Webplatformen</span>
+            <span class="marquee-item">•</span>
+            <span class="marquee-item">Cloud</span>
+            <span class="marquee-item">•</span>
+            <span class="marquee-item">Software</span>
+            <span class="marquee-item">•</span>
+            <span class="marquee-item">Databases</span>
+            <span class="marquee-item">•</span>
+        </div>
+    </div>
+
+    <!-- DIENSTEN -->
+    <section id="diensten">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div class="section-header fade-up">
+                <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">Wat Wij Bouwen</span>
+                <h2>Enterprise Oplossingen</h2>
+                <p>Van database-architectuur tot volledige webplatformen. Wij bouwen de technische ruggengraat van ambitieuze bedrijven.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="tilt-card fade-up" data-tilt>
+                    <div class="card-content">
+                        <div class="card-number">01</div>
+                        <h3>Custom Software</h3>
+                        <p>Maatwerk applicaties die je bedrijfsprocessen automatiseren. Van interne tools tot klantgerichte platforms — gebouwd voor schaalbaarheid en performance.</p>
+                    </div>
+                </div>
+
+                <div class="tilt-card fade-up" data-tilt style="transition-delay: 0.1s">
+                    <div class="card-content">
+                        <div class="card-number">02</div>
+                        <h3>Database Architectuur</h3>
+                        <p>Robuuste database-oplossingen die miljoenen records aankunnen. Optimalisatie, migratie en ontwerp van SQL en NoSQL systemen voor maximale snelheid.</p>
+                    </div>
+                </div>
+
+                <div class="tilt-card fade-up" data-tilt style="transition-delay: 0.2s">
+                    <div class="card-content">
+                        <div class="card-number">03</div>
+                        <h3>Webplatformen</h3>
+                        <p>High-traffic websites en webapplicaties die niet omvallen onder druk. E-commerce, portalen en SaaS-platforms met enterprise-grade infrastructuur.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- QUOTE -->
+    <section class="quote-section">
+        <div class="quote-bg">
+            <img src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80" alt="Data visualization" width="1600" height="900" loading="lazy" decoding="async">
+        </div>
+        <blockquote class="quote-text">
+            <span class="quote-accent">Goede software zie je niet</span> —<br>
+            je merkt het pas als<br>
+            het ontbreekt.
+        </blockquote>
+    </section>
+
+    <!-- OVER + IMAGE -->
+    <section class="image-text-section" id="over">
+        <div class="image-side">
+            <img src="https://images.unsplash.com/photo-1504639725590-34d0984388bd?auto=format&fit=crop&w=1000&q=80" alt="Code on screen" width="1000" height="667" loading="lazy" decoding="async">
+        </div>
+        <div class="content-side fade-up">
+            <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem; display: inline-block; margin-bottom: 2rem;">Over Ons</span>
+            <h2 style="margin-bottom: 2rem;">Geen Agencies.<br>Geen Overhead.</h2>
+            <p style="color: var(--text-secondary); font-size: 1.1rem; line-height: 1.9; margin-bottom: 2rem; font-weight: 300;">
+                Wij zijn een team van senior developers dat rechtstreeks met je samenwerkt. Geen accountmanagers, geen tussenlagen. Jij praat direct met de mensen die je software bouwen.
+            </p>
+            <p style="color: var(--text-secondary); font-size: 1.1rem; line-height: 1.9; margin-bottom: 3rem; font-weight: 300;">
+                Vanuit Tilburg werken wij voor bedrijven door heel Nederland en daarbuiten. Van scale-ups tot enterprise — als je serieuze technologie nodig hebt, zijn wij je partner.
+            </p>
+            <a href="#contact" class="magnetic-btn accent-btn magnetic">Neem Contact Op</a>
+        </div>
+    </section>
+
+    <!-- WERKWIJZE -->
+    <section id="werkwijze" style="background: var(--bg-tertiary); padding: 10rem 4rem;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div class="grid-2">
+                <div class="fade-up">
+                    <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">Werkwijze</span>
+                    <h2 style="margin: 1rem 0 2rem;">Van Architectuur<br>Naar Productie</h2>
+                    <p style="color: var(--text-secondary); font-size: 1.1rem; line-height: 1.9; margin-bottom: 2rem; font-weight: 300;">
+                        Een bewezen development-proces met CI/CD, code reviews en uitgebreide testing. Voorspelbaar, transparant en schaalbaar.
+                    </p>
+                    <ul style="list-style: none;">
+                        <li style="padding: 1.2rem 0; border-bottom: 1px solid var(--border); color: var(--text-secondary); display: flex; align-items: center; gap: 1rem; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.05em;">
+                            <span style="color: var(--accent-color); font-weight: 700;">›</span> Discovery & Architectuur
+                        </li>
+                        <li style="padding: 1.2rem 0; border-bottom: 1px solid var(--border); color: var(--text-secondary); display: flex; align-items: center; gap: 1rem; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.05em;">
+                            <span style="color: var(--accent-color); font-weight: 700;">›</span> Sprint-based Development
+                        </li>
+                        <li style="padding: 1.2rem 0; border-bottom: 1px solid var(--border); color: var(--text-secondary); display: flex; align-items: center; gap: 1rem; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.05em;">
+                            <span style="color: var(--accent-color); font-weight: 700;">›</span> Testing & QA
+                        </li>
+                        <li style="padding: 1.2rem 0; color: var(--text-secondary); display: flex; align-items: center; gap: 1rem; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.05em;">
+                            <span style="color: var(--accent-color); font-weight: 700;">›</span> Deployment & Monitoring
+                        </li>
+                    </ul>
+                </div>
+                
+                <div style="display: grid; gap: 0;">
+                    <div class="stat-item fade-up">
+                        <span class="stat-number">99.9%</span>
+                        <span class="stat-label">Uptime Garantie</span>
+                    </div>
+                    <div class="stat-item fade-up" style="transition-delay: 0.1s">
+                        <span class="stat-number">50M<span style="font-size: 1.5rem; color: var(--text-tertiary);">+</span></span>
+                        <span class="stat-label">Requests Per Maand</span>
+                    </div>
+                    <div class="stat-item fade-up" style="transition-delay: 0.2s">
+                        <span class="stat-number">&lt;200<span style="font-size: 1.5rem; color: var(--text-tertiary);">MS</span></span>
+                        <span class="stat-label">Gemiddelde Response Time</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PRIJZEN -->
+    <section id="prijzen">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div class="section-header fade-up" style="text-align: center; margin: 0 auto 6rem; display: flex; flex-direction: column; align-items: center;">
+                <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">Investering</span>
+                <h2 style="text-align: center;">Pakketten & Prijzen</h2>
+                <p style="text-align: center;">Transparante prijzen voor elk type project. Van MVP tot enterprise-platform.</p>
+            </div>
+
+            <div class="pricing-grid">
+                <div class="pricing-card fade-up" data-tilt>
+                    <div class="pricing-header">
+                        <div class="sessions">Starter</div>
+                        <h3 style="font-size: 2rem;">MVP / Webapplicatie</h3>
+                        <div class="price"><span class="price-currency">€</span>8K<span class="price-note">+</span></div>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Snel naar markt met een solide basis</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>Custom webapplicatie</li>
+                        <li>Database setup & design</li>
+                        <li>REST API development</li>
+                        <li>Basis hosting & deployment</li>
+                        <li>1 maand support na launch</li>
+                    </ul>
+                    <a href="#contact" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Bespreek Project</a>
+                </div>
+
+                <div class="pricing-card featured fade-up" data-tilt style="transition-delay: 0.1s">
+                    <div class="pricing-header">
+                        <div class="sessions">Groei</div>
+                        <h3 style="font-size: 2rem;">Platform & Software</h3>
+                        <div class="price"><span class="price-currency">€</span>25K<span class="price-note">+</span></div>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Schaalbare oplossingen voor groei</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>Volledig custom platform</li>
+                        <li>Geavanceerde database architectuur</li>
+                        <li>API-integraties & microservices</li>
+                        <li>Automated testing & CI/CD</li>
+                        <li>Cloud infrastructure (AWS/Azure)</li>
+                        <li>3 maanden support & monitoring</li>
+                    </ul>
+                    <a href="#contact" class="magnetic-btn accent-btn magnetic" style="width: 100%; justify-content: center;">Bespreek Project</a>
+                </div>
+
+                <div class="pricing-card fade-up" data-tilt style="transition-delay: 0.2s">
+                    <div class="pricing-header">
+                        <div class="sessions">Enterprise</div>
+                        <h3 style="font-size: 2rem;">Enterprise Suite</h3>
+                        <div class="price"><span class="price-currency">€</span>60K<span class="price-note">+</span></div>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Mission-critical systemen</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>Enterprise-grade architectuur</li>
+                        <li>High-availability & load balancing</li>
+                        <li>Database clustering & replicatie</li>
+                        <li>Security audits & compliance</li>
+                        <li>Dedicated SLA & 24/7 support</li>
+                    </ul>
+                    <a href="#contact" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Bespreek Opties</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" style="background: var(--bg-tertiary);">
+        <div style="max-width: 900px; margin: 0 auto;">
+            <div class="section-header fade-up" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
+                <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">FAQ</span>
+                <h2 style="text-align: center;">Veelgestelde Vragen</h2>
+            </div>
+
+            <div class="faq-container" style="margin-top: 4rem;">
+                <div class="faq-item fade-up">
+                    <button class="faq-question magnetic">
+                        Welke technologieën gebruiken jullie?
+                        <span class="faq-icon"></span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Wij werken met moderne stacks zoals Node.js, Python, React, Next.js en Vue. Voor databases gebruiken we PostgreSQL, MongoDB, Redis en meer — afhankelijk van wat het project nodig heeft. We kiezen altijd de juiste tool voor de klus.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item fade-up" style="transition-delay: 0.1s">
+                    <button class="faq-question magnetic">
+                        Kunnen jullie een bestaand systeem overnemen of verbeteren?
+                        <span class="faq-icon"></span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Ja. We doen regelmatig code audits, performance optimalisaties en database-migraties van bestaande systemen. Na een technische analyse adviseren we of refactoring of een rebuild de beste route is.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item fade-up" style="transition-delay: 0.2s">
+                    <button class="faq-question magnetic">
+                        Hoe gaan jullie om met data security?
+                        <span class="faq-icon"></span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Security staat centraal in alles wat we bouwen. We werken met encrypted connections, role-based access control, regular security audits en volgen OWASP-richtlijnen. Voor specifieke compliance-eisen (AVG, ISO) stemmen we de aanpak af.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item fade-up" style="transition-delay: 0.3s">
+                    <button class="faq-question magnetic">
+                        Bieden jullie doorlopend onderhoud en hosting?
+                        <span class="faq-icon"></span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Absoluut. We bieden SLA-contracten met monitoring, security patches, performance-optimalisatie en 24/7 support voor mission-critical systemen. Hosting regelen we via AWS, Azure of Google Cloud — wat het beste past.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section id="contact" class="cta-section">
+        <div class="cta-bg">
+            <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1600&q=80" alt="Technology infrastructure" width="1600" height="900" loading="lazy" decoding="async">
+        </div>
+        <div class="cta-content">
+            <span class="eyebrow fade-up" style="border: none; padding: 0; color: rgba(255,255,255,0.5); font-size: 0.9rem; display: inline-block; margin-bottom: 2rem;">Laten We Bouwen</span>
+            <h2 class="cta-title fade-up">
+                Klaar Voor<br>
+                <span style="color: #7b8ef8;">Serieuze Software</span>?
+            </h2>
+            <p class="fade-up" style="color: rgba(255,255,255,0.5); max-width: 500px; margin: 0 auto 3rem; font-size: 1.1rem; font-weight: 300;">
+                Plan een technisch gesprek en ontdek hoe wij jouw software-uitdaging oplossen.
+            </p>
+            <div class="fade-up" style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;">
+                <a href="tel:+31612345678" class="magnetic-btn accent-btn magnetic">Bel Direct</a>
+                <a href="mailto:info@softora.nl" class="magnetic-btn magnetic secondary" style="border-color: rgba(255,255,255,0.2); color: white;">Mail Ons</a>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a href="#" class="logo">SOFTORA.</a>
+                    <p>Custom software & database oplossingen vanuit Tilburg. Gebouwd voor schaal.</p>
+                </div>
+                <div class="footer-links">
+                    <h4>Navigatie</h4>
+                    <a href="#diensten" class="magnetic">Diensten</a>
+                    <a href="#werkwijze" class="magnetic">Werkwijze</a>
+                    <a href="#prijzen" class="magnetic">Prijzen</a>
+                    <a href="#faq" class="magnetic">FAQ</a>
+                </div>
+                <div class="footer-links">
+                    <h4>Contact</h4>
+                    <a href="mailto:info@softora.nl" class="magnetic">info@softora.nl</a>
+                    <a href="tel:+31612345678" class="magnetic">06 12 34 56 78</a>
+                    <a href="#" class="magnetic">Piusplein 25, Tilburg</a>
+                    <a href="personeel-login.html" class="magnetic">Personeel inloggen</a>
+                </div>
+                <div class="footer-links">
+                    <h4>Social</h4>
+                    <a href="#" class="magnetic">GitHub</a>
+                    <a href="#" class="magnetic">LinkedIn</a>
+                    <a href="#" class="magnetic">Twitter</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Softora</p>
+                <p>Engineered With Precision</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const cursor = document.querySelector(".cursor");
+        const cursorDot = document.querySelector(".cursor-dot");
+        const progressBar = document.querySelector(".scroll-progress");
+        const navbar = document.getElementById("navbar");
+        const magneticElements = document.querySelectorAll(".magnetic");
+        const tiltCards = document.querySelectorAll("[data-tilt]");
+        const faqButtons = document.querySelectorAll(".faq-question");
+        const anchors = document.querySelectorAll('a[href^="#"]');
+        const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+
+        if (!enablePointerFx) {
+            document.body.style.cursor = "auto";
+            cursor.style.display = "none";
+            cursorDot.style.display = "none";
+        } else {
+            let mouseX = 0;
+            let mouseY = 0;
+            let cursorX = 0;
+            let cursorY = 0;
+            let dotX = 0;
+            let dotY = 0;
+            let cursorRafId = null;
+
+            document.addEventListener(
+                "mousemove",
+                function (event) {
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                },
+                { passive: true }
+            );
+
+            function animateCursor() {
+                cursorX += (mouseX - cursorX) * 0.15;
+                cursorY += (mouseY - cursorY) * 0.15;
+                cursor.style.left = cursorX + "px";
+                cursor.style.top = cursorY + "px";
+                dotX += (mouseX - dotX) * 0.5;
+                dotY += (mouseY - dotY) * 0.5;
+                cursorDot.style.left = dotX + "px";
+                cursorDot.style.top = dotY + "px";
+                cursorRafId = requestAnimationFrame(animateCursor);
+            }
+
+            function startCursorLoop() {
+                if (cursorRafId === null) {
+                    cursorRafId = requestAnimationFrame(animateCursor);
+                }
+            }
+
+            function stopCursorLoop() {
+                if (cursorRafId !== null) {
+                    cancelAnimationFrame(cursorRafId);
+                    cursorRafId = null;
+                }
+            }
+
+            startCursorLoop();
+
+            document.addEventListener("visibilitychange", function () {
+                if (document.hidden) {
+                    stopCursorLoop();
+                } else {
+                    startCursorLoop();
+                }
+            });
+
+            magneticElements.forEach(function (element) {
+                let magneticRaf = 0;
+                let targetX = 0;
+                let targetY = 0;
+
+                element.addEventListener("mouseenter", function () {
+                    cursor.classList.add("hover");
+                });
+
+                element.addEventListener("mouseleave", function () {
+                    cursor.classList.remove("hover");
+                    element.style.transform = "translate(0, 0)";
+                });
+
+                element.addEventListener(
+                    "mousemove",
+                    function (event) {
+                        const rect = element.getBoundingClientRect();
+                        targetX = (event.clientX - rect.left - rect.width / 2) * 0.2;
+                        targetY = (event.clientY - rect.top - rect.height / 2) * 0.2;
+
+                        if (magneticRaf) return;
+                        magneticRaf = requestAnimationFrame(function () {
+                            element.style.transform = `translate(${targetX}px, ${targetY}px)`;
+                            magneticRaf = 0;
+                        });
+                    },
+                    { passive: true }
+                );
+            });
+
+            tiltCards.forEach(function (card) {
+                let tiltRaf = 0;
+                let rotateX = 0;
+                let rotateY = 0;
+
+                card.addEventListener(
+                    "mousemove",
+                    function (event) {
+                        const rect = card.getBoundingClientRect();
+                        const x = event.clientX - rect.left;
+                        const y = event.clientY - rect.top;
+                        const centerX = rect.width / 2;
+                        const centerY = rect.height / 2;
+                        rotateX = (y - centerY) / 15;
+                        rotateY = (centerX - x) / 15;
+
+                        if (tiltRaf) return;
+                        tiltRaf = requestAnimationFrame(function () {
+                            card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+                            tiltRaf = 0;
+                        });
+                    },
+                    { passive: true }
+                );
+
+                card.addEventListener("mouseleave", function () {
+                    card.style.transform = "perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)";
+                });
+            });
+        }
+
+        let scrollRafPending = false;
+        function updateScrollUi() {
+            const scrolled = window.scrollY;
+            const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+            progressBar.style.transform = `scaleX(${Math.min(scrolled / maxScroll, 1)})`;
+            navbar.classList.toggle("scrolled", scrolled > 100);
+            scrollRafPending = false;
+        }
+
+        function onScroll() {
+            if (scrollRafPending) return;
+            scrollRafPending = true;
+            requestAnimationFrame(updateScrollUi);
+        }
+
+        window.addEventListener("scroll", onScroll, { passive: true });
+        updateScrollUi();
+
+        const observerOptions = { threshold: 0.1, rootMargin: "0px 0px -10% 0px" };
+        const observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting) entry.target.classList.add("visible");
+            });
+        }, observerOptions);
+        document.querySelectorAll(".fade-up").forEach(function (element) {
+            observer.observe(element);
+        });
+
+        const quoteObserver = new IntersectionObserver(
+            function (entries) {
+                entries.forEach(function (entry) {
+                    if (entry.isIntersecting) entry.target.classList.add("visible");
+                });
+            },
+            { threshold: 0.3 }
+        );
+        document.querySelectorAll(".quote-text").forEach(function (quote) {
+            quoteObserver.observe(quote);
+        });
+
+        faqButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                const item = button.parentElement;
+                const isActive = item.classList.contains("active");
+                document.querySelectorAll(".faq-item").forEach(function (faqItem) {
+                    faqItem.classList.remove("active");
+                });
+                if (!isActive) item.classList.add("active");
+            });
+        });
+
+        anchors.forEach(function (anchor) {
+            anchor.addEventListener("click", function (event) {
+                event.preventDefault();
+                const target = document.querySelector(anchor.getAttribute("href"));
+                if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+        });
+    </script>
+</body>
+</html>

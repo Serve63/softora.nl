@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Softora | AI Coldmailing — Premium</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="assets/personnel-theme.css">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
+                var storageKey = isPremiumPersonnel
+                    ? "softora_premium_personnel_theme_mode"
+                    : "softora_software_personnel_theme_mode";
+                var mode = localStorage.getItem(storageKey);
+                if (mode === "light" || mode === "dark") {
+                    document.documentElement.setAttribute("data-theme-mode", mode);
+                    document.documentElement.setAttribute("data-theme", mode);
+                }
+            } catch (error) {
+                /* ignore storage errors */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #080808;
+            --bg-secondary: #0d0d0d;
+            --bg-tertiary: #111;
+            --accent: #8B2252;
+            --accent-dark: #6B1A3F;
+            --accent-glow: rgba(139, 34, 82, 0.4);
+            --accent-light: #A62D65;
+            --text-primary: #f5f5f5;
+            --text-secondary: #888;
+            --text-tertiary: #555;
+            --border: rgba(255, 255, 255, 0.06);
+            --green: #2ecc71;
+            --green-glow: rgba(46, 204, 113, 0.15);
+            --yellow: #f39c12;
+
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .cursor {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--accent-light);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.1s var(--ease-out-expo),
+                        background 0.2s ease,
+                        width 0.3s var(--ease-out-expo),
+                        height 0.3s var(--ease-out-expo);
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+        }
+
+        .cursor.hover {
+            width: 80px;
+            height: 80px;
+            background: var(--accent-light);
+            border-color: transparent;
+        }
+
+        .cursor-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-light);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10001;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Layout */
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 2.5rem 0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 0 2rem;
+            margin-bottom: 3rem;
+            display: block;
+        }
+
+        .sidebar-logo span { color: var(--accent-light); }
+
+        .sidebar-nav { flex: 1; }
+
+        .sidebar-section { margin-bottom: 2rem; }
+
+        .sidebar-section-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--text-tertiary);
+            padding: 0 2rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.8rem 2rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 400;
+            transition: all 0.2s;
+            cursor: none;
+            position: relative;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar-link:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .sidebar-link.active {
+            color: var(--text-primary);
+            background: rgba(139, 34, 82, 0.06);
+        }
+
+        .sidebar-link.active::before { opacity: 1; }
+
+        .sidebar-link svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.5;
+            flex-shrink: 0;
+        }
+
+        .sidebar-link.active svg,
+        .sidebar-link:hover svg { opacity: 1; }
+
+        .sidebar-footer {
+            padding: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .sidebar-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .sidebar-user-info { flex: 1; min-width: 0; }
+
+        .sidebar-user-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .sidebar-user-role {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: none;
+            padding: 0.3rem;
+            transition: color 0.2s;
+        }
+
+        .logout-btn:hover { color: #e74c3c; }
+        .logout-btn svg { width: 18px; height: 18px; }
+
+        /* Main */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 3rem;
+        }
+
+        /* Top bar */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+        }
+
+        .topbar-left h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+
+        .topbar-left p {
+            color: var(--text-tertiary);
+            font-size: 0.9rem;
+            font-weight: 300;
+        }
+
+        /* Status indicator */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 0.5rem 1.2rem;
+            border: 1px solid var(--border);
+        }
+
+        .status-pill .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-tertiary);
+        }
+
+        .status-pill.active .dot {
+            background: var(--green);
+            box-shadow: 0 0 10px var(--green-glow);
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        .status-pill.active {
+            color: var(--green);
+            border-color: rgba(46,204,113,0.2);
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Generator panels */
+        .generator-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 2.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUp 0.6s var(--ease-out-expo) forwards;
+        }
+
+        @keyframes fadeUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .panel-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .panel-badge {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent-light);
+            padding: 0.3rem 0.8rem;
+            border: 1px solid rgba(139,34,82,0.3);
+        }
+
+        /* Form elements */
+        .form-group {
+            margin-bottom: 2rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.8rem;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 1rem 1.2rem;
+            background: rgba(255,255,255,0.03);
+            border: 2px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 400;
+            outline: none;
+            transition: all 0.3s var(--ease-out-expo);
+            cursor: none;
+        }
+
+        .form-input::placeholder,
+        .form-textarea::placeholder {
+            color: var(--text-tertiary);
+            font-weight: 300;
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            border-color: var(--accent-light);
+            background: rgba(139, 34, 82, 0.03);
+            box-shadow: 0 0 30px rgba(139, 34, 82, 0.08);
+        }
+
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23555' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1.2rem center;
+            padding-right: 3rem;
+        }
+
+        .form-select option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+            line-height: 1.7;
+        }
+
+        /* Slider */
+        .slider-container {
+            position: relative;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .slider-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-light);
+            line-height: 1;
+            transition: all 0.2s;
+        }
+
+        .slider-value span {
+            font-size: 1rem;
+            color: var(--text-tertiary);
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            appearance: none;
+            background: var(--border);
+            outline: none;
+            cursor: none;
+            border-radius: 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: var(--accent);
+            border: 3px solid var(--accent-light);
+            cursor: none;
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: var(--accent);
+            border: 3px solid var(--accent-light);
+            border-radius: 0;
+            cursor: none;
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+        }
+
+        .slider-labels span {
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* Price input with prefix */
+        .price-input-wrap {
+            position: relative;
+        }
+
+        .price-input-wrap .prefix {
+            position: absolute;
+            left: 1.2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent-light);
+            pointer-events: none;
+        }
+
+        .price-input-wrap .form-input {
+            padding-left: 2.5rem;
+        }
+
+        /* Launch button */
+        .launch-section {
+            margin-bottom: 3rem;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUp 0.6s var(--ease-out-expo) 0.4s forwards;
+        }
+
+        .launch-btn {
+            width: 100%;
+            padding: 1.5rem;
+            background: var(--accent);
+            color: white;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: none;
+            cursor: none;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s var(--ease-out-expo);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+        }
+
+        .launch-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.6s;
+        }
+
+        .launch-btn:hover {
+            background: var(--accent-light);
+            box-shadow: 0 0 60px var(--accent-glow);
+            transform: translateY(-2px);
+        }
+
+        .launch-btn:hover::before { left: 100%; }
+
+        .launch-btn svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .launch-btn.running {
+            background: var(--green);
+            box-shadow: 0 0 60px var(--green-glow);
+        }
+
+        .launch-btn.running:hover {
+            background: #27ae60;
+            box-shadow: 0 0 60px rgba(46,204,113,0.3);
+        }
+
+        /* Stats bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1.8rem;
+            clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUp 0.6s var(--ease-out-expo) forwards;
+        }
+
+        .stat-card:nth-child(1) { animation-delay: 0.5s; }
+        .stat-card:nth-child(2) { animation-delay: 0.6s; }
+        .stat-card:nth-child(3) { animation-delay: 0.7s; }
+        .stat-card:nth-child(4) { animation-delay: 0.8s; }
+
+        .stat-card-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .stat-card-value.accent { color: var(--accent-light); }
+        .stat-card-value.green { color: var(--green); }
+
+        /* Log panel */
+        .log-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUp 0.6s var(--ease-out-expo) 0.9s forwards;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .log-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .log-body {
+            padding: 1.5rem 2rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-body::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .log-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .log-body::-webkit-scrollbar-thumb {
+            background: var(--border);
+        }
+
+        .log-empty {
+            text-align: center;
+            padding: 3rem 0;
+            color: var(--text-tertiary);
+            font-size: 0.9rem;
+            font-weight: 300;
+        }
+
+        .log-entry {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid var(--border);
+            animation: fadeUp 0.3s var(--ease-out-expo) forwards;
+        }
+
+        .log-entry:last-child { border-bottom: none; }
+
+        .log-entry-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-top: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .log-entry-dot.call { background: var(--accent-light); }
+        .log-entry-dot.success { background: var(--green); }
+        .log-entry-dot.skip { background: var(--yellow); }
+
+        .log-entry-text {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            line-height: 1.5;
+        }
+
+        .log-entry-text strong {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .log-entry-time {
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            margin-left: auto;
+            white-space: nowrap;
+            font-family: 'Oswald', sans-serif;
+            letter-spacing: 0.05em;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .generator-grid { grid-template-columns: 1fr; }
+            .stats-bar { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 1024px) {
+            body { cursor: auto; }
+            .cursor, .cursor-dot { display: none; }
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+        }
+
+        @media (max-width: 768px) {
+            .main-content { padding: 1.5rem; }
+            .stats-bar { grid-template-columns: 1fr; }
+            .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="noise-overlay"></div>
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+
+    <div class="dashboard-layout">
+
+        <aside class="sidebar">
+            <a href="premium-website.html" class="sidebar-logo magnetic">Softora.nl</a>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="premium-personeel-dashboard.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="premium-personeel-agenda.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        Agenda
+                    </a>
+                    <a href="premium-actieve-opdrachten.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Actieve Opdrachten
+                    </a>
+                    <a href="premium-ai-lead-generator.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
+                        AI Coldcalling
+                    </a>
+                    <a href="premium-ai-coldmailing.html" class="sidebar-link active magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                        AI Coldmailing
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5V21h4.5L21 7.5l-4.5-4.5L3 16.5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9"/></svg>
+                        SEO
+                    </a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Beheer</div>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Klanten
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                        Instellingen
+                    </a>
+                <div class="sidebar-theme">
+                    <div class="sidebar-theme-label">Thema</div>
+                    <div class="sidebar-theme-options" role="group" aria-label="Thema kiezen">
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="dark" aria-pressed="false">Donker</button>
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="light" aria-pressed="false">Licht</button>
+                    </div>
+                </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">SP</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">Softora Premium</div>
+                        <div class="sidebar-user-role">Administrator</div>
+                    </div>
+                    <a href="premium-personeel-login.html" class="logout-btn magnetic" title="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+
+            <div class="topbar">
+                <div class="topbar-left">
+                    <h1>AI Coldmailing</h1>
+                    <p>AI coldmailing campagne configureren & starten</p>
+                </div>
+                <div class="status-pill" id="statusPill">
+                    <span class="dot"></span>
+                    Inactief
+                </div>
+            </div>
+
+            <div class="generator-grid">
+
+                <div class="panel" style="animation-delay: 0.1s;">
+                    <div class="panel-header">
+                        <span class="panel-title">Campagne Instellingen</span>
+                        <span class="panel-badge">Configuratie</span>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="slider-container">
+                            <div class="slider-header">
+                                <label class="form-label" style="margin-bottom: 0;">Aantal Leads</label>
+                                <div class="slider-value" id="leadValue">25 <span>leads</span></div>
+                            </div>
+                            <input type="range" min="5" max="100" value="25" step="5" id="leadSlider" class="magnetic">
+                            <div class="slider-labels">
+                                <span>5</span>
+                                <span>50</span>
+                                <span>100</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Doelgroep / Branche</label>
+                        <select class="form-select magnetic" id="branche">
+                            <option value="horeca">Horeca & Restaurants</option>
+                            <option value="retail">Retail & Winkels</option>
+                            <option value="zakelijk" selected>Zakelijke Dienstverlening</option>
+                            <option value="bouw">Bouw & Vastgoed</option>
+                            <option value="gezondheid">Gezondheidszorg</option>
+                            <option value="creatief">Creatieve Sector</option>
+                            <option value="tech">Tech & Startups</option>
+                            <option value="overig">Overig</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Regio</label>
+                        <select class="form-select magnetic" id="regio">
+                            <option value="tilburg" selected>Tilburg & Omgeving</option>
+                            <option value="eindhoven">Eindhoven & Omgeving</option>
+                            <option value="brabant">Heel Noord-Brabant</option>
+                            <option value="randstad">Randstad</option>
+                            <option value="nl">Heel Nederland</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="panel" style="animation-delay: 0.2s;">
+                    <div class="panel-header">
+                        <span class="panel-title">AI Instructies</span>
+                        <span class="panel-badge">Cold Mailing</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Minimale Verkoopprijs Website</label>
+                        <div class="price-input-wrap">
+                            <span class="prefix">€</span>
+                            <input type="number" class="form-input magnetic" id="minPrice" value="2500" placeholder="2500">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Maximale Korting (%)</label>
+                        <div class="price-input-wrap">
+                            <span class="prefix">%</span>
+                            <input type="number" class="form-input magnetic" id="maxDiscount" value="10" placeholder="10" min="0" max="50">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Extra Instructies voor AI</label>
+                        <textarea class="form-textarea magnetic" id="instructions" placeholder="Bijv. personalisatie per branche, onderwerpregel varianten, 2 follow-ups, niet mailen na 17:00..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="launch-section">
+                <button class="launch-btn magnetic" id="launchBtn" onclick="toggleCampaign()">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Start Campagne
+                </button>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-card">
+                    <div class="stat-card-label">Verstuurd Vandaag</div>
+                    <div class="stat-card-value" id="statCalled">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Geïnteresseerd</div>
+                    <div class="stat-card-value accent" id="statInterested">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Intake Gepland</div>
+                    <div class="stat-card-value green" id="statBooked">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Conversie</div>
+                    <div class="stat-card-value" id="statConversion">0%</div>
+                </div>
+            </div>
+
+            <div class="log-panel">
+                <div class="log-header">
+                    <span class="log-title">Live Activiteit</span>
+                    <span class="panel-badge" id="logCount">0 mails</span>
+                </div>
+                <div class="log-body" id="logBody">
+                    <div class="log-empty">Start een campagne om activiteit te zien.</div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        const slider = document.getElementById('leadSlider');
+        const sliderValue = document.getElementById('leadValue');
+        slider.addEventListener('input', () => {
+            sliderValue.innerHTML = `${slider.value} <span>leads</span>`;
+        });
+
+        let isRunning = false;
+        let callInterval = null;
+        let totalSent = 0;
+        let totalInterested = 0;
+        let totalBooked = 0;
+
+        const companies = [
+            'Bakkerij van Dijk', 'Restaurant De Harmonie', 'Kapsalon Mooi', 'Autoservice Tilburg',
+            'Bloemist Flora', 'Tandarts Smeets', 'Café De Kroeg', 'Schoonmaakbedrijf Proper',
+            'Fysiotherapie Centrum', 'Drukkerij Offset', 'Sportschool FitArea', 'Dierenarts Huisdier',
+            'Installatiebedrijf Volt', 'Makelaardij Wonen+', 'Advocatenkantoor Recht',
+            'Accountancy Van Beek', 'Hoveniersbedrijf Groen', 'Schildersbedrijf Kleur',
+            'IT Solutions BV', 'Marketingbureau Pulse', 'Yoga Studio Zen', 'Fietsenwinkel Trap',
+            'Slagerij Vers', 'Bouwbedrijf Fundament', 'Verzekeringen Direct'
+        ];
+
+        function getTime() {
+            const now = new Date();
+            return now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function addLog(type, text) {
+            const logBody = document.getElementById('logBody');
+            const empty = logBody.querySelector('.log-empty');
+            if (empty) empty.remove();
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <div class="log-entry-dot ${type}"></div>
+                <div class="log-entry-text">${text}</div>
+                <div class="log-entry-time">${getTime()}</div>
+            `;
+            logBody.insertBefore(entry, logBody.firstChild);
+
+            // Cap to keep DOM light
+            const entries = logBody.querySelectorAll('.log-entry');
+            if (entries.length > 80) {
+                entries[entries.length - 1].remove();
+            }
+
+            document.getElementById('logCount').textContent = `${totalSent} mails`;
+        }
+
+        function simulateMail() {
+            const company = companies[Math.floor(Math.random() * companies.length)];
+            const roll = Math.random();
+
+            totalSent++;
+            document.getElementById('statCalled').textContent = totalSent;
+
+            if (roll < 0.15) {
+                totalBooked++;
+                totalInterested++;
+                addLog('success', `<strong>${company}</strong> — Reply ontvangen: intake ingepland (mail).`);
+            } else if (roll < 0.35) {
+                totalInterested++;
+                addLog('call', `<strong>${company}</strong> — Reply: geïnteresseerd, wil voorstel per mail.`);
+            } else if (roll < 0.6) {
+                addLog('skip', `<strong>${company}</strong> — Bounce / out-of-office, opnieuw proberen.`);
+            } else {
+                addLog('call', `<strong>${company}</strong> — Mail verstuurd, nog geen reactie.`);
+            }
+
+            document.getElementById('statInterested').textContent = totalInterested;
+            document.getElementById('statBooked').textContent = totalBooked;
+            document.getElementById('statConversion').textContent = totalSent > 0
+                ? Math.round((totalBooked / totalSent) * 100) + '%'
+                : '0%';
+        }
+
+        function toggleCampaign() {
+            const btn = document.getElementById('launchBtn');
+            const pill = document.getElementById('statusPill');
+
+            if (!isRunning) {
+                isRunning = true;
+                btn.innerHTML = `
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    Campagne Actief — Pauzeren
+                `;
+                btn.classList.add('running');
+                pill.classList.add('active');
+                pill.innerHTML = '<span class="dot"></span> Actief';
+
+                simulateMail();
+                callInterval = setInterval(simulateMail, 3000 + Math.random() * 2000);
+            } else {
+                isRunning = false;
+                clearInterval(callInterval);
+                btn.innerHTML = `
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Hervat Campagne
+                `;
+                btn.classList.remove('running');
+                pill.classList.remove('active');
+                pill.innerHTML = '<span class="dot"></span> Gepauzeerd';
+            }
+        }
+
+        // Cursor
+        const cursor = document.querySelector('.cursor');
+        const cursorDot = document.querySelector('.cursor-dot');
+        const magneticElements = document.querySelectorAll('.magnetic');
+        const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+
+        if (enablePointerFx) {
+            let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0, dotX = 0, dotY = 0;
+            let cursorRafId = null;
+
+            document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; }, { passive: true });
+
+            function animateCursor() {
+                cursorX += (mouseX - cursorX) * 0.15;
+                cursorY += (mouseY - cursorY) * 0.15;
+                cursor.style.left = cursorX + 'px';
+                cursor.style.top = cursorY + 'px';
+                dotX += (mouseX - dotX) * 0.5;
+                dotY += (mouseY - dotY) * 0.5;
+                cursorDot.style.left = dotX + 'px';
+                cursorDot.style.top = dotY + 'px';
+                cursorRafId = requestAnimationFrame(animateCursor);
+            }
+
+            function startCursorLoop() {
+                if (cursorRafId === null) {
+                    cursorRafId = requestAnimationFrame(animateCursor);
+                }
+            }
+
+            function stopCursorLoop() {
+                if (cursorRafId !== null) {
+                    cancelAnimationFrame(cursorRafId);
+                    cursorRafId = null;
+                }
+            }
+
+            startCursorLoop();
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) stopCursorLoop();
+                else startCursorLoop();
+            });
+
+            magneticElements.forEach((elem) => {
+                elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+                elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+            });
+        } else {
+            cursor.style.display = 'none';
+            cursorDot.style.display = 'none';
+            document.body.style.cursor = 'auto';
+            magneticElements.forEach((elem) => {
+                elem.style.cursor = 'pointer';
+            });
+        }
+    </script>
+    <script src="assets/coldcalling-vapi.js"></script>
+</body>
+</html>

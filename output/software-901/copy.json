@@ -1,0 +1,169 @@
+{
+  "brand": "FlowPilot Systems",
+  "city": "Amsterdam",
+  "businessType": "B2B Software Platform Website",
+  "conceptName": "Campaign Narrative",
+  "conceptVibe": "creatieve marketing, krachtige hooks, premium pacing",
+  "hero": {
+    "kicker": "Amsterdam",
+    "titleTop": "B2B Software",
+    "titleAccent": "Platform Website",
+    "claim": "Van productinformatie naar demo-intentie met een route die beslissers direct begrijpen.",
+    "subtitle": "Snellere route van eerste bezoek naar gekwalificeerde demo. Voor beslissers die tempo, grip en voorspelbare implementatie willen.",
+    "primaryCta": "Plan een demo",
+    "secondaryCta": "Bekijk de productaanpak"
+  },
+  "valueLadder": [
+    "Snellere route van eerste bezoek naar gekwalificeerde demo.",
+    "Duidelijke positionering per beslisser zonder technische ruis.",
+    "Consistente conversion copy over alle kernpagina's."
+  ],
+  "painCards": [
+    {
+      "title": "Knelpunt 1",
+      "text": "Bezoekers zien functies maar begrijpen te laat de zakelijke impact.",
+      "outcome": "Snellere route van eerste bezoek naar gekwalificeerde demo."
+    },
+    {
+      "title": "Knelpunt 2",
+      "text": "Demo-aanvragen zijn te algemeen en daardoor lastig te kwalificeren.",
+      "outcome": "Duidelijke positionering per beslisser zonder technische ruis."
+    },
+    {
+      "title": "Knelpunt 3",
+      "text": "Teams met verschillende rollen vinden niet snel hun relevante route.",
+      "outcome": "Consistente conversion copy over alle kernpagina's."
+    },
+    {
+      "title": "Knelpunt 4",
+      "text": "Copy klinkt technisch of juist te vaag voor beslissers.",
+      "outcome": "Heldere bezwaarbehandeling vóór het salesgesprek."
+    },
+    {
+      "title": "Knelpunt 5",
+      "text": "De stap van interesse naar afspraak bevat te veel ruis.",
+      "outcome": "Schaalbare contentstructuur voor nieuwe proposities."
+    }
+  ],
+  "benefits": [
+    "Use-cases zijn per beslisrol uitgewerkt zodat ieder teamlid meteen relevante context ziet.",
+    "CTA-hiarchie brengt bezoekers naar de juiste stap in plaats van naar generieke contactblokken.",
+    "Producttaal blijft concreet en zakelijk zonder technische overload.",
+    "Bezwaren worden op de juiste momenten geadresseerd vóór het demoverzoek.",
+    "Pagina's zijn ontworpen voor snelle scanbaarheid op mobiel en desktop.",
+    "De structuur is uitbreidbaar wanneer nieuwe proposities worden toegevoegd."
+  ],
+  "process": [
+    {
+      "step": "01",
+      "title": "Discovery",
+      "text": "Doelgroepen, besluitcriteria en huidige frictie scherp maken."
+    },
+    {
+      "step": "02",
+      "title": "Positionering",
+      "text": "Propositie vertalen naar heldere claims per use-case."
+    },
+    {
+      "step": "03",
+      "title": "Architectuur",
+      "text": "Route ontwerpen van eerste bezoek naar gekwalificeerde actie."
+    },
+    {
+      "step": "04",
+      "title": "Build",
+      "text": "Volledige statische uitwerking met consistente copy-hiarchie."
+    },
+    {
+      "step": "05",
+      "title": "Polish",
+      "text": "Controle op snelheid, leesbaarheid, contrast en conversieflow."
+    }
+  ],
+  "trust": [
+    "Transparante scope en duidelijke verwachtingen per fase.",
+    "Geen nep-social-proof; de site vertrouwt op inhoudelijke helderheid.",
+    "Heldere route van aanvraag naar vervolggesprek.",
+    "Modulaire opbouw zodat je later gecontroleerd kunt uitbreiden."
+  ],
+  "faq": [
+    {
+      "q": "Past dit naast onze huidige stack?",
+      "a": "Ja. De inhoud wordt geschreven rondom je bestaande processen en teams, zodat je geen kunstmatige herpositionering hoeft te forceren."
+    },
+    {
+      "q": "Wordt dit niet te veel marketingtaal?",
+      "a": "Nee. Elke sectie is gekoppeld aan een concreet beslismoment en gebruikt duidelijke, toetsbare taal."
+    },
+    {
+      "q": "Kunnen meerdere doelgroepen tegelijk landen?",
+      "a": "Ja. De structuur splitst routes per rol zodat operations, management en commercie direct relevante informatie zien."
+    },
+    {
+      "q": "Is dit alleen design of ook conversiegericht?",
+      "a": "Beide. Design, copy en CTA-flow worden samen gebouwd om gesprekken sneller en scherper te maken."
+    },
+    {
+      "q": "Moeten we alle productdetails vooraf aanleveren?",
+      "a": "Nee. We starten met kernpropositie en bezwaren, en verdiepen daarna stapsgewijs zonder vertraging in de livegang."
+    },
+    {
+      "q": "Hoe houden we dit later actueel?",
+      "a": "De pagina-opbouw is modulair, waardoor je nieuwe use-cases en proposities kunt toevoegen zonder de conversielijn te breken."
+    }
+  ],
+  "signatureA": {
+    "id": "product-tour",
+    "title": "Product Tour Cards met Beslispunten",
+    "lead": "Geen featuredump, wel een route waarin elke stap een concreet besluit ondersteunt.",
+    "bullets": [
+      "Start bij context en pijn, niet bij losse features.",
+      "Koppel elke capability aan een zakelijke uitkomst.",
+      "Eindig met één duidelijke vervolgactie."
+    ]
+  },
+  "signatureB": {
+    "id": "decision-sheet",
+    "title": "Besliskader voor Demo-aanvragen",
+    "lead": "Filtert intentie vooraf zodat salesgesprekken direct inhoudelijk starten.",
+    "bullets": [
+      "Kernvragen vooraf in contactflow verwerkt.",
+      "Minder algemene aanvragen, meer context.",
+      "Snellere opvolging met hogere kwaliteit."
+    ]
+  },
+  "featureCards": [
+    {
+      "title": "Messaging Architecture",
+      "text": "Positioneert je product direct op zakelijke impact."
+    },
+    {
+      "title": "Use-case Routing",
+      "text": "Stuurt verschillende doelgroepen naar de juiste route."
+    },
+    {
+      "title": "Demo Conversion Layer",
+      "text": "CTA's zijn afgestemd op intentie en besluitfase."
+    },
+    {
+      "title": "Objection Framing",
+      "text": "Belangrijke bezwaren worden vroeg en helder geadresseerd."
+    },
+    {
+      "title": "Commercial Readability",
+      "text": "Inhoud blijft scanbaar zonder diepgang te verliezen."
+    },
+    {
+      "title": "Scalable Content System",
+      "text": "Nieuwe proposities passen binnen dezelfde logica."
+    }
+  ],
+  "aboutPoints": [
+    "Design en copy worden samen opgebouwd vanuit het commerciële doel.",
+    "Elke pagina is ontworpen rondom beslismomenten, niet rondom opvulling.",
+    "De contentstructuur is schaalbaar en blijft beheersbaar bij groei.",
+    "Performance, contrast en leesbaarheid worden meegenomen als kernkwaliteit."
+  ],
+  "contactMode": "form",
+  "contactPromise": "Binnen 1 werkdag reactie."
+}

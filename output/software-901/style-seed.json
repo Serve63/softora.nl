@@ -1,0 +1,94 @@
+{
+  "seed": 2918532093,
+  "run_id": "cli-1770824740502-u09yab",
+  "layoutVariant": 9,
+  "layout_variant": 9,
+  "layoutVariantKey": "arc-minimal",
+  "layout_pattern": "arc-minimal",
+  "sectionOrder": [
+    "hero",
+    "signatureB",
+    "benefits",
+    "trust",
+    "faq",
+    "signatureA",
+    "value",
+    "pain",
+    "process",
+    "cta"
+  ],
+  "section_order": [
+    "hero",
+    "signatureB",
+    "benefits",
+    "trust",
+    "faq",
+    "signatureA",
+    "value",
+    "pain",
+    "process",
+    "cta"
+  ],
+  "typePair": 5,
+  "type_pair": 5,
+  "typography_pairing": {
+    "headings": "\"Arial Narrow\", Arial, sans-serif",
+    "body": "\"Helvetica Neue\", Arial, sans-serif"
+  },
+  "mood_words": [
+    "creatieve marketing",
+    "krachtige hooks",
+    "premium pacing"
+  ],
+  "signatureSections": [
+    "Product Tour Cards met Beslispunten",
+    "Besliskader voor Demo-aanvragen"
+  ],
+  "signature_sections": [
+    "Product Tour Cards met Beslispunten",
+    "Besliskader voor Demo-aanvragen"
+  ],
+  "signature_payload": {
+    "a": {
+      "id": "product-tour",
+      "title": "Product Tour Cards met Beslispunten",
+      "lead": "Geen featuredump, wel een route waarin elke stap een concreet besluit ondersteunt.",
+      "bullets": [
+        "Start bij context en pijn, niet bij losse features.",
+        "Koppel elke capability aan een zakelijke uitkomst.",
+        "Eindig met één duidelijke vervolgactie."
+      ]
+    },
+    "b": {
+      "id": "decision-sheet",
+      "title": "Besliskader voor Demo-aanvragen",
+      "lead": "Filtert intentie vooraf zodat salesgesprekken direct inhoudelijk starten.",
+      "bullets": [
+        "Kernvragen vooraf in contactflow verwerkt.",
+        "Minder algemene aanvragen, meer context.",
+        "Snellere opvolging met hogere kwaliteit."
+      ]
+    }
+  },
+  "spacingScale": "balanced",
+  "spacing_scale": "balanced",
+  "borderRadius": "10px",
+  "border_radius": "10px",
+  "gridStyle": "chapter",
+  "grid_style": "chapter",
+  "buttonStyle": "outline",
+  "button_style": "outline",
+  "cardStyle": "elevated",
+  "card_style": "elevated",
+  "microinteractions": "subtiele reveal, hover lift, duidelijke focus states",
+  "animation_rules": "subtiel, functioneel, geen circus",
+  "palette": {
+    "bg": "#f7f6f2",
+    "surface": "#ffffff",
+    "text": "#101426",
+    "muted": "#5a6078",
+    "border": "rgba(16,20,38,0.12)",
+    "accent": "#5b6ee0",
+    "accentAlt": "#3f53c7"
+  }
+}

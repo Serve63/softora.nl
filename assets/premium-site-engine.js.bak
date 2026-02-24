@@ -1,0 +1,1505 @@
+/* Softora Premium Site Engine
+ * Deterministic pipeline per order:
+ * discovery -> 3 concepts -> style seed -> copy -> render -> QA gate (+ seed retry)
+ */
+(function (root, factory) {
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = factory();
+  } else {
+    root.PremiumSiteEngine = factory();
+  }
+}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  var FORBIDDEN_TERMS = [
+    'lorem',
+    'placeholder',
+    'todo',
+    'vul later in',
+    'coming soon',
+    'tbd',
+    '[...]'
+  ];
+
+  var TYPOGRAPHY_PAIRS = [
+    { id: 'executive-sans', headings: '"Arial Black", "Segoe UI", Arial, sans-serif', body: '"Segoe UI", "Helvetica Neue", Arial, sans-serif' },
+    { id: 'modern-contrast', headings: '"Trebuchet MS", "Segoe UI", Arial, sans-serif', body: '"Verdana", "Segoe UI", Arial, sans-serif' },
+    { id: 'editorial-control', headings: 'Georgia, "Times New Roman", serif', body: '"Segoe UI", "Trebuchet MS", sans-serif' },
+    { id: 'humanist-clean', headings: '"Gill Sans", "Trebuchet MS", sans-serif', body: '"Segoe UI", Tahoma, sans-serif' },
+    { id: 'system-precision', headings: 'system-ui, -apple-system, "Segoe UI", sans-serif', body: 'system-ui, -apple-system, "Segoe UI", sans-serif' },
+    { id: 'narrow-authority', headings: '"Arial Narrow", Arial, sans-serif', body: '"Helvetica Neue", Arial, sans-serif' },
+    { id: 'classic-command', headings: '"Palatino Linotype", "Book Antiqua", serif', body: '"Segoe UI", "Helvetica Neue", Arial, sans-serif' },
+    { id: 'dense-display', headings: '"Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif', body: '"Trebuchet MS", "Segoe UI", sans-serif' },
+    { id: 'balanced-garamond', headings: 'Garamond, "Times New Roman", serif', body: '"Segoe UI", Arial, sans-serif' }
+  ];
+
+  var LAYOUT_VARIANTS = [
+    {
+      id: 'split-command',
+      name: 'Split Command',
+      pattern: 'split hero, tactical side panel, modular body',
+      hero_style: 'split',
+      section_pattern: 'modular-grid',
+      signature_visual: 'insight-stack'
+    },
+    {
+      id: 'editorial-stack',
+      name: 'Editorial Stack',
+      pattern: 'center hero, longform rhythm, alternating sections',
+      hero_style: 'editorial',
+      section_pattern: 'alternating-blocks',
+      signature_visual: 'chapter-cards'
+    },
+    {
+      id: 'offer-rail',
+      name: 'Offer Rail',
+      pattern: 'offer rail top fold, value ladder, action rails',
+      hero_style: 'offer-rail',
+      section_pattern: 'offer-rails',
+      signature_visual: 'decision-rail'
+    },
+    {
+      id: 'process-cascade',
+      name: 'Process Cascade',
+      pattern: 'process-led hero with cascading timeline',
+      hero_style: 'process-cascade',
+      section_pattern: 'process-first',
+      signature_visual: 'timeline-panels'
+    },
+    {
+      id: 'proof-wall',
+      name: 'Proof Wall',
+      pattern: 'proof-first hero with trust wall and conversion strip',
+      hero_style: 'proof-wall',
+      section_pattern: 'proof-priority',
+      signature_visual: 'proof-matrix'
+    },
+    {
+      id: 'contrast-panels',
+      name: 'Contrast Panels',
+      pattern: 'problem-vs-outcome panels with high contrast rhythm',
+      hero_style: 'contrast-panels',
+      section_pattern: 'contrast-flow',
+      signature_visual: 'before-after'
+    },
+    {
+      id: 'chapter-runway',
+      name: 'Chapter Runway',
+      pattern: 'chapter sections with runway CTA transitions',
+      hero_style: 'chapter-runway',
+      section_pattern: 'chapters',
+      signature_visual: 'chapter-signatures'
+    },
+    {
+      id: 'matrix-grid',
+      name: 'Matrix Grid',
+      pattern: 'grid-first architecture with matrix hero',
+      hero_style: 'matrix-grid',
+      section_pattern: 'matrix',
+      signature_visual: 'matrix-signatures'
+    },
+    {
+      id: 'timeline-spotlight',
+      name: 'Timeline Spotlight',
+      pattern: 'time-based story flow with spotlight cards',
+      hero_style: 'timeline-spotlight',
+      section_pattern: 'timeline',
+      signature_visual: 'spotlight-stack'
+    },
+    {
+      id: 'precision-minimal',
+      name: 'Precision Minimal',
+      pattern: 'minimal premium shell with disciplined copy focus',
+      hero_style: 'precision-minimal',
+      section_pattern: 'minimal',
+      signature_visual: 'minimal-tiles'
+    },
+    {
+      id: 'conversion-rail',
+      name: 'Conversion Rail',
+      pattern: 'sticky conversion rails and compact section cadence',
+      hero_style: 'conversion-rail',
+      section_pattern: 'compact-rail',
+      signature_visual: 'rail-signatures'
+    },
+    {
+      id: 'visual-cabinet',
+      name: 'Visual Cabinet',
+      pattern: 'cabinet cards with editorial callouts',
+      hero_style: 'visual-cabinet',
+      section_pattern: 'cabinet',
+      signature_visual: 'cabinet-signatures'
+    }
+  ];
+
+  var DEFAULT_LOCAL_SECTION_ORDER = ['hero', 'offerStrip', 'problemFrame', 'benefits', 'signatureA', 'localPlanner', 'process', 'signatureB', 'proof', 'faq', 'cta'];
+  var DEFAULT_SOFTWARE_SECTION_ORDER = ['hero', 'problemFrame', 'benefits', 'useCaseMatrix', 'signatureA', 'process', 'signatureB', 'proof', 'faq', 'cta'];
+
+  function fnv1a(input) {
+    var str = String(input || '');
+    var hash = 2166136261;
+    for (var i = 0; i < str.length; i++) {
+      hash ^= str.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function mulberry32(seed) {
+    var t = seed >>> 0;
+    return function () {
+      t += 0x6D2B79F5;
+      var x = t;
+      x = Math.imul(x ^ (x >>> 15), x | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function pick(rng, items) {
+    if (!items || !items.length) return null;
+    return items[Math.floor(rng() * items.length)] || items[0];
+  }
+
+  function shuffle(rng, list) {
+    var out = (list || []).slice();
+    for (var i = out.length - 1; i > 0; i--) {
+      var j = Math.floor(rng() * (i + 1));
+      var tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
+    }
+    return out;
+  }
+
+  function unique(list) {
+    var map = Object.create(null);
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var v = list[i];
+      if (!map[v]) {
+        map[v] = true;
+        out.push(v);
+      }
+    }
+    return out;
+  }
+
+  function esc(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function slugify(value) {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  }
+
+  function titleize(value) {
+    var str = String(value || '');
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  function inferIndustry(order) {
+    var pool = [order.title, order.description, order.clientName, order.location].join(' ').toLowerCase();
+    if (/(software|platform|saas|database|api|dashboard|webapp|applicatie|integratie|crm|erp|automation|cloud)/.test(pool)) return 'software';
+    if (/(schilder|painting|stukadoor|renovatie|afwerking|interieurwerk)/.test(pool)) return 'contractor';
+    if (/(kapper|kapsalon|barber|haar|beauty)/.test(pool)) return 'salon';
+    if (/(restaurant|menu|reservering|cafe|bistro|brasserie)/.test(pool)) return 'restaurant';
+    if (/(sportschool|gym|fitness|trainer|rooster)/.test(pool)) return 'gym';
+    if (/(interieur|studio|portfolio|architect|designbureau)/.test(pool)) return 'interior';
+    if (/(bakkerij|brood|gebak|patisserie)/.test(pool)) return 'bakery';
+    if (/(makelaar|vastgoed)/.test(pool)) return 'real-estate';
+    return 'local-service';
+  }
+
+  function inferAudience(industry) {
+    if (industry === 'software') return 'beslissers die snelheid, grip en duidelijke productwaarde nodig hebben';
+    if (industry === 'contractor') return 'huiseigenaren en ondernemers die strak gepland vakwerk willen';
+    if (industry === 'salon') return 'klanten die stijlvol resultaat willen en direct online willen boeken';
+    if (industry === 'restaurant') return 'gasten die snel willen kiezen, reserveren en komen';
+    if (industry === 'gym') return 'mensen die direct een proefles of intake willen plannen';
+    if (industry === 'interior') return 'klanten die premium projectkwaliteit direct willen voelen';
+    if (industry === 'bakery') return 'lokale klanten die makkelijk willen bestellen en afhalen';
+    return 'bezoekers die snel vertrouwen willen en duidelijkheid zoeken';
+  }
+
+  function inferPrimaryAction(industry) {
+    if (industry === 'software') return 'Plan demo';
+    if (industry === 'real-estate') return 'Plan intake';
+    if (industry === 'contractor') return 'Vraag opname aan';
+    return 'Vraag offerte';
+  }
+
+  function inferPriceBand(budget) {
+    var n = Number(budget || 0);
+    if (n >= 50000) return 'enterprise';
+    if (n >= 20000) return 'premium';
+    if (n >= 8000) return 'growth';
+    if (n >= 3000) return 'core';
+    return 'starter';
+  }
+
+  function industryPainSet(industry) {
+    if (industry === 'software') {
+      return [
+        'De waarde van het product komt online niet snel genoeg over.',
+        'Salesgesprekken starten te vaak met basisuitleg in plaats van beslisinformatie.',
+        'Losse pagina’s en copy zorgen voor frictie in de demo-flow.',
+        'Use-cases zijn niet scherp genoeg voor verschillende beslissers.',
+        'Bezoekers krijgen geen duidelijke vervolgstap per context.'
+      ];
+    }
+    if (industry === 'contractor') {
+      return [
+        'Aanvragen komen binnen zonder duidelijke scope of planning.',
+        'Bezoekers twijfelen over kwaliteit vóór het eerste gesprek.',
+        'Praktische keuzes zoals afwerking of voorbereiding blijven onduidelijk.',
+        'Er is geen sterke route van interesse naar concrete aanvraag.',
+        'De website laat vakmanschap niet overtuigend zien.'
+      ];
+    }
+    return [
+      'Bezoekers begrijpen het aanbod niet snel genoeg.',
+      'De route naar contact is te lang of te vaag.',
+      'Belangrijke bezwaren worden niet vooraf behandeld.',
+      'Mobiele bezoekers haken af vóór ze actie nemen.',
+      'De website ondersteunt groei onvoldoende.'
+    ];
+  }
+
+  function industryOutcomeSet(industry) {
+    if (industry === 'software') {
+      return [
+        'Duidelijke productpositionering die beslissers sneller richting demo stuurt.',
+        'Een conversion-flow die per use-case de juiste vervolgactie aanbiedt.',
+        'Kortere route van eerste bezoek naar gekwalificeerd gesprek.',
+        'Consistente copy die sales en marketing hetzelfde verhaal laat vertellen.',
+        'Uitbreidbare structuur voor nieuwe proposities zonder herbouw.'
+      ];
+    }
+    if (industry === 'contractor') {
+      return [
+        'Meer serieuze aanvragen met heldere projectscope.',
+        'Snellere keuze bij bezoekers dankzij duidelijke werkwijze en voorbereiding.',
+        'Sterkere merkbeleving die vakmanschap premium positioneert.',
+        'Minder losse vragen door transparante informatie vooraf.',
+        'Beter mobiel rendement op lokale zoekers.'
+      ];
+    }
+    return [
+      'Sneller begrip van het aanbod bij nieuwe bezoekers.',
+      'Meer contactaanvragen met betere intentie.',
+      'Sterkere merkbeleving zonder visuele ruis.',
+      'Duidelijke beslisroute met sterke CTA-momenten.',
+      'Een schaalbare contentbasis voor toekomstige groei.'
+    ];
+  }
+
+  function industryObjections(industry) {
+    if (industry === 'software') {
+      return [
+        ['Past dit naast onze huidige stack?', 'Ja. De websitepositionering wordt geschreven rond je huidige processen, zodat je niets hoeft te forceren om duidelijk te communiceren.'],
+        ['Is dit alleen design of ook commerciële inhoud?', 'Beide. De structuur, copy en CTA-flow zijn ontworpen om beslissingen te versnellen, niet alleen om mooi te ogen.'],
+        ['Kunnen we verschillende doelgroepen tegelijk bedienen?', 'Ja. We bouwen de navigatie en use-cases per doelgroep, zodat iedereen direct relevante inhoud ziet.'],
+        ['Moeten we eerst alle productdetails uitwerken?', 'Nee. We starten met de kern: probleem, uitkomst en besluitcriteria. Daarna verdiepen we waar nodig.'],
+        ['Hoe voorkomen we generieke B2B-taal?', 'Door je echte salesvragen en bezwaren te vertalen naar concrete copy per sectie.'],
+        ['Wat gebeurt er na livegang?', 'Je houdt een structuur die je team zelfstandig kan uitbreiden zonder de conversielijn te verliezen.']
+      ];
+    }
+    if (industry === 'contractor') {
+      return [
+        ['Moet alles meteen vastliggen voor een aanvraag?', 'Nee. De site stuurt op een heldere eerste intake met genoeg informatie om snel te kunnen schakelen.'],
+        ['Hoe maken jullie kwaliteit online zichtbaar?', 'Met duidelijke keuzes, projectlogica en concrete verwachtingen in plaats van losse claims.'],
+        ['Krijgen bezoekers duidelijkheid over planning?', 'Ja. De planning en voorbereiding worden stap voor stap uitgelegd.'],
+        ['Wat als een klant nog twijfelt tussen opties?', 'De keuzehulp-secties begeleiden bezoekers naar een passende route zonder druk.'],
+        ['Werkt dit ook goed op mobiel?', 'Ja. Mobiele flow is leidend in navigatie, CTA’s en formulieropbouw.'],
+        ['Is de inhoud later uitbreidbaar?', 'Ja. De paginastructuur is modulair, zodat nieuwe diensten logisch inpasbaar blijven.']
+      ];
+    }
+    return [
+      ['Wordt dit niet te standaard?', 'Nee. De opbouw wordt per opdracht bepaald met een eigen stijlseed en branchegerichte copy.'],
+      ['Is dit vooral visueel of ook commercieel sterk?', 'Commercieel sterk. Elke sectie ondersteunt een concrete vervolgstap.'],
+      ['Kunnen we later onderdelen aanpassen?', 'Ja. De site is opgezet in heldere secties die eenvoudig aanpasbaar zijn.'],
+      ['Hoe snel kunnen we live?', 'Zodra inhoud en richting akkoord zijn, staat er direct een volledige statische basis klaar.'],
+      ['Hoe voorkomen we onduidelijke aanvragen?', 'Door keuzehulp en gerichte formulieren die bezoekers vooraf structureren.'],
+      ['Wat is de volgende stap na oplevering?', 'Je gebruikt dezelfde structuur om campagnes, pagina’s of nieuwe proposities door te trekken.']
+    ];
+  }
+
+  function signatureCatalog(industry) {
+    if (industry === 'software') {
+      return [
+        {
+          id: 'use-case-matrix',
+          title: 'Use-case Matrix per Beslisser',
+          lead: 'Eén product, meerdere beslissers. Deze sectie koppelt elke doelgroep aan een concrete uitkomst en CTA.',
+          bullets: ['Operationeel team: minder handwerk en minder overdrachtsfouten.', 'Commercieel team: kortere route naar kwalificatie en demo.', 'Management: duidelijkere businesscase zonder technisch ruisniveau.']
+        },
+        {
+          id: 'product-tour-cards',
+          title: 'Product Tour Cards met Beslismomenten',
+          lead: 'Geen featuredump, wel een route waarin elke stap eindigt met een betekenisvolle volgende actie.',
+          bullets: ['Stap 1: probleem en context scherp.', 'Stap 2: hoe de oplossing werkt in de dagelijkse praktijk.', 'Stap 3: directe route naar demo of technisch gesprek.']
+        },
+        {
+          id: 'adoptie-kompas',
+          title: 'Adoptiekompas zonder Lock-in',
+          lead: 'Helder pad van eerste implementatie naar opschaling, zonder verborgen afhankelijkheden in je communicatie.',
+          bullets: ['Klein starten zonder strategische concessie.', 'Opschalen met vaste copy- en navigatielijnen.', 'Interne teams houden controle over inhoud en updates.']
+        },
+        {
+          id: 'integration-approach',
+          title: 'Integratie-aanpak per Team',
+          lead: 'Legt uit hoe het product aansluit op bestaande werkwijzen, zonder onnodige technische claims.',
+          bullets: ['Operationele impact per team zichtbaar.', 'Heldere verantwoordelijkheden per fase.', 'Realistische verwachtingen rond adoptie en training.']
+        }
+      ];
+    }
+
+    if (industry === 'contractor') {
+      return [
+        {
+          id: 'kleur-afwerking-keuzehulp',
+          title: 'Kleur & Afwerking Keuzehulp',
+          lead: 'Bezoekers kiezen sneller als ze direct zien welke afwerking past bij gebruik, uitstraling en onderhoud.',
+          bullets: ['Binnenruimte vs buitenruimte duidelijk gescheiden.', 'Praktische verschillen in duurzaamheid uitgelegd.', 'Keuze direct koppelbaar aan intake.']
+        },
+        {
+          id: 'planning-voorbereiding',
+          title: 'Planning & Voorbereiding zonder Ruis',
+          lead: 'Laat exact zien wat de klant voorbereidt en wat het team regelt, zodat de start soepel verloopt.',
+          bullets: ['Heldere startvolgorde per projecttype.', 'Communicatiemomenten vooraf benoemd.', 'Minder vertraging door duidelijke checklist.']
+        },
+        {
+          id: 'materiaal-keuzepad',
+          title: 'Materiaalkeuze per Ruimte',
+          lead: 'Bouwt vertrouwen door keuzes praktisch te maken in plaats van abstract te presenteren.',
+          bullets: ['Per ruimte direct de juiste materiaalrichting.', 'Onderhoud en levensduur in duidelijke taal.', 'Aansluitend voorstel tijdens intake.']
+        },
+        {
+          id: 'werkvolgorde-compact',
+          title: 'Werkvolgorde Compact Uitgelegd',
+          lead: 'Van opname tot oplevering in één overzicht, zodat verwachtingen vooraf strak staan.',
+          bullets: ['Duidelijke fases en beslismomenten.', 'Geen vage overgang tussen voorbereiding en uitvoering.', 'Transparante route naar oplevering.']
+        }
+      ];
+    }
+
+    return [
+      {
+        id: 'keuzehulp-klantroute',
+        title: 'Klantroute Keuzehulp',
+        lead: 'Helpt bezoekers hun situatie snel herkennen en de juiste route kiezen.',
+        bullets: ['Snelle selectie op behoefte.', 'Duidelijke vervolgstap zonder twijfel.', 'Minder afhakers in de eerste minuut.']
+      },
+      {
+        id: 'aanpak-transparant',
+        title: 'Aanpak Transparant in Fases',
+        lead: 'Maakt de route van eerste contact tot oplevering helder en voorspelbaar.',
+        bullets: ['Iedere fase heeft een concreet doel.', 'Verwachtingen staan vooraf duidelijk.', 'Meer rust in samenwerking.']
+      },
+      {
+        id: 'scope-besliskader',
+        title: 'Scope Besliskader',
+        lead: 'Geeft bezoekers houvast in keuzes en voorkomt losse aanvragen zonder context.',
+        bullets: ['Aanbod vertaald naar praktische opties.', 'Duidelijk verschil tussen routes.', 'Snellere intakekwaliteit.']
+      },
+      {
+        id: 'vervolgstap-engine',
+        title: 'Vervolgstap Engine',
+        lead: 'Zorgt dat elk inhoudsblok logisch eindigt in een bruikbare CTA.',
+        bullets: ['CTA’s afgestemd op intentie.', 'Geen doodlopende secties.', 'Meer momentum naar contact.']
+      }
+    ];
+  }
+
+  function paletteFor(industry, theme, rng) {
+    var lightBase = {
+      bg: '#f7f6f2',
+      surface: '#ffffff',
+      text: '#111426',
+      muted: '#5f637a',
+      border: 'rgba(17,20,38,0.11)'
+    };
+    var darkBase = {
+      bg: '#090a11',
+      surface: '#111423',
+      text: '#eef1ff',
+      muted: '#a3abc6',
+      border: 'rgba(255,255,255,0.12)'
+    };
+    var base = theme === 'dark' ? darkBase : lightBase;
+
+    var accentMap = {
+      software: ['#4a5fd7', '#5c6ee4', '#3f53c7', '#6477f0'],
+      contractor: ['#2f5bd4', '#3b82f6', '#2a6fd8', '#4a5fd7'],
+      salon: ['#8b2252', '#a62d65', '#c43a78', '#b83280'],
+      restaurant: ['#c45a12', '#e67e22', '#f39c12', '#d97706'],
+      gym: ['#1f9d67', '#2ecc71', '#10b981', '#059669'],
+      interior: ['#5a4ccf', '#6d5ef0', '#4f46e5', '#7c3aed'],
+      bakery: ['#b45309', '#f59e0b', '#fb923c', '#d97706'],
+      'real-estate': ['#3156cc', '#4a5fd7', '#4338ca', '#2563eb'],
+      'local-service': ['#4a5fd7', '#5b6ee0', '#3f53c7', '#6477f0']
+    };
+
+    var picks = accentMap[industry] || accentMap['local-service'];
+    var accent = pick(rng, picks);
+    var accentAlt = pick(rng, picks.filter(function (v) { return v !== accent; })) || picks[1] || picks[0];
+
+    return {
+      bg: base.bg,
+      surface: base.surface,
+      text: base.text,
+      muted: base.muted,
+      border: base.border,
+      accent: accent,
+      accent_alt: accentAlt
+    };
+  }
+
+  function normalizeOrder(meta, fallbackOrderId) {
+    var id = String((meta && meta.id) || fallbackOrderId || 'order').trim() || 'order';
+    var clientName = String((meta && meta.clientName) || '').trim();
+    var title = String((meta && meta.title) || '').trim();
+    var description = String((meta && meta.description) || '').trim();
+    var location = String((meta && meta.location) || '').trim();
+
+    if (!clientName) {
+      clientName = title ? title.split(' ')[0] + ' Studio' : 'Premium Studio';
+    }
+    if (!title) {
+      title = 'Premium Website traject';
+    }
+    if (!description) {
+      description = 'Conversiegerichte website met premium positionering en duidelijke vervolgstappen.';
+    }
+
+    return {
+      id: id,
+      clientName: clientName,
+      title: title,
+      description: description,
+      location: location,
+      budget: Number((meta && meta.budget) || 0)
+    };
+  }
+
+  function makeBrief(order, opts) {
+    var industry = inferIndustry(order);
+    var primaryAction = inferPrimaryAction(industry);
+    var priceBand = inferPriceBand(order.budget);
+
+    return {
+      order_id: String(opts.orderId),
+      source: opts.source || 'ui-click',
+      source_theme: opts.theme || 'light',
+      industry: industry,
+      audience: inferAudience(industry),
+      primary_action: primaryAction,
+      secondary_action: industry === 'software' ? 'Bekijk use-cases' : 'Bekijk aanpak',
+      price_band: priceBand,
+      tone: industry === 'software' ? 'scherp, besluitgericht, helder' : 'persoonlijk, premium, praktisch',
+      top_pains: industryPainSet(industry),
+      desired_outcomes: industryOutcomeSet(industry),
+      differentiator_angle: industry === 'software'
+        ? 'Van productverhaal naar demo-actie, zonder technische ruis.'
+        : 'Van eerste interesse naar concrete aanvraag met duidelijke verwachtingen.',
+      forbidden_claims: [
+        'Geen verzonnen klantlogo’s of testimonials.',
+        'Geen certificaten of keurmerken zonder bron in order-data.',
+        'Geen harde volumecijfers of percentages zonder onderbouwing.',
+        'Geen beloftes over responstijd buiten 1 werkdag tenzij expliciet bekend.'
+      ],
+      objections: industryObjections(industry),
+      sitemap: industry === 'software'
+        ? ['index.html', 'features.html', 'use-cases.html', 'about.html', 'contact.html']
+        : ['index.html', 'diensten.html', 'projecttypes.html', 'about.html', 'contact.html']
+    };
+  }
+
+  function makeConcepts(brief) {
+    var catalog = signatureCatalog(brief.industry);
+    return [
+      {
+        id: 'concept-authority-atelier',
+        name: 'Authority Atelier',
+        vibe: 'strak, strategisch, beslisgericht',
+        layout_pool: ['split-command', 'proof-wall', 'precision-minimal', 'matrix-grid'],
+        section_priority: ['problemFrame', 'benefits', 'proof', 'faq'],
+        signature_candidates: [catalog[0], catalog[1]]
+      },
+      {
+        id: 'concept-campaign-narrative',
+        name: 'Campaign Narrative',
+        vibe: 'narratief, emotioneel gecontroleerd, commercieel scherp',
+        layout_pool: ['chapter-runway', 'timeline-spotlight', 'editorial-stack', 'contrast-panels'],
+        section_priority: ['signatureA', 'signatureB', 'process', 'cta'],
+        signature_candidates: [catalog[1], catalog[2]]
+      },
+      {
+        id: 'concept-conversion-lab',
+        name: 'Conversion Lab',
+        vibe: 'actiegedreven, modulair, performance-first',
+        layout_pool: ['offer-rail', 'conversion-rail', 'process-cascade', 'visual-cabinet'],
+        section_priority: ['offerStrip', 'benefits', 'faq', 'cta'],
+        signature_candidates: [catalog[2], catalog[3] || catalog[0]]
+      }
+    ];
+  }
+
+  function chooseConcept(brief, concepts, rng) {
+    var scores = concepts.map(function (concept) {
+      var score = 40 + Math.floor(rng() * 15);
+      if (brief.industry === 'software' && concept.id === 'concept-conversion-lab') score += 14;
+      if (brief.industry !== 'software' && concept.id === 'concept-authority-atelier') score += 10;
+      if (brief.price_band === 'premium' || brief.price_band === 'enterprise') {
+        if (concept.id === 'concept-campaign-narrative') score += 8;
+      }
+      return { concept: concept, score: score };
+    });
+
+    scores.sort(function (a, b) { return b.score - a.score; });
+    return scores[0].concept;
+  }
+
+  function makeStyleSeed(order, brief, concept, opts, seedInt) {
+    var rng = mulberry32(seedInt >>> 0);
+
+    var variantPool = LAYOUT_VARIANTS.filter(function (v) {
+      return concept.layout_pool.indexOf(v.id) !== -1;
+    });
+    var layoutVariant = pick(rng, variantPool.length ? variantPool : LAYOUT_VARIANTS);
+    var typographyPairing = pick(rng, TYPOGRAPHY_PAIRS);
+
+    var spacingScale = pick(rng, ['compact', 'balanced', 'airy', 'wide']);
+    var borderRadius = pick(rng, ['none', 'sm', 'md', 'lg']);
+    var gridStyle = pick(rng, ['12-col', 'asymmetric', 'masonry', 'chapter-grid', 'split-grid']);
+    var iconStyle = pick(rng, ['line', 'dot', 'soft-block', 'outlined']);
+    var imageryStyle = pick(rng, ['editorial-context', 'detail-focus', 'architectural', 'atmospheric']);
+    var buttonStyle = pick(rng, ['solid', 'outline', 'pill', 'underline']);
+    var cardStyle = pick(rng, ['flat', 'elevated', 'panel', 'glass']);
+    var componentSet = pick(rng, [
+      ['value-cards', 'timeline', 'trust-checks'],
+      ['comparison-grid', 'process-track', 'faq-accordion'],
+      ['insight-panels', 'offer-strip', 'cta-banner'],
+      ['chapter-cards', 'decision-rail', 'proof-stack']
+    ]);
+
+    var signaturePool = shuffle(rng, signatureCatalog(brief.industry));
+    var signatureA = signaturePool[0] || signatureCatalog(brief.industry)[0];
+    var signatureB = signaturePool[1] || signaturePool[0] || signatureCatalog(brief.industry)[0];
+
+    var baseOrder = (brief.industry === 'software' ? DEFAULT_SOFTWARE_SECTION_ORDER : DEFAULT_LOCAL_SECTION_ORDER).slice();
+    var middle = baseOrder.slice(1, -1);
+    var shuffledMiddle = shuffle(rng, middle);
+
+    var sectionOrder = ['hero'].concat(shuffledMiddle).concat(['cta']);
+    if (sectionOrder.join('|') === baseOrder.join('|')) {
+      var rotated = shuffledMiddle.slice();
+      rotated.push(rotated.shift());
+      sectionOrder = ['hero'].concat(rotated).concat(['cta']);
+    }
+
+    sectionOrder = unique(sectionOrder.filter(Boolean));
+    if (sectionOrder.indexOf('signatureA') === -1) sectionOrder.splice(2, 0, 'signatureA');
+    if (sectionOrder.indexOf('signatureB') === -1) sectionOrder.splice(sectionOrder.length - 2, 0, 'signatureB');
+    if (sectionOrder[sectionOrder.length - 1] !== 'cta') {
+      sectionOrder = sectionOrder.filter(function (s) { return s !== 'cta'; }).concat(['cta']);
+    }
+
+    var moodWords = brief.industry === 'software'
+      ? ['precies', 'vertrouwen', 'besluitkracht', 'focus', 'schaalbaar']
+      : ['helder', 'premium', 'toegankelijk', 'concreet', 'vertrouwd'];
+
+    return {
+      brand_archetype: brief.industry === 'software' ? 'Strategic Product Operator' : 'Trusted Craft Operator',
+      mood_words: moodWords,
+      layoutVariant: layoutVariant.id,
+      layout_pattern: layoutVariant.pattern,
+      section_order: sectionOrder,
+      sectionOrder: sectionOrder,
+      typography_pairing: {
+        id: typographyPairing.id,
+        headings: typographyPairing.headings,
+        body: typographyPairing.body
+      },
+      typographyPairing: {
+        id: typographyPairing.id,
+        headings: typographyPairing.headings,
+        body: typographyPairing.body
+      },
+      type_scale: pick(rng, ['hero-xl', 'hero-l', 'hero-wide']),
+      spacing_scale: spacingScale,
+      border_radius: borderRadius,
+      grid_style: gridStyle,
+      icon_style: iconStyle,
+      imagery_style: imageryStyle,
+      button_style: buttonStyle,
+      card_style: cardStyle,
+      component_set: componentSet,
+      signatureSections: [signatureA.title, signatureB.title],
+      signaturePayload: {
+        a: signatureA,
+        b: signatureB
+      },
+      signature_visual: layoutVariant.signature_visual,
+      microinteractions: pick(rng, [
+        'fade-up reveals + card lift',
+        'underline nav + accordion smooth open',
+        'staggered cards + button sheen',
+        'section parallax subtle + focus rings'
+      ]),
+      animation_rules: 'subtiel, functioneel, geen circus',
+      palette: paletteFor(brief.industry, opts.theme, rng),
+      seed: seedInt,
+      seed_meta: {
+        order_id: String(opts.orderId),
+        mode: opts.mode,
+        theme: opts.theme,
+        attempt: opts.attempt
+      }
+    };
+  }
+
+  function makeCopy(order, brief, concept, styleSeed, seedInt) {
+    var rng = mulberry32((seedInt ^ 0xA5A5A5A5) >>> 0);
+
+    var titleWords = String(order.title || '').split(/\s+/).filter(Boolean);
+    if (!titleWords.length) titleWords = ['Premium', 'Website'];
+
+    var split = Math.max(2, Math.min(titleWords.length - 1, Math.floor(titleWords.length * 0.58)));
+    var titleTop = titleWords.slice(0, split).join(' ');
+    var titleAccent = titleWords.slice(split).join(' ');
+    if (!titleAccent) {
+      titleAccent = brief.industry === 'software' ? 'Met Besliskracht' : 'Met Resultaat';
+    }
+
+    var heroClaim = brief.industry === 'software'
+      ? 'Van productuitleg naar demo-intentie in één duidelijke route.'
+      : 'Van eerste indruk naar aanvraag, zonder ruis in het beslismoment.';
+
+    var heroSub = brief.desired_outcomes[0] + ' Voor ' + brief.audience + '.';
+
+    var benefitPoolSoftware = [
+      'Boodschap en UX wijzen direct naar de juiste demo-actie.',
+      'Use-case inhoud per beslisser voorkomt algemene productpraat.',
+      'CTA-hiërarchie verlaagt frictie tussen interesse en gesprek.',
+      'Commerciële copy en productinhoud blijven consistent over alle pagina’s.',
+      'Navigatie is ontworpen voor snelle evaluatie op mobiel én desktop.',
+      'Elke sectie behandelt een echt bezwaar vóór het salesgesprek.'
+    ];
+
+    var benefitPoolLocal = [
+      'Bezoekers zien direct wat je levert en waarom dat relevant is.',
+      'Keuzehulp-secties zetten twijfel om in een concrete vervolgstap.',
+      'Structuur en copy sturen naar kwalitatieve aanvragen, niet losse vragen.',
+      'Mobiele flow is leidend zodat lokale zoekers direct kunnen handelen.',
+      'Procesuitleg en verwachtingen bouwen vertrouwen vóór contact.',
+      'CTA-momenten liggen op natuurlijke beslispunten in de pagina.'
+    ];
+
+    var valueLadder = brief.industry === 'software'
+      ? [
+          'Positionering die commerciële gesprekken verkort.',
+          'Productnarratief dat meerdere beslissers tegelijk bedient.',
+          'Conversieflow die demo’s kwalificeert in plaats van verzamelt.'
+        ]
+      : [
+          'Heldere propositie die direct vertrouwen opbouwt.',
+          'Praktische route van interesse naar intake.',
+          'Commerciële copy die bezoekers laat kiezen in plaats van twijfelen.'
+        ];
+
+    var process = brief.industry === 'software'
+      ? [
+          { step: '01', title: 'Discovery', text: 'Doelgroepen, besluitcriteria en huidige salesfrictie scherpstellen.' },
+          { step: '02', title: 'Positionering', text: 'Propositie vertalen naar heldere claims per use-case.' },
+          { step: '03', title: 'Structuur', text: 'Paginaflow bouwen die per intentie de juiste CTA geeft.' },
+          { step: '04', title: 'Build', text: 'Volledige statische uitwerking met consistente copy-hiërarchie.' },
+          { step: '05', title: 'Polish', text: 'Controle op readability, conversielogica en responsive kwaliteit.' }
+        ]
+      : [
+          { step: '01', title: 'Intake', text: 'Context, doelgroep en gewenste aanvragen scherp maken.' },
+          { step: '02', title: 'Richting', text: 'Visuele en tekstuele lijn bepalen op basis van klantbeslissingen.' },
+          { step: '03', title: 'Keuzehulp', text: 'Aanbod structureren zodat bezoekers sneller een route kiezen.' },
+          { step: '04', title: 'Uitwerking', text: 'Complete paginastructuur bouwen met duidelijke CTA-momenten.' },
+          { step: '05', title: 'Oplevering', text: 'Kwaliteitscontrole op inhoud, techniek en gebruiksgemak.' }
+        ];
+
+    var faq = brief.objections.map(function (q) {
+      return { q: q[0], a: q[1] };
+    });
+
+    var trustBlocks = brief.industry === 'software'
+      ? [
+          'Transparante scope per fase en deliverable.',
+          'Geen verzonnen bewijsblokken; alleen controleerbare inhoud.',
+          'Duidelijke verantwoordelijkheden tussen team en opdrachtgever.',
+          'Uitbreidbare opzet zonder lock-in in tooling.'
+        ]
+      : [
+          'Heldere verwachtingen over aanpak en vervolg.',
+          'Transparante scope zodat intakegesprekken direct inhoudelijk zijn.',
+          'Geen ruis in contactflow: elke CTA heeft een duidelijk doel.',
+          'Modulaire opbouw die meegroeit met nieuw aanbod.'
+        ];
+
+    var challengeCards = brief.top_pains.map(function (pain, idx) {
+      var outcome = brief.desired_outcomes[idx] || brief.desired_outcomes[brief.desired_outcomes.length - 1];
+      return {
+        title: titleize('van knelpunt naar richting ' + (idx + 1)),
+        problem: pain,
+        outcome: outcome
+      };
+    });
+
+    var featureCards = brief.industry === 'software'
+      ? [
+          { title: 'Messaging Architecture', text: 'Structuur die productwaarde per beslisrol vertaalt naar concrete actie.' },
+          { title: 'Use-case Routing', text: 'Elke doelgroep krijgt een eigen route, zonder navigatiechaos.' },
+          { title: 'Demo-first CTA System', text: 'CTA’s zijn gekoppeld aan intentie, niet willekeurige pagina-einden.' },
+          { title: 'Trust & Risk Framing', text: 'Bezwaren worden vroeg geadresseerd in duidelijke taal.' },
+          { title: 'Commercial Readability', text: 'Teksten zijn scanbaar en overtuigend zonder overdrijving.' },
+          { title: 'Scalable Content Blocks', text: 'Nieuwe proposities blijven binnen dezelfde conversielijn passen.' }
+        ]
+      : [
+          { title: 'Aanbodstructuur', text: 'Diensten en keuzes staan in logische volgorde voor snelle beslissing.' },
+          { title: 'Lokale Conversieflow', text: 'Contactmomenten sluiten aan op intentie van lokale bezoekers.' },
+          { title: 'Vertrouwensopbouw', text: 'Proces en voorwaarden zijn helder vóór het eerste gesprek.' },
+          { title: 'Mobiel Eerst', text: 'Belangrijkste keuzes en CTA’s zijn direct bereikbaar op telefoon.' },
+          { title: 'Bezwaarafhandeling', text: 'FAQ en secties beantwoorden echte vragen die aanvragen blokkeren.' },
+          { title: 'Uitbreidbare Basis', text: 'Nieuwe diensten of acties zijn later zonder breuk toe te voegen.' }
+        ];
+
+    var aboutPoints = [
+      'We combineren commerciële copy met strakke visuele hiërarchie.',
+      'Elke pagina is gebouwd rondom beslismomenten, niet rondom opvulling.',
+      'We sturen op duidelijkheid, snelheid en kwalitatieve opvolgacties.',
+      'De structuur blijft beheersbaar wanneer je aanbod groeit.'
+    ];
+
+    var contactPromise = 'Binnen 1 werkdag reactie.';
+
+    var tonePick = pick(rng, [
+      'direct en nuchter',
+      'premium en kalm',
+      'commercieel scherp',
+      'helder en overtuigend'
+    ]);
+
+    return {
+      brand: order.clientName,
+      city: order.location || 'jouw regio',
+      businessType: order.title,
+      conceptName: concept.name,
+      conceptVibe: concept.vibe,
+      toneDirection: tonePick,
+      hero: {
+        kicker: order.location || (brief.industry === 'software' ? 'Digital Product Growth' : 'Lokale Groei'),
+        titleTop: titleTop,
+        titleAccent: titleAccent,
+        claim: heroClaim,
+        subtitle: heroSub,
+        primaryCta: brief.primary_action,
+        secondaryCta: brief.secondary_action
+      },
+      valueLadder: valueLadder,
+      challengeCards: challengeCards,
+      benefits: benefitPoolSoftware,
+      localBenefits: benefitPoolLocal,
+      selectedBenefits: brief.industry === 'software' ? benefitPoolSoftware : benefitPoolLocal,
+      process: process,
+      trust: trustBlocks,
+      faq: faq,
+      signatureA: {
+        title: styleSeed.signaturePayload.a.title,
+        lead: styleSeed.signaturePayload.a.lead,
+        bullets: styleSeed.signaturePayload.a.bullets
+      },
+      signatureB: {
+        title: styleSeed.signaturePayload.b.title,
+        lead: styleSeed.signaturePayload.b.lead,
+        bullets: styleSeed.signaturePayload.b.bullets
+      },
+      featureCards: featureCards,
+      aboutPoints: aboutPoints,
+      contactPromise: contactPromise,
+      pages: brief.sitemap
+    };
+  }
+
+  function buildPageNav(pages, activeFile) {
+    return pages.map(function (file) {
+      var label = file.replace('.html', '').replace(/-/g, ' ');
+      if (label === 'index') label = 'home';
+      return '<a href="' + file + '"' + (file === activeFile ? ' class="active"' : '') + '>' + esc(titleize(label)) + '</a>';
+    }).join('');
+  }
+
+  function renderHero(brief, copy, seed) {
+    var cta = '<div class="hero-ctas"><a data-hero-cta="1" class="btn btn-primary" href="contact.html">' + esc(copy.hero.primaryCta) + '</a><a data-hero-cta="2" class="btn btn-secondary" href="' + (brief.industry === 'software' ? 'use-cases.html' : 'projecttypes.html') + '">' + esc(copy.hero.secondaryCta) + '</a></div>';
+
+    var valueList = '<ul class="hero-value-list">' + copy.valueLadder.map(function (item) {
+      return '<li>' + esc(item) + '</li>';
+    }).join('') + '</ul>';
+
+    var heroCore = '<p class="eyebrow">' + esc(copy.hero.kicker) + '</p><h1>' + esc(copy.hero.titleTop) + ' <span>' + esc(copy.hero.titleAccent) + '</span></h1><p class="hero-claim">' + esc(copy.hero.claim) + '</p><p class="hero-sub">' + esc(copy.hero.subtitle) + '</p>';
+
+    if (seed.layoutVariant === 'split-command') {
+      return '<section class="section hero hero--split" data-section="hero"><div class="container hero-grid"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><aside class="hero-panel-side reveal"><h2>Commerciële focus</h2>' + valueList + '<p class="hero-note">' + esc(copy.contactPromise) + '</p></aside></div></section>';
+    }
+
+    if (seed.layoutVariant === 'editorial-stack') {
+      return '<section class="section hero hero--editorial" data-section="hero"><div class="container hero-stack"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><article class="hero-panel-note reveal">' + valueList + '</article></div></section>';
+    }
+
+    if (seed.layoutVariant === 'offer-rail') {
+      return '<section class="section hero hero--offer-rail" data-section="hero"><div class="container"><div class="offer-rail-top reveal"><span>Focus</span><p>' + esc(copy.valueLadder[0]) + '</p></div><div class="hero-grid"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><aside class="hero-panel-side reveal"><h2>Waarom dit werkt</h2>' + valueList + '</aside></div></div></section>';
+    }
+
+    if (seed.layoutVariant === 'process-cascade') {
+      return '<section class="section hero hero--process-cascade" data-section="hero"><div class="container hero-grid"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><aside class="hero-panel-side reveal"><h2>Eerste route</h2><ol class="hero-steps"><li>Briefing</li><li>Structuur</li><li>Build</li><li>Live</li></ol></aside></div></section>';
+    }
+
+    if (seed.layoutVariant === 'proof-wall') {
+      return '<section class="section hero hero--proof-wall" data-section="hero"><div class="container"><div class="hero-proof-grid"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><aside class="hero-proof-wall reveal"><h2>Trust Framework</h2>' + valueList + '</aside></div></div></section>';
+    }
+
+    if (seed.layoutVariant === 'contrast-panels') {
+      return '<section class="section hero hero--contrast" data-section="hero"><div class="container contrast-wrap"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><article class="contrast-panel reveal"><h2>Van ruis naar richting</h2><p>' + esc(copy.challengeCards[0].problem) + '</p><p>' + esc(copy.challengeCards[0].outcome) + '</p></article></div></section>';
+    }
+
+    if (seed.layoutVariant === 'chapter-runway') {
+      return '<section class="section hero hero--chapter" data-section="hero"><div class="container hero-stack"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><article class="chapter-runway reveal"><h2>Runway</h2><p>' + esc(copy.valueLadder[1]) + '</p></article></div></section>';
+    }
+
+    if (seed.layoutVariant === 'matrix-grid') {
+      return '<section class="section hero hero--matrix" data-section="hero"><div class="container matrix-hero"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><div class="hero-matrix reveal">' + copy.challengeCards.slice(0, 3).map(function (card) {
+        return '<div class="matrix-cell"><h3>' + esc(card.title) + '</h3><p>' + esc(card.outcome) + '</p></div>';
+      }).join('') + '</div></div></section>';
+    }
+
+    if (seed.layoutVariant === 'timeline-spotlight') {
+      return '<section class="section hero hero--timeline" data-section="hero"><div class="container hero-grid"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><aside class="timeline-spotlight reveal"><h2>Spotlight</h2><p>' + esc(copy.valueLadder[2]) + '</p><div class="spot-dot"></div></aside></div></section>';
+    }
+
+    if (seed.layoutVariant === 'precision-minimal') {
+      return '<section class="section hero hero--minimal" data-section="hero"><div class="container hero-stack"><article class="hero-panel-main reveal">' + heroCore + cta + '</article></div></section>';
+    }
+
+    if (seed.layoutVariant === 'conversion-rail') {
+      return '<section class="section hero hero--conversion-rail" data-section="hero"><div class="container rail-layout"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><aside class="cta-rail reveal"><h2>Snelle route</h2><p>' + esc(copy.contactPromise) + '</p></aside></div></section>';
+    }
+
+    return '<section class="section hero hero--cabinet" data-section="hero"><div class="container hero-grid"><article class="hero-panel-main reveal">' + heroCore + cta + '</article><aside class="hero-cabinet reveal">' + valueList + '</aside></div></section>';
+  }
+
+  function renderOfferStrip(copy) {
+    return '<section class="section section-alt" data-section="offerStrip"><div class="container"><div class="offer-strip reveal"><p>' + esc(copy.businessType) + ' · ' + esc(copy.city) + '</p><a class="btn btn-primary" href="contact.html">' + esc(copy.hero.primaryCta) + '</a></div></div></section>';
+  }
+
+  function renderProblemFrame(copy) {
+    var cards = copy.challengeCards.map(function (card, idx) {
+      return '<article class="challenge-card reveal"><span class="idx">0' + (idx + 1) + '</span><h3>' + esc(card.title) + '</h3><p>' + esc(card.problem) + '</p><p class="outcome">' + esc(card.outcome) + '</p></article>';
+    }).join('');
+    return '<section class="section" data-section="problemFrame"><div class="container"><div class="section-head"><p class="eyebrow">Kernspanning</p><h2>Waar aanvragen vaak stuklopen</h2><p>Deze site draait de frictie om naar duidelijke keuzes en concrete vervolgstappen.</p></div><div class="challenge-grid">' + cards + '</div></div></section>';
+  }
+
+  function renderBenefits(copy) {
+    var items = copy.selectedBenefits.map(function (text, idx) {
+      return '<article class="benefit-card reveal"><span class="idx">0' + (idx + 1) + '</span><p>' + esc(text) + '</p></article>';
+    }).join('');
+    return '<section class="section section-alt" data-section="benefits"><div class="container"><div class="section-head"><p class="eyebrow">Voordelen</p><h2>Waarom deze route converteert</h2></div><div class="benefit-grid">' + items + '</div></div></section>';
+  }
+
+  function renderUseCaseMatrix(copy) {
+    var matrixRows = [
+      ['Commercieel', 'Snellere kwalificatie', 'Gerichte CTA naar demo'],
+      ['Operations', 'Minder handmatige uitleg', 'Heldere route per use-case'],
+      ['Management', 'Duidelijk besluitkader', 'Structuur op waarde en risico']
+    ];
+    var rows = matrixRows.map(function (row) {
+      return '<div class="matrix-row reveal"><strong>' + esc(row[0]) + '</strong><span>' + esc(row[1]) + '</span><span>' + esc(row[2]) + '</span></div>';
+    }).join('');
+    return '<section class="section" data-section="useCaseMatrix"><div class="container"><div class="section-head"><p class="eyebrow">Use-case matrix</p><h2>Per team een duidelijke route</h2></div><div class="usecase-matrix">' + rows + '</div></div></section>';
+  }
+
+  function renderLocalPlanner(copy) {
+    var lines = [
+      'Situatie en doel in 1 intake scherp.',
+      'Keuzepad voor scope en prioriteiten.',
+      'Duidelijke voorbereiding vóór uitvoering.',
+      'Vaste route naar oplevering en vervolgstap.'
+    ];
+    var blocks = lines.map(function (line, idx) {
+      return '<article class="planner-step reveal"><span>0' + (idx + 1) + '</span><p>' + esc(line) + '</p></article>';
+    }).join('');
+    return '<section class="section" data-section="localPlanner"><div class="container"><div class="section-head"><p class="eyebrow">Planning</p><h2>Van aanvraag naar uitvoering zonder ruis</h2></div><div class="planner-grid">' + blocks + '</div></div></section>';
+  }
+
+  function renderSignature(key, copy, seed) {
+    var payload = key === 'signatureA' ? copy.signatureA : copy.signatureB;
+    var marker = key === 'signatureA' ? 'a' : 'b';
+    var bullets = payload.bullets.map(function (bullet) {
+      return '<li>' + esc(bullet) + '</li>';
+    }).join('');
+
+    var visualClass = seed.signature_visual || 'insight-stack';
+    return '<section class="section section-signature ' + esc(visualClass) + '" data-section="' + esc(key) + '"><div class="container"><article class="signature-card reveal" data-signature="' + marker + '"><p class="eyebrow">Signature Section</p><h2>' + esc(payload.title) + '</h2><p class="signature-lead">' + esc(payload.lead) + '</p><ul>' + bullets + '</ul></article></div></section>';
+  }
+
+  function renderProcess(copy) {
+    var steps = copy.process.map(function (step) {
+      return '<article class="process-step reveal"><span>' + esc(step.step) + '</span><div><h3>' + esc(step.title) + '</h3><p>' + esc(step.text) + '</p></div></article>';
+    }).join('');
+    return '<section class="section" data-section="process"><div class="container"><div class="section-head"><p class="eyebrow">Proces</p><h2>Strak traject van briefing naar livegang</h2></div><div class="process-list">' + steps + '</div></div></section>';
+  }
+
+  function renderProof(copy) {
+    var trustItems = copy.trust.map(function (item) {
+      return '<li>' + esc(item) + '</li>';
+    }).join('');
+    return '<section class="section section-alt" data-section="proof"><div class="container"><div class="proof-wrap reveal"><div><p class="eyebrow">Trust Block</p><h2>Duidelijkheid vóór overtuiging</h2><p>Geen opgeblazen claims. Wel een transparante route die vertrouwen opbouwt en actie versnelt.</p></div><ul>' + trustItems + '</ul></div></div></section>';
+  }
+
+  function renderFaq(copy) {
+    var items = copy.faq.map(function (item, idx) {
+      return '<article class="faq-item reveal"><button type="button" class="faq-question" data-faq-question="' + idx + '">' + esc(item.q) + '</button><div class="faq-answer"><p>' + esc(item.a) + '</p></div></article>';
+    }).join('');
+    return '<section class="section" data-section="faq"><div class="container"><div class="section-head"><p class="eyebrow">FAQ</p><h2>Bezwaren direct beantwoord</h2></div><div class="faq-list">' + items + '</div></div></section>';
+  }
+
+  function renderCta(copy) {
+    return '<section class="section section-cta" data-section="cta"><div class="container"><article class="cta-card reveal"><h2>Klaar voor de volgende stap?</h2><p>De route staat. Nu is het moment om de intake te starten.</p><div class="hero-ctas"><a class="btn btn-primary" href="contact.html">' + esc(copy.hero.primaryCta) + '</a><a class="btn btn-secondary" href="about.html">Bekijk aanpak</a></div><p class="cta-note">' + esc(copy.contactPromise) + '</p></article></div></section>';
+  }
+
+  function renderSection(sectionKey, brief, copy, seed) {
+    if (sectionKey === 'hero') return renderHero(brief, copy, seed);
+    if (sectionKey === 'offerStrip') return renderOfferStrip(copy);
+    if (sectionKey === 'problemFrame') return renderProblemFrame(copy);
+    if (sectionKey === 'benefits') return renderBenefits(copy);
+    if (sectionKey === 'useCaseMatrix') return renderUseCaseMatrix(copy);
+    if (sectionKey === 'localPlanner') return renderLocalPlanner(copy);
+    if (sectionKey === 'signatureA') return renderSignature('signatureA', copy, seed);
+    if (sectionKey === 'signatureB') return renderSignature('signatureB', copy, seed);
+    if (sectionKey === 'process') return renderProcess(copy);
+    if (sectionKey === 'proof') return renderProof(copy);
+    if (sectionKey === 'faq') return renderFaq(copy);
+    if (sectionKey === 'cta') return renderCta(copy);
+    return '';
+  }
+
+  function docShell(params) {
+    var h = esc;
+    return '<!DOCTYPE html>\n<html lang="nl">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>' + h(params.title) + '</title>\n  <meta name="description" content="' + h(params.description) + '">\n  <meta name="theme-color" content="' + h(params.themeColor) + '">\n  <link rel="stylesheet" href="assets/styles.css">\n</head>\n<body data-theme="' + h(params.theme) + '" data-layout-variant="' + h(params.layoutVariant) + '" data-card-style="' + h(params.cardStyle) + '">\n  <header class="site-header">\n    <div class="container nav-wrap">\n      <a class="logo" href="index.html">' + h(params.brand) + '<span>.</span></a>\n      <nav class="site-nav" aria-label="Hoofdnavigatie">' + params.nav + '</nav>\n      <a class="btn btn-primary" href="contact.html">' + h(params.primaryCta) + '</a>\n      <button class="nav-toggle" type="button" aria-label="Menu">☰</button>\n    </div>\n  </header>\n  <main>\n' + params.body + '\n  </main>\n  <footer class="site-footer">\n    <div class="container footer-grid">\n      <div>\n        <h3>' + h(params.brand) + '</h3>\n        <p>' + h(params.footerText) + '</p>\n      </div>\n      <div>\n        <h4>Navigatie</h4>\n        <ul><li><a href="index.html">Home</a></li><li><a href="' + h(params.servicesFile) + '">' + h(params.servicesLabel) + '</a></li><li><a href="about.html">Over</a></li><li><a href="contact.html">Contact</a></li></ul>\n      </div>\n      <div>\n        <h4>Actie</h4>\n        <ul><li><a href="contact.html">' + h(params.primaryCta) + '</a></li><li>Binnen 1 werkdag reactie</li><li>Heldere vervolgstap</li></ul>\n      </div>\n    </div>\n  </footer>\n  <script src="assets/app.js"></script>\n</body>\n</html>\n';
+  }
+
+  function renderIndex(order, brief, copy, seed, pages) {
+    var sectionOrder = seed.sectionOrder.slice();
+    var body = sectionOrder.map(function (sectionKey) {
+      return renderSection(sectionKey, brief, copy, seed);
+    }).join('\n');
+
+    var nav = buildPageNav(pages, 'index.html');
+    var servicesFile = brief.industry === 'software' ? 'features.html' : 'diensten.html';
+    var servicesLabel = brief.industry === 'software' ? 'Features' : 'Diensten';
+
+    return docShell({
+      title: order.clientName + ' | ' + order.title,
+      description: copy.hero.claim,
+      themeColor: seed.palette.accent,
+      theme: seed.seed_meta.theme,
+      layoutVariant: seed.layoutVariant,
+      cardStyle: seed.card_style,
+      brand: order.clientName,
+      nav: nav,
+      primaryCta: copy.hero.primaryCta,
+      body: body,
+      footerText: order.title + ' in ' + (order.location || 'jouw regio') + ', gebouwd voor duidelijke keuzes en betere conversie.',
+      servicesFile: servicesFile,
+      servicesLabel: servicesLabel
+    });
+  }
+
+  function renderServicesPage(order, brief, copy, seed, pages) {
+    var title = brief.industry === 'software' ? 'Features die beslissingen versnellen' : 'Diensten die aanvragen versterken';
+    var intro = brief.industry === 'software'
+      ? 'Elke featurekaart verbindt productwaarde aan een concrete vervolgstap in de demo-flow.'
+      : 'Elke dienst is gepositioneerd op duidelijk resultaat en een snelle route naar intake.';
+
+    var cards = copy.featureCards.map(function (card, idx) {
+      return '<article class="feature-card reveal"><span class="idx">0' + (idx + 1) + '</span><h3>' + esc(card.title) + '</h3><p>' + esc(card.text) + '</p></article>';
+    }).join('');
+
+    var servicesFile = brief.industry === 'software' ? 'features.html' : 'diensten.html';
+    var servicesLabel = brief.industry === 'software' ? 'Features' : 'Diensten';
+
+    return docShell({
+      title: servicesLabel + ' | ' + order.clientName,
+      description: intro,
+      themeColor: seed.palette.accent,
+      theme: seed.seed_meta.theme,
+      layoutVariant: seed.layoutVariant,
+      cardStyle: seed.card_style,
+      brand: order.clientName,
+      nav: buildPageNav(pages, servicesFile),
+      primaryCta: copy.hero.primaryCta,
+      body: '<section class="section"><div class="container"><div class="section-head"><p class="eyebrow">' + esc(servicesLabel) + '</p><h1>' + esc(title) + '</h1><p>' + esc(intro) + '</p></div><div class="feature-grid">' + cards + '</div></div></section>' + renderCta(copy),
+      footerText: 'Heldere ' + servicesLabel.toLowerCase() + ' voor ' + order.clientName + ' met focus op kwaliteit van aanvragen.',
+      servicesFile: servicesFile,
+      servicesLabel: servicesLabel
+    });
+  }
+
+  function renderCasesPage(order, brief, copy, seed, pages) {
+    var fileName = brief.industry === 'software' ? 'use-cases.html' : 'projecttypes.html';
+    var title = brief.industry === 'software' ? 'Use-cases met duidelijke beslisroute' : 'Projecttypes met heldere aanpak';
+
+    var cards = copy.challengeCards.map(function (item, idx) {
+      return '<article class="case-card reveal"><span class="idx">0' + (idx + 1) + '</span><h3>' + esc(item.title) + '</h3><p>' + esc(item.problem) + '</p><p class="outcome">' + esc(item.outcome) + '</p></article>';
+    }).join('');
+
+    var servicesFile = brief.industry === 'software' ? 'features.html' : 'diensten.html';
+    var servicesLabel = brief.industry === 'software' ? 'Features' : 'Diensten';
+
+    return docShell({
+      title: title + ' | ' + order.clientName,
+      description: title,
+      themeColor: seed.palette.accent,
+      theme: seed.seed_meta.theme,
+      layoutVariant: seed.layoutVariant,
+      cardStyle: seed.card_style,
+      brand: order.clientName,
+      nav: buildPageNav(pages, fileName),
+      primaryCta: copy.hero.primaryCta,
+      body: '<section class="section section-alt"><div class="container"><div class="section-head"><p class="eyebrow">Casestructuur</p><h1>' + esc(title) + '</h1><p>Geen opgeblazen caseclaims. Wel duidelijke scenario’s die laten zien hoe de route werkt.</p></div><div class="case-grid">' + cards + '</div></div></section>' + renderCta(copy),
+      footerText: 'Scenario-gebaseerde structuur voor betere intakekwaliteit en heldere verwachtingen.',
+      servicesFile: servicesFile,
+      servicesLabel: servicesLabel
+    });
+  }
+
+  function renderAboutPage(order, brief, copy, seed, pages) {
+    var points = copy.aboutPoints.map(function (point) {
+      return '<li>' + esc(point) + '</li>';
+    }).join('');
+
+    var servicesFile = brief.industry === 'software' ? 'features.html' : 'diensten.html';
+    var servicesLabel = brief.industry === 'software' ? 'Features' : 'Diensten';
+
+    return docShell({
+      title: 'Over | ' + order.clientName,
+      description: 'Strategische aanpak voor premium conversie.',
+      themeColor: seed.palette.accent,
+      theme: seed.seed_meta.theme,
+      layoutVariant: seed.layoutVariant,
+      cardStyle: seed.card_style,
+      brand: order.clientName,
+      nav: buildPageNav(pages, 'about.html'),
+      primaryCta: copy.hero.primaryCta,
+      body: '<section class="section"><div class="container about-layout"><article class="about-main reveal"><p class="eyebrow">Over de aanpak</p><h1>Design en copy in één conversielijn</h1><p>We bouwen geen losse pagina’s, maar een complete commerciële route die bezoekers sneller richting contact beweegt.</p><ul>' + points + '</ul></article><aside class="about-side reveal"><h2>Positionering</h2><p>' + esc(copy.toneDirection) + ' in toon, strak in structuur en altijd gericht op de volgende actie.</p></aside></div></section>' + renderCta(copy),
+      footerText: 'Commerciële webarchitectuur met focus op kwaliteit, helderheid en schaalbare inhoud.',
+      servicesFile: servicesFile,
+      servicesLabel: servicesLabel
+    });
+  }
+
+  function renderContactPage(order, brief, copy, seed, pages) {
+    var servicesFile = brief.industry === 'software' ? 'features.html' : 'diensten.html';
+    var servicesLabel = brief.industry === 'software' ? 'Features' : 'Diensten';
+
+    var form = '<form class="contact-form reveal" data-demo-form><label>Naam<input type="text" name="name" required></label><label>E-mail<input type="email" name="email" required></label><label>Bedrijf<input type="text" name="company"></label><label>Vraag<textarea name="message" rows="5" required></textarea></label><button class="btn btn-primary" type="submit">' + esc(copy.hero.primaryCta) + '</button><p class="form-feedback" hidden>Bedankt. Je bericht is ontvangen.</p></form>';
+
+    var info = '<article class="contact-copy reveal"><p class="eyebrow">Contact</p><h1>' + esc(copy.hero.primaryCta) + '</h1><p>Omschrijf kort je situatie, doel en gewenste timing. Je krijgt een heldere vervolgstap.</p><ul><li>Focus: ' + esc(brief.differentiator_angle) + '</li><li>Doel: ' + esc(brief.desired_outcomes[0]) + '</li><li>' + esc(copy.contactPromise) + '</li></ul></article>';
+
+    return docShell({
+      title: 'Contact | ' + order.clientName,
+      description: 'Start direct met een duidelijke intake.',
+      themeColor: seed.palette.accent,
+      theme: seed.seed_meta.theme,
+      layoutVariant: seed.layoutVariant,
+      cardStyle: seed.card_style,
+      brand: order.clientName,
+      nav: buildPageNav(pages, 'contact.html'),
+      primaryCta: copy.hero.primaryCta,
+      body: '<section class="section"><div class="container contact-layout">' + info + form + '</div></section>',
+      footerText: 'Contactroute die snel van vraag naar inhoudelijk gesprek beweegt.',
+      servicesFile: servicesFile,
+      servicesLabel: servicesLabel
+    });
+  }
+
+  function renderSite(order, brief, copy, styleSeed, opts) {
+    var pages = brief.sitemap.slice();
+
+    var files = {};
+    files['index.html'] = renderIndex(order, brief, copy, styleSeed, pages);
+
+    if (brief.industry === 'software') {
+      files['features.html'] = renderServicesPage(order, brief, copy, styleSeed, pages);
+      files['use-cases.html'] = renderCasesPage(order, brief, copy, styleSeed, pages);
+    } else {
+      files['diensten.html'] = renderServicesPage(order, brief, copy, styleSeed, pages);
+      files['projecttypes.html'] = renderCasesPage(order, brief, copy, styleSeed, pages);
+    }
+
+    files['about.html'] = renderAboutPage(order, brief, copy, styleSeed, pages);
+    files['contact.html'] = renderContactPage(order, brief, copy, styleSeed, pages);
+
+    files['assets/styles.css'] = buildStyles(styleSeed, brief);
+    files['assets/app.js'] = buildAppJs(styleSeed, brief);
+
+    return files;
+  }
+
+  function buildStyles(seed, brief) {
+    var p = seed.palette;
+    var headingFont = seed.typographyPairing.headings;
+    var bodyFont = seed.typographyPairing.body;
+
+    var radiusMap = { none: '0px', sm: '8px', md: '14px', lg: '20px' };
+    var spacingMap = { compact: '0.9rem', balanced: '1.15rem', airy: '1.45rem', wide: '1.8rem' };
+
+    var sectionPad = seed.spacing_scale === 'wide'
+      ? 'clamp(3.6rem, 7vw, 7rem)'
+      : seed.spacing_scale === 'airy'
+        ? 'clamp(3.2rem, 6.2vw, 6.3rem)'
+        : seed.spacing_scale === 'compact'
+          ? 'clamp(2.4rem, 5vw, 5rem)'
+          : 'clamp(2.8rem, 5.5vw, 5.8rem)';
+
+    return [
+      ':root {',
+      '  --bg: ' + p.bg + ';',
+      '  --surface: ' + p.surface + ';',
+      '  --text: ' + p.text + ';',
+      '  --muted: ' + p.muted + ';',
+      '  --border: ' + p.border + ';',
+      '  --accent: ' + p.accent + ';',
+      '  --accent-alt: ' + p.accent_alt + ';',
+      '  --radius: ' + (radiusMap[seed.border_radius] || '14px') + ';',
+      '  --gap: ' + (spacingMap[seed.spacing_scale] || '1.15rem') + ';',
+      '  --section-pad: ' + sectionPad + ';',
+      '}',
+      '* { box-sizing: border-box; }',
+      'html, body { margin: 0; padding: 0; }',
+      'body { font-family: ' + bodyFont + '; background: var(--bg); color: var(--text); line-height: 1.65; text-rendering: optimizeLegibility; }',
+      'h1, h2, h3, h4 { font-family: ' + headingFont + '; margin: 0; line-height: 1.05; letter-spacing: .02em; text-transform: uppercase; }',
+      'p { margin: 0; }',
+      'a { color: inherit; text-decoration: none; }',
+      '.container { width: min(1240px, calc(100% - 3rem)); margin: 0 auto; }',
+      '.site-header { position: sticky; top: 0; z-index: 40; border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); background: color-mix(in srgb, var(--bg) 88%, transparent); }',
+      '.nav-wrap { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: .9rem; }',
+      '.logo { font-family: ' + headingFont + '; font-size: 1.32rem; font-weight: 700; letter-spacing: .01em; }',
+      '.logo span { color: var(--accent); }',
+      '.site-nav { display: flex; flex-wrap: wrap; align-items: center; gap: .95rem; }',
+      '.site-nav a { font-size: .76rem; text-transform: uppercase; letter-spacing: .11em; color: var(--muted); padding: .4rem 0; border-bottom: 2px solid transparent; transition: .22s ease; }',
+      '.site-nav a:hover, .site-nav a.active { color: var(--text); border-bottom-color: var(--accent); }',
+      '.nav-toggle { display: none; border: 1px solid var(--border); background: var(--surface); color: var(--text); width: 38px; height: 38px; border-radius: calc(var(--radius) - 4px); }',
+      '.btn { display: inline-flex; align-items: center; justify-content: center; gap: .42rem; border: 1px solid transparent; padding: .83rem 1.15rem; border-radius: var(--radius); font-family: ' + headingFont + '; font-size: .79rem; text-transform: uppercase; letter-spacing: .08em; transition: .22s ease; }',
+      '.btn-primary { background: var(--accent); color: #fff; }',
+      '.btn-primary:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 30%, transparent); }',
+      '.btn-secondary { background: transparent; border-color: var(--border); color: var(--text); }',
+      '.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }',
+      '.section { padding: var(--section-pad) 0; }',
+      '.section-alt { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 76%, transparent); }',
+      '.section-signature { background: color-mix(in srgb, var(--surface) 84%, transparent); }',
+      '.section-cta { padding-top: calc(var(--section-pad) * .8); }',
+      '.eyebrow { font-family: ' + headingFont + '; font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: .72rem; }',
+      '.section-head { max-width: 760px; margin-bottom: 1.4rem; }',
+      '.section-head h1, .section-head h2 { margin-bottom: .65rem; font-size: clamp(1.7rem, 4.1vw, 3rem); }',
+      '.section-head p { color: var(--muted); max-width: 70ch; }',
+      '.hero-grid, .rail-layout, .matrix-hero, .contrast-wrap, .hero-proof-grid, .contact-layout, .about-layout { display: grid; gap: var(--gap); }',
+      '.hero-grid { grid-template-columns: 1.07fr .93fr; }',
+      '.hero-stack { display: grid; gap: var(--gap); }',
+      '.hero-panel-main, .hero-panel-side, .hero-panel-note, .hero-proof-wall, .contrast-panel, .chapter-runway, .hero-cabinet, .cta-rail, .timeline-spotlight, .offer-rail-top, .signature-card, .proof-wrap, .cta-card, .about-main, .about-side, .contact-copy, .contact-form, .feature-card, .case-card, .challenge-card, .benefit-card, .planner-step, .process-step, .matrix-cell, .matrix-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }',
+      '.hero-panel-main, .hero-panel-side, .hero-panel-note, .hero-proof-wall, .contrast-panel, .chapter-runway, .hero-cabinet, .cta-rail, .timeline-spotlight, .offer-rail-top { padding: clamp(1rem, 2.4vw, 1.8rem); }',
+      '.hero-panel-main h1 { font-size: clamp(2.1rem, 6.4vw, 5.2rem); margin-bottom: .8rem; }',
+      '.hero-panel-main h1 span { color: var(--accent); }',
+      '.hero-claim { font-size: clamp(1.06rem, 2vw, 1.26rem); color: var(--text); margin-bottom: .55rem; max-width: 63ch; }',
+      '.hero-sub { color: var(--muted); margin-bottom: 1rem; max-width: 63ch; }',
+      '.hero-ctas { display: flex; flex-wrap: wrap; gap: .68rem; }',
+      '.hero-value-list { margin: 0; padding-left: 1rem; color: var(--muted); display: grid; gap: .35rem; }',
+      '.hero-note { color: var(--muted); margin-top: .75rem; font-size: .9rem; }',
+      '.hero-steps { margin: .6rem 0 0; padding-left: 1rem; color: var(--muted); display: grid; gap: .3rem; }',
+      '.spot-dot { width: 12px; height: 12px; border-radius: 999px; background: var(--accent); margin-top: .8rem; box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent); }',
+      '.offer-rail-top { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: var(--gap); }',
+      '.offer-rail-top span { font-family: ' + headingFont + '; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }',
+      '.offer-strip { display: flex; justify-content: space-between; gap: .8rem; align-items: center; flex-wrap: wrap; padding: 1rem 1.15rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }',
+      '.offer-strip p { color: var(--muted); }',
+      '.challenge-grid, .benefit-grid, .feature-grid, .case-grid, .planner-grid { display: grid; gap: var(--gap); grid-template-columns: repeat(3, minmax(0, 1fr)); }',
+      '.challenge-card, .benefit-card, .feature-card, .case-card, .planner-step { padding: 1.05rem; display: grid; gap: .55rem; transition: transform .2s ease, border-color .2s ease; }',
+      '.challenge-card:hover, .benefit-card:hover, .feature-card:hover, .case-card:hover, .planner-step:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }',
+      '.idx { font-family: ' + headingFont + '; color: var(--accent); font-size: 1.02rem; letter-spacing: .07em; }',
+      '.challenge-card p, .benefit-card p, .feature-card p, .case-card p, .planner-step p { color: var(--muted); }',
+      '.challenge-card .outcome, .case-card .outcome { color: var(--text); }',
+      '.signature-card { padding: 1.25rem; display: grid; gap: .6rem; }',
+      '.signature-card ul { margin: 0; padding-left: 1rem; display: grid; gap: .35rem; color: var(--muted); }',
+      '.signature-lead { color: var(--muted); }',
+      '.process-list { display: grid; gap: .75rem; }',
+      '.process-step { padding: .92rem 1.05rem; display: grid; grid-template-columns: auto 1fr; gap: .72rem; align-items: start; }',
+      '.process-step span { font-family: ' + headingFont + '; color: var(--accent); font-size: 1.1rem; }',
+      '.process-step p { color: var(--muted); }',
+      '.proof-wrap { padding: 1.18rem; display: grid; grid-template-columns: 1fr .95fr; gap: var(--gap); }',
+      '.proof-wrap p { color: var(--muted); }',
+      '.proof-wrap ul { margin: 0; padding-left: 1rem; display: grid; gap: .35rem; color: var(--muted); }',
+      '.usecase-matrix { display: grid; gap: .6rem; }',
+      '.matrix-row { display: grid; grid-template-columns: .9fr 1fr 1fr; gap: .6rem; align-items: center; padding: .85rem 1rem; }',
+      '.matrix-row span { color: var(--muted); }',
+      '.matrix-cell { padding: .9rem; display: grid; gap: .45rem; }',
+      '.matrix-cell p { color: var(--muted); }',
+      '.faq-list { display: grid; gap: .7rem; }',
+      '.faq-item { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }',
+      '.faq-question { width: 100%; border: 0; background: transparent; text-align: left; padding: .9rem 1rem; color: var(--text); font-family: ' + headingFont + '; font-size: .94rem; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }',
+      '.faq-answer { max-height: 0; overflow: hidden; transition: max-height .28s ease; }',
+      '.faq-answer p { padding: 0 1rem .9rem; color: var(--muted); }',
+      '.faq-item.open .faq-answer { max-height: 260px; }',
+      '.cta-card { padding: 1.25rem; display: grid; gap: .7rem; }',
+      '.cta-card p { color: var(--muted); }',
+      '.cta-note { font-size: .9rem; color: var(--muted); }',
+      '.about-layout { grid-template-columns: 1.08fr .92fr; }',
+      '.about-main, .about-side { padding: 1.15rem; display: grid; gap: .65rem; }',
+      '.about-main p, .about-side p, .about-main li { color: var(--muted); }',
+      '.about-main ul { margin: 0; padding-left: 1rem; display: grid; gap: .35rem; }',
+      '.contact-layout { grid-template-columns: 1fr 1fr; }',
+      '.contact-copy, .contact-form { padding: 1.15rem; display: grid; gap: .7rem; }',
+      '.contact-copy p, .contact-copy li { color: var(--muted); }',
+      '.contact-copy ul { margin: 0; padding-left: 1rem; display: grid; gap: .35rem; }',
+      '.contact-form label { display: grid; gap: .35rem; color: var(--muted); font-size: .86rem; }',
+      '.contact-form input, .contact-form textarea { width: 100%; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--text); font: 400 .95rem/1.4 ' + bodyFont + '; padding: .7rem .76rem; border-radius: calc(var(--radius) - 4px); }',
+      '.contact-form input:focus, .contact-form textarea:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }',
+      '.form-feedback { color: var(--accent); font-size: .9rem; }',
+      '.site-footer { border-top: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 84%, transparent); padding: 2.3rem 0; margin-top: 2rem; }',
+      '.footer-grid { display: grid; grid-template-columns: 1.2fr .8fr .8fr; gap: var(--gap); }',
+      '.footer-grid p, .footer-grid li { color: var(--muted); }',
+      '.footer-grid ul { margin: 0; padding-left: 1rem; display: grid; gap: .35rem; }',
+      '.reveal { opacity: 0; transform: translateY(12px); transition: .4s ease; }',
+      '.reveal.in { opacity: 1; transform: translateY(0); }',
+      'body[data-card-style="elevated"] .challenge-card, body[data-card-style="elevated"] .benefit-card, body[data-card-style="elevated"] .feature-card, body[data-card-style="elevated"] .case-card { box-shadow: 0 14px 32px rgba(0,0,0,0.08); }',
+      'body[data-card-style="glass"] .challenge-card, body[data-card-style="glass"] .benefit-card, body[data-card-style="glass"] .feature-card, body[data-card-style="glass"] .case-card { backdrop-filter: blur(8px); background: color-mix(in srgb, var(--surface) 84%, transparent); }',
+      'body[data-layout-variant="chapter-runway"] .hero-grid { grid-template-columns: 1fr; }',
+      'body[data-layout-variant="conversion-rail"] .cta-rail { position: sticky; top: 96px; }',
+      'body[data-layout-variant="matrix-grid"] .matrix-hero { grid-template-columns: 1fr 1fr; }',
+      'body[data-layout-variant="precision-minimal"] .hero-panel-main { border-width: 2px; }',
+      '@media (max-width: 1080px) {',
+      '  .container { width: min(1240px, calc(100% - 2rem)); }',
+      '  .site-nav { display: none; }',
+      '  .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }',
+      '  .hero-grid, .hero-proof-grid, .contrast-wrap, .matrix-hero, .proof-wrap, .challenge-grid, .benefit-grid, .feature-grid, .case-grid, .planner-grid, .contact-layout, .about-layout, .footer-grid { grid-template-columns: 1fr; }',
+      '  .matrix-row { grid-template-columns: 1fr; }',
+      '}',
+      '@media (prefers-reduced-motion: reduce) {',
+      '  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }',
+      '}'
+    ].join('\n');
+  }
+
+  function buildAppJs(seed, brief) {
+    var base = [
+      '(function(){',
+      '  var observer = new IntersectionObserver(function(entries){',
+      '    entries.forEach(function(entry){',
+      '      if(entry.isIntersecting) entry.target.classList.add("in");',
+      '    });',
+      '  }, { threshold: 0.12 });',
+      '  document.querySelectorAll(".reveal").forEach(function(el){ observer.observe(el); });',
+      '',
+      '  document.querySelectorAll(".faq-question").forEach(function(btn){',
+      '    btn.addEventListener("click", function(){',
+      '      var item = btn.closest(".faq-item");',
+      '      document.querySelectorAll(".faq-item").forEach(function(x){ if(x !== item) x.classList.remove("open"); });',
+      '      item.classList.toggle("open");',
+      '    });',
+      '  });',
+      '',
+      '  var navToggle = document.querySelector(".nav-toggle");',
+      '  var nav = document.querySelector(".site-nav");',
+      '  if(navToggle && nav){',
+      '    navToggle.addEventListener("click", function(){',
+      '      nav.classList.toggle("open");',
+      '      if(nav.classList.contains("open")){',
+      '        nav.style.display = "flex";',
+      '      } else {',
+      '        nav.style.display = "none";',
+      '      }',
+      '    });',
+      '  }',
+      '',
+      '  document.querySelectorAll("form[data-demo-form]").forEach(function(form){',
+      '    form.addEventListener("submit", function(e){',
+      '      e.preventDefault();',
+      '      var msg = form.querySelector(".form-feedback");',
+      '      if(msg) msg.hidden = false;',
+      '      form.reset();',
+      '    });',
+      '  });',
+      '})();'
+    ];
+
+    return base.join('\n');
+  }
+
+  function runQaGate(files, styleSeed, attempt, brief) {
+    var findings = [];
+    var checks = [];
+
+    var entries = Object.keys(files).map(function (key) {
+      return { key: key, text: String(files[key] || '') };
+    });
+
+    var combinedLower = entries.map(function (x) { return x.text.toLowerCase(); }).join('\n');
+    FORBIDDEN_TERMS.forEach(function (term) {
+      if (combinedLower.indexOf(term) !== -1) {
+        findings.push('Verboden term gevonden: ' + term);
+      }
+    });
+    checks.push('Geen verboden placeholder-termen in output');
+
+    var htmlEntries = entries.filter(function (x) { return /\.html$/.test(x.key); });
+    if (htmlEntries.length < 3 || htmlEntries.length > 5) {
+      findings.push('Aantal HTML pagina’s valt buiten vereiste range (3-5).');
+    }
+    checks.push('HTML pagina-aantal binnen 3-5');
+
+    htmlEntries.forEach(function (entry) {
+      var text = entry.text;
+      if (text.indexOf('<!DOCTYPE html>') === -1 || text.indexOf('<html') === -1 || text.indexOf('<body') === -1) {
+        findings.push('Geen volledig HTML document: ' + entry.key);
+      }
+    });
+    checks.push('Alle pagina’s zijn volledige HTML documenten');
+
+    var index = String(files['index.html'] || '');
+
+    var faqCount = (index.match(/data-faq-question=/g) || []).length;
+    if (faqCount < 6) {
+      findings.push('FAQ bevat minder dan 6 vragen in index.');
+    }
+    checks.push('FAQ >= 6');
+
+    var heroCtaCount = (index.match(/data-hero-cta=/g) || []).length;
+    if (heroCtaCount < 2) {
+      findings.push('Hero bevat minder dan 2 CTA-knoppen.');
+    }
+    checks.push('Hero bevat 2 CTA’s');
+
+    if (index.indexOf('data-signature="a"') === -1 || index.indexOf('data-signature="b"') === -1) {
+      findings.push('Signature sections ontbreken in index.');
+    }
+    checks.push('Signature sections A en B aanwezig');
+
+    if (index.indexOf('data-layout-variant="' + styleSeed.layoutVariant + '"') === -1) {
+      findings.push('layoutVariant is niet toegepast op index-body.');
+    }
+    checks.push('layoutVariant aantoonbaar toegepast');
+
+    var expectedDefault = (brief.industry === 'software' ? DEFAULT_SOFTWARE_SECTION_ORDER : DEFAULT_LOCAL_SECTION_ORDER).join('|');
+    var usedOrder = (styleSeed.sectionOrder || []).join('|');
+    if (usedOrder === expectedDefault) {
+      findings.push('Section order bleef op default-template volgorde.');
+    }
+    checks.push('Section order gebruikt seed-variatie');
+
+    if (!styleSeed.typographyPairing || !styleSeed.typographyPairing.id) {
+      findings.push('Typography pairing ontbreekt in style-seed.');
+    }
+    checks.push('Typography pairing aanwezig');
+
+    if (!styleSeed.signatureSections || styleSeed.signatureSections.length < 2) {
+      findings.push('Signature section-configuratie ontbreekt in style-seed.');
+    }
+    checks.push('Signature section-configuratie aanwezig');
+
+    var passed = findings.length === 0;
+
+    return {
+      passed: passed,
+      attempt: attempt,
+      checks: checks,
+      findings: findings,
+      fail_reason: passed ? null : findings.join(' | ')
+    };
+  }
+
+  function renderArtifacts(order, brief, copy, styleSeed, opts) {
+    var files = renderSite(order, brief, copy, styleSeed, opts);
+    files['brief.json'] = JSON.stringify(brief, null, 2);
+    files['copy.json'] = JSON.stringify(copy, null, 2);
+    files['style-seed.json'] = JSON.stringify(styleSeed, null, 2);
+    return files;
+  }
+
+  function buildSiteBundle(input) {
+    var options = {
+      orderId: String(input.orderId || (input.meta && input.meta.id) || 'order'),
+      mode: input.mode === 'quick' ? 'quick' : 'premium',
+      theme: input.theme === 'dark' ? 'dark' : 'light',
+      source: input.source || 'ui-click'
+    };
+
+    var order = normalizeOrder(input.meta || {}, options.orderId);
+    var stableSeedSource = order.id || slugify(order.clientName + '-' + order.title);
+    var baseSeed = fnv1a(stableSeedSource);
+
+    var lastBundle = null;
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      var attemptSeed = (baseSeed + attempt) >>> 0;
+      options.attempt = attempt + 1;
+
+      var brief = makeBrief(order, options);
+      var concepts = makeConcepts(brief);
+      var conceptRng = mulberry32((attemptSeed ^ 0x9E3779B9) >>> 0);
+      var chosenConcept = chooseConcept(brief, concepts, conceptRng);
+      var styleSeed = makeStyleSeed(order, brief, chosenConcept, options, attemptSeed);
+      var copy = makeCopy(order, brief, chosenConcept, styleSeed, attemptSeed);
+
+      var files = renderArtifacts(order, brief, copy, styleSeed, options);
+      var qa = runQaGate(files, styleSeed, options.attempt, brief);
+      files['qa.json'] = JSON.stringify(qa, null, 2);
+
+      var bundle = {
+        order_id: options.orderId,
+        mode: options.mode,
+        theme: options.theme,
+        generated_at: new Date().toISOString(),
+        brief: brief,
+        concepts: concepts,
+        chosen_concept: chosenConcept,
+        style_seed: styleSeed,
+        copy: copy,
+        qa: qa,
+        files: files,
+        output_hint: '/output/' + options.orderId + '/'
+      };
+
+      lastBundle = bundle;
+      if (qa.passed) {
+        return bundle;
+      }
+    }
+
+    return lastBundle;
+  }
+
+  return {
+    makeBrief: makeBrief,
+    makeStyleSeed: makeStyleSeed,
+    makeCopy: makeCopy,
+    renderSite: renderSite,
+    runQaGate: runQaGate,
+    buildSiteBundle: buildSiteBundle
+  };
+}));

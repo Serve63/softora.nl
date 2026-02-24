@@ -1,0 +1,233 @@
+:root {
+    --theme-control-bg: rgba(0, 0, 0, 0.03);
+    --theme-control-bg-hover: rgba(0, 0, 0, 0.06);
+    --theme-control-bg-active: rgba(0, 0, 0, 0.1);
+    --sidebar-logo-color: #8b2252;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg-primary: #080808;
+    --bg-secondary: #0d0d0d;
+    --bg-tertiary: #111111;
+    --bg-card: rgba(255, 255, 255, 0.03);
+    --text-primary: #f5f5f5;
+    --text-secondary: #8a8a94;
+    --text-tertiary: #5f5f68;
+    --border: rgba(255, 255, 255, 0.08);
+    --theme-control-bg: rgba(255, 255, 255, 0.02);
+    --theme-control-bg-hover: rgba(255, 255, 255, 0.05);
+    --theme-control-bg-active: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+    --bg-primary: #f8f7f4;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #efeee9;
+    --bg-card: rgba(15, 23, 42, 0.03);
+    --text-primary: #1a1a2e;
+    --text-secondary: #606272;
+    --text-tertiary: #9599a8;
+    --border: rgba(0, 0, 0, 0.08);
+    --theme-control-bg: rgba(0, 0, 0, 0.03);
+    --theme-control-bg-hover: rgba(0, 0, 0, 0.06);
+    --theme-control-bg-active: rgba(0, 0, 0, 0.1);
+}
+
+/* Stabilize first paint after sidebar navigation between personeel pages */
+:root[data-personnel-loading="true"] *,
+:root[data-personnel-loading="true"] *::before,
+:root[data-personnel-loading="true"] *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+}
+
+.sidebar-theme {
+    padding: 0.5rem 2rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sidebar-theme-label {
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.62rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-tertiary);
+}
+
+.sidebar-theme-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+}
+
+.theme-switch-btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--theme-control-bg);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    width: 100%;
+    padding: 0.38rem 0.3rem;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    line-height: 1;
+    text-align: center;
+    cursor: none;
+    transition: all 0.2s var(--ease-out-expo, ease);
+}
+
+.theme-switch-btn:hover {
+    color: var(--text-primary);
+    background: var(--theme-control-bg-hover);
+}
+
+.theme-switch-btn.is-active {
+    color: var(--text-primary);
+    border-color: var(--accent, var(--accent-color));
+    background: var(--theme-control-bg-active);
+}
+
+.sidebar-logo,
+.sidebar-logo span {
+    color: var(--sidebar-logo-color) !important;
+}
+
+.sidebar-logo {
+    font-family: 'Oswald', sans-serif !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.02em !important;
+    line-height: 1 !important;
+}
+
+.sidebar-footer .sidebar-user .logout-btn {
+    order: -1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-footer .sidebar-user .logout-btn svg {
+    transform: scaleX(-1);
+    transform-origin: center;
+}
+
+.theme-scope-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+}
+
+.theme-scope-modal[hidden] {
+    display: none;
+}
+
+.theme-scope-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.theme-scope-dialog {
+    position: relative;
+    width: min(420px, 100%);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    padding: 1.1rem;
+    display: grid;
+    gap: 0.9rem;
+}
+
+.theme-scope-title {
+    margin: 0;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.1;
+}
+
+.theme-scope-text {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.theme-scope-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+.theme-scope-btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--theme-control-bg);
+    color: var(--text-primary);
+    padding: 0.58rem 0.65rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer !important;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.theme-scope-btn:hover {
+    background: var(--theme-control-bg-hover);
+}
+
+.theme-scope-btn.is-primary {
+    border-color: var(--accent, var(--accent-color));
+}
+
+.theme-scope-btn.is-cancel {
+    grid-column: 1 / -1;
+}
+
+.theme-scope-btn:active {
+    transform: translateY(1px);
+}
+
+@media (max-width: 960px) {
+    .sidebar-theme {
+        display: none;
+    }
+}
+
+/* Gebruik overal de standaard muis in de personeelomgeving */
+body {
+    cursor: auto !important;
+}
+
+.cursor,
+.cursor-dot {
+    display: none !important;
+}
+
+a,
+button,
+.magnetic,
+.appointment {
+    cursor: pointer !important;
+}

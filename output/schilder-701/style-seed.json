@@ -1,0 +1,94 @@
+{
+  "seed": 2740134680,
+  "run_id": "cli-1770824740502-juvrfu",
+  "layoutVariant": 8,
+  "layout_variant": 8,
+  "layoutVariantKey": "arc-timeline",
+  "layout_pattern": "arc-timeline",
+  "sectionOrder": [
+    "hero",
+    "faq",
+    "trust",
+    "signatureA",
+    "benefits",
+    "value",
+    "signatureB",
+    "process",
+    "pain",
+    "cta"
+  ],
+  "section_order": [
+    "hero",
+    "faq",
+    "trust",
+    "signatureA",
+    "benefits",
+    "value",
+    "signatureB",
+    "process",
+    "pain",
+    "cta"
+  ],
+  "typePair": 0,
+  "type_pair": 0,
+  "typography_pairing": {
+    "headings": "\"Arial Black\", \"Segoe UI\", Arial, sans-serif",
+    "body": "\"Segoe UI\", \"Helvetica Neue\", Arial, sans-serif"
+  },
+  "mood_words": [
+    "actiegedreven",
+    "compact",
+    "performance-first"
+  ],
+  "signatureSections": [
+    "Kleur & Afwerking Keuzehulp",
+    "Materiaalkeuze per Ruimtetype"
+  ],
+  "signature_sections": [
+    "Kleur & Afwerking Keuzehulp",
+    "Materiaalkeuze per Ruimtetype"
+  ],
+  "signature_payload": {
+    "a": {
+      "id": "kleur-afwerking",
+      "title": "Kleur & Afwerking Keuzehulp",
+      "lead": "Bezoekers kiezen sneller als afwerking en gebruik direct praktisch worden uitgelegd.",
+      "bullets": [
+        "Binnen en buiten apart uitgewerkt.",
+        "Onderhoud en duurzaamheid in begrijpelijke taal.",
+        "Keuze direct te koppelen aan intake."
+      ]
+    },
+    "b": {
+      "id": "materiaal-kader",
+      "title": "Materiaalkeuze per Ruimtetype",
+      "lead": "Maakt materiaalkeuzes concreet zodat bezoekers met vertrouwen een richting kiezen.",
+      "bullets": [
+        "Praktische verschillen in uitstraling en levensduur.",
+        "Keuzes gekoppeld aan gebruiksintensiteit.",
+        "Direct bruikbaar in offertegesprek."
+      ]
+    }
+  },
+  "spacingScale": "tight",
+  "spacing_scale": "tight",
+  "borderRadius": "0px",
+  "border_radius": "0px",
+  "gridStyle": "asymmetric",
+  "grid_style": "asymmetric",
+  "buttonStyle": "solid",
+  "button_style": "solid",
+  "cardStyle": "flat",
+  "card_style": "flat",
+  "microinteractions": "subtiele reveal, hover lift, duidelijke focus states",
+  "animation_rules": "subtiel, functioneel, geen circus",
+  "palette": {
+    "bg": "#f7f6f2",
+    "surface": "#ffffff",
+    "text": "#101426",
+    "muted": "#5a6078",
+    "border": "rgba(16,20,38,0.12)",
+    "accent": "#2f5bd4",
+    "accentAlt": "#3a6fe4"
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "order_id": "schilder-premium-201",
+  "source": "cli-custom-order",
+  "run_id": "cli-1770826487051-6ot4o9",
+  "theme": "light",
+  "industry": "contractor",
+  "offer": "Schilder Website met Offerteflow",
+  "location": "Breda",
+  "audience": "huiseigenaren en ondernemers die strak gepland vakwerk zoeken",
+  "primary_action": "Plan een opname",
+  "secondary_action": "Bekijk werkwijze",
+  "top_pains": [
+    "Aanvragen komen binnen zonder duidelijke scope of timing.",
+    "Bezoekers twijfelen over afwerking en materiaalkeuze.",
+    "Kwaliteit is online niet concreet genoeg zichtbaar.",
+    "Mobiele bezoekers haken af vóór ze contact opnemen.",
+    "Verwachtingen over voorbereiding en planning blijven vaag."
+  ],
+  "desired_outcomes": [
+    "Meer serieuze aanvragen met duidelijke projectcontext.",
+    "Sneller vertrouwen door transparante aanpak en voorbereiding.",
+    "Minder losse vragen door praktische keuzehulp.",
+    "Sterkere lokale conversie op mobiel en desktop.",
+    "Premium uitstraling die vakmanschap inhoudelijk onderbouwt."
+  ],
+  "differentiator_angle": "Van vrijblijvende interesse naar concrete aanvraag met duidelijke voorbereiding en planning.",
+  "forbidden_claims": [
+    "Geen verzonnen aantallen of groeicijfers.",
+    "Geen klantlogo's of testimonials zonder brondata.",
+    "Geen certificeringen of keurmerken zonder bewijs in opdrachtdata.",
+    "Geen fictieve SLA- of responstijdclaims buiten expliciete input."
+  ],
+  "faq": [
+    [
+      "Moet ik alles exact weten vóór contact?",
+      "Nee. De intake is bedoeld om scope, planning en keuzes samen concreet te maken."
+    ],
+    [
+      "Krijg ik snel duidelijkheid over de aanpak?",
+      "Ja. Na je aanvraag volgt direct een heldere vervolgstap met praktische route."
+    ],
+    [
+      "Wat als ik nog twijfel over materiaal of afwerking?",
+      "Daarvoor gebruiken we keuzehulp-secties die opties praktisch vergelijken zonder verkooppraat."
+    ],
+    [
+      "Is de website alleen visueel sterk of ook commercieel?",
+      "Commercie is leidend: elke sectie ondersteunt een concrete stap richting opname of offerte."
+    ],
+    [
+      "Werkt dit goed op mobiel?",
+      "Ja. Navigatie, contentvolgorde en CTA's zijn mobiel eerst ontworpen."
+    ],
+    [
+      "Kan ik later diensten toevoegen?",
+      "Ja. De structuur is modulair zodat nieuwe diensten logisch blijven aansluiten."
+    ]
+  ],
+  "signature_pool": [
+    {
+      "id": "kleur-afwerking",
+      "title": "Kleur & Afwerking Keuzehulp",
+      "lead": "Bezoekers kiezen sneller als afwerking en gebruik direct praktisch worden uitgelegd.",
+      "bullets": [
+        "Binnen en buiten apart uitgewerkt.",
+        "Onderhoud en duurzaamheid in begrijpelijke taal.",
+        "Keuze direct te koppelen aan intake."
+      ]
+    },
+    {
+      "id": "planning-voorbereiding",
+      "title": "Planning & Voorbereiding in 5 Stappen",
+      "lead": "Laat exact zien wat jij regelt en wat de klant voorbereidt voor een soepele start.",
+      "bullets": [
+        "Heldere startvolgorde per projecttype.",
+        "Minder vertraging door concrete voorbereiding.",
+        "Transparante communicatiemomenten per fase."
+      ]
+    },
+    {
+      "id": "materiaal-kader",
+      "title": "Materiaalkeuze per Ruimtetype",
+      "lead": "Maakt materiaalkeuzes concreet zodat bezoekers met vertrouwen richting kiezen.",
+      "bullets": [
+        "Praktische verschillen in uitstraling en levensduur.",
+        "Keuzes gekoppeld aan gebruiksintensiteit.",
+        "Direct bruikbaar in opnamegesprek."
+      ]
+    },
+    {
+      "id": "werkvolgorde",
+      "title": "Werkvolgorde van Opname tot Oplevering",
+      "lead": "Verwachtingen staan vooraf scherp waardoor trajecten rustiger verlopen.",
+      "bullets": [
+        "Vaste fases met beslismomenten.",
+        "Geen vage overgangen in planning.",
+        "Duidelijke route naar oplevering."
+      ]
+    }
+  ],
+  "sitemap": [
+    "index.html",
+    "services.html",
+    "about.html",
+    "contact.html"
+  ]
+}

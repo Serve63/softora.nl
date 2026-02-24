@@ -1,0 +1,189 @@
+{
+  "brand": "Fluxera Systems",
+  "city": "Utrecht",
+  "businessType": "B2B Software Platform Site met Demo Flow",
+  "conceptName": "Authority Atelier",
+  "conceptVibe": "high-trust, disciplined, strategic",
+  "hero": {
+    "kicker": "Utrecht",
+    "titleTop": "B2B Software Platform",
+    "titleAccent": "Site met Demo Flow",
+    "claim": "Positioneer complexe software in heldere beslistaal die demo-aanvragen versnelt.",
+    "subtitle": "Voor teams die productwaarde snel moeten overbrengen aan meerdere beslissers. Snellere route van eerste bezoek naar gekwalificeerde demo..",
+    "primaryCta": "Plan Product Demo",
+    "secondaryCta": "Bekijk Use-Cases"
+  },
+  "valueLadder": [
+    "Snellere route van eerste bezoek naar gekwalificeerde demo.",
+    "Eerst structuur en messaging scherp, daarna pas schalen op verkeer.",
+    "Use-case matrix per rol: directie, operations, IT en commercie."
+  ],
+  "painCards": [
+    {
+      "title": "Knelpunt 1",
+      "text": "Bezoekers zien losse features maar begrijpen te laat de zakelijke impact.",
+      "outcome": "Snellere route van eerste bezoek naar gekwalificeerde demo."
+    },
+    {
+      "title": "Knelpunt 2",
+      "text": "Demo-aanvragen missen context waardoor sales veel tijd verliest in de eerste call.",
+      "outcome": "Duidelijke positionering per doelgroep zonder technische ruis."
+    },
+    {
+      "title": "Knelpunt 3",
+      "text": "Verschillende doelgroepen vinden niet direct hun eigen route.",
+      "outcome": "Consistente direct-response copy over alle kernpagina's."
+    },
+    {
+      "title": "Knelpunt 4",
+      "text": "Copy is te algemeen en adresseert bezwaren pas laat.",
+      "outcome": "Bezwaren worden behandeld vóór de afspraakfase."
+    },
+    {
+      "title": "Knelpunt 5",
+      "text": "De overgang van interesse naar afspraak bevat te veel frictie.",
+      "outcome": "Schaalbare inhoudsstructuur voor nieuwe proposities."
+    }
+  ],
+  "benefits": [
+    "Bezoekers zien binnen seconden welke use-case op hun situatie past.",
+    "Features worden vertaald naar operationele impact in plaats van jargon.",
+    "Bezwaren over security, implementatie en adoptie worden vooraf opgevangen.",
+    "Salesgesprekken starten inhoudelijker door betere voorselectie in formulieren.",
+    "Site blijft bruikbaar voor zowel korte demo-cycli als enterprise trajecten.",
+    "Design ondersteunt authority zonder afstandelijk of generiek te worden."
+  ],
+  "process": [
+    {
+      "step": "01",
+      "title": "Discovery",
+      "text": "Besluitproces, stakeholders en huidige bottlenecks in kaart brengen."
+    },
+    {
+      "step": "02",
+      "title": "Messaging",
+      "text": "Per use-case een concrete belofte plus risico-reversal formuleren."
+    },
+    {
+      "step": "03",
+      "title": "Architectuur",
+      "text": "Paginaflow bouwen die van herkenning naar demo-intentie beweegt."
+    },
+    {
+      "step": "04",
+      "title": "Build",
+      "text": "Premium front-end met component states, visuals en heldere copyblokken."
+    },
+    {
+      "step": "05",
+      "title": "QA",
+      "text": "Gate op specificiteit, bezwaren, CTA-logica en mobile conversie."
+    }
+  ],
+  "trust": [
+    "Geen fictieve klantlogo's of verzonnen performance claims.",
+    "Elke pagina toont welke actie logisch is per fase van de funnel.",
+    "Technische diepgang blijft aanwezig zonder verkoopverhaal te vertragen.",
+    "Structuur is gemaakt voor snelle updates van features en proposities.",
+    "Use-case matrix per rol: directie, operations, IT en commercie.",
+    "Demo-intake met verplichte contextvelden voor huidige stack en doelstelling."
+  ],
+  "faq": [
+    {
+      "q": "Hoe houden jullie het project strak zonder eindeloze revisierondes?",
+      "a": "We werken met vaste beslismomenten per fase. Je krijgt per fase een heldere keuze met impact, zodat feedback concreet blijft en doorlooptijd voorspelbaar is."
+    },
+    {
+      "q": "Hoe voorkomen we dat de site mooi is maar niet converteert?",
+      "a": "Elke sectie krijgt een commerciële functie: aandacht pakken, bezwaar wegnemen of actie uitlokken. We schrijven eerst op basis van intentie, daarna pas op stijl."
+    },
+    {
+      "q": "Wat als onze input nog niet compleet is?",
+      "a": "We starten met een compacte intake en vullen gaten pragmatisch op met marktlogica. Onzekere punten worden expliciet gemaakt zodat je gericht kunt beslissen."
+    },
+    {
+      "q": "Hoe zit het met uitbreiding na livegang?",
+      "a": "De structuur is modulair opgezet. Nieuwe diensten, proposities of campagnes kunnen worden toegevoegd zonder volledige herbouw."
+    },
+    {
+      "q": "Wat gebeurt er als timing kritisch is?",
+      "a": "Planning wordt opgesplitst in harde opleverpunten met duidelijke afhankelijkheden. Zo weet je precies wat wanneer nodig is om livegang te halen."
+    },
+    {
+      "q": "Hoe borgen jullie kwaliteit op mobiel?",
+      "a": "De layout en copy worden mobile-first gecontroleerd op hiërarchie, leesritme en CTA-bereik, inclusief hover/focus/active states waar relevant."
+    },
+    {
+      "q": "Hoe spreken jullie zowel business als IT aan?",
+      "a": "We splitsen copy op beslisniveau: zakelijke impact voor business, technische haalbaarheid voor implementatieteams."
+    },
+    {
+      "q": "Kunnen jullie rekening houden met lange salescycli?",
+      "a": "Ja. CTA's zijn gelaagd: van verkenning tot demo, zodat bezoekers kunnen instappen op hun beslisniveau."
+    }
+  ],
+  "signatureA": {
+    "id": "demo-qualifier",
+    "title": "Demo Qualifier Flow",
+    "lead": "Filtert intentie vooraf zodat gesprekken sneller inhoudelijk worden.",
+    "bullets": [
+      "Vooraf kernvragen in de contactflow.",
+      "Minder algemene aanvragen, meer bruikbare context.",
+      "Kortere route naar beslisinformatie."
+    ]
+  },
+  "signatureB": {
+    "id": "product-tour",
+    "title": "Product Tour Cards met Beslispunten",
+    "lead": "Geen featuredump, wel een route waarin elke stap eindigt in een concrete actie.",
+    "bullets": [
+      "Start met context en pijn, niet met losse functionaliteit.",
+      "Koppel capability aan een zakelijke uitkomst.",
+      "Sluit af met één heldere vervolgstap."
+    ]
+  },
+  "featureCards": [
+    {
+      "title": "Use-Case Matrix",
+      "text": "Sorteert productwaarde per doelgroep zodat elke rol direct relevante context ziet."
+    },
+    {
+      "title": "Decision Narrative",
+      "text": "Leidt bezoekers van probleemherkenning naar concrete evaluatiecriteria."
+    },
+    {
+      "title": "Demo Qualifier",
+      "text": "Formulier vraagt alleen informatie die salesgesprekken direct verbetert."
+    },
+    {
+      "title": "Objection Handling",
+      "text": "FAQ en microcopy tackelen implementatie-, timing- en risicovragen vooraf."
+    },
+    {
+      "title": "Product Tour Blocks",
+      "text": "Visuele kaarten combineren kernfeature, impact en vervolgstap."
+    },
+    {
+      "title": "Expansion-ready Layout",
+      "text": "Nieuwe modules kunnen toegevoegd worden zonder het conversieritme te breken."
+    }
+  ],
+  "aboutPoints": [
+    "Deze website is opgezet als commerciële productnarratief, niet als losse informatiepagina.",
+    "Typografie en spacing sturen leesprioriteit voor zowel C-level als operationele teams.",
+    "Elke component heeft een rol in beslisversnelling: uitleg, bewijs of actie.",
+    "De basis blijft onderhoudbaar terwijl propositie en markt evolueren.",
+    "Differentiator-hoek: Productverhaal wordt vertaald naar beslisacties in plaats van feature-overzichten.",
+    "Praktische specifics: Demo-intake met verplichte contextvelden voor huidige stack en doelstelling."
+  ],
+  "directSpecifics": [
+    "Use-case matrix per rol: directie, operations, IT en commercie.",
+    "Demo-intake met verplichte contextvelden voor huidige stack en doelstelling.",
+    "Integratieblokken in begrijpelijke taal zonder technische ruis.",
+    "Migratie- en implementatierisico expliciet behandeld in FAQ.",
+    "Releaseflow met testfase, rollback-pad en oplevercriteria.",
+    "CTA-routing per intentie: oriënteren, evalueren of beslissen."
+  ],
+  "riskReversal": "Eerst structuur en messaging scherp, daarna pas schalen op verkeer.",
+  "contactPromise": "Binnen 1 werkdag reactie."
+}

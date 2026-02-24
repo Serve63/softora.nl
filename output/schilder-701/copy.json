@@ -1,0 +1,169 @@
+{
+  "brand": "Van Pelt Schilderwerken",
+  "city": "Eindhoven",
+  "businessType": "Schilder Website met offerteflow",
+  "conceptName": "Conversion Engine",
+  "conceptVibe": "actiegedreven, compact, performance-first",
+  "hero": {
+    "kicker": "Eindhoven",
+    "titleTop": "Schilder Website",
+    "titleAccent": "met offerteflow",
+    "claim": "Van eerste indruk naar serieuze aanvraag met copy die direct richting geeft.",
+    "subtitle": "Meer serieuze aanvragen met duidelijke projectcontext. Voor huiseigenaren en ondernemers die strak gepland vakwerk zoeken.",
+    "primaryCta": "Vraag een opname aan",
+    "secondaryCta": "Bekijk de werkwijze"
+  },
+  "valueLadder": [
+    "Meer serieuze aanvragen met duidelijke projectcontext.",
+    "Sneller vertrouwen door transparante aanpak en voorbereiding.",
+    "Minder losse vragen door praktische keuzehulpen."
+  ],
+  "painCards": [
+    {
+      "title": "Knelpunt 1",
+      "text": "Aanvragen komen binnen zonder duidelijke scope of gewenste planning.",
+      "outcome": "Meer serieuze aanvragen met duidelijke projectcontext."
+    },
+    {
+      "title": "Knelpunt 2",
+      "text": "Bezoekers twijfelen over afwerking en materiaalkeuze.",
+      "outcome": "Sneller vertrouwen door transparante aanpak en voorbereiding."
+    },
+    {
+      "title": "Knelpunt 3",
+      "text": "Kwaliteit is moeilijk zichtbaar vóór het intakegesprek.",
+      "outcome": "Minder losse vragen door praktische keuzehulpen."
+    },
+    {
+      "title": "Knelpunt 4",
+      "text": "Mobiele bezoekers haken af als de route niet direct duidelijk is.",
+      "outcome": "Sterkere lokale conversie op mobiel en desktop."
+    },
+    {
+      "title": "Knelpunt 5",
+      "text": "Veel vragen worden pas laat gesteld waardoor trajecten vertragen.",
+      "outcome": "Een premium uitstraling die vakmanschap direct onderbouwt."
+    }
+  ],
+  "benefits": [
+    "Bezoekers zien direct wat je levert, voor wie, en welke stap daarna logisch is.",
+    "Keuzehulp-secties reduceren twijfel en verhogen de kwaliteit van binnenkomende aanvragen.",
+    "Procesblokken maken planning en samenwerking vooraf helder.",
+    "CTA's staan op beslispunten, niet alleen onderaan een pagina.",
+    "Mobiele bezoekers kunnen zonder frictie door naar intake of offerte.",
+    "Copy blijft concreet en bruikbaar zonder opgeblazen claims."
+  ],
+  "process": [
+    {
+      "step": "01",
+      "title": "Intake",
+      "text": "Vraag, context en gewenste uitkomst in een compacte briefing."
+    },
+    {
+      "step": "02",
+      "title": "Richting",
+      "text": "Creatieve lijn + commerciële structuur vastzetten."
+    },
+    {
+      "step": "03",
+      "title": "Keuzehulp",
+      "text": "Aanbod vertalen naar routes die bezoekers echt snappen."
+    },
+    {
+      "step": "04",
+      "title": "Uitwerking",
+      "text": "Volledige HTML-site met heldere CTA-flow per sectie."
+    },
+    {
+      "step": "05",
+      "title": "Oplevering",
+      "text": "Responsive check, copycheck en finale kwaliteitscontrole."
+    }
+  ],
+  "trust": [
+    "Transparante scope en duidelijke verwachtingen per fase.",
+    "Geen nep-social-proof; de site vertrouwt op inhoudelijke helderheid.",
+    "Heldere route van aanvraag naar vervolggesprek.",
+    "Modulaire opbouw zodat je later gecontroleerd kunt uitbreiden."
+  ],
+  "faq": [
+    {
+      "q": "Moet ik alles al exact weten voor ik contact opneem?",
+      "a": "Nee. De intake is juist bedoeld om scope, timing en prioriteiten samen scherp te maken."
+    },
+    {
+      "q": "Hoe snel krijg ik duidelijkheid over de aanpak?",
+      "a": "Na je aanvraag krijg je een concrete vervolgstap met heldere route, zonder vaag voortraject."
+    },
+    {
+      "q": "Wat als ik nog twijfel over opties?",
+      "a": "De keuzehulp-secties maken verschillen praktisch, zodat je gericht kunt beslissen zonder druk."
+    },
+    {
+      "q": "Is de site alleen mooi of ook commercieel sterk?",
+      "a": "Commercie staat centraal: elke sectie ondersteunt een logische stap richting aanvraag."
+    },
+    {
+      "q": "Werkt dit goed op mobiel?",
+      "a": "Ja. Navigatie, contentvolgorde en CTA's zijn mobiel eerst opgebouwd."
+    },
+    {
+      "q": "Kan ik later uitbreiden zonder opnieuw te beginnen?",
+      "a": "Ja. De structuur is ontworpen om nieuwe diensten en pagina's gecontroleerd toe te voegen."
+    }
+  ],
+  "signatureA": {
+    "id": "kleur-afwerking",
+    "title": "Kleur & Afwerking Keuzehulp",
+    "lead": "Bezoekers kiezen sneller als afwerking en gebruik direct praktisch worden uitgelegd.",
+    "bullets": [
+      "Binnen en buiten apart uitgewerkt.",
+      "Onderhoud en duurzaamheid in begrijpelijke taal.",
+      "Keuze direct te koppelen aan intake."
+    ]
+  },
+  "signatureB": {
+    "id": "materiaal-kader",
+    "title": "Materiaalkeuze per Ruimtetype",
+    "lead": "Maakt materiaalkeuzes concreet zodat bezoekers met vertrouwen een richting kiezen.",
+    "bullets": [
+      "Praktische verschillen in uitstraling en levensduur.",
+      "Keuzes gekoppeld aan gebruiksintensiteit.",
+      "Direct bruikbaar in offertegesprek."
+    ]
+  },
+  "featureCards": [
+    {
+      "title": "Aanbodstructuur",
+      "text": "Dienstinformatie in een volgorde die bezoekers helpt kiezen."
+    },
+    {
+      "title": "Lokale Conversieroute",
+      "text": "CTA's sluiten aan op intentie van lokale zoekers."
+    },
+    {
+      "title": "Vertrouwensblokken",
+      "text": "Werkwijze en voorwaarden geven rust vóór contact."
+    },
+    {
+      "title": "Mobiele Beslisflow",
+      "text": "Belangrijkste acties direct zichtbaar op kleine schermen."
+    },
+    {
+      "title": "Bezwaarafhandeling",
+      "text": "FAQ en secties beantwoorden echte vragen vooraf."
+    },
+    {
+      "title": "Uitbreidbare Basis",
+      "text": "Nieuwe diensten blijven logisch inpasbaar."
+    }
+  ],
+  "aboutPoints": [
+    "Design en copy worden samen opgebouwd vanuit het commerciële doel.",
+    "Elke pagina is ontworpen rondom beslismomenten, niet rondom opvulling.",
+    "De contentstructuur is schaalbaar en blijft beheersbaar bij groei.",
+    "Performance, contrast en leesbaarheid worden meegenomen als kernkwaliteit."
+  ],
+  "contactMode": "form",
+  "contactPromise": "Binnen 1 werkdag reactie."
+}

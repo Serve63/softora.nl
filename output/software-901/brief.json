@@ -1,0 +1,65 @@
+{
+  "order_id": "software-901",
+  "source": "cli-custom-order",
+  "run_id": "cli-1770824740502-u09yab",
+  "theme": "light",
+  "industry": "software",
+  "audience": "beslissers die tempo, grip en voorspelbare implementatie willen",
+  "primary_action": "Plan een demo",
+  "secondary_action": "Bekijk de productaanpak",
+  "offer": "B2B Software Platform Website",
+  "location": "Amsterdam",
+  "top_pains": [
+    "Bezoekers zien functies maar begrijpen te laat de zakelijke impact.",
+    "Demo-aanvragen zijn te algemeen en daardoor lastig te kwalificeren.",
+    "Teams met verschillende rollen vinden niet snel hun relevante route.",
+    "Copy klinkt technisch of juist te vaag voor beslissers.",
+    "De stap van interesse naar afspraak bevat te veel ruis."
+  ],
+  "desired_outcomes": [
+    "Snellere route van eerste bezoek naar gekwalificeerde demo.",
+    "Duidelijke positionering per beslisser zonder technische ruis.",
+    "Consistente conversion copy over alle kernpagina's.",
+    "Heldere bezwaarbehandeling vóór het salesgesprek.",
+    "Schaalbare contentstructuur voor nieuwe proposities."
+  ],
+  "differentiator_angle": "Van productuitleg naar beslisactie, zonder technische ruis.",
+  "forbidden_claims": [
+    "Geen verzonnen aantallen of groeicijfers.",
+    "Geen klantlogo's of testimonials zonder brondata.",
+    "Geen certificeringen of keurmerken zonder bewijs in opdrachtdata.",
+    "Geen fictieve SLA- of responstijdclaims buiten expliciete input."
+  ],
+  "faq": [
+    [
+      "Past dit naast onze huidige stack?",
+      "Ja. De inhoud wordt geschreven rondom je bestaande processen en teams, zodat je geen kunstmatige herpositionering hoeft te forceren."
+    ],
+    [
+      "Wordt dit niet te veel marketingtaal?",
+      "Nee. Elke sectie is gekoppeld aan een concreet beslismoment en gebruikt duidelijke, toetsbare taal."
+    ],
+    [
+      "Kunnen meerdere doelgroepen tegelijk landen?",
+      "Ja. De structuur splitst routes per rol zodat operations, management en commercie direct relevante informatie zien."
+    ],
+    [
+      "Is dit alleen design of ook conversiegericht?",
+      "Beide. Design, copy en CTA-flow worden samen gebouwd om gesprekken sneller en scherper te maken."
+    ],
+    [
+      "Moeten we alle productdetails vooraf aanleveren?",
+      "Nee. We starten met kernpropositie en bezwaren, en verdiepen daarna stapsgewijs zonder vertraging in de livegang."
+    ],
+    [
+      "Hoe houden we dit later actueel?",
+      "De pagina-opbouw is modulair, waardoor je nieuwe use-cases en proposities kunt toevoegen zonder de conversielijn te breken."
+    ]
+  ],
+  "sitemap": [
+    "index.html",
+    "features.html",
+    "about.html",
+    "contact.html"
+  ]
+}

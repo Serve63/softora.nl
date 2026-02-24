@@ -1,0 +1,163 @@
+{
+  "discovery": {
+    "order_id": "2",
+    "source": "cli-test-run",
+    "source_theme": "dark",
+    "industry": "restaurant",
+    "audience": "gasten die snel willen kiezen, reserveren en langskomen",
+    "primary_action": "Vraag offerte",
+    "price_level": "entry-mid",
+    "tone": "persoonlijk, premium, helder",
+    "core_pain": "bezoekers die afhaken vóór reserveren door trage of rommelige info",
+    "core_promise": "meer reserveringen door duidelijke keuze, sfeer en frictieloze acties",
+    "differentiator": "menu, sfeer en reservering ontworpen als één snelle beslisflow",
+    "assumptions": [
+      "Doel is sneller contactmoment met de juiste leads.",
+      "Website moet mobiel als primaire ervaring behandelen.",
+      "Copy moet concreet sturen op volgende stap."
+    ]
+  },
+  "concepts": [
+    {
+      "key": "editorial-impact",
+      "name": "Editorial Impact",
+      "vibe": "high-end magazine met scherpe call-to-action",
+      "layout_pattern": "split-hero + rhythm sections + staggered feature grid",
+      "signature_sections": [
+        "Belofte Breakdown: van pijnpunt naar tastbare winst in 3 blokken",
+        "Decision Lens: interactieve keuzehulp per situatie"
+      ],
+      "typography_pairing": {
+        "headings": "Oswald",
+        "body": "Inter"
+      },
+      "type_scale": "display-heavy",
+      "spacing_scale": "airy",
+      "border_radius": "small",
+      "grid_style": "12-col editorial",
+      "icon_style": "outlined minimal",
+      "imagery_style": "high contrast lifestyle",
+      "button_style": "solid high-contrast",
+      "card_style": "elevated flat cards",
+      "microinteractions": "lift-on-hover + reveal-on-scroll",
+      "section_order": [
+        "hero",
+        "promise",
+        "signatureA",
+        "services",
+        "signatureB",
+        "process",
+        "faq",
+        "contact"
+      ]
+    },
+    {
+      "key": "conversion-lab",
+      "name": "Conversion Lab",
+      "vibe": "data-minded, strak en direct naar actie",
+      "layout_pattern": "centered hero + modular strips + comparison blocks",
+      "signature_sections": [
+        "Friction Map: waar klanten afhaken en hoe deze flow dat oplost",
+        "Offer Builder: duidelijke scope + route naar keuze"
+      ],
+      "typography_pairing": {
+        "headings": "Oswald",
+        "body": "Inter"
+      },
+      "type_scale": "balanced",
+      "spacing_scale": "compact-medium",
+      "border_radius": "none-small",
+      "grid_style": "modular blocks",
+      "icon_style": "bold geometric",
+      "imagery_style": "clean contextual",
+      "button_style": "pill-outline to solid",
+      "card_style": "border-driven panels",
+      "microinteractions": "underline-shift + accordion transitions",
+      "section_order": [
+        "hero",
+        "services",
+        "signatureA",
+        "proof",
+        "process",
+        "signatureB",
+        "faq",
+        "contact"
+      ]
+    },
+    {
+      "key": "storyline-premium",
+      "name": "Storyline Premium",
+      "vibe": "cinematic storytelling met commerciële scherpte",
+      "layout_pattern": "immersive hero + narrative chapters + sticky CTA rail",
+      "signature_sections": [
+        "Transformation Story: van huidige situatie naar gewenste uitkomst",
+        "Action Sprint: 7-daagse startplanning met heldere deliverables"
+      ],
+      "typography_pairing": {
+        "headings": "Oswald",
+        "body": "Inter"
+      },
+      "type_scale": "cinematic",
+      "spacing_scale": "wide",
+      "border_radius": "medium",
+      "grid_style": "chapter-based",
+      "icon_style": "line + accent dots",
+      "imagery_style": "immersive cinematic",
+      "button_style": "accent gradient",
+      "card_style": "glass-like solid mix",
+      "microinteractions": "soft parallax + progress highlight",
+      "section_order": [
+        "hero",
+        "story",
+        "signatureA",
+        "services",
+        "process",
+        "signatureB",
+        "proof",
+        "contact"
+      ]
+    }
+  ],
+  "chosen_concept": {
+    "key": "editorial-impact",
+    "name": "Editorial Impact",
+    "vibe": "high-end magazine met scherpe call-to-action",
+    "layout_pattern": "split-hero + rhythm sections + staggered feature grid",
+    "signature_sections": [
+      "Belofte Breakdown: van pijnpunt naar tastbare winst in 3 blokken",
+      "Decision Lens: interactieve keuzehulp per situatie"
+    ],
+    "typography_pairing": {
+      "headings": "Oswald",
+      "body": "Inter"
+    },
+    "type_scale": "display-heavy",
+    "spacing_scale": "airy",
+    "border_radius": "small",
+    "grid_style": "12-col editorial",
+    "icon_style": "outlined minimal",
+    "imagery_style": "high contrast lifestyle",
+    "button_style": "solid high-contrast",
+    "card_style": "elevated flat cards",
+    "microinteractions": "lift-on-hover + reveal-on-scroll",
+    "section_order": [
+      "hero",
+      "promise",
+      "signatureA",
+      "services",
+      "signatureB",
+      "process",
+      "faq",
+      "contact"
+    ]
+  },
+  "sitemap": [
+    "index.html",
+    "diensten.html",
+    "aanpak.html",
+    "projecttypes.html",
+    "contact.html"
+  ],
+  "tone": "persoonlijk, premium, helder",
+  "primary_action": "Vraag offerte"
+}

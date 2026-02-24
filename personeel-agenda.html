@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Servé Digital | Agenda — Software</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="assets/personnel-theme.css">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
+                var storageKey = isPremiumPersonnel
+                    ? "softora_premium_personnel_theme_mode"
+                    : "softora_software_personnel_theme_mode";
+                var mode = localStorage.getItem(storageKey);
+                if (mode === "light" || mode === "dark") {
+                    document.documentElement.setAttribute("data-theme-mode", mode);
+                    document.documentElement.setAttribute("data-theme", mode);
+                }
+            } catch (error) {
+                /* ignore storage errors */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #f8f7f4;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #efeee9;
+            --accent: #1a1a2e;
+            --accent-color: #4a5fd7;
+            --accent-color-light: #5b6ee0;
+            --accent-color-glow: rgba(74, 95, 215, 0.2);
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b6b7b;
+            --text-tertiary: #a0a0b0;
+            --border: rgba(0, 0, 0, 0.07);
+            --green: #27ae60;
+            --green-glow: rgba(39, 174, 96, 0.1);
+            --yellow: #e67e22;
+            --yellow-glow: rgba(230, 126, 34, 0.08);
+            --blue: #3498db;
+            --blue-glow: rgba(52, 152, 219, 0.08);
+            --red: #e74c3c;
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9999; opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .cursor {
+            width: 24px; height: 24px; border: 2px solid var(--accent);
+            border-radius: 50%; position: fixed; pointer-events: none; z-index: 10000;
+            transition: transform 0.1s var(--ease-out-expo), background 0.2s ease, width 0.3s var(--ease-out-expo), height 0.3s var(--ease-out-expo);
+            transform: translate(-50%, -50%); mix-blend-mode: difference;
+        }
+        .cursor.hover { width: 80px; height: 80px; background: var(--accent); border-color: transparent; }
+
+        .cursor-dot {
+            width: 6px; height: 6px; background: var(--accent);
+            border-radius: 50%; position: fixed; pointer-events: none;
+            z-index: 10001; transform: translate(-50%, -50%);
+        }
+
+        /* Layout */
+        .dashboard-layout { display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px; background: var(--bg-secondary); border-right: 1px solid var(--border);
+            padding: 2.5rem 0; display: flex; flex-direction: column;
+            position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
+            box-shadow: 4px 0 30px rgba(0,0,0,0.03);
+        }
+        .sidebar-logo {
+            font-family: 'Oswald', sans-serif; font-size: 1.5rem; font-weight: 700;
+            color: var(--text-primary); text-decoration: none; padding: 0 2rem;
+            margin-bottom: 3rem; display: block;
+        }
+        .sidebar-logo span { color: var(--accent-color); }
+        .sidebar-nav { flex: 1; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-section-label {
+            font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.2em; color: var(--text-tertiary);
+            padding: 0 2rem; margin-bottom: 0.8rem;
+        }
+        .sidebar-link {
+            display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem 2rem;
+            color: var(--text-secondary); text-decoration: none; font-size: 0.9rem;
+            font-weight: 400; transition: all 0.2s; cursor: none; position: relative;
+        }
+        .sidebar-link::before {
+            content: ''; position: absolute; left: 0; top: 0; width: 3px; height: 100%;
+            background: var(--accent-color); opacity: 0; transition: opacity 0.2s;
+        }
+        .sidebar-link:hover { color: var(--text-primary); background: rgba(0,0,0,0.02); }
+        .sidebar-link.active { color: var(--accent-color); background: rgba(74,95,215,0.04); font-weight: 500; }
+        .sidebar-link.active::before { opacity: 1; }
+        .sidebar-link svg { width: 18px; height: 18px; opacity: 0.4; flex-shrink: 0; }
+        .sidebar-link.active svg, .sidebar-link:hover svg { opacity: 0.8; }
+        .sidebar-footer { padding: 2rem; border-top: 1px solid var(--border); }
+        .sidebar-user { display: flex; align-items: center; gap: 0.8rem; }
+        .sidebar-avatar {
+            width: 36px; height: 36px; background: var(--accent-color); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Oswald', sans-serif; font-size: 0.85rem; font-weight: 600; color: white;
+        }
+        .sidebar-user-info { flex: 1; min-width: 0; }
+        .sidebar-user-name { font-size: 0.85rem; font-weight: 500; color: var(--text-primary); }
+        .sidebar-user-role { font-size: 0.75rem; color: var(--text-tertiary); }
+        .logout-btn { background: none; border: none; color: var(--text-tertiary); cursor: none; padding: 0.3rem; transition: color 0.2s; }
+        .logout-btn:hover { color: var(--red); }
+        .logout-btn svg { width: 18px; height: 18px; }
+
+        /* Main */
+        .main-content { flex: 1; margin-left: 280px; padding: 3rem; }
+
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
+        .topbar-left h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.3rem; }
+        .topbar-left p { color: var(--text-tertiary); font-size: 0.9rem; font-weight: 300; }
+
+        /* Month nav */
+        .month-nav {
+            display: flex; align-items: center; gap: 1.5rem;
+            opacity: 0; transform: translateY(15px);
+            animation: fadeUp 0.5s var(--ease-out-expo) 0.1s forwards;
+        }
+        .month-nav-btn {
+            width: 40px; height: 40px; border: 1px solid var(--border);
+            background: var(--bg-secondary); color: var(--text-tertiary);
+            display: flex; align-items: center; justify-content: center;
+            cursor: none; transition: all 0.2s;
+        }
+        .month-nav-btn:hover { border-color: var(--accent-color); color: var(--accent-color); }
+        .month-nav-btn svg { width: 16px; height: 16px; }
+        .month-label {
+            font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em; min-width: 220px; text-align: center;
+        }
+        .today-btn {
+            font-family: 'Oswald', sans-serif; font-size: 0.75rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-color);
+            border: 1px solid rgba(74,95,215,0.2); background: transparent;
+            padding: 0.5rem 1rem; cursor: none; transition: all 0.2s;
+        }
+        .today-btn:hover { background: rgba(74,95,215,0.05); border-color: var(--accent-color); }
+
+        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+        /* Calendar */
+        .calendar-wrapper {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            max-width: 1240px; margin: 0 auto;
+            opacity: 0; transform: translateY(15px);
+            animation: fadeUp 0.5s var(--ease-out-expo) 0.2s forwards;
+        }
+
+        .calendar-header {
+            display: grid; grid-template-columns: repeat(7, 1fr);
+            border-bottom: 1px solid var(--border);
+        }
+        .calendar-header-day {
+            padding: 0.8rem; text-align: center;
+            font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-tertiary);
+        }
+
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+
+        .calendar-day {
+            min-height: 102px; border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border); padding: 0.5rem;
+            position: relative; transition: background 0.2s;
+        }
+        .calendar-day:nth-child(7n) { border-right: none; }
+        .calendar-day:hover { background: rgba(0,0,0,0.01); }
+        .calendar-day.other-month { opacity: 0.25; }
+        .calendar-day.today { background: rgba(74,95,215,0.04); }
+        .calendar-day.today .day-number { color: var(--accent-color); font-weight: 700; }
+
+        .day-number {
+            font-family: 'Oswald', sans-serif; font-size: 0.78rem; font-weight: 500;
+            color: var(--text-secondary); margin-bottom: 0.3rem;
+        }
+
+        /* Appointments */
+        .appointment {
+            padding: 0.3rem 0.45rem; margin-bottom: 0.22rem;
+            font-size: 0.65rem; font-weight: 400; border-radius: 2px;
+            cursor: none; transition: all 0.2s; line-height: 1.3;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .appointment:hover { transform: translateX(2px); }
+
+        .appointment.meeting {
+            background: rgba(74,95,215,0.08); color: var(--accent-color);
+            border-left: 2px solid var(--accent-color);
+        }
+
+        .appointment .apt-time {
+            font-family: 'Oswald', sans-serif; font-weight: 600;
+            font-size: 0.6rem; letter-spacing: 0.05em;
+        }
+
+        /* Legend */
+        .calendar-legend {
+            display: flex; gap: 1.2rem; padding: 1rem 1.2rem;
+            border-top: 1px solid var(--border);
+        }
+        .legend-item {
+            display: flex; align-items: center; gap: 0.4rem;
+            font-size: 0.7rem; color: var(--text-tertiary);
+            font-family: 'Oswald', sans-serif; text-transform: uppercase;
+            letter-spacing: 0.1em; font-weight: 500;
+        }
+        .legend-dot { width: 8px; height: 8px; border-radius: 1px; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(8px); z-index: 5000;
+            display: none; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .modal-overlay.show { display: flex; opacity: 1; }
+
+        .modal {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            width: 90%; max-width: 520px; padding: 0;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.15);
+            transform: translateY(20px); transition: transform 0.4s var(--ease-out-expo);
+        }
+        .modal-overlay.show .modal { transform: translateY(0); }
+
+        .modal-top {
+            padding: 2.5rem 2.5rem 0;
+            display: flex; justify-content: space-between; align-items: flex-start;
+        }
+        .modal-close {
+            width: 36px; height: 36px; border: 1px solid var(--border);
+            background: none; color: var(--text-tertiary); cursor: none;
+            display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .modal-close:hover { border-color: var(--red); color: var(--red); }
+        .modal-close svg { width: 16px; height: 16px; }
+
+        .modal-type-badge {
+            font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            padding: 0.3rem 0.8rem; display: inline-block; margin-bottom: 1rem;
+        }
+        .modal-type-badge.meeting { background: rgba(74,95,215,0.08); color: var(--accent-color); }
+
+        .modal-company {
+            font-family: 'Oswald', sans-serif; font-size: 1.6rem; font-weight: 700;
+            text-transform: uppercase; margin-bottom: 0.3rem;
+        }
+        .modal-contact { font-size: 0.9rem; color: var(--text-secondary); font-weight: 300; }
+
+        .modal-body { padding: 2rem 2.5rem; }
+
+        .modal-details {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;
+        }
+        .modal-detail-label {
+            font-family: 'Oswald', sans-serif; font-size: 0.65rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.15em;
+            color: var(--text-tertiary); margin-bottom: 0.3rem;
+        }
+        .modal-detail-value { font-size: 0.95rem; font-weight: 400; color: var(--text-primary); }
+
+        .modal-summary-label {
+            font-family: 'Oswald', sans-serif; font-size: 0.75rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.12em;
+            color: var(--text-tertiary); margin-bottom: 0.6rem;
+        }
+        .modal-summary {
+            font-size: 0.9rem; color: var(--text-secondary); font-weight: 300;
+            line-height: 1.8; padding: 1.2rem 1.5rem;
+            background: var(--bg-primary); border: 1px solid var(--border);
+        }
+
+        .modal-footer {
+            padding: 0 2.5rem 2.5rem; display: flex; gap: 0.5rem;
+        }
+        .modal-btn {
+            flex: 1; padding: 1rem;
+            font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            border: none; cursor: none; transition: all 0.3s var(--ease-out-expo);
+        }
+        .modal-btn.primary { background: var(--accent-color); color: white; }
+        .modal-btn.primary:hover { background: #3a4fc7; box-shadow: 0 0 30px var(--accent-color-glow); }
+        .modal-btn.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+        .modal-btn.secondary:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .calendar-day { min-height: 82px; }
+            .appointment { font-size: 0.65rem; padding: 0.25rem 0.4rem; }
+        }
+        @media (max-width: 1024px) {
+            body { cursor: auto; }
+            .cursor, .cursor-dot { display: none; }
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+        }
+        @media (max-width: 768px) {
+            .main-content { padding: 1.5rem; }
+            .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
+            .calendar-day { min-height: 64px; }
+            .appointment { font-size: 0.6rem; }
+            .day-number { font-size: 0.75rem; }
+            .modal-details { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="noise-overlay"></div>
+<div class="cursor"></div>
+<div class="cursor-dot"></div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+    <div class="modal">
+        <div class="modal-top">
+            <div>
+                <div class="modal-type-badge" id="modalBadge">Meeting</div>
+                <div class="modal-company" id="modalCompany">Bedrijf</div>
+                <div class="modal-contact" id="modalContact">Contact</div>
+            </div>
+            <button class="modal-close magnetic" onclick="closeModal()" type="button">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-details">
+                <div><div class="modal-detail-label">Datum & Tijd</div><div class="modal-detail-value" id="modalDate">-</div></div>
+                <div><div class="modal-detail-label">Geschatte Waarde</div><div class="modal-detail-value" id="modalValue">-</div></div>
+                <div><div class="modal-detail-label">Sector</div><div class="modal-detail-value" id="modalBranche">-</div></div>
+                <div><div class="modal-detail-label">Bron</div><div class="modal-detail-value" id="modalSource">-</div></div>
+            </div>
+            <div class="modal-summary-label">AI Samenvatting van Lead</div>
+            <div class="modal-summary" id="modalSummary">-</div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn primary magnetic" onclick="closeModal()" type="button">Opvolgen</button>
+            <button class="modal-btn secondary magnetic" onclick="closeModal()" type="button">Sluiten</button>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-layout">
+
+    <!-- Sidebar -->
+        <aside class="sidebar">
+            <a href="maatwerk-platform.html" class="sidebar-logo magnetic">Softora.nl</a>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="personeel-dashboard.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="personeel-agenda.html" class="sidebar-link active magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        Agenda
+                    </a>
+                    <a href="actieve-opdrachten.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Actieve Opdrachten
+                    </a>
+                    <a href="ai-lead-generator.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
+                        AI Coldcalling
+                    </a>
+                    <a href="ai-coldmailing.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                        AI Coldmailing
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L7 20l-3-3 3-2.75m2.75 2.75L20 7l-3-3L6.75 14.25m3 3L6.75 14.25m3 3L17 10"/></svg>
+                        SEO
+                    </a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Systeem</div>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
+                        Servers
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Klanten
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                        Instellingen
+                    </a>
+                <div class="sidebar-theme">
+                    <div class="sidebar-theme-label">Thema</div>
+                    <div class="sidebar-theme-options" role="group" aria-label="Thema kiezen">
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="dark" aria-pressed="false">Donker</button>
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="light" aria-pressed="false">Licht</button>
+                    </div>
+                </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">SS</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">Softora Software</div>
+                        <div class="sidebar-user-role">Administrator</div>
+                    </div>
+                    <a href="personeel-login.html" class="logout-btn magnetic" title="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+    <!-- Main -->
+    <main class="main-content">
+
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1>Agenda</h1>
+                <p>Meetings ingepland door AI Lead Generator</p>
+            </div>
+            <div class="month-nav">
+                <button class="month-nav-btn magnetic" onclick="changeMonth(-1)" type="button">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <span class="month-label" id="monthLabel"></span>
+                <button class="month-nav-btn magnetic" onclick="changeMonth(1)" type="button">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </button>
+                <button class="today-btn magnetic" onclick="goToday()" type="button">Vandaag</button>
+            </div>
+        </div>
+
+        <div class="calendar-wrapper">
+            <div class="calendar-header">
+                <div class="calendar-header-day">Maandag</div>
+                <div class="calendar-header-day">Dinsdag</div>
+                <div class="calendar-header-day">Woensdag</div>
+                <div class="calendar-header-day">Donderdag</div>
+                <div class="calendar-header-day">Vrijdag</div>
+                <div class="calendar-header-day">Zaterdag</div>
+                <div class="calendar-header-day">Zondag</div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <div class="calendar-legend">
+                <div class="legend-item"><div class="legend-dot" style="background: var(--accent-color);"></div> Meeting</div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    const appointments = [
+        {
+            id: 1, company: 'DataFlow BV', contact: 'Martin Koers', phone: '06-12345678',
+            type: 'meeting', date: '2025-02-03', time: '09:00', value: '€28.000',
+            branche: 'SaaS & Data', source: 'AI Cold Calling',
+            summary: 'Martin is CTO bij DataFlow en zoekt een partner voor het herbouwen van hun SaaS-platform. Huidige stack is verouderd (PHP/MySQL) en schaalt niet meer. Wil migreren naar Node.js/PostgreSQL met microservices architectuur. Dagelijks 2M+ API requests. Hoge prioriteit, budget is goedgekeurd door board.'
+        },
+        {
+            id: 2, company: 'MedVault Healthcare', contact: 'Dr. Sarah Visser', phone: '06-98765432',
+            type: 'meeting', date: '2025-02-05', time: '14:00', value: '€45.000',
+            branche: 'Gezondheidszorg', source: 'AI Cold Calling',
+            summary: 'Dr. Visser heeft een patientenportaal nodig dat voldoet aan NEN-7510 en AVG. Moet integreren met bestaand EPD-systeem. Functionaliteit: afspraken plannen, lab-uitslagen inzien, berichten met arts. Demo aangevraagd om onze healthcare-expertise te tonen. Mogelijkheid tot langlopend onderhoudscontract.'
+        },
+        {
+            id: 3, company: 'LogiTech Systems', contact: 'Pieter van Dam', phone: '06-11223344',
+            type: 'meeting', date: '2025-02-06', time: '11:00', value: '€18.500',
+            branche: 'Logistiek', source: 'AI Cold Calling',
+            summary: 'Pieter zoekt een custom inventory management systeem. Werkt nu met Excel voor 3 warehouses. Wil real-time voorraadoverzicht, barcode scanning integratie, en automatische bestelnotificaties. Heeft 15 medewerkers die het systeem dagelijks moeten gebruiken. Snelle implementatie gewenst.'
+        },
+        {
+            id: 4, company: 'FinCore Solutions', contact: 'Anne de Boer', phone: '06-55667788',
+            type: 'meeting', date: '2025-02-10', time: '10:00', value: '€52.000',
+            branche: 'Financiële Dienstverlening', source: 'AI Cold Calling',
+            summary: 'Tweede gesprek na uitgebreide intake. FinCore wil een compleet client-portaal met realtime portfolio-overzicht, risicoanalyse dashboards, en geautomatiseerde rapportages. Moeten voldoen aan AFM-regelgeving. Technische architectuur is besproken, offerte is verstuurd. Beslissing door directie verwacht binnen een week.'
+        },
+        {
+            id: 5, company: 'GreenEnergy Data', contact: 'Tom Hendriks', phone: '06-99887766',
+            type: 'meeting', date: '2025-02-11', time: '13:30', value: '€35.000',
+            branche: 'Energie & Duurzaamheid', source: 'AI Cold Calling',
+            summary: 'Contract getekend! GreenEnergy heeft een IoT-data platform nodig dat sensordata van 500+ zonnepaneel-installaties verzamelt en visualiseert. Real-time dashboards met energieopbrengst, storingen, en voorspellende onderhoudsmeldingen. Eerste fase: MVP in 6 weken. Aanbetaling 40% ontvangen.'
+        },
+        {
+            id: 6, company: 'Krekel & Partners', contact: 'Mr. Krekel', phone: '06-44332211',
+            type: 'meeting', date: '2025-02-12', time: '15:30', value: '€22.000',
+            branche: 'Juridisch', source: 'AI Cold Calling',
+            summary: 'Mr. Krekel runt een advocatenkantoor met 12 juristen. Wil een intern zaakbeheersysteem dat deadlines tracked, documenten beheert, en declarabele uren registreert. Huidige systeem is end-of-life. Integratie met Outlook en MS Teams vereist. Bereid om te investeren in maatwerk.'
+        },
+        {
+            id: 7, company: 'RetailStack', contact: 'Eva Mulder', phone: '06-77665544',
+            type: 'meeting', date: '2025-02-14', time: '10:30', value: '€32.000',
+            branche: 'Retail & E-commerce', source: 'AI Cold Calling',
+            summary: 'Eva is Head of Digital bij RetailStack (14 winkels). Wil een unified commerce platform: webshop + POS koppeling + voorraadbeheer over alle locaties. Huidige Shopify-setup schaalt niet meer. Demo van ons platform-werk voor vergelijkbare klanten aangevraagd. Groot potentieel.'
+        },
+        {
+            id: 8, company: 'Apex Manufacturing', contact: 'Ing. Bos', phone: '06-33221100',
+            type: 'meeting', date: '2025-02-18', time: '09:00', value: '€41.000',
+            branche: 'Maakindustrie', source: 'AI Cold Calling',
+            summary: 'Follow-up na technische deep-dive. Apex wil een productie-planning systeem met machine-status monitoring, order tracking, en kwaliteitscontrole registratie. Moet integreren met hun SAP-omgeving. Complex project, bespreken of we in 3 sprints werken. Ing. Bos is de beslisser.'
+        },
+        {
+            id: 9, company: 'TransPort Pro', contact: 'Rick Jansen', phone: '06-12312312',
+            type: 'meeting', date: '2025-02-19', time: '16:00', value: '€15.000',
+            branche: 'Transport', source: 'AI Cold Calling',
+            summary: 'Rick heeft een transportbedrijf met 25 vrachtwagens. Zoekt een fleet management dashboard met GPS tracking, ritregistratie, en chauffeurs-planning. Wil ook een klantportaal waar opdrachtgevers zendingen kunnen volgen. Realistisch budget, snelle beslisser.'
+        },
+        {
+            id: 10, company: 'SecureNet BV', contact: 'Lars de Wit', phone: '06-45645645',
+            type: 'meeting', date: '2025-02-21', time: '11:00', value: '€28.500',
+            branche: 'Cybersecurity', source: 'AI Cold Calling',
+            summary: 'Deal gesloten! SecureNet heeft een vulnerability scanning dashboard nodig. Automatisch scannen van client-netwerken, rapportage genereren, en compliance tracking (ISO 27001). Eerste milestone: werkend prototype in 4 weken. Contract voor 12 maanden doorlopend onderhoud getekend.'
+        },
+        {
+            id: 11, company: 'CarePoint Systems', contact: 'Marian Vos', phone: '06-78978978',
+            type: 'meeting', date: '2025-02-24', time: '14:00', value: '€38.000',
+            branche: 'Thuiszorg', source: 'AI Cold Calling',
+            summary: 'Marian zoekt een planning- en registratiesysteem voor thuiszorgmedewerkers. Moet werken op tablet en telefoon. Functies: roosterplanning, zorgdossier bijhouden, kilometers registreren, en facturatie. 200+ gebruikers. Demo van mobile-first aanpak aangevraagd.'
+        },
+        {
+            id: 12, company: 'PropTech Innovators', contact: 'Bas Dekker', phone: '06-65465465',
+            type: 'meeting', date: '2025-02-26', time: '10:00', value: '€25.000',
+            branche: 'Vastgoed Tech', source: 'AI Cold Calling',
+            summary: 'Bas bouwt een proptech startup en heeft een MVP nodig. Platform voor vastgoedbeheerders: huurders-portaal, onderhoudsverzoeken, automatische facturatie, en data-analytics over hun portefeuille. Funding recent ontvangen, wil snel naar markt. Zoekt een technisch co-development partner.'
+        }
+    ];
+
+    let currentDate = appointments.length ? new Date(`${appointments[0].date}T00:00:00`) : new Date();
+    const today = new Date();
+    const monthNames = ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'];
+
+    function renderCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const grid = document.getElementById('calendarGrid');
+        document.getElementById('monthLabel').textContent = `${monthNames[month]} ${year}`;
+
+        const firstDay = new Date(year, month, 1);
+        let startDay = firstDay.getDay() - 1;
+        if (startDay < 0) startDay = 6;
+
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+        const totalCells = Math.ceil((startDay + daysInMonth) / 7) * 7;
+
+        let html = '';
+        for (let i = 0; i < totalCells; i++) {
+            let day;
+            let dateStr;
+            let isOtherMonth = false;
+            let isToday = false;
+
+            if (i < startDay) {
+                day = daysInPrevMonth - startDay + i + 1;
+                const m = month === 0 ? 12 : month;
+                const y = month === 0 ? year - 1 : year;
+                dateStr = `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                isOtherMonth = true;
+            } else if (i >= startDay + daysInMonth) {
+                day = i - startDay - daysInMonth + 1;
+                const m = month + 2 > 12 ? 1 : month + 2;
+                const y = month + 2 > 12 ? year + 1 : year;
+                dateStr = `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                isOtherMonth = true;
+            } else {
+                day = i - startDay + 1;
+                dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                isToday = (day === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+            }
+
+            const dayApts = appointments.filter((a) => a.date === dateStr);
+            let classes = 'calendar-day';
+            if (isOtherMonth) classes += ' other-month';
+            if (isToday) classes += ' today';
+
+            html += `<div class="${classes}"><div class="day-number">${day}</div>`;
+            dayApts.forEach((apt) => {
+                html += `<div class="appointment meeting magnetic" onclick="openAppointment(${apt.id})"><span class="apt-time">${apt.time}</span> ${apt.company}</div>`;
+            });
+            html += '</div>';
+        }
+
+        grid.innerHTML = html;
+        document.querySelectorAll('.appointment.magnetic').forEach((elem) => {
+            elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+            elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        });
+    }
+
+    function changeMonth(dir) { currentDate.setMonth(currentDate.getMonth() + dir); renderCalendar(); }
+    function goToday() { currentDate = new Date(); renderCalendar(); }
+
+    function openAppointment(id) {
+        const apt = appointments.find((a) => a.id === id);
+        if (!apt) return;
+        document.getElementById('modalBadge').textContent = 'Meeting';
+        document.getElementById('modalBadge').className = 'modal-type-badge meeting';
+        document.getElementById('modalCompany').textContent = apt.company;
+        document.getElementById('modalContact').textContent = `${apt.contact}  ·  ${apt.phone}`;
+        document.getElementById('modalDate').textContent = `${apt.date.split('-').reverse().join('-')}  om  ${apt.time}`;
+        document.getElementById('modalValue').textContent = apt.value;
+        document.getElementById('modalBranche').textContent = apt.branche;
+        document.getElementById('modalSource').textContent = apt.source;
+        document.getElementById('modalSummary').textContent = apt.summary;
+        document.getElementById('modal').classList.add('show');
+    }
+
+    function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+    renderCalendar();
+
+    const cursor = document.querySelector('.cursor');
+    const cursorDot = document.querySelector('.cursor-dot');
+    let mouseX = 0;
+    let mouseY = 0;
+    let cursorX = 0;
+    let cursorY = 0;
+    let dotX = 0;
+    let dotY = 0;
+    document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+
+    function animateCursor() {
+        cursorX += (mouseX - cursorX) * 0.15;
+        cursorY += (mouseY - cursorY) * 0.15;
+        cursor.style.left = `${cursorX}px`;
+        cursor.style.top = `${cursorY}px`;
+        dotX += (mouseX - dotX) * 0.5;
+        dotY += (mouseY - dotY) * 0.5;
+        cursorDot.style.left = `${dotX}px`;
+        cursorDot.style.top = `${dotY}px`;
+        requestAnimationFrame(animateCursor);
+    }
+    animateCursor();
+
+    document.querySelectorAll('.magnetic').forEach((elem) => {
+        elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+        elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+    });
+</script>
+</body>
+</html>

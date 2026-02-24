@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "checks": [
+    "Geen verboden placeholder-termen in output",
+    "Output-structuur compleet",
+    "Alle pagina's zijn volledige HTML documenten",
+    "Hero bevat 2 CTA's",
+    "FAQ >= 6",
+    "Signature sections aanwezig",
+    "Section order gebruikt seeded variatie",
+    "layoutVariant zichtbaar toegepast"
+  ],
+  "findings": [],
+  "fail_reason": null,
+  "attempt": 1
+}

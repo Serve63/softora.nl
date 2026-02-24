@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --bg: #f8f7f4;
+      --panel: #ffffff;
+      --text: #1a1a2e;
+      --muted: #6b6b7b;
+      --border: rgba(0,0,0,0.08);
+      --accent: #4a5fd7;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+    }
+
+    .card {
+      width: min(640px, 92vw);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 2rem;
+    }
+
+    h1 {
+      font-family: Oswald, system-ui, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      margin: 0 0 0.8rem;
+      line-height: 1;
+      font-size: 2rem;
+    }
+
+    p { margin: 0 0 1.4rem; color: var(--muted); line-height: 1.7; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-family: Oswald, system-ui, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.8rem;
+    }
+
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card" id="fallback">
+    <h1>Preview niet gevonden</h1>
+    <p>Deze preview staat (nog) niet lokaal opgeslagen. Ga terug naar Actieve Opdrachten en voer de opdracht opnieuw uit.</p>
+    <a href="actieve-opdrachten.html">Terug naar Actieve Opdrachten</a>
+  </div>
+
+  <script>
+    (function () {
+      const PREVIEW_HTML_PREFIX = 'softora_preview_html_software_v2_';
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (!id) return;
+
+      let html = null;
+      try {
+        html = localStorage.getItem(PREVIEW_HTML_PREFIX + id);
+      } catch (_) {
+        html = null;
+      }
+
+      if (!html) return;
+
+      // Replace the whole document with the generated preview HTML.
+      document.open();
+      document.write(html);
+      document.close();
+    })();
+  </script>
+</body>
+</html>

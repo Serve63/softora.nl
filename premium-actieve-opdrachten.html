@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Softora | Actieve Opdrachten — Premium</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="assets/personnel-theme.css">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
+                var storageKey = isPremiumPersonnel
+                    ? "softora_premium_personnel_theme_mode"
+                    : "softora_software_personnel_theme_mode";
+                var mode = localStorage.getItem(storageKey);
+                if (mode === "light" || mode === "dark") {
+                    document.documentElement.setAttribute("data-theme-mode", mode);
+                    document.documentElement.setAttribute("data-theme", mode);
+                }
+            } catch (error) {
+                /* ignore storage errors */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #080808;
+            --bg-secondary: #0d0d0d;
+            --bg-tertiary: #111;
+            --accent: #8B2252;
+            --accent-dark: #6B1A3F;
+            --accent-glow: rgba(139, 34, 82, 0.4);
+            --accent-light: #A62D65;
+            --text-primary: #f5f5f5;
+            --text-secondary: #888;
+            --text-tertiary: #555;
+            --border: rgba(255, 255, 255, 0.06);
+            --green: #2ecc71;
+            --green-glow: rgba(46, 204, 113, 0.15);
+            --yellow: #f39c12;
+            --yellow-glow: rgba(243, 156, 18, 0.15);
+            --red: #e74c3c;
+
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .cursor {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--accent-light);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.1s var(--ease-out-expo), background 0.2s ease, width 0.3s var(--ease-out-expo), height 0.3s var(--ease-out-expo);
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+        }
+
+        .cursor.hover {
+            width: 80px;
+            height: 80px;
+            background: var(--accent-light);
+            border-color: transparent;
+        }
+
+        .cursor-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-light);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10001;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Layout */
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 2.5rem 0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 0 2rem;
+            margin-bottom: 3rem;
+            display: block;
+        }
+
+        .sidebar-logo span { color: var(--accent-light); }
+        .sidebar-nav { flex: 1; }
+        .sidebar-section { margin-bottom: 2rem; }
+
+        .sidebar-section-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--text-tertiary);
+            padding: 0 2rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.8rem 2rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 400;
+            transition: all 0.2s;
+            cursor: none;
+            position: relative;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar-link:hover { color: var(--text-primary); background: rgba(255,255,255,0.02); }
+
+        .sidebar-link.active {
+            color: var(--text-primary);
+            background: rgba(139, 34, 82, 0.06);
+        }
+
+        .sidebar-link.active::before { opacity: 1; }
+
+        .sidebar-link svg { width: 18px; height: 18px; opacity: 0.5; flex-shrink: 0; }
+        .sidebar-link.active svg, .sidebar-link:hover svg { opacity: 1; }
+
+        .sidebar-link .count-badge {
+            margin-left: auto;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: var(--accent);
+            color: white;
+            padding: 0.15rem 0.5rem;
+            border-radius: 2px;
+            letter-spacing: 0.05em;
+        }
+
+        .sidebar-footer { padding: 2rem; border-top: 1px solid var(--border); }
+
+        .sidebar-user { display: flex; align-items: center; gap: 0.8rem; }
+
+        .sidebar-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .sidebar-user-info { flex: 1; min-width: 0; }
+        .sidebar-user-name { font-size: 0.85rem; font-weight: 500; color: var(--text-primary); }
+        .sidebar-user-role { font-size: 0.75rem; color: var(--text-tertiary); }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: none;
+            padding: 0.3rem;
+            transition: color 0.2s;
+        }
+
+        .logout-btn:hover { color: var(--red); }
+        .logout-btn svg { width: 18px; height: 18px; }
+
+        /* Main */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 3rem;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+        }
+
+        .topbar-left h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.3rem; }
+        .topbar-left p { color: var(--text-tertiary); font-size: 0.9rem; font-weight: 300; }
+        .topbar-right { display: flex; align-items: center; gap: 0.8rem; }
+
+        .build-mode {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .mode-btn {
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.5rem 0.75rem;
+            cursor: none;
+            transition: all 0.2s var(--ease-out-expo);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .mode-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--border);
+        }
+
+        .mode-btn.active {
+            color: #fff;
+            background: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .build-mode-hint {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        /* Summary */
+        .summary-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .summary-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            opacity: 0;
+            transform: translateY(15px);
+            animation: fadeUp 0.5s var(--ease-out-expo) forwards;
+        }
+
+        .summary-card:nth-child(1) { animation-delay: 0.1s; }
+        .summary-card:nth-child(2) { animation-delay: 0.15s; }
+        .summary-card:nth-child(3) { animation-delay: 0.2s; }
+
+        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+        .summary-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.3rem;
+        }
+
+        .summary-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .summary-value.accent { color: var(--accent-light); }
+        .summary-value.green { color: var(--green); }
+
+        .summary-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(139,34,82,0.08);
+            flex-shrink: 0;
+        }
+
+        .summary-icon svg { width: 22px; height: 22px; color: var(--accent-light); }
+
+        .summary-icon.green-bg { background: var(--green-glow); }
+        .summary-icon.green-bg svg { color: var(--green); }
+
+        /* Orders */
+        .orders-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .order-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            transition: all 0.3s var(--ease-out-expo);
+            opacity: 0;
+            transform: translateY(15px);
+            animation: fadeUp 0.5s var(--ease-out-expo) forwards;
+        }
+
+        .order-card:nth-child(1) { animation-delay: 0.25s; }
+        .order-card:nth-child(2) { animation-delay: 0.3s; }
+        .order-card:nth-child(3) { animation-delay: 0.35s; }
+        .order-card:nth-child(4) { animation-delay: 0.4s; }
+        .order-card:nth-child(5) { animation-delay: 0.45s; }
+
+        .order-card:hover {
+            border-color: rgba(139,34,82,0.3);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3), 0 0 40px rgba(139,34,82,0.05);
+        }
+
+        .order-main {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            align-items: center;
+            gap: 2rem;
+            padding: 2rem 2.5rem;
+        }
+
+        .order-info { min-width: 0; }
+
+        .order-client {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--accent-light);
+            margin-bottom: 0.4rem;
+        }
+
+        .order-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.5rem;
+            line-height: 1.1;
+        }
+
+        .order-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            line-height: 1.5;
+        }
+
+        .order-price { text-align: right; min-width: 120px; }
+
+        .order-price-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.3rem;
+        }
+
+        .order-price-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .order-price-value .currency {
+            font-size: 1rem;
+            color: var(--accent-light);
+            vertical-align: top;
+        }
+
+        .order-status { min-width: 110px; text-align: center; }
+
+        .status-tag {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 0.4rem 1rem;
+            display: inline-block;
+        }
+
+        .status-tag.wacht { color: var(--yellow); background: var(--yellow-glow); }
+        .status-tag.actief { color: var(--accent-light); background: rgba(139,34,82,0.1); }
+        .status-tag.bezig { color: var(--green); background: var(--green-glow); }
+        .status-tag.klaar { color: var(--text-tertiary); background: rgba(255,255,255,0.03); }
+
+        /* Execute btn */
+        .order-actions { min-width: 180px; }
+
+        .execute-btn {
+            width: 100%;
+            padding: 0.8rem 1.5rem;
+            background: var(--accent);
+            color: white;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            border: none;
+            cursor: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.3s var(--ease-out-expo);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .execute-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .execute-btn:hover {
+            background: var(--accent-light);
+            box-shadow: 0 0 30px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+
+        .execute-btn:hover::before { left: 100%; }
+        .execute-btn svg { width: 16px; height: 16px; }
+
+        .execute-btn.running { background: var(--green); }
+        .execute-btn.running:hover { background: #27ae60; box-shadow: 0 0 30px var(--green-glow); }
+
+        .execute-btn.done {
+            background: rgba(255,255,255,0.03);
+            color: var(--text-tertiary);
+            pointer-events: none;
+        }
+
+        .view-btn {
+            width: 100%;
+            padding: 0.6rem 1.5rem;
+            background: transparent;
+            color: var(--accent-light);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: 1px solid rgba(139,34,82,0.3);
+            cursor: none;
+            margin-top: 0.5rem;
+            transition: all 0.2s;
+            display: none;
+        }
+
+        .view-btn:hover { background: rgba(139,34,82,0.05); border-color: var(--accent-light); }
+        .view-btn.show { display: block; }
+
+        /* Progress */
+        .order-progress {
+            padding: 0 2.5rem 1.5rem;
+            display: none;
+        }
+
+        .order-progress.show { display: block; }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 4px;
+            background: var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-light));
+            width: 0%;
+            transition: width 0.5s var(--ease-out-expo);
+        }
+
+        .progress-bar-fill.green {
+            background: linear-gradient(90deg, #27ae60, var(--green));
+        }
+
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.8rem;
+        }
+
+        .progress-step {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-tertiary);
+            transition: color 0.3s;
+        }
+
+        .progress-step.active { color: var(--accent-light); }
+        .progress-step.done { color: var(--green); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            z-index: 5000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.show { display: flex; opacity: 1; }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            width: 90%;
+            max-width: 600px;
+            padding: 3rem;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+            transform: translateY(20px);
+            transition: transform 0.4s var(--ease-out-expo);
+        }
+
+        .modal-overlay.show .modal { transform: translateY(0); }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+        }
+
+        .modal-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .modal-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            margin-top: 0.3rem;
+        }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--border);
+            background: none;
+            color: var(--text-tertiary);
+            cursor: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .modal-close:hover { border-color: var(--red); color: var(--red); }
+        .modal-close svg { width: 16px; height: 16px; }
+
+        .modal-log {
+            max-height: 250px;
+            overflow-y: auto;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+        }
+
+        .modal-log::-webkit-scrollbar { width: 3px; }
+        .modal-log::-webkit-scrollbar-thumb { background: var(--border); }
+
+        .modal-log-entry {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            padding: 0.4rem 0;
+            line-height: 1.6;
+        }
+
+        .modal-log-entry .time { color: var(--text-tertiary); font-size: 0.7rem; margin-right: 0.5rem; }
+        .modal-log-entry .highlight { color: var(--accent-light); font-weight: 500; }
+        .modal-log-entry .success { color: var(--green); font-weight: 500; }
+
+        .modal-progress { margin-bottom: 2rem; }
+
+        .modal-progress-text {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-progress-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-tertiary);
+        }
+
+        .modal-progress-pct {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--accent-light);
+        }
+
+        .modal-btn {
+            width: 100%;
+            padding: 1.2rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: none;
+            cursor: none;
+            transition: all 0.3s var(--ease-out-expo);
+        }
+
+        .modal-btn.primary { background: var(--green); color: white; }
+        .modal-btn.primary:hover { background: #27ae60; box-shadow: 0 0 30px var(--green-glow); }
+
+        .modal-btn.secondary {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            margin-top: 0.5rem;
+        }
+
+        .modal-btn.secondary:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .order-main { grid-template-columns: 1fr auto auto; gap: 1.5rem; }
+            .order-actions { min-width: 150px; }
+            .summary-bar { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 1024px) {
+            body { cursor: auto; }
+            .cursor, .cursor-dot { display: none; }
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+            .order-main { grid-template-columns: 1fr; gap: 1rem; }
+            .order-price { text-align: left; }
+            .order-status { text-align: left; }
+        }
+
+        @media (max-width: 768px) {
+            .main-content { padding: 1.5rem; }
+            .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
+            .topbar-right { width: 100%; flex-direction: column; align-items: stretch; gap: 0.5rem; }
+            .build-mode { width: 100%; }
+            .mode-btn { flex: 1; justify-content: center; }
+            .build-mode-hint { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="noise-overlay"></div>
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+
+    <div class="modal-overlay" id="modal" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Opdracht uitvoeren">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title" id="modalTitle">Opdracht Uitvoeren</div>
+                    <div class="modal-subtitle" id="modalSubtitle">AI bouwt de website...</div>
+                </div>
+                <button class="modal-close magnetic" type="button" id="modalCloseBtn">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="modal-progress">
+                <div class="modal-progress-text">
+                    <span class="modal-progress-label">Voortgang</span>
+                    <span class="modal-progress-pct" id="modalPct">0%</span>
+                </div>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" id="modalBar" style="width: 0%;"></div></div>
+            </div>
+            <div class="modal-log" id="modalLog"></div>
+            <button class="modal-btn primary magnetic" id="modalBtn" type="button" style="display: none;">Oplevering Bekijken</button>
+            <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
+        </div>
+    </div>
+
+    <div class="dashboard-layout">
+
+        <aside class="sidebar">
+            <a href="premium-website.html" class="sidebar-logo magnetic">Softora.nl</a>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="premium-personeel-dashboard.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="premium-personeel-agenda.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        Agenda
+                    </a>
+                    <a href="premium-actieve-opdrachten.html" class="sidebar-link active magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Actieve Opdrachten
+                    </a>
+                    <a href="premium-ai-lead-generator.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
+                        AI Coldcalling
+                    </a>
+                    <a href="premium-ai-coldmailing.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                        AI Coldmailing
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5V21h4.5L21 7.5l-4.5-4.5L3 16.5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9"/></svg>
+                        SEO
+                    </a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Beheer</div>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Klanten
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                        Instellingen
+                    </a>
+                <div class="sidebar-theme">
+                    <div class="sidebar-theme-label">Thema</div>
+                    <div class="sidebar-theme-options" role="group" aria-label="Thema kiezen">
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="dark" aria-pressed="false">Donker</button>
+                        <button type="button" class="theme-switch-btn magnetic" data-theme-value="light" aria-pressed="false">Licht</button>
+                    </div>
+                </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">SP</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">Softora Premium</div>
+                        <div class="sidebar-user-role">Administrator</div>
+                    </div>
+                    <a href="premium-personeel-login.html" class="logout-btn magnetic" title="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+
+            <div class="topbar">
+                <div class="topbar-left">
+                    <h1>Actieve Opdrachten</h1>
+                    <p>Beheer en voer klantopdrachten uit met AI</p>
+                </div>
+            </div>
+
+            <div class="summary-bar">
+                <div class="summary-card">
+                    <div>
+                        <div class="summary-label">Actieve Opdrachten</div>
+                        <div class="summary-value accent" id="sumActive">5</div>
+                    </div>
+                    <div class="summary-icon">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div>
+                        <div class="summary-label">Totale Waarde</div>
+                        <div class="summary-value" id="sumTotal">€38.200</div>
+                    </div>
+                    <div class="summary-icon">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div>
+                        <div class="summary-label">Opgeleverd Deze Maand</div>
+                        <div class="summary-value green" id="sumDelivered">3</div>
+                    </div>
+                    <div class="summary-icon green-bg">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="orders-grid" id="ordersGrid">
+
+                <div class="order-card" id="order-1" role="button" tabindex="0" aria-label="Opdracht 1">
+                    <div class="order-main">
+                        <div class="order-info">
+                            <div class="order-client">Kapsalon Mooi — Breda</div>
+                            <div class="order-title">Website Kapper met Online Booking</div>
+                            <div class="order-desc">Moderne one-page website met diensten, prijslijst, team sectie en online afspraak-systeem.</div>
+                        </div>
+                        <div class="order-price">
+                            <div class="order-price-label">Bedrag</div>
+                            <div class="order-price-value"><span class="currency">€</span>2.800</div>
+                        </div>
+                        <div class="order-status"><span class="status-tag wacht" id="status-1">Wachtend</span></div>
+                        <div class="order-actions">
+                            <button class="execute-btn magnetic" id="btn-1" type="button" data-order="1">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                Voer Opdracht Uit
+                            </button>
+                            <button class="view-btn magnetic" id="view-1" type="button" data-order="1">Bekijk Voortgang</button>
+                        </div>
+                    </div>
+                    <div class="order-progress" id="progress-1">
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-1"></div></div>
+                        <div class="progress-steps">
+                            <span class="progress-step" id="step-1-1">Analyse</span>
+                            <span class="progress-step" id="step-1-2">Design</span>
+                            <span class="progress-step" id="step-1-3">Development</span>
+                            <span class="progress-step" id="step-1-4">Testing</span>
+                            <span class="progress-step" id="step-1-5">Oplevering</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="order-card" id="order-2" role="button" tabindex="0" aria-label="Opdracht 2">
+                    <div class="order-main">
+                        <div class="order-info">
+                            <div class="order-client">Restaurant De Harmonie — Tilburg</div>
+                            <div class="order-title">Restaurant Website met Menu & Reserveringen</div>
+                            <div class="order-desc">Premium website met digitaal menu, fotogalerij, reserveringssysteem en Google Maps integratie.</div>
+                        </div>
+                        <div class="order-price">
+                            <div class="order-price-label">Bedrag</div>
+                            <div class="order-price-value"><span class="currency">€</span>3.500</div>
+                        </div>
+                        <div class="order-status"><span class="status-tag wacht" id="status-2">Wachtend</span></div>
+                        <div class="order-actions">
+                            <button class="execute-btn magnetic" id="btn-2" type="button" data-order="2">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                Voer Opdracht Uit
+                            </button>
+                            <button class="view-btn magnetic" id="view-2" type="button" data-order="2">Bekijk Voortgang</button>
+                        </div>
+                    </div>
+                    <div class="order-progress" id="progress-2">
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-2"></div></div>
+                        <div class="progress-steps">
+                            <span class="progress-step" id="step-2-1">Analyse</span>
+                            <span class="progress-step" id="step-2-2">Design</span>
+                            <span class="progress-step" id="step-2-3">Development</span>
+                            <span class="progress-step" id="step-2-4">Testing</span>
+                            <span class="progress-step" id="step-2-5">Oplevering</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="order-card" id="order-3" role="button" tabindex="0" aria-label="Opdracht 3">
+                    <div class="order-main">
+                        <div class="order-info">
+                            <div class="order-client">FitLife Gym — Eindhoven</div>
+                            <div class="order-title">Sportschool Website met Rooster</div>
+                            <div class="order-desc">Energieke website met lesrooster, tarieven, trainer profielen en proefles aanvraag.</div>
+                        </div>
+                        <div class="order-price">
+                            <div class="order-price-label">Bedrag</div>
+                            <div class="order-price-value"><span class="currency">€</span>4.200</div>
+                        </div>
+                        <div class="order-status"><span class="status-tag actief" id="status-3">Actief</span></div>
+                        <div class="order-actions">
+                            <button class="execute-btn magnetic" id="btn-3" type="button" data-order="3">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                Voer Opdracht Uit
+                            </button>
+                            <button class="view-btn magnetic" id="view-3" type="button" data-order="3">Bekijk Voortgang</button>
+                        </div>
+                    </div>
+                    <div class="order-progress" id="progress-3">
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-3"></div></div>
+                        <div class="progress-steps">
+                            <span class="progress-step" id="step-3-1">Analyse</span>
+                            <span class="progress-step" id="step-3-2">Design</span>
+                            <span class="progress-step" id="step-3-3">Development</span>
+                            <span class="progress-step" id="step-3-4">Testing</span>
+                            <span class="progress-step" id="step-3-5">Oplevering</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="order-card" id="order-4" role="button" tabindex="0" aria-label="Opdracht 4">
+                    <div class="order-main">
+                        <div class="order-info">
+                            <div class="order-client">Van der Berg Interiors — Den Bosch</div>
+                            <div class="order-title">Interieurdesign Portfolio Website</div>
+                            <div class="order-desc">Luxe portfolio met projectgalerij, before/after slider, klantreviews en contactformulier.</div>
+                        </div>
+                        <div class="order-price">
+                            <div class="order-price-label">Bedrag</div>
+                            <div class="order-price-value"><span class="currency">€</span>5.500</div>
+                        </div>
+                        <div class="order-status"><span class="status-tag wacht" id="status-4">Wachtend</span></div>
+                        <div class="order-actions">
+                            <button class="execute-btn magnetic" id="btn-4" type="button" data-order="4">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                Voer Opdracht Uit
+                            </button>
+                            <button class="view-btn magnetic" id="view-4" type="button" data-order="4">Bekijk Voortgang</button>
+                        </div>
+                    </div>
+                    <div class="order-progress" id="progress-4">
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-4"></div></div>
+                        <div class="progress-steps">
+                            <span class="progress-step" id="step-4-1">Analyse</span>
+                            <span class="progress-step" id="step-4-2">Design</span>
+                            <span class="progress-step" id="step-4-3">Development</span>
+                            <span class="progress-step" id="step-4-4">Testing</span>
+                            <span class="progress-step" id="step-4-5">Oplevering</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="order-card" id="order-5" role="button" tabindex="0" aria-label="Opdracht 5">
+                    <div class="order-main">
+                        <div class="order-info">
+                            <div class="order-client">Bakkerij Jansen — Tilburg</div>
+                            <div class="order-title">Bakkerij Website met Bestelmodule</div>
+                            <div class="order-desc">Warme website met productoverzicht, online bestellen voor afhaal en bedrijfsverhaal.</div>
+                        </div>
+                        <div class="order-price">
+                            <div class="order-price-label">Bedrag</div>
+                            <div class="order-price-value"><span class="currency">€</span>22.200</div>
+                        </div>
+                        <div class="order-status"><span class="status-tag wacht" id="status-5">Wachtend</span></div>
+                        <div class="order-actions">
+                            <button class="execute-btn magnetic" id="btn-5" type="button" data-order="5">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                Voer Opdracht Uit
+                            </button>
+                            <button class="view-btn magnetic" id="view-5" type="button" data-order="5">Bekijk Voortgang</button>
+                        </div>
+                    </div>
+                    <div class="order-progress" id="progress-5">
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-5"></div></div>
+                        <div class="progress-steps">
+                            <span class="progress-step" id="step-5-1">Analyse</span>
+                            <span class="progress-step" id="step-5-2">Design</span>
+                            <span class="progress-step" id="step-5-3">Development</span>
+                            <span class="progress-step" id="step-5-4">Testing</span>
+                            <span class="progress-step" id="step-5-5">Oplevering</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+    <script>
+        const PREVIEW_HTML_PREFIX = 'softora_preview_html_premium_v4_';
+        const ORDER_STATE_KEY = 'softora_order_state_premium_v1';
+        const BUILD_MODE_KEY = 'softora_build_mode_premium_v1';
+
+        const orders = {
+            1: { name: 'Kapsalon Mooi', type: 'Kapper Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
+            2: { name: 'Restaurant De Harmonie', type: 'Restaurant Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
+            3: { name: 'FitLife Gym', type: 'Sportschool Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
+            4: { name: 'Van der Berg Interiors', type: 'Portfolio Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
+            5: { name: 'Bakkerij Jansen', type: 'Bakkerij Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null }
+        };
+
+        const quickBuildSteps = [
+            { pct: 5, step: 1, msg: 'Opdracht ontvangen, klantgegevens analyseren...' },
+            { pct: 12, step: 1, msg: 'Branche-analyse en concurrentie-onderzoek gestart' },
+            { pct: 20, step: 1, msg: 'Sitemap en content-structuur opgesteld' },
+            { pct: 28, step: 2, msg: 'Kleurenpalet en typografie geselecteerd' },
+            { pct: 38, step: 2, msg: 'Wireframes voor alle pagina\'s aangemaakt' },
+            { pct: 45, step: 2, msg: 'Visueel design finalized — responsive mockups klaar' },
+            { pct: 55, step: 3, msg: 'HTML/CSS structuur gegenereerd' },
+            { pct: 62, step: 3, msg: 'Interactieve elementen en animaties ingebouwd' },
+            { pct: 72, step: 3, msg: 'Formulieren en functionaliteit geïmplementeerd' },
+            { pct: 80, step: 4, msg: 'Cross-browser testing gestart' },
+            { pct: 85, step: 4, msg: 'Mobile responsiveness gevalideerd' },
+            { pct: 90, step: 4, msg: 'Performance optimalisatie — Lighthouse score 95+' },
+            { pct: 95, step: 5, msg: 'Finale check afgerond, bestanden klaargezet' },
+            { pct: 100, step: 5, msg: 'Website succesvol opgeleverd!' }
+        ];
+
+        const premiumBuildSteps = [
+            { pct: 4, step: 1, msg: 'Opdracht ontvangen, premium briefing analyseren...' },
+            { pct: 10, step: 1, msg: 'Doelgroeppsychologie en positionering bepaald' },
+            { pct: 18, step: 1, msg: 'Merktoon, hooks en storytelling-richting vastgesteld' },
+            { pct: 26, step: 2, msg: '3 unieke creatieve concepten gegenereerd' },
+            { pct: 34, step: 2, msg: 'Best presterende concept geselecteerd op conversie' },
+            { pct: 42, step: 2, msg: 'High-end visuele richting en motion-stijl uitgewerkt' },
+            { pct: 52, step: 3, msg: 'Volledige premium layout voor alle secties gebouwd' },
+            { pct: 62, step: 3, msg: 'Copywriting en aanbodstructuur geoptimaliseerd' },
+            { pct: 72, step: 3, msg: 'Interactie, formulieren en componenten afgerond' },
+            { pct: 82, step: 4, msg: 'SEO-structuur, metadata en snelheid geoptimaliseerd' },
+            { pct: 90, step: 4, msg: 'Cross-browser en mobile QA uitgevoerd' },
+            { pct: 96, step: 5, msg: 'Final polish: hiërarchie, contrast en micro-copy' },
+            { pct: 100, step: 5, msg: 'Premium website succesvol opgeleverd!' }
+        ];
+
+        let currentModalId = null;
+        let buildMode = loadBuildMode();
+
+        function getTime() {
+            return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function loadBuildMode() {
+            try {
+                const v = localStorage.getItem(BUILD_MODE_KEY);
+                if (v === 'quick' || v === 'premium') return v;
+                return 'premium';
+            } catch (_) {
+                return 'premium';
+            }
+        }
+
+        function saveBuildMode(mode) {
+            try {
+                localStorage.setItem(BUILD_MODE_KEY, mode);
+            } catch (_) {
+                // ignore
+            }
+        }
+
+        function getBuildSteps() {
+            return buildMode === 'premium' ? premiumBuildSteps : quickBuildSteps;
+        }
+
+        function setBuildMode(mode) {
+            buildMode = mode === 'premium' ? 'premium' : 'quick';
+            saveBuildMode(buildMode);
+
+            document.querySelectorAll('.mode-btn[data-build-mode]').forEach((btn) => {
+                btn.classList.toggle('active', btn.getAttribute('data-build-mode') === buildMode);
+            });
+
+            const hint = document.getElementById('buildModeHint');
+            if (hint) {
+                hint.textContent = buildMode === 'premium'
+                    ? 'Premium workflow'
+                    : 'Snelle workflow';
+            }
+        }
+
+        function moneyToNumber(text) {
+            const raw = String(text || '').replace(/[^0-9]/g, '');
+            const n = Number(raw);
+            return Number.isFinite(n) ? n : null;
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function slugify(s) {
+            return String(s || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9\s-]/g, '')
+                .trim()
+                .replace(/\s+/g, '-')
+                .replace(/-+/g, '-');
+        }
+
+        function deriveFeatures(desc) {
+            const d = String(desc || '').trim();
+            if (!d) return [];
+
+            let source = d;
+            const m = /\bmet\s+(.+?)(?:\.|$)/i.exec(d);
+            if (m && m[1]) source = m[1];
+
+            source = source.replace(/\s+en\s+/gi, ', ');
+            return source
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean)
+                .map(s => s.replace(/\.$/, ''))
+                .slice(0, 8);
+        }
+
+        function getOrderMeta(id) {
+            const card = document.getElementById('order-' + id);
+            if (!card) return null;
+
+            const clientLine = (card.querySelector('.order-client')?.textContent || '').trim();
+            const title = (card.querySelector('.order-title')?.textContent || '').trim();
+            const description = (card.querySelector('.order-desc')?.textContent || '').trim();
+            const priceText = (card.querySelector('.order-price-value')?.textContent || '').trim();
+            const budget = moneyToNumber(priceText);
+
+            const parts = clientLine.split('—').map(s => s.trim()).filter(Boolean);
+            const clientName = parts[0] || orders[id]?.name || 'Bedrijf';
+            const location = parts[1] || '';
+
+            const features = deriveFeatures(description);
+
+            return {
+                id: String(id),
+                clientName,
+                location,
+                title: title || (orders[id]?.type || 'Project'),
+                description,
+                budget,
+                features
+            };
+        }
+
+        function formatBudget(n) {
+            if (typeof n !== 'number' || !isFinite(n) || n <= 0) return '—';
+            return '€' + n.toLocaleString('nl-NL');
+        }
+
+        function setLastActiveOrder(orderId) {
+            try {
+                localStorage.setItem(ORDER_STATE_KEY, JSON.stringify({
+                    lastOrderId: String(orderId),
+                    updatedAt: new Date().toISOString()
+                }));
+            } catch (_) {
+                // ignore
+            }
+        }
+
+        function selectActiveOrderId(explicitId) {
+            if (explicitId && orders[explicitId]) return Number(explicitId);
+
+            try {
+                const raw = localStorage.getItem(ORDER_STATE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    const lastId = Number(parsed?.lastOrderId);
+                    if (lastId && orders[lastId]) return lastId;
+                }
+            } catch (_) {
+                // ignore
+            }
+
+            const byUpdated = Object.entries(orders)
+                .map(([id, o]) => ({ id: Number(id), ts: Number(o.updatedAt || 0) }))
+                .filter(x => Number.isFinite(x.ts) && x.ts > 0)
+                .sort((a, b) => b.ts - a.ts);
+            if (byUpdated.length) return byUpdated[0].id;
+
+            const first = Object.keys(orders).map(Number).sort((a, b) => a - b)[0];
+            return first || 1;
+        }
+        function resolvePreviewUrl(meta) {
+            const text = (String(meta?.title || '') + ' ' + String(meta?.description || '')).toLowerCase();
+            const isSoftware = /(software|platform|database|saas|api|webapp|applicatie|dashboard)/.test(text);
+            return isSoftware ? 'maatwerk-platform.html' : 'premium-website.html';
+        }
+
+        function openPreview(id) {
+            const activeId = selectActiveOrderId(id);
+            const order = orders[activeId];
+            const meta = getOrderMeta(activeId) || {
+                id: String(activeId),
+                clientName: order?.name || 'Bedrijf',
+                title: order?.type || 'Project',
+                description: ''
+            };
+
+            const w = window.open(resolvePreviewUrl(meta), '_blank');
+            if (!w) {
+                alert('Pop-up geblokkeerd. Sta pop-ups toe om de preview te openen.');
+            }
+        }
+
+        function executeOrder(id) {
+            const activeId = selectActiveOrderId(id);
+            const btn = document.getElementById(`btn-${id}`);
+            const status = document.getElementById(`status-${id}`);
+            const progress = document.getElementById(`progress-${id}`);
+            const bar = document.getElementById(`bar-${id}`);
+            const viewBtn = document.getElementById(`view-${id}`);
+
+            if (!btn || btn.classList.contains('running') || btn.classList.contains('done')) return;
+
+            btn.classList.add('running');
+            status.textContent = 'Bezig';
+            status.className = 'status-tag bezig';
+
+            progress.classList.add('show');
+            viewBtn.classList.add('show');
+            viewBtn.textContent = 'Bekijk Voortgang';
+            viewBtn.onclick = () => openModal(id);
+
+            orders[id].logs = [];
+            orders[id].progressPct = 0;
+            orders[id].updatedAt = Date.now();
+            setLastActiveOrder(activeId);
+
+            let stepIndex = 0;
+            const buildSteps = getBuildSteps();
+
+            btn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Verwerken...';
+
+            function nextStep() {
+                if (stepIndex >= buildSteps.length) {
+                    btn.innerHTML = '✓ Opgeleverd';
+                    btn.classList.remove('running');
+                    btn.classList.add('done');
+
+                    status.textContent = 'Klaar';
+                    status.className = 'status-tag klaar';
+                    bar.classList.add('green');
+
+                    orders[id].logs.push({
+                        time: getTime(),
+                        msg: 'Preview gereed. Open de vaste template-preview.',
+                        highlight: true
+                    });
+
+                    viewBtn.textContent = 'Open preview';
+                    viewBtn.onclick = () => openPreview(activeId);
+                    return;
+                }
+
+                const step = buildSteps[stepIndex];
+                bar.style.width = step.pct + '%';
+
+                for (let s = 1; s <= 5; s++) {
+                    const el = document.getElementById(`step-${id}-${s}`);
+                    if (!el) continue;
+                    if (s < step.step) el.className = 'progress-step done';
+                    else if (s === step.step) el.className = 'progress-step active';
+                    else el.className = 'progress-step';
+                }
+
+                orders[id].progressPct = step.pct;
+                orders[id].logs.push({ time: getTime(), msg: step.msg, highlight: step.pct === 100 });
+                stepIndex++;
+                setTimeout(nextStep, 650 + Math.random() * 700);
+            }
+
+            nextStep();
+        }
+
+        function openModal(id) {
+            const modal = document.getElementById('modal');
+            const log = document.getElementById('modalLog');
+            const bar = document.getElementById('modalBar');
+            const pct = document.getElementById('modalPct');
+            const title = document.getElementById('modalTitle');
+            const subtitle = document.getElementById('modalSubtitle');
+            const primaryBtn = document.getElementById('modalBtn');
+
+            currentModalId = id;
+
+            title.textContent = orders[id].type;
+            subtitle.textContent = orders[id].name;
+
+            log.innerHTML = '';
+            if (!orders[id].logs.length) {
+                const div = document.createElement('div');
+                div.className = 'modal-log-entry';
+                div.innerHTML = '<span class="time">[--:--:--]</span> <span class="highlight">Nog geen activiteit. Start de opdracht om voortgang te zien.</span>';
+                log.appendChild(div);
+            } else {
+                orders[id].logs.forEach(entry => {
+                    const div = document.createElement('div');
+                    div.className = 'modal-log-entry';
+                    div.innerHTML = `<span class="time">[${entry.time}]</span> <span class="${entry.highlight ? 'success' : 'highlight'}">${entry.msg}</span>`;
+                    log.appendChild(div);
+                });
+            }
+
+            const pctValue = Number(orders[id].progressPct) || 0;
+            bar.style.width = pctValue + '%';
+            if (pctValue === 100) bar.classList.add('green');
+            else bar.classList.remove('green');
+
+            pct.textContent = pctValue + '%';
+
+            if (pctValue === 100) {
+                primaryBtn.style.display = 'block';
+                primaryBtn.onclick = () => {
+                    openPreview(id);
+                    closeModal();
+                };
+            } else {
+                primaryBtn.style.display = 'none';
+                primaryBtn.onclick = null;
+            }
+
+            log.scrollTop = log.scrollHeight;
+            modal.classList.add('show');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.remove('show');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        // Build mode UI
+        document.querySelectorAll('.mode-btn[data-build-mode]').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                setBuildMode(btn.getAttribute('data-build-mode'));
+            });
+        });
+        setBuildMode(buildMode);
+
+        // Bind UI
+        document.querySelectorAll('.execute-btn').forEach((b) => {
+            b.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = Number(b.getAttribute('data-order'));
+                executeOrder(id);
+            });
+        });
+
+        document.querySelectorAll('.view-btn').forEach((b) => {
+            b.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = Number(b.getAttribute('data-order'));
+                if (b.textContent.trim().toLowerCase().includes('preview')) openPreview(id);
+                else openModal(id);
+            });
+        });
+
+        document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+        document.getElementById('modalSecondaryBtn').addEventListener('click', closeModal);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Click card to open modal (keeps logs accessible even when button switches to preview)
+        document.querySelectorAll('.order-card').forEach((card) => {
+            const id = Number(String(card.id || '').split('-')[1]);
+            if (!id) return;
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('button,a')) return;
+                openModal(id);
+            });
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openModal(id);
+                }
+            });
+        });
+
+        // Cursor (robust)
+        (function initCursor() {
+            const cursor = document.querySelector('.cursor');
+            const cursorDot = document.querySelector('.cursor-dot');
+            const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+
+            function disable() {
+                document.body.style.cursor = 'auto';
+                if (cursor) cursor.style.display = 'none';
+                if (cursorDot) cursorDot.style.display = 'none';
+            }
+
+            if (!cursor || !cursorDot || !enablePointerFx) {
+                disable();
+                return;
+            }
+
+            let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0, dotX = 0, dotY = 0;
+            let cursorRafId = null;
+            document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; }, { passive: true });
+
+            function animateCursor() {
+                cursorX += (mouseX - cursorX) * 0.15;
+                cursorY += (mouseY - cursorY) * 0.15;
+                cursor.style.left = cursorX + 'px';
+                cursor.style.top = cursorY + 'px';
+                dotX += (mouseX - dotX) * 0.5;
+                dotY += (mouseY - dotY) * 0.5;
+                cursorDot.style.left = dotX + 'px';
+                cursorDot.style.top = dotY + 'px';
+                cursorRafId = requestAnimationFrame(animateCursor);
+            }
+            cursorRafId = requestAnimationFrame(animateCursor);
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    if (cursorRafId) cancelAnimationFrame(cursorRafId);
+                    cursorRafId = null;
+                } else if (!cursorRafId) {
+                    cursorRafId = requestAnimationFrame(animateCursor);
+                }
+            });
+
+            document.addEventListener('mouseover', (e) => {
+                if (e.target.closest('.magnetic')) cursor.classList.add('hover');
+            });
+            document.addEventListener('mouseout', (e) => {
+                if (e.target.closest('.magnetic')) cursor.classList.remove('hover');
+            });
+
+            window.addEventListener('error', disable);
+        })();
+    </script>
+</body>
+</html>

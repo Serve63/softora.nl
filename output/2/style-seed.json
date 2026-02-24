@@ -1,0 +1,49 @@
+{
+  "brand_archetype": "The Trusted Craft Partner",
+  "mood_words": [
+    "smaakvol",
+    "warm",
+    "uitnodigend",
+    "levendig",
+    "verfijnd"
+  ],
+  "layout_pattern": "split-hero + rhythm sections + staggered feature grid",
+  "section_order": [
+    "hero",
+    "promise",
+    "signatureA",
+    "services",
+    "signatureB",
+    "process",
+    "faq",
+    "contact"
+  ],
+  "typography_pairing": {
+    "headings": "Oswald",
+    "body": "Inter"
+  },
+  "type_scale": "display-heavy",
+  "spacing_scale": "airy",
+  "border_radius": "small",
+  "grid_style": "12-col editorial",
+  "icon_style": "outlined minimal",
+  "imagery_style": "high contrast lifestyle",
+  "button_style": "solid high-contrast",
+  "card_style": "elevated flat cards",
+  "microinteractions": "lift-on-hover + reveal-on-scroll",
+  "animation_rules": "subtiel, functioneel, geen circus",
+  "palette": {
+    "bg": "#09090d",
+    "surface": "#121219",
+    "text": "#f4f4f8",
+    "muted": "#a3a6b7",
+    "border": "rgba(255,255,255,0.12)",
+    "accent": "#e67e22",
+    "accent_alt": "#c45a12"
+  },
+  "seed_meta": {
+    "order_id": "2",
+    "mode": "premium",
+    "theme": "dark"
+  }
+}
