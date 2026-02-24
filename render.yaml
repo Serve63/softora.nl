@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: softora-vapi-coldcalling
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: VAPI_API_KEY
+        sync: false
+      - key: VAPI_ASSISTANT_ID
+        sync: false
+      - key: VAPI_PHONE_NUMBER_ID
+        sync: false
+      - key: WEBHOOK_SECRET
+        sync: false

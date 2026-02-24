@@ -46,13 +46,13 @@ De server draait standaard op:
 
 Omdat je frontend nu `fetch('/api/coldcalling/start')` gebruikt, open je de pagina via de Express server (zelfde origin):
 
-- `http://localhost:3000/ai-coldmailing.html`
-- of `http://localhost:3000/premium-ai-coldmailing.html`
+- `http://localhost:3000/ai-lead-generator.html`
+- of `http://localhost:3000/premium-ai-lead-generator.html`
 
 Wat de frontend nu doet:
 
 - Leest de bestaande UI-velden uit (aantal leads, sector, regio, prijs, korting, instructies)
-- Gebruikt tijdelijk een test-array met leads (totdat je echte leadbron is gekoppeld)
+- Gebruikt de spreadsheet-leadlijst (en alleen als die leeg is: fallback testlead)
 - Stuurt alles naar `POST /api/coldcalling/start`
 - Toont simpele status in de UI + logregels per lead
 
@@ -69,6 +69,37 @@ Voor lokaal testen gebruik je een tunnel (bijv. ngrok / Cloudflare Tunnel) en da
 Als je `WEBHOOK_SECRET` gebruikt:
 
 - configureer dezelfde secret ook in Vapi (bij de webhook/server credential instellingen)
+
+## 4b) Deploy naar Render (aanbevolen)
+
+De repo bevat nu een `render.yaml`, zodat je backend + statische frontend als 1 service kan draaien.
+
+### Render aanmaken
+
+1. Log in op Render en kies `New +` -> `Blueprint`.
+2. Koppel je GitHub repo: `Serve63/softora.nl`.
+3. Render leest `render.yaml` automatisch in.
+4. Vul in Render deze environment variables in (service settings):
+   - `VAPI_API_KEY`
+   - `VAPI_ASSISTANT_ID`
+   - `VAPI_PHONE_NUMBER_ID`
+   - `WEBHOOK_SECRET` (zelfde waarde als in Vapi webhook config, optioneel maar aanbevolen)
+5. Deploy de service.
+
+### Na deploy
+
+- Open je live dashboard via:
+  - `https://<jouw-render-service>.onrender.com/ai-lead-generator.html`
+- Stel in Vapi webhook URL in op:
+  - `https://<jouw-render-service>.onrender.com/api/vapi/webhook`
+- Healthcheck (voor controle):
+  - `https://<jouw-render-service>.onrender.com/healthz`
+
+Belangrijk:
+
+- Ook al staat er nu lokaal/zelfs in je repo een `.env`, Render gebruikt zijn eigen environment variables.
+- Zet je echte secrets altijd in Render service settings (niet vertrouwen op repo-`.env` voor live).
+- Rotate je `VAPI_API_KEY` zodra je `.env` per ongeluk of bewust publiek hebt gemaakt.
 
 ## 5) API gedrag (backend)
 
