@@ -1096,6 +1096,9 @@
     }
 
     restoreCampaignFormStateFromStorage();
+    if (typeof window.initCustomFormSelects === 'function') {
+      window.initCustomFormSelects();
+    }
     bindCampaignFormStatePersistence();
     leadSlider.addEventListener('input', updateLeadListHint);
     leadSlider.addEventListener('change', updateLeadListHint);

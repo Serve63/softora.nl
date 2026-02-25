@@ -465,6 +465,216 @@
             color: var(--text-primary);
         }
 
+        .site-select {
+            position: relative;
+        }
+
+        .site-select-native {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .site-select-trigger {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 1.2rem;
+            background: rgba(255,255,255,0.03);
+            border: 2px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 400;
+            text-align: left;
+            outline: none;
+            cursor: none;
+            transition: all 0.3s var(--ease-out-expo);
+        }
+
+        .site-select-trigger:hover,
+        .site-select-trigger:focus-visible,
+        .site-select.is-open .site-select-trigger {
+            border-color: var(--accent-light);
+            background: rgba(139, 34, 82, 0.03);
+            box-shadow: 0 0 30px rgba(139, 34, 82, 0.08);
+        }
+
+        .site-select-trigger::after {
+            content: '';
+            flex: 0 0 12px;
+            width: 12px;
+            height: 8px;
+            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23555' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center;
+            transition: transform 0.25s var(--ease-out-expo);
+        }
+
+        .site-select.is-open .site-select-trigger::after {
+            transform: rotate(180deg);
+        }
+
+        .site-select-value {
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .site-select-menu {
+            position: absolute;
+            top: calc(100% + 0.55rem);
+            left: 0;
+            right: 0;
+            z-index: 60;
+            padding: 0.35rem;
+            display: grid;
+            gap: 0.25rem;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(139,34,82,0.25);
+            box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+            max-height: 17rem;
+            overflow: auto;
+            opacity: 0;
+            transform: translateY(8px);
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s var(--ease-out-expo);
+        }
+
+        .site-select.is-open .site-select-menu {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .site-select-option {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            color: var(--text-primary);
+            text-align: left;
+            padding: 0.7rem 0.8rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            line-height: 1.3;
+            cursor: none;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .site-select-option:hover,
+        .site-select-option:focus-visible {
+            background: rgba(255,255,255,0.05);
+            outline: none;
+        }
+
+        .site-select-option.is-selected {
+            color: var(--accent-light);
+            background: rgba(139, 34, 82, 0.12);
+        }
+
+        .site-dialog-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(8, 10, 18, 0.72);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .site-dialog {
+            width: min(100%, 34rem);
+            background: var(--bg-secondary);
+            border: 1px solid rgba(139,34,82,0.25);
+            box-shadow: 0 25px 80px rgba(0,0,0,0.45);
+            padding: 1.2rem;
+            animation: fadeUp 0.2s ease forwards;
+        }
+
+        .site-dialog-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.95rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 0.45rem;
+        }
+
+        .site-dialog-text {
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            margin-bottom: 0.9rem;
+        }
+
+        .site-dialog-input {
+            width: 100%;
+            padding: 1rem 1.2rem;
+            background: rgba(255,255,255,0.03);
+            border: 2px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            outline: none;
+            cursor: text;
+            transition: all 0.3s var(--ease-out-expo);
+        }
+
+        .site-dialog-input:focus {
+            border-color: var(--accent-light);
+            background: rgba(139, 34, 82, 0.03);
+            box-shadow: 0 0 30px rgba(139, 34, 82, 0.08);
+        }
+
+        .site-dialog-error {
+            min-height: 1.25rem;
+            margin-top: 0.55rem;
+            font-size: 0.8rem;
+            color: #f4a0bc;
+        }
+
+        .site-dialog-actions {
+            margin-top: 0.9rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        .site-dialog-btn {
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-primary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.75rem 1.15rem;
+            min-width: 7.5rem;
+            cursor: none;
+            transition: all 0.2s ease;
+        }
+
+        .site-dialog-btn:hover,
+        .site-dialog-btn:focus-visible {
+            border-color: var(--accent-light);
+            outline: none;
+        }
+
+        .site-dialog-btn--primary {
+            background: linear-gradient(135deg, rgba(139,34,82,0.9), rgba(183,28,92,0.95));
+            border-color: rgba(139,34,82,0.45);
+            color: #fff;
+            box-shadow: 0 10px 24px rgba(139,34,82,0.22);
+        }
+
         .form-textarea {
             min-height: 120px;
             resize: vertical;
@@ -1246,6 +1456,297 @@
     </div>
 
     <script>
+        const customSelectInstances = [];
+
+        function closeAllCustomSelects(exceptWrapper = null) {
+            customSelectInstances.forEach((instance) => {
+                if (instance.wrapper !== exceptWrapper) {
+                    instance.close(false);
+                }
+            });
+        }
+
+        function initCustomFormSelect(select) {
+            if (!(select instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            if (select.dataset.customUiReady === '1') {
+                if (typeof select.__softoraSyncCustomFormSelect === 'function') {
+                    select.__softoraSyncCustomFormSelect();
+                }
+                return;
+            }
+
+            select.dataset.customUiReady = '1';
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'site-select';
+
+            select.parentNode.insertBefore(wrapper, select);
+            wrapper.appendChild(select);
+            select.classList.add('site-select-native');
+
+            const trigger = document.createElement('button');
+            trigger.type = 'button';
+            trigger.className = 'site-select-trigger';
+            trigger.setAttribute('aria-haspopup', 'listbox');
+            trigger.setAttribute('aria-expanded', 'false');
+
+            const valueEl = document.createElement('span');
+            valueEl.className = 'site-select-value';
+            trigger.appendChild(valueEl);
+
+            const menu = document.createElement('div');
+            menu.className = 'site-select-menu';
+            menu.setAttribute('role', 'listbox');
+
+            wrapper.appendChild(trigger);
+            wrapper.appendChild(menu);
+
+            const optionButtons = [];
+
+            function close(returnFocus = false) {
+                wrapper.classList.remove('is-open');
+                trigger.setAttribute('aria-expanded', 'false');
+                if (returnFocus) trigger.focus();
+            }
+
+            function open() {
+                closeAllCustomSelects(wrapper);
+                wrapper.classList.add('is-open');
+                trigger.setAttribute('aria-expanded', 'true');
+                const selectedButton = optionButtons.find((btn) => btn.classList.contains('is-selected') && !btn.disabled);
+                window.requestAnimationFrame(() => {
+                    (selectedButton || optionButtons.find((btn) => !btn.disabled))?.focus();
+                });
+            }
+
+            function syncFromSelect() {
+                const selectedOption = select.options[select.selectedIndex] || select.options[0];
+                valueEl.textContent = selectedOption ? selectedOption.textContent : '';
+                optionButtons.forEach((button) => {
+                    const isSelected = button.dataset.value === select.value;
+                    button.classList.toggle('is-selected', isSelected);
+                    button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+                });
+            }
+
+            Array.from(select.options).forEach((option, index) => {
+                const optionButton = document.createElement('button');
+                optionButton.type = 'button';
+                optionButton.className = 'site-select-option';
+                optionButton.textContent = option.textContent;
+                optionButton.dataset.value = option.value;
+                optionButton.setAttribute('role', 'option');
+                optionButton.disabled = option.disabled;
+                optionButton.tabIndex = -1;
+                if (!option.disabled) {
+                    optionButton.addEventListener('click', () => {
+                        if (select.value !== option.value) {
+                            select.value = option.value;
+                            select.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        syncFromSelect();
+                        close(true);
+                    });
+                }
+                menu.appendChild(optionButton);
+                optionButtons.push(optionButton);
+            });
+
+            trigger.addEventListener('click', () => {
+                if (wrapper.classList.contains('is-open')) {
+                    close();
+                } else {
+                    open();
+                }
+            });
+
+            trigger.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (!wrapper.classList.contains('is-open')) {
+                        open();
+                    }
+                }
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    close();
+                }
+            });
+
+            menu.addEventListener('keydown', (event) => {
+                const enabledButtons = optionButtons.filter((btn) => !btn.disabled);
+                const currentIndex = enabledButtons.indexOf(document.activeElement);
+
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (!enabledButtons.length) return;
+                    const direction = event.key === 'ArrowDown' ? 1 : -1;
+                    const nextIndex = currentIndex < 0
+                        ? 0
+                        : (currentIndex + direction + enabledButtons.length) % enabledButtons.length;
+                    enabledButtons[nextIndex].focus();
+                    return;
+                }
+
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    if (document.activeElement && menu.contains(document.activeElement)) {
+                        document.activeElement.click();
+                    }
+                    return;
+                }
+
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    close(true);
+                    return;
+                }
+
+                if (event.key === 'Tab') {
+                    close();
+                }
+            });
+
+            select.addEventListener('change', syncFromSelect);
+            select.__softoraSyncCustomFormSelect = syncFromSelect;
+            syncFromSelect();
+
+            customSelectInstances.push({ wrapper, close });
+        }
+
+        function initCustomFormSelects() {
+            document.querySelectorAll('select.form-select').forEach(initCustomFormSelect);
+        }
+
+        document.addEventListener('click', (event) => {
+            customSelectInstances.forEach((instance) => {
+                if (!instance.wrapper.contains(event.target)) {
+                    instance.close(false);
+                }
+            });
+        });
+
+        function openSiteInputDialog({
+            title,
+            message,
+            initialValue = '',
+            placeholder = '',
+            confirmLabel = 'OK',
+            cancelLabel = 'Annuleren',
+            validate = () => ''
+        }) {
+            return new Promise((resolve) => {
+                const previousActive = document.activeElement;
+                const backdrop = document.createElement('div');
+                backdrop.className = 'site-dialog-backdrop';
+
+                const dialog = document.createElement('div');
+                dialog.className = 'site-dialog';
+                dialog.setAttribute('role', 'dialog');
+                dialog.setAttribute('aria-modal', 'true');
+
+                const titleEl = document.createElement('div');
+                titleEl.className = 'site-dialog-title';
+                titleEl.textContent = title;
+
+                const textEl = document.createElement('div');
+                textEl.className = 'site-dialog-text';
+                textEl.textContent = message;
+
+                const inputEl = document.createElement('input');
+                inputEl.className = 'site-dialog-input';
+                inputEl.type = 'text';
+                inputEl.inputMode = 'numeric';
+                inputEl.autocomplete = 'off';
+                inputEl.placeholder = placeholder;
+                inputEl.value = String(initialValue ?? '');
+
+                const errorEl = document.createElement('div');
+                errorEl.className = 'site-dialog-error';
+
+                const actionsEl = document.createElement('div');
+                actionsEl.className = 'site-dialog-actions';
+
+                const cancelBtn = document.createElement('button');
+                cancelBtn.type = 'button';
+                cancelBtn.className = 'site-dialog-btn';
+                cancelBtn.textContent = cancelLabel;
+
+                const confirmBtn = document.createElement('button');
+                confirmBtn.type = 'button';
+                confirmBtn.className = 'site-dialog-btn site-dialog-btn--primary';
+                confirmBtn.textContent = confirmLabel;
+
+                actionsEl.appendChild(cancelBtn);
+                actionsEl.appendChild(confirmBtn);
+                dialog.appendChild(titleEl);
+                dialog.appendChild(textEl);
+                dialog.appendChild(inputEl);
+                dialog.appendChild(errorEl);
+                dialog.appendChild(actionsEl);
+                backdrop.appendChild(dialog);
+
+                function cleanup(value) {
+                    document.removeEventListener('keydown', onKeydown, true);
+                    backdrop.remove();
+                    if (previousActive && typeof previousActive.focus === 'function') {
+                        previousActive.focus();
+                    }
+                    resolve(value);
+                }
+
+                function submit() {
+                    const value = inputEl.value.trim();
+                    const validationMessage = String(validate(value) || '');
+                    if (validationMessage) {
+                        errorEl.textContent = validationMessage;
+                        inputEl.focus();
+                        inputEl.select();
+                        return;
+                    }
+                    cleanup(value);
+                }
+
+                function onKeydown(event) {
+                    if (!document.body.contains(backdrop)) return;
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        cleanup(null);
+                        return;
+                    }
+                    if (event.key === 'Enter') {
+                        if (dialog.contains(event.target)) {
+                            event.preventDefault();
+                            submit();
+                        }
+                    }
+                }
+
+                cancelBtn.addEventListener('click', () => cleanup(null));
+                confirmBtn.addEventListener('click', submit);
+                backdrop.addEventListener('click', (event) => {
+                    if (event.target === backdrop) {
+                        cleanup(null);
+                    }
+                });
+                inputEl.addEventListener('input', () => {
+                    if (errorEl.textContent) errorEl.textContent = '';
+                });
+
+                document.body.appendChild(backdrop);
+                document.addEventListener('keydown', onKeydown, true);
+                window.requestAnimationFrame(() => {
+                    inputEl.focus();
+                    inputEl.select();
+                });
+            });
+        }
+
+        initCustomFormSelects();
+
         const slider = document.getElementById('leadSlider');
         const sliderValue = document.getElementById('leadValue');
         const sliderValueMap = String(slider?.dataset?.valueMap || '')
@@ -1277,14 +1778,26 @@
             renderSliderValue();
         });
 
-        function promptCustomSliderValue() {
+        async function promptCustomSliderValue() {
             const currentAmount = getSliderDisplayAmount();
-            const input = window.prompt('Hoeveel mensen wil je bellen?', String(currentAmount));
+            const input = await openSiteInputDialog({
+                title: 'Campagne instellingen',
+                message: 'Hoeveel mensen wil je bellen?',
+                initialValue: String(currentAmount),
+                placeholder: 'Bijvoorbeeld 100',
+                confirmLabel: 'Opslaan',
+                validate: (value) => {
+                    const parsed = Math.round(Number(String(value).replace(',', '.')));
+                    if (!Number.isFinite(parsed) || parsed < 1) {
+                        return 'Voer een geldig aantal in (minimaal 1).';
+                    }
+                    return '';
+                }
+            });
             if (input === null) return;
 
             const parsed = Math.round(Number(String(input).trim().replace(',', '.')));
             if (!Number.isFinite(parsed) || parsed < 1) {
-                window.alert('Voer een geldig aantal in (minimaal 1).');
                 return;
             }
 
