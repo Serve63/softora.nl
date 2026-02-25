@@ -1507,17 +1507,25 @@
 
   function formatWebhookMemoryForNotebook(update) {
     const summary = String(update?.summary || '').trim();
+    const transcriptFull = String(update?.transcriptFull || '').trim();
     const transcriptSnippet = String(update?.transcriptSnippet || '').trim();
+    const transcriptText = (transcriptFull || transcriptSnippet)
+      .replace(/\r\n/g, '\n')
+      .split('\n')
+      .map((line) => String(line || '').trim())
+      .filter(Boolean)
+      .join(' | ');
 
-    if (summary) {
-      return `Samenvatting: ${summary}`;
+    if (!summary && !transcriptText) return '';
+
+    const parts = [];
+    if (summary) parts.push(`Samenvatting: ${summary}`);
+    if (transcriptText) {
+      parts.push(
+        `${transcriptFull ? 'Volledige transcriptie' : 'Transcript (kort)'}: ${transcriptText}`
+      );
     }
-
-    if (transcriptSnippet) {
-      return `Transcript snippet: ${transcriptSnippet}`;
-    }
-
-    return '';
+    return parts.join(' || ');
   }
 
   function upsertAiNotebookRowsFromWebhookUpdates(updates) {
