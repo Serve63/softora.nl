@@ -40,6 +40,17 @@ function getKnownHtmlPageFiles() {
 }
 
 const knownHtmlPageFiles = getKnownHtmlPageFiles();
+const knownPrettyPageSlugToFile = new Map(
+  Array.from(knownHtmlPageFiles)
+    .filter((file) => /\.html$/i.test(file))
+    .map((file) => [file.replace(/\.html$/i, ''), file])
+);
+
+function toPrettyPagePathFromHtmlFile(fileName) {
+  const base = String(fileName || '').replace(/\.html$/i, '');
+  if (!base || base === 'index') return '/';
+  return `/${base}`;
+}
 
 app.disable('x-powered-by');
 
@@ -2048,7 +2059,29 @@ app.get('/:page', (req, res, next) => {
     return next();
   }
 
-  return res.sendFile(path.join(__dirname, page), (err) => {
+  const destination = toPrettyPagePathFromHtmlFile(page);
+  const queryIndex = req.originalUrl.indexOf('?');
+  const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+  return res.redirect(301, `${destination}${query}`);
+});
+
+app.get('/:slug', (req, res, next) => {
+  const slug = String(req.params.slug || '').trim();
+
+  if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
+    return next();
+  }
+
+  if (slug === 'index') {
+    return res.redirect(301, '/');
+  }
+
+  const fileName = knownPrettyPageSlugToFile.get(slug);
+  if (!fileName) {
+    return next();
+  }
+
+  return res.sendFile(path.join(__dirname, fileName), (err) => {
     if (err) next();
   });
 });
