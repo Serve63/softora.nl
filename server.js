@@ -1144,6 +1144,62 @@ async function createVapiOutboundCall(payload) {
   throw lastError || new Error('Onbekende fout bij starten Vapi call');
 }
 
+async function fetchVapiCallStatusById(callId) {
+  const normalizedCallId = normalizeString(callId);
+  if (!normalizedCallId) {
+    throw new Error('callId ontbreekt');
+  }
+
+  const encodedCallId = encodeURIComponent(normalizedCallId);
+  const endpoints = [`/call/${encodedCallId}`, `/calls/${encodedCallId}`];
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const { response, data } = await fetchJsonWithTimeout(
+        `${VAPI_BASE_URL}${endpoint}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${process.env.VAPI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        },
+        10000
+      );
+
+      if (response.ok) {
+        return { endpoint, data };
+      }
+
+      const statusError = new Error(
+        data?.message || data?.error || data?.raw || `Vapi call status fout (${response.status})`
+      );
+      statusError.status = response.status;
+      statusError.endpoint = endpoint;
+      statusError.data = data;
+      lastError = statusError;
+
+      if (response.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
+        continue;
+      }
+
+      throw statusError;
+    } catch (error) {
+      lastError = error;
+      if (error?.name === 'AbortError') {
+        throw new Error('Timeout bij ophalen Vapi call status');
+      }
+      if (error?.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError || new Error('Kon Vapi call status niet ophalen');
+}
+
 function classifyVapiFailure(error) {
   const message = String(error?.message || '').toLowerCase();
   const detailText = JSON.stringify(error?.data || {}).toLowerCase();
@@ -1698,6 +1754,37 @@ app.post('/api/coldcalling/start', async (req, res) => {
     },
     results,
   });
+});
+
+app.get('/api/coldcalling/call-status/:callId', async (req, res) => {
+  const callId = normalizeString(req.params?.callId);
+  if (!callId) {
+    return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
+  }
+
+  if (!normalizeString(process.env.VAPI_API_KEY)) {
+    return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
+  }
+
+  try {
+    const { endpoint, data } = await fetchVapiCallStatusById(callId);
+    const call = data?.call && typeof data.call === 'object' ? data.call : data;
+
+    return res.status(200).json({
+      ok: true,
+      endpoint,
+      callId: normalizeString(call?.id || callId),
+      status: normalizeString(call?.status || data?.status || ''),
+      endedReason: normalizeString(call?.endedReason || data?.endedReason || ''),
+    });
+  } catch (error) {
+    return res.status(Number(error?.status || 500)).json({
+      ok: false,
+      error: error?.message || 'Kon Vapi call status niet ophalen.',
+      endpoint: error?.endpoint || null,
+      details: error?.data || null,
+    });
+  }
 });
 
 app.post('/api/vapi/webhook', (req, res) => {

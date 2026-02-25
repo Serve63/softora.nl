@@ -12,7 +12,9 @@
   let lastVapiCallUpdateSeenMs = 0;
   let vapiCallUpdatePollTimer = null;
   let isPollingVapiCallUpdates = false;
+  let isPollingSequentialClientDirectStatus = false;
   let statusMessageHideTimer = null;
+  let activeSequentialClientDispatch = null;
   const defaultLaunchBtnHtml = launchBtn.innerHTML;
   const TEST_LEAD_STORAGE_KEY = 'softora_vapi_test_lead_phone';
   const LEAD_ROWS_STORAGE_KEY = 'softora_vapi_lead_rows_json';
@@ -1573,6 +1575,255 @@
     }
   }
 
+  function isTerminalCallUpdateForSequentialClient(update) {
+    if (!update) return false;
+    const status = String(update.status || '').toLowerCase();
+    const messageType = String(update.messageType || '').toLowerCase();
+    const endedReason = String(update.endedReason || '').toLowerCase();
+
+    if (endedReason) return true;
+    if (messageType.includes('call.ended') || messageType.includes('end-of-call')) return true;
+
+    return /(ended|completed|failed|cancelled|canceled|busy|no-answer|no answer|voicemail|hungup|hangup|disconnected)/.test(
+      status
+    );
+  }
+
+  function updateSequentialClientDispatchStatus() {
+    const run = activeSequentialClientDispatch;
+    if (!run || run.completed) return;
+
+    const processed = run.started + run.failed;
+    const total = run.total;
+    if (run.waiting) {
+      setStatusPill('loading', '1 voor 1 actief');
+      setStatusMessage(
+        'loading',
+        `1 voor 1 actief: ${processed}/${total} verwerkt. Wacht tot het huidige gesprek is afgelopen om de volgende call te starten.`
+      );
+      return;
+    }
+
+    setStatusPill('loading', 'Bezig met starten');
+    setStatusMessage('loading', `1 voor 1 actief: ${processed}/${total} verwerkt. Volgende call wordt gestart...`);
+  }
+
+  function matchesSequentialClientWaitingUpdate(run, update) {
+    if (!run || !run.waiting || !update) return false;
+    if (!isTerminalCallUpdateForSequentialClient(update)) return false;
+
+    const updateCallId = String(update.callId || '').trim();
+    const updatePhoneKey = phoneKey(update.phone);
+    const updateTs = Number(update.updatedAtMs || 0);
+
+    if (Number.isFinite(updateTs) && run.waitingSinceMs && updateTs + 1000 < run.waitingSinceMs) {
+      return false;
+    }
+
+    if (run.waitingCallId && updateCallId && run.waitingCallId === updateCallId) {
+      return true;
+    }
+
+    if (run.waitingPhoneKey && updatePhoneKey && run.waitingPhoneKey === updatePhoneKey) {
+      return true;
+    }
+
+    return false;
+  }
+
+  async function startSingleLeadRequestForSequential(run, lead, leadIndex) {
+    const response = await fetch('/api/coldcalling/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        campaign: {
+          ...run.campaign,
+          amount: 1,
+        },
+        leads: [lead],
+      }),
+    });
+
+    const data = await parseApiResponse(response);
+
+    if (!response.ok || !data || data.ok === false) {
+      throw new Error(data?.error || `API fout (${response.status})`);
+    }
+
+    const results = Array.isArray(data.results) ? data.results : [];
+    upsertAiNotebookRowsFromCallResults(results);
+
+    results.forEach((result) => {
+      const company = escapeHtml(result?.lead?.company || result?.lead?.name || 'Onbekende lead');
+
+      if (result.success) {
+        const callId = result?.vapi?.callId ? ` (callId: ${escapeHtml(result.vapi.callId)})` : '';
+        addUiLog('success', `<strong>${company}</strong> - Outbound call gestart${callId}.`);
+      } else {
+        const cause = result?.cause ? ` Oorzaak: ${escapeHtml(result.cause)}.` : '';
+        const causeExplanation = result?.causeExplanation ? ` ${escapeHtml(result.causeExplanation)}` : '';
+        addUiLog(
+          'skip',
+          `<strong>${company}</strong> - Fout: ${escapeHtml(result.error || 'Onbekende fout')}.${cause}${causeExplanation}`
+        );
+      }
+    });
+
+    const primaryResult = results[0] || null;
+    if (!primaryResult) {
+      run.failed += 1;
+      return { success: false };
+    }
+
+    if (!primaryResult.success) {
+      run.failed += 1;
+      updateStats({ started: run.started });
+      return { success: false };
+    }
+
+    run.started += 1;
+    updateStats({ started: run.started });
+
+    run.waiting = true;
+    run.waitingSinceMs = Date.now();
+    run.waitingCallId = String(primaryResult?.vapi?.callId || '').trim();
+    run.waitingPhoneKey = phoneKey(primaryResult?.lead?.phoneE164 || primaryResult?.lead?.phone || lead?.phone);
+    run.currentLeadIndex = leadIndex;
+
+    updateSequentialClientDispatchStatus();
+    return { success: true };
+  }
+
+  async function advanceSequentialClientDispatch(reason) {
+    const run = activeSequentialClientDispatch;
+    if (!run || run.completed) return;
+    if (run.isAdvancing || run.waiting) return;
+
+    run.isAdvancing = true;
+    try {
+      while (!run.completed && !run.waiting && run.nextLeadIndex < run.leads.length) {
+        const leadIndex = run.nextLeadIndex;
+        const lead = run.leads[leadIndex];
+        run.nextLeadIndex += 1;
+
+        setButtonLoading(true);
+        isSubmitting = true;
+        updateSequentialClientDispatchStatus();
+
+        try {
+          await startSingleLeadRequestForSequential(run, lead, leadIndex);
+        } catch (error) {
+          run.failed += 1;
+          const company = escapeHtml(lead?.company || lead?.name || 'Onbekende lead');
+          addUiLog('skip', `<strong>${company}</strong> - Fout: ${escapeHtml(error.message || 'Onbekende fout')}.`);
+        } finally {
+          setButtonLoading(false);
+          isSubmitting = false;
+        }
+
+        if (run.waiting) {
+          break;
+        }
+      }
+
+      if (!run.waiting && run.nextLeadIndex >= run.leads.length) {
+        run.completed = true;
+        const completedCount = run.started;
+        if (run.started > 0 && run.failed === 0) {
+          setStatusPill('success', 'Campagne gestart');
+          setStatusMessage('success', buildCampaignStartedMessage(completedCount, run.campaign, run.failed));
+        } else if (run.started > 0) {
+          setStatusPill('success', 'Campagne gestart (deels)');
+          setStatusMessage('success', buildCampaignStartedMessage(completedCount, run.campaign, run.failed));
+        } else {
+          setStatusPill('error', 'Fout');
+          setStatusMessage('error', 'Geen calls gestart. Controleer Vapi-configuratie en logs.');
+        }
+        activeSequentialClientDispatch = null;
+      }
+    } finally {
+      if (run) run.isAdvancing = false;
+    }
+  }
+
+  function handleSequentialClientDispatchWebhookUpdates(updates) {
+    const run = activeSequentialClientDispatch;
+    if (!run || run.completed || !run.waiting || !Array.isArray(updates) || updates.length === 0) return;
+
+    const matchedUpdate = updates.find((update) => matchesSequentialClientWaitingUpdate(run, update));
+    if (!matchedUpdate) return;
+
+    run.waiting = false;
+    run.waitingSinceMs = 0;
+    run.waitingCallId = '';
+    run.waitingPhoneKey = '';
+
+    if (run.nextLeadIndex < run.total) {
+      addUiLog(
+        'call',
+        `<strong>Campagne</strong> - Gesprek afgerond. Volgende lead wordt gestart (${escapeHtml(
+          `${run.nextLeadIndex + 1}/${run.total}`
+        )}).`
+      );
+    } else {
+      addUiLog('call', '<strong>Campagne</strong> - Gesprek afgerond. Campagne wordt afgerond.');
+    }
+    updateSequentialClientDispatchStatus();
+    void advanceSequentialClientDispatch('webhook-ended');
+  }
+
+  async function pollSequentialClientDirectCallStatusOnce() {
+    const run = activeSequentialClientDispatch;
+    if (!run || run.completed || !run.waiting || !run.waitingCallId) return;
+    if (isPollingSequentialClientDirectStatus) return;
+
+    isPollingSequentialClientDirectStatus = true;
+    try {
+      const response = await fetch(
+        `/api/coldcalling/call-status/${encodeURIComponent(run.waitingCallId)}`,
+        { method: 'GET' }
+      );
+      if (!response.ok) return;
+
+      const data = await response.json().catch(() => ({}));
+      if (!data || data.ok === false) return;
+
+      const statusUpdate = {
+        callId: String(data.callId || run.waitingCallId || '').trim(),
+        status: String(data.status || '').trim(),
+        endedReason: String(data.endedReason || '').trim(),
+        messageType: 'direct.call.status',
+        updatedAtMs: Date.now(),
+      };
+
+      if (!matchesSequentialClientWaitingUpdate(run, statusUpdate)) return;
+
+      run.waiting = false;
+      run.waitingSinceMs = 0;
+      run.waitingCallId = '';
+      run.waitingPhoneKey = '';
+
+      if (run.nextLeadIndex < run.total) {
+        addUiLog(
+          'call',
+          `<strong>Campagne</strong> - Gesprek afgerond. Volgende lead wordt gestart (${escapeHtml(
+            `${run.nextLeadIndex + 1}/${run.total}`
+          )}).`
+        );
+      } else {
+        addUiLog('call', '<strong>Campagne</strong> - Gesprek afgerond. Campagne wordt afgerond.');
+      }
+      updateSequentialClientDispatchStatus();
+      void advanceSequentialClientDispatch('direct-status-ended');
+    } catch {
+      // Stil houden; webhook/polling fallback kan nog steeds de queue vervolgen.
+    } finally {
+      isPollingSequentialClientDirectStatus = false;
+    }
+  }
+
   async function pollVapiCallUpdatesOnce() {
     if (isPollingVapiCallUpdates) return;
     isPollingVapiCallUpdates = true;
@@ -1594,7 +1845,9 @@
         });
         lastVapiCallUpdateSeenMs = maxSeen;
         upsertAiNotebookRowsFromWebhookUpdates(updates);
+        handleSequentialClientDispatchWebhookUpdates(updates);
       }
+      await pollSequentialClientDirectCallStatusOnce();
     } catch {
       // Stil houden in UI; polling is best-effort.
     } finally {
@@ -1607,7 +1860,7 @@
     void pollVapiCallUpdatesOnce();
     vapiCallUpdatePollTimer = window.setInterval(() => {
       void pollVapiCallUpdatesOnce();
-    }, 5000);
+    }, 1500);
   }
 
   function getOrAskTestLeadPhone() {
@@ -1697,6 +1950,11 @@
 
   async function startCampaignRequest() {
     if (isSubmitting) return;
+    if (activeSequentialClientDispatch && !activeSequentialClientDispatch.completed) {
+      setStatusPill('loading', '1 voor 1 actief');
+      setStatusMessage('loading', 'Er loopt al een 1 voor 1 campagne. Wacht tot deze klaar is.');
+      return;
+    }
 
     try {
       const campaign = collectCampaignFormData();
@@ -1734,6 +1992,34 @@
               : '1 voor 1'
         )}).`
       );
+
+      if (campaign.dispatchMode === 'sequential' && leads.length > 1) {
+        activeSequentialClientDispatch = {
+          id: `seq-client-${Date.now()}`,
+          campaign: { ...campaign },
+          leads: leads.slice(),
+          total: leads.length,
+          nextLeadIndex: 0,
+          started: 0,
+          failed: 0,
+          waiting: false,
+          waitingCallId: '',
+          waitingPhoneKey: '',
+          waitingSinceMs: 0,
+          currentLeadIndex: -1,
+          isAdvancing: false,
+          completed: false,
+        };
+
+        setStatusPill('loading', '1 voor 1 actief');
+        setStatusMessage(
+          'loading',
+          `1 voor 1 actief: 0/${leads.length} verwerkt. Eerste call wordt gestart...`
+        );
+
+        await advanceSequentialClientDispatch('start-request');
+        return;
+      }
 
       const response = await fetch('/api/coldcalling/start', {
         method: 'POST',
