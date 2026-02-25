@@ -1629,12 +1629,12 @@
             document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; }, { passive: true });
 
             function animateCursor() {
-                cursorX += (mouseX - cursorX) * 0.15;
-                cursorY += (mouseY - cursorY) * 0.15;
+                cursorX += (mouseX - cursorX) * 1;
+                cursorY += (mouseY - cursorY) * 1;
                 cursor.style.left = cursorX + 'px';
                 cursor.style.top = cursorY + 'px';
-                dotX += (mouseX - dotX) * 0.5;
-                dotY += (mouseY - dotY) * 0.5;
+                dotX += (mouseX - dotX) * 1;
+                dotY += (mouseY - dotY) * 1;
                 cursorDot.style.left = dotX + 'px';
                 cursorDot.style.top = dotY + 'px';
                 cursorRafId = requestAnimationFrame(animateCursor);
