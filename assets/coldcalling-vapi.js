@@ -91,7 +91,15 @@
   function renderLeadAmountDisplay() {
     const leadValueEl = byId('leadValue');
     if (!leadValueEl) return;
-    leadValueEl.innerHTML = `${getLeadSliderAmount()} <span>mensen</span>`;
+    const amount = getLeadSliderAmount();
+    const inlineInput = leadValueEl.querySelector('.slider-value-input');
+    if (inlineInput) {
+      inlineInput.value = String(amount);
+      const length = Math.max(1, String(inlineInput.value || '').length);
+      inlineInput.style.width = `${Math.max(2, length)}ch`;
+      return;
+    }
+    leadValueEl.innerHTML = `${amount} <span>mensen</span>`;
   }
 
   function readPositiveIntStorage(key, fallback = null) {
@@ -184,7 +192,7 @@
     });
     leadSlider.addEventListener('change', persistCampaignAmountState);
 
-    if (leadValueEl && leadValueEl.dataset.campaignPersistenceBound !== '1') {
+    if (leadValueEl && leadValueEl.dataset.campaignPersistenceBound !== '1' && !leadValueEl.querySelector('.slider-value-input')) {
       leadValueEl.dataset.campaignPersistenceBound = '1';
       const persistAfterPrompt = () => {
         window.setTimeout(() => {
