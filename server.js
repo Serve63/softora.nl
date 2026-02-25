@@ -1999,6 +1999,15 @@ app.get('/healthz', (_req, res) => {
   });
 });
 
+// Alias voor serverless setups waar de backend onder /api/* hangt (zoals Vercel).
+app.get('/api/healthz', (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: 'softora-vapi-coldcalling-backend',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // API routes eerst, daarna statische frontend assets/html serveren.
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/output', express.static(path.join(__dirname, 'output')));
