@@ -2068,7 +2068,8 @@ app.use((err, _req, res, _next) => {
 
 function seedDemoConfirmationTaskForUiTesting() {
   const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-  if (isProduction) return;
+  const isHostedServerlessPreview = Boolean(process.env.VERCEL);
+  if (isProduction && !isHostedServerlessPreview) return;
 
   const demoCallId = 'demo-confirmation-task-call-1';
   if (generatedAgendaAppointments.some((item) => normalizeString(item?.callId) === demoCallId)) {
@@ -2173,6 +2174,10 @@ function seedDemoConfirmationTaskForUiTesting() {
 
   console.log('[Startup] Demo bevestigingstaak toegevoegd voor UI-testen.');
 }
+
+// In serverless (zoals Vercel) wordt startServer() niet aangeroepen, dus seed de
+// demo-taak ook bij module-load. De functie is idempotent op basis van callId.
+seedDemoConfirmationTaskForUiTesting();
 
 function startServer() {
   seedDemoConfirmationTaskForUiTesting();
