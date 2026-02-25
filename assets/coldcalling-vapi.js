@@ -21,6 +21,13 @@
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
+  const CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY = 'softora_campaign_amount_slider_index';
+  const CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY = 'softora_campaign_amount_custom';
+  const CAMPAIGN_BRANCHE_STORAGE_KEY = 'softora_campaign_branche';
+  const CAMPAIGN_REGIO_STORAGE_KEY = 'softora_campaign_regio';
+  const CAMPAIGN_MIN_PRICE_STORAGE_KEY = 'softora_campaign_min_price';
+  const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
+  const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
 
   function byId(id) {
     return document.getElementById(id);
@@ -72,6 +79,142 @@
     const rawIndex = Math.round(parseNumber(leadSlider.value, 0));
     const safeIndex = Math.max(0, Math.min(mappedValues.length - 1, rawIndex));
     return mappedValues[safeIndex];
+  }
+
+  function renderLeadAmountDisplay() {
+    const leadValueEl = byId('leadValue');
+    if (!leadValueEl) return;
+    leadValueEl.innerHTML = `${getLeadSliderAmount()} <span>mensen</span>`;
+  }
+
+  function readPositiveIntStorage(key, fallback = null) {
+    const raw = readStorage(key).trim();
+    if (!raw) return fallback;
+    const parsed = Math.round(Number(raw));
+    if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+    return parsed;
+  }
+
+  function restoreCampaignFormStateFromStorage() {
+    const sliderIndexRaw = readStorage(CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY).trim();
+    const sliderIndex = Math.round(Number(sliderIndexRaw));
+    if (sliderIndexRaw && Number.isFinite(sliderIndex) && sliderIndex >= 0) {
+      const max = Math.max(0, Math.round(parseNumber(leadSlider.max, 0)));
+      const min = Math.max(0, Math.round(parseNumber(leadSlider.min, 0)));
+      const safeIndex = Math.max(min, Math.min(max, sliderIndex));
+      leadSlider.value = String(safeIndex);
+    }
+
+    const customAmount = readPositiveIntStorage(CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY, null);
+    if (Number.isFinite(customAmount)) {
+      leadSlider.dataset.customValue = String(customAmount);
+    } else {
+      delete leadSlider.dataset.customValue;
+    }
+
+    const brancheEl = byId('branche');
+    const regioEl = byId('regio');
+    const minPriceEl = byId('minPrice');
+    const maxDiscountEl = byId('maxDiscount');
+    const instructionsEl = byId('instructions');
+
+    const savedBranche = readStorage(CAMPAIGN_BRANCHE_STORAGE_KEY).trim();
+    if (brancheEl && savedBranche && Array.from(brancheEl.options || []).some((opt) => String(opt.value) === savedBranche)) {
+      brancheEl.value = savedBranche;
+    }
+
+    const savedRegio = readStorage(CAMPAIGN_REGIO_STORAGE_KEY).trim();
+    if (regioEl && savedRegio && Array.from(regioEl.options || []).some((opt) => String(opt.value) === savedRegio)) {
+      regioEl.value = savedRegio;
+    }
+
+    const savedMinPrice = readStorage(CAMPAIGN_MIN_PRICE_STORAGE_KEY);
+    if (minPriceEl && savedMinPrice !== '') {
+      minPriceEl.value = savedMinPrice;
+    }
+
+    const savedMaxDiscount = readStorage(CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY);
+    if (maxDiscountEl && savedMaxDiscount !== '') {
+      maxDiscountEl.value = savedMaxDiscount;
+    }
+
+    const savedInstructions = readStorage(CAMPAIGN_INSTRUCTIONS_STORAGE_KEY);
+    if (instructionsEl && savedInstructions !== '') {
+      instructionsEl.value = savedInstructions;
+    }
+
+    renderLeadAmountDisplay();
+  }
+
+  function persistCampaignAmountState() {
+    const sliderIndex = Math.round(parseNumber(leadSlider.value, 0));
+    writeStorage(CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY, String(Math.max(0, sliderIndex)));
+
+    const customValue = Math.round(parseNumber(leadSlider.dataset?.customValue, NaN));
+    if (Number.isFinite(customValue) && customValue > 0) {
+      writeStorage(CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY, String(customValue));
+    } else {
+      writeStorage(CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY, '');
+    }
+
+    renderLeadAmountDisplay();
+  }
+
+  function bindCampaignFormStatePersistence() {
+    if (leadSlider.dataset.campaignPersistenceBound === '1') return;
+    leadSlider.dataset.campaignPersistenceBound = '1';
+
+    const brancheEl = byId('branche');
+    const regioEl = byId('regio');
+    const minPriceEl = byId('minPrice');
+    const maxDiscountEl = byId('maxDiscount');
+    const instructionsEl = byId('instructions');
+    const leadValueEl = byId('leadValue');
+
+    leadSlider.addEventListener('input', () => {
+      // De pagina-script verwijdert customValue al op slider beweging; wij persistten daarna de nieuwe state.
+      persistCampaignAmountState();
+    });
+    leadSlider.addEventListener('change', persistCampaignAmountState);
+
+    if (leadValueEl && leadValueEl.dataset.campaignPersistenceBound !== '1') {
+      leadValueEl.dataset.campaignPersistenceBound = '1';
+      const persistAfterPrompt = () => {
+        window.setTimeout(() => {
+          persistCampaignAmountState();
+          updateLeadListHint();
+        }, 0);
+      };
+      leadValueEl.addEventListener('click', persistAfterPrompt);
+      leadValueEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          persistAfterPrompt();
+        }
+      });
+    }
+
+    if (brancheEl) {
+      brancheEl.addEventListener('change', () => writeStorage(CAMPAIGN_BRANCHE_STORAGE_KEY, brancheEl.value));
+    }
+    if (regioEl) {
+      regioEl.addEventListener('change', () => {
+        writeStorage(CAMPAIGN_REGIO_STORAGE_KEY, regioEl.value);
+        updateLeadListHint();
+      });
+    }
+    if (minPriceEl) {
+      minPriceEl.addEventListener('input', () => writeStorage(CAMPAIGN_MIN_PRICE_STORAGE_KEY, minPriceEl.value));
+    }
+    if (maxDiscountEl) {
+      maxDiscountEl.addEventListener('input', () =>
+        writeStorage(CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY, maxDiscountEl.value)
+      );
+    }
+    if (instructionsEl) {
+      instructionsEl.addEventListener('input', () =>
+        writeStorage(CAMPAIGN_INSTRUCTIONS_STORAGE_KEY, instructionsEl.value)
+      );
+    }
   }
 
   function clearStatusMessageAutoHide() {
@@ -872,7 +1015,10 @@
       });
     }
 
+    restoreCampaignFormStateFromStorage();
+    bindCampaignFormStatePersistence();
     leadSlider.addEventListener('input', updateLeadListHint);
+    leadSlider.addEventListener('change', updateLeadListHint);
     updateLeadListHint();
     ensureAiNotebookPanel();
     return button;
