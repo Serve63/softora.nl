@@ -20,6 +20,7 @@ const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
 const recentAiCallInsights = [];
+const recentDashboardActivities = [];
 const aiCallInsightsByCallId = new Map();
 const aiAnalysisFingerprintByCallId = new Map();
 const aiAnalysisInFlightCallIds = new Set();
@@ -130,6 +131,7 @@ function buildRuntimeStateSnapshotPayload() {
     recentWebhookEvents: recentWebhookEvents.slice(0, 200),
     recentCallUpdates: recentCallUpdates.slice(0, 500),
     recentAiCallInsights: recentAiCallInsights.slice(0, 500),
+    recentDashboardActivities: recentDashboardActivities.slice(0, 500),
     generatedAgendaAppointments: generatedAgendaAppointments.slice(),
     nextGeneratedAgendaAppointmentId,
   };
@@ -141,6 +143,9 @@ function applyRuntimeStateSnapshotPayload(payload) {
   const nextWebhookEvents = Array.isArray(payload.recentWebhookEvents) ? payload.recentWebhookEvents.slice(0, 200) : [];
   const nextCallUpdates = Array.isArray(payload.recentCallUpdates) ? payload.recentCallUpdates.slice(0, 500) : [];
   const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights) ? payload.recentAiCallInsights.slice(0, 500) : [];
+  const nextDashboardActivities = Array.isArray(payload.recentDashboardActivities)
+    ? payload.recentDashboardActivities.slice(0, 500)
+    : [];
   const nextAppointments = Array.isArray(payload.generatedAgendaAppointments)
     ? payload.generatedAgendaAppointments.slice()
     : [];
@@ -162,6 +167,8 @@ function applyRuntimeStateSnapshotPayload(payload) {
       aiCallInsightsByCallId.set(item.callId, item);
     }
   });
+
+  recentDashboardActivities.splice(0, recentDashboardActivities.length, ...nextDashboardActivities);
 
   generatedAgendaAppointments.splice(0, generatedAgendaAppointments.length, ...nextAppointments);
   agendaAppointmentIdByCallId.clear();
@@ -214,6 +221,7 @@ async function ensureRuntimeStateHydratedFromSupabase() {
             updatedAt: data.updated_at || null,
             callUpdates: recentCallUpdates.length,
             insights: recentAiCallInsights.length,
+            dashboardActivities: recentDashboardActivities.length,
             appointments: generatedAgendaAppointments.length,
           })
         );
@@ -248,6 +256,7 @@ async function persistRuntimeStateToSupabase(reason = 'unknown') {
           webhookEvents: recentWebhookEvents.length,
           callUpdates: recentCallUpdates.length,
           aiCallInsights: recentAiCallInsights.length,
+          dashboardActivities: recentDashboardActivities.length,
           appointments: generatedAgendaAppointments.length,
         },
       },
@@ -279,6 +288,33 @@ function queueRuntimeStatePersist(reason = 'unknown') {
       console.error('[Supabase][PersistQueueError]', error?.message || error);
       return false;
     });
+}
+
+function createDashboardActivityEntry(input) {
+  const nowIso = new Date().toISOString();
+  const entryId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    id: normalizeString(input?.id || entryId),
+    type: normalizeString(input?.type || input?.action || 'dashboard_action'),
+    title: truncateText(normalizeString(input?.title || ''), 200) || 'Dashboard actie',
+    detail: truncateText(normalizeString(input?.detail || input?.description || ''), 500),
+    company: truncateText(normalizeString(input?.company || ''), 120),
+    source: truncateText(normalizeString(input?.source || 'personeel-dashboard'), 80),
+    actor: truncateText(normalizeString(input?.actor || ''), 120),
+    taskId: Number.isFinite(Number(input?.taskId)) ? Number(input.taskId) : null,
+    callId: truncateText(normalizeString(input?.callId || ''), 120),
+    createdAt: normalizeString(input?.createdAt || nowIso) || nowIso,
+  };
+}
+
+function appendDashboardActivity(input, reason = 'dashboard_activity') {
+  const entry = createDashboardActivityEntry(input);
+  recentDashboardActivities.unshift(entry);
+  if (recentDashboardActivities.length > 500) {
+    recentDashboardActivities.length = 500;
+  }
+  queueRuntimeStatePersist(reason);
+  return entry;
 }
 
 function getByPath(obj, path) {
@@ -2151,6 +2187,31 @@ app.get('/api/ai/call-insights', (req, res) => {
   });
 });
 
+app.get('/api/dashboard/activity', (req, res) => {
+  const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
+  return res.status(200).json({
+    ok: true,
+    count: Math.min(limit, recentDashboardActivities.length),
+    activities: recentDashboardActivities.slice(0, limit),
+  });
+});
+
+app.post('/api/dashboard/activity', (req, res) => {
+  const entry = appendDashboardActivity(
+    {
+      ...req.body,
+      source: normalizeString(req.body?.source || 'personeel-dashboard'),
+      actor: normalizeString(req.body?.actor || ''),
+    },
+    'dashboard_activity_manual'
+  );
+
+  return res.status(201).json({
+    ok: true,
+    activity: entry,
+  });
+});
+
 app.get('/api/agenda/appointments', (req, res) => {
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 200)));
   const sorted = generatedAgendaAppointments
@@ -2214,12 +2275,26 @@ app.post('/api/agenda/confirmation-tasks/:id/draft-email', async (req, res) => {
     const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
       idx,
       {
-      ...generatedAgendaAppointments[idx],
-      confirmationEmailDraft: generated.draft,
-      confirmationEmailDraftGeneratedAt: nowIso,
-      confirmationEmailDraftSource: normalizeString(generated.source || 'template'),
+        ...generatedAgendaAppointments[idx],
+        confirmationEmailDraft: generated.draft,
+        confirmationEmailDraftGeneratedAt: nowIso,
+        confirmationEmailDraftSource: normalizeString(generated.source || 'template'),
       },
       'confirmation_task_draft_email'
+    );
+
+    appendDashboardActivity(
+      {
+        type: 'confirmation_mail_draft_generated',
+        title: 'Bevestigingsmail concept gemaakt',
+        detail: `Concept gegenereerd (${normalizeString(generated.source || 'template') || 'onbekende bron'}).`,
+        company: updatedAppointment?.company || appointment?.company || '',
+        actor: normalizeString(req.body?.actor || req.body?.doneBy || ''),
+        taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
+        callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+        source: 'premium-personeel-dashboard',
+      },
+      'dashboard_activity_draft_email'
     );
 
     return res.status(200).json({
@@ -2277,6 +2352,20 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-sent', (req, res) => {
     'confirmation_task_mark_sent'
   );
 
+  appendDashboardActivity(
+    {
+      type: 'confirmation_mail_sent',
+      title: 'Bevestigingsmail verstuurd',
+      detail: 'Bevestigingsmail is als verstuurd gemarkeerd in het personeel dashboard.',
+      company: updatedAppointment?.company || appointment?.company || '',
+      actor,
+      taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
+      callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+      source: 'premium-personeel-dashboard',
+    },
+    'dashboard_activity_mark_sent'
+  );
+
   return res.status(200).json({
     ok: true,
     taskUpdated: true,
@@ -2312,6 +2401,20 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-response-received', (req, res)
       confirmationAppointmentCancelledBy: null,
     },
     'confirmation_task_mark_response_received'
+  );
+
+  appendDashboardActivity(
+    {
+      type: 'appointment_confirmed_by_mail',
+      title: 'Afspraak bevestigd per mail',
+      detail: 'De klant heeft de afspraak per mail bevestigd.',
+      company: updatedAppointment?.company || appointment?.company || '',
+      actor,
+      taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
+      callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+      source: 'premium-personeel-dashboard',
+    },
+    'dashboard_activity_mark_response_received'
   );
 
   return res.status(200).json({
@@ -2351,6 +2454,20 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-cancelled', (req, res) => {
     'confirmation_task_mark_cancelled'
   );
 
+  appendDashboardActivity(
+    {
+      type: 'appointment_cancelled',
+      title: 'Afspraak geannuleerd',
+      detail: 'Afspraak is geannuleerd vanuit het bevestigingsmailproces.',
+      company: updatedAppointment?.company || appointment?.company || '',
+      actor,
+      taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
+      callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+      source: 'premium-personeel-dashboard',
+    },
+    'dashboard_activity_mark_cancelled'
+  );
+
   return res.status(200).json({
     ok: true,
     taskCompleted: true,
@@ -2388,6 +2505,20 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
       confirmationAppointmentCancelledBy: null,
     },
     'confirmation_task_complete'
+  );
+
+  appendDashboardActivity(
+    {
+      type: 'confirmation_task_completed',
+      title: 'Bevestigingstaak afgerond',
+      detail: 'Bevestigingsmail + bevestiging ontvangen via snelle complete-route.',
+      company: updatedAppointment?.company || appointment?.company || '',
+      actor,
+      taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
+      callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+      source: 'personeel-dashboard',
+    },
+    'dashboard_activity_complete_task'
   );
 
   return res.status(200).json({

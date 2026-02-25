@@ -1149,6 +1149,22 @@
             });
         }
 
+        async function logDashboardAction(entry) {
+            try {
+                await fetch('/api/dashboard/activity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        source: 'premium-personeel-dashboard',
+                        actor: 'Premium dashboard gebruiker',
+                        ...entry
+                    })
+                });
+            } catch (_) {
+                // Silent fail: acties moeten de UI niet blokkeren.
+            }
+        }
+
         function addRecentActivityEntry(labelHtml, company) {
             const activityList = document.getElementById('recentActivityList');
             if (!activityList) return;
@@ -1308,10 +1324,24 @@
                     const taskId = Number(btn.getAttribute('data-open-task-id'));
                     if (!taskId) return;
                     if (confirmationTaskState.expandedTaskId === taskId) {
+                        const closingTask = getTaskById(taskId);
+                        void logDashboardAction({
+                            type: 'confirmation_task_detail_closed',
+                            title: 'Taakdetails gesloten',
+                            company: closingTask?.company || '',
+                            taskId
+                        });
                         confirmationTaskState.expandedTaskId = null;
                         renderConfirmationTasks();
                         return;
                     }
+                    const openingTask = getTaskById(taskId);
+                    void logDashboardAction({
+                        type: 'confirmation_task_detail_opened',
+                        title: 'Taakdetails geopend',
+                        company: openingTask?.company || '',
+                        taskId
+                    });
                     confirmationTaskState.expandedTaskId = taskId;
                     renderConfirmationTasks();
                     if (!confirmationTaskState.detailsById[String(taskId)]) {
