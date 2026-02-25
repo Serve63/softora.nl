@@ -62,6 +62,10 @@
             cursor: none;
         }
 
+        body.software-prompt-open {
+            overflow: hidden;
+        }
+
         h1, h2, h3, h4 {
             font-family: 'Oswald', sans-serif;
             font-weight: 600;
@@ -182,6 +186,118 @@
             border-radius: 50%;
             filter: blur(120px);
             opacity: 0.2;
+        }
+
+        .software-entry-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 10, 12, 0.68);
+            backdrop-filter: blur(10px);
+            z-index: 10020;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+        }
+
+        .software-entry-modal.show {
+            display: flex;
+        }
+
+        .software-entry-panel {
+            width: min(620px, 100%);
+            background: rgba(16, 16, 18, 0.96);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 24px 60px rgba(0,0,0,0.38);
+            padding: 1.15rem;
+            clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+        }
+
+        .software-entry-eyebrow {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 0.8rem;
+        }
+
+        .software-entry-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(1.6rem, 2.7vw, 2.2rem);
+            line-height: 0.95;
+            text-transform: uppercase;
+            color: white;
+            margin: 0;
+        }
+
+        .software-entry-title .accent {
+            color: var(--accent-light);
+        }
+
+        .software-entry-text {
+            margin-top: 0.9rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.7;
+            font-weight: 300;
+            max-width: 52ch;
+        }
+
+        .software-entry-actions {
+            margin-top: 1.15rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .software-entry-close {
+            border: 1px solid rgba(255,255,255,0.08);
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.65rem 0.85rem;
+            cursor: none;
+            transition: all 0.2s var(--ease-out-expo);
+        }
+
+        .software-entry-close:hover {
+            border-color: rgba(166,45,101,0.35);
+            background: rgba(166,45,101,0.08);
+            color: white;
+        }
+
+        .software-entry-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.8rem 1rem;
+            border: 1px solid rgba(166,45,101,0.35);
+            background: rgba(166,45,101,0.12);
+            color: white;
+            text-decoration: none;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            transition: all 0.2s var(--ease-out-expo);
+        }
+
+        .software-entry-cta:hover {
+            border-color: rgba(166,45,101,0.55);
+            background: rgba(166,45,101,0.2);
+            transform: translateY(-1px);
+        }
+
+        .software-entry-cta-note {
+            color: var(--text-tertiary);
+            font-size: 0.72rem;
+            font-weight: 300;
         }
 
         .blob-1 {
@@ -1109,6 +1225,13 @@
             .nav-links { display: none; }
             .footer-grid { grid-template-columns: 1fr; }
             h1 { font-size: 3rem; }
+            .software-entry-panel { padding: 1rem; }
+            .software-entry-actions { align-items: stretch; }
+            .software-entry-cta {
+                width: 100%;
+                justify-content: center;
+                order: -1;
+            }
         }
     </style>
 </head>
@@ -1121,6 +1244,28 @@
 
     <div class="ambient-bg">
         <div class="ambient-blob blob-1"></div>
+    </div>
+
+    <div class="software-entry-modal" id="softwareEntryModal" aria-hidden="true">
+        <div class="software-entry-panel" role="dialog" aria-modal="true" aria-labelledby="softwareEntryTitle">
+            <div class="software-entry-eyebrow">Snelle Route</div>
+            <h2 class="software-entry-title" id="softwareEntryTitle">
+                Kom je voor <span class="accent">maatwerk software</span>?
+            </h2>
+            <p class="software-entry-text">
+                We hebben ook een aparte Softora Software site (lichte blauwe stijl) voor custom software, databases en platformen.
+            </p>
+            <div class="software-entry-actions">
+                <button type="button" class="software-entry-close magnetic" id="softwareEntryCloseBtn">Nee, ik zoek websites</button>
+                <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; justify-content:flex-end;">
+                    <span class="software-entry-cta-note">Je gaat naar de software-site</span>
+                    <a href="/maatwerk-platform" class="software-entry-cta magnetic" id="softwareEntryGoBtn">
+                        Naar Softora Software
+                        <span aria-hidden="true">↗</span>
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 
     <nav id="navbar">
@@ -1463,6 +1608,8 @@
         const tiltCards = document.querySelectorAll("[data-tilt]");
         const faqButtons = document.querySelectorAll(".faq-question");
         const anchors = document.querySelectorAll('a[href^="#"]');
+        const softwareEntryModal = document.getElementById("softwareEntryModal");
+        const softwareEntryCloseBtn = document.getElementById("softwareEntryCloseBtn");
         const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
         const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         const enablePointerFx = hasFinePointer && !prefersReducedMotion;
@@ -1632,6 +1779,40 @@
                 const target = document.querySelector(anchor.getAttribute("href"));
                 if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
             });
+        });
+
+        function setSoftwareEntryModalOpen(open) {
+            if (!softwareEntryModal) return;
+            softwareEntryModal.classList.toggle("show", Boolean(open));
+            softwareEntryModal.setAttribute("aria-hidden", open ? "false" : "true");
+            document.body.classList.toggle("software-prompt-open", Boolean(open));
+        }
+
+        const isHomepageRootPath = window.location.pathname === "/" || window.location.pathname === "/index.html";
+        if (isHomepageRootPath && softwareEntryModal) {
+            window.setTimeout(function () {
+                setSoftwareEntryModalOpen(true);
+            }, 220);
+        }
+
+        if (softwareEntryCloseBtn) {
+            softwareEntryCloseBtn.addEventListener("click", function () {
+                setSoftwareEntryModalOpen(false);
+            });
+        }
+
+        if (softwareEntryModal) {
+            softwareEntryModal.addEventListener("click", function (event) {
+                if (event.target === softwareEntryModal) {
+                    setSoftwareEntryModalOpen(false);
+                }
+            });
+        }
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && softwareEntryModal?.classList.contains("show")) {
+                setSoftwareEntryModalOpen(false);
+            }
         });
     </script>
 </body>
