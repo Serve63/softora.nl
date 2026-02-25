@@ -8,6 +8,9 @@ const PORT = Number(process.env.PORT) || 3000;
 const VAPI_BASE_URL = process.env.VAPI_BASE_URL || 'https://api.vapi.ai';
 const OPENAI_API_BASE_URL = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const VERBOSE_VAPI_WEBHOOK_LOGS = /^(1|true|yes)$/i.test(
+  String(process.env.VERBOSE_VAPI_WEBHOOK_LOGS || '')
+);
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
@@ -481,7 +484,8 @@ function shouldAnalyzeCallUpdateWithAi(callUpdate) {
     statusText
   );
 
-  return Boolean(summary) || looksFinal;
+  // Analyseer pas op (waarschijnlijk) finale updates om webhook-load tijdens live calls te beperken.
+  return looksFinal;
 }
 
 function getCallUpdateAiFingerprint(callUpdate) {
@@ -1701,6 +1705,9 @@ app.post('/api/vapi/webhook', (req, res) => {
     return res.status(401).json({ ok: false, error: 'Webhook secret ongeldig.' });
   }
 
+  // Reageer zo snel mogelijk naar Vapi om retries/vertraging door webhook-processing te voorkomen.
+  res.status(200).json({ ok: true });
+
   const messageType = req.body?.message?.type || req.body?.type || 'unknown';
   const callData = req.body?.message?.call || req.body?.call || null;
 
@@ -1717,17 +1724,29 @@ app.post('/api/vapi/webhook', (req, res) => {
     recentWebhookEvents.pop();
   }
 
-  console.log(
-    '[Vapi Webhook]',
-    JSON.stringify(
-      {
+  if (VERBOSE_VAPI_WEBHOOK_LOGS) {
+    console.log(
+      '[Vapi Webhook]',
+      JSON.stringify(
+        {
+          messageType,
+          call: callData,
+        },
+        null,
+        2
+      )
+    );
+  } else {
+    console.log(
+      '[Vapi Webhook]',
+      JSON.stringify({
         messageType,
-        call: callData,
-      },
-      null,
-      2
-    )
-  );
+        callId: callData?.id || null,
+        status: callData?.status || null,
+        endedReason: callData?.endedReason || null,
+      })
+    );
+  }
 
   const callUpdate = upsertRecentCallUpdate(extractCallUpdateFromWebhookPayload(req.body));
   if (callUpdate) {
@@ -1770,8 +1789,7 @@ app.post('/api/vapi/webhook', (req, res) => {
   // TODO: Sla call-status updates op (bijv. queued/ringing/in-progress/ended).
   // TODO: Sla transcript/events op zodra je transcriptie wilt tonen in het dashboard.
   // TODO: Sla afspraken of opvolgacties op wanneer de call een afspraak boekt.
-
-  return res.status(200).json({ ok: true });
+  return;
 });
 
 app.get('/api/vapi/call-updates', (req, res) => {
