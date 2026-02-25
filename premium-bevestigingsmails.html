@@ -1676,21 +1676,10 @@
                 draftMeta.push('Bron: fictieve testdata');
             }
 
-            const aiSummary = String(detail?.aiSummary || detail?.vapiSummary || task?.summary || '').trim();
-            const infoLines = [];
-            if (aiSummary) infoLines.push(`Samenvatting: ${aiSummary}`);
-            if (detail?.phone) infoLines.push(`Telefoon: ${detail.phone}`);
-            if (task?.source) infoLines.push(`Bron: ${task.source}`);
-            const infoHtml = infoLines.map((line) => `<div>${escapeHtml(line)}</div>`).join('');
-
-            const busy = isTaskActionBusy(taskId);
             const mailSent = Boolean(task.mailSent);
-            const canMarkResponse = mailSent;
             const step1ChipClass = mailSent ? 'done' : 'active';
-            const step1StatusText = mailSent ? 'Afgerond' : 'Actief';
             const step1DotText = mailSent ? '✓' : '1';
             const step2ChipClass = mailSent ? 'active' : 'pending';
-            const step2StatusText = mailSent ? 'Open' : 'Wacht op 1';
             const step2DotText = '2';
 
             return `
@@ -1709,20 +1698,17 @@
                             </div>
                         </div>
                     </div>
-                    ${infoHtml ? `<div class="confirm-task-detail-info">${infoHtml}</div>` : ''}
                     <div class="confirm-task-flow">
                         <div class="confirm-task-flow-title">Tijdlijn opvolging</div>
                         <div class="confirm-task-stepper" role="list" aria-label="Tijdlijn opvolging">
                             <div class="confirm-task-step-chip ${step1ChipClass}" role="listitem">
                                 <span class="confirm-task-step-chip-index">${step1DotText}</span>
                                 <span class="confirm-task-step-chip-label">Bevestigingsmail</span>
-                                <span class="confirm-task-step-chip-state">${step1StatusText}</span>
                             </div>
                             <div class="confirm-task-stepper-connector ${mailSent ? 'done' : ''}" aria-hidden="true"></div>
                             <div class="confirm-task-step-chip ${step2ChipClass}" role="listitem">
                                 <span class="confirm-task-step-chip-index">${step2DotText}</span>
                                 <span class="confirm-task-step-chip-label">Afspraak bevestigd</span>
-                                <span class="confirm-task-step-chip-state">${step2StatusText}</span>
                             </div>
                         </div>
                     </div>
