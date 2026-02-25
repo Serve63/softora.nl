@@ -2154,7 +2154,12 @@ function startServer() {
   });
 }
 
-if (require.main === module) {
+const isServerlessRuntime =
+  Boolean(process.env.VERCEL) ||
+  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+  Boolean(process.env.LAMBDA_TASK_ROOT);
+
+if (require.main === module && !isServerlessRuntime) {
   startServer();
 }
 
