@@ -2045,7 +2045,7 @@ app.use('/output', express.static(path.join(__dirname, 'output')));
 app.use('/scripts', express.static(path.join(__dirname, 'scripts')));
 
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'premium-website.html'));
 });
 
 app.get('/:page', (req, res, next) => {
