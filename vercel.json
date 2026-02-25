@@ -6,17 +6,14 @@
       "maxDuration": 60
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index.js"
+      "source": "/api/:path*",
+      "destination": "/api/index"
     },
     {
-      "src": "/healthz",
-      "dest": "/api/index.js"
-    },
-    {
-      "handle": "filesystem"
+      "source": "/healthz",
+      "destination": "/api/index"
     }
   ]
 }
