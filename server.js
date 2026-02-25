@@ -2172,8 +2172,7 @@ if (require.main === module && !isServerlessRuntime) {
   startServer();
 }
 
-module.exports = {
-  app,
-  normalizeNlPhoneToE164,
-  startServer,
-};
+module.exports = app;
+module.exports.app = app;
+module.exports.normalizeNlPhoneToE164 = normalizeNlPhoneToE164;
+module.exports.startServer = startServer;
