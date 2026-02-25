@@ -1036,7 +1036,7 @@
       '<button type="button" class="form-input magnetic" id="openLeadListModalBtn" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">',
       '  <span>Open spreadsheet</span>',
       '</button>',
-      '<div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85;">Geen lijst opgeslagen. Open spreadsheet, vul regels in en klik "Opslaan lijst".</div>',
+      '<div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85; display:none;"></div>',
     ].join('');
 
     if (regioGroup) {
@@ -1170,8 +1170,8 @@
     const parsed = parseLeadRows(getSavedLeadRows());
 
     if (!parsed.hasInput) {
-      hint.style.display = 'block';
-      hint.textContent = 'Geen lijst opgeslagen. Open spreadsheet, vul regels in en klik "Opslaan lijst".';
+      hint.textContent = '';
+      hint.style.display = 'none';
       return;
     }
 
