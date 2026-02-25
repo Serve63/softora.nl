@@ -12,6 +12,7 @@
   let lastVapiCallUpdateSeenMs = 0;
   let vapiCallUpdatePollTimer = null;
   let isPollingVapiCallUpdates = false;
+  let statusMessageHideTimer = null;
   const defaultLaunchBtnHtml = launchBtn.innerHTML;
   const TEST_LEAD_STORAGE_KEY = 'softora_vapi_test_lead_phone';
   const LEAD_ROWS_STORAGE_KEY = 'softora_vapi_lead_rows_json';
@@ -43,6 +44,82 @@
   function parseNumber(value, fallback) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function getLeadSliderAmount() {
+    const rawValue = Math.max(1, parseNumber(leadSlider.value, 1));
+    const customValue = Math.round(parseNumber(leadSlider.dataset?.customValue, NaN));
+    if (Number.isFinite(customValue) && customValue > 0) {
+      return customValue;
+    }
+    const mapRaw = String(leadSlider.dataset?.valueMap || '').trim();
+
+    if (!mapRaw) {
+      return rawValue;
+    }
+
+    const mappedValues = mapRaw
+      .split(',')
+      .map((item) => Number(String(item).trim()))
+      .filter((item) => Number.isFinite(item) && item > 0);
+
+    if (mappedValues.length === 0) {
+      return rawValue;
+    }
+
+    const rawIndex = Math.round(parseNumber(leadSlider.value, 0));
+    const safeIndex = Math.max(0, Math.min(mappedValues.length - 1, rawIndex));
+    return mappedValues[safeIndex];
+  }
+
+  function clearStatusMessageAutoHide() {
+    if (statusMessageHideTimer) {
+      window.clearTimeout(statusMessageHideTimer);
+      statusMessageHideTimer = null;
+    }
+  }
+
+  function formatClockTime(date) {
+    return new Date(date).toLocaleTimeString('nl-NL', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function estimateCampaignCompletionTime(startedCount, campaign) {
+    const started = Math.max(0, Number(startedCount) || 0);
+    if (started <= 0) return null;
+
+    const avgCallSeconds = 90;
+    const mode = String(campaign?.dispatchMode || 'sequential');
+    const delaySeconds =
+      mode === 'delay' ? Math.max(0, Number(campaign?.dispatchDelaySeconds) || 0) : 0;
+    const requestSpreadSeconds = mode === 'parallel' ? 5 : Math.min(20, started);
+
+    let estimateSeconds;
+    if (mode === 'parallel') {
+      estimateSeconds = avgCallSeconds + requestSpreadSeconds;
+    } else if (mode === 'delay') {
+      const staggerSeconds = started > 1 ? (started - 1) * delaySeconds : 0;
+      estimateSeconds = avgCallSeconds + staggerSeconds + requestSpreadSeconds;
+    } else {
+      // "1 voor 1": calls happen in sequence, so duration scales roughly with count.
+      estimateSeconds = started * avgCallSeconds + requestSpreadSeconds;
+    }
+
+    estimateSeconds = Math.max(30, estimateSeconds);
+
+    return new Date(Date.now() + estimateSeconds * 1000);
+  }
+
+  function buildCampaignStartedMessage(startedCount, campaign, failedCount = 0) {
+    const started = Math.max(0, Number(startedCount) || 0);
+    const failed = Math.max(0, Number(failedCount) || 0);
+    const personWord = started === 1 ? 'persoon' : 'personen';
+    const eta = estimateCampaignCompletionTime(started, campaign);
+    const etaText = eta ? ` Verwachte voltooiingstijd is rond ${formatClockTime(eta)}.` : '';
+    const failedText = failed > 0 ? ` (${failed} niet gestart)` : '';
+    return `Gestart met het bellen van ${started} ${personWord}${failedText}.${etaText}`;
   }
 
   function readStorage(key) {
@@ -125,15 +202,49 @@
 
     statusEl = document.createElement('div');
     statusEl.id = 'campaignStatusMessage';
-    statusEl.style.margin = '12px 0 0';
-    statusEl.style.padding = '10px 12px';
+    statusEl.style.display = 'none';
+    statusEl.style.margin = '14px 0 0';
+    statusEl.style.padding = '10px 14px';
     statusEl.style.borderRadius = '12px';
-    statusEl.style.fontSize = '14px';
+    statusEl.style.fontSize = '13px';
     statusEl.style.lineHeight = '1.35';
+    statusEl.style.fontWeight = '500';
     statusEl.style.border = '1px solid rgba(255,255,255,0.12)';
-    statusEl.style.background = 'rgba(255,255,255,0.03)';
+    statusEl.style.background = 'rgba(255,255,255,0.035)';
     statusEl.style.color = 'inherit';
-    statusEl.textContent = 'Nog geen campagne gestart.';
+    statusEl.style.width = '100%';
+    statusEl.style.maxWidth = '100%';
+    statusEl.style.textAlign = 'left';
+    statusEl.style.boxSizing = 'border-box';
+    statusEl.style.boxShadow = '0 8px 24px rgba(0,0,0,0.10)';
+    statusEl.style.backdropFilter = 'blur(6px)';
+    statusEl.style.webkitBackdropFilter = 'blur(6px)';
+    statusEl.style.opacity = '0';
+    statusEl.style.transform = 'translateY(-4px)';
+    statusEl.style.transition = 'opacity 160ms ease, transform 160ms ease';
+    statusEl.style.alignItems = 'center';
+    statusEl.style.gap = '10px';
+    statusEl.style.position = 'relative';
+    statusEl.style.overflow = 'hidden';
+
+    const indicator = document.createElement('div');
+    indicator.id = 'campaignStatusMessageIndicator';
+    indicator.style.width = '8px';
+    indicator.style.height = '8px';
+    indicator.style.borderRadius = '999px';
+    indicator.style.flex = '0 0 auto';
+    indicator.style.background = 'rgba(255,255,255,0.35)';
+
+    const text = document.createElement('div');
+    text.id = 'campaignStatusMessageText';
+    text.style.minWidth = '0';
+    text.style.flex = '1 1 auto';
+    text.style.whiteSpace = 'normal';
+    text.style.wordBreak = 'break-word';
+    text.textContent = '';
+
+    statusEl.appendChild(indicator);
+    statusEl.appendChild(text);
 
     launchSection.insertAdjacentElement('afterend', statusEl);
     return statusEl;
@@ -142,21 +253,53 @@
   function setStatusMessage(kind, message) {
     const el = ensureStatusMessageElement();
     if (!el) return;
+    const textEl = byId('campaignStatusMessageText');
+    const indicatorEl = byId('campaignStatusMessageIndicator');
 
-    el.textContent = message;
+    clearStatusMessageAutoHide();
+    if (textEl) {
+      textEl.textContent = message || '';
+    } else {
+      el.textContent = message || '';
+    }
+    el.style.display = message ? 'flex' : 'none';
+    el.style.opacity = message ? '1' : '0';
+    el.style.transform = message ? 'translateY(0)' : 'translateY(-4px)';
 
     if (kind === 'success') {
-      el.style.borderColor = 'rgba(44, 207, 125, 0.35)';
-      el.style.background = 'rgba(44, 207, 125, 0.08)';
+      el.style.borderColor = 'rgba(44, 207, 125, 0.20)';
+      el.style.background =
+        'linear-gradient(90deg, rgba(44, 207, 125, 0.07), rgba(44, 207, 125, 0.02) 48%, rgba(255,255,255,0.02))';
+      el.style.boxShadow = 'inset 3px 0 0 rgba(44,207,125,0.65), 0 8px 24px rgba(0,0,0,0.10)';
+      el.style.color = 'inherit';
+      if (indicatorEl) indicatorEl.style.background = 'rgba(44,207,125,0.95)';
+      statusMessageHideTimer = window.setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-4px)';
+        window.setTimeout(() => {
+          el.style.display = 'none';
+        }, 180);
+      }, 9000);
     } else if (kind === 'error') {
-      el.style.borderColor = 'rgba(255, 99, 99, 0.35)';
-      el.style.background = 'rgba(255, 99, 99, 0.08)';
+      el.style.borderColor = 'rgba(255, 99, 99, 0.22)';
+      el.style.background =
+        'linear-gradient(90deg, rgba(255, 99, 99, 0.07), rgba(255, 99, 99, 0.02) 48%, rgba(255,255,255,0.02))';
+      el.style.boxShadow = 'inset 3px 0 0 rgba(255,99,99,0.65), 0 8px 24px rgba(0,0,0,0.10)';
+      el.style.color = 'inherit';
+      if (indicatorEl) indicatorEl.style.background = 'rgba(255,99,99,0.95)';
     } else if (kind === 'loading') {
-      el.style.borderColor = 'rgba(255, 185, 0, 0.35)';
-      el.style.background = 'rgba(255, 185, 0, 0.08)';
+      el.style.borderColor = 'rgba(255, 185, 0, 0.20)';
+      el.style.background =
+        'linear-gradient(90deg, rgba(255, 185, 0, 0.07), rgba(255, 185, 0, 0.02) 48%, rgba(255,255,255,0.02))';
+      el.style.boxShadow = 'inset 3px 0 0 rgba(255,185,0,0.65), 0 8px 24px rgba(0,0,0,0.10)';
+      el.style.color = 'inherit';
+      if (indicatorEl) indicatorEl.style.background = 'rgba(255,185,0,0.95)';
     } else {
       el.style.borderColor = 'rgba(255,255,255,0.12)';
-      el.style.background = 'rgba(255,255,255,0.03)';
+      el.style.background = 'rgba(255,255,255,0.04)';
+      el.style.boxShadow = '0 8px 24px rgba(0,0,0,0.10)';
+      el.style.color = 'inherit';
+      if (indicatorEl) indicatorEl.style.background = 'rgba(255,255,255,0.35)';
     }
   }
 
@@ -221,15 +364,20 @@
     return {
       company: '',
       phone: '',
-      region: getSelectedText('regio') || '',
+      region: '',
     };
   }
 
   function normalizeLeadRow(row) {
+    const company = String(row?.company || '').trim();
+    const phone = String(row?.phone || '').trim();
+    const region = String(row?.region || '').trim();
+
     return {
-      company: String(row?.company || '').trim(),
-      phone: String(row?.phone || '').trim(),
-      region: String(row?.region || '').trim(),
+      company,
+      phone,
+      // Keep legacy saved rows from showing prefilled region values when no lead data exists.
+      region: company || phone ? region : '',
     };
   }
 
@@ -573,8 +721,6 @@
       '    <div style="display:flex; align-items:center; gap:8px;">',
       '      <button type="button" id="leadListAddRowBtn" style="height:30px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 10px; cursor:pointer;">+10 rijen</button>',
       '      <button type="button" id="leadListClearRowsBtn" style="height:30px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 10px; cursor:pointer;">Lijst wissen</button>',
-      '      <div style="margin-left:8px; width:1px; height:18px; background:#dadce0;"></div>',
-      '      <div style="padding:0 10px; height:30px; border:1px solid #dadce0; border-radius:6px; display:flex; align-items:center; font-size:12px; background:#f8f9fa;">Blad1</div>',
       '    </div>',
       '    <div style="font-size:11px; color:#5f6368;">Tip: selecteer A1 en plak direct een 3-koloms bereik</div>',
       '  </div>',
@@ -630,7 +776,7 @@
       updateLeadListHint();
       const parsed = parseLeadRows(rows);
       if (!parsed.hasInput) {
-        setLeadModalDraftHint('Lege lijst opgeslagen. Fallback blijft 1 testlead.');
+        setLeadModalDraftHint('Lege lijst opgeslagen. Er worden geen calls gestart zonder geldige leads.');
       } else {
         setLeadModalDraftHint(`Opgeslagen: ${parsed.leads.length} geldige lead(s).`);
       }
@@ -665,11 +811,11 @@
       '<button type="button" class="form-input magnetic" id="openLeadListModalBtn" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">',
       '  <span>Open spreadsheet</span>',
       '</button>',
-      '<div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85;">Geen lijst toegevoegd. Fallback: 1 testlead (jouw nummer).</div>',
+      '<div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85;">Geen lijst opgeslagen. Open spreadsheet, vul regels in en klik "Opslaan lijst".</div>',
     ].join('');
 
     if (regioGroup) {
-      regioGroup.insertAdjacentElement('afterend', controlWrap);
+      regioGroup.insertAdjacentElement('beforebegin', controlWrap);
     } else {
       targetParent.appendChild(controlWrap);
     }
@@ -683,16 +829,18 @@
       '<select class="form-select magnetic" id="callDispatchMode">',
       '  <option value="parallel">Alles tegelijk</option>',
       '  <option value="sequential">1 voor 1</option>',
-      '  <option value="delay">Wachttijd ertussen</option>',
       '</select>',
       '<div id="callDispatchDelayWrap" style="margin-top:10px; display:none;">',
       '  <label class="form-label" for="callDispatchDelaySeconds">Wachttijd tussen starts (seconden)</label>',
       '  <input type="number" class="form-input magnetic" id="callDispatchDelaySeconds" min="0" step="1" value="5" placeholder="5">',
       '</div>',
-      '<div id="callDispatchHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85;">Leads worden 1 voor 1 gestart zonder extra wachttijd ertussen.</div>',
     ].join('');
 
-    controlWrap.insertAdjacentElement('afterend', dispatchWrap);
+    if (regioGroup) {
+      regioGroup.insertAdjacentElement('afterend', dispatchWrap);
+    } else {
+      controlWrap.insertAdjacentElement('afterend', dispatchWrap);
+    }
 
     const modeEl = byId('callDispatchMode');
     const delayEl = byId('callDispatchDelaySeconds');
@@ -738,7 +886,8 @@
 
     rows.forEach((row, idx) => {
       const rowNo = idx + 1;
-      const hasAnyData = Boolean(row.company || row.phone || row.region);
+      // Treat rows without company/phone as empty so prefilled region values don't become "input".
+      const hasAnyData = Boolean(row.company || row.phone);
       if (!hasAnyData) {
         return;
       }
@@ -787,16 +936,16 @@
     const hint = byId('leadListHint');
     if (!hint) return;
 
-    const sliderAmount = Math.max(1, parseNumber(leadSlider.value, 1));
     const parsed = parseLeadRows(getSavedLeadRows());
 
     if (!parsed.hasInput) {
-      hint.textContent =
-        'Geen lijst toegevoegd. Fallback: 1 testlead (jouw nummer). Klik op de knop om regels toe te voegen.';
+      hint.style.display = 'block';
+      hint.textContent = 'Geen lijst opgeslagen. Open spreadsheet, vul regels in en klik "Opslaan lijst".';
       return;
     }
 
     if (parsed.leads.length === 0) {
+      hint.style.display = 'block';
       hint.textContent = `0 geldige leads. ${parsed.errors[0] || 'Controleer Bedrijfsnaam/Telefoonnummer/Regio regels.'}`;
       return;
     }
@@ -805,21 +954,21 @@
     if (parsed.errors.length > 0) warningBits.push(`${parsed.errors.length} ongeldige regel(s)`);
     if (parsed.duplicateCount > 0) warningBits.push(`${parsed.duplicateCount} dubbel(e) nummers`);
 
-    const maxCalls = Math.min(sliderAmount, parsed.leads.length);
-    hint.textContent = `${parsed.leads.length} geldige lead(s). Met de huidige slider start je ${maxCalls} call(s).${
-      warningBits.length ? ` Let op: ${warningBits.join(', ')}.` : ''
-    }`;
+    if (warningBits.length > 0) {
+      hint.style.display = 'block';
+      hint.textContent = `Let op: ${warningBits.join(', ')}.`;
+      return;
+    }
+
+    hint.textContent = '';
+    hint.style.display = 'none';
   }
 
   function getManualLeadsFromDashboard(requestedAmount) {
     const parsed = parseLeadRows(getSavedLeadRows());
 
     if (!parsed.hasInput) {
-      return {
-        mode: 'test',
-        leads: buildTestLeads(),
-        parsed,
-      };
+      throw new Error('Geen leadlijst opgeslagen. Open spreadsheet, voeg leads toe en klik "Opslaan lijst".');
     }
 
     if (parsed.leads.length === 0) {
@@ -1132,13 +1281,14 @@
 
     const parsed = parseAiNotebookRows(getSavedAiNotebookRows());
     if (!parsed.hasInput) {
+      hint.style.display = 'block';
       hint.textContent =
         'Nog leeg. Gebruik dit kladblok om callstatus, terugbelreden en geheugenpunten voor AI bij te houden.';
       return;
     }
 
-    hint.textContent =
-      `${parsed.nonEmptyRowCount} regel(s) in AI kladblok. ${parsed.rowsWithStatus} met status. ${parsed.followUpYes} gemarkeerd voor terugbellen (Ja).`;
+    hint.textContent = '';
+    hint.style.display = 'none';
   }
 
   function ensureAiNotebookModal() {
@@ -1243,6 +1393,7 @@
 
     const leadControl = byId('leadListControlWrap');
     if (!leadControl) return null;
+    const dispatchControl = byId('callDispatchControlWrap');
 
     const wrap = document.createElement('div');
     wrap.className = 'form-group';
@@ -1256,7 +1407,11 @@
       '<div id="aiNotebookHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85;">Nog leeg. Gebruik dit kladblok om callstatus, terugbelreden en geheugenpunten voor AI bij te houden.</div>',
     ].join('');
 
-    leadControl.insertAdjacentElement('afterend', wrap);
+    if (dispatchControl) {
+      dispatchControl.insertAdjacentElement('beforebegin', wrap);
+    } else {
+      leadControl.insertAdjacentElement('afterend', wrap);
+    }
 
     button = byId('openAiNotebookModalBtn');
     const modal = ensureAiNotebookModal();
@@ -1492,7 +1647,7 @@
   }
 
   function collectCampaignFormData() {
-    const amount = Math.max(1, parseNumber(leadSlider.value, 1));
+    const amount = getLeadSliderAmount();
     const minProjectValue = parseNumber(byId('minPrice')?.value, 0);
     const maxDiscountPct = parseNumber(byId('maxDiscount')?.value, 0);
     const extraInstructions = String(byId('instructions')?.value || '').trim();
@@ -1543,45 +1698,43 @@
   async function startCampaignRequest() {
     if (isSubmitting) return;
 
-    const campaign = collectCampaignFormData();
-    const leadSelection = getManualLeadsFromDashboard(campaign.amount);
-    const leads = leadSelection.leads;
-    campaign.amount = leads.length;
-
-    isSubmitting = true;
-    setButtonLoading(true);
-    setStatusPill('loading', 'Bezig met starten');
-    setStatusMessage('loading', 'Campagne wordt gestart via Vapi...');
-    if (leadSelection.mode === 'manual' && leadSelection.parsed.errors.length > 0) {
-      addUiLog(
-        'skip',
-        `<strong>Leadlijst</strong> - ${escapeHtml(
-          `${leadSelection.parsed.errors.length} ongeldige regel(s) overgeslagen tijdens parsing.`
-        )}`
-      );
-    }
-    if (leadSelection.mode === 'manual' && leadSelection.parsed.duplicateCount > 0) {
-      addUiLog(
-        'skip',
-        `<strong>Leadlijst</strong> - ${escapeHtml(
-          `${leadSelection.parsed.duplicateCount} dubbel(e) nummer(s) overgeslagen.`
-        )}`
-      );
-    }
-    addUiLog(
-      'call',
-      leadSelection.mode === 'manual'
-        ? `<strong>Campagne</strong> - Startverzoek verzonden voor ${escapeHtml(leads.length)} lead(s) uit je telefoonlijst (${escapeHtml(
-            campaign.dispatchMode === 'parallel'
-              ? 'alles tegelijk'
-              : campaign.dispatchMode === 'delay'
-                ? `${campaign.dispatchDelaySeconds}s tussen calls`
-                : '1 voor 1'
-          )}).`
-        : '<strong>Campagne</strong> - Startverzoek verzonden voor 1 testlead (fallback).'
-    );
-
     try {
+      const campaign = collectCampaignFormData();
+      const leadSelection = getManualLeadsFromDashboard(campaign.amount);
+      const leads = leadSelection.leads;
+      campaign.amount = leads.length;
+
+      isSubmitting = true;
+      setButtonLoading(true);
+      setStatusPill('loading', 'Bezig met starten');
+      setStatusMessage('loading', 'Campagne wordt gestart via Vapi...');
+      if (leadSelection.parsed.errors.length > 0) {
+        addUiLog(
+          'skip',
+          `<strong>Leadlijst</strong> - ${escapeHtml(
+            `${leadSelection.parsed.errors.length} ongeldige regel(s) overgeslagen tijdens parsing.`
+          )}`
+        );
+      }
+      if (leadSelection.parsed.duplicateCount > 0) {
+        addUiLog(
+          'skip',
+          `<strong>Leadlijst</strong> - ${escapeHtml(
+            `${leadSelection.parsed.duplicateCount} dubbel(e) nummer(s) overgeslagen.`
+          )}`
+        );
+      }
+      addUiLog(
+        'call',
+        `<strong>Campagne</strong> - Startverzoek verzonden voor ${escapeHtml(leads.length)} lead(s) uit je telefoonlijst (${escapeHtml(
+          campaign.dispatchMode === 'parallel'
+            ? 'alles tegelijk'
+            : campaign.dispatchMode === 'delay'
+              ? `${campaign.dispatchDelaySeconds}s tussen calls`
+              : '1 voor 1'
+        )}).`
+      );
+
       const response = await fetch('/api/coldcalling/start', {
         method: 'POST',
         headers: {
@@ -1602,6 +1755,9 @@
       const summary = data.summary || {};
       const started = Number(summary.started || 0);
       const failed = Number(summary.failed || 0);
+      const plannedCount = Number(
+        summary.sequentialWaitForCallEnd ? summary.attempted || summary.requested || started : started
+      );
       updateStats(summary);
 
       const results = Array.isArray(data.results) ? data.results : [];
@@ -1629,13 +1785,10 @@
 
       if (started > 0 && failed === 0) {
         setStatusPill('success', 'Campagne gestart');
-        setStatusMessage('success', `Campagne gestart. ${started} outbound call(s) zijn aangevraagd.`);
+        setStatusMessage('success', buildCampaignStartedMessage(plannedCount, campaign, failed));
       } else if (started > 0) {
         setStatusPill('success', 'Campagne gestart (deels)');
-        setStatusMessage(
-          'loading',
-          `Campagne gestart met fouten. ${started} call(s) gestart, ${failed} fout(en).`
-        );
+        setStatusMessage('success', buildCampaignStartedMessage(plannedCount, campaign, failed));
       } else {
         setStatusPill('error', 'Fout');
         const firstFailure = results.find((item) => !item.success);

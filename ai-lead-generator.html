@@ -360,6 +360,26 @@
             animation: fadeUp 0.6s var(--ease-out-expo) forwards;
         }
 
+        /* If only the campaign settings panel remains, let it use the full row width. */
+        .generator-grid > .panel:only-child {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: minmax(360px, 1.25fr) minmax(260px, 1fr);
+            column-gap: 1.5rem;
+            row-gap: 1.25rem;
+            align-items: end;
+        }
+
+        .generator-grid > .panel:only-child .panel-header,
+        .generator-grid > .panel:only-child .form-group:first-of-type {
+            grid-column: 1 / -1;
+        }
+
+        .generator-grid > .panel:only-child .panel-header,
+        .generator-grid > .panel:only-child .form-group {
+            margin-bottom: 0;
+        }
+
         @keyframes fadeUp {
             to { opacity: 1; transform: translateY(0); }
         }
@@ -736,6 +756,7 @@
         /* Responsive */
         @media (max-width: 1200px) {
             .generator-grid { grid-template-columns: 1fr; }
+            .generator-grid > .panel:only-child { display: block; }
             .stats-bar { grid-template-columns: repeat(2, 1fr); }
         }
 
@@ -783,7 +804,7 @@
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
                         AI Coldcalling
                     </a>
-                    <a href="ai-coldmailing.html" class="sidebar-link magnetic">
+                    <a href="#" class="sidebar-link magnetic">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
                         AI Coldmailing
                     </a>
@@ -855,8 +876,8 @@
                     <div class="form-group">
                         <div class="slider-container">
                             <div class="slider-header">
-                                <label class="form-label" style="margin-bottom: 0;">Aantal Leads</label>
-                                <div class="slider-value" id="leadValue">15 <span>leads</span></div>
+                                <label class="form-label" style="margin-bottom: 0;">Hoeveel mensen bellen</label>
+                                <div class="slider-value" id="leadValue">15 <span>mensen</span></div>
                             </div>
                             <input type="range" min="5" max="50" value="15" step="5" id="leadSlider" class="magnetic">
                             <div class="slider-labels">
@@ -892,33 +913,6 @@
                     </div>
                 </div>
 
-                <div class="panel" style="animation-delay: 0.2s;">
-                    <div class="panel-header">
-                        <span class="panel-title">AI Instructies</span>
-                        <span class="panel-badge">Cold Calling</span>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Minimale Projectwaarde</label>
-                        <div class="price-input-wrap">
-                            <span class="prefix">€</span>
-                            <input type="number" class="form-input magnetic" id="minPrice" value="8000" placeholder="8000">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Maximale Korting (%)</label>
-                        <div class="price-input-wrap">
-                            <span class="prefix">%</span>
-                            <input type="number" class="form-input magnetic" id="maxDiscount" value="5" placeholder="5" min="0" max="30">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Extra Instructies voor AI</label>
-                        <textarea class="form-textarea magnetic" id="instructions" placeholder="Bijv. focus op legacy systeem migratie, vraag naar huidige database-omvang, benadruk uptime garantie..."></textarea>
-                    </div>
-                </div>
             </div>
 
             <div class="launch-section">
@@ -963,9 +957,50 @@
     <script>
         const slider = document.getElementById('leadSlider');
         const sliderValue = document.getElementById('leadValue');
+        sliderValue.style.cursor = 'pointer';
+        sliderValue.title = 'Klik om een eigen aantal in te vullen';
+        sliderValue.tabIndex = 0;
+
+        function getSliderDisplayAmount() {
+            const customValue = Math.round(Number(slider?.dataset?.customValue || NaN));
+            if (Number.isFinite(customValue) && customValue > 0) {
+                return customValue;
+            }
+            return slider.value;
+        }
+
+        function renderSliderValue() {
+            sliderValue.innerHTML = `${getSliderDisplayAmount()} <span>mensen</span>`;
+        }
+
         slider.addEventListener('input', () => {
-            sliderValue.innerHTML = `${slider.value} <span>leads</span>`;
+            delete slider.dataset.customValue;
+            renderSliderValue();
         });
+
+        function promptCustomSliderValue() {
+            const currentAmount = getSliderDisplayAmount();
+            const input = window.prompt('Hoeveel mensen wil je bellen?', String(currentAmount));
+            if (input === null) return;
+
+            const parsed = Math.round(Number(String(input).trim().replace(',', '.')));
+            if (!Number.isFinite(parsed) || parsed < 1) {
+                window.alert('Voer een geldig aantal in (minimaal 1).');
+                return;
+            }
+
+            slider.dataset.customValue = String(parsed);
+            renderSliderValue();
+        }
+
+        sliderValue.addEventListener('click', promptCustomSliderValue);
+        sliderValue.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                promptCustomSliderValue();
+            }
+        });
+        renderSliderValue();
 
         let isRunning = false;
         let callInterval = null;

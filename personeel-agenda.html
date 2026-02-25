@@ -408,7 +408,7 @@
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
                         AI Coldcalling
                     </a>
-                    <a href="ai-coldmailing.html" class="sidebar-link magnetic">
+                    <a href="#" class="sidebar-link magnetic">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
                         AI Coldmailing
                     </a>
@@ -496,84 +496,62 @@
 </div>
 
 <script>
-    const appointments = [
-        {
-            id: 1, company: 'DataFlow BV', contact: 'Martin Koers', phone: '06-12345678',
-            type: 'meeting', date: '2025-02-03', time: '09:00', value: '€28.000',
-            branche: 'SaaS & Data', source: 'AI Cold Calling',
-            summary: 'Martin is CTO bij DataFlow en zoekt een partner voor het herbouwen van hun SaaS-platform. Huidige stack is verouderd (PHP/MySQL) en schaalt niet meer. Wil migreren naar Node.js/PostgreSQL met microservices architectuur. Dagelijks 2M+ API requests. Hoge prioriteit, budget is goedgekeurd door board.'
-        },
-        {
-            id: 2, company: 'MedVault Healthcare', contact: 'Dr. Sarah Visser', phone: '06-98765432',
-            type: 'meeting', date: '2025-02-05', time: '14:00', value: '€45.000',
-            branche: 'Gezondheidszorg', source: 'AI Cold Calling',
-            summary: 'Dr. Visser heeft een patientenportaal nodig dat voldoet aan NEN-7510 en AVG. Moet integreren met bestaand EPD-systeem. Functionaliteit: afspraken plannen, lab-uitslagen inzien, berichten met arts. Demo aangevraagd om onze healthcare-expertise te tonen. Mogelijkheid tot langlopend onderhoudscontract.'
-        },
-        {
-            id: 3, company: 'LogiTech Systems', contact: 'Pieter van Dam', phone: '06-11223344',
-            type: 'meeting', date: '2025-02-06', time: '11:00', value: '€18.500',
-            branche: 'Logistiek', source: 'AI Cold Calling',
-            summary: 'Pieter zoekt een custom inventory management systeem. Werkt nu met Excel voor 3 warehouses. Wil real-time voorraadoverzicht, barcode scanning integratie, en automatische bestelnotificaties. Heeft 15 medewerkers die het systeem dagelijks moeten gebruiken. Snelle implementatie gewenst.'
-        },
-        {
-            id: 4, company: 'FinCore Solutions', contact: 'Anne de Boer', phone: '06-55667788',
-            type: 'meeting', date: '2025-02-10', time: '10:00', value: '€52.000',
-            branche: 'Financiële Dienstverlening', source: 'AI Cold Calling',
-            summary: 'Tweede gesprek na uitgebreide intake. FinCore wil een compleet client-portaal met realtime portfolio-overzicht, risicoanalyse dashboards, en geautomatiseerde rapportages. Moeten voldoen aan AFM-regelgeving. Technische architectuur is besproken, offerte is verstuurd. Beslissing door directie verwacht binnen een week.'
-        },
-        {
-            id: 5, company: 'GreenEnergy Data', contact: 'Tom Hendriks', phone: '06-99887766',
-            type: 'meeting', date: '2025-02-11', time: '13:30', value: '€35.000',
-            branche: 'Energie & Duurzaamheid', source: 'AI Cold Calling',
-            summary: 'Contract getekend! GreenEnergy heeft een IoT-data platform nodig dat sensordata van 500+ zonnepaneel-installaties verzamelt en visualiseert. Real-time dashboards met energieopbrengst, storingen, en voorspellende onderhoudsmeldingen. Eerste fase: MVP in 6 weken. Aanbetaling 40% ontvangen.'
-        },
-        {
-            id: 6, company: 'Krekel & Partners', contact: 'Mr. Krekel', phone: '06-44332211',
-            type: 'meeting', date: '2025-02-12', time: '15:30', value: '€22.000',
-            branche: 'Juridisch', source: 'AI Cold Calling',
-            summary: 'Mr. Krekel runt een advocatenkantoor met 12 juristen. Wil een intern zaakbeheersysteem dat deadlines tracked, documenten beheert, en declarabele uren registreert. Huidige systeem is end-of-life. Integratie met Outlook en MS Teams vereist. Bereid om te investeren in maatwerk.'
-        },
-        {
-            id: 7, company: 'RetailStack', contact: 'Eva Mulder', phone: '06-77665544',
-            type: 'meeting', date: '2025-02-14', time: '10:30', value: '€32.000',
-            branche: 'Retail & E-commerce', source: 'AI Cold Calling',
-            summary: 'Eva is Head of Digital bij RetailStack (14 winkels). Wil een unified commerce platform: webshop + POS koppeling + voorraadbeheer over alle locaties. Huidige Shopify-setup schaalt niet meer. Demo van ons platform-werk voor vergelijkbare klanten aangevraagd. Groot potentieel.'
-        },
-        {
-            id: 8, company: 'Apex Manufacturing', contact: 'Ing. Bos', phone: '06-33221100',
-            type: 'meeting', date: '2025-02-18', time: '09:00', value: '€41.000',
-            branche: 'Maakindustrie', source: 'AI Cold Calling',
-            summary: 'Follow-up na technische deep-dive. Apex wil een productie-planning systeem met machine-status monitoring, order tracking, en kwaliteitscontrole registratie. Moet integreren met hun SAP-omgeving. Complex project, bespreken of we in 3 sprints werken. Ing. Bos is de beslisser.'
-        },
-        {
-            id: 9, company: 'TransPort Pro', contact: 'Rick Jansen', phone: '06-12312312',
-            type: 'meeting', date: '2025-02-19', time: '16:00', value: '€15.000',
-            branche: 'Transport', source: 'AI Cold Calling',
-            summary: 'Rick heeft een transportbedrijf met 25 vrachtwagens. Zoekt een fleet management dashboard met GPS tracking, ritregistratie, en chauffeurs-planning. Wil ook een klantportaal waar opdrachtgevers zendingen kunnen volgen. Realistisch budget, snelle beslisser.'
-        },
-        {
-            id: 10, company: 'SecureNet BV', contact: 'Lars de Wit', phone: '06-45645645',
-            type: 'meeting', date: '2025-02-21', time: '11:00', value: '€28.500',
-            branche: 'Cybersecurity', source: 'AI Cold Calling',
-            summary: 'Deal gesloten! SecureNet heeft een vulnerability scanning dashboard nodig. Automatisch scannen van client-netwerken, rapportage genereren, en compliance tracking (ISO 27001). Eerste milestone: werkend prototype in 4 weken. Contract voor 12 maanden doorlopend onderhoud getekend.'
-        },
-        {
-            id: 11, company: 'CarePoint Systems', contact: 'Marian Vos', phone: '06-78978978',
-            type: 'meeting', date: '2025-02-24', time: '14:00', value: '€38.000',
-            branche: 'Thuiszorg', source: 'AI Cold Calling',
-            summary: 'Marian zoekt een planning- en registratiesysteem voor thuiszorgmedewerkers. Moet werken op tablet en telefoon. Functies: roosterplanning, zorgdossier bijhouden, kilometers registreren, en facturatie. 200+ gebruikers. Demo van mobile-first aanpak aangevraagd.'
-        },
-        {
-            id: 12, company: 'PropTech Innovators', contact: 'Bas Dekker', phone: '06-65465465',
-            type: 'meeting', date: '2025-02-26', time: '10:00', value: '€25.000',
-            branche: 'Vastgoed Tech', source: 'AI Cold Calling',
-            summary: 'Bas bouwt een proptech startup en heeft een MVP nodig. Platform voor vastgoedbeheerders: huurders-portaal, onderhoudsverzoeken, automatische facturatie, en data-analytics over hun portefeuille. Funding recent ontvangen, wil snel naar markt. Zoekt een technisch co-development partner.'
-        }
-    ];
+    const appointments = [];
 
     let currentDate = appointments.length ? new Date(`${appointments[0].date}T00:00:00`) : new Date();
     const today = new Date();
     const monthNames = ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'];
+
+    function appointmentFingerprint(apt) {
+        return [apt.date || '', apt.time || '', apt.company || '', apt.phone || ''].join('|');
+    }
+
+    function normalizeServerAppointment(item) {
+        if (!item || typeof item !== 'object') return null;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || ''))) return null;
+
+        return {
+            id: Number(item.id) || Math.floor(Math.random() * 1e9),
+            company: String(item.company || 'Onbekende lead'),
+            contact: String(item.contact || 'Onbekend'),
+            phone: String(item.phone || ''),
+            type: 'meeting',
+            date: String(item.date),
+            time: /^\d{2}:\d{2}$/.test(String(item.time || '')) ? String(item.time) : '09:00',
+            value: String(item.value || 'Onbekend'),
+            branche: String(item.branche || 'Onbekend'),
+            source: String(item.source || 'AI Cold Calling'),
+            summary: String(item.summary || 'AI-samenvatting niet beschikbaar.'),
+        };
+    }
+
+    async function loadServerAppointments() {
+        try {
+            const response = await fetch('/api/agenda/appointments?limit=250');
+            const data = await response.json();
+            if (!response.ok || !data?.ok || !Array.isArray(data.appointments)) return;
+
+            const existing = new Set(appointments.map(appointmentFingerprint));
+            let added = 0;
+
+            data.appointments.forEach((item) => {
+                const apt = normalizeServerAppointment(item);
+                if (!apt) return;
+                const fp = appointmentFingerprint(apt);
+                if (existing.has(fp)) return;
+                existing.add(fp);
+                appointments.push(apt);
+                added += 1;
+            });
+
+            if (added > 0) {
+                appointments.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+                renderCalendar();
+            }
+        } catch {
+            // Zonder backend blijft de agenda leeg tot echte afspraken binnenkomen.
+        }
+    }
 
     function renderCalendar() {
         const year = currentDate.getFullYear();
@@ -654,6 +632,8 @@
     function closeModal() { document.getElementById('modal').classList.remove('show'); }
 
     renderCalendar();
+    void loadServerAppointments();
+    window.setInterval(() => { void loadServerAppointments(); }, 15000);
 
     const cursor = document.querySelector('.cursor');
     const cursorDot = document.querySelector('.cursor-dot');

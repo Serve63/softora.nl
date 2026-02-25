@@ -356,6 +356,26 @@
             animation: fadeUp 0.6s var(--ease-out-expo) forwards;
         }
 
+        /* If only the campaign settings panel remains, let it use the full row width. */
+        .generator-grid > .panel:only-child {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: minmax(360px, 1.25fr) minmax(260px, 1fr);
+            column-gap: 1.5rem;
+            row-gap: 1.25rem;
+            align-items: end;
+        }
+
+        .generator-grid > .panel:only-child .panel-header,
+        .generator-grid > .panel:only-child .form-group:first-of-type {
+            grid-column: 1 / -1;
+        }
+
+        .generator-grid > .panel:only-child .panel-header,
+        .generator-grid > .panel:only-child .form-group {
+            margin-bottom: 0;
+        }
+
         @keyframes fadeUp {
             to { opacity: 1; transform: translateY(0); }
         }
@@ -748,9 +768,275 @@
             letter-spacing: 0.05em;
         }
 
+        .log-task-section {
+            border-top: 1px solid var(--border);
+            padding: 1.25rem 2rem 1.5rem;
+        }
+
+        .log-task-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.85rem;
+        }
+
+        .log-task-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--text-tertiary);
+        }
+
+        .log-task-count {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent-light);
+            border: 1px solid rgba(139,34,82,0.2);
+            background: rgba(139,34,82,0.06);
+            padding: 0.25rem 0.5rem;
+        }
+
+        .log-task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+        }
+
+        .log-task-empty {
+            font-size: 0.82rem;
+            color: var(--text-tertiary);
+            font-weight: 300;
+            line-height: 1.5;
+            padding: 0.15rem 0 0.2rem;
+        }
+
+        .log-task-item {
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+            padding: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+        }
+
+        .log-task-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.8rem;
+        }
+
+        .log-task-left {
+            min-width: 0;
+        }
+
+        .log-task-company-btn {
+            border: none;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            text-align: left;
+            width: 100%;
+            cursor: none;
+        }
+
+        .log-task-company {
+            font-size: 0.86rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            line-height: 1.35;
+        }
+
+        .log-task-company strong {
+            color: var(--accent-light);
+            font-weight: 600;
+        }
+
+        .log-task-company-btn:hover .log-task-company strong {
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .log-task-meta {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            margin-top: 0.25rem;
+            line-height: 1.45;
+        }
+
+        .log-task-note {
+            margin-top: 0.35rem;
+            font-size: 0.74rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            line-height: 1.45;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .log-task-side {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.45rem;
+            flex-shrink: 0;
+        }
+
+        .log-task-statuses {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.35rem;
+        }
+
+        .log-task-badge {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.64rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.25rem 0.45rem;
+            border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-tertiary);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .log-task-badge.pending {
+            color: var(--yellow);
+            border-color: rgba(243, 156, 18, 0.2);
+            background: rgba(243, 156, 18, 0.08);
+        }
+
+        .log-task-badge.done {
+            color: var(--green);
+            border-color: rgba(46, 204, 113, 0.2);
+            background: rgba(46, 204, 113, 0.08);
+        }
+
+        .log-task-btn {
+            border: 1px solid rgba(139,34,82,0.22);
+            background: rgba(139,34,82,0.06);
+            color: var(--accent-light);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.5rem 0.65rem;
+            cursor: none;
+            transition: all 0.2s;
+        }
+
+        .log-task-btn:hover:not(:disabled) {
+            background: rgba(139,34,82,0.12);
+            border-color: rgba(139,34,82,0.4);
+        }
+
+        .log-task-btn.success {
+            border-color: rgba(46, 204, 113, 0.22);
+            background: rgba(46, 204, 113, 0.08);
+            color: var(--green);
+        }
+
+        .log-task-btn.warning {
+            border-color: rgba(243, 156, 18, 0.2);
+            background: rgba(243, 156, 18, 0.08);
+            color: var(--yellow);
+        }
+
+        .log-task-btn:disabled {
+            opacity: 0.55;
+            cursor: default;
+        }
+
+        .log-task-detail {
+            border-top: 1px solid var(--border);
+            padding-top: 0.75rem;
+            display: none;
+        }
+
+        .log-task-detail.show {
+            display: block;
+        }
+
+        .log-task-detail-grid {
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            gap: 0.7rem;
+        }
+
+        .log-task-detail-block {
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.15);
+            padding: 0.75rem;
+        }
+
+        .log-task-detail-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.66rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.45rem;
+        }
+
+        .log-task-transcript {
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.72rem;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            max-height: 220px;
+            overflow: auto;
+        }
+
+        .log-task-transcript.empty {
+            font-family: inherit;
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+        }
+
+        .log-task-draft {
+            width: 100%;
+            min-height: 220px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 0.7rem;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            resize: vertical;
+            outline: none;
+        }
+
+        .log-task-actions {
+            margin-top: 0.7rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+
+        .log-task-info {
+            margin-top: 0.5rem;
+            font-size: 0.72rem;
+            color: var(--text-tertiary);
+            line-height: 1.45;
+        }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .generator-grid { grid-template-columns: 1fr; }
+            .generator-grid > .panel:only-child { display: block; }
             .stats-bar { grid-template-columns: repeat(2, 1fr); }
         }
 
@@ -765,6 +1051,12 @@
             .main-content { padding: 1.5rem; }
             .stats-bar { grid-template-columns: 1fr; }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
+            .log-task-section { padding: 1rem 1.2rem 1.2rem; }
+            .log-task-top { flex-direction: column; }
+            .log-task-side { align-items: flex-start; width: 100%; }
+            .log-task-statuses { justify-content: flex-start; }
+            .log-task-detail-grid { grid-template-columns: 1fr; }
+            .log-task-actions { flex-direction: column; }
         }
     </style>
 </head>
@@ -798,7 +1090,11 @@
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
                         AI Coldcalling
                     </a>
-                    <a href="premium-ai-coldmailing.html" class="sidebar-link magnetic">
+                    <a href="premium-bevestigingsmails.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                        Bevestigingsmails
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
                         AI Coldmailing
                     </a>
@@ -866,14 +1162,15 @@
                     <div class="form-group">
                         <div class="slider-container">
                             <div class="slider-header">
-                                <label class="form-label" style="margin-bottom: 0;">Aantal Leads</label>
-                                <div class="slider-value" id="leadValue">25 <span>leads</span></div>
+                                <label class="form-label" style="margin-bottom: 0;">Hoeveel mensen bellen</label>
+                                <div class="slider-value" id="leadValue">1 <span>mensen</span></div>
                             </div>
-                            <input type="range" min="5" max="100" value="25" step="5" id="leadSlider" class="magnetic">
+                            <input type="range" min="0" max="3" value="0" step="1" id="leadSlider" class="magnetic" data-value-map="1,50,100,250">
                             <div class="slider-labels">
-                                <span>5</span>
+                                <span>1</span>
                                 <span>50</span>
                                 <span>100</span>
+                                <span>250</span>
                             </div>
                         </div>
                     </div>
@@ -881,10 +1178,10 @@
                     <div class="form-group">
                         <label class="form-label">Doelgroep / Branche</label>
                         <select class="form-select magnetic" id="branche">
-                            <option value="all">Alles</option>
+                            <option value="all" selected>Alles</option>
                             <option value="horeca">Horeca & Restaurants</option>
                             <option value="retail">Retail & Winkels</option>
-                            <option value="zakelijk" selected>Zakelijke Dienstverlening</option>
+                            <option value="zakelijk">Zakelijke Dienstverlening</option>
                             <option value="bouw">Bouw & Vastgoed</option>
                             <option value="gezondheid">Gezondheidszorg</option>
                             <option value="creatief">Creatieve Sector</option>
@@ -896,7 +1193,8 @@
                     <div class="form-group">
                         <label class="form-label">Regio</label>
                         <select class="form-select magnetic" id="regio">
-                            <option value="tilburg" selected>Tilburg & Omgeving</option>
+                            <option value="all" selected>Alles</option>
+                            <option value="tilburg">Tilburg & Omgeving</option>
                             <option value="eindhoven">Eindhoven & Omgeving</option>
                             <option value="brabant">Heel Noord-Brabant</option>
                             <option value="randstad">Randstad</option>
@@ -905,33 +1203,6 @@
                     </div>
                 </div>
 
-                <div class="panel" style="animation-delay: 0.2s;">
-                    <div class="panel-header">
-                        <span class="panel-title">AI Instructies</span>
-                        <span class="panel-badge">Cold Calling</span>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Minimale Verkoopprijs Website</label>
-                        <div class="price-input-wrap">
-                            <span class="prefix">€</span>
-                            <input type="number" class="form-input magnetic" id="minPrice" value="2500" placeholder="2500">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Maximale Korting (%)</label>
-                        <div class="price-input-wrap">
-                            <span class="prefix">%</span>
-                            <input type="number" class="form-input magnetic" id="maxDiscount" value="10" placeholder="10" min="0" max="50">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Extra Instructies voor AI</label>
-                        <textarea class="form-textarea magnetic" id="instructions" placeholder="Bijv. altijd vragen naar huidige website, niet bellen na 17:00, focus op redesign..."></textarea>
-                    </div>
-                </div>
             </div>
 
             <div class="launch-section">
@@ -968,6 +1239,15 @@
                 <div class="log-body" id="logBody">
                     <div class="log-empty">Start een campagne om activiteit te zien.</div>
                 </div>
+                <div class="log-task-section">
+                    <div class="log-task-header">
+                        <span class="log-task-title">Bevestigingsmail sturen</span>
+                        <span class="log-task-count" id="logTaskCount">0 taken</span>
+                    </div>
+                    <div class="log-task-list" id="logTaskList">
+                        <div class="log-task-empty">Nog geen open bevestigingstaken. Zodra AI een afspraak plant verschijnt die hier.</div>
+                    </div>
+                </div>
             </div>
 
         </main>
@@ -976,9 +1256,58 @@
     <script>
         const slider = document.getElementById('leadSlider');
         const sliderValue = document.getElementById('leadValue');
+        const sliderValueMap = String(slider?.dataset?.valueMap || '')
+            .split(',')
+            .map((item) => Number(String(item).trim()))
+            .filter((item) => Number.isFinite(item) && item > 0);
+
+        sliderValue.style.cursor = 'pointer';
+        sliderValue.title = 'Klik om een eigen aantal in te vullen';
+        sliderValue.tabIndex = 0;
+
+        function getSliderDisplayAmount() {
+            const customValue = Math.round(Number(slider?.dataset?.customValue || NaN));
+            if (Number.isFinite(customValue) && customValue > 0) {
+                return customValue;
+            }
+            if (!sliderValueMap.length) return slider.value;
+            const rawIndex = Math.round(Number(slider.value) || 0);
+            const safeIndex = Math.max(0, Math.min(sliderValueMap.length - 1, rawIndex));
+            return sliderValueMap[safeIndex];
+        }
+
+        function renderSliderValue() {
+            sliderValue.innerHTML = `${getSliderDisplayAmount()} <span>mensen</span>`;
+        }
+
         slider.addEventListener('input', () => {
-            sliderValue.innerHTML = `${slider.value} <span>leads</span>`;
+            delete slider.dataset.customValue;
+            renderSliderValue();
         });
+
+        function promptCustomSliderValue() {
+            const currentAmount = getSliderDisplayAmount();
+            const input = window.prompt('Hoeveel mensen wil je bellen?', String(currentAmount));
+            if (input === null) return;
+
+            const parsed = Math.round(Number(String(input).trim().replace(',', '.')));
+            if (!Number.isFinite(parsed) || parsed < 1) {
+                window.alert('Voer een geldig aantal in (minimaal 1).');
+                return;
+            }
+
+            slider.dataset.customValue = String(parsed);
+            renderSliderValue();
+        }
+
+        sliderValue.addEventListener('click', promptCustomSliderValue);
+        sliderValue.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                promptCustomSliderValue();
+            }
+        });
+        renderSliderValue();
 
         let isRunning = false;
         let callInterval = null;
@@ -1140,5 +1469,333 @@
         }
     </script>
     <script src="assets/coldcalling-vapi.js"></script>
+    <script>
+        (function initConfirmationTasksInLiveActivity() {
+            const listEl = document.getElementById('logTaskList');
+            const countEl = document.getElementById('logTaskCount');
+            const logBody = document.getElementById('logBody');
+            if (!listEl || !countEl) return;
+
+            const state = {
+                loading: false,
+                tasks: [],
+                expandedTaskId: null,
+                detailLoadingId: null,
+                detailsById: {},
+                actionBusyById: {},
+                pollTimer: null,
+            };
+
+            function esc(str) {
+                return String(str || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function formatTaskDateTime(task) {
+                if (task && task.datetimeLabel) return String(task.datetimeLabel);
+                const date = String(task?.date || '');
+                const time = String(task?.time || '09:00');
+                if (!date) return time;
+                const d = new Date(`${date}T${time}:00`);
+                if (Number.isNaN(d.getTime())) return `${date} ${time}`;
+                return d.toLocaleString('nl-NL', {
+                    weekday: 'short',
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            function getTaskById(taskId) {
+                return state.tasks.find((task) => Number(task.id) === Number(taskId)) || null;
+            }
+
+            function mergeTask(task) {
+                if (!task || !task.id) return;
+                const idx = state.tasks.findIndex((item) => Number(item.id) === Number(task.id));
+                if (idx >= 0) state.tasks[idx] = { ...state.tasks[idx], ...task };
+            }
+
+            function setBusy(taskId, value) {
+                state.actionBusyById[String(taskId)] = Boolean(value);
+            }
+
+            function isBusy(taskId) {
+                return Boolean(state.actionBusyById[String(taskId)]);
+            }
+
+            function addActivityLine(type, htmlText) {
+                if (typeof window.addLog === 'function') {
+                    window.addLog(type, htmlText);
+                    return;
+                }
+
+                if (!logBody) return;
+                const empty = logBody.querySelector('.log-empty');
+                if (empty) empty.remove();
+
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.innerHTML = `
+                    <div class="log-entry-dot ${type}"></div>
+                    <div class="log-entry-text">${htmlText}</div>
+                    <div class="log-entry-time">${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                `;
+                logBody.insertBefore(entry, logBody.firstChild);
+            }
+
+            function badgesHtml(task) {
+                const mailSent = Boolean(task?.mailSent);
+                const confirmationReceived = Boolean(task?.confirmationReceived);
+                return `
+                    <span class="log-task-badge ${mailSent ? 'done' : 'pending'}">${mailSent ? 'Mail verstuurd' : 'Mail open'}</span>
+                    <span class="log-task-badge ${confirmationReceived ? 'done' : 'pending'}">${confirmationReceived ? 'Bevestigd' : 'Wacht reply'}</span>
+                `;
+            }
+
+            function detailHtml(task) {
+                const taskId = Number(task?.id) || 0;
+                if (state.expandedTaskId !== taskId) return '';
+
+                const detail = state.detailsById[String(taskId)] || null;
+                const loading = state.detailLoadingId === taskId;
+                const busy = isBusy(taskId);
+                const transcript = String(detail?.transcript || '');
+                const transcriptBlock = transcript
+                    ? `<div class="log-task-transcript">${esc(transcript)}</div>`
+                    : `<div class="log-task-transcript empty">Nog geen transcript beschikbaar vanuit Vapi webhook voor deze call.</div>`;
+                const draft = String(detail?.confirmationEmailDraft || '');
+                const canMarkResponse = Boolean(task?.mailSent);
+
+                const infoLines = [];
+                const summary = String(detail?.aiSummary || detail?.vapiSummary || task?.summary || '').trim();
+                if (summary) infoLines.push(`Samenvatting: ${summary}`);
+                if (detail?.phone) infoLines.push(`Telefoon: ${detail.phone}`);
+                if (detail?.source || task?.source) infoLines.push(`Bron: ${detail?.source || task?.source}`);
+                if (detail?.confirmationEmailDraftGeneratedAt) {
+                    try {
+                        infoLines.push(`Mailconcept: ${new Date(detail.confirmationEmailDraftGeneratedAt).toLocaleString('nl-NL')}`);
+                    } catch (_) {}
+                }
+
+                return `
+                    <div class="log-task-detail show">
+                        ${loading ? '<div class="log-task-info">Details laden...</div>' : ''}
+                        <div class="log-task-detail-grid">
+                            <div class="log-task-detail-block">
+                                <div class="log-task-detail-label">Transcriptie gesprek</div>
+                                ${transcriptBlock}
+                            </div>
+                            <div class="log-task-detail-block">
+                                <div class="log-task-detail-label">Bevestigingsmail</div>
+                                <textarea class="log-task-draft" readonly placeholder="Klik op &quot;Schrijf bevestigingsmail&quot; om AI een concept te genereren.">${esc(draft)}</textarea>
+                            </div>
+                        </div>
+                        ${infoLines.length ? `<div class="log-task-info">${infoLines.map((line) => `<div>${esc(line)}</div>`).join('')}</div>` : ''}
+                        <div class="log-task-actions">
+                            <button type="button" class="log-task-btn magnetic" data-task-action="draft" data-task-id="${taskId}" ${busy ? 'disabled' : ''}>Schrijf bevestigingsmail</button>
+                            <button type="button" class="log-task-btn success magnetic" data-task-action="sent" data-task-id="${taskId}" ${busy ? 'disabled' : ''}>Mail verstuurd</button>
+                            <button type="button" class="log-task-btn warning magnetic" data-task-action="confirmed" data-task-id="${taskId}" ${(busy || !canMarkResponse) ? 'disabled' : ''}>Bevestiging ontvangen</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function renderTasks() {
+                const tasks = Array.isArray(state.tasks) ? state.tasks : [];
+                countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
+
+                if (!tasks.length) {
+                    state.expandedTaskId = null;
+                    listEl.innerHTML = '<div class="log-task-empty">Nog geen open bevestigingstaken. Zodra AI een afspraak plant verschijnt die hier.</div>';
+                    return;
+                }
+
+                listEl.innerHTML = tasks.map((task) => {
+                    const taskId = Number(task.id) || 0;
+                    const company = esc(task.company || 'Onbekende lead');
+                    const contact = esc(task.contact || 'Onbekend');
+                    const dt = esc(formatTaskDateTime(task));
+                    const note = task.summary ? `<div class="log-task-note">${esc(task.summary)}</div>` : '';
+                    const openLabel = state.expandedTaskId === taskId ? 'Sluit details' : 'Open details';
+
+                    return `
+                        <div class="log-task-item" data-task-item-id="${taskId}">
+                            <div class="log-task-top">
+                                <div class="log-task-left">
+                                    <button type="button" class="log-task-company-btn magnetic" data-task-open="${taskId}">
+                                        <div class="log-task-company"><strong>${company}</strong> · ${contact}</div>
+                                    </button>
+                                    <div class="log-task-meta">Bevestigingsmail sturen voor afspraak op ${dt}</div>
+                                    ${note}
+                                </div>
+                                <div class="log-task-side">
+                                    <div class="log-task-statuses">${badgesHtml(task)}</div>
+                                    <button type="button" class="log-task-btn magnetic" data-task-open="${taskId}">${openLabel}</button>
+                                </div>
+                            </div>
+                            ${detailHtml(task)}
+                        </div>
+                    `;
+                }).join('');
+
+                listEl.querySelectorAll('[data-task-open]').forEach((btn) => {
+                    btn.addEventListener('click', async (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const taskId = Number(btn.getAttribute('data-task-open'));
+                        if (!taskId) return;
+
+                        if (state.expandedTaskId === taskId) {
+                            state.expandedTaskId = null;
+                            renderTasks();
+                            return;
+                        }
+
+                        state.expandedTaskId = taskId;
+                        renderTasks();
+                        if (!state.detailsById[String(taskId)]) {
+                            await loadTaskDetail(taskId);
+                        }
+                    });
+                });
+
+                listEl.querySelectorAll('[data-task-action]').forEach((btn) => {
+                    btn.addEventListener('click', async (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const taskId = Number(btn.getAttribute('data-task-id'));
+                        const action = String(btn.getAttribute('data-task-action') || '');
+                        if (!taskId || !action || isBusy(taskId)) return;
+
+                        setBusy(taskId, true);
+                        renderTasks();
+
+                        let ok = false;
+                        if (action === 'draft') ok = await generateDraft(taskId);
+                        if (action === 'sent') ok = await markSent(taskId);
+                        if (action === 'confirmed') ok = await markConfirmed(taskId);
+
+                        setBusy(taskId, false);
+                        if (!ok) renderTasks();
+                    });
+                });
+            }
+
+            async function loadTaskDetail(taskId) {
+                state.detailLoadingId = taskId;
+                renderTasks();
+                try {
+                    const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}`, { cache: 'no-store' });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data?.ok || !data.task) return false;
+                    state.detailsById[String(taskId)] = data.task;
+                    mergeTask(data.task);
+                    renderTasks();
+                    return true;
+                } catch (_) {
+                    return false;
+                } finally {
+                    if (state.detailLoadingId === taskId) {
+                        state.detailLoadingId = null;
+                        renderTasks();
+                    }
+                }
+            }
+
+            async function generateDraft(taskId) {
+                try {
+                    const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/draft-email`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ actor: 'AI coldcalling pagina' })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data?.ok || !data.task) return false;
+                    state.detailsById[String(taskId)] = data.task;
+                    mergeTask(data.task);
+                    renderTasks();
+                    return true;
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            async function markSent(taskId) {
+                try {
+                    const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/mark-sent`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ actor: 'AI coldcalling pagina' })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data?.ok || !data.task) return false;
+                    state.detailsById[String(taskId)] = data.task;
+                    mergeTask(data.task);
+                    renderTasks();
+                    addActivityLine('success', `<strong>Bevestigingsmail verstuurd</strong> naar ${esc(data.task.company || '')}`);
+                    return true;
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            async function markConfirmed(taskId) {
+                const task = getTaskById(taskId);
+                if (!task || !task.mailSent) return false;
+                try {
+                    const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/mark-response-received`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ actor: 'AI coldcalling pagina' })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data?.ok) return false;
+
+                    state.tasks = state.tasks.filter((item) => Number(item.id) !== Number(taskId));
+                    delete state.detailsById[String(taskId)];
+                    delete state.actionBusyById[String(taskId)];
+                    if (Number(state.expandedTaskId) === Number(taskId)) state.expandedTaskId = null;
+                    renderTasks();
+
+                    const company = data.appointment?.company || task.company || '';
+                    addActivityLine('success', `<strong>Afspraak bevestigd per mail</strong> door ${esc(company)}`);
+                    return true;
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            async function loadTasks() {
+                if (state.loading) return;
+                state.loading = true;
+                try {
+                    const res = await fetch('/api/agenda/confirmation-tasks?limit=50', { cache: 'no-store' });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data?.ok || !Array.isArray(data.tasks)) return;
+                    state.tasks = data.tasks;
+
+                    if (state.expandedTaskId && !state.tasks.some((task) => Number(task.id) === Number(state.expandedTaskId))) {
+                        state.expandedTaskId = null;
+                    }
+
+                    renderTasks();
+                } catch (_) {
+                    // Laat UI gewoon staan; backend kan lokaal offline zijn.
+                } finally {
+                    state.loading = false;
+                }
+            }
+
+            renderTasks();
+            loadTasks();
+            state.pollTimer = window.setInterval(loadTasks, 15000);
+        })();
+    </script>
 </body>
 </html>

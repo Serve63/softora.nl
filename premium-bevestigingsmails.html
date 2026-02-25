@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Softora | Dashboard</title>
+    <title>Softora | Bevestigingsmails</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -930,6 +930,407 @@
             line-height: 1.45;
         }
 
+        .confirm-task-flow {
+            margin-top: 0.9rem;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            padding: 0.85rem;
+        }
+
+        .confirm-task-flow-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 0.7rem;
+        }
+
+        .confirm-task-stepper {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 0.1rem;
+        }
+
+        .confirm-task-step-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: 1px solid rgba(139,34,82,0.15);
+            background: rgba(139,34,82,0.03);
+            padding: 0.28rem 0.45rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .confirm-task-step-chip.active {
+            border-color: rgba(139,34,82,0.24);
+            background: rgba(139,34,82,0.07);
+        }
+
+        .confirm-task-step-chip.done {
+            border-color: rgba(139,34,82,0.26);
+            background: rgba(139,34,82,0.09);
+        }
+
+        .confirm-task-step-chip.pending {
+            border-color: rgba(139,34,82,0.12);
+            background: rgba(139,34,82,0.02);
+        }
+
+        .confirm-task-step-chip-index {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1px solid rgba(139,34,82,0.22);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.58rem;
+            font-weight: 600;
+            color: var(--accent-light);
+            line-height: 1;
+            background: rgba(139,34,82,0.03);
+            flex-shrink: 0;
+        }
+
+        .confirm-task-step-chip.done .confirm-task-step-chip-index {
+            background: rgba(139,34,82,0.1);
+            border-color: rgba(139,34,82,0.28);
+        }
+
+        .confirm-task-step-chip-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .confirm-task-step-chip-state {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.58rem;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(166,45,101,0.9);
+            opacity: 0.95;
+        }
+
+        .confirm-task-stepper-connector {
+            width: 18px;
+            height: 2px;
+            background: rgba(139,34,82,0.12);
+            flex-shrink: 0;
+        }
+
+        .confirm-task-stepper-connector.done {
+            background: rgba(139,34,82,0.24);
+        }
+
+        .confirm-task-flow-actions {
+            margin-top: 0.6rem;
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 0.1rem;
+        }
+
+        .confirm-task-flow-actions .confirm-task-detail-btn {
+            margin: 0;
+            flex-shrink: 0;
+            font-size: 0.62rem;
+            padding: 0.42rem 0.55rem;
+            letter-spacing: 0.07em;
+            border-color: rgba(139,34,82,0.22);
+            background: rgba(139,34,82,0.05);
+            color: var(--accent-light);
+        }
+
+        .confirm-task-flow-actions .confirm-task-detail-btn:hover:not(:disabled) {
+            border-color: rgba(139,34,82,0.36);
+            background: rgba(139,34,82,0.1);
+        }
+
+        .confirm-task-step {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.7rem;
+            align-items: flex-start;
+            position: relative;
+        }
+
+        .confirm-task-step + .confirm-task-step {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .confirm-task-step-rail {
+            width: 26px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.35rem;
+            padding-top: 0.05rem;
+        }
+
+        .confirm-task-step-dot {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 1px solid rgba(139,34,82,0.22);
+            background: rgba(139,34,82,0.03);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: var(--accent-light);
+            line-height: 1;
+        }
+
+        .confirm-task-step-dot.done {
+            background: rgba(139,34,82,0.12);
+            border-color: rgba(139,34,82,0.32);
+            box-shadow: 0 0 0 3px rgba(139,34,82,0.06);
+        }
+
+        .confirm-task-step-dot.active {
+            background: rgba(139,34,82,0.16);
+            border-color: rgba(139,34,82,0.32);
+            box-shadow: 0 0 0 3px rgba(139,34,82,0.07);
+        }
+
+        .confirm-task-step-dot.warning {
+            background: rgba(139,34,82,0.09);
+            border-color: rgba(139,34,82,0.24);
+            box-shadow: 0 0 0 3px rgba(139,34,82,0.04);
+        }
+
+        .confirm-task-step-dot.pending,
+        .confirm-task-step-dot.muted {
+            color: rgba(166,45,101,0.7);
+            background: rgba(139,34,82,0.02);
+            border-color: rgba(139,34,82,0.14);
+        }
+
+        .confirm-task-step-line {
+            width: 2px;
+            flex: 1;
+            min-height: 42px;
+            background: rgba(139,34,82,0.12);
+        }
+
+        .confirm-task-step-line.active,
+        .confirm-task-step-line.done {
+            background: rgba(139,34,82,0.22);
+        }
+
+        .confirm-task-step:last-child .confirm-task-step-line {
+            display: none;
+        }
+
+        .confirm-task-step-content {
+            min-width: 0;
+        }
+
+        .confirm-task-step-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
+        .confirm-task-step-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.76rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .confirm-task-step-status {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.64rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.2rem 0.45rem;
+            border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-tertiary);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .confirm-task-step-status.done {
+            color: var(--accent-light);
+            border-color: rgba(139,34,82,0.2);
+            background: rgba(139,34,82,0.07);
+        }
+
+        .confirm-task-step-status.active {
+            color: var(--accent-light);
+            border-color: rgba(139,34,82,0.2);
+            background: rgba(139,34,82,0.06);
+        }
+
+        .confirm-task-step-status.warning {
+            color: var(--accent-light);
+            border-color: rgba(139,34,82,0.18);
+            background: rgba(139,34,82,0.04);
+        }
+
+        .confirm-task-step-status.muted {
+            color: rgba(166,45,101,0.75);
+            border-color: rgba(139,34,82,0.12);
+            background: rgba(139,34,82,0.02);
+        }
+
+        .confirm-task-step-text {
+            margin-top: 0.32rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .confirm-task-step-actions {
+            margin-top: 0.55rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .confirm-task-step-actions .confirm-task-detail-btn {
+            margin: 0;
+        }
+
+        .confirm-task-step-actions .confirm-task-detail-btn.success,
+        .confirm-task-step-actions .confirm-task-detail-btn.warning {
+            border-color: rgba(139,34,82,0.22);
+            background: rgba(139,34,82,0.06);
+            color: var(--accent-light);
+        }
+
+        .confirm-task-step-actions .confirm-task-detail-btn.success:hover:not(:disabled),
+        .confirm-task-step-actions .confirm-task-detail-btn.warning:hover:not(:disabled) {
+            border-color: rgba(139,34,82,0.4);
+            background: rgba(139,34,82,0.11);
+        }
+
+        .confirm-task-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(8, 8, 8, 0.28);
+            backdrop-filter: blur(2px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            z-index: 1400;
+        }
+
+        .confirm-task-modal.show {
+            display: flex;
+        }
+
+        .confirm-task-modal-panel {
+            width: min(1040px, 100%);
+            max-height: min(88vh, 900px);
+            overflow: auto;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            box-shadow: 0 18px 50px rgba(0,0,0,0.22);
+        }
+
+        .confirm-task-modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 1rem 0.85rem;
+            border-bottom: 1px solid var(--border);
+            background: transparent;
+        }
+
+        .confirm-task-modal-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-primary);
+            line-height: 1.15;
+        }
+
+        .confirm-task-modal-subtitle {
+            margin-top: 0.35rem;
+            font-size: 0.78rem;
+            color: var(--text-tertiary);
+            line-height: 1.4;
+        }
+
+        .confirm-task-modal-close {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.55rem 0.7rem;
+            cursor: none;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .confirm-task-modal-close:hover {
+            border-color: rgba(139,34,82,0.26);
+            background: rgba(139,34,82,0.08);
+            color: var(--accent-light);
+        }
+
+        .confirm-task-modal-body {
+            padding: 1rem;
+            background: var(--bg-secondary);
+        }
+
+        .confirm-task-modal-empty {
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            padding: 1rem;
+        }
+
+        .confirm-task-modal-body .confirm-task-detail {
+            border-top: none;
+            padding-top: 0;
+            display: block;
+        }
+
+        .confirm-task-modal-body .confirm-task-detail-block {
+            background: var(--bg-card);
+            border-color: var(--border);
+        }
+
+        .confirm-task-modal-body .confirm-task-transcript {
+            background: rgba(255,255,255,0.01);
+            border: 1px solid var(--border);
+            padding: 0.7rem;
+        }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .kpi-grid {
@@ -956,6 +1357,12 @@
             .confirm-task-statuses { justify-content: flex-start; }
             .confirm-task-detail-grid { grid-template-columns: 1fr; }
             .confirm-task-detail-actions { flex-direction: column; }
+            .confirm-task-step-actions { flex-direction: column; }
+            .confirm-task-modal { padding: 0.6rem; }
+            .confirm-task-modal-header { padding: 0.85rem 0.85rem 0.75rem; }
+            .confirm-task-modal-title { font-size: 0.92rem; }
+            .confirm-task-modal-body { padding: 0.85rem; }
+            .confirm-task-flow-actions { gap: 0.35rem; }
         }
     </style>
 </head>
@@ -973,7 +1380,7 @@
             <nav class="sidebar-nav">
                 <div class="sidebar-section">
                     <div class="sidebar-section-label">Overzicht</div>
-                    <a href="premium-personeel-dashboard.html" class="sidebar-link active magnetic">
+                    <a href="premium-personeel-dashboard.html" class="sidebar-link magnetic">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                         Dashboard
                     </a>
@@ -989,8 +1396,8 @@
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
                         AI Coldcalling
                     </a>
-                    <a href="premium-bevestigingsmails.html" class="sidebar-link magnetic">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                    <a href="premium-bevestigingsmails.html" class="sidebar-link active magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 7.5v9a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 16.5v-9m19.5 0A2.25 2.25 0 0019.5 5.25h-15A2.25 2.25 0 002.25 7.5m19.5 0l-8.69 5.52a2.25 2.25 0 01-2.12 0L2.25 7.5"/></svg>
                         Bevestigingsmails
                     </a>
                     <a href="#" class="sidebar-link magnetic">
@@ -1041,8 +1448,8 @@
 
             <div class="topbar">
                 <div class="topbar-left">
-                    <h1>Dashboard</h1>
-                    <p>Overzicht van je bedrijfsprestaties</p>
+                    <h1>Bevestigingsmails</h1>
+                    <p>Opvolgtaken voor ingeplande afspraken: transcript, mailconcept en bevestiging.</p>
                 </div>
                 <div class="topbar-right">
                     <div class="topbar-date">
@@ -1051,83 +1458,13 @@
                 </div>
             </div>
 
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-label">Omzet Dit Jaar</div>
-                    <div class="kpi-value">€6.200</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Omzet Deze Maand</div>
-                    <div class="kpi-value">€24.800</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Totale Klanten</div>
-                    <div class="kpi-value">47</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Actieve Projecten</div>
-                    <div class="kpi-value">8</div>
-                </div>
-            </div>
-
             <div class="content-grid">
-
-                <div class="panel">
+                <div class="panel" style="grid-column: 1 / -1;">
                     <div class="panel-header">
-                        <span class="panel-title">Omzet 2025</span>
-                        <span class="panel-badge">Per Maand</span>
+                        <span class="panel-title">Bevestigingsmail Taken</span>
+                        <span class="panel-badge">Opvolging</span>
                     </div>
-                    <div class="chart-area">
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 55%;"></div><span class="chart-label">Jan</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 72%;"></div><span class="chart-label">Feb</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 48%;"></div><span class="chart-label">Mrt</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 85%;"></div><span class="chart-label">Apr</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 65%;"></div><span class="chart-label">Mei</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 90%;"></div><span class="chart-label">Jun</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 78%;"></div><span class="chart-label">Jul</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 60%;"></div><span class="chart-label">Aug</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 95%;"></div><span class="chart-label">Sep</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 70%;"></div><span class="chart-label">Okt</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 82%;"></div><span class="chart-label">Nov</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 40%;"></div><span class="chart-label">Dec</span></div>
-                    </div>
-                </div>
-
-                <div class="panel" style="animation-delay: 0.6s;">
-                    <div class="panel-header">
-                        <span class="panel-title">Recente Activiteit</span>
-                    </div>
-                    <div class="activity-list" id="recentActivityList">
-                        <div class="activity-item">
-                            <div class="activity-dot"></div>
-                            <div>
-                                <div class="activity-text"><strong>Factuur #2025-042</strong> verstuurd naar Bakkerij Jansen</div>
-                                <div class="activity-time">2 uur geleden</div>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <div class="activity-dot" style="background: var(--green);"></div>
-                            <div>
-                                <div class="activity-text"><strong>Project De Vries Advocaten</strong> is live gegaan</div>
-                                <div class="activity-time">Gisteren, 16:30</div>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <div class="activity-dot"></div>
-                            <div>
-                                <div class="activity-text"><strong>Nieuwe klant</strong> Studio Bloom toegevoegd</div>
-                                <div class="activity-time">Gisteren, 11:00</div>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <div class="activity-dot" style="background: var(--yellow);"></div>
-                            <div>
-                                <div class="activity-text"><strong>Betaling ontvangen</strong> €5.500 van Tech Solutions</div>
-                                <div class="activity-time">2 dagen geleden</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="confirm-task-section">
+                    <div class="confirm-task-section" style="margin-top: 0; padding-top: 0; border-top: none;">
                         <div class="confirm-task-header">
                             <div class="confirm-task-title">Bevestigingsmail sturen</div>
                             <div class="confirm-task-count" id="confirmTaskCount">0 taken</div>
@@ -1137,53 +1474,25 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="panel" style="animation-delay: 0.7s;">
-                <div class="panel-header">
-                    <span class="panel-title">Lopende Projecten</span>
-                    <span class="panel-badge">8 Actief</span>
-                </div>
-                <div class="project-list">
-                    <div class="project-item">
-                        <div class="project-info">
-                            <span class="project-name">Website Redesign</span>
-                            <span class="project-client">Van der Berg Interiors</span>
-                        </div>
-                        <span class="project-status status-active">Actief</span>
-                    </div>
-                    <div class="project-item">
-                        <div class="project-info">
-                            <span class="project-name">E-commerce Platform</span>
-                            <span class="project-client">Mode Collectief</span>
-                        </div>
-                        <span class="project-status status-active">Actief</span>
-                    </div>
-                    <div class="project-item">
-                        <div class="project-info">
-                            <span class="project-name">Branding + Website</span>
-                            <span class="project-client">Studio Bloom</span>
-                        </div>
-                        <span class="project-status status-review">Review</span>
-                    </div>
-                    <div class="project-item">
-                        <div class="project-info">
-                            <span class="project-name">Corporate Website</span>
-                            <span class="project-client">De Vries Advocaten</span>
-                        </div>
-                        <span class="project-status status-done">Opgeleverd</span>
-                    </div>
-                    <div class="project-item">
-                        <div class="project-info">
-                            <span class="project-name">Landing Page Campagne</span>
-                            <span class="project-client">FitLife Gym</span>
-                        </div>
-                        <span class="project-status status-active">Actief</span>
-                    </div>
-                </div>
             </div>
 
         </main>
+    </div>
+
+    <div class="confirm-task-modal" id="confirmTaskModal" aria-hidden="true">
+        <div class="confirm-task-modal-panel" role="dialog" aria-modal="true" aria-labelledby="confirmTaskModalTitle">
+            <div class="confirm-task-modal-header">
+                <div>
+                    <div class="confirm-task-modal-title" id="confirmTaskModalTitle">Taakdetails</div>
+                    <div class="confirm-task-modal-subtitle" id="confirmTaskModalSubtitle">Selecteer een taak om transcriptie en bevestigingsmail te bekijken.</div>
+                </div>
+                <button type="button" class="confirm-task-modal-close magnetic" id="confirmTaskModalClose">Sluiten</button>
+            </div>
+            <div class="confirm-task-modal-body" id="confirmTaskModalBody">
+                <div class="confirm-task-modal-empty">Selecteer een taak om transcriptie en bevestigingsmail te bekijken.</div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1273,8 +1582,7 @@
 
         function renderConfirmationTaskDetail(task) {
             const taskId = Number(task?.id) || 0;
-            const isExpanded = confirmationTaskState.expandedTaskId === taskId;
-            if (!isExpanded) return '';
+            if (!taskId) return '';
 
             const isLoading = confirmationTaskState.detailLoadingId === taskId;
             const detail = confirmationTaskState.detailsById[String(taskId)] || null;
@@ -1304,9 +1612,15 @@
             const busy = isTaskActionBusy(taskId);
             const mailSent = Boolean(task.mailSent);
             const canMarkResponse = mailSent;
+            const step1ChipClass = mailSent ? 'done' : 'active';
+            const step1StatusText = mailSent ? 'Afgerond' : 'Actief';
+            const step1DotText = mailSent ? '✓' : '1';
+            const step2ChipClass = mailSent ? 'active' : 'pending';
+            const step2StatusText = mailSent ? 'Kies uitkomst' : 'Wacht op 1';
+            const step2DotText = '2';
 
             return `
-                <div class="confirm-task-detail ${isExpanded ? 'show' : ''}" data-task-detail-id="${taskId}">
+                <div class="confirm-task-detail show" data-task-detail-id="${taskId}">
                     ${isLoading ? '<div class="confirm-task-detail-info">Details laden...</div>' : ''}
                     <div class="confirm-task-detail-grid">
                         <div class="confirm-task-detail-block">
@@ -1322,78 +1636,80 @@
                         </div>
                     </div>
                     ${infoHtml ? `<div class="confirm-task-detail-info">${infoHtml}</div>` : ''}
-                    <div class="confirm-task-detail-actions">
-                        <button type="button" class="confirm-task-detail-btn magnetic" data-generate-draft-id="${taskId}" ${busy ? 'disabled' : ''}>Schrijf bevestigingsmail</button>
-                        <button type="button" class="confirm-task-detail-btn success magnetic" data-mark-sent-id="${taskId}" ${busy ? 'disabled' : ''}>Mail verstuurd</button>
-                        <button type="button" class="confirm-task-detail-btn warning magnetic" data-mark-confirmed-id="${taskId}" ${(busy || !canMarkResponse) ? 'disabled' : ''}>Bevestiging ontvangen</button>
+                    <div class="confirm-task-flow">
+                        <div class="confirm-task-flow-title">Tijdlijn opvolging</div>
+                        <div class="confirm-task-stepper" role="list" aria-label="Tijdlijn opvolging">
+                            <div class="confirm-task-step-chip ${step1ChipClass}" role="listitem">
+                                <span class="confirm-task-step-chip-index">${step1DotText}</span>
+                                <span class="confirm-task-step-chip-label">Bevestigingsmail</span>
+                                <span class="confirm-task-step-chip-state">${step1StatusText}</span>
+                            </div>
+                            <div class="confirm-task-stepper-connector ${mailSent ? 'done' : ''}" aria-hidden="true"></div>
+                            <div class="confirm-task-step-chip ${step2ChipClass}" role="listitem">
+                                <span class="confirm-task-step-chip-index">${step2DotText}</span>
+                                <span class="confirm-task-step-chip-label">Uitkomst afspraak</span>
+                                <span class="confirm-task-step-chip-state">${step2StatusText}</span>
+                            </div>
+                        </div>
+
+                        <div class="confirm-task-flow-actions">
+                            <button type="button" class="confirm-task-detail-btn magnetic" data-generate-draft-id="${taskId}" ${busy ? 'disabled' : ''}>Schrijf bevestigingsmail</button>
+                            <button type="button" class="confirm-task-detail-btn success magnetic" data-mark-sent-id="${taskId}" ${busy ? 'disabled' : ''}>Mail verstuurd</button>
+                            <button type="button" class="confirm-task-detail-btn warning magnetic" data-mark-confirmed-id="${taskId}" ${(busy || !canMarkResponse) ? 'disabled' : ''}>Afspraak bevestigd</button>
+                            <button type="button" class="confirm-task-detail-btn magnetic" data-mark-cancelled-id="${taskId}" ${(busy || !canMarkResponse) ? 'disabled' : ''}>Afspraak geannuleerd</button>
+                        </div>
                     </div>
                 </div>
             `;
         }
 
-        function renderConfirmationTasks() {
-            const listEl = document.getElementById('confirmTaskList');
-            const countEl = document.getElementById('confirmTaskCount');
-            if (!listEl || !countEl) return;
+        function getSelectedConfirmationTask() {
+            if (!confirmationTaskState.expandedTaskId) return null;
+            return getTaskById(confirmationTaskState.expandedTaskId);
+        }
 
-            const tasks = Array.isArray(confirmationTaskState.tasks) ? confirmationTaskState.tasks : [];
-            countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
+        function closeConfirmationTaskModal() {
+            confirmationTaskState.expandedTaskId = null;
+            renderConfirmationTasks();
+        }
 
-            if (!tasks.length) {
-                listEl.innerHTML = '<div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>';
-                confirmationTaskState.expandedTaskId = null;
+        async function openConfirmationTaskModal(taskId) {
+            const normalizedTaskId = Number(taskId) || 0;
+            if (!normalizedTaskId) return;
+            confirmationTaskState.expandedTaskId = normalizedTaskId;
+            renderConfirmationTasks();
+            if (!confirmationTaskState.detailsById[String(normalizedTaskId)]) {
+                await loadConfirmationTaskDetail(normalizedTaskId);
+            }
+        }
+
+        function renderConfirmationTaskModal() {
+            const modalEl = document.getElementById('confirmTaskModal');
+            const bodyEl = document.getElementById('confirmTaskModalBody');
+            const titleEl = document.getElementById('confirmTaskModalTitle');
+            const subtitleEl = document.getElementById('confirmTaskModalSubtitle');
+            if (!modalEl || !bodyEl || !titleEl || !subtitleEl) return;
+
+            const selectedTask = getSelectedConfirmationTask();
+            const hasSelection = Boolean(selectedTask);
+            modalEl.classList.toggle('show', hasSelection);
+            modalEl.setAttribute('aria-hidden', hasSelection ? 'false' : 'true');
+
+            if (!selectedTask) {
+                titleEl.textContent = 'Taakdetails';
+                subtitleEl.textContent = 'Selecteer een taak om transcriptie en bevestigingsmail te bekijken.';
+                bodyEl.innerHTML = '<div class="confirm-task-modal-empty">Selecteer een taak om transcriptie en bevestigingsmail te bekijken.</div>';
                 return;
             }
 
-            listEl.innerHTML = tasks.map((task) => {
-                const taskId = Number(task.id) || 0;
-                const company = escapeHtml(task.company || 'Onbekende lead');
-                const contact = escapeHtml(task.contact || 'Onbekend');
-                const timeLabel = escapeHtml(formatTaskDateTimeLabel(task));
-                const note = task.summary ? `<div class="confirm-task-note">${escapeHtml(task.summary)}</div>` : '';
-                const expandedClass = confirmationTaskState.expandedTaskId === taskId ? 'show' : '';
-                return `
-                    <div class="confirm-task-item ${expandedClass}" data-task-id="${taskId}">
-                        <div class="confirm-task-top">
-                            <div style="min-width:0;">
-                                <button type="button" class="confirm-task-company-btn magnetic" data-open-task-id="${taskId}">
-                                    <div class="confirm-task-company"><strong>${company}</strong> · ${contact}</div>
-                                </button>
-                                <div class="confirm-task-meta">Stuur bevestigingsmail voor afspraak op ${timeLabel}</div>
-                                ${note}
-                            </div>
-                            <div class="confirm-task-side">
-                                <div class="confirm-task-statuses">
-                                    ${taskStatusBadgesHtml(task)}
-                                </div>
-                                <button type="button" class="confirm-task-detail-btn magnetic" data-open-task-id="${taskId}">${confirmationTaskState.expandedTaskId === taskId ? 'Sluit details' : 'Open details'}</button>
-                            </div>
-                        </div>
-                        ${renderConfirmationTaskDetail(task)}
-                    </div>
-                `;
-            }).join('');
+            const company = selectedTask.company || 'Onbekende lead';
+            const contact = selectedTask.contact || 'Onbekend';
+            const timeLabel = formatTaskDateTimeLabel(selectedTask);
+            titleEl.textContent = company;
+            subtitleEl.textContent = `Afspraak ${timeLabel} · Contact: ${contact}`;
+            bodyEl.innerHTML = renderConfirmationTaskDetail(selectedTask);
 
-            listEl.querySelectorAll('[data-open-task-id]').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = Number(btn.getAttribute('data-open-task-id'));
-                    if (!taskId) return;
-                    if (confirmationTaskState.expandedTaskId === taskId) {
-                        confirmationTaskState.expandedTaskId = null;
-                        renderConfirmationTasks();
-                        return;
-                    }
-                    confirmationTaskState.expandedTaskId = taskId;
-                    renderConfirmationTasks();
-                    if (!confirmationTaskState.detailsById[String(taskId)]) {
-                        await loadConfirmationTaskDetail(taskId);
-                    }
-                });
-            });
-
-            listEl.querySelectorAll('[data-generate-draft-id]').forEach((btn) => {
+            bodyEl.querySelectorAll('[data-generate-draft-id]').forEach((btn) => {
                 btn.addEventListener('click', async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1407,7 +1723,7 @@
                 });
             });
 
-            listEl.querySelectorAll('[data-mark-sent-id]').forEach((btn) => {
+            bodyEl.querySelectorAll('[data-mark-sent-id]').forEach((btn) => {
                 btn.addEventListener('click', async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1421,7 +1737,7 @@
                 });
             });
 
-            listEl.querySelectorAll('[data-mark-confirmed-id]').forEach((btn) => {
+            bodyEl.querySelectorAll('[data-mark-confirmed-id]').forEach((btn) => {
                 btn.addEventListener('click', async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1434,6 +1750,75 @@
                     if (!ok) renderConfirmationTasks();
                 });
             });
+
+            bodyEl.querySelectorAll('[data-mark-cancelled-id]').forEach((btn) => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const taskId = Number(btn.getAttribute('data-mark-cancelled-id'));
+                    if (!taskId || isTaskActionBusy(taskId)) return;
+                    setTaskActionBusy(taskId, true);
+                    renderConfirmationTasks();
+                    const ok = await markConfirmationCancelled(taskId);
+                    setTaskActionBusy(taskId, false);
+                    if (!ok) renderConfirmationTasks();
+                });
+            });
+        }
+
+        function renderConfirmationTasks() {
+            const listEl = document.getElementById('confirmTaskList');
+            const countEl = document.getElementById('confirmTaskCount');
+            if (!listEl || !countEl) return;
+
+            const tasks = Array.isArray(confirmationTaskState.tasks) ? confirmationTaskState.tasks : [];
+            countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
+
+            if (!tasks.length) {
+                listEl.innerHTML = '<div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>';
+                confirmationTaskState.expandedTaskId = null;
+                renderConfirmationTaskModal();
+                return;
+            }
+
+            listEl.innerHTML = tasks.map((task) => {
+                const taskId = Number(task.id) || 0;
+                const company = escapeHtml(task.company || 'Onbekende lead');
+                const contact = escapeHtml(task.contact || 'Onbekend');
+                const timeLabel = escapeHtml(formatTaskDateTimeLabel(task));
+                const note = task.summary ? `<div class="confirm-task-note">${escapeHtml(task.summary)}</div>` : '';
+                return `
+                    <div class="confirm-task-item" data-task-id="${taskId}">
+                        <div class="confirm-task-top">
+                            <div style="min-width:0;">
+                                <button type="button" class="confirm-task-company-btn magnetic" data-open-task-id="${taskId}">
+                                    <div class="confirm-task-company"><strong>${company}</strong> · ${contact}</div>
+                                </button>
+                                <div class="confirm-task-meta">Stuur bevestigingsmail voor afspraak op ${timeLabel}</div>
+                                ${note}
+                            </div>
+                            <div class="confirm-task-side">
+                                <div class="confirm-task-statuses">
+                                    ${taskStatusBadgesHtml(task)}
+                                </div>
+                                <button type="button" class="confirm-task-detail-btn magnetic" data-open-task-id="${taskId}">Open details</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            listEl.querySelectorAll('[data-open-task-id]').forEach((btn) => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const taskId = Number(btn.getAttribute('data-open-task-id'));
+                    if (!taskId) return;
+                    await openConfirmationTaskModal(taskId);
+                });
+            });
+
+            renderConfirmationTaskModal();
         }
 
         async function loadConfirmationTaskDetail(taskId) {
@@ -1541,6 +1926,53 @@
                 return false;
             }
         }
+
+        async function markConfirmationCancelled(taskId) {
+            const task = getTaskById(taskId);
+            if (!task?.mailSent) return false;
+            try {
+                const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/mark-cancelled`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ actor: 'Premium dashboard gebruiker' })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data?.ok) return false;
+
+                confirmationTaskState.tasks = confirmationTaskState.tasks.filter((item) => Number(item.id) !== Number(taskId));
+                delete confirmationTaskState.detailsById[String(taskId)];
+                delete confirmationTaskState.actionBusyById[String(taskId)];
+                if (Number(confirmationTaskState.expandedTaskId) === Number(taskId)) {
+                    confirmationTaskState.expandedTaskId = null;
+                }
+                renderConfirmationTasks();
+                addRecentActivityEntry('<strong>Afspraak geannuleerd</strong>', data.appointment?.company || task.company);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        const confirmTaskModalEl = document.getElementById('confirmTaskModal');
+        const confirmTaskModalCloseEl = document.getElementById('confirmTaskModalClose');
+        if (confirmTaskModalEl) {
+            confirmTaskModalEl.addEventListener('click', (e) => {
+                if (e.target === confirmTaskModalEl) {
+                    closeConfirmationTaskModal();
+                }
+            });
+        }
+        if (confirmTaskModalCloseEl) {
+            confirmTaskModalCloseEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                closeConfirmationTaskModal();
+            });
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && confirmationTaskState.expandedTaskId) {
+                closeConfirmationTaskModal();
+            }
+        });
 
         renderConfirmationTasks();
         loadConfirmationTasks();

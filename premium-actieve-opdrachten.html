@@ -314,6 +314,38 @@
             color: var(--text-tertiary);
         }
 
+        .topbar-btn {
+            border: 1px solid rgba(139,34,82,0.35);
+            background: linear-gradient(135deg, rgba(139,34,82,0.12), rgba(167,43,100,0.06));
+            color: var(--accent-light);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.9rem 1.15rem;
+            cursor: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.25s var(--ease-out-expo);
+            white-space: nowrap;
+        }
+
+        .topbar-btn svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .topbar-btn:hover {
+            color: #fff;
+            border-color: var(--accent);
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            box-shadow: 0 0 28px rgba(139,34,82,0.22);
+            transform: translateY(-1px);
+        }
+
         /* Summary */
         .summary-bar {
             display: grid;
@@ -380,6 +412,17 @@
             display: flex;
             flex-direction: column;
             gap: 1rem;
+        }
+
+        .orders-empty-state {
+            background: var(--bg-secondary);
+            border: 1px dashed var(--border);
+            color: var(--text-tertiary);
+            font-size: 0.9rem;
+            font-weight: 300;
+            line-height: 1.5;
+            padding: 1.5rem 1.75rem;
+            text-align: center;
         }
 
         .order-card {
@@ -739,6 +782,118 @@
 
         .modal-btn.secondary:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
 
+        .modal.create-order-dialog {
+            max-width: 760px;
+            padding: 2rem;
+        }
+
+        .create-order-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .create-order-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .create-order-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+
+        .create-order-field.full {
+            grid-column: 1 / -1;
+        }
+
+        .create-order-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 500;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .create-order-input,
+        .create-order-select,
+        .create-order-textarea {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.8rem 0.95rem;
+            font-size: 0.9rem;
+            font-weight: 400;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .create-order-input:focus,
+        .create-order-select:focus,
+        .create-order-textarea:focus {
+            border-color: rgba(139,34,82,0.55);
+            box-shadow: 0 0 0 3px rgba(139,34,82,0.08);
+        }
+
+        .create-order-input::placeholder,
+        .create-order-textarea::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .create-order-select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+        }
+
+        .create-order-textarea {
+            min-height: 96px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .create-order-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 0.15rem;
+        }
+
+        .create-order-help {
+            font-size: 0.78rem;
+            color: var(--text-tertiary);
+            font-weight: 300;
+        }
+
+        .create-order-message {
+            min-height: 1.1rem;
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+        }
+
+        .create-order-message.error { color: var(--red); }
+        .create-order-message.success { color: var(--green); }
+
+        .create-order-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.7rem;
+            margin-top: 0.25rem;
+        }
+
+        .create-order-actions .modal-btn {
+            width: auto;
+            min-width: 180px;
+            margin-top: 0;
+            padding: 0.95rem 1.1rem;
+            font-size: 0.86rem;
+        }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .order-main { grid-template-columns: 1fr auto auto; gap: 1.5rem; }
@@ -760,9 +915,15 @@
             .main-content { padding: 1.5rem; }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
             .topbar-right { width: 100%; flex-direction: column; align-items: stretch; gap: 0.5rem; }
+            .topbar-btn { width: 100%; justify-content: center; }
             .build-mode { width: 100%; }
             .mode-btn { flex: 1; justify-content: center; }
             .build-mode-hint { display: none; }
+            .modal.create-order-dialog { width: 94%; padding: 1.25rem; }
+            .create-order-grid { grid-template-columns: 1fr; }
+            .create-order-actions { flex-direction: column; }
+            .create-order-actions .modal-btn { width: 100%; min-width: 0; }
+            .create-order-meta { align-items: flex-start; flex-direction: column; }
         }
     </style>
 </head>
@@ -796,6 +957,59 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="createOrderModal" aria-hidden="true">
+        <div class="modal create-order-dialog" role="dialog" aria-modal="true" aria-label="Actieve opdracht aanmaken">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">Actieve Opdracht Aanmaken</div>
+                    <div class="modal-subtitle">Nieuwe opdracht toevoegen aan de actieve opdrachtenlijst.</div>
+                </div>
+                <button class="modal-close magnetic" type="button" id="createOrderCloseBtn" aria-label="Sluiten">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form class="create-order-form" id="createOrderForm">
+                <div class="create-order-grid">
+                    <div class="create-order-field">
+                        <label class="create-order-label" for="newOrderClient">Klantnaam</label>
+                        <input class="create-order-input" id="newOrderClient" name="clientName" type="text" placeholder="Bijv. Salon Nova" required>
+                    </div>
+                    <div class="create-order-field">
+                        <label class="create-order-label" for="newOrderLocation">Plaats</label>
+                        <input class="create-order-input" id="newOrderLocation" name="location" type="text" placeholder="Bijv. Breda" required>
+                    </div>
+                    <div class="create-order-field full">
+                        <label class="create-order-label" for="newOrderTitle">Opdracht Titel</label>
+                        <input class="create-order-input" id="newOrderTitle" name="title" type="text" placeholder="Bijv. Website met online booking" required>
+                    </div>
+                    <div class="create-order-field full">
+                        <label class="create-order-label" for="newOrderDesc">Omschrijving</label>
+                        <textarea class="create-order-textarea" id="newOrderDesc" name="description" placeholder="Korte omschrijving van de opdracht..." required></textarea>
+                    </div>
+                    <div class="create-order-field">
+                        <label class="create-order-label" for="newOrderAmount">Bedrag (€)</label>
+                        <input class="create-order-input" id="newOrderAmount" name="amount" type="number" min="1" step="100" placeholder="2800" required>
+                    </div>
+                    <div class="create-order-field">
+                        <label class="create-order-label" for="newOrderStatus">Status</label>
+                        <select class="create-order-select" id="newOrderStatus" name="status">
+                            <option value="wacht" selected>Wachtend</option>
+                            <option value="actief">Actief</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="create-order-meta">
+                    <div class="create-order-help">Na aanmaken verschijnt de opdracht direct in de lijst hieronder.</div>
+                    <div class="create-order-message" id="createOrderMessage" aria-live="polite"></div>
+                </div>
+                <div class="create-order-actions">
+                    <button class="modal-btn secondary magnetic" type="button" id="createOrderCancelBtn">Annuleren</button>
+                    <button class="modal-btn magnetic" type="submit" style="background: var(--accent); color: #fff;">Opdracht Aanmaken</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="dashboard-layout">
 
         <aside class="sidebar">
@@ -820,7 +1034,11 @@
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
                         AI Coldcalling
                     </a>
-                    <a href="premium-ai-coldmailing.html" class="sidebar-link magnetic">
+                    <a href="premium-bevestigingsmails.html" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                        Bevestigingsmails
+                    </a>
+                    <a href="#" class="sidebar-link magnetic">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
                         AI Coldmailing
                     </a>
@@ -871,13 +1089,19 @@
                     <h1>Actieve Opdrachten</h1>
                     <p>Beheer en voer klantopdrachten uit met AI</p>
                 </div>
+                <div class="topbar-right">
+                    <button class="topbar-btn magnetic" type="button" id="createOrderBtn">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+                        Actieve Opdracht Aanmaken
+                    </button>
+                </div>
             </div>
 
             <div class="summary-bar">
                 <div class="summary-card">
                     <div>
                         <div class="summary-label">Actieve Opdrachten</div>
-                        <div class="summary-value accent" id="sumActive">5</div>
+                        <div class="summary-value accent" id="sumActive">0</div>
                     </div>
                     <div class="summary-icon">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -886,7 +1110,7 @@
                 <div class="summary-card">
                     <div>
                         <div class="summary-label">Totale Waarde</div>
-                        <div class="summary-value" id="sumTotal">€38.200</div>
+                        <div class="summary-value" id="sumTotal">€0</div>
                     </div>
                     <div class="summary-icon">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -895,7 +1119,7 @@
                 <div class="summary-card">
                     <div>
                         <div class="summary-label">Opgeleverd Deze Maand</div>
-                        <div class="summary-value green" id="sumDelivered">3</div>
+                        <div class="summary-value green" id="sumDelivered">0</div>
                     </div>
                     <div class="summary-icon green-bg">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -1072,6 +1296,7 @@
         const PREVIEW_HTML_PREFIX = 'softora_preview_html_premium_v4_';
         const ORDER_STATE_KEY = 'softora_order_state_premium_v1';
         const BUILD_MODE_KEY = 'softora_build_mode_premium_v1';
+        const CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
 
         const orders = {
             1: { name: 'Kapsalon Mooi', type: 'Kapper Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
@@ -1080,6 +1305,7 @@
             4: { name: 'Van der Berg Interiors', type: 'Portfolio Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
             5: { name: 'Bakkerij Jansen', type: 'Bakkerij Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null }
         };
+        let customOrders = [];
 
         const quickBuildSteps = [
             { pct: 5, step: 1, msg: 'Opdracht ontvangen, klantgegevens analyseren...' },
@@ -1230,6 +1456,333 @@
         function formatBudget(n) {
             if (typeof n !== 'number' || !isFinite(n) || n <= 0) return '—';
             return '€' + n.toLocaleString('nl-NL');
+        }
+
+        function renderOrdersEmptyState() {
+            const grid = document.getElementById('ordersGrid');
+            if (!grid) return;
+
+            const hasCards = Boolean(grid.querySelector('.order-card'));
+            let empty = grid.querySelector('.orders-empty-state');
+
+            if (!hasCards) {
+                if (!empty) {
+                    empty = document.createElement('div');
+                    empty.className = 'orders-empty-state';
+                    empty.textContent = 'Nog geen actieve opdrachten.';
+                    grid.appendChild(empty);
+                }
+                return;
+            }
+
+            if (empty) empty.remove();
+        }
+
+        function clearDemoOrdersOnLoad() {
+            const grid = document.getElementById('ordersGrid');
+            if (!grid) return;
+
+            const removedIds = [];
+            grid.querySelectorAll('.order-card').forEach((card) => {
+                const id = Number(String(card.id || '').replace('order-', ''));
+                if (Number.isFinite(id) && id > 0) removedIds.push(id);
+                card.remove();
+            });
+
+            removedIds.forEach((id) => {
+                delete orders[id];
+            });
+
+            const sumActive = document.getElementById('sumActive');
+            if (sumActive) sumActive.textContent = '0';
+            const sumTotal = document.getElementById('sumTotal');
+            if (sumTotal) sumTotal.textContent = '€0';
+            const sumDelivered = document.getElementById('sumDelivered');
+            if (sumDelivered) sumDelivered.textContent = '0';
+
+            renderOrdersEmptyState();
+        }
+
+        function normalizeOrderStatus(value) {
+            const key = String(value || '').toLowerCase().trim();
+            if (key === 'actief') return { key: 'actief', text: 'Actief', className: 'actief' };
+            if (key === 'bezig') return { key: 'bezig', text: 'Bezig', className: 'bezig' };
+            if (key === 'klaar') return { key: 'klaar', text: 'Klaar', className: 'klaar' };
+            return { key: 'wacht', text: 'Wachtend', className: 'wacht' };
+        }
+
+        function refreshOrderSummaryCards() {
+            const cards = Array.from(document.querySelectorAll('#ordersGrid .order-card'));
+            const totalValue = cards.reduce((sum, card) => {
+                const amount = moneyToNumber(card.querySelector('.order-price-value')?.textContent || '');
+                return sum + (Number.isFinite(amount) ? amount : 0);
+            }, 0);
+
+            const sumActive = document.getElementById('sumActive');
+            if (sumActive) sumActive.textContent = String(cards.length);
+
+            const sumTotal = document.getElementById('sumTotal');
+            if (sumTotal) sumTotal.textContent = '€' + totalValue.toLocaleString('nl-NL');
+
+            renderOrdersEmptyState();
+        }
+
+        function getNextOrderId() {
+            const ids = [
+                ...Object.keys(orders).map((id) => Number(id)),
+                ...Array.from(document.querySelectorAll('#ordersGrid .order-card')).map((card) => {
+                    return Number(String(card.id || '').replace('order-', ''));
+                }),
+                ...customOrders.map((item) => Number(item?.id))
+            ].filter((n) => Number.isFinite(n) && n > 0);
+
+            return (ids.length ? Math.max(...ids) : 0) + 1;
+        }
+
+        function readCustomOrdersFromStorage() {
+            try {
+                const raw = localStorage.getItem(CUSTOM_ORDERS_KEY);
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                if (!Array.isArray(parsed)) return [];
+
+                return parsed
+                    .map((item) => {
+                        const id = Number(item?.id);
+                        const amount = Number(item?.amount);
+                        const clientName = String(item?.clientName || '').trim();
+                        const location = String(item?.location || '').trim();
+                        const title = String(item?.title || '').trim();
+                        const description = String(item?.description || '').trim();
+                        if (!Number.isFinite(id) || id <= 0) return null;
+                        if (!clientName || !title || !description) return null;
+                        if (!Number.isFinite(amount) || amount <= 0) return null;
+
+                        return {
+                            id,
+                            clientName,
+                            location,
+                            title,
+                            description,
+                            amount: Math.round(amount),
+                            status: normalizeOrderStatus(item?.status).key
+                        };
+                    })
+                    .filter(Boolean);
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function persistCustomOrders() {
+            try {
+                localStorage.setItem(CUSTOM_ORDERS_KEY, JSON.stringify(customOrders));
+            } catch (_) {
+                // ignore
+            }
+        }
+
+        function ensureOrderRuntimeState(record) {
+            const id = Number(record?.id);
+            if (!id) return;
+            const prev = orders[id] || {};
+            orders[id] = {
+                name: record.clientName || prev.name || 'Bedrijf',
+                type: record.title || prev.type || 'Project',
+                logs: Array.isArray(prev.logs) ? prev.logs : [],
+                progressPct: Number(prev.progressPct) || 0,
+                previewHtml: prev.previewHtml || null,
+                artifact: prev.artifact || null,
+                updatedAt: prev.updatedAt || null
+            };
+        }
+
+        function renderCustomOrderCardHtml(record) {
+            const id = Number(record.id);
+            const status = normalizeOrderStatus(record.status);
+            const clientLine = [record.clientName, record.location].filter(Boolean).join(' — ');
+            const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
+
+            return `
+                <div class="order-card" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
+                    <div class="order-main">
+                        <div class="order-info">
+                            <div class="order-client">${escapeHtml(clientLine || 'Nieuwe opdracht')}</div>
+                            <div class="order-title">${escapeHtml(record.title)}</div>
+                            <div class="order-desc">${escapeHtml(record.description)}</div>
+                        </div>
+                        <div class="order-price">
+                            <div class="order-price-label">Bedrag</div>
+                            <div class="order-price-value"><span class="currency">€</span>${amountText}</div>
+                        </div>
+                        <div class="order-status"><span class="status-tag ${status.className}" id="status-${id}">${status.text}</span></div>
+                        <div class="order-actions">
+                            <button class="execute-btn magnetic" id="btn-${id}" type="button" data-order="${id}">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                Voer Opdracht Uit
+                            </button>
+                            <button class="view-btn magnetic" id="view-${id}" type="button" data-order="${id}">Bekijk Voortgang</button>
+                        </div>
+                    </div>
+                    <div class="order-progress" id="progress-${id}">
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar-${id}"></div></div>
+                        <div class="progress-steps">
+                            <span class="progress-step" id="step-${id}-1">Analyse</span>
+                            <span class="progress-step" id="step-${id}-2">Design</span>
+                            <span class="progress-step" id="step-${id}-3">Development</span>
+                            <span class="progress-step" id="step-${id}-4">Testing</span>
+                            <span class="progress-step" id="step-${id}-5">Oplevering</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function bindDynamicOrderCard(card) {
+            if (!card) return;
+
+            const id = Number(String(card.id || '').replace('order-', ''));
+            if (!id) return;
+
+            const executeBtn = card.querySelector('.execute-btn[data-order]');
+            if (executeBtn && !executeBtn.dataset.boundExecute) {
+                executeBtn.dataset.boundExecute = '1';
+                executeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    executeOrder(id);
+                });
+            }
+
+            const viewBtn = card.querySelector('.view-btn[data-order]');
+            if (viewBtn && !viewBtn.dataset.boundView) {
+                viewBtn.dataset.boundView = '1';
+                viewBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (viewBtn.textContent.trim().toLowerCase().includes('preview')) openPreview(id);
+                    else openModal(id);
+                });
+            }
+
+            if (!card.dataset.boundCardOpen) {
+                card.dataset.boundCardOpen = '1';
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('button,a')) return;
+                    openModal(id);
+                });
+                card.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openModal(id);
+                    }
+                });
+            }
+        }
+
+        function appendCustomOrderCard(record, options = {}) {
+            const grid = document.getElementById('ordersGrid');
+            if (!grid || !record) return null;
+
+            const id = Number(record.id);
+            if (!Number.isFinite(id) || id <= 0) return null;
+
+            const existing = document.getElementById('order-' + id);
+            if (existing) return existing;
+
+            ensureOrderRuntimeState(record);
+
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = renderCustomOrderCardHtml(record).trim();
+            const card = wrapper.firstElementChild;
+            if (!card) return null;
+
+            grid.appendChild(card);
+            bindDynamicOrderCard(card);
+            refreshOrderSummaryCards();
+
+            if (options.scrollIntoView) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            return card;
+        }
+
+        function loadCustomOrderCards() {
+            customOrders = readCustomOrdersFromStorage();
+            customOrders.forEach((record) => {
+                appendCustomOrderCard(record);
+            });
+            refreshOrderSummaryCards();
+        }
+
+        function setCreateOrderMessage(message, type) {
+            const el = document.getElementById('createOrderMessage');
+            if (!el) return;
+            el.textContent = message || '';
+            el.className = 'create-order-message' + (type ? ' ' + type : '');
+        }
+
+        function openCreateOrderModal() {
+            const modal = document.getElementById('createOrderModal');
+            if (!modal) return;
+            const form = document.getElementById('createOrderForm');
+            if (form) form.reset();
+            const statusField = document.getElementById('newOrderStatus');
+            if (statusField) statusField.value = 'wacht';
+            setCreateOrderMessage('', '');
+            modal.classList.add('show');
+            modal.setAttribute('aria-hidden', 'false');
+            window.setTimeout(() => {
+                document.getElementById('newOrderClient')?.focus();
+            }, 40);
+        }
+
+        function closeCreateOrderModal() {
+            const modal = document.getElementById('createOrderModal');
+            if (!modal) return;
+            modal.classList.remove('show');
+            modal.setAttribute('aria-hidden', 'true');
+            setCreateOrderMessage('', '');
+        }
+
+        function handleCreateOrderSubmit(event) {
+            event.preventDefault();
+
+            const form = event.currentTarget;
+            const data = new FormData(form);
+
+            const clientName = String(data.get('clientName') || '').trim();
+            const location = String(data.get('location') || '').trim();
+            const title = String(data.get('title') || '').trim();
+            const description = String(data.get('description') || '').trim();
+            const amount = Math.round(Number(data.get('amount')));
+            const status = normalizeOrderStatus(data.get('status')).key;
+
+            if (!clientName || !location || !title || !description) {
+                setCreateOrderMessage('Vul alle velden in.', 'error');
+                return;
+            }
+            if (!Number.isFinite(amount) || amount <= 0) {
+                setCreateOrderMessage('Vul een geldig bedrag in.', 'error');
+                return;
+            }
+
+            const record = {
+                id: getNextOrderId(),
+                clientName,
+                location,
+                title,
+                description,
+                amount,
+                status
+            };
+
+            customOrders.push(record);
+            persistCustomOrders();
+            appendCustomOrderCard(record, { scrollIntoView: true });
+            form.reset();
+            const statusField = document.getElementById('newOrderStatus');
+            if (statusField) statusField.value = 'wacht';
+            closeCreateOrderModal();
         }
 
         function setLastActiveOrder(orderId) {
@@ -1424,6 +1977,7 @@
             });
         });
         setBuildMode(buildMode);
+        clearDemoOrdersOnLoad();
 
         // Bind UI
         document.querySelectorAll('.execute-btn').forEach((b) => {
@@ -1445,9 +1999,19 @@
 
         document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
         document.getElementById('modalSecondaryBtn').addEventListener('click', closeModal);
+        document.getElementById('createOrderBtn')?.addEventListener('click', openCreateOrderModal);
+        document.getElementById('createOrderCloseBtn')?.addEventListener('click', closeCreateOrderModal);
+        document.getElementById('createOrderCancelBtn')?.addEventListener('click', closeCreateOrderModal);
+        document.getElementById('createOrderForm')?.addEventListener('submit', handleCreateOrderSubmit);
+        document.getElementById('createOrderModal')?.addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeCreateOrderModal();
+        });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeModal();
+            if (e.key === 'Escape') {
+                closeModal();
+                closeCreateOrderModal();
+            }
         });
 
         // Click card to open modal (keeps logs accessible even when button switches to preview)
@@ -1465,6 +2029,8 @@
                 }
             });
         });
+
+        loadCustomOrderCards();
 
         // Cursor (robust)
         (function initCursor() {

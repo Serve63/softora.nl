@@ -21,6 +21,7 @@ VAPI_API_KEY=your_vapi_private_api_key
 VAPI_ASSISTANT_ID=your_assistant_id
 VAPI_PHONE_NUMBER_ID=your_phone_number_id
 WEBHOOK_SECRET=your_optional_webhook_secret
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 Belangrijk:
@@ -28,6 +29,7 @@ Belangrijk:
 - `VAPI_API_KEY` is je private key en blijft alleen op de backend.
 - Gebruik deze key nooit in frontend JS/HTML.
 - `WEBHOOK_SECRET` is optioneel. De backend checkt dan headers zoals `Authorization` of `x-vapi-secret`.
+- `OPENAI_API_KEY` is optioneel. Als gezet, maakt de backend AI-samenvattingen van webhook call updates en probeert afspraken automatisch in de interne agenda-API te zetten.
 
 ## 2) Backend starten
 
@@ -84,6 +86,7 @@ De repo bevat nu een `render.yaml`, zodat je backend + statische frontend als 1 
    - `VAPI_ASSISTANT_ID`
    - `VAPI_PHONE_NUMBER_ID`
    - `WEBHOOK_SECRET` (zelfde waarde als in Vapi webhook config, optioneel maar aanbevolen)
+   - `OPENAI_API_KEY` (optioneel, voor AI-samenvatting + afspraakextractie)
 5. Deploy de service.
 
 ### Na deploy
@@ -136,7 +139,9 @@ Voor nu:
 
 - logt inkomende events (`message.type` + call data)
 - bewaart recente events tijdelijk in memory (geen database)
-- bevat TODO-comments voor status/transcript/afspraak-opslag
+- kan (optioneel) met `OPENAI_API_KEY` een AI-samenvatting + afspraakextractie doen
+- bewaart AI insights tijdelijk in memory via `GET /api/ai/call-insights`
+- zet AI-gedetecteerde afspraken (indien datum gevonden) in de interne agenda-feed via `GET /api/agenda/appointments`
 
 ## Belangrijke notities
 
