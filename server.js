@@ -1531,7 +1531,8 @@ function handleSequentialDispatchQueueWebhookProgress(callUpdate) {
   if (!queue && webhookPhoneKey) {
     for (const candidate of sequentialDispatchQueues.values()) {
       if (candidate.completed) continue;
-      if (candidate.waitingForCallId && callId && candidate.waitingForCallId !== callId) continue;
+      // Fallback via telefoon alleen gebruiken wanneer we GEEN callId hebben om op te wachten.
+      if (candidate.waitingForCallId) continue;
       if (candidate.waitingForPhoneKey && candidate.waitingForPhoneKey === webhookPhoneKey) {
         queue = candidate;
         queueId = candidate.id;
@@ -1542,8 +1543,10 @@ function handleSequentialDispatchQueueWebhookProgress(callUpdate) {
 
   if (!queue || !queueId) return;
 
-  const matchesCallId = callId && queue.waitingForCallId && queue.waitingForCallId === callId;
-  const matchesPhone = webhookPhoneKey && queue.waitingForPhoneKey && queue.waitingForPhoneKey === webhookPhoneKey;
+  const matchesCallId = Boolean(callId && queue.waitingForCallId && queue.waitingForCallId === callId);
+  const matchesPhone = Boolean(
+    !queue.waitingForCallId && webhookPhoneKey && queue.waitingForPhoneKey && queue.waitingForPhoneKey === webhookPhoneKey
+  );
   if (!matchesCallId && !matchesPhone) return;
 
   if (queue.waitingForCallId) {
