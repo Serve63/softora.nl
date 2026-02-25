@@ -1496,12 +1496,86 @@
             try { return JSON.parse(value); } catch { return fallback; }
         }
 
+        const REMOTE_UI_STATE_SCOPE = 'premium_seo_crm';
+        let remoteUiStateCache = {};
+        let remoteUiStatePendingPatch = {};
+        let remoteUiStateSaveTimer = null;
+        let remoteUiStateSaveInFlight = false;
+
+        function preloadRemoteUiStateSync() {
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', `/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, false);
+                xhr.send(null);
+                if (xhr.status < 200 || xhr.status >= 300) return;
+                const data = safeJsonParse(xhr.responseText, null);
+                if (!data || !data.ok || !data.values || typeof data.values !== 'object') return;
+                const next = {};
+                Object.entries(data.values).forEach(([k, v]) => {
+                    next[String(k)] = String(v ?? '');
+                });
+                remoteUiStateCache = next;
+            } catch (_) {
+                // Silent fallback; page blijft werken zonder preload.
+            }
+        }
+
+        function flushRemoteUiStateSave() {
+            if (remoteUiStateSaveInFlight) return;
+            const patch = remoteUiStatePendingPatch;
+            const keys = Object.keys(patch);
+            if (!keys.length) return;
+
+            remoteUiStatePendingPatch = {};
+            remoteUiStateSaveInFlight = true;
+            fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patch,
+                    source: 'premium-seo-crm-system',
+                    actor: 'browser'
+                })
+            }).catch(() => {
+                keys.forEach((key) => {
+                    remoteUiStatePendingPatch[key] = String(patch[key] ?? '');
+                });
+            }).finally(() => {
+                remoteUiStateSaveInFlight = false;
+                if (Object.keys(remoteUiStatePendingPatch).length) {
+                    scheduleRemoteUiStateSave();
+                }
+            });
+        }
+
+        function scheduleRemoteUiStateSave() {
+            if (remoteUiStateSaveTimer) clearTimeout(remoteUiStateSaveTimer);
+            remoteUiStateSaveTimer = setTimeout(() => {
+                remoteUiStateSaveTimer = null;
+                flushRemoteUiStateSave();
+            }, 250);
+        }
+
+        function writeUiStateValue(key, value) {
+            remoteUiStateCache[key] = String(value ?? '');
+            remoteUiStatePendingPatch[key] = String(value ?? '');
+            scheduleRemoteUiStateSave();
+        }
+
+        function removeUiStateValue(key) {
+            delete remoteUiStateCache[key];
+            remoteUiStatePendingPatch[key] = '';
+            scheduleRemoteUiStateSave();
+        }
+
+        preloadRemoteUiStateSync();
+
         function loadStore(key, fallback) {
-            return safeJsonParse(localStorage.getItem(key) || '', fallback);
+            return safeJsonParse(remoteUiStateCache[key] || '', fallback);
         }
 
         function saveStore(key, value) {
-            localStorage.setItem(key, JSON.stringify(value));
+            writeUiStateValue(key, JSON.stringify(value));
         }
 
         function downloadText(filename, text, type = 'application/json') {
@@ -2732,9 +2806,9 @@
         });
 
         document.getElementById('resetAllBtn').addEventListener('click', () => {
-            localStorage.removeItem(STORAGE_KEYS.images);
-            localStorage.removeItem(STORAGE_KEYS.blogs);
-            localStorage.removeItem(STORAGE_KEYS.kb);
+            removeUiStateValue(STORAGE_KEYS.images);
+            removeUiStateValue(STORAGE_KEYS.blogs);
+            removeUiStateValue(STORAGE_KEYS.kb);
             window.location.reload();
         });
 
