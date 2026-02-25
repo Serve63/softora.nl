@@ -1281,6 +1281,42 @@
             line-height: 1.4;
         }
 
+        .confirm-task-modal-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            flex-shrink: 0;
+        }
+
+        .confirm-task-modal-send {
+            border: 1px solid rgba(139,34,82,0.22);
+            background: rgba(139,34,82,0.08);
+            color: var(--accent-light);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.55rem 0.7rem;
+            cursor: none;
+            transition: all 0.2s;
+        }
+
+        .confirm-task-modal-send:hover:not(:disabled) {
+            border-color: rgba(139,34,82,0.34);
+            background: rgba(139,34,82,0.12);
+            color: var(--accent);
+        }
+
+        .confirm-task-modal-send:disabled {
+            opacity: 0.65;
+        }
+
+        .confirm-task-modal-send.is-done {
+            border-color: rgba(46,204,113,0.24);
+            background: rgba(46,204,113,0.08);
+            color: var(--green);
+        }
+
         .confirm-task-modal-close {
             border: 1px solid var(--border);
             background: transparent;
@@ -1360,6 +1396,7 @@
             .confirm-task-step-actions { flex-direction: column; }
             .confirm-task-modal { padding: 0.6rem; }
             .confirm-task-modal-header { padding: 0.85rem 0.85rem 0.75rem; }
+            .confirm-task-modal-actions { width: 100%; justify-content: flex-end; }
             .confirm-task-modal-title { font-size: 0.92rem; }
             .confirm-task-modal-body { padding: 0.85rem; }
             .confirm-task-flow-actions { gap: 0.35rem; }
@@ -1488,7 +1525,10 @@
                     <div class="confirm-task-modal-title" id="confirmTaskModalTitle">Taakdetails</div>
                     <div class="confirm-task-modal-subtitle" id="confirmTaskModalSubtitle">Selecteer een taak om transcriptie en bevestigingsmail te bekijken.</div>
                 </div>
-                <button type="button" class="confirm-task-modal-close magnetic" id="confirmTaskModalClose">Sluiten</button>
+                <div class="confirm-task-modal-actions">
+                    <button type="button" class="confirm-task-modal-send magnetic" id="confirmTaskModalSendBtn" hidden>Bevestigingsmail sturen</button>
+                    <button type="button" class="confirm-task-modal-close magnetic" id="confirmTaskModalClose">Sluiten</button>
+                </div>
             </div>
             <div class="confirm-task-modal-body" id="confirmTaskModalBody">
                 <div class="confirm-task-modal-empty">Selecteer een taak om transcriptie en bevestigingsmail te bekijken.</div>
@@ -1715,6 +1755,7 @@
             const bodyEl = document.getElementById('confirmTaskModalBody');
             const titleEl = document.getElementById('confirmTaskModalTitle');
             const subtitleEl = document.getElementById('confirmTaskModalSubtitle');
+            const sendBtnEl = document.getElementById('confirmTaskModalSendBtn');
             if (!modalEl || !bodyEl || !titleEl || !subtitleEl) return;
 
             const selectedTask = getSelectedConfirmationTask();
@@ -1725,6 +1766,13 @@
             if (!selectedTask) {
                 titleEl.textContent = 'Taakdetails';
                 subtitleEl.textContent = 'Selecteer een taak om transcriptie en bevestigingsmail te bekijken.';
+                if (sendBtnEl) {
+                    sendBtnEl.hidden = true;
+                    sendBtnEl.disabled = true;
+                    sendBtnEl.classList.remove('is-done');
+                    sendBtnEl.textContent = 'Bevestigingsmail sturen';
+                    sendBtnEl.removeAttribute('data-task-id');
+                }
                 bodyEl.innerHTML = '<div class="confirm-task-modal-empty">Selecteer een taak om transcriptie en bevestigingsmail te bekijken.</div>';
                 return;
             }
@@ -1732,8 +1780,20 @@
             const company = selectedTask.company || 'Onbekende lead';
             const contact = selectedTask.contact || 'Onbekend';
             const timeLabel = formatTaskDateTimeLabel(selectedTask);
+            const taskId = Number(selectedTask.id) || 0;
+            const taskBusy = taskId ? isTaskActionBusy(taskId) : false;
+            const mailSent = Boolean(selectedTask.mailSent);
             titleEl.textContent = company;
             subtitleEl.textContent = `Afspraak ${timeLabel} · Contact: ${contact}`;
+            if (sendBtnEl) {
+                sendBtnEl.hidden = false;
+                sendBtnEl.setAttribute('data-task-id', String(taskId || ''));
+                sendBtnEl.classList.toggle('is-done', mailSent);
+                sendBtnEl.disabled = !taskId || taskBusy || mailSent;
+                sendBtnEl.textContent = taskBusy
+                    ? 'Bezig...'
+                    : (mailSent ? 'Bevestigingsmail verstuurd' : 'Bevestigingsmail sturen');
+            }
             bodyEl.innerHTML = renderConfirmationTaskDetail(selectedTask);
 
             bodyEl.querySelectorAll('[data-generate-draft-id]').forEach((btn) => {
@@ -1982,6 +2042,7 @@
 
         const confirmTaskModalEl = document.getElementById('confirmTaskModal');
         const confirmTaskModalCloseEl = document.getElementById('confirmTaskModalClose');
+        const confirmTaskModalSendEl = document.getElementById('confirmTaskModalSendBtn');
         if (confirmTaskModalEl) {
             confirmTaskModalEl.addEventListener('click', (e) => {
                 if (e.target === confirmTaskModalEl) {
@@ -1993,6 +2054,21 @@
             confirmTaskModalCloseEl.addEventListener('click', (e) => {
                 e.preventDefault();
                 closeConfirmationTaskModal();
+            });
+        }
+        if (confirmTaskModalSendEl) {
+            confirmTaskModalSendEl.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const selectedTask = getSelectedConfirmationTask();
+                const taskId = Number(confirmTaskModalSendEl.getAttribute('data-task-id')) || Number(selectedTask?.id) || 0;
+                if (!taskId || isTaskActionBusy(taskId)) return;
+                if (getTaskById(taskId)?.mailSent) return;
+                setTaskActionBusy(taskId, true);
+                renderConfirmationTasks();
+                await markConfirmationMailSent(taskId);
+                setTaskActionBusy(taskId, false);
+                renderConfirmationTasks();
             });
         }
         document.addEventListener('keydown', (e) => {
