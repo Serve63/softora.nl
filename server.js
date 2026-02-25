@@ -1787,6 +1787,39 @@ app.get('/api/coldcalling/call-status/:callId', async (req, res) => {
   }
 });
 
+// Vercel route-fallback: sommige serverless route-combinaties geven NOT_FOUND op diepere paden.
+// Deze variant gebruikt een ondiep pad met querystring en werkt betrouwbaarder.
+app.get('/api/coldcalling/status', async (req, res) => {
+  const callId = normalizeString(req.query?.callId);
+  if (!callId) {
+    return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
+  }
+
+  if (!normalizeString(process.env.VAPI_API_KEY)) {
+    return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
+  }
+
+  try {
+    const { endpoint, data } = await fetchVapiCallStatusById(callId);
+    const call = data?.call && typeof data.call === 'object' ? data.call : data;
+
+    return res.status(200).json({
+      ok: true,
+      endpoint,
+      callId: normalizeString(call?.id || callId),
+      status: normalizeString(call?.status || data?.status || ''),
+      endedReason: normalizeString(call?.endedReason || data?.endedReason || ''),
+    });
+  } catch (error) {
+    return res.status(Number(error?.status || 500)).json({
+      ok: false,
+      error: error?.message || 'Kon Vapi call status niet ophalen.',
+      endpoint: error?.endpoint || null,
+      details: error?.data || null,
+    });
+  }
+});
+
 app.post('/api/vapi/webhook', (req, res) => {
   if (!isWebhookAuthorized(req)) {
     return res.status(401).json({ ok: false, error: 'Webhook secret ongeldig.' });

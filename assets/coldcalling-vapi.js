@@ -1782,7 +1782,7 @@
     isPollingSequentialClientDirectStatus = true;
     try {
       const response = await fetch(
-        `/api/coldcalling/call-status/${encodeURIComponent(run.waitingCallId)}`,
+        `/api/coldcalling/status?callId=${encodeURIComponent(run.waitingCallId)}`,
         { method: 'GET' }
       );
       if (!response.ok) return;
