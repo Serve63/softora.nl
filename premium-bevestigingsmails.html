@@ -1587,12 +1587,43 @@
 
             const isLoading = confirmationTaskState.detailLoadingId === taskId;
             const detail = confirmationTaskState.detailsById[String(taskId)] || null;
-            const transcript = detail?.transcript ? String(detail.transcript) : '';
+            const isDemoTask = /testbedrijf demo/i.test(String(task?.company || '')) || /testdata/i.test(String(task?.source || ''));
+            const demoTranscript = [
+                'assistant: Goedemiddag, u spreekt met de AI assistent van Softora. Dit is een fictieve testtranscriptie.',
+                'klant: Goedemiddag, prima.',
+                'assistant: Ik bel kort over het automatiseren van intake-opvolging en afspraken in jullie salesproces.',
+                'klant: Interessant, waar helpt dat ons concreet mee?',
+                'assistant: Minder handmatig nabellen, sneller kwalificeren en direct een intake inplannen wanneer er interesse is.',
+                'klant: Klinkt goed. We willen dit wel bekijken.',
+                'assistant: Zal ik een korte intake plannen voor donderdag om 14:00?',
+                'klant: Ja, graag. Stuur eerst even een bevestigingsmail, dan bevestig ik per mail terug.',
+                'assistant: Helemaal goed, dan zet ik de afspraak als concept en volgt de bevestigingsmail direct.',
+            ].join('\n');
+            const transcript = detail?.transcript
+                ? String(detail.transcript)
+                : (isDemoTask ? demoTranscript : '');
             const transcriptHtml = transcript
                 ? `<div class="confirm-task-transcript">${escapeHtml(transcript)}</div>`
                 : `<div class="confirm-task-transcript empty">Nog geen transcript beschikbaar vanuit Vapi webhook voor deze call.</div>`;
 
-            const draft = detail?.confirmationEmailDraft ? String(detail.confirmationEmailDraft) : '';
+            const demoDraft = [
+                'Onderwerp: Bevestiging intakeafspraak Testbedrijf Demo BV - donderdag 14:00',
+                '',
+                'Beste Servé,',
+                '',
+                'Dank voor het gesprek van zojuist.',
+                'Hierbij stuur ik de bevestiging van onze intakeafspraak op donderdag om 14:00.',
+                '',
+                'Tijdens de intake nemen we kort de huidige leadopvolging door en laten we zien hoe AI coldcalling + opvolging in jullie workflow past.',
+                '',
+                'Wil je deze afspraak per mail bevestigen? Na jouw reply zetten we de afspraak definitief in de agenda.',
+                '',
+                'Met vriendelijke groet,',
+                'Team Softora',
+            ].join('\n');
+            const draft = detail?.confirmationEmailDraft
+                ? String(detail.confirmationEmailDraft)
+                : (isDemoTask ? demoDraft : '');
             const draftMeta = [];
             if (detail?.confirmationEmailDraftGeneratedAt) {
                 try {
@@ -1601,6 +1632,8 @@
             }
             if (detail?.confirmationEmailDraftSource) {
                 draftMeta.push(`Bron: ${String(detail.confirmationEmailDraftSource)}`);
+            } else if (isDemoTask) {
+                draftMeta.push('Bron: fictieve testdata');
             }
 
             const aiSummary = String(detail?.aiSummary || detail?.vapiSummary || task?.summary || '').trim();
@@ -1617,7 +1650,7 @@
             const step1StatusText = mailSent ? 'Afgerond' : 'Actief';
             const step1DotText = mailSent ? '✓' : '1';
             const step2ChipClass = mailSent ? 'active' : 'pending';
-            const step2StatusText = mailSent ? 'Kies uitkomst' : 'Wacht op 1';
+            const step2StatusText = mailSent ? 'Open' : 'Wacht op 1';
             const step2DotText = '2';
 
             return `
@@ -1648,16 +1681,9 @@
                             <div class="confirm-task-stepper-connector ${mailSent ? 'done' : ''}" aria-hidden="true"></div>
                             <div class="confirm-task-step-chip ${step2ChipClass}" role="listitem">
                                 <span class="confirm-task-step-chip-index">${step2DotText}</span>
-                                <span class="confirm-task-step-chip-label">Uitkomst afspraak</span>
+                                <span class="confirm-task-step-chip-label">Afspraak bevestigd</span>
                                 <span class="confirm-task-step-chip-state">${step2StatusText}</span>
                             </div>
-                        </div>
-
-                        <div class="confirm-task-flow-actions">
-                            <button type="button" class="confirm-task-detail-btn magnetic" data-generate-draft-id="${taskId}" ${busy ? 'disabled' : ''}>Schrijf bevestigingsmail</button>
-                            <button type="button" class="confirm-task-detail-btn success magnetic" data-mark-sent-id="${taskId}" ${busy ? 'disabled' : ''}>Mail verstuurd</button>
-                            <button type="button" class="confirm-task-detail-btn warning magnetic" data-mark-confirmed-id="${taskId}" ${(busy || !canMarkResponse) ? 'disabled' : ''}>Afspraak bevestigd</button>
-                            <button type="button" class="confirm-task-detail-btn magnetic" data-mark-cancelled-id="${taskId}" ${(busy || !canMarkResponse) ? 'disabled' : ''}>Afspraak geannuleerd</button>
                         </div>
                     </div>
                 </div>
