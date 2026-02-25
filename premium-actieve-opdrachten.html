@@ -1298,6 +1298,14 @@
         const ORDER_STATE_KEY = 'softora_order_state_premium_v1';
         const BUILD_MODE_KEY = 'softora_build_mode_premium_v1';
         const CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
+        const ORDER_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
+        const REMOTE_UI_STATE_SCOPE = 'premium_active_orders';
+        let remoteUiStateCache = {};
+        let remoteUiStateLoaded = false;
+        let remoteUiStateLoadPromise = null;
+        let remoteUiStateSaveTimer = null;
+        let remoteUiStateSaveInFlight = false;
+        let remoteUiStatePendingPatch = {};
 
         const orders = {
             1: { name: 'Kapsalon Mooi', type: 'Kapper Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
@@ -1342,28 +1350,97 @@
         ];
 
         let currentModalId = null;
-        let buildMode = loadBuildMode();
+        let buildMode = 'premium';
 
         function getTime() {
             return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
-        function loadBuildMode() {
+        async function loadRemoteUiState() {
+            if (remoteUiStateLoaded) return true;
+            if (remoteUiStateLoadPromise) return remoteUiStateLoadPromise;
+
+            remoteUiStateLoadPromise = (async () => {
+                try {
+                    const res = await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
+                        method: 'GET',
+                        cache: 'no-store'
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok && data?.ok && data.values && typeof data.values === 'object') {
+                        const next = {};
+                        Object.entries(data.values).forEach(([k, v]) => {
+                            next[String(k)] = String(v ?? '');
+                        });
+                        remoteUiStateCache = next;
+                    }
+                    remoteUiStateLoaded = true;
+                    return true;
+                } catch (_) {
+                    remoteUiStateLoaded = true;
+                    return false;
+                } finally {
+                    remoteUiStateLoadPromise = null;
+                }
+            })();
+
+            return remoteUiStateLoadPromise;
+        }
+
+        function readStateValue(key) {
+            return String(remoteUiStateCache[key] ?? '');
+        }
+
+        function queueRemoteUiStateSave() {
+            if (remoteUiStateSaveTimer) clearTimeout(remoteUiStateSaveTimer);
+            remoteUiStateSaveTimer = setTimeout(() => {
+                remoteUiStateSaveTimer = null;
+                void flushRemoteUiStateSave();
+            }, 250);
+        }
+
+        async function flushRemoteUiStateSave() {
+            if (remoteUiStateSaveInFlight) return;
+            const patch = remoteUiStatePendingPatch;
+            const keys = Object.keys(patch);
+            if (!keys.length) return;
+
+            remoteUiStatePendingPatch = {};
+            remoteUiStateSaveInFlight = true;
             try {
-                const v = localStorage.getItem(BUILD_MODE_KEY);
-                if (v === 'quick' || v === 'premium') return v;
-                return 'premium';
+                await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patch,
+                        source: 'premium-actieve-opdrachten',
+                        actor: 'browser'
+                    })
+                });
             } catch (_) {
-                return 'premium';
+                keys.forEach((key) => {
+                    remoteUiStatePendingPatch[key] = String(patch[key] ?? '');
+                });
+            } finally {
+                remoteUiStateSaveInFlight = false;
+                if (Object.keys(remoteUiStatePendingPatch).length) queueRemoteUiStateSave();
             }
         }
 
+        function writeStateValue(key, value) {
+            remoteUiStateCache[key] = String(value ?? '');
+            remoteUiStatePendingPatch[key] = String(value ?? '');
+            queueRemoteUiStateSave();
+        }
+
+        function loadBuildMode() {
+            const v = readStateValue(BUILD_MODE_KEY);
+            if (v === 'quick' || v === 'premium') return v;
+            return 'premium';
+        }
+
         function saveBuildMode(mode) {
-            try {
-                localStorage.setItem(BUILD_MODE_KEY, mode);
-            } catch (_) {
-                // ignore
-            }
+            writeStateValue(BUILD_MODE_KEY, mode);
         }
 
         function getBuildSteps() {
@@ -1542,7 +1619,7 @@
 
         function readCustomOrdersFromStorage() {
             try {
-                const raw = localStorage.getItem(CUSTOM_ORDERS_KEY);
+                const raw = readStateValue(CUSTOM_ORDERS_KEY);
                 if (!raw) return [];
                 const parsed = JSON.parse(raw);
                 if (!Array.isArray(parsed)) return [];
@@ -1576,11 +1653,7 @@
         }
 
         function persistCustomOrders() {
-            try {
-                localStorage.setItem(CUSTOM_ORDERS_KEY, JSON.stringify(customOrders));
-            } catch (_) {
-                // ignore
-            }
+            writeStateValue(CUSTOM_ORDERS_KEY, JSON.stringify(customOrders));
         }
 
         function ensureOrderRuntimeState(record) {
@@ -1592,10 +1665,122 @@
                 type: record.title || prev.type || 'Project',
                 logs: Array.isArray(prev.logs) ? prev.logs : [],
                 progressPct: Number(prev.progressPct) || 0,
+                statusKey: normalizeOrderStatus(prev.statusKey || record.status || 'wacht').key,
                 previewHtml: prev.previewHtml || null,
                 artifact: prev.artifact || null,
                 updatedAt: prev.updatedAt || null
             };
+        }
+
+        function serializeOrdersRuntime() {
+            const out = {};
+            Object.entries(orders).forEach(([id, order]) => {
+                const numericId = Number(id);
+                if (!Number.isFinite(numericId) || numericId <= 0 || !order) return;
+                out[String(numericId)] = {
+                    name: String(order.name || ''),
+                    type: String(order.type || ''),
+                    logs: Array.isArray(order.logs) ? order.logs.slice(-200).map((entry) => ({
+                        time: String(entry?.time || ''),
+                        msg: String(entry?.msg || ''),
+                        highlight: Boolean(entry?.highlight)
+                    })) : [],
+                    progressPct: Math.max(0, Math.min(100, Number(order.progressPct) || 0)),
+                    statusKey: normalizeOrderStatus(order.statusKey || '').key,
+                    updatedAt: Number(order.updatedAt) || null
+                };
+            });
+            return out;
+        }
+
+        function persistOrdersRuntime() {
+            writeStateValue(ORDER_RUNTIME_KEY, JSON.stringify(serializeOrdersRuntime()));
+        }
+
+        function applyOrderUiStateToCard(id) {
+            const order = orders[id];
+            if (!order) return;
+
+            const statusEl = document.getElementById(`status-${id}`);
+            const progressEl = document.getElementById(`progress-${id}`);
+            const barEl = document.getElementById(`bar-${id}`);
+            const btnEl = document.getElementById(`btn-${id}`);
+            const viewBtnEl = document.getElementById(`view-${id}`);
+            const pct = Math.max(0, Math.min(100, Number(order.progressPct) || 0));
+            const status = normalizeOrderStatus(order.statusKey || (pct >= 100 ? 'klaar' : pct > 0 ? 'bezig' : 'wacht'));
+
+            order.statusKey = status.key;
+
+            if (statusEl) {
+                statusEl.textContent = status.text;
+                statusEl.className = `status-tag ${status.className}`;
+            }
+            if (progressEl && pct > 0) {
+                progressEl.classList.add('show');
+            }
+            if (barEl) {
+                barEl.style.width = pct + '%';
+                barEl.classList.toggle('green', pct >= 100);
+            }
+            for (let s = 1; s <= 5; s += 1) {
+                const stepEl = document.getElementById(`step-${id}-${s}`);
+                if (!stepEl) continue;
+                if (pct >= 100) {
+                    stepEl.className = 'progress-step done';
+                } else if (pct > 0) {
+                    const approxStep = Math.max(1, Math.min(5, Math.ceil(pct / 20)));
+                    if (s < approxStep) stepEl.className = 'progress-step done';
+                    else if (s === approxStep) stepEl.className = 'progress-step active';
+                    else stepEl.className = 'progress-step';
+                } else {
+                    stepEl.className = 'progress-step';
+                }
+            }
+            if (viewBtnEl && pct > 0) {
+                viewBtnEl.classList.add('show');
+                if (pct >= 100) {
+                    viewBtnEl.textContent = 'Open preview';
+                    viewBtnEl.onclick = () => openPreview(id);
+                } else {
+                    viewBtnEl.textContent = 'Bekijk Voortgang';
+                    viewBtnEl.onclick = () => openModal(id);
+                }
+            }
+            if (btnEl) {
+                if (pct >= 100) {
+                    btnEl.classList.remove('running');
+                    btnEl.classList.add('done');
+                    btnEl.innerHTML = '✓ Opgeleverd';
+                }
+            }
+        }
+
+        function restoreOrdersRuntimeFromState() {
+            try {
+                const raw = readStateValue(ORDER_RUNTIME_KEY);
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+
+                Object.entries(parsed).forEach(([id, value]) => {
+                    const numericId = Number(id);
+                    if (!Number.isFinite(numericId) || numericId <= 0) return;
+                    const prev = orders[numericId] || {};
+                    orders[numericId] = {
+                        ...prev,
+                        name: String(value?.name || prev.name || ''),
+                        type: String(value?.type || prev.type || ''),
+                        logs: Array.isArray(value?.logs) ? value.logs.slice(-200) : (Array.isArray(prev.logs) ? prev.logs : []),
+                        progressPct: Math.max(0, Math.min(100, Number(value?.progressPct) || 0)),
+                        statusKey: normalizeOrderStatus(value?.statusKey || '').key,
+                        updatedAt: Number(value?.updatedAt) || prev.updatedAt || null
+                    };
+                });
+
+                Object.keys(orders).forEach((id) => applyOrderUiStateToCard(Number(id)));
+            } catch (_) {
+                // ignore broken state
+            }
         }
 
         function renderCustomOrderCardHtml(record) {
@@ -1780,6 +1965,7 @@
             customOrders.push(record);
             persistCustomOrders();
             appendCustomOrderCard(record, { scrollIntoView: true });
+            persistOrdersRuntime();
             form.reset();
             const statusField = document.getElementById('newOrderStatus');
             if (statusField) statusField.value = 'wacht';
@@ -1787,21 +1973,17 @@
         }
 
         function setLastActiveOrder(orderId) {
-            try {
-                localStorage.setItem(ORDER_STATE_KEY, JSON.stringify({
-                    lastOrderId: String(orderId),
-                    updatedAt: new Date().toISOString()
-                }));
-            } catch (_) {
-                // ignore
-            }
+            writeStateValue(ORDER_STATE_KEY, JSON.stringify({
+                lastOrderId: String(orderId),
+                updatedAt: new Date().toISOString()
+            }));
         }
 
         function selectActiveOrderId(explicitId) {
             if (explicitId && orders[explicitId]) return Number(explicitId);
 
             try {
-                const raw = localStorage.getItem(ORDER_STATE_KEY);
+                const raw = readStateValue(ORDER_STATE_KEY);
                 if (raw) {
                     const parsed = JSON.parse(raw);
                     const lastId = Number(parsed?.lastOrderId);
@@ -1863,8 +2045,10 @@
 
             orders[id].logs = [];
             orders[id].progressPct = 0;
+            orders[id].statusKey = 'bezig';
             orders[id].updatedAt = Date.now();
             setLastActiveOrder(activeId);
+            persistOrdersRuntime();
 
             let stepIndex = 0;
             const buildSteps = getBuildSteps();
@@ -1880,12 +2064,15 @@
                     status.textContent = 'Klaar';
                     status.className = 'status-tag klaar';
                     bar.classList.add('green');
+                    orders[id].statusKey = 'klaar';
 
                     orders[id].logs.push({
                         time: getTime(),
                         msg: 'Preview gereed. Open de vaste template-preview.',
                         highlight: true
                     });
+                    orders[id].updatedAt = Date.now();
+                    persistOrdersRuntime();
 
                     viewBtn.textContent = 'Open preview';
                     viewBtn.onclick = () => openPreview(activeId);
@@ -1905,6 +2092,9 @@
 
                 orders[id].progressPct = step.pct;
                 orders[id].logs.push({ time: getTime(), msg: step.msg, highlight: step.pct === 100 });
+                orders[id].updatedAt = Date.now();
+                orders[id].statusKey = step.pct >= 100 ? 'klaar' : 'bezig';
+                persistOrdersRuntime();
                 stepIndex++;
                 setTimeout(nextStep, 650 + Math.random() * 700);
             }
@@ -1977,8 +2167,6 @@
                 setBuildMode(btn.getAttribute('data-build-mode'));
             });
         });
-        setBuildMode(buildMode);
-        clearDemoOrdersOnLoad();
 
         // Bind UI
         document.querySelectorAll('.execute-btn').forEach((b) => {
@@ -2031,7 +2219,17 @@
             });
         });
 
-        loadCustomOrderCards();
+        async function initializeActiveOrdersPageState() {
+            await loadRemoteUiState();
+            buildMode = loadBuildMode();
+            setBuildMode(buildMode);
+            clearDemoOrdersOnLoad();
+            loadCustomOrderCards();
+            restoreOrdersRuntimeFromState();
+            refreshOrderSummaryCards();
+        }
+
+        void initializeActiveOrdersPageState();
 
         // Cursor (robust)
         (function initCursor() {
