@@ -1505,7 +1505,6 @@
                     <div class="confirm-task-section" style="margin-top: 0; padding-top: 0; border-top: none;">
                         <div class="confirm-task-header">
                             <div class="confirm-task-title">Bevestigingsmail sturen</div>
-                            <div class="confirm-task-count" id="confirmTaskCount">0 taken</div>
                         </div>
                         <div class="confirm-task-list" id="confirmTaskList">
                             <div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>
@@ -1610,15 +1609,6 @@
 
         function isTaskActionBusy(taskId) {
             return Boolean(confirmationTaskState.actionBusyById[String(taskId)]);
-        }
-
-        function taskStatusBadgesHtml(task) {
-            const mailSent = Boolean(task?.mailSent);
-            const confirmationReceived = Boolean(task?.confirmationReceived);
-            return `
-                <span class="confirm-task-badge ${mailSent ? 'done' : 'pending'}">${mailSent ? 'Mail verstuurd' : 'Mail nog niet verstuurd'}</span>
-                <span class="confirm-task-badge ${confirmationReceived ? 'done' : 'pending'}">${confirmationReceived ? 'Bevestiging binnen' : 'Wacht op bevestiging'}</span>
-            `;
         }
 
         function renderConfirmationTaskDetail(task) {
@@ -1842,10 +1832,12 @@
         function renderConfirmationTasks() {
             const listEl = document.getElementById('confirmTaskList');
             const countEl = document.getElementById('confirmTaskCount');
-            if (!listEl || !countEl) return;
+            if (!listEl) return;
 
             const tasks = Array.isArray(confirmationTaskState.tasks) ? confirmationTaskState.tasks : [];
-            countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
+            if (countEl) {
+                countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
+            }
 
             if (!tasks.length) {
                 listEl.innerHTML = '<div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>';
@@ -1871,9 +1863,6 @@
                                 ${note}
                             </div>
                             <div class="confirm-task-side">
-                                <div class="confirm-task-statuses">
-                                    ${taskStatusBadgesHtml(task)}
-                                </div>
                                 <button type="button" class="confirm-task-detail-btn magnetic" data-open-task-id="${taskId}">Open details</button>
                             </div>
                         </div>
