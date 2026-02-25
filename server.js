@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
@@ -11,6 +12,10 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const VERBOSE_VAPI_WEBHOOK_LOGS = /^(1|true|yes)$/i.test(
   String(process.env.VERBOSE_VAPI_WEBHOOK_LOGS || '')
 );
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
+const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const SUPABASE_STATE_TABLE = String(process.env.SUPABASE_STATE_TABLE || 'softora_runtime_state').trim();
+const SUPABASE_STATE_KEY = String(process.env.SUPABASE_STATE_KEY || 'core').trim();
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
@@ -24,6 +29,10 @@ let nextGeneratedAgendaAppointmentId = 100000;
 const sequentialDispatchQueues = new Map();
 const sequentialDispatchQueueIdByCallId = new Map();
 let nextSequentialDispatchQueueId = 1;
+let supabaseClient = null;
+let supabaseStateHydrationPromise = null;
+let supabaseStateHydrated = false;
+let supabasePersistChain = Promise.resolve();
 
 // Vercel bundelt dynamische sendFile-doelen niet altijd mee. Door de root-dir
 // één keer te scannen op .html bestanden worden die files traceable voor de
@@ -66,6 +75,19 @@ app.use(
   })
 );
 
+app.use((req, _res, next) => {
+  const requestPath = String(req.path || '');
+  if (!isSupabaseConfigured()) return next();
+  if (!requestPath.startsWith('/api/')) return next();
+
+  ensureRuntimeStateHydratedFromSupabase()
+    .then(() => next())
+    .catch((error) => {
+      console.error('[Supabase][HydrateMiddlewareError]', error?.message || error);
+      next();
+    });
+});
+
 function parseIntSafe(value, fallback = 0) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -86,6 +108,177 @@ function truncateText(value, maxLength = 500) {
   const text = normalizeString(value);
   if (!text) return '';
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
+}
+
+function isSupabaseConfigured() {
+  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function getSupabaseClient() {
+  if (!isSupabaseConfigured()) return null;
+  if (supabaseClient) return supabaseClient;
+  supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return supabaseClient;
+}
+
+function buildRuntimeStateSnapshotPayload() {
+  return {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    recentWebhookEvents: recentWebhookEvents.slice(0, 200),
+    recentCallUpdates: recentCallUpdates.slice(0, 500),
+    recentAiCallInsights: recentAiCallInsights.slice(0, 500),
+    generatedAgendaAppointments: generatedAgendaAppointments.slice(),
+    nextGeneratedAgendaAppointmentId,
+  };
+}
+
+function applyRuntimeStateSnapshotPayload(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+
+  const nextWebhookEvents = Array.isArray(payload.recentWebhookEvents) ? payload.recentWebhookEvents.slice(0, 200) : [];
+  const nextCallUpdates = Array.isArray(payload.recentCallUpdates) ? payload.recentCallUpdates.slice(0, 500) : [];
+  const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights) ? payload.recentAiCallInsights.slice(0, 500) : [];
+  const nextAppointments = Array.isArray(payload.generatedAgendaAppointments)
+    ? payload.generatedAgendaAppointments.slice()
+    : [];
+
+  recentWebhookEvents.splice(0, recentWebhookEvents.length, ...nextWebhookEvents);
+
+  recentCallUpdates.splice(0, recentCallUpdates.length, ...nextCallUpdates);
+  callUpdatesById.clear();
+  recentCallUpdates.forEach((item) => {
+    if (item && item.callId) {
+      callUpdatesById.set(item.callId, item);
+    }
+  });
+
+  recentAiCallInsights.splice(0, recentAiCallInsights.length, ...nextAiCallInsights);
+  aiCallInsightsByCallId.clear();
+  recentAiCallInsights.forEach((item) => {
+    if (item && item.callId) {
+      aiCallInsightsByCallId.set(item.callId, item);
+    }
+  });
+
+  generatedAgendaAppointments.splice(0, generatedAgendaAppointments.length, ...nextAppointments);
+  agendaAppointmentIdByCallId.clear();
+  let maxAppointmentId = 99999;
+  generatedAgendaAppointments.forEach((item) => {
+    const id = Number(item?.id);
+    const callId = normalizeString(item?.callId || '');
+    if (Number.isFinite(id) && id > maxAppointmentId) maxAppointmentId = id;
+    if (Number.isFinite(id) && callId) {
+      agendaAppointmentIdByCallId.set(callId, id);
+    }
+  });
+
+  const payloadNextId = Number(payload.nextGeneratedAgendaAppointmentId);
+  nextGeneratedAgendaAppointmentId = Number.isFinite(payloadNextId)
+    ? Math.max(payloadNextId, maxAppointmentId + 1)
+    : maxAppointmentId + 1;
+
+  return true;
+}
+
+async function ensureRuntimeStateHydratedFromSupabase() {
+  if (!isSupabaseConfigured()) return false;
+  if (supabaseStateHydrated) return true;
+  if (supabaseStateHydrationPromise) return supabaseStateHydrationPromise;
+
+  supabaseStateHydrationPromise = (async () => {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return false;
+
+      const { data, error } = await client
+        .from(SUPABASE_STATE_TABLE)
+        .select('payload, updated_at')
+        .eq('state_key', SUPABASE_STATE_KEY)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[Supabase][HydrateError]', error.message || error);
+        return false;
+      }
+
+      if (data && data.payload && typeof data.payload === 'object') {
+        applyRuntimeStateSnapshotPayload(data.payload);
+        console.log(
+          '[Supabase] Runtime state geladen',
+          JSON.stringify({
+            table: SUPABASE_STATE_TABLE,
+            stateKey: SUPABASE_STATE_KEY,
+            updatedAt: data.updated_at || null,
+            callUpdates: recentCallUpdates.length,
+            insights: recentAiCallInsights.length,
+            appointments: generatedAgendaAppointments.length,
+          })
+        );
+      }
+
+      supabaseStateHydrated = true;
+      return true;
+    } catch (error) {
+      console.error('[Supabase][HydrateCrash]', error?.message || error);
+      return false;
+    } finally {
+      supabaseStateHydrationPromise = null;
+    }
+  })();
+
+  return supabaseStateHydrationPromise;
+}
+
+async function persistRuntimeStateToSupabase(reason = 'unknown') {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const client = getSupabaseClient();
+    if (!client) return false;
+    const payload = buildRuntimeStateSnapshotPayload();
+    const row = {
+      state_key: SUPABASE_STATE_KEY,
+      payload,
+      updated_at: new Date().toISOString(),
+      meta: {
+        reason,
+        counts: {
+          webhookEvents: recentWebhookEvents.length,
+          callUpdates: recentCallUpdates.length,
+          aiCallInsights: recentAiCallInsights.length,
+          appointments: generatedAgendaAppointments.length,
+        },
+      },
+    };
+
+    const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
+      onConflict: 'state_key',
+    });
+
+    if (error) {
+      console.error('[Supabase][PersistError]', error.message || error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[Supabase][PersistCrash]', error?.message || error);
+    return false;
+  }
+}
+
+function queueRuntimeStatePersist(reason = 'unknown') {
+  if (!isSupabaseConfigured()) return;
+
+  supabasePersistChain = supabasePersistChain
+    .catch(() => null)
+    .then(() => persistRuntimeStateToSupabase(reason))
+    .catch((error) => {
+      console.error('[Supabase][PersistQueueError]', error?.message || error);
+      return false;
+    });
 }
 
 function getByPath(obj, path) {
@@ -303,6 +496,8 @@ function upsertRecentCallUpdate(update) {
       callUpdatesById.delete(removed.callId);
     }
   }
+
+  queueRuntimeStatePersist('call_update');
 
   return merged;
 }
@@ -593,6 +788,20 @@ function getGeneratedAppointmentIndexById(id) {
   return generatedAgendaAppointments.findIndex((item) => Number(item?.id) === taskId);
 }
 
+function setGeneratedAgendaAppointmentAtIndex(idx, nextValue, reason = 'agenda_appointment_update') {
+  if (!Number.isInteger(idx) || idx < 0 || idx >= generatedAgendaAppointments.length) return null;
+  if (!nextValue || typeof nextValue !== 'object') return null;
+
+  generatedAgendaAppointments[idx] = nextValue;
+  const id = Number(nextValue.id);
+  const callId = normalizeString(nextValue.callId || '');
+  if (Number.isFinite(id) && id > 0 && callId) {
+    agendaAppointmentIdByCallId.set(callId, id);
+  }
+  queueRuntimeStatePersist(reason);
+  return generatedAgendaAppointments[idx];
+}
+
 function getLatestCallUpdateByCallId(callId) {
   const normalizedCallId = normalizeString(callId);
   if (!normalizedCallId) return null;
@@ -655,7 +864,7 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
     const idx = generatedAgendaAppointments.findIndex((item) => item.id === existingId);
     if (idx >= 0) {
       const existing = generatedAgendaAppointments[idx];
-      generatedAgendaAppointments[idx] = {
+      const updated = {
         ...existing,
         ...appointment,
         id: existingId,
@@ -690,7 +899,7 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
           normalizeString(existing?.createdAt || '') ||
           new Date().toISOString(),
       };
-      return generatedAgendaAppointments[idx];
+      return setGeneratedAgendaAppointmentAtIndex(idx, updated, 'agenda_appointment_upsert');
     }
   }
 
@@ -717,6 +926,7 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
   };
   generatedAgendaAppointments.push(withId);
   agendaAppointmentIdByCallId.set(callId, withId.id);
+  queueRuntimeStatePersist('agenda_appointment_insert');
   return withId;
 }
 
@@ -872,6 +1082,8 @@ function upsertAiCallInsight(insight) {
   if (recentAiCallInsights.length > 500) {
     recentAiCallInsights.pop();
   }
+
+  queueRuntimeStatePersist('ai_call_insight');
 
   return merged;
 }
@@ -1999,16 +2211,20 @@ app.post('/api/agenda/confirmation-tasks/:id/draft-email', async (req, res) => {
   try {
     const generated = await generateConfirmationEmailDraftWithAi(appointment, detail);
     const nowIso = new Date().toISOString();
-    generatedAgendaAppointments[idx] = {
+    const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+      idx,
+      {
       ...generatedAgendaAppointments[idx],
       confirmationEmailDraft: generated.draft,
       confirmationEmailDraftGeneratedAt: nowIso,
       confirmationEmailDraftSource: normalizeString(generated.source || 'template'),
-    };
+      },
+      'confirmation_task_draft_email'
+    );
 
     return res.status(200).json({
       ok: true,
-      task: buildConfirmationTaskDetail(generatedAgendaAppointments[idx]),
+      task: buildConfirmationTaskDetail(updatedAppointment),
       generated: {
         source: normalizeString(generated.source || ''),
         model: normalizeString(generated.model || '') || null,
@@ -2050,17 +2266,21 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-sent', (req, res) => {
 
   const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
   const nowIso = new Date().toISOString();
-  generatedAgendaAppointments[idx] = {
-    ...appointment,
-    confirmationEmailSent: true,
-    confirmationEmailSentAt: nowIso,
-    confirmationEmailSentBy: actor || null,
-  };
+  const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+    idx,
+    {
+      ...appointment,
+      confirmationEmailSent: true,
+      confirmationEmailSentAt: nowIso,
+      confirmationEmailSentBy: actor || null,
+    },
+    'confirmation_task_mark_sent'
+  );
 
   return res.status(200).json({
     ok: true,
     taskUpdated: true,
-    task: buildConfirmationTaskDetail(generatedAgendaAppointments[idx]),
+    task: buildConfirmationTaskDetail(updatedAppointment),
   });
 });
 
@@ -2077,23 +2297,27 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-response-received', (req, res)
 
   const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
   const nowIso = new Date().toISOString();
-  generatedAgendaAppointments[idx] = {
-    ...appointment,
-    confirmationEmailSent: true,
-    confirmationEmailSentAt: normalizeString(appointment?.confirmationEmailSentAt || '') || nowIso,
-    confirmationEmailSentBy: normalizeString(appointment?.confirmationEmailSentBy || '') || actor || null,
-    confirmationResponseReceived: true,
-    confirmationResponseReceivedAt: nowIso,
-    confirmationResponseReceivedBy: actor || null,
-    confirmationAppointmentCancelled: false,
-    confirmationAppointmentCancelledAt: null,
-    confirmationAppointmentCancelledBy: null,
-  };
+  const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+    idx,
+    {
+      ...appointment,
+      confirmationEmailSent: true,
+      confirmationEmailSentAt: normalizeString(appointment?.confirmationEmailSentAt || '') || nowIso,
+      confirmationEmailSentBy: normalizeString(appointment?.confirmationEmailSentBy || '') || actor || null,
+      confirmationResponseReceived: true,
+      confirmationResponseReceivedAt: nowIso,
+      confirmationResponseReceivedBy: actor || null,
+      confirmationAppointmentCancelled: false,
+      confirmationAppointmentCancelledAt: null,
+      confirmationAppointmentCancelledBy: null,
+    },
+    'confirmation_task_mark_response_received'
+  );
 
   return res.status(200).json({
     ok: true,
     taskCompleted: true,
-    appointment: generatedAgendaAppointments[idx],
+    appointment: updatedAppointment,
   });
 });
 
@@ -2110,24 +2334,28 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-cancelled', (req, res) => {
 
   const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
   const nowIso = new Date().toISOString();
-  generatedAgendaAppointments[idx] = {
-    ...appointment,
-    confirmationEmailSent: true,
-    confirmationEmailSentAt: normalizeString(appointment?.confirmationEmailSentAt || '') || nowIso,
-    confirmationEmailSentBy: normalizeString(appointment?.confirmationEmailSentBy || '') || actor || null,
-    confirmationResponseReceived: false,
-    confirmationResponseReceivedAt: null,
-    confirmationResponseReceivedBy: null,
-    confirmationAppointmentCancelled: true,
-    confirmationAppointmentCancelledAt: nowIso,
-    confirmationAppointmentCancelledBy: actor || null,
-  };
+  const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+    idx,
+    {
+      ...appointment,
+      confirmationEmailSent: true,
+      confirmationEmailSentAt: normalizeString(appointment?.confirmationEmailSentAt || '') || nowIso,
+      confirmationEmailSentBy: normalizeString(appointment?.confirmationEmailSentBy || '') || actor || null,
+      confirmationResponseReceived: false,
+      confirmationResponseReceivedAt: null,
+      confirmationResponseReceivedBy: null,
+      confirmationAppointmentCancelled: true,
+      confirmationAppointmentCancelledAt: nowIso,
+      confirmationAppointmentCancelledBy: actor || null,
+    },
+    'confirmation_task_mark_cancelled'
+  );
 
   return res.status(200).json({
     ok: true,
     taskCompleted: true,
     cancelled: true,
-    appointment: generatedAgendaAppointments[idx],
+    appointment: updatedAppointment,
   });
 });
 
@@ -2145,24 +2373,28 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 
   const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
   const nowIso = new Date().toISOString();
-  generatedAgendaAppointments[idx] = {
-    ...appointment,
-    confirmationEmailSent: true,
-    confirmationEmailSentAt: nowIso,
-    confirmationEmailSentBy: actor || null,
-    confirmationResponseReceived: true,
-    confirmationResponseReceivedAt: nowIso,
-    confirmationResponseReceivedBy: actor || null,
-    confirmationAppointmentCancelled: false,
-    confirmationAppointmentCancelledAt: null,
-    confirmationAppointmentCancelledBy: null,
-  };
+  const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+    idx,
+    {
+      ...appointment,
+      confirmationEmailSent: true,
+      confirmationEmailSentAt: nowIso,
+      confirmationEmailSentBy: actor || null,
+      confirmationResponseReceived: true,
+      confirmationResponseReceivedAt: nowIso,
+      confirmationResponseReceivedBy: actor || null,
+      confirmationAppointmentCancelled: false,
+      confirmationAppointmentCancelledAt: null,
+      confirmationAppointmentCancelledBy: null,
+    },
+    'confirmation_task_complete'
+  );
 
   return res.status(200).json({
     ok: true,
     taskCompleted: true,
     taskId,
-    appointment: generatedAgendaAppointments[idx],
+    appointment: updatedAppointment,
   });
 });
 
@@ -2171,6 +2403,12 @@ app.get('/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
+    supabase: {
+      enabled: isSupabaseConfigured(),
+      hydrated: supabaseStateHydrated,
+      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
+      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
+    },
     timestamp: new Date().toISOString(),
   });
 });
@@ -2180,6 +2418,12 @@ app.get('/api/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
+    supabase: {
+      enabled: isSupabaseConfigured(),
+      hydrated: supabaseStateHydrated,
+      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
+      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
+    },
     timestamp: new Date().toISOString(),
   });
 });
@@ -2348,6 +2592,7 @@ function seedDemoConfirmationTaskForUiTesting() {
     if (insight) {
       insight.agendaAppointmentId = appointment.id;
     }
+    queueRuntimeStatePersist('demo_seed_confirmation_task');
   }
 
   console.log('[Startup] Demo bevestigingstaak toegevoegd voor UI-testen.');
@@ -2356,9 +2601,11 @@ function seedDemoConfirmationTaskForUiTesting() {
 // In serverless (zoals Vercel) wordt startServer() niet aangeroepen, dus seed de
 // demo-taak ook bij module-load. De functie is idempotent op basis van callId.
 seedDemoConfirmationTaskForUiTesting();
+void ensureRuntimeStateHydratedFromSupabase();
 
 function startServer() {
   seedDemoConfirmationTaskForUiTesting();
+  void ensureRuntimeStateHydratedFromSupabase();
   app.listen(PORT, () => {
     console.log(`Softora Vapi backend draait op http://localhost:${PORT}`);
     const missingEnv = getMissingEnvVars();
@@ -2366,6 +2613,13 @@ function startServer() {
       console.warn(
         `[Startup] Let op: ontbrekende env vars voor Vapi (${missingEnv.join(', ')}). /api/coldcalling/start zal falen totdat deze zijn ingevuld.`
       );
+    }
+    if (isSupabaseConfigured()) {
+      console.log(
+        `[Startup] Supabase state persistence actief (${SUPABASE_STATE_TABLE}:${SUPABASE_STATE_KEY}).`
+      );
+    } else {
+      console.log('[Startup] Supabase state persistence uit (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY ontbreken).');
     }
   });
 }
