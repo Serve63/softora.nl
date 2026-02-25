@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
@@ -20,6 +21,25 @@ let nextGeneratedAgendaAppointmentId = 100000;
 const sequentialDispatchQueues = new Map();
 const sequentialDispatchQueueIdByCallId = new Map();
 let nextSequentialDispatchQueueId = 1;
+
+// Vercel bundelt dynamische sendFile-doelen niet altijd mee. Door de root-dir
+// één keer te scannen op .html bestanden worden die files traceable voor de
+// serverless bundle en blijven pagina-links zoals /premium-website.html werken.
+function getKnownHtmlPageFiles() {
+  try {
+    return new Set(
+      fs
+        .readdirSync(__dirname, { withFileTypes: true })
+        .filter((entry) => entry && entry.isFile() && /\.html$/i.test(entry.name))
+        .map((entry) => entry.name)
+    );
+  } catch (error) {
+    console.warn('[Startup] Kon HTML-pagina lijst niet lezen:', error?.message || error);
+    return new Set(['index.html']);
+  }
+}
+
+const knownHtmlPageFiles = getKnownHtmlPageFiles();
 
 app.disable('x-powered-by');
 
@@ -2021,6 +2041,10 @@ app.get('/:page', (req, res, next) => {
   const page = req.params.page;
 
   if (!/^[a-zA-Z0-9._-]+\.html$/.test(page)) {
+    return next();
+  }
+
+  if (!knownHtmlPageFiles.has(page)) {
     return next();
   }
 
