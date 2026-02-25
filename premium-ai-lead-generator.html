@@ -700,12 +700,43 @@
             color: var(--accent-light);
             line-height: 1;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.45rem;
         }
 
         .slider-value span {
             font-size: 1rem;
             color: var(--text-tertiary);
             font-weight: 500;
+        }
+
+        .slider-value-input {
+            width: 2ch;
+            min-width: 1ch;
+            border: 0;
+            border-bottom: 2px solid transparent;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            line-height: 1;
+            padding: 0;
+            margin: 0;
+            outline: none;
+            text-align: right;
+            cursor: text;
+            transition: border-color 0.2s ease;
+            -moz-appearance: textfield;
+        }
+
+        .slider-value-input::-webkit-outer-spin-button,
+        .slider-value-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .slider-value-input:focus {
+            border-bottom-color: rgba(183, 28, 92, 0.8);
         }
 
         input[type="range"] {
@@ -1753,10 +1784,22 @@
             .split(',')
             .map((item) => Number(String(item).trim()))
             .filter((item) => Number.isFinite(item) && item > 0);
+        const sliderValueInput = document.createElement('input');
+        sliderValueInput.type = 'number';
+        sliderValueInput.min = '1';
+        sliderValueInput.step = '1';
+        sliderValueInput.inputMode = 'numeric';
+        sliderValueInput.autocomplete = 'off';
+        sliderValueInput.className = 'slider-value-input';
+        sliderValueInput.setAttribute('aria-label', 'Hoeveel mensen bellen');
 
-        sliderValue.style.cursor = 'pointer';
-        sliderValue.title = 'Klik om een eigen aantal in te vullen';
-        sliderValue.tabIndex = 0;
+        const sliderValueUnit = document.createElement('span');
+        sliderValueUnit.textContent = 'mensen';
+
+        sliderValue.innerHTML = '';
+        sliderValue.appendChild(sliderValueInput);
+        sliderValue.appendChild(sliderValueUnit);
+        sliderValue.title = 'Plaats je cursor en voer een aantal in';
 
         function getSliderDisplayAmount() {
             const customValue = Math.round(Number(slider?.dataset?.customValue || NaN));
@@ -1769,8 +1812,14 @@
             return sliderValueMap[safeIndex];
         }
 
+        function resizeSliderValueInput() {
+            const length = Math.max(1, String(sliderValueInput.value || '').length);
+            sliderValueInput.style.width = `${Math.max(2, length)}ch`;
+        }
+
         function renderSliderValue() {
-            sliderValue.innerHTML = `${getSliderDisplayAmount()} <span>mensen</span>`;
+            sliderValueInput.value = String(getSliderDisplayAmount());
+            resizeSliderValueInput();
         }
 
         slider.addEventListener('input', () => {
@@ -1778,38 +1827,41 @@
             renderSliderValue();
         });
 
-        async function promptCustomSliderValue() {
-            const currentAmount = getSliderDisplayAmount();
-            const input = await openSiteInputDialog({
-                title: 'Campagne instellingen',
-                message: 'Hoeveel mensen wil je bellen?',
-                initialValue: String(currentAmount),
-                placeholder: 'Bijvoorbeeld 100',
-                confirmLabel: 'Opslaan',
-                validate: (value) => {
-                    const parsed = Math.round(Number(String(value).replace(',', '.')));
-                    if (!Number.isFinite(parsed) || parsed < 1) {
-                        return 'Voer een geldig aantal in (minimaal 1).';
-                    }
-                    return '';
-                }
-            });
-            if (input === null) return;
-
-            const parsed = Math.round(Number(String(input).trim().replace(',', '.')));
+        function commitInlineSliderValue(rawValue) {
+            const parsed = Math.round(Number(String(rawValue).trim().replace(',', '.')));
             if (!Number.isFinite(parsed) || parsed < 1) {
+                renderSliderValue();
                 return;
             }
 
             slider.dataset.customValue = String(parsed);
             renderSliderValue();
+            slider.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        sliderValue.addEventListener('click', promptCustomSliderValue);
-        sliderValue.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
+        sliderValueInput.addEventListener('focus', () => {
+            sliderValueInput.select();
+        });
+
+        sliderValueInput.addEventListener('input', () => {
+            resizeSliderValueInput();
+        });
+
+        sliderValueInput.addEventListener('blur', () => {
+            commitInlineSliderValue(sliderValueInput.value);
+        });
+
+        sliderValueInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
                 event.preventDefault();
-                promptCustomSliderValue();
+                event.stopPropagation();
+                commitInlineSliderValue(sliderValueInput.value);
+                sliderValueInput.blur();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                renderSliderValue();
+                sliderValueInput.blur();
             }
         });
         renderSliderValue();
