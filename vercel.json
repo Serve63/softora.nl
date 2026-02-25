@@ -3,7 +3,8 @@
   "functions": {
     "api/index.js": {
       "runtime": "nodejs20.x",
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "{*.html,assets/**,output/**,scripts/**}"
     }
   },
   "routes": [
