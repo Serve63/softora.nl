@@ -3,14 +3,20 @@
   "functions": {
     "api/index.js": {
       "runtime": "nodejs20.x",
-      "maxDuration": 60,
-      "includeFiles": "{*.html,assets/**,output/**,scripts/**}"
+      "maxDuration": 60
     }
   },
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "/api/index.js"
+    },
+    {
+      "src": "/healthz",
+      "dest": "/api/index.js"
+    },
+    {
+      "handle": "filesystem"
     }
   ]
 }
