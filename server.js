@@ -21,6 +21,7 @@ const recentCallUpdates = [];
 const callUpdatesById = new Map();
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
+const inMemoryUiStateByScope = new Map();
 const aiCallInsightsByCallId = new Map();
 const aiAnalysisFingerprintByCallId = new Map();
 const aiAnalysisInFlightCallIds = new Set();
@@ -34,6 +35,7 @@ let supabaseClient = null;
 let supabaseStateHydrationPromise = null;
 let supabaseStateHydrated = false;
 let supabasePersistChain = Promise.resolve();
+const UI_STATE_SCOPE_PREFIX = 'ui_state:';
 
 // Vercel bundelt dynamische sendFile-doelen niet altijd mee. Door de root-dir
 // één keer te scannen op .html bestanden worden die files traceable voor de
@@ -315,6 +317,113 @@ function appendDashboardActivity(input, reason = 'dashboard_activity') {
   }
   queueRuntimeStatePersist(reason);
   return entry;
+}
+
+function normalizeUiStateScope(scope) {
+  const value = normalizeString(scope || '').toLowerCase();
+  if (!/^[a-z0-9:_-]{1,80}$/.test(value)) return '';
+  return value;
+}
+
+function getUiStateRowKey(scope) {
+  const normalizedScope = normalizeUiStateScope(scope);
+  return normalizedScope ? `${UI_STATE_SCOPE_PREFIX}${normalizedScope}` : '';
+}
+
+function sanitizeUiStateValues(values) {
+  if (!values || typeof values !== 'object' || Array.isArray(values)) return {};
+  const out = {};
+  for (const [rawKey, rawValue] of Object.entries(values)) {
+    const key = normalizeString(rawKey);
+    if (!key || key.length > 120) continue;
+    if (rawValue === undefined) continue;
+    if (rawValue === null) {
+      out[key] = '';
+      continue;
+    }
+    out[key] = truncateText(String(rawValue), 200000);
+  }
+  return out;
+}
+
+async function getUiStateValues(scope) {
+  const normalizedScope = normalizeUiStateScope(scope);
+  if (!normalizedScope) return null;
+
+  if (!isSupabaseConfigured()) {
+    return { values: { ...(inMemoryUiStateByScope.get(normalizedScope) || {}) }, source: 'memory' };
+  }
+
+  try {
+    const client = getSupabaseClient();
+    const rowKey = getUiStateRowKey(normalizedScope);
+    const { data, error } = await client
+      .from(SUPABASE_STATE_TABLE)
+      .select('payload, updated_at')
+      .eq('state_key', rowKey)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[UI State][Supabase][GetError]', error.message || error);
+      return { values: { ...(inMemoryUiStateByScope.get(normalizedScope) || {}) }, source: 'memory' };
+    }
+
+    const values = sanitizeUiStateValues(data?.payload?.values || {});
+    inMemoryUiStateByScope.set(normalizedScope, values);
+    return {
+      values: { ...values },
+      updatedAt: normalizeString(data?.updated_at || '') || null,
+      source: 'supabase',
+    };
+  } catch (error) {
+    console.error('[UI State][Supabase][GetCrash]', error?.message || error);
+    return { values: { ...(inMemoryUiStateByScope.get(normalizedScope) || {}) }, source: 'memory' };
+  }
+}
+
+async function setUiStateValues(scope, values, meta = {}) {
+  const normalizedScope = normalizeUiStateScope(scope);
+  if (!normalizedScope) return null;
+
+  const sanitizedValues = sanitizeUiStateValues(values);
+  inMemoryUiStateByScope.set(normalizedScope, sanitizedValues);
+
+  if (!isSupabaseConfigured()) {
+    return { values: { ...sanitizedValues }, source: 'memory' };
+  }
+
+  try {
+    const client = getSupabaseClient();
+    const rowKey = getUiStateRowKey(normalizedScope);
+    const row = {
+      state_key: rowKey,
+      payload: {
+        scope: normalizedScope,
+        values: sanitizedValues,
+      },
+      meta: {
+        type: 'ui_state',
+        scope: normalizedScope,
+        source: normalizeString(meta.source || 'frontend'),
+        actor: normalizeString(meta.actor || ''),
+      },
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
+      onConflict: 'state_key',
+    });
+
+    if (error) {
+      console.error('[UI State][Supabase][SetError]', error.message || error);
+      return { values: { ...sanitizedValues }, source: 'memory' };
+    }
+
+    return { values: { ...sanitizedValues }, source: 'supabase' };
+  } catch (error) {
+    console.error('[UI State][Supabase][SetCrash]', error?.message || error);
+    return { values: { ...sanitizedValues }, source: 'memory' };
+  }
 }
 
 function getByPath(obj, path) {
@@ -2193,6 +2302,60 @@ app.get('/api/dashboard/activity', (req, res) => {
     ok: true,
     count: Math.min(limit, recentDashboardActivities.length),
     activities: recentDashboardActivities.slice(0, limit),
+  });
+});
+
+app.get('/api/ui-state/:scope', async (req, res) => {
+  const scope = normalizeUiStateScope(req.params.scope);
+  if (!scope) {
+    return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
+  }
+
+  const state = await getUiStateValues(scope);
+  if (!state) {
+    return res.status(400).json({ ok: false, error: 'Kon UI state niet laden' });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    scope,
+    values: state.values || {},
+    source: state.source || 'memory',
+    updatedAt: state.updatedAt || null,
+  });
+});
+
+app.post('/api/ui-state/:scope', async (req, res) => {
+  const scope = normalizeUiStateScope(req.params.scope);
+  if (!scope) {
+    return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
+  }
+
+  const patchProvided = req.body && typeof req.body === 'object' && req.body.patch && typeof req.body.patch === 'object';
+  let valuesToSave;
+
+  if (patchProvided) {
+    const current = await getUiStateValues(scope);
+    const currentValues = current && current.values && typeof current.values === 'object' ? current.values : {};
+    const patchValues = sanitizeUiStateValues(req.body.patch);
+    valuesToSave = { ...currentValues, ...patchValues };
+  } else {
+    valuesToSave = sanitizeUiStateValues(req.body?.values || {});
+  }
+
+  const state = await setUiStateValues(scope, valuesToSave, {
+    source: normalizeString(req.body?.source || 'frontend'),
+    actor: normalizeString(req.body?.actor || ''),
+  });
+  if (!state) {
+    return res.status(500).json({ ok: false, error: 'Kon UI state niet opslaan' });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    scope,
+    values: state.values || {},
+    source: state.source || 'memory',
   });
 });
 

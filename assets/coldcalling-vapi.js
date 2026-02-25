@@ -28,6 +28,13 @@
   const CAMPAIGN_MIN_PRICE_STORAGE_KEY = 'softora_campaign_min_price';
   const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
   const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
+  const REMOTE_UI_STATE_SCOPE = 'coldcalling';
+  let remoteUiStateCache = Object.create(null);
+  let remoteUiStateLoaded = false;
+  let remoteUiStateLoadingPromise = null;
+  let remoteUiStateSaveTimer = null;
+  let remoteUiStateSaveInFlight = false;
+  let remoteUiStatePendingPatch = Object.create(null);
 
   function byId(id) {
     return document.getElementById(id);
@@ -268,19 +275,92 @@
   }
 
   function readStorage(key) {
-    try {
-      return String(window.localStorage.getItem(key) || '');
-    } catch {
-      return '';
-    }
+    if (!key) return '';
+    return String(remoteUiStateCache[key] ?? '');
   }
 
   function writeStorage(key, value) {
+    if (!key) return;
+    const nextValue = String(value ?? '');
+    remoteUiStateCache[key] = nextValue;
+    remoteUiStatePendingPatch[key] = nextValue;
+    scheduleRemoteUiStateSave();
+  }
+
+  async function loadRemoteUiState() {
+    if (remoteUiStateLoaded) return true;
+    if (remoteUiStateLoadingPromise) return remoteUiStateLoadingPromise;
+
+    remoteUiStateLoadingPromise = (async () => {
+      try {
+        const response = await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        if (!response.ok) return false;
+
+        const data = await response.json().catch(() => ({}));
+        const values = data && data.ok && data.values && typeof data.values === 'object' ? data.values : {};
+        const nextCache = Object.create(null);
+        Object.entries(values).forEach(([k, v]) => {
+          nextCache[String(k)] = String(v ?? '');
+        });
+        remoteUiStateCache = nextCache;
+        remoteUiStateLoaded = true;
+        return true;
+      } catch {
+        remoteUiStateLoaded = true;
+        return false;
+      } finally {
+        remoteUiStateLoadingPromise = null;
+      }
+    })();
+
+    return remoteUiStateLoadingPromise;
+  }
+
+  async function flushRemoteUiStateSave() {
+    if (remoteUiStateSaveInFlight) return;
+
+    const patch = remoteUiStatePendingPatch;
+    const patchKeys = Object.keys(patch);
+    if (patchKeys.length === 0) return;
+
+    remoteUiStatePendingPatch = Object.create(null);
+    remoteUiStateSaveInFlight = true;
+
     try {
-      window.localStorage.setItem(key, String(value ?? ''));
+      await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          patch,
+          source: 'assets/coldcalling-vapi.js',
+          actor: 'browser',
+        }),
+      });
     } catch {
-      // Ignore storage failures (e.g. private mode) and continue without persistence.
+      patchKeys.forEach((key) => {
+        remoteUiStatePendingPatch[key] = String(patch[key] ?? '');
+      });
+    } finally {
+      remoteUiStateSaveInFlight = false;
+      if (Object.keys(remoteUiStatePendingPatch).length > 0) {
+        scheduleRemoteUiStateSave(800);
+      }
     }
+  }
+
+  function scheduleRemoteUiStateSave(delayMs = 250) {
+    if (remoteUiStateSaveTimer) {
+      window.clearTimeout(remoteUiStateSaveTimer);
+    }
+    remoteUiStateSaveTimer = window.setTimeout(() => {
+      remoteUiStateSaveTimer = null;
+      void flushRemoteUiStateSave();
+    }, delayMs);
   }
 
   function getSavedDispatchMode() {
@@ -2254,10 +2334,15 @@
     void startCampaignRequest();
   };
 
-  ensureLeadListPanel();
-  ensureAiNotebookPanel();
-  startVapiCallUpdatePolling();
+  async function bootstrapColdcallingUi() {
+    await loadRemoteUiState();
+    ensureLeadListPanel();
+    ensureAiNotebookPanel();
+    startVapiCallUpdatePolling();
 
-  // Zorg dat het loglabel direct "calls" toont in plaats van "mails".
-  updateLogCountLabel();
+    // Zorg dat het loglabel direct "calls" toont in plaats van "mails".
+    updateLogCountLabel();
+  }
+
+  void bootstrapColdcallingUi();
 })();
