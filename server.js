@@ -141,10 +141,20 @@ function getSupabaseClient() {
 }
 
 function buildRuntimeStateSnapshotPayload() {
+  const compactWebhookEvents = recentWebhookEvents.slice(0, 80).map((event) => ({
+    receivedAt: normalizeString(event?.receivedAt || ''),
+    messageType: normalizeString(event?.messageType || ''),
+    callId: normalizeString(event?.callId || ''),
+    callStatus: normalizeString(event?.callStatus || ''),
+    // Volledige webhook payloads (met transcript/messages) maken de snapshot snel te groot
+    // voor serverless + Supabase sync. Call updates bevatten de relevante transcriptdata al.
+    payload: null,
+  }));
+
   return {
-    version: 1,
+    version: 2,
     savedAt: new Date().toISOString(),
-    recentWebhookEvents: recentWebhookEvents.slice(0, 200),
+    recentWebhookEvents: compactWebhookEvents,
     recentCallUpdates: recentCallUpdates.slice(0, 500),
     recentAiCallInsights: recentAiCallInsights.slice(0, 500),
     recentDashboardActivities: recentDashboardActivities.slice(0, 500),
