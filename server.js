@@ -2462,6 +2462,76 @@ app.get('/api/vapi/call-updates', (req, res) => {
   });
 });
 
+app.get('/api/vapi/webhook-debug', (req, res) => {
+  const limit = Math.max(1, Math.min(100, parseIntSafe(req.query.limit, 20)));
+  const demoCallIdPrefix = 'demo-';
+
+  const latestWebhookEvents = recentWebhookEvents.slice(0, limit).map((event) => {
+    const payload = event?.payload && typeof event.payload === 'object' ? event.payload : null;
+    const message = payload?.message && typeof payload.message === 'object' ? payload.message : null;
+    const call = (message?.call && typeof message.call === 'object' ? message.call : null) ||
+      (payload?.call && typeof payload.call === 'object' ? payload.call : null);
+    const transcriptSnippet = extractTranscriptSnippet(payload || {});
+    const transcriptFull = extractTranscriptFull(payload || {});
+    const summary = extractSummaryFromVapiPayload(payload || {});
+
+    return {
+      receivedAt: normalizeString(event?.receivedAt || ''),
+      messageType: normalizeString(event?.messageType || ''),
+      callId: normalizeString(event?.callId || call?.id || ''),
+      callStatus: normalizeString(event?.callStatus || call?.status || ''),
+      endedReason: normalizeString(call?.endedReason || ''),
+      hasSummary: Boolean(summary),
+      summaryLen: normalizeString(summary).length || 0,
+      hasTranscriptSnippet: Boolean(transcriptSnippet),
+      transcriptSnippetLen: normalizeString(transcriptSnippet).length || 0,
+      hasTranscriptFull: Boolean(transcriptFull),
+      transcriptFullLen: normalizeString(transcriptFull).length || 0,
+      topLevelKeys: payload ? Object.keys(payload).slice(0, 30) : [],
+      messageKeys: message ? Object.keys(message).slice(0, 30) : [],
+      callKeys: call ? Object.keys(call).slice(0, 30) : [],
+    };
+  });
+
+  const latestRealCallUpdates = recentCallUpdates
+    .filter((item) => {
+      const callId = normalizeString(item?.callId || '');
+      return callId && !callId.startsWith(demoCallIdPrefix);
+    })
+    .slice(0, limit)
+    .map((item) => ({
+      callId: normalizeString(item?.callId || ''),
+      phone: normalizeString(item?.phone || ''),
+      company: normalizeString(item?.company || ''),
+      status: normalizeString(item?.status || ''),
+      messageType: normalizeString(item?.messageType || ''),
+      hasSummary: Boolean(normalizeString(item?.summary || '')),
+      hasTranscriptSnippet: Boolean(normalizeString(item?.transcriptSnippet || '')),
+      transcriptSnippetLen: normalizeString(item?.transcriptSnippet || '').length || 0,
+      hasTranscriptFull: Boolean(normalizeString(item?.transcriptFull || '')),
+      transcriptFullLen: normalizeString(item?.transcriptFull || '').length || 0,
+      updatedAt: normalizeString(item?.updatedAt || ''),
+      updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
+    }));
+
+  const allCallUpdateCount = recentCallUpdates.length;
+  const realCallUpdateCount = recentCallUpdates.filter((item) => {
+    const callId = normalizeString(item?.callId || '');
+    return callId && !callId.startsWith(demoCallIdPrefix);
+  }).length;
+
+  return res.status(200).json({
+    ok: true,
+    now: new Date().toISOString(),
+    webhookEventCount: recentWebhookEvents.length,
+    callUpdateCount: allCallUpdateCount,
+    realCallUpdateCount,
+    demoOnlyCallUpdates: allCallUpdateCount > 0 && realCallUpdateCount === 0,
+    latestWebhookEvents,
+    latestRealCallUpdates,
+  });
+});
+
 app.get('/api/ai/call-insights', (req, res) => {
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
   return res.status(200).json({
