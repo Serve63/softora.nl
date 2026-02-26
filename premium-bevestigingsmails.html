@@ -1638,6 +1638,20 @@
             return Boolean(confirmationTaskState.transcriptSummaryBusyByTaskId[String(taskId)]);
         }
 
+        function normalizeDisplayedCallTranscript(value) {
+            const raw = String(value || '').replace(/\r\n?/g, '\n').trim();
+            if (!raw) return '';
+
+            const lines = raw.split('\n');
+            const filtered = lines.filter((line) => {
+                const trimmed = String(line || '').trim();
+                if (!trimmed) return false;
+                return !/^(system|developer|tool|function)\s*:/i.test(trimmed);
+            });
+
+            return filtered.join('\n').trim();
+        }
+
         async function requestTranscriptSummaryWithAi(payload) {
             if (window.SoftoraAI && typeof window.SoftoraAI.summarizeText === 'function') {
                 return window.SoftoraAI.summarizeText(payload);
@@ -1662,7 +1676,7 @@
                 detail = confirmationTaskState.detailsById[key] || null;
             }
 
-            const transcript = String(detail?.transcript || '').trim();
+            const transcript = normalizeDisplayedCallTranscript(detail?.transcript);
             if (!transcript) {
                 confirmationTaskState.transcriptSummaryErrorByTaskId[key] = 'Geen transcriptie beschikbaar voor deze taak.';
                 renderConfirmationTasks();
@@ -1715,9 +1729,11 @@
                 'klant: Ja, graag. Stuur eerst even een bevestigingsmail, dan bevestig ik per mail terug.',
                 'assistant: Helemaal goed, dan zet ik de afspraak als concept en volgt de bevestigingsmail direct.',
             ].join('\n');
-            const transcript = detail?.transcript
-                ? String(detail.transcript)
-                : (isDemoTask ? demoTranscript : '');
+            const transcript = normalizeDisplayedCallTranscript(
+                detail?.transcript
+                    ? String(detail.transcript)
+                    : (isDemoTask ? demoTranscript : '')
+            );
             const transcriptHtml = transcript
                 ? `<div class="confirm-task-transcript">${escapeHtml(transcript)}</div>`
                 : `<div class="confirm-task-transcript empty">Nog geen transcript beschikbaar vanuit Vapi webhook voor deze call.</div>`;
