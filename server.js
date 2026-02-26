@@ -3354,6 +3354,45 @@ app.get('/api/supabase-probe', async (_req, res) => {
   }
 });
 
+app.post('/api/runtime-sync-now', async (_req, res) => {
+  const before = {
+    hydrated: supabaseStateHydrated,
+    lastHydrateError: supabaseLastHydrateError || null,
+    lastPersistError: supabaseLastPersistError || null,
+  };
+
+  const persistOk = await persistRuntimeStateToSupabase('debug_runtime_sync_now');
+
+  // Forceer een nieuwe hydrate-attempt op deze instance voor directe diagnose.
+  supabaseStateHydrated = false;
+  supabaseHydrateRetryNotBeforeMs = 0;
+
+  const hydratedOk = await ensureRuntimeStateHydratedFromSupabase();
+
+  return res.status(200).json({
+    ok: Boolean(persistOk && hydratedOk),
+    before,
+    after: {
+      hydrated: supabaseStateHydrated,
+      lastHydrateError: supabaseLastHydrateError || null,
+      lastPersistError: supabaseLastPersistError || null,
+      counts: {
+        webhookEvents: recentWebhookEvents.length,
+        callUpdates: recentCallUpdates.length,
+        aiCallInsights: recentAiCallInsights.length,
+        appointments: generatedAgendaAppointments.length,
+      },
+    },
+    persistOk,
+    hydratedOk,
+    supabase: {
+      host: redactSupabaseUrlForDebug(SUPABASE_URL),
+      table: SUPABASE_STATE_TABLE,
+      stateKey: SUPABASE_STATE_KEY,
+    },
+  });
+});
+
 // API routes eerst, daarna statische frontend assets/html serveren.
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/output', express.static(path.join(__dirname, 'output')));
