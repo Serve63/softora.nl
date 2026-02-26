@@ -36,6 +36,8 @@ let supabaseStateHydrationPromise = null;
 let supabaseStateHydrated = false;
 let supabasePersistChain = Promise.resolve();
 let supabaseHydrateRetryNotBeforeMs = 0;
+let supabaseLastHydrateError = '';
+let supabaseLastPersistError = '';
 const UI_STATE_SCOPE_PREFIX = 'ui_state:';
 
 // Vercel bundelt dynamische sendFile-doelen niet altijd mee. Door de root-dir
@@ -116,6 +118,17 @@ function truncateText(value, maxLength = 500) {
 
 function isSupabaseConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function redactSupabaseUrlForDebug(url) {
+  const raw = normalizeString(url || '');
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return truncateText(raw, 80);
+  }
 }
 
 function getSupabaseClient() {
@@ -212,6 +225,7 @@ async function ensureRuntimeStateHydratedFromSupabase() {
 
       if (error) {
         console.error('[Supabase][HydrateError]', error.message || error);
+        supabaseLastHydrateError = truncateText(error.message || String(error), 500);
         supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
         return false;
       }
@@ -233,10 +247,12 @@ async function ensureRuntimeStateHydratedFromSupabase() {
       }
 
       supabaseStateHydrated = true;
+      supabaseLastHydrateError = '';
       supabaseHydrateRetryNotBeforeMs = 0;
       return true;
     } catch (error) {
       console.error('[Supabase][HydrateCrash]', error?.message || error);
+      supabaseLastHydrateError = truncateText(error?.message || String(error), 500);
       supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
       return false;
     } finally {
@@ -275,12 +291,15 @@ async function persistRuntimeStateToSupabase(reason = 'unknown') {
 
     if (error) {
       console.error('[Supabase][PersistError]', error.message || error);
+      supabaseLastPersistError = truncateText(error.message || String(error), 500);
       return false;
     }
 
+    supabaseLastPersistError = '';
     return true;
   } catch (error) {
     console.error('[Supabase][PersistCrash]', error?.message || error);
+    supabaseLastPersistError = truncateText(error?.message || String(error), 500);
     return false;
   }
 }
@@ -3209,6 +3228,34 @@ app.get('/api/healthz', (_req, res) => {
       stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
     },
     timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/api/debug/runtime-health', (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    timestamp: new Date().toISOString(),
+    runtime: {
+      webhookEvents: recentWebhookEvents.length,
+      callUpdates: recentCallUpdates.length,
+      aiCallInsights: recentAiCallInsights.length,
+      appointments: generatedAgendaAppointments.length,
+      realCallUpdates: recentCallUpdates.filter((item) => {
+        const callId = normalizeString(item?.callId || '');
+        return callId && !callId.startsWith('demo-');
+      }).length,
+    },
+    supabase: {
+      enabled: isSupabaseConfigured(),
+      hydrated: supabaseStateHydrated,
+      hydrateRetryNotBeforeMs: supabaseHydrateRetryNotBeforeMs,
+      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
+      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
+      host: redactSupabaseUrlForDebug(SUPABASE_URL),
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      lastHydrateError: supabaseLastHydrateError || null,
+      lastPersistError: supabaseLastPersistError || null,
+    },
   });
 });
 
