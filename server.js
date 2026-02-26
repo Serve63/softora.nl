@@ -3226,13 +3226,13 @@ app.get('/api/agenda/confirmation-tasks', async (req, res) => {
   });
 });
 
-app.get('/api/agenda/confirmation-tasks/:id', async (req, res) => {
+async function sendConfirmationTaskDetailResponse(req, res, taskIdRaw) {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
 
-  const idx = getGeneratedAppointmentIndexById(req.params.id);
+  const idx = getGeneratedAppointmentIndexById(taskIdRaw);
   if (idx < 0) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
   }
@@ -3251,6 +3251,15 @@ app.get('/api/agenda/confirmation-tasks/:id', async (req, res) => {
     ok: true,
     task: detail,
   });
+}
+
+app.get('/api/agenda/confirmation-tasks/:id', async (req, res) => {
+  return sendConfirmationTaskDetailResponse(req, res, req.params.id);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.get('/api/agenda/confirmation-task', async (req, res) => {
+  return sendConfirmationTaskDetailResponse(req, res, req.query.taskId);
 });
 
 app.post('/api/agenda/confirmation-tasks/:id/draft-email', async (req, res) => {

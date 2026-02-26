@@ -2061,7 +2061,7 @@
             confirmationTaskState.detailLoadingId = taskId;
             renderConfirmationTasks();
             try {
-                const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}`, { cache: 'no-store' });
+                const res = await fetch(`/api/agenda/confirmation-task?taskId=${encodeURIComponent(taskId)}`, { cache: 'no-store' });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok || !data?.ok || !data.task) return false;
                 confirmationTaskState.detailsById[String(taskId)] = data.task;
