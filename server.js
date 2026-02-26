@@ -35,6 +35,7 @@ let supabaseClient = null;
 let supabaseStateHydrationPromise = null;
 let supabaseStateHydrated = false;
 let supabasePersistChain = Promise.resolve();
+let supabaseHydrateRetryNotBeforeMs = 0;
 const UI_STATE_SCOPE_PREFIX = 'ui_state:';
 
 // Vercel bundelt dynamische sendFile-doelen niet altijd mee. Door de root-dir
@@ -196,6 +197,7 @@ async function ensureRuntimeStateHydratedFromSupabase() {
   if (!isSupabaseConfigured()) return false;
   if (supabaseStateHydrated) return true;
   if (supabaseStateHydrationPromise) return supabaseStateHydrationPromise;
+  if (Date.now() < supabaseHydrateRetryNotBeforeMs) return false;
 
   supabaseStateHydrationPromise = (async () => {
     try {
@@ -210,6 +212,7 @@ async function ensureRuntimeStateHydratedFromSupabase() {
 
       if (error) {
         console.error('[Supabase][HydrateError]', error.message || error);
+        supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
         return false;
       }
 
@@ -230,9 +233,11 @@ async function ensureRuntimeStateHydratedFromSupabase() {
       }
 
       supabaseStateHydrated = true;
+      supabaseHydrateRetryNotBeforeMs = 0;
       return true;
     } catch (error) {
       console.error('[Supabase][HydrateCrash]', error?.message || error);
+      supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
       return false;
     } finally {
       supabaseStateHydrationPromise = null;
@@ -471,14 +476,75 @@ function collectStringValuesByKey(root, keyRegex, options = {}) {
   return out;
 }
 
+function formatTranscriptPartsFromEntries(entries, options = {}) {
+  if (!Array.isArray(entries)) return '';
+  const preferFull = options.preferFull !== false;
+  const maxLength = Number.isFinite(options.maxLength) ? options.maxLength : 4000;
+
+  const parts = entries
+    .map((entry) => {
+      if (!entry) return '';
+      if (typeof entry === 'string') return normalizeString(entry);
+      if (typeof entry !== 'object') return '';
+
+      const speaker = normalizeString(
+        entry.role ||
+          entry.speaker ||
+          entry.name ||
+          entry.from ||
+          entry.participant ||
+          entry.channel ||
+          entry.actor
+      );
+
+      const nestedMessage =
+        (entry.message && typeof entry.message === 'object' ? entry.message : null) ||
+        (entry.content && typeof entry.content === 'object' ? entry.content : null);
+
+      const text = normalizeString(
+        entry.text ||
+          entry.content ||
+          entry.message ||
+          entry.utterance ||
+          entry.transcript ||
+          entry.value ||
+          nestedMessage?.text ||
+          nestedMessage?.content ||
+          nestedMessage?.message
+      );
+      if (!text) return '';
+      return speaker ? `${speaker}: ${text}` : text;
+    })
+    .filter(Boolean);
+
+  if (parts.length === 0) return '';
+  const joined = preferFull ? parts.join('\n') : parts.slice(-6).join(' | ');
+  return truncateText(joined, maxLength);
+}
+
 function extractTranscriptText(payload, options = {}) {
   const maxLength = Number.isFinite(options.maxLength) ? Math.max(80, options.maxLength) : 4000;
   const preferFull = options.preferFull !== false;
   const transcriptCandidates = [
     getByPath(payload, 'message.call.transcript'),
+    getByPath(payload, 'message.call.artifact.transcript'),
+    getByPath(payload, 'message.artifact.transcript'),
+    getByPath(payload, 'call.artifact.transcript'),
     getByPath(payload, 'message.transcript'),
     getByPath(payload, 'call.transcript'),
     getByPath(payload, 'transcript'),
+    getByPath(payload, 'message.call.artifact.messages'),
+    getByPath(payload, 'message.artifact.messages'),
+    getByPath(payload, 'call.artifact.messages'),
+    getByPath(payload, 'message.call.messages'),
+    getByPath(payload, 'message.messages'),
+    getByPath(payload, 'call.messages'),
+    getByPath(payload, 'message.call.conversation'),
+    getByPath(payload, 'message.conversation'),
+    getByPath(payload, 'call.conversation'),
+    getByPath(payload, 'message.call.utterances'),
+    getByPath(payload, 'message.utterances'),
+    getByPath(payload, 'call.utterances'),
   ];
 
   for (const candidate of transcriptCandidates) {
@@ -489,20 +555,24 @@ function extractTranscriptText(payload, options = {}) {
     }
 
     if (Array.isArray(candidate)) {
-      const parts = candidate
-        .map((entry) => {
-          if (!entry) return '';
-          if (typeof entry === 'string') return entry;
-          const speaker = normalizeString(entry.role || entry.speaker || entry.name || entry.from || '');
-          const text = normalizeString(entry.text || entry.content || entry.message || entry.utterance || '');
-          if (!text) return '';
-          return speaker ? `${speaker}: ${text}` : text;
-        })
-        .filter(Boolean);
+      const formatted = formatTranscriptPartsFromEntries(candidate, { preferFull, maxLength });
+      if (formatted) return formatted;
+    }
 
-      if (parts.length > 0) {
-        const joined = preferFull ? parts.join('\n') : parts.slice(-6).join(' | ');
-        return truncateText(joined, maxLength);
+    if (candidate && typeof candidate === 'object') {
+      const nestedArrays = [
+        candidate.messages,
+        candidate.items,
+        candidate.utterances,
+        candidate.turns,
+        candidate.entries,
+        candidate.segments,
+        candidate.transcript,
+      ];
+      for (const nested of nestedArrays) {
+        if (!Array.isArray(nested)) continue;
+        const formatted = formatTranscriptPartsFromEntries(nested, { preferFull, maxLength });
+        if (formatted) return formatted;
       }
     }
   }
@@ -2342,6 +2412,9 @@ app.post('/api/vapi/webhook', (req, res) => {
           messageType: callUpdate.messageType,
           hasSummary: Boolean(callUpdate.summary),
           hasTranscriptSnippet: Boolean(callUpdate.transcriptSnippet),
+          transcriptSnippetLen: normalizeString(callUpdate.transcriptSnippet).length || 0,
+          hasTranscriptFull: Boolean(callUpdate.transcriptFull),
+          transcriptFullLen: normalizeString(callUpdate.transcriptFull).length || 0,
         },
         null,
         2
