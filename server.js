@@ -1008,7 +1008,129 @@ function getCallUpdateAiFingerprint(callUpdate) {
     normalizeString(callUpdate?.endedReason),
     normalizeString(callUpdate?.summary),
     normalizeString(callUpdate?.transcriptSnippet),
+    truncateText(normalizeString(callUpdate?.transcriptFull), 1200),
   ].join('|');
+}
+
+function addDaysToIsoDate(dateValue, days) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const next = new Date(date.getTime() + Number(days || 0) * 24 * 60 * 60 * 1000);
+  const y = next.getFullYear();
+  const m = String(next.getMonth() + 1).padStart(2, '0');
+  const d = String(next.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function extractLikelyAppointmentDateFromText(text, baseIso) {
+  const raw = normalizeString(text);
+  if (!raw) return '';
+
+  const isoMatch = raw.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
+  if (isoMatch) {
+    return normalizeDateYyyyMmDd(isoMatch[1]);
+  }
+
+  const dmyMatch = raw.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+  if (dmyMatch) {
+    const now = new Date(baseIso || Date.now());
+    const yearRaw = normalizeString(dmyMatch[3]);
+    const year =
+      yearRaw.length === 4
+        ? Number(yearRaw)
+        : yearRaw.length === 2
+          ? 2000 + Number(yearRaw)
+          : now.getFullYear();
+    const month = Math.max(1, Math.min(12, Number(dmyMatch[2])));
+    const day = Math.max(1, Math.min(31, Number(dmyMatch[1])));
+    return normalizeDateYyyyMmDd(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+  }
+
+  const lower = raw.toLowerCase();
+  const baseDate = normalizeDateYyyyMmDd(baseIso) || normalizeDateYyyyMmDd(new Date().toISOString());
+  if (!baseDate) return '';
+  if (/\bovermorgen\b/.test(lower)) return addDaysToIsoDate(baseDate, 2);
+  if (/\bmorgen\b/.test(lower)) return addDaysToIsoDate(baseDate, 1);
+  if (/\bvandaag\b/.test(lower)) return addDaysToIsoDate(baseDate, 0);
+
+  return '';
+}
+
+function extractLikelyAppointmentTimeFromText(text) {
+  const raw = normalizeString(text);
+  if (!raw) return '';
+
+  const hhmm = raw.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (hhmm) {
+    return normalizeTimeHhMm(`${hhmm[1]}:${hhmm[2]}`);
+  }
+
+  const lower = raw.toLowerCase();
+  const uurMatch = lower.match(/\b(?:om\s+)?(\d{1,2})\s*uur(?:\s+([a-z]+(?:\s+[a-z]+)?))?\b/);
+  if (!uurMatch) return '';
+
+  let hour = Math.max(0, Math.min(23, Number(uurMatch[1])));
+  const suffix = normalizeString(uurMatch[2] || '').toLowerCase();
+
+  if (/(middag|des middags|vanmiddag|avond)/.test(suffix) && hour >= 1 && hour <= 11) {
+    hour += 12;
+  }
+  if (/(ochtend|smorgens|morgens)/.test(suffix) && hour === 12) {
+    hour = 0;
+  }
+
+  return normalizeTimeHhMm(`${String(hour).padStart(2, '0')}:00`);
+}
+
+function createRuleBasedInsightFromCallUpdate(callUpdate) {
+  if (!callUpdate?.callId) return null;
+
+  const summary = normalizeString(callUpdate.summary || '');
+  const transcriptFull = normalizeString(callUpdate.transcriptFull || '');
+  const transcriptSnippet = normalizeString(callUpdate.transcriptSnippet || '');
+  const sourceText = [summary, transcriptFull, transcriptSnippet].filter(Boolean).join('\n');
+  if (!sourceText) return null;
+
+  const lower = sourceText.toLowerCase();
+  const hasAppointmentLanguage =
+    /(afspraak|intake|kennismaking|langs\s+kom)/.test(lower) &&
+    /(ingepland|gepland|bevestigd|morgen|overmorgen|\bom\b\s*\d{1,2}(:\d{2})?\s*uur|\b\d{1,2}:\d{2}\b)/.test(
+      lower
+    );
+
+  const vapiSummaryStrong =
+    /er is een afspraak ingepland|afspraak ingepland|afspraak gepland|intake ingepland/.test(lower);
+
+  const appointmentBooked = hasAppointmentLanguage || vapiSummaryStrong;
+  const appointmentDate = extractLikelyAppointmentDateFromText(sourceText, callUpdate.updatedAt);
+  const appointmentTime = extractLikelyAppointmentTimeFromText(sourceText);
+
+  const ruleSummary =
+    summary ||
+    truncateText(
+      transcriptSnippet || transcriptFull || 'Call verwerkt op basis van transcriptie.',
+      900
+    );
+
+  return {
+    callId: normalizeString(callUpdate.callId),
+    company: normalizeString(callUpdate.company || ''),
+    contactName: normalizeString(callUpdate.name || ''),
+    phone: normalizeString(callUpdate.phone || ''),
+    branche: '',
+    summary: ruleSummary,
+    appointmentBooked: Boolean(appointmentBooked && appointmentDate),
+    appointmentDate: appointmentBooked ? appointmentDate : '',
+    appointmentTime: appointmentBooked ? appointmentTime : '',
+    estimatedValueEur: null,
+    followUpRequired: Boolean(appointmentBooked),
+    followUpReason: appointmentBooked
+      ? 'Bevestigingsmail sturen op basis van gedetecteerde afspraak in Vapi transcriptie.'
+      : '',
+    source: 'rule',
+    model: 'rule',
+    analyzedAt: new Date().toISOString(),
+  };
 }
 
 function compareAgendaAppointments(a, b) {
@@ -1319,6 +1441,7 @@ async function createAiInsightFromCallUpdate(callUpdate) {
       phone: callUpdate.phone,
       vapiSummary: callUpdate.summary,
       transcriptSnippet: callUpdate.transcriptSnippet,
+      transcriptFull: truncateText(normalizeString(callUpdate.transcriptFull || ''), 5000),
       updatedAt: callUpdate.updatedAt,
     },
   };
@@ -1421,8 +1544,61 @@ async function maybeAnalyzeCallUpdateWithAi(callUpdate) {
 
   aiAnalysisInFlightCallIds.add(callUpdate.callId);
   try {
-    const insight = await createAiInsightFromCallUpdate(callUpdate);
-    if (!insight) return null;
+    let insight = null;
+    let aiError = null;
+    try {
+      insight = await createAiInsightFromCallUpdate(callUpdate);
+    } catch (error) {
+      aiError = error;
+      console.error(
+        '[AI Call Insight Create Error]',
+        JSON.stringify(
+          {
+            callId: callUpdate.callId,
+            message: error?.message || 'Onbekende fout',
+            status: error?.status || null,
+            data: error?.data || null,
+          },
+          null,
+          2
+        )
+      );
+    }
+
+    const ruleInsight = createRuleBasedInsightFromCallUpdate(callUpdate);
+    if (!insight && ruleInsight) {
+      insight = ruleInsight;
+      console.log(
+        '[AI Call Insight Fallback]',
+        JSON.stringify(
+          {
+            callId: callUpdate.callId,
+            source: 'rule',
+            appointmentBooked: ruleInsight.appointmentBooked,
+            appointmentDate: ruleInsight.appointmentDate || null,
+            appointmentTime: ruleInsight.appointmentTime || null,
+          },
+          null,
+          2
+        )
+      );
+    } else if (insight && ruleInsight) {
+      if (!insight.summary && ruleInsight.summary) {
+        insight.summary = ruleInsight.summary;
+      }
+      if (!toBooleanSafe(insight.appointmentBooked, false) && toBooleanSafe(ruleInsight.appointmentBooked, false)) {
+        insight.appointmentBooked = true;
+        if (!normalizeDateYyyyMmDd(insight.appointmentDate)) insight.appointmentDate = ruleInsight.appointmentDate;
+        if (!normalizeTimeHhMm(insight.appointmentTime)) insight.appointmentTime = ruleInsight.appointmentTime;
+        if (!normalizeString(insight.followUpReason)) insight.followUpReason = ruleInsight.followUpReason;
+        if (!toBooleanSafe(insight.followUpRequired, false)) insight.followUpRequired = true;
+      }
+    }
+
+    if (!insight) {
+      if (aiError) throw aiError;
+      return null;
+    }
 
     const savedInsight = upsertAiCallInsight(insight);
     aiAnalysisFingerprintByCallId.set(callUpdate.callId, fingerprint);
