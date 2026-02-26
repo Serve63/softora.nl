@@ -296,11 +296,12 @@ function applyRuntimeStateSnapshotPayload(payload) {
   return true;
 }
 
-async function ensureRuntimeStateHydratedFromSupabase() {
+async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
+  const force = Boolean(options && options.force);
   if (!isSupabaseConfigured()) return false;
   if (supabaseStateHydrated) return true;
   if (supabaseStateHydrationPromise) return supabaseStateHydrationPromise;
-  if (Date.now() < supabaseHydrateRetryNotBeforeMs) return false;
+  if (!force && Date.now() < supabaseHydrateRetryNotBeforeMs) return false;
 
   supabaseStateHydrationPromise = (async () => {
     try {
@@ -368,6 +369,22 @@ async function ensureRuntimeStateHydratedFromSupabase() {
   })();
 
   return supabaseStateHydrationPromise;
+}
+
+async function forceHydrateRuntimeStateWithRetries(maxAttempts = 3) {
+  if (!isSupabaseConfigured()) return false;
+  if (supabaseStateHydrated) return true;
+
+  const attempts = Math.max(1, Math.min(5, Number(maxAttempts) || 1));
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    supabaseHydrateRetryNotBeforeMs = 0;
+    const ok = await ensureRuntimeStateHydratedFromSupabase({ force: true });
+    if (ok) return true;
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+    }
+  }
+  return false;
 }
 
 async function persistRuntimeStateToSupabase(reason = 'unknown') {
@@ -2848,7 +2865,10 @@ app.post('/api/vapi/webhook', (req, res) => {
   return;
 });
 
-app.get('/api/vapi/call-updates', (req, res) => {
+app.get('/api/vapi/call-updates', async (req, res) => {
+  if (isSupabaseConfigured() && !supabaseStateHydrated) {
+    await forceHydrateRuntimeStateWithRetries(3);
+  }
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 200)));
   const sinceMs = parseNumberSafe(req.query.sinceMs, null);
 
@@ -2934,7 +2954,10 @@ app.get('/api/vapi/webhook-debug', (req, res) => {
   });
 });
 
-app.get('/api/ai/call-insights', (req, res) => {
+app.get('/api/ai/call-insights', async (req, res) => {
+  if (isSupabaseConfigured() && !supabaseStateHydrated) {
+    await forceHydrateRuntimeStateWithRetries(3);
+  }
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
   return res.status(200).json({
@@ -3092,7 +3115,10 @@ app.post('/api/dashboard/activity', (req, res) => {
   });
 });
 
-app.get('/api/agenda/appointments', (req, res) => {
+app.get('/api/agenda/appointments', async (req, res) => {
+  if (isSupabaseConfigured() && !supabaseStateHydrated) {
+    await forceHydrateRuntimeStateWithRetries(3);
+  }
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 200)));
   const sorted = generatedAgendaAppointments
     .filter(isGeneratedAppointmentConfirmedForAgenda)
@@ -3105,7 +3131,10 @@ app.get('/api/agenda/appointments', (req, res) => {
   });
 });
 
-app.get('/api/agenda/confirmation-tasks', (req, res) => {
+app.get('/api/agenda/confirmation-tasks', async (req, res) => {
+  if (isSupabaseConfigured() && !supabaseStateHydrated) {
+    await forceHydrateRuntimeStateWithRetries(3);
+  }
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 100)));
   const includeDemo = /^(1|true|yes)$/i.test(String(req.query.includeDemo || ''));
