@@ -3290,6 +3290,60 @@ app.get('/api/runtime-health', sendRuntimeHealthDebug);
   });
 }); */
 
+app.get('/api/supabase-probe', async (_req, res) => {
+  if (!isSupabaseConfigured()) {
+    return res.status(200).json({
+      ok: false,
+      configured: false,
+      error: 'Supabase niet geconfigureerd.',
+    });
+  }
+
+  const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/${encodeURIComponent(
+    SUPABASE_STATE_TABLE
+  )}?select=state_key&limit=1`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
+
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = truncateText(text, 800);
+    }
+
+    return res.status(200).json({
+      ok: response.ok,
+      configured: true,
+      status: response.status,
+      supabaseHost: redactSupabaseUrlForDebug(SUPABASE_URL),
+      table: SUPABASE_STATE_TABLE,
+      stateKey: SUPABASE_STATE_KEY,
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      body,
+    });
+  } catch (error) {
+    return res.status(200).json({
+      ok: false,
+      configured: true,
+      status: null,
+      supabaseHost: redactSupabaseUrlForDebug(SUPABASE_URL),
+      table: SUPABASE_STATE_TABLE,
+      stateKey: SUPABASE_STATE_KEY,
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      error: truncateText(error?.message || String(error), 500),
+    });
+  }
+});
+
 // API routes eerst, daarna statische frontend assets/html serveren.
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/output', express.static(path.join(__dirname, 'output')));
