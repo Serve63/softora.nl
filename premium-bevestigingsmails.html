@@ -1780,6 +1780,7 @@
             }
 
             const mailSent = Boolean(task.mailSent);
+            const mailSendBusy = isTaskActionBusy(taskId);
             const step1ChipClass = mailSent ? 'done' : 'active';
             const step1DotText = mailSent ? '✓' : '1';
             const step2ChipClass = mailSent ? 'active' : 'pending';
@@ -1819,6 +1820,16 @@
                             <textarea class="confirm-task-draft" readonly placeholder="Klik op &quot;Schrijf bevestigingsmail&quot; om AI een concept te laten maken.">${escapeHtml(draft)}</textarea>
                             <div class="confirm-task-detail-info">
                                 ${draftMeta.length ? escapeHtml(draftMeta.join(' • ')) : (draft ? '' : 'Nog geen concept gegenereerd.')}
+                            </div>
+                            <div class="confirm-task-detail-actions" style="margin-top:0.55rem;">
+                                <button
+                                    type="button"
+                                    class="confirm-task-detail-btn ${mailSent ? 'success' : ''}"
+                                    data-send-confirmation-mail-id="${taskId}"
+                                    ${(taskId && !mailSent && !mailSendBusy) ? '' : 'disabled'}
+                                >
+                                    ${mailSendBusy ? 'Bezig...' : (mailSent ? 'Bevestigingsmail verstuurd' : 'Bevestigingsmail sturen')}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1941,6 +1952,21 @@
                     e.stopPropagation();
                     const taskId = Number(btn.getAttribute('data-mark-sent-id'));
                     if (!taskId || isTaskActionBusy(taskId)) return;
+                    setTaskActionBusy(taskId, true);
+                    renderConfirmationTasks();
+                    const ok = await markConfirmationMailSent(taskId);
+                    setTaskActionBusy(taskId, false);
+                    if (!ok) renderConfirmationTasks();
+                });
+            });
+
+            bodyEl.querySelectorAll('[data-send-confirmation-mail-id]').forEach((btn) => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const taskId = Number(btn.getAttribute('data-send-confirmation-mail-id'));
+                    if (!taskId || isTaskActionBusy(taskId)) return;
+                    if (getTaskById(taskId)?.mailSent) return;
                     setTaskActionBusy(taskId, true);
                     renderConfirmationTasks();
                     const ok = await markConfirmationMailSent(taskId);
