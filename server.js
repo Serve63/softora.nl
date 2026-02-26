@@ -1269,6 +1269,92 @@ function createRuleBasedInsightFromCallUpdate(callUpdate) {
   };
 }
 
+function ensureRuleBasedInsightAndAppointment(callUpdate) {
+  if (!callUpdate || !callUpdate.callId) return null;
+
+  const existingInsight = aiCallInsightsByCallId.get(callUpdate.callId) || null;
+  const ruleInsight = createRuleBasedInsightFromCallUpdate(callUpdate);
+
+  let nextInsight = existingInsight;
+
+  if (!existingInsight && ruleInsight) {
+    nextInsight = upsertAiCallInsight(ruleInsight);
+  } else if (existingInsight && ruleInsight) {
+    let changed = false;
+    const merged = { ...existingInsight };
+
+    if (!normalizeString(merged.summary) && normalizeString(ruleInsight.summary)) {
+      merged.summary = ruleInsight.summary;
+      changed = true;
+    }
+
+    if (!toBooleanSafe(merged.appointmentBooked, false) && toBooleanSafe(ruleInsight.appointmentBooked, false)) {
+      merged.appointmentBooked = true;
+      if (!normalizeDateYyyyMmDd(merged.appointmentDate)) merged.appointmentDate = ruleInsight.appointmentDate;
+      if (!normalizeTimeHhMm(merged.appointmentTime)) merged.appointmentTime = ruleInsight.appointmentTime;
+      if (!normalizeString(merged.followUpReason)) merged.followUpReason = ruleInsight.followUpReason;
+      if (!toBooleanSafe(merged.followUpRequired, false)) merged.followUpRequired = true;
+      if (!normalizeString(merged.model)) merged.model = 'rule';
+      if (!normalizeString(merged.source)) merged.source = 'rule';
+      changed = true;
+    }
+
+    if (changed) {
+      merged.analyzedAt = new Date().toISOString();
+      nextInsight = upsertAiCallInsight(merged);
+    }
+  }
+
+  if (!nextInsight) return null;
+
+  const existingAppointmentId = agendaAppointmentIdByCallId.get(callUpdate.callId);
+  if (
+    !existingAppointmentId &&
+    toBooleanSafe(nextInsight.appointmentBooked, false)
+  ) {
+    const agendaAppointment = buildGeneratedAgendaAppointmentFromAiInsight({
+      ...nextInsight,
+      callId: callUpdate.callId,
+      leadCompany: callUpdate.company,
+      leadName: callUpdate.name,
+    });
+
+    if (agendaAppointment) {
+      const savedAppointment = upsertGeneratedAgendaAppointment(agendaAppointment, callUpdate.callId);
+      if (savedAppointment) {
+        nextInsight = upsertAiCallInsight({
+          ...nextInsight,
+          agendaAppointmentId: savedAppointment.id,
+        });
+      }
+    }
+  }
+
+  return nextInsight;
+}
+
+function backfillInsightsAndAppointmentsFromRecentCallUpdates() {
+  let touched = 0;
+  for (const callUpdate of recentCallUpdates) {
+    const callId = normalizeString(callUpdate?.callId || '');
+    if (!callId || callId.startsWith('demo-')) continue;
+
+    const beforeInsight = aiCallInsightsByCallId.get(callId) || null;
+    const beforeApptId = agendaAppointmentIdByCallId.get(callId) || null;
+    const afterInsight = ensureRuleBasedInsightAndAppointment(callUpdate);
+    const afterApptId = agendaAppointmentIdByCallId.get(callId) || null;
+
+    if (
+      (afterInsight && !beforeInsight) ||
+      (afterInsight && beforeInsight && JSON.stringify(afterInsight) !== JSON.stringify(beforeInsight)) ||
+      (!beforeApptId && afterApptId)
+    ) {
+      touched += 1;
+    }
+  }
+  return touched;
+}
+
 function compareAgendaAppointments(a, b) {
   const aKey = `${normalizeDateYyyyMmDd(a?.date)}T${normalizeTimeHhMm(a?.time) || '00:00'}`;
   const bKey = `${normalizeDateYyyyMmDd(b?.date)}T${normalizeTimeHhMm(b?.time) || '00:00'}`;
@@ -2668,9 +2754,6 @@ app.post('/api/vapi/webhook', (req, res) => {
     return res.status(401).json({ ok: false, error: 'Webhook secret ongeldig.' });
   }
 
-  // Reageer zo snel mogelijk naar Vapi om retries/vertraging door webhook-processing te voorkomen.
-  res.status(200).json({ ok: true });
-
   const messageType = req.body?.message?.type || req.body?.type || 'unknown';
   const callData = req.body?.message?.call || req.body?.call || null;
 
@@ -2735,6 +2818,10 @@ app.post('/api/vapi/webhook', (req, res) => {
 
     handleSequentialDispatchQueueWebhookProgress(callUpdate);
 
+    // Cruciale backoffice-functie (bevestigingstaak) synchroon doen zodat Vercel serverless
+    // background-cancellation dit niet kan verliezen. OpenAI-enrichment blijft asynchroon.
+    ensureRuleBasedInsightAndAppointment(callUpdate);
+
     void maybeAnalyzeCallUpdateWithAi(callUpdate).catch((error) => {
       console.error(
         '[AI Call Insight Error]',
@@ -2751,6 +2838,9 @@ app.post('/api/vapi/webhook', (req, res) => {
       );
     });
   }
+
+  // Reageer na de snelle lokale verwerking. Dit blijft snel genoeg en voorkomt gemiste taken.
+  res.status(200).json({ ok: true });
 
   // TODO: Sla call-status updates op (bijv. queued/ringing/in-progress/ended).
   // TODO: Sla transcript/events op zodra je transcriptie wilt tonen in het dashboard.
@@ -2845,6 +2935,7 @@ app.get('/api/vapi/webhook-debug', (req, res) => {
 });
 
 app.get('/api/ai/call-insights', (req, res) => {
+  backfillInsightsAndAppointmentsFromRecentCallUpdates();
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
   return res.status(200).json({
     ok: true,
@@ -3015,8 +3106,16 @@ app.get('/api/agenda/appointments', (req, res) => {
 });
 
 app.get('/api/agenda/confirmation-tasks', (req, res) => {
+  backfillInsightsAndAppointmentsFromRecentCallUpdates();
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 100)));
+  const includeDemo = /^(1|true|yes)$/i.test(String(req.query.includeDemo || ''));
   const tasks = generatedAgendaAppointments
+    .filter((appointment) => {
+      if (includeDemo) return true;
+      if (DEMO_CONFIRMATION_TASK_ENABLED) return true;
+      const callId = normalizeString(appointment?.callId || '');
+      return !callId.startsWith('demo-');
+    })
     .map(mapAppointmentToConfirmationTask)
     .filter(Boolean)
     .sort(compareConfirmationTasks);
