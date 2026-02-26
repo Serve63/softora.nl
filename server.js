@@ -2,6 +2,8 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
+const { ImapFlow } = require('imapflow');
+const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
@@ -49,6 +51,30 @@ const MAIL_FROM_NAME = String(
 const MAIL_REPLY_TO = String(
   process.env.CONFIRMATION_MAIL_REPLY_TO || process.env.MAIL_REPLY_TO || ''
 ).trim();
+const MAIL_IMAP_HOST = String(
+  process.env.MAIL_IMAP_HOST || process.env.IMAP_HOST || process.env.STRATO_IMAP_HOST || ''
+).trim();
+const MAIL_IMAP_PORT = Number(
+  process.env.MAIL_IMAP_PORT || process.env.IMAP_PORT || process.env.STRATO_IMAP_PORT || 993
+);
+const MAIL_IMAP_SECURE = /^(1|true|yes)$/i.test(
+  String(
+    process.env.MAIL_IMAP_SECURE ||
+      process.env.IMAP_SECURE ||
+      (MAIL_IMAP_PORT === 993 ? 'true' : '')
+  )
+);
+const MAIL_IMAP_USER = String(
+  process.env.MAIL_IMAP_USER || process.env.IMAP_USER || process.env.STRATO_IMAP_USER || MAIL_SMTP_USER || ''
+).trim();
+const MAIL_IMAP_PASS = String(
+  process.env.MAIL_IMAP_PASS || process.env.IMAP_PASS || process.env.STRATO_IMAP_PASS || MAIL_SMTP_PASS || ''
+).trim();
+const MAIL_IMAP_MAILBOX = String(process.env.MAIL_IMAP_MAILBOX || process.env.IMAP_MAILBOX || 'INBOX').trim() || 'INBOX';
+const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
+  5_000,
+  Math.min(300_000, Number(process.env.MAIL_IMAP_POLL_COOLDOWN_MS || 20_000) || 20_000)
+);
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
@@ -66,6 +92,9 @@ const sequentialDispatchQueueIdByCallId = new Map();
 let nextSequentialDispatchQueueId = 1;
 let supabaseClient = null;
 let smtpTransporter = null;
+let inboundConfirmationMailSyncPromise = null;
+let inboundConfirmationMailSyncNotBeforeMs = 0;
+let inboundConfirmationMailSyncLastResult = null;
 let supabaseStateHydrationPromise = null;
 let supabaseStateHydrated = false;
 let supabasePersistChain = Promise.resolve();
@@ -2174,6 +2203,12 @@ function parseConfirmationDraftToMailParts(draftText, appointment = null) {
   };
 }
 
+function getConfirmationTaskReplyReferenceToken(appointment) {
+  const taskId = Number(appointment?.id || appointment?.appointmentId || 0);
+  if (!Number.isFinite(taskId) || taskId <= 0) return '';
+  return `CT-${taskId}`;
+}
+
 async function sendConfirmationEmailViaSmtp({ appointment, recipientEmail, draftText }) {
   if (!isSmtpMailConfigured()) {
     const error = new Error('SMTP mail is nog niet geconfigureerd op de server.');
@@ -2196,12 +2231,19 @@ async function sendConfirmationEmailViaSmtp({ appointment, recipientEmail, draft
   }
 
   const parts = parseConfirmationDraftToMailParts(draftText, appointment);
+  const refToken = getConfirmationTaskReplyReferenceToken(appointment);
+  const subject = refToken && !new RegExp(`\\b${refToken}\\b`, 'i').test(parts.subject)
+    ? `[${refToken}] ${parts.subject}`
+    : parts.subject;
+  const text = refToken && !new RegExp(`\\b${refToken}\\b`, 'i').test(parts.text)
+    ? `${parts.text}\n\nReferentie: ${refToken}`
+    : parts.text;
   const info = await transporter.sendMail({
     from: formatMailFromHeader(),
     to: toEmail,
     replyTo: MAIL_REPLY_TO || undefined,
-    subject: parts.subject,
-    text: parts.text,
+    subject,
+    text,
   });
 
   return {
@@ -2211,6 +2253,376 @@ async function sendConfirmationEmailViaSmtp({ appointment, recipientEmail, draft
     rejected: Array.isArray(info?.rejected) ? info.rejected : [],
     envelope: info?.envelope || null,
   };
+}
+
+function isImapMailConfigured() {
+  return Boolean(
+    MAIL_IMAP_HOST &&
+      Number.isFinite(MAIL_IMAP_PORT) &&
+      MAIL_IMAP_PORT > 0 &&
+      MAIL_IMAP_USER &&
+      MAIL_IMAP_PASS
+  );
+}
+
+function normalizeMessageIdToken(value) {
+  return normalizeString(String(value || '').trim()).replace(/[<>]/g, '').toLowerCase();
+}
+
+function collectMessageIdReferenceTokens(parsedMail) {
+  const out = new Set();
+  const add = (value) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach(add);
+      return;
+    }
+    const raw = String(value || '');
+    raw
+      .split(/\s+/)
+      .map(normalizeMessageIdToken)
+      .filter(Boolean)
+      .forEach((token) => out.add(token));
+  };
+
+  add(parsedMail?.inReplyTo);
+  add(parsedMail?.references);
+  try {
+    const refsHeader = parsedMail?.headers?.get?.('references');
+    add(refsHeader);
+  } catch (_) {}
+
+  return out;
+}
+
+function getParsedMailFromEmail(parsedMail) {
+  const fromList = Array.isArray(parsedMail?.from?.value) ? parsedMail.from.value : [];
+  const first = fromList.find((entry) => normalizeEmailAddress(entry?.address || ''));
+  return {
+    address: normalizeEmailAddress(first?.address || ''),
+    name: normalizeString(first?.name || ''),
+  };
+}
+
+function normalizeInboundReplyTextForDecision(textValue) {
+  const raw = String(textValue || '').replace(/\r\n?/g, '\n').trim();
+  if (!raw) return '';
+
+  let text = raw;
+  const splitPatterns = [
+    /\n[-_]{2,}\s*oorspronkelijk bericht\s*[-_]{2,}/i,
+    /\non .+ wrote:/i,
+    /\nop .+ schreef .+:/i,
+    /\nvan:\s.+/i,
+  ];
+  for (const pattern of splitPatterns) {
+    const match = text.match(pattern);
+    if (match && Number.isFinite(match.index)) {
+      text = text.slice(0, match.index);
+    }
+  }
+
+  const cleanedLines = text
+    .split('\n')
+    .map((line) => String(line || '').trim())
+    .filter((line) => line && !line.startsWith('>'))
+    .filter((line) => !/^(from|to|subject|onderwerp|sent|verzonden|cc):/i.test(line));
+
+  return cleanedLines.join('\n').trim();
+}
+
+function detectInboundConfirmationDecision(parsedMail) {
+  const subject = normalizeString(parsedMail?.subject || '');
+  const bodyText = normalizeInboundReplyTextForDecision(parsedMail?.text || parsedMail?.html || '');
+  const full = `${subject}\n${bodyText}`.toLowerCase();
+
+  const cancelPatterns = [
+    /\b(annuleer|annuleren|geannuleerd|afzeggen|afgezegd|kan niet doorgaan|gaat niet door)\b/i,
+    /\b(niet akkoord|niet goed|komt niet uit)\b/i,
+  ];
+  if (cancelPatterns.some((pattern) => pattern.test(full))) {
+    return { decision: 'cancel', reason: 'negative_reply', bodyText };
+  }
+
+  const positivePatterns = [
+    /\bbevestig(?:\s+ik)?\b/i,
+    /\bbevestigd\b/i,
+    /\bakkoord\b/i,
+    /\bklopt\b/i,
+    /\bgaat door\b/i,
+    /\bprima\b/i,
+    /\bis goed\b/i,
+    /^\s*ja[\s!.,]*$/i,
+    /\bja[, ]/i,
+  ];
+  if (positivePatterns.some((pattern) => pattern.test(full))) {
+    return { decision: 'confirm', reason: 'positive_reply', bodyText };
+  }
+
+  return { decision: '', reason: 'undetermined', bodyText };
+}
+
+function findAppointmentIndexBySentMessageIdReference(refTokens) {
+  if (!refTokens || !refTokens.size) return -1;
+  for (let i = 0; i < generatedAgendaAppointments.length; i += 1) {
+    const appt = generatedAgendaAppointments[i];
+    if (!appt || !mapAppointmentToConfirmationTask(appt)) continue;
+    const sentId = normalizeMessageIdToken(appt.confirmationEmailLastSentMessageId || '');
+    if (!sentId) continue;
+    if (refTokens.has(sentId)) return i;
+  }
+  return -1;
+}
+
+function findAppointmentIndexForInboundConfirmationMail(parsedMail) {
+  const subject = normalizeString(parsedMail?.subject || '');
+  const text = normalizeString(parsedMail?.text || '');
+  const combined = `${subject}\n${text}`;
+
+  const refMatch = combined.match(/\bCT-(\d{3,})\b/i);
+  if (refMatch) {
+    const idx = getGeneratedAppointmentIndexById(refMatch[1]);
+    if (idx >= 0) return idx;
+  }
+
+  const refTokens = collectMessageIdReferenceTokens(parsedMail);
+  const byMsgRefIdx = findAppointmentIndexBySentMessageIdReference(refTokens);
+  if (byMsgRefIdx >= 0) return byMsgRefIdx;
+
+  const from = getParsedMailFromEmail(parsedMail);
+  if (from.address) {
+    const candidates = generatedAgendaAppointments
+      .map((appt, idx) => ({ appt, idx }))
+      .filter(({ appt }) => appt && mapAppointmentToConfirmationTask(appt))
+      .filter(({ appt }) => normalizeEmailAddress(appt.contactEmail || appt.email || '') === from.address);
+    if (candidates.length === 1) return candidates[0].idx;
+  }
+
+  return -1;
+}
+
+function applyInboundMailDecisionToAppointment(idx, decision, metadata = {}) {
+  if (!Number.isInteger(idx) || idx < 0 || idx >= generatedAgendaAppointments.length) {
+    return { ok: false, changed: false, reason: 'not_found' };
+  }
+  const appointment = generatedAgendaAppointments[idx];
+  if (!appointment || !mapAppointmentToConfirmationTask(appointment)) {
+    return { ok: false, changed: false, reason: 'no_open_task' };
+  }
+
+  const actor = 'Klant reply e-mail (IMAP)';
+  const nowIso = new Date().toISOString();
+  const inboundFrom = normalizeEmailAddress(metadata.fromEmail || '');
+  const inboundSubject = truncateText(normalizeString(metadata.subject || ''), 220);
+
+  if (decision === 'confirm') {
+    if (appointment.confirmationResponseReceived || appointment.confirmationResponseReceivedAt) {
+      return { ok: true, changed: false, reason: 'already_confirmed' };
+    }
+    const updated = setGeneratedAgendaAppointmentAtIndex(
+      idx,
+      {
+        ...appointment,
+        contactEmail: inboundFrom || normalizeEmailAddress(appointment.contactEmail || '') || null,
+        confirmationEmailSent: Boolean(appointment.confirmationEmailSent || appointment.confirmationEmailSentAt),
+        confirmationEmailSentAt: normalizeString(appointment.confirmationEmailSentAt || '') || nowIso,
+        confirmationEmailSentBy: normalizeString(appointment.confirmationEmailSentBy || '') || 'SMTP',
+        confirmationResponseReceived: true,
+        confirmationResponseReceivedAt: nowIso,
+        confirmationResponseReceivedBy: actor,
+        confirmationAppointmentCancelled: false,
+        confirmationAppointmentCancelledAt: null,
+        confirmationAppointmentCancelledBy: null,
+        confirmationEmailLastError: null,
+      },
+      'confirmation_task_imap_reply_confirm'
+    );
+    appendDashboardActivity(
+      {
+        type: 'appointment_confirmed_by_mail',
+        title: 'Afspraak bevestigd per mail',
+        detail: inboundSubject ? `Reply verwerkt: ${inboundSubject}` : 'Klantreply via mailbox verwerkt.',
+        company: updated?.company || appointment?.company || '',
+        actor,
+        taskId: Number(updated?.id || appointment?.id || 0) || null,
+        callId: normalizeString(updated?.callId || appointment?.callId || ''),
+        source: 'imap-mailbox-sync',
+      },
+      'dashboard_activity_imap_confirm'
+    );
+    return { ok: true, changed: true, status: 'confirmed', appointment: updated };
+  }
+
+  if (decision === 'cancel') {
+    if (appointment.confirmationAppointmentCancelled || appointment.confirmationAppointmentCancelledAt) {
+      return { ok: true, changed: false, reason: 'already_cancelled' };
+    }
+    const updated = setGeneratedAgendaAppointmentAtIndex(
+      idx,
+      {
+        ...appointment,
+        contactEmail: inboundFrom || normalizeEmailAddress(appointment.contactEmail || '') || null,
+        confirmationEmailSent: Boolean(appointment.confirmationEmailSent || appointment.confirmationEmailSentAt),
+        confirmationEmailSentAt: normalizeString(appointment.confirmationEmailSentAt || '') || nowIso,
+        confirmationEmailSentBy: normalizeString(appointment.confirmationEmailSentBy || '') || 'SMTP',
+        confirmationResponseReceived: false,
+        confirmationResponseReceivedAt: null,
+        confirmationResponseReceivedBy: null,
+        confirmationAppointmentCancelled: true,
+        confirmationAppointmentCancelledAt: nowIso,
+        confirmationAppointmentCancelledBy: actor,
+        confirmationEmailLastError: null,
+      },
+      'confirmation_task_imap_reply_cancel'
+    );
+    appendDashboardActivity(
+      {
+        type: 'appointment_cancelled',
+        title: 'Afspraak geannuleerd',
+        detail: inboundSubject ? `Reply verwerkt: ${inboundSubject}` : 'Klantreply via mailbox verwerkt.',
+        company: updated?.company || appointment?.company || '',
+        actor,
+        taskId: Number(updated?.id || appointment?.id || 0) || null,
+        callId: normalizeString(updated?.callId || appointment?.callId || ''),
+        source: 'imap-mailbox-sync',
+      },
+      'dashboard_activity_imap_cancel'
+    );
+    return { ok: true, changed: true, status: 'cancelled', appointment: updated };
+  }
+
+  return { ok: false, changed: false, reason: 'no_decision' };
+}
+
+async function syncInboundConfirmationEmailsFromImap(options = {}) {
+  const force = Boolean(options?.force);
+  const maxMessages = Math.max(1, Math.min(50, Number(options?.maxMessages || 20) || 20));
+
+  if (!isImapMailConfigured()) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'imap_not_configured',
+      missingEnv: [
+        !MAIL_IMAP_HOST ? 'MAIL_IMAP_HOST' : null,
+        !MAIL_IMAP_USER ? 'MAIL_IMAP_USER' : null,
+        !MAIL_IMAP_PASS ? 'MAIL_IMAP_PASS' : null,
+      ].filter(Boolean),
+    };
+  }
+
+  if (!force && Date.now() < inboundConfirmationMailSyncNotBeforeMs) {
+    return inboundConfirmationMailSyncLastResult || {
+      ok: true,
+      skipped: true,
+      reason: 'cooldown',
+    };
+  }
+  if (inboundConfirmationMailSyncPromise) return inboundConfirmationMailSyncPromise;
+
+  inboundConfirmationMailSyncPromise = (async () => {
+    const stats = {
+      ok: true,
+      startedAt: new Date().toISOString(),
+      mailbox: MAIL_IMAP_MAILBOX,
+      unseenFound: 0,
+      scanned: 0,
+      matched: 0,
+      confirmed: 0,
+      cancelled: 0,
+      markedSeen: 0,
+      ignored: 0,
+      errors: [],
+    };
+
+    const client = new ImapFlow({
+      host: MAIL_IMAP_HOST,
+      port: MAIL_IMAP_PORT,
+      secure: MAIL_IMAP_SECURE,
+      auth: {
+        user: MAIL_IMAP_USER,
+        pass: MAIL_IMAP_PASS,
+      },
+      logger: false,
+    });
+
+    let lock = null;
+    try {
+      await client.connect();
+      lock = await client.getMailboxLock(MAIL_IMAP_MAILBOX);
+      const unseenUids = await client.search(['UNSEEN']);
+      const selectedUids = Array.isArray(unseenUids) ? unseenUids.slice(-maxMessages) : [];
+      stats.unseenFound = Array.isArray(unseenUids) ? unseenUids.length : 0;
+
+      const uidsToMarkSeen = [];
+      if (selectedUids.length) {
+        for await (const message of client.fetch(
+          selectedUids,
+          {
+            uid: true,
+            source: true,
+            envelope: true,
+            internalDate: true,
+            flags: true,
+          },
+          { uid: true }
+        )) {
+          stats.scanned += 1;
+          let parsedMail = null;
+          try {
+            parsedMail = await simpleParser(message.source);
+          } catch (error) {
+            stats.errors.push(`Parse error uid=${message.uid}: ${truncateText(error?.message || String(error), 120)}`);
+            continue;
+          }
+
+          const idx = findAppointmentIndexForInboundConfirmationMail(parsedMail);
+          if (idx < 0) {
+            stats.ignored += 1;
+            continue;
+          }
+
+          stats.matched += 1;
+          const decision = detectInboundConfirmationDecision(parsedMail);
+          const from = getParsedMailFromEmail(parsedMail);
+          const result = applyInboundMailDecisionToAppointment(idx, decision.decision, {
+            fromEmail: from.address,
+            subject: normalizeString(parsedMail?.subject || ''),
+            bodyText: decision.bodyText,
+          });
+
+          if (result.changed && result.status === 'confirmed') stats.confirmed += 1;
+          if (result.changed && result.status === 'cancelled') stats.cancelled += 1;
+
+          // Behandel matched confirmation replies als "verwerkt" om eindeloze retry's te voorkomen.
+          uidsToMarkSeen.push(message.uid);
+        }
+      }
+
+      if (uidsToMarkSeen.length) {
+        await client.messageFlagsAdd(uidsToMarkSeen, ['\\Seen'], { uid: true });
+        stats.markedSeen = uidsToMarkSeen.length;
+      }
+    } catch (error) {
+      stats.ok = false;
+      stats.error = truncateText(error?.message || String(error), 500);
+    } finally {
+      try {
+        if (lock) lock.release();
+      } catch (_) {}
+      try {
+        if (client.usable) await client.logout();
+      } catch (_) {}
+      inboundConfirmationMailSyncNotBeforeMs = Date.now() + MAIL_IMAP_POLL_COOLDOWN_MS;
+      stats.finishedAt = new Date().toISOString();
+      inboundConfirmationMailSyncLastResult = stats;
+      inboundConfirmationMailSyncPromise = null;
+    }
+
+    return stats;
+  })();
+
+  return inboundConfirmationMailSyncPromise;
 }
 
 async function generateConfirmationEmailDraftWithAi(appointment, detail = {}) {
@@ -3394,6 +3806,9 @@ app.get('/api/agenda/appointments', async (req, res) => {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
+  if (isImapMailConfigured()) {
+    await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
+  }
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 200)));
   const sorted = generatedAgendaAppointments
     .filter(isGeneratedAppointmentConfirmedForAgenda)
@@ -3409,6 +3824,9 @@ app.get('/api/agenda/appointments', async (req, res) => {
 app.get('/api/agenda/confirmation-tasks', async (req, res) => {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
+  }
+  if (isImapMailConfigured()) {
+    await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
   }
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
   generatedAgendaAppointments.forEach((appointment, idx) => {
@@ -3436,9 +3854,26 @@ app.get('/api/agenda/confirmation-tasks', async (req, res) => {
   });
 });
 
+app.post('/api/agenda/confirmation-mail-sync', async (req, res) => {
+  if (isSupabaseConfigured() && !supabaseStateHydrated) {
+    await forceHydrateRuntimeStateWithRetries(3);
+  }
+  const result = await syncInboundConfirmationEmailsFromImap({
+    force: true,
+    maxMessages: Math.max(1, Math.min(50, parseIntSafe(req.body?.maxMessages, 20))),
+  });
+  return res.status(result?.ok === false && !result?.skipped ? 500 : 200).json({
+    ok: result?.ok !== false,
+    sync: result || null,
+  });
+});
+
 async function sendConfirmationTaskDetailResponse(req, res, taskIdRaw) {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
+  }
+  if (isImapMailConfigured()) {
+    await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
   }
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
 
@@ -3935,6 +4370,14 @@ function sendRuntimeHealthDebug(_req, res) {
       hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
       lastHydrateError: supabaseLastHydrateError || null,
       lastPersistError: supabaseLastPersistError || null,
+    },
+    mail: {
+      smtpConfigured: isSmtpMailConfigured(),
+      imapConfigured: isImapMailConfigured(),
+      imapMailbox: isImapMailConfigured() ? MAIL_IMAP_MAILBOX : null,
+      imapPollCooldownMs: MAIL_IMAP_POLL_COOLDOWN_MS,
+      imapNextPollAfterMs: inboundConfirmationMailSyncNotBeforeMs,
+      imapLastSync: inboundConfirmationMailSyncLastResult || null,
     },
   });
 }
