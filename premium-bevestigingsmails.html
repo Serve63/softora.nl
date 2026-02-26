@@ -2020,10 +2020,11 @@
                     const taskId = Number(btn.getAttribute('data-send-confirmation-mail-id'));
                     if (!taskId || isTaskActionBusy(taskId)) return;
                     if (getTaskById(taskId)?.mailSent) return;
+                    const recipientEmail = getConfirmationRecipientEmailInputValue(taskId);
                     setTaskActionBusy(taskId, true);
                     delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
                     renderConfirmationTasks();
-                    const ok = await markConfirmationMailSent(taskId);
+                    const ok = await markConfirmationMailSent(taskId, recipientEmail);
                     setTaskActionBusy(taskId, false);
                     if (!ok) renderConfirmationTasks();
                 });
@@ -2175,9 +2176,11 @@
             }
         }
 
-        async function markConfirmationMailSent(taskId) {
+        async function markConfirmationMailSent(taskId, recipientEmailOverride = '') {
             try {
-                const recipientEmail = getConfirmationRecipientEmailInputValue(taskId);
+                const recipientEmail = String(
+                    recipientEmailOverride || getConfirmationRecipientEmailInputValue(taskId) || ''
+                ).trim();
                 const res = await fetch(`/api/agenda/confirmation-task-send-email?taskId=${encodeURIComponent(taskId)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
