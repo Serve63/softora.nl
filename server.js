@@ -39,6 +39,9 @@ let supabaseHydrateRetryNotBeforeMs = 0;
 let supabaseLastHydrateError = '';
 let supabaseLastPersistError = '';
 const UI_STATE_SCOPE_PREFIX = 'ui_state:';
+const DEMO_CONFIRMATION_TASK_ENABLED = /^(1|true|yes)$/i.test(
+  String(process.env.ENABLE_DEMO_CONFIRMATION_TASK || '')
+);
 
 // Vercel bundelt dynamische sendFile-doelen niet altijd mee. Door de root-dir
 // één keer te scannen op .html bestanden worden die files traceable voor de
@@ -128,6 +131,83 @@ function redactSupabaseUrlForDebug(url) {
     return `${parsed.protocol}//${parsed.host}`;
   } catch {
     return truncateText(raw, 80);
+  }
+}
+
+async function fetchSupabaseStateRowViaRest(selectColumns = 'payload,updated_at') {
+  if (!isSupabaseConfigured()) return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
+
+  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
+  const url =
+    `${baseUrl}/rest/v1/${encodeURIComponent(SUPABASE_STATE_TABLE)}` +
+    `?select=${encodeURIComponent(selectColumns)}` +
+    `&state_key=eq.${encodeURIComponent(SUPABASE_STATE_KEY)}` +
+    '&limit=1';
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
+
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = text;
+    }
+
+    return { ok: response.ok, status: response.status, body, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      status: null,
+      body: null,
+      error: truncateText(error?.message || String(error), 500),
+    };
+  }
+}
+
+async function upsertSupabaseStateRowViaRest(row) {
+  if (!isSupabaseConfigured()) return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
+
+  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
+  const url = `${baseUrl}/rest/v1/${encodeURIComponent(
+    SUPABASE_STATE_TABLE
+  )}?on_conflict=state_key`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify([row]),
+    });
+
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = text;
+    }
+
+    return { ok: response.ok, status: response.status, body, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      status: null,
+      body: null,
+      error: truncateText(error?.message || String(error), 500),
+    };
   }
 }
 
@@ -234,10 +314,27 @@ async function ensureRuntimeStateHydratedFromSupabase() {
         .maybeSingle();
 
       if (error) {
-        console.error('[Supabase][HydrateError]', error.message || error);
-        supabaseLastHydrateError = truncateText(error.message || String(error), 500);
-        supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
-        return false;
+        const fallback = await fetchSupabaseStateRowViaRest('payload,updated_at');
+        if (!fallback.ok) {
+          console.error('[Supabase][HydrateError]', error.message || error);
+          const fallbackMsg = fallback.error
+            ? ` | REST fallback: ${fallback.error}`
+            : fallback.status
+              ? ` | REST fallback status: ${fallback.status}`
+              : '';
+          supabaseLastHydrateError = truncateText(`${error.message || String(error)}${fallbackMsg}`, 500);
+          supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
+          return false;
+        }
+
+        const row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
+        if (row && row.payload && typeof row.payload === 'object') {
+          applyRuntimeStateSnapshotPayload(row.payload);
+        }
+        supabaseStateHydrated = true;
+        supabaseLastHydrateError = '';
+        supabaseHydrateRetryNotBeforeMs = 0;
+        return true;
       }
 
       if (data && data.payload && typeof data.payload === 'object') {
@@ -300,9 +397,19 @@ async function persistRuntimeStateToSupabase(reason = 'unknown') {
     });
 
     if (error) {
-      console.error('[Supabase][PersistError]', error.message || error);
-      supabaseLastPersistError = truncateText(error.message || String(error), 500);
-      return false;
+      const fallback = await upsertSupabaseStateRowViaRest(row);
+      if (!fallback.ok) {
+        console.error('[Supabase][PersistError]', error.message || error);
+        const fallbackMsg = fallback.error
+          ? ` | REST fallback: ${fallback.error}`
+          : fallback.status
+            ? ` | REST fallback status: ${fallback.status}`
+            : '';
+        supabaseLastPersistError = truncateText(`${error.message || String(error)}${fallbackMsg}`, 500);
+        return false;
+      }
+      supabaseLastPersistError = '';
+      return true;
     }
 
     supabaseLastPersistError = '';
@@ -3455,8 +3562,7 @@ app.use((err, _req, res, _next) => {
 
 function seedDemoConfirmationTaskForUiTesting() {
   const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-  const isHostedServerlessPreview = Boolean(process.env.VERCEL);
-  if (isProduction && !isHostedServerlessPreview) return;
+  if (isProduction && !DEMO_CONFIRMATION_TASK_ENABLED) return;
 
   const demoCallId = 'demo-confirmation-task-call-1';
   if (generatedAgendaAppointments.some((item) => normalizeString(item?.callId) === demoCallId)) {
