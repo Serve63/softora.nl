@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/agenda/confirmation-tasks/:taskId",
+      "destination": "/api/agenda/confirmation-task?taskId=:taskId"
+    }
+  ]
+}
