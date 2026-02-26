@@ -2136,7 +2136,7 @@
 
         async function generateConfirmationEmailDraft(taskId) {
             try {
-                const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/draft-email`, {
+                const res = await fetch(`/api/agenda/confirmation-task-draft-email?taskId=${encodeURIComponent(taskId)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ actor: 'Premium dashboard gebruiker' })
@@ -2178,7 +2178,7 @@
         async function markConfirmationMailSent(taskId) {
             try {
                 const recipientEmail = getConfirmationRecipientEmailInputValue(taskId);
-                const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/send-email`, {
+                const res = await fetch(`/api/agenda/confirmation-task-send-email?taskId=${encodeURIComponent(taskId)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

@@ -3,6 +3,14 @@
     {
       "source": "/api/agenda/confirmation-tasks/:taskId",
       "destination": "/api/agenda/confirmation-task?taskId=:taskId"
+    },
+    {
+      "source": "/api/agenda/confirmation-tasks/:taskId/draft-email",
+      "destination": "/api/agenda/confirmation-task-draft-email?taskId=:taskId"
+    },
+    {
+      "source": "/api/agenda/confirmation-tasks/:taskId/send-email",
+      "destination": "/api/agenda/confirmation-task-send-email?taskId=:taskId"
     }
   ]
 }

@@ -3473,8 +3473,8 @@ app.get('/api/agenda/confirmation-task', async (req, res) => {
   return sendConfirmationTaskDetailResponse(req, res, req.query.taskId);
 });
 
-app.post('/api/agenda/confirmation-tasks/:id/draft-email', async (req, res) => {
-  const idx = getGeneratedAppointmentIndexById(req.params.id);
+async function sendConfirmationTaskDraftEmailResponse(req, res, taskIdRaw) {
+  const idx = getGeneratedAppointmentIndexById(taskIdRaw);
   if (idx < 0) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
   }
@@ -3543,10 +3543,18 @@ app.post('/api/agenda/confirmation-tasks/:id/draft-email', async (req, res) => {
       detail: normalizeString(error?.message || '') || null,
     });
   }
+}
+
+app.post('/api/agenda/confirmation-tasks/:id/draft-email', async (req, res) => {
+  return sendConfirmationTaskDraftEmailResponse(req, res, req.params.id);
 });
 
-app.post('/api/agenda/confirmation-tasks/:id/send-email', async (req, res) => {
-  const idx = getGeneratedAppointmentIndexById(req.params.id);
+app.post('/api/agenda/confirmation-task-draft-email', async (req, res) => {
+  return sendConfirmationTaskDraftEmailResponse(req, res, req.query.taskId);
+});
+
+async function sendConfirmationTaskEmailResponse(req, res, taskIdRaw) {
+  const idx = getGeneratedAppointmentIndexById(taskIdRaw);
   if (idx < 0) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
   }
@@ -3662,6 +3670,14 @@ app.post('/api/agenda/confirmation-tasks/:id/send-email', async (req, res) => {
       task: updatedAppointment ? buildConfirmationTaskDetail(updatedAppointment) : null,
     });
   }
+}
+
+app.post('/api/agenda/confirmation-tasks/:id/send-email', async (req, res) => {
+  return sendConfirmationTaskEmailResponse(req, res, req.params.id);
+});
+
+app.post('/api/agenda/confirmation-task-send-email', async (req, res) => {
+  return sendConfirmationTaskEmailResponse(req, res, req.query.taskId);
 });
 
 app.post('/api/agenda/confirmation-tasks/:id/mark-sent', (req, res) => {
