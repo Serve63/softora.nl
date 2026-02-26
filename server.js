@@ -829,6 +829,76 @@ function extractCallUpdateFromWebhookPayload(payload) {
   };
 }
 
+function extractCallUpdateFromVapiCallStatusResponse(callId, data) {
+  const call =
+    data?.call && typeof data.call === 'object'
+      ? data.call
+      : data && typeof data === 'object'
+        ? data
+        : null;
+  if (!call || typeof call !== 'object') return null;
+
+  const syntheticPayload = {
+    type: 'vapi-call-status-fetch',
+    message: {
+      type: 'vapi-call-status-fetch',
+      call,
+      analysis: call.analysis || data?.analysis || null,
+      artifact: call.artifact || data?.artifact || null,
+      summary: call.summary || data?.summary || null,
+      transcript: call.transcript || data?.transcript || null,
+      messages: call.messages || data?.messages || null,
+      conversation: call.conversation || data?.conversation || null,
+      customer: call.customer || data?.customer || null,
+    },
+    call,
+    analysis: call.analysis || data?.analysis || null,
+    artifact: call.artifact || data?.artifact || null,
+    summary: call.summary || data?.summary || null,
+    transcript: call.transcript || data?.transcript || null,
+    messages: call.messages || data?.messages || null,
+  };
+
+  const extracted = extractCallUpdateFromWebhookPayload(syntheticPayload);
+  if (!extracted) return null;
+
+  return {
+    ...extracted,
+    callId: normalizeString(call?.id || callId || extracted.callId),
+    messageType: 'vapi-call-status-fetch',
+    updatedAt: normalizeString(call?.updatedAt || data?.updatedAt || '') || new Date().toISOString(),
+    updatedAtMs:
+      Date.parse(normalizeString(call?.updatedAt || data?.updatedAt || '')) || Date.now(),
+  };
+}
+
+async function refreshCallUpdateFromVapiStatusApi(callId) {
+  const normalizedCallId = normalizeString(callId);
+  if (!normalizedCallId) return null;
+  if (!normalizeString(process.env.VAPI_API_KEY)) return null;
+
+  try {
+    const { data } = await fetchVapiCallStatusById(normalizedCallId);
+    const update = extractCallUpdateFromVapiCallStatusResponse(normalizedCallId, data);
+    if (!update) return null;
+    return upsertRecentCallUpdate(update);
+  } catch (error) {
+    console.warn(
+      '[Vapi Call Status Refresh Failed]',
+      JSON.stringify(
+        {
+          callId: normalizedCallId,
+          message: error?.message || 'Onbekende fout',
+          status: error?.status || null,
+        },
+        null,
+        2
+      )
+    );
+    return null;
+  }
+}
+
 function upsertRecentCallUpdate(update) {
   if (!update) return null;
 
@@ -3156,14 +3226,23 @@ app.get('/api/agenda/confirmation-tasks', async (req, res) => {
   });
 });
 
-app.get('/api/agenda/confirmation-tasks/:id', (req, res) => {
+app.get('/api/agenda/confirmation-tasks/:id', async (req, res) => {
+  if (isSupabaseConfigured() && !supabaseStateHydrated) {
+    await forceHydrateRuntimeStateWithRetries(3);
+  }
+  backfillInsightsAndAppointmentsFromRecentCallUpdates();
+
   const idx = getGeneratedAppointmentIndexById(req.params.id);
   if (idx < 0) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
   }
 
   const appointment = generatedAgendaAppointments[idx];
-  const detail = buildConfirmationTaskDetail(appointment);
+  let detail = buildConfirmationTaskDetail(appointment);
+  if (detail && !detail.transcriptAvailable && normalizeString(appointment?.callId || '')) {
+    await refreshCallUpdateFromVapiStatusApi(appointment.callId);
+    detail = buildConfirmationTaskDetail(generatedAgendaAppointments[idx] || appointment);
+  }
   if (!detail) {
     return res.status(404).json({ ok: false, error: 'Geen open bevestigingstaak voor deze afspraak' });
   }
