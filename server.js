@@ -810,6 +810,110 @@ function getOpenAiApiKey() {
   return normalizeString(process.env.OPENAI_API_KEY);
 }
 
+function normalizeAiSummaryStyle(value) {
+  const raw = normalizeString(value).toLowerCase();
+  if (!raw) return 'medium';
+  if (['short', 'medium', 'long', 'bullets'].includes(raw)) return raw;
+  return '';
+}
+
+async function generateTextSummaryWithAi(options = {}) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) {
+    const err = new Error('OPENAI_API_KEY ontbreekt');
+    err.status = 503;
+    throw err;
+  }
+
+  const sourceText = truncateText(normalizeString(options.text || ''), 20000);
+  const style = normalizeAiSummaryStyle(options.style) || 'medium';
+  const language = normalizeString(options.language || 'nl') || 'nl';
+  const maxSentences = Math.max(1, Math.min(12, parseIntSafe(options.maxSentences, style === 'short' ? 2 : 4)));
+
+  const systemPrompt = [
+    'Je bent een nauwkeurige tekstassistent.',
+    'Vat de input samen op basis van de gevraagde stijl.',
+    'Gebruik de gevraagde taal.',
+    'Verzin geen feiten die niet in de bron staan.',
+    'Geef alleen de samenvatting terug (geen markdown-uitleg of extra labels).',
+  ].join('\n');
+
+  const userPayload = {
+    task: 'summarize',
+    style,
+    language,
+    maxSentences,
+    extraInstructions: normalizeString(options.extraInstructions || ''),
+    text: sourceText,
+  };
+
+  const { response, data } = await fetchJsonWithTimeout(
+    `${OPENAI_API_BASE_URL}/chat/completions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: [
+              `Maak een samenvatting in taal: ${language}.`,
+              `Stijl: ${style}.`,
+              style === 'bullets'
+                ? `Geef maximaal ${Math.max(3, maxSentences)} bullets, elke regel start met "- ".`
+                : `Geef maximaal ${maxSentences} zinnen.`,
+              normalizeString(options.extraInstructions || '')
+                ? `Extra instructies: ${normalizeString(options.extraInstructions || '')}`
+                : '',
+              '',
+              'Brontekst:',
+              sourceText,
+              '',
+              'JSON context (ter controle):',
+              JSON.stringify(userPayload),
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          },
+        ],
+      }),
+    },
+    30000
+  );
+
+  if (!response.ok) {
+    const err = new Error(`OpenAI samenvatting mislukt (${response.status})`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+
+  const content = data?.choices?.[0]?.message?.content;
+  const text = normalizeString(extractOpenAiTextContent(content));
+  if (!text) {
+    const err = new Error('OpenAI gaf een lege samenvatting terug.');
+    err.status = 502;
+    err.data = data;
+    throw err;
+  }
+
+  return {
+    summary: truncateText(text, 5000),
+    style,
+    language,
+    maxSentences,
+    source: 'openai',
+    model: OPENAI_MODEL,
+    usage: data?.usage || null,
+  };
+}
+
 function shouldAnalyzeCallUpdateWithAi(callUpdate) {
   if (!callUpdate || !getOpenAiApiKey()) return false;
 
@@ -2294,6 +2398,73 @@ app.get('/api/ai/call-insights', (req, res) => {
     openAiEnabled: Boolean(getOpenAiApiKey()),
     model: OPENAI_MODEL,
   });
+});
+
+app.post('/api/ai/summarize', async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const text = normalizeString(body.text || '');
+    const style = normalizeAiSummaryStyle(body.style);
+    const language = normalizeString(body.language || 'nl') || 'nl';
+    const extraInstructions = normalizeString(body.extraInstructions || '');
+    const maxSentences = Math.max(1, Math.min(12, parseIntSafe(body.maxSentences, 4)));
+
+    if (!text) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Tekst ontbreekt',
+        detail: 'Stuur een JSON body met { text: "..." }',
+      });
+    }
+
+    if (text.length > 50000) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Tekst te lang',
+        detail: 'Maximaal 50.000 tekens per request.',
+      });
+    }
+
+    if (body.style !== undefined && !style) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Ongeldige stijl',
+        detail: 'Gebruik: short, medium, long of bullets',
+      });
+    }
+
+    const result = await generateTextSummaryWithAi({
+      text,
+      style: style || 'medium',
+      language,
+      maxSentences,
+      extraInstructions,
+    });
+
+    return res.status(200).json({
+      ok: true,
+      summary: result.summary,
+      style: result.style,
+      language: result.language,
+      maxSentences: result.maxSentences,
+      source: result.source,
+      model: result.model,
+      usage: result.usage,
+      openAiEnabled: true,
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    const safeStatus = status >= 400 && status < 600 ? status : 500;
+    return res.status(safeStatus).json({
+      ok: false,
+      error:
+        safeStatus === 503
+          ? 'AI samenvatting niet beschikbaar'
+          : 'AI samenvatting mislukt',
+      detail: String(error?.message || 'Onbekende fout'),
+      openAiEnabled: Boolean(getOpenAiApiKey()),
+    });
+  }
 });
 
 app.get('/api/dashboard/activity', (req, res) => {

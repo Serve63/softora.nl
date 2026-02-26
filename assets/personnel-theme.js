@@ -9,6 +9,38 @@
     const themeButtons = document.querySelectorAll(".theme-switch-btn[data-theme-value]");
     let activeScopeModal = null;
 
+    window.SoftoraAI = window.SoftoraAI || {};
+
+    if (typeof window.SoftoraAI.summarizeText !== "function") {
+        window.SoftoraAI.summarizeText = async function summarizeText(input, options) {
+            const opts = (typeof input === "object" && input && !Array.isArray(input))
+                ? { ...input }
+                : { ...(options || {}), text: input };
+            const response = await fetch("/api/ai/summarize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    text: String(opts.text || ""),
+                    style: opts.style || "medium",
+                    language: opts.language || "nl",
+                    maxSentences: opts.maxSentences,
+                    extraInstructions: opts.extraInstructions || "",
+                }),
+                signal: opts.signal,
+            });
+
+            const data = await response.json().catch(function () {
+                return {};
+            });
+
+            if (!response.ok || !data || data.ok === false) {
+                throw new Error(String((data && (data.detail || data.error)) || "AI samenvatting mislukt"));
+            }
+
+            return data;
+        };
+    }
+
     function releaseLoadingState() {
         root.removeAttribute("data-personnel-loading");
     }
