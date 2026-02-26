@@ -15,7 +15,6 @@
   let isPollingSequentialClientDirectStatus = false;
   let statusMessageHideTimer = null;
   let activeSequentialClientDispatch = null;
-  let aiNotebookSummaryRunId = 0;
   const defaultLaunchBtnHtml = launchBtn.innerHTML;
   const TEST_LEAD_STORAGE_KEY = 'softora_vapi_test_lead_phone';
   const LEAD_ROWS_STORAGE_KEY = 'softora_vapi_lead_rows_json';
@@ -1273,212 +1272,6 @@
     if (el) el.textContent = message;
   }
 
-  function setAiNotebookWorkspaceHint(message, tone = 'muted') {
-    const el = byId('aiNotebookWorkspaceAiHint');
-    if (!el) return;
-    el.textContent = String(message || '');
-    if (tone === 'error') {
-      el.style.color = '#c5221f';
-      return;
-    }
-    if (tone === 'success') {
-      el.style.color = '#137333';
-      return;
-    }
-    if (tone === 'loading') {
-      el.style.color = '#174ea6';
-      return;
-    }
-    el.style.color = '#5f6368';
-  }
-
-  function getAiNotebookFieldLabel(field) {
-    switch (String(field || '')) {
-      case 'company':
-        return 'Bedrijfsnaam';
-      case 'phone':
-        return 'Telefoon';
-      case 'status':
-        return 'Status';
-      case 'followUp':
-        return 'Opnieuw bellen?';
-      case 'followUpReason':
-        return 'Waarom';
-      case 'memory':
-        return 'Onthouden';
-      default:
-        return 'Cel';
-    }
-  }
-
-  function getActiveAiNotebookInput() {
-    if (!activeSheetInput || !(activeSheetInput instanceof HTMLElement)) return null;
-    if (!activeSheetInput.matches('input[data-ai-field]')) return null;
-    if (!activeSheetInput.closest('#aiNotebookRowsWrap')) return null;
-    return activeSheetInput;
-  }
-
-  function updateAiNotebookWorkspaceSelectionLabel() {
-    const label = byId('aiNotebookWorkspaceSelection');
-    if (!label) return;
-
-    const input = getActiveAiNotebookInput();
-    if (!input) {
-      label.textContent = 'Geen cel geselecteerd. Klik (of dubbelklik) een cel in de tabel.';
-      return;
-    }
-
-    const rowIndex = Number(input.getAttribute('data-row-index') || 0);
-    const colIndex = Number(input.getAttribute('data-col-index') || 0);
-    const field = input.getAttribute('data-ai-field') || '';
-    label.textContent = `Geselecteerd: ${getSpreadsheetCellRef(rowIndex, colIndex)} (${getAiNotebookFieldLabel(field)})`;
-  }
-
-  function loadAiNotebookSelectedCellIntoWorkspace(focusTextarea = false) {
-    const input = getActiveAiNotebookInput();
-    if (!input) {
-      updateAiNotebookWorkspaceSelectionLabel();
-      setAiNotebookWorkspaceHint('Selecteer eerst een cel in het AI kladblok.', 'error');
-      return false;
-    }
-
-    const sourceEl = byId('aiNotebookWorkspaceSource');
-    if (!sourceEl) return false;
-
-    sourceEl.value = String(input.value || '');
-    const rowIndex = Number(input.getAttribute('data-row-index') || 0);
-    const colIndex = Number(input.getAttribute('data-col-index') || 0);
-    setAiNotebookWorkspaceHint(
-      `Tekst uit ${getSpreadsheetCellRef(rowIndex, colIndex)} geladen in de grote editor.`,
-      'success'
-    );
-    if (focusTextarea) {
-      sourceEl.focus();
-      sourceEl.select();
-    }
-    return true;
-  }
-
-  function applyAiNotebookWorkspaceTextToSelectedCell(sourceFieldId) {
-    const input = getActiveAiNotebookInput();
-    if (!input) {
-      updateAiNotebookWorkspaceSelectionLabel();
-      setAiNotebookWorkspaceHint('Selecteer eerst een doelcel in het AI kladblok.', 'error');
-      return false;
-    }
-
-    const sourceEl = byId(sourceFieldId);
-    if (!sourceEl) return false;
-    const nextValue = String(sourceEl.value || '');
-    input.value = nextValue;
-    setActiveSheetInput(input);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-
-    const rowIndex = Number(input.getAttribute('data-row-index') || 0);
-    const colIndex = Number(input.getAttribute('data-col-index') || 0);
-    setAiNotebookWorkspaceHint(
-      `Editor-tekst opgeslagen naar ${getSpreadsheetCellRef(rowIndex, colIndex)}.`,
-      'success'
-    );
-    return true;
-  }
-
-  function buildAiNotebookWorkspaceTextFromRows(rowsInput) {
-    const rows = Array.isArray(rowsInput) ? rowsInput.map(normalizeAiNotebookRow) : [];
-    const lines = [];
-
-    rows.forEach((row, index) => {
-      const hasAnyData = Boolean(
-        row.company || row.phone || row.status || row.followUp || row.followUpReason || row.memory
-      );
-      if (!hasAnyData) return;
-      lines.push(
-        [
-          `Regel ${index + 1}`,
-          row.company ? `bedrijf: ${row.company}` : '',
-          row.phone ? `telefoon: ${row.phone}` : '',
-          row.status ? `status: ${row.status}` : '',
-          row.followUp ? `opnieuw bellen: ${row.followUp}` : '',
-          row.followUpReason ? `reden: ${row.followUpReason}` : '',
-          row.memory ? `onthouden: ${row.memory}` : '',
-        ]
-          .filter(Boolean)
-          .join(' | ')
-      );
-    });
-
-    return lines.join('\n');
-  }
-
-  async function requestAiNotebookSummary(payload) {
-    if (window.SoftoraAI && typeof window.SoftoraAI.summarizeText === 'function') {
-      return window.SoftoraAI.summarizeText(payload);
-    }
-
-    const response = await fetch('/api/ai/summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data || data.ok === false) {
-      throw new Error(String(data?.detail || data?.error || 'AI samenvatting mislukt'));
-    }
-    return data;
-  }
-
-  async function summarizeAiNotebookWorkspaceText() {
-    const sourceEl = byId('aiNotebookWorkspaceSource');
-    const resultEl = byId('aiNotebookWorkspaceResult');
-    const styleEl = byId('aiNotebookWorkspaceStyle');
-    const button = byId('aiNotebookSummarizeBtn');
-    if (!sourceEl || !resultEl) return;
-
-    const text = String(sourceEl.value || '').trim();
-    if (!text) {
-      setAiNotebookWorkspaceHint('Vul eerst brontekst in (of laad een cel/kladblok).', 'error');
-      return;
-    }
-
-    const style = String(styleEl?.value || 'short').trim() || 'short';
-    const maxSentences = style === 'long' ? 6 : style === 'bullets' ? 6 : style === 'medium' ? 4 : 2;
-    const runId = ++aiNotebookSummaryRunId;
-    const previousLabel = button ? button.textContent : '';
-
-    if (button) {
-      button.disabled = true;
-      button.textContent = 'Bezig...';
-      button.style.opacity = '0.7';
-      button.style.cursor = 'default';
-    }
-    setAiNotebookWorkspaceHint('AI maakt een samenvatting...', 'loading');
-
-    try {
-      const result = await requestAiNotebookSummary({
-        text,
-        style,
-        language: 'nl',
-        maxSentences,
-      });
-      if (runId !== aiNotebookSummaryRunId) return;
-      resultEl.value = String(result?.summary || '').trim();
-      setAiNotebookWorkspaceHint(
-        `Samenvatting klaar (${String(result?.model || 'AI')}). Gebruik "Resultaat -> cel" om op te slaan in het kladblok.`,
-        'success'
-      );
-    } catch (error) {
-      if (runId !== aiNotebookSummaryRunId) return;
-      setAiNotebookWorkspaceHint(String(error?.message || 'AI samenvatting mislukt.'), 'error');
-    } finally {
-      if (button && runId === aiNotebookSummaryRunId) {
-        button.disabled = false;
-        button.textContent = previousLabel || 'AI samenvatten';
-        button.style.opacity = '';
-        button.style.cursor = 'pointer';
-      }
-    }
-  }
-
   function collectAiNotebookRowsFromModal() {
     const rowsWrap = byId('aiNotebookRowsWrap');
     if (!rowsWrap) return getSavedAiNotebookRows();
@@ -1519,7 +1312,6 @@
     if (!rowsWrap) return;
 
     activeSheetInput = null;
-    updateAiNotebookWorkspaceSelectionLabel();
     rowsWrap.style.display = 'flex';
     rowsWrap.style.minHeight = '0';
     rowsWrap.innerHTML = '';
@@ -1669,22 +1461,10 @@
     rowsWrap.querySelectorAll('input[data-ai-field]').forEach((input) => {
       input.addEventListener('input', () => {
         setActiveSheetInput(input);
-        updateAiNotebookWorkspaceSelectionLabel();
         setAiNotebookDraftHint('Kladblok aangepast. Klik "Opslaan lijst" om te bewaren.');
       });
-      input.addEventListener('focus', () => {
-        setActiveSheetInput(input);
-        updateAiNotebookWorkspaceSelectionLabel();
-      });
-      input.addEventListener('click', () => {
-        setActiveSheetInput(input);
-        updateAiNotebookWorkspaceSelectionLabel();
-      });
-      input.addEventListener('dblclick', () => {
-        setActiveSheetInput(input);
-        updateAiNotebookWorkspaceSelectionLabel();
-        loadAiNotebookSelectedCellIntoWorkspace(true);
-      });
+      input.addEventListener('focus', () => setActiveSheetInput(input));
+      input.addEventListener('click', () => setActiveSheetInput(input));
       input.addEventListener('paste', (event) => {
         const clipboardText = event.clipboardData?.getData('text/plain') || '';
         if (!clipboardText) return;
@@ -1703,14 +1483,11 @@
           `input[data-row-index="${startRowIndex}"][data-col-index="${startColIndex}"]`
         );
         if (nextFocus) setActiveSheetInput(nextFocus);
-        updateAiNotebookWorkspaceSelectionLabel();
         setAiNotebookDraftHint(
           `Excel/Sheets plak verwerkt: ${grid.length} rij(en) in AI kladblok. Klik "Opslaan lijst".`
         );
       });
     });
-
-    updateAiNotebookWorkspaceSelectionLabel();
   }
 
   function parseAiNotebookRows(rowsInput) {
@@ -1779,40 +1556,6 @@
       '      <span id="aiNotebookDraftHint" style="color:#5f6368;">Excel/Sheets plakken wordt ondersteund. Kolommen A-F: bedrijf, telefoon, status, terugbellen, reden, onthouden.</span>',
       '    </div>',
       '  </div>',
-      '  <div style="padding:0 12px 8px; background:#f1f3f4;">',
-      '    <div style="border:1px solid #dadce0; border-radius:8px; background:#ffffff; padding:10px;">',
-      '      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:8px;">',
-      '        <div id="aiNotebookWorkspaceSelection" style="font-size:12px; color:#3c4043;">Geen cel geselecteerd. Klik (of dubbelklik) een cel in de tabel.</div>',
-      '        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">',
-      '          <select id="aiNotebookWorkspaceStyle" style="height:30px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 8px; font-size:12px; color:#202124;">',
-      '            <option value="short">Korte samenvatting</option>',
-      '            <option value="medium">Normale samenvatting</option>',
-      '            <option value="bullets">Bullet points</option>',
-      '            <option value="long">Uitgebreid</option>',
-      '          </select>',
-      '          <button type="button" id="aiNotebookSummarizeBtn" style="height:30px; border:1px solid #c6dafc; background:#d2e3fc; color:#174ea6; border-radius:6px; padding:0 10px; font-weight:600; cursor:pointer;">AI samenvatten</button>',
-      '        </div>',
-      '      </div>',
-      '      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">',
-      '        <button type="button" id="aiNotebookLoadCellBtn" style="height:28px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 10px; cursor:pointer; font-size:12px;">Laad geselecteerde cel</button>',
-      '        <button type="button" id="aiNotebookLoadRowsBtn" style="height:28px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 10px; cursor:pointer; font-size:12px;">Laad hele kladblok</button>',
-      '        <button type="button" id="aiNotebookApplySourceBtn" style="height:28px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 10px; cursor:pointer; font-size:12px;">Bron -> cel</button>',
-      '        <button type="button" id="aiNotebookApplyResultBtn" style="height:28px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 10px; cursor:pointer; font-size:12px;">Resultaat -> cel</button>',
-      '        <button type="button" id="aiNotebookWorkspaceClearBtn" style="height:28px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 10px; cursor:pointer; font-size:12px;">Leeg werkruimte</button>',
-      '      </div>',
-      '      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px;">',
-      '        <div style="display:flex; flex-direction:column; min-height:0;">',
-      '          <label for="aiNotebookWorkspaceSource" style="font-size:11px; color:#5f6368; margin-bottom:4px;">Brontekst / notities / transcript</label>',
-      '          <textarea id="aiNotebookWorkspaceSource" style="width:100%; min-height:110px; resize:vertical; border:1px solid #dadce0; border-radius:6px; padding:8px; font-size:13px; line-height:1.45; color:#202124; box-sizing:border-box;" placeholder="Plak hier langere tekst, of dubbelklik een cel in de tabel om die hier groot te bewerken."></textarea>',
-      '        </div>',
-      '        <div style="display:flex; flex-direction:column; min-height:0;">',
-      '          <label for="aiNotebookWorkspaceResult" style="font-size:11px; color:#5f6368; margin-bottom:4px;">AI resultaat / samenvatting</label>',
-      '          <textarea id="aiNotebookWorkspaceResult" style="width:100%; min-height:110px; resize:vertical; border:1px solid #dadce0; border-radius:6px; padding:8px; font-size:13px; line-height:1.45; color:#202124; box-sizing:border-box;" placeholder="Hier komt de samenvatting. Klik daarna op &quot;Resultaat -> cel&quot; om terug te zetten in het kladblok."></textarea>',
-      '        </div>',
-      '      </div>',
-      '      <div id="aiNotebookWorkspaceAiHint" style="margin-top:8px; font-size:11px; color:#5f6368;">Tip: dubbelklik een cel om die in de grote editor te openen. Gebruik daarna AI samenvatten en zet het resultaat terug in een cel.</div>',
-      '    </div>',
-      '  </div>',
       '  <div style="padding:0 12px 8px; flex:1; min-height:0; background:#f1f3f4;">',
       '    <div id="aiNotebookRowsWrap" style="height:100%;"></div>',
       '  </div>',
@@ -1842,10 +1585,6 @@
       setAiNotebookDraftHint(
         'Excel/Sheets plakken wordt ondersteund. Kolommen A-F: bedrijf, telefoon, status, terugbellen, reden, onthouden.'
       );
-      updateAiNotebookWorkspaceSelectionLabel();
-      setAiNotebookWorkspaceHint(
-        'Tip: dubbelklik een cel om die in de grote editor te openen. Gebruik daarna AI samenvatten en zet het resultaat terug in een cel.'
-      );
     }
 
     modal.addEventListener('click', (event) => {
@@ -1864,52 +1603,6 @@
     byId('aiNotebookClearRowsBtn')?.addEventListener('click', () => {
       renderAiNotebookRows([]);
       setAiNotebookDraftHint('AI kladblok geleegd in concept. Klik "Opslaan lijst" om te bewaren.');
-    });
-
-    byId('aiNotebookLoadCellBtn')?.addEventListener('click', () => {
-      loadAiNotebookSelectedCellIntoWorkspace(true);
-    });
-
-    byId('aiNotebookLoadRowsBtn')?.addEventListener('click', () => {
-      const sourceEl = byId('aiNotebookWorkspaceSource');
-      if (!sourceEl) return;
-      const rows = collectAiNotebookRowsFromModal();
-      const text = buildAiNotebookWorkspaceTextFromRows(rows);
-      sourceEl.value = text;
-      if (text) {
-        setAiNotebookWorkspaceHint('Hele AI kladblok geladen in de grote editor.', 'success');
-      } else {
-        setAiNotebookWorkspaceHint('AI kladblok is leeg; er is niets om te laden.', 'error');
-      }
-      sourceEl.focus();
-    });
-
-    byId('aiNotebookApplySourceBtn')?.addEventListener('click', () => {
-      applyAiNotebookWorkspaceTextToSelectedCell('aiNotebookWorkspaceSource');
-    });
-
-    byId('aiNotebookApplyResultBtn')?.addEventListener('click', () => {
-      applyAiNotebookWorkspaceTextToSelectedCell('aiNotebookWorkspaceResult');
-    });
-
-    byId('aiNotebookWorkspaceClearBtn')?.addEventListener('click', () => {
-      const sourceEl = byId('aiNotebookWorkspaceSource');
-      const resultEl = byId('aiNotebookWorkspaceResult');
-      if (sourceEl) sourceEl.value = '';
-      if (resultEl) resultEl.value = '';
-      setAiNotebookWorkspaceHint('Werkruimte geleegd.');
-    });
-
-    byId('aiNotebookSummarizeBtn')?.addEventListener('click', () => {
-      void summarizeAiNotebookWorkspaceText();
-    });
-
-    byId('aiNotebookWorkspaceSource')?.addEventListener('input', () => {
-      setAiNotebookWorkspaceHint('Brontekst aangepast. Klik "AI samenvatten" om een samenvatting te maken.');
-    });
-
-    byId('aiNotebookWorkspaceResult')?.addEventListener('input', () => {
-      setAiNotebookWorkspaceHint('AI-resultaat aangepast. Gebruik "Resultaat -> cel" om het terug te zetten.');
     });
 
     byId('aiNotebookSaveBtn')?.addEventListener('click', () => {

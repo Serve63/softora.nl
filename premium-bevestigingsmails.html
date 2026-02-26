@@ -880,6 +880,20 @@
             outline: none;
         }
 
+        .confirm-task-ai-summary {
+            width: 100%;
+            min-height: 128px;
+            resize: vertical;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 0.7rem;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            outline: none;
+            margin-bottom: 0.55rem;
+        }
+
         .confirm-task-detail-actions {
             margin-top: 0.75rem;
             display: flex;
@@ -928,6 +942,10 @@
             font-size: 0.72rem;
             color: var(--text-tertiary);
             line-height: 1.45;
+        }
+
+        .confirm-task-detail-info.error {
+            color: #ff9ba6;
         }
 
         .confirm-task-flow {
@@ -1547,6 +1565,8 @@
             detailLoadingId: null,
             detailsById: {},
             actionBusyById: {},
+            transcriptSummaryBusyByTaskId: {},
+            transcriptSummaryErrorByTaskId: {},
             pollTimer: null,
         };
 
@@ -1611,6 +1631,73 @@
             return Boolean(confirmationTaskState.actionBusyById[String(taskId)]);
         }
 
+        function setTranscriptSummaryBusy(taskId, value) {
+            confirmationTaskState.transcriptSummaryBusyByTaskId[String(taskId)] = Boolean(value);
+        }
+
+        function isTranscriptSummaryBusy(taskId) {
+            return Boolean(confirmationTaskState.transcriptSummaryBusyByTaskId[String(taskId)]);
+        }
+
+        async function requestTranscriptSummaryWithAi(payload) {
+            if (window.SoftoraAI && typeof window.SoftoraAI.summarizeText === 'function') {
+                return window.SoftoraAI.summarizeText(payload);
+            }
+            const res = await fetch('/api/ai/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.ok) {
+                throw new Error(String(data?.detail || data?.error || 'AI samenvatting mislukt'));
+            }
+            return data;
+        }
+
+        async function generateTranscriptSummaryForConfirmationTask(taskId) {
+            const key = String(taskId);
+            let detail = confirmationTaskState.detailsById[key] || null;
+            if (!detail) {
+                await loadConfirmationTaskDetail(taskId);
+                detail = confirmationTaskState.detailsById[key] || null;
+            }
+
+            const transcript = String(detail?.transcript || '').trim();
+            if (!transcript) {
+                confirmationTaskState.transcriptSummaryErrorByTaskId[key] = 'Geen transcriptie beschikbaar voor deze taak.';
+                renderConfirmationTasks();
+                return false;
+            }
+
+            try {
+                const result = await requestTranscriptSummaryWithAi({
+                    text: transcript,
+                    style: 'short',
+                    language: 'nl',
+                    maxSentences: 4,
+                    extraInstructions:
+                        'Vat dit salesgesprek samen voor een bevestigingsmail-workflow. Benoem kort de context, de afspraak (datum/tijd indien genoemd) en eventuele vervolgstap.'
+                });
+
+                const currentDetail = confirmationTaskState.detailsById[key] || detail || {};
+                confirmationTaskState.detailsById[key] = {
+                    ...currentDetail,
+                    transcriptAiSummary: String(result?.summary || '').trim(),
+                    transcriptAiSummaryGeneratedAt: new Date().toISOString(),
+                    transcriptAiSummarySource: 'openai',
+                    transcriptAiSummaryModel: String(result?.model || '')
+                };
+                delete confirmationTaskState.transcriptSummaryErrorByTaskId[key];
+                renderConfirmationTasks();
+                return true;
+            } catch (error) {
+                confirmationTaskState.transcriptSummaryErrorByTaskId[key] = String(error?.message || 'AI samenvatting mislukt.');
+                renderConfirmationTasks();
+                return false;
+            }
+        }
+
         function renderConfirmationTaskDetail(task) {
             const taskId = Number(task?.id) || 0;
             if (!taskId) return '';
@@ -1654,6 +1741,34 @@
             const draft = detail?.confirmationEmailDraft
                 ? String(detail.confirmationEmailDraft)
                 : (isDemoTask ? demoDraft : '');
+
+            const transcriptAiSummary = detail?.transcriptAiSummary
+                ? String(detail.transcriptAiSummary)
+                : '';
+            const backendAiSummary = detail?.aiSummary
+                ? String(detail.aiSummary)
+                : '';
+            const displayedTranscriptSummary = transcriptAiSummary || backendAiSummary;
+            const transcriptSummaryBusy = isTranscriptSummaryBusy(taskId);
+            const transcriptSummaryError = String(
+                confirmationTaskState.transcriptSummaryErrorByTaskId[String(taskId)] || ''
+            );
+            const transcriptSummaryMeta = [];
+            if (detail?.transcriptAiSummaryGeneratedAt) {
+                try {
+                    transcriptSummaryMeta.push(
+                        `Samenvatting gemaakt: ${new Date(detail.transcriptAiSummaryGeneratedAt).toLocaleString('nl-NL')}`
+                    );
+                } catch (_) {}
+            }
+            if (detail?.transcriptAiSummaryModel) {
+                transcriptSummaryMeta.push(`Model: ${String(detail.transcriptAiSummaryModel)}`);
+            }
+            if (detail?.transcriptAiSummarySource) {
+                transcriptSummaryMeta.push(`Bron: ${String(detail.transcriptAiSummarySource)} (op transcriptie)`);
+            } else if (backendAiSummary) {
+                transcriptSummaryMeta.push('Bron: bestaande AI call-analyse');
+            }
             const draftMeta = [];
             if (detail?.confirmationEmailDraftGeneratedAt) {
                 try {
@@ -1681,6 +1796,27 @@
                             ${transcriptHtml}
                         </div>
                         <div class="confirm-task-detail-block">
+                            <div class="confirm-task-detail-label">AI samenvatting transcriptie</div>
+                            <textarea class="confirm-task-ai-summary" readonly placeholder="Klik op &quot;Samenvatting maken&quot; om AI de transcriptie kort samen te laten vatten.">${escapeHtml(displayedTranscriptSummary)}</textarea>
+                            <div class="confirm-task-detail-info${transcriptSummaryError ? ' error' : ''}">
+                                ${transcriptSummaryError
+                                    ? escapeHtml(transcriptSummaryError)
+                                    : (transcriptSummaryMeta.length
+                                        ? escapeHtml(transcriptSummaryMeta.join(' • '))
+                                        : 'Nog geen AI samenvatting gemaakt op basis van transcriptie.')}
+                            </div>
+                            <div class="confirm-task-detail-actions" style="margin-top:0.55rem; margin-bottom:0.75rem;">
+                                <button
+                                    type="button"
+                                    class="confirm-task-detail-btn"
+                                    data-generate-transcript-summary-id="${taskId}"
+                                    ${transcript ? '' : 'disabled'}
+                                >
+                                    ${transcriptSummaryBusy
+                                        ? 'Samenvatting maken...'
+                                        : (displayedTranscriptSummary ? 'Opnieuw samenvatten' : 'Samenvatting maken')}
+                                </button>
+                            </div>
                             <div class="confirm-task-detail-label">Bevestigingsmail concept</div>
                             <textarea class="confirm-task-draft" readonly placeholder="Klik op &quot;Schrijf bevestigingsmail&quot; om AI een concept te laten maken.">${escapeHtml(draft)}</textarea>
                             <div class="confirm-task-detail-info">
@@ -1782,6 +1918,21 @@
                     renderConfirmationTasks();
                     await generateConfirmationEmailDraft(taskId);
                     setTaskActionBusy(taskId, false);
+                    renderConfirmationTasks();
+                });
+            });
+
+            bodyEl.querySelectorAll('[data-generate-transcript-summary-id]').forEach((btn) => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const taskId = Number(btn.getAttribute('data-generate-transcript-summary-id'));
+                    if (!taskId || isTranscriptSummaryBusy(taskId)) return;
+                    setTranscriptSummaryBusy(taskId, true);
+                    delete confirmationTaskState.transcriptSummaryErrorByTaskId[String(taskId)];
+                    renderConfirmationTasks();
+                    await generateTranscriptSummaryForConfirmationTask(taskId);
+                    setTranscriptSummaryBusy(taskId, false);
                     renderConfirmationTasks();
                 });
             });
