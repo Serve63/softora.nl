@@ -3231,7 +3231,38 @@ app.get('/api/healthz', (_req, res) => {
   });
 });
 
-app.get('/api/debug/runtime-health', (_req, res) => {
+function sendRuntimeHealthDebug(_req, res) {
+  return res.status(200).json({
+    ok: true,
+    timestamp: new Date().toISOString(),
+    runtime: {
+      webhookEvents: recentWebhookEvents.length,
+      callUpdates: recentCallUpdates.length,
+      aiCallInsights: recentAiCallInsights.length,
+      appointments: generatedAgendaAppointments.length,
+      realCallUpdates: recentCallUpdates.filter((item) => {
+        const callId = normalizeString(item?.callId || '');
+        return callId && !callId.startsWith('demo-');
+      }).length,
+    },
+    supabase: {
+      enabled: isSupabaseConfigured(),
+      hydrated: supabaseStateHydrated,
+      hydrateRetryNotBeforeMs: supabaseHydrateRetryNotBeforeMs,
+      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
+      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
+      host: redactSupabaseUrlForDebug(SUPABASE_URL),
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      lastHydrateError: supabaseLastHydrateError || null,
+      lastPersistError: supabaseLastPersistError || null,
+    },
+  });
+}
+
+app.get('/api/debug/runtime-health', sendRuntimeHealthDebug);
+app.get('/api/runtime-health', sendRuntimeHealthDebug);
+
+/* app.get('/api/debug/runtime-health', (_req, res) => {
   res.status(200).json({
     ok: true,
     timestamp: new Date().toISOString(),
@@ -3257,7 +3288,7 @@ app.get('/api/debug/runtime-health', (_req, res) => {
       lastPersistError: supabaseLastPersistError || null,
     },
   });
-});
+}); */
 
 // API routes eerst, daarna statische frontend assets/html serveren.
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
