@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
@@ -16,6 +17,38 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const SUPABASE_STATE_TABLE = String(process.env.SUPABASE_STATE_TABLE || 'softora_runtime_state').trim();
 const SUPABASE_STATE_KEY = String(process.env.SUPABASE_STATE_KEY || 'core').trim();
+const MAIL_SMTP_HOST = String(
+  process.env.MAIL_SMTP_HOST || process.env.SMTP_HOST || process.env.STRATO_SMTP_HOST || ''
+).trim();
+const MAIL_SMTP_PORT = Number(
+  process.env.MAIL_SMTP_PORT || process.env.SMTP_PORT || process.env.STRATO_SMTP_PORT || 587
+);
+const MAIL_SMTP_USER = String(
+  process.env.MAIL_SMTP_USER || process.env.SMTP_USER || process.env.STRATO_SMTP_USER || ''
+).trim();
+const MAIL_SMTP_PASS = String(
+  process.env.MAIL_SMTP_PASS || process.env.SMTP_PASS || process.env.STRATO_SMTP_PASS || ''
+).trim();
+const MAIL_SMTP_SECURE = /^(1|true|yes)$/i.test(
+  String(
+    process.env.MAIL_SMTP_SECURE ||
+      process.env.SMTP_SECURE ||
+      (MAIL_SMTP_PORT === 465 ? 'true' : '')
+  )
+);
+const MAIL_FROM_ADDRESS = String(
+  process.env.CONFIRMATION_MAIL_FROM ||
+    process.env.MAIL_FROM ||
+    process.env.STRATO_SMTP_FROM ||
+    MAIL_SMTP_USER ||
+    ''
+).trim();
+const MAIL_FROM_NAME = String(
+  process.env.CONFIRMATION_MAIL_FROM_NAME || process.env.MAIL_FROM_NAME || 'Softora'
+).trim();
+const MAIL_REPLY_TO = String(
+  process.env.CONFIRMATION_MAIL_REPLY_TO || process.env.MAIL_REPLY_TO || ''
+).trim();
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
@@ -32,6 +65,7 @@ const sequentialDispatchQueues = new Map();
 const sequentialDispatchQueueIdByCallId = new Map();
 let nextSequentialDispatchQueueId = 1;
 let supabaseClient = null;
+let smtpTransporter = null;
 let supabaseStateHydrationPromise = null;
 let supabaseStateHydrated = false;
 let supabasePersistChain = Promise.resolve();
@@ -1513,6 +1547,7 @@ function mapAppointmentToConfirmationTask(appointment) {
     createdAt: normalizeString(appointment.confirmationTaskCreatedAt || appointment.createdAt || ''),
     appointmentId: Number(appointment.id) || 0,
     callId: normalizeString(appointment.callId || ''),
+    contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
     mailDraftAvailable: Boolean(normalizeString(appointment.confirmationEmailDraft || '')),
     mailSent: Boolean(appointment.confirmationEmailSent || appointment.confirmationEmailSentAt),
     mailSentAt: normalizeString(appointment.confirmationEmailSentAt || '') || null,
@@ -1590,6 +1625,7 @@ function buildConfirmationTaskDetail(appointment) {
 
   return {
     ...task,
+    contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
     transcript,
     transcriptAvailable: Boolean(transcript),
     vapiSummary: normalizeString(callUpdate?.summary || ''),
@@ -1598,12 +1634,38 @@ function buildConfirmationTaskDetail(appointment) {
     confirmationEmailDraft: normalizeString(appointment.confirmationEmailDraft || ''),
     confirmationEmailDraftGeneratedAt: normalizeString(appointment.confirmationEmailDraftGeneratedAt || '') || null,
     confirmationEmailDraftSource: normalizeString(appointment.confirmationEmailDraftSource || '') || null,
+    confirmationEmailLastError: normalizeString(appointment.confirmationEmailLastError || '') || null,
+    confirmationEmailLastSentMessageId:
+      normalizeString(appointment.confirmationEmailLastSentMessageId || '') || null,
     rawStatus: {
       callStatus: normalizeString(callUpdate?.status || ''),
       callMessageType: normalizeString(callUpdate?.messageType || ''),
       endedReason: normalizeString(callUpdate?.endedReason || ''),
     },
   };
+}
+
+function ensureConfirmationEmailDraftAtIndex(idx, options = {}) {
+  if (!Number.isInteger(idx) || idx < 0 || idx >= generatedAgendaAppointments.length) return null;
+  const appointment = generatedAgendaAppointments[idx];
+  if (!appointment || typeof appointment !== 'object') return null;
+  if (normalizeString(appointment.confirmationEmailDraft || '')) return appointment;
+
+  const detail = buildConfirmationTaskDetail(appointment) || {};
+  const fallbackDraft = buildConfirmationEmailDraftFallback(appointment, detail);
+  const nowIso = new Date().toISOString();
+  return setGeneratedAgendaAppointmentAtIndex(
+    idx,
+    {
+      ...appointment,
+      confirmationEmailDraft: fallbackDraft,
+      confirmationEmailDraftGeneratedAt:
+        normalizeString(appointment.confirmationEmailDraftGeneratedAt || '') || nowIso,
+      confirmationEmailDraftSource:
+        normalizeString(appointment.confirmationEmailDraftSource || '') || 'template-auto',
+    },
+    normalizeString(options.reason || 'confirmation_task_auto_draft')
+  );
 }
 
 function upsertGeneratedAgendaAppointment(appointment, callId) {
@@ -1644,11 +1706,26 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
           normalizeString(existing?.confirmationEmailDraftGeneratedAt || '') || null,
         confirmationEmailDraftSource:
           normalizeString(existing?.confirmationEmailDraftSource || '') || null,
+        contactEmail:
+          normalizeEmailAddress(
+            appointment?.contactEmail || appointment?.email || existing?.contactEmail || existing?.email || ''
+          ) || null,
+        confirmationEmailLastError:
+          normalizeString(existing?.confirmationEmailLastError || '') || null,
+        confirmationEmailLastSentMessageId:
+          normalizeString(existing?.confirmationEmailLastSentMessageId || '') || null,
         confirmationTaskCreatedAt:
           normalizeString(existing?.confirmationTaskCreatedAt || '') ||
           normalizeString(existing?.createdAt || '') ||
           new Date().toISOString(),
       };
+      if (!normalizeString(updated.confirmationEmailDraft || '')) {
+        updated.confirmationEmailDraft = buildConfirmationEmailDraftFallback(updated, updated);
+        updated.confirmationEmailDraftGeneratedAt =
+          normalizeString(updated.confirmationEmailDraftGeneratedAt || '') || new Date().toISOString();
+        updated.confirmationEmailDraftSource =
+          normalizeString(updated.confirmationEmailDraftSource || '') || 'template-auto';
+      }
       return setGeneratedAgendaAppointmentAtIndex(idx, updated, 'agenda_appointment_upsert');
     }
   }
@@ -1669,9 +1746,12 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
     confirmationAppointmentCancelled: false,
     confirmationAppointmentCancelledAt: null,
     confirmationAppointmentCancelledBy: null,
-    confirmationEmailDraft: null,
-    confirmationEmailDraftGeneratedAt: null,
-    confirmationEmailDraftSource: null,
+    contactEmail: normalizeEmailAddress(appointment?.contactEmail || appointment?.email || '') || null,
+    confirmationEmailDraft: buildConfirmationEmailDraftFallback(appointment, appointment),
+    confirmationEmailDraftGeneratedAt: createdAtIso,
+    confirmationEmailDraftSource: 'template-auto',
+    confirmationEmailLastError: null,
+    confirmationEmailLastSentMessageId: null,
     confirmationTaskCreatedAt: createdAtIso,
   };
   generatedAgendaAppointments.push(withId);
@@ -1704,6 +1784,7 @@ function buildGeneratedAgendaAppointmentFromAiInsight(insight) {
     company,
     contact,
     phone,
+    contactEmail: normalizeEmailAddress(insight.contactEmail || insight.email || insight.leadEmail || ''),
     type: 'meeting',
     date,
     time,
@@ -2006,6 +2087,130 @@ function buildConfirmationEmailDraftFallback(appointment, detail = {}) {
     'Met vriendelijke groet,',
     'Softora',
   ].join('\n');
+}
+
+function isSmtpMailConfigured() {
+  return Boolean(
+    MAIL_SMTP_HOST &&
+      Number.isFinite(MAIL_SMTP_PORT) &&
+      MAIL_SMTP_PORT > 0 &&
+      MAIL_SMTP_USER &&
+      MAIL_SMTP_PASS &&
+      MAIL_FROM_ADDRESS
+  );
+}
+
+function getSmtpTransporter() {
+  if (!isSmtpMailConfigured()) return null;
+  if (smtpTransporter) return smtpTransporter;
+
+  smtpTransporter = nodemailer.createTransport({
+    host: MAIL_SMTP_HOST,
+    port: MAIL_SMTP_PORT,
+    secure: MAIL_SMTP_SECURE,
+    auth: {
+      user: MAIL_SMTP_USER,
+      pass: MAIL_SMTP_PASS,
+    },
+  });
+
+  return smtpTransporter;
+}
+
+function normalizeEmailAddress(value) {
+  return normalizeString(String(value || '').trim().toLowerCase());
+}
+
+function isLikelyValidEmail(value) {
+  const email = normalizeEmailAddress(value);
+  return Boolean(email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+}
+
+function formatMailFromHeader() {
+  const address = normalizeEmailAddress(MAIL_FROM_ADDRESS);
+  if (!address) return '';
+  const name = normalizeString(MAIL_FROM_NAME || 'Softora');
+  return name ? `${name} <${address}>` : address;
+}
+
+function parseConfirmationDraftToMailParts(draftText, appointment = null) {
+  const raw = normalizeString(draftText || '');
+  const lines = raw.replace(/\r\n?/g, '\n').split('\n');
+  let subject = '';
+  let bodyStartIdx = 0;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = normalizeString(lines[i]);
+    if (!line) continue;
+    const match = line.match(/^onderwerp\s*:\s*(.+)$/i);
+    if (match) {
+      subject = normalizeString(match[1]);
+      bodyStartIdx = i + 1;
+    } else {
+      bodyStartIdx = i;
+    }
+    break;
+  }
+
+  if (!subject) {
+    const company = normalizeString(appointment?.company || '') || 'afspraak';
+    const date = normalizeDateYyyyMmDd(appointment?.date) || '';
+    const time = normalizeTimeHhMm(appointment?.time) || '';
+    subject = truncateText(
+      `Bevestiging afspraak ${company}${date ? ` - ${date}` : ''}${time ? ` ${time}` : ''}`.trim(),
+      200
+    );
+  }
+
+  const text = lines
+    .slice(bodyStartIdx)
+    .join('\n')
+    .replace(/^\s+/, '')
+    .trim();
+
+  return {
+    subject: subject || 'Bevestiging afspraak',
+    text: text || raw || 'Bedankt voor het gesprek. Hierbij bevestigen wij de afspraak.',
+  };
+}
+
+async function sendConfirmationEmailViaSmtp({ appointment, recipientEmail, draftText }) {
+  if (!isSmtpMailConfigured()) {
+    const error = new Error('SMTP mail is nog niet geconfigureerd op de server.');
+    error.code = 'SMTP_NOT_CONFIGURED';
+    throw error;
+  }
+
+  const toEmail = normalizeEmailAddress(recipientEmail);
+  if (!isLikelyValidEmail(toEmail)) {
+    const error = new Error('Vul een geldig e-mailadres in voor de ontvanger.');
+    error.code = 'INVALID_RECIPIENT_EMAIL';
+    throw error;
+  }
+
+  const transporter = getSmtpTransporter();
+  if (!transporter) {
+    const error = new Error('SMTP transporter kon niet worden opgebouwd.');
+    error.code = 'SMTP_TRANSPORT_UNAVAILABLE';
+    throw error;
+  }
+
+  const parts = parseConfirmationDraftToMailParts(draftText, appointment);
+  const info = await transporter.sendMail({
+    from: formatMailFromHeader(),
+    to: toEmail,
+    replyTo: MAIL_REPLY_TO || undefined,
+    subject: parts.subject,
+    text: parts.text,
+  });
+
+  return {
+    messageId: normalizeString(info?.messageId || ''),
+    response: truncateText(normalizeString(info?.response || ''), 500),
+    accepted: Array.isArray(info?.accepted) ? info.accepted : [],
+    rejected: Array.isArray(info?.rejected) ? info.rejected : [],
+    envelope: info?.envelope || null,
+  };
 }
 
 async function generateConfirmationEmailDraftWithAi(appointment, detail = {}) {
@@ -3206,6 +3411,11 @@ app.get('/api/agenda/confirmation-tasks', async (req, res) => {
     await forceHydrateRuntimeStateWithRetries(3);
   }
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
+  generatedAgendaAppointments.forEach((appointment, idx) => {
+    if (!appointment) return;
+    if (!mapAppointmentToConfirmationTask(appointment)) return;
+    ensureConfirmationEmailDraftAtIndex(idx, { reason: 'confirmation_task_list_auto_draft' });
+  });
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 100)));
   const includeDemo = /^(1|true|yes)$/i.test(String(req.query.includeDemo || ''));
   const tasks = generatedAgendaAppointments
@@ -3237,6 +3447,7 @@ async function sendConfirmationTaskDetailResponse(req, res, taskIdRaw) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
   }
 
+  ensureConfirmationEmailDraftAtIndex(idx, { reason: 'confirmation_task_detail_auto_draft' });
   const appointment = generatedAgendaAppointments[idx];
   let detail = buildConfirmationTaskDetail(appointment);
   if (detail && !detail.transcriptAvailable && normalizeString(appointment?.callId || '')) {
@@ -3284,6 +3495,7 @@ app.post('/api/agenda/confirmation-tasks/:id/draft-email', async (req, res) => {
         confirmationEmailDraft: generated.draft,
         confirmationEmailDraftGeneratedAt: nowIso,
         confirmationEmailDraftSource: normalizeString(generated.source || 'template'),
+        confirmationEmailLastError: null,
       },
       'confirmation_task_draft_email'
     );
@@ -3329,6 +3541,125 @@ app.post('/api/agenda/confirmation-tasks/:id/draft-email', async (req, res) => {
       ok: false,
       error: 'Kon geen bevestigingsmail opstellen.',
       detail: normalizeString(error?.message || '') || null,
+    });
+  }
+});
+
+app.post('/api/agenda/confirmation-tasks/:id/send-email', async (req, res) => {
+  const idx = getGeneratedAppointmentIndexById(req.params.id);
+  if (idx < 0) {
+    return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
+  }
+
+  const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
+  ensureConfirmationEmailDraftAtIndex(idx, { reason: 'confirmation_task_send_auto_draft' });
+  const appointment = generatedAgendaAppointments[idx];
+  const task = mapAppointmentToConfirmationTask(appointment);
+  if (!task) {
+    return res.status(409).json({ ok: false, error: 'Taak is al afgerond of niet beschikbaar' });
+  }
+
+  const recipientEmail = normalizeEmailAddress(
+    req.body?.recipientEmail || req.body?.email || appointment?.contactEmail || appointment?.email || ''
+  );
+  if (!isLikelyValidEmail(recipientEmail)) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Vul een geldig ontvanger e-mailadres in.',
+      code: 'INVALID_RECIPIENT_EMAIL',
+    });
+  }
+
+  if (!isSmtpMailConfigured()) {
+    return res.status(503).json({
+      ok: false,
+      error: 'Mail verzending is nog niet geconfigureerd op de server (SMTP ontbreekt).',
+      code: 'SMTP_NOT_CONFIGURED',
+      missingEnv: [
+        !MAIL_SMTP_HOST ? 'MAIL_SMTP_HOST' : null,
+        !MAIL_SMTP_USER ? 'MAIL_SMTP_USER' : null,
+        !MAIL_SMTP_PASS ? 'MAIL_SMTP_PASS' : null,
+        !MAIL_FROM_ADDRESS ? 'MAIL_FROM_ADDRESS' : null,
+      ].filter(Boolean),
+    });
+  }
+
+  try {
+    const delivery = await sendConfirmationEmailViaSmtp({
+      appointment,
+      recipientEmail,
+      draftText: normalizeString(appointment?.confirmationEmailDraft || ''),
+    });
+
+    const nowIso = new Date().toISOString();
+    const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+      idx,
+      {
+        ...appointment,
+        contactEmail: recipientEmail,
+        confirmationEmailSent: true,
+        confirmationEmailSentAt: nowIso,
+        confirmationEmailSentBy: actor || null,
+        confirmationEmailLastError: null,
+        confirmationEmailLastSentMessageId:
+          normalizeString(delivery?.messageId || '') || null,
+      },
+      'confirmation_task_send_email'
+    );
+
+    appendDashboardActivity(
+      {
+        type: 'confirmation_mail_sent',
+        title: 'Bevestigingsmail verstuurd',
+        detail: `E-mail verstuurd naar ${recipientEmail} via SMTP.`,
+        company: updatedAppointment?.company || appointment?.company || '',
+        actor,
+        taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
+        callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+        source: 'premium-personeel-dashboard',
+      },
+      'dashboard_activity_send_email'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      sent: true,
+      task: buildConfirmationTaskDetail(updatedAppointment),
+      delivery,
+    });
+  } catch (error) {
+    console.error(
+      '[ConfirmationTask][SendEmailError]',
+      JSON.stringify(
+        {
+          appointmentId: Number(appointment?.id) || null,
+          callId: normalizeString(appointment?.callId || '') || null,
+          recipientEmail,
+          code: normalizeString(error?.code || ''),
+          message: error?.message || 'Onbekende fout',
+        },
+        null,
+        2
+      )
+    );
+
+    const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+      idx,
+      {
+        ...appointment,
+        contactEmail: recipientEmail || normalizeEmailAddress(appointment?.contactEmail || '') || null,
+        confirmationEmailLastError:
+          truncateText(normalizeString(error?.message || 'Bevestigingsmail verzenden mislukt.'), 500),
+      },
+      'confirmation_task_send_email_error'
+    );
+
+    return res.status(500).json({
+      ok: false,
+      error: 'Bevestigingsmail verzenden mislukt.',
+      detail: normalizeString(error?.message || '') || null,
+      code: normalizeString(error?.code || '') || null,
+      task: updatedAppointment ? buildConfirmationTaskDetail(updatedAppointment) : null,
     });
   }
 });

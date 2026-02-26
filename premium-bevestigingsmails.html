@@ -894,6 +894,18 @@
             margin-bottom: 0.55rem;
         }
 
+        .confirm-task-email-input {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 0.7rem;
+            font-size: 0.8rem;
+            line-height: 1.2;
+            outline: none;
+            margin-bottom: 0.55rem;
+        }
+
         .confirm-task-detail-actions {
             margin-top: 0.75rem;
             display: flex;
@@ -1566,6 +1578,7 @@
             actionBusyById: {},
             transcriptSummaryBusyByTaskId: {},
             transcriptSummaryErrorByTaskId: {},
+            sendMailErrorByTaskId: {},
             pollTimer: null,
         };
 
@@ -1636,6 +1649,11 @@
 
         function isTranscriptSummaryBusy(taskId) {
             return Boolean(confirmationTaskState.transcriptSummaryBusyByTaskId[String(taskId)]);
+        }
+
+        function getConfirmationRecipientEmailInputValue(taskId) {
+            const el = document.querySelector(`[data-confirmation-recipient-email-id="${String(taskId)}"]`);
+            return el ? String(el.value || '').trim() : '';
         }
 
         function normalizeDisplayedCallTranscript(value) {
@@ -1793,6 +1811,14 @@
             if (detail?.confirmationEmailDraftSource) {
                 draftMeta.push(`Bron: ${String(detail.confirmationEmailDraftSource)}`);
             }
+            const recipientEmail = String(
+                detail?.contactEmail || task?.contactEmail || ''
+            ).trim();
+            const sendMailError = String(
+                confirmationTaskState.sendMailErrorByTaskId[String(taskId)] ||
+                detail?.confirmationEmailLastError ||
+                ''
+            ).trim();
 
             const mailSent = Boolean(task.mailSent);
             const mailSendBusy = isTaskActionBusy(taskId);
@@ -1835,6 +1861,18 @@
                             <textarea class="confirm-task-draft" readonly placeholder="Klik op &quot;Schrijf bevestigingsmail&quot; om AI een concept te laten maken.">${escapeHtml(draft)}</textarea>
                             <div class="confirm-task-detail-info">
                                 ${draftMeta.length ? escapeHtml(draftMeta.join(' • ')) : (draft ? '' : 'Nog geen concept gegenereerd.')}
+                            </div>
+                            <div class="confirm-task-detail-label" style="margin-top:0.65rem;">Ontvanger e-mail</div>
+                            <input
+                                type="email"
+                                class="confirm-task-email-input"
+                                data-confirmation-recipient-email-id="${taskId}"
+                                value="${escapeHtml(recipientEmail)}"
+                                placeholder="klant@bedrijf.nl"
+                                ${mailSent ? 'disabled' : ''}
+                            />
+                            <div class="confirm-task-detail-info${sendMailError ? ' error' : ''}" style="margin-top:-0.15rem;">
+                                ${sendMailError ? escapeHtml(sendMailError) : 'De knop verstuurt via server-side SMTP (bijv. Strato).'}
                             </div>
                             <div class="confirm-task-detail-actions" style="margin-top:0.55rem;">
                                 <button
@@ -1983,6 +2021,7 @@
                     if (!taskId || isTaskActionBusy(taskId)) return;
                     if (getTaskById(taskId)?.mailSent) return;
                     setTaskActionBusy(taskId, true);
+                    delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
                     renderConfirmationTasks();
                     const ok = await markConfirmationMailSent(taskId);
                     setTaskActionBusy(taskId, false);
@@ -2081,6 +2120,7 @@
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok || !data?.ok || !data.task) return false;
                 confirmationTaskState.detailsById[String(taskId)] = data.task;
+                delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
                 mergeTaskIntoState(data.task);
                 renderConfirmationTasks();
                 return true;
@@ -2104,6 +2144,7 @@
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok || !data?.ok || !data.task) return false;
                 confirmationTaskState.detailsById[String(taskId)] = data.task;
+                delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
                 mergeTaskIntoState(data.task);
                 renderConfirmationTasks();
                 return true;
@@ -2136,19 +2177,34 @@
 
         async function markConfirmationMailSent(taskId) {
             try {
-                const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/mark-sent`, {
+                const recipientEmail = getConfirmationRecipientEmailInputValue(taskId);
+                const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/send-email`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ actor: 'Premium dashboard gebruiker' })
+                    body: JSON.stringify({
+                        actor: 'Premium dashboard gebruiker',
+                        recipientEmail
+                    })
                 });
                 const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data?.ok || !data.task) return false;
+                if (!res.ok || !data?.ok || !data.task) {
+                    confirmationTaskState.sendMailErrorByTaskId[String(taskId)] = String(
+                        data?.detail || data?.error || 'Bevestigingsmail verzenden mislukt.'
+                    );
+                    if (data?.task) {
+                        confirmationTaskState.detailsById[String(taskId)] = data.task;
+                        mergeTaskIntoState(data.task);
+                    }
+                    return false;
+                }
+                delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
                 confirmationTaskState.detailsById[String(taskId)] = data.task;
                 mergeTaskIntoState(data.task);
                 renderConfirmationTasks();
                 addRecentActivityEntry('<strong>Bevestigingsmail verstuurd</strong>', data.task.company || getTaskById(taskId)?.company);
                 return true;
             } catch (_) {
+                confirmationTaskState.sendMailErrorByTaskId[String(taskId)] = 'Netwerkfout bij verzenden.';
                 return false;
             }
         }
