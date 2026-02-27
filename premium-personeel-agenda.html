@@ -320,6 +320,74 @@
             background: var(--bg-primary); border: 1px solid var(--border);
         }
 
+        .modal-workspace { display: none; }
+        .modal-workspace.show { display: block; }
+
+        .modal-workspace-label {
+            font-family: 'Oswald', sans-serif; font-size: 0.72rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.12em;
+            color: var(--text-tertiary); margin-bottom: 0.45rem;
+        }
+
+        .modal-workspace-help {
+            font-size: 0.82rem; color: var(--text-secondary); font-weight: 300;
+            margin-bottom: 0.8rem; line-height: 1.55;
+        }
+
+        .modal-workspace-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .modal-workspace-field textarea {
+            width: 100%;
+            min-height: 200px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 0.75rem;
+            resize: vertical;
+            line-height: 1.55;
+            font-size: 0.84rem;
+            outline: none;
+        }
+
+        .modal-workspace-status {
+            margin-top: 0.45rem;
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            min-height: 1.2em;
+        }
+
+        .modal-workspace-status.error { color: var(--red); }
+        .modal-workspace-status.success { color: var(--green); }
+
+        .modal-workspace-actions {
+            margin-top: 0.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+
+        .modal-workspace-actions .modal-btn {
+            flex: 0 0 auto;
+            padding: 0.65rem 0.85rem;
+            font-size: 0.72rem;
+            letter-spacing: 0.04em;
+        }
+
+        .modal-btn.subtle {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .modal-btn.subtle:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-light);
+        }
+
         .modal-footer {
             padding: 0 2.5rem 2.5rem;
             display: flex; gap: 0.5rem;
@@ -334,6 +402,9 @@
         .modal-btn.primary:hover { background: var(--accent-light); box-shadow: 0 0 30px var(--accent-glow); }
         .modal-btn.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
         .modal-btn.secondary:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+        .modal-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+        .modal-overview.hide { display: none; }
 
         /* Responsive */
         @media (max-width: 1200px) {
@@ -353,6 +424,7 @@
             .appointment { font-size: 0.6rem; }
             .day-number { font-size: 0.75rem; }
             .modal-details { grid-template-columns: 1fr; }
+            .modal-workspace-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -376,30 +448,56 @@
             </button>
         </div>
         <div class="modal-body">
-            <div class="modal-details">
-                <div class="modal-detail-item">
-                    <div class="modal-detail-label">Datum & Tijd</div>
-                    <div class="modal-detail-value" id="modalDate">-</div>
+            <div class="modal-overview" id="modalOverview">
+                <div class="modal-details">
+                    <div class="modal-detail-item">
+                        <div class="modal-detail-label">Datum & Tijd</div>
+                        <div class="modal-detail-value" id="modalDate">-</div>
+                    </div>
+                    <div class="modal-detail-item">
+                        <div class="modal-detail-label">Geschatte Waarde</div>
+                        <div class="modal-detail-value" id="modalValue">-</div>
+                    </div>
+                    <div class="modal-detail-item">
+                        <div class="modal-detail-label">Branche</div>
+                        <div class="modal-detail-value" id="modalBranche">-</div>
+                    </div>
+                    <div class="modal-detail-item">
+                        <div class="modal-detail-label">Bron</div>
+                        <div class="modal-detail-value" id="modalSource">-</div>
+                    </div>
                 </div>
-                <div class="modal-detail-item">
-                    <div class="modal-detail-label">Geschatte Waarde</div>
-                    <div class="modal-detail-value" id="modalValue">-</div>
-                </div>
-                <div class="modal-detail-item">
-                    <div class="modal-detail-label">Branche</div>
-                    <div class="modal-detail-value" id="modalBranche">-</div>
-                </div>
-                <div class="modal-detail-item">
-                    <div class="modal-detail-label">Bron</div>
-                    <div class="modal-detail-value" id="modalSource">-</div>
-                </div>
+                <div class="modal-summary-label">AI Samenvatting van Lead</div>
+                <div class="modal-summary" id="modalSummary">-</div>
             </div>
-            <div class="modal-summary-label">AI Samenvatting van Lead</div>
-            <div class="modal-summary" id="modalSummary">-</div>
+            <div class="modal-workspace" id="modalWorkspace">
+                <div class="modal-workspace-label">Na de afspraak</div>
+                <div class="modal-workspace-help">
+                    Neem via spraak op wat de klant exact wil. We slaan de transcriptie direct op bij deze afspraak.
+                </div>
+                <div class="modal-workspace-actions">
+                    <button class="modal-btn subtle magnetic" id="voiceStartBtn" type="button">Start spraakopname</button>
+                    <button class="modal-btn subtle magnetic" id="voiceStopBtn" type="button" disabled>Stop opname</button>
+                    <button class="modal-btn subtle magnetic" id="voiceClearBtn" type="button">Wis transcriptie</button>
+                    <button class="modal-btn subtle magnetic" id="workspaceGeneratePromptBtn" type="button">Zet transcriptie om naar exacte prompt</button>
+                </div>
+                <div class="modal-workspace-status" id="workspaceVoiceStatus"></div>
+                <div class="modal-workspace-grid">
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Spraaktranscriptie (exact)</div>
+                        <textarea id="workspaceTranscript" placeholder="Vertel hier via microfoon exact wat de klant wil."></textarea>
+                    </div>
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Prompt voor website-AI</div>
+                        <textarea id="workspacePrompt" placeholder="Klik op 'Zet transcriptie om naar exacte prompt'."></textarea>
+                    </div>
+                </div>
+                <div class="modal-workspace-status" id="workspaceSaveStatus"></div>
+            </div>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn primary magnetic" onclick="closeModal()" type="button">Opvolgen</button>
-            <button class="modal-btn secondary magnetic" onclick="closeModal()" type="button">Sluiten</button>
+            <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Plaatsgevonden en klant wil door</button>
+            <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
         </div>
     </div>
 </div>
@@ -527,6 +625,28 @@
     const today = new Date();
 
     const monthNames = ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'];
+    const modalElement = document.getElementById('modal');
+    const modalOverviewElement = document.getElementById('modalOverview');
+    const modalWorkspaceElement = document.getElementById('modalWorkspace');
+    const modalPrimaryBtn = document.getElementById('modalPrimaryBtn');
+    const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
+    const workspaceTranscriptEl = document.getElementById('workspaceTranscript');
+    const workspacePromptEl = document.getElementById('workspacePrompt');
+    const workspaceVoiceStatusEl = document.getElementById('workspaceVoiceStatus');
+    const workspaceSaveStatusEl = document.getElementById('workspaceSaveStatus');
+    const workspaceGeneratePromptBtn = document.getElementById('workspaceGeneratePromptBtn');
+    const voiceStartBtn = document.getElementById('voiceStartBtn');
+    const voiceStopBtn = document.getElementById('voiceStopBtn');
+    const voiceClearBtn = document.getElementById('voiceClearBtn');
+
+    let activeAppointmentId = null;
+    let modalWorkspaceMode = false;
+    let speechRecognizer = null;
+    let speechListening = false;
+    let pendingSpeechFinalText = '';
+    let workspaceBusy = false;
+
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
     function appointmentFingerprint(apt) {
         return [apt.date || '', apt.time || '', apt.company || '', apt.phone || ''].join('|');
@@ -548,7 +668,229 @@
             branche: String(item.branche || 'Onbekend'),
             source: String(item.source || 'AI Cold Calling'),
             summary: String(item.summary || 'AI-samenvatting niet beschikbaar.'),
+            postCallStatus: String(item.postCallStatus || ''),
+            postCallNotesTranscript: String(item.postCallNotesTranscript || ''),
+            postCallPrompt: String(item.postCallPrompt || ''),
+            postCallUpdatedAt: String(item.postCallUpdatedAt || ''),
         };
+    }
+
+    function setWorkspaceStatus(message, variant = '') {
+        workspaceSaveStatusEl.textContent = message || '';
+        workspaceSaveStatusEl.className = `modal-workspace-status${variant ? ` ${variant}` : ''}`;
+    }
+
+    function setVoiceStatus(message, variant = '') {
+        workspaceVoiceStatusEl.textContent = message || '';
+        workspaceVoiceStatusEl.className = `modal-workspace-status${variant ? ` ${variant}` : ''}`;
+    }
+
+    function applyWorkspaceMode(enabled) {
+        modalWorkspaceMode = Boolean(enabled);
+        modalOverviewElement.classList.toggle('hide', modalWorkspaceMode);
+        modalWorkspaceElement.classList.toggle('show', modalWorkspaceMode);
+        modalPrimaryBtn.textContent = modalWorkspaceMode ? 'Opslaan' : 'Plaatsgevonden en klant wil door';
+        modalSecondaryBtn.textContent = modalWorkspaceMode ? 'Terug' : 'Sluiten';
+    }
+
+    function getActiveAppointment() {
+        return appointments.find((item) => Number(item.id) === Number(activeAppointmentId)) || null;
+    }
+
+    function fillWorkspaceFromAppointment(apt) {
+        workspaceTranscriptEl.value = String(apt?.postCallNotesTranscript || '');
+        workspacePromptEl.value = String(apt?.postCallPrompt || '');
+        const updatedAt = String(apt?.postCallUpdatedAt || '');
+        if (updatedAt) {
+            setWorkspaceStatus(`Laatst opgeslagen: ${new Date(updatedAt).toLocaleString('nl-NL')}`);
+        } else {
+            setWorkspaceStatus('');
+        }
+        setVoiceStatus('');
+    }
+
+    function updateAppointmentPostCallFields(update) {
+        const appointmentId = Number(update?.id || activeAppointmentId || 0);
+        const idx = appointments.findIndex((item) => Number(item.id) === appointmentId);
+        if (idx < 0) return;
+        appointments[idx] = {
+            ...appointments[idx],
+            postCallStatus: String(update?.postCallStatus || appointments[idx].postCallStatus || ''),
+            postCallNotesTranscript: String(update?.postCallNotesTranscript || ''),
+            postCallPrompt: String(update?.postCallPrompt || ''),
+            postCallUpdatedAt: String(update?.postCallUpdatedAt || ''),
+        };
+    }
+
+    async function postJsonWithFallback(urls, body) {
+        let lastError = null;
+        const endpointList = Array.isArray(urls) ? urls : [urls];
+        for (const url of endpointList) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body || {}),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data?.ok) {
+                    const err = new Error(String(data?.error || data?.detail || `Request mislukt (${response.status})`));
+                    err.status = response.status;
+                    throw err;
+                }
+                return data;
+            } catch (error) {
+                lastError = error;
+            }
+        }
+        throw lastError || new Error('Request mislukt.');
+    }
+
+    function getSpeechRecognizer() {
+        if (!SpeechRecognitionCtor) return null;
+        if (speechRecognizer) return speechRecognizer;
+
+        speechRecognizer = new SpeechRecognitionCtor();
+        speechRecognizer.lang = 'nl-NL';
+        speechRecognizer.continuous = true;
+        speechRecognizer.interimResults = true;
+
+        speechRecognizer.onresult = (event) => {
+            let interim = '';
+            let finalText = '';
+            for (let i = event.resultIndex; i < event.results.length; i += 1) {
+                const transcript = String(event.results[i]?.[0]?.transcript || '').trim();
+                if (!transcript) continue;
+                if (event.results[i].isFinal) finalText += `${transcript}\n`;
+                else interim += `${transcript} `;
+            }
+            if (finalText) {
+                pendingSpeechFinalText += finalText;
+                workspaceTranscriptEl.value = `${workspaceTranscriptEl.value || ''}${workspaceTranscriptEl.value ? '\n' : ''}${finalText.trim()}`.trim();
+                setVoiceStatus('Spraak verwerkt.', 'success');
+            }
+            if (interim.trim()) {
+                setVoiceStatus(`Luistert: ${interim.trim()}`);
+            }
+        };
+
+        speechRecognizer.onerror = (event) => {
+            speechListening = false;
+            voiceStartBtn.disabled = false;
+            voiceStopBtn.disabled = true;
+            setVoiceStatus(`Spraakopname fout: ${String(event?.error || 'onbekend')}`, 'error');
+        };
+
+        speechRecognizer.onend = () => {
+            speechListening = false;
+            voiceStartBtn.disabled = false;
+            voiceStopBtn.disabled = true;
+            if (!workspaceVoiceStatusEl.textContent) {
+                setVoiceStatus('Spraakopname gestopt.');
+            }
+        };
+
+        return speechRecognizer;
+    }
+
+    function startVoiceRecording() {
+        const recognizer = getSpeechRecognizer();
+        if (!recognizer) {
+            setVoiceStatus('Deze browser ondersteunt geen spraak-naar-tekst.', 'error');
+            return;
+        }
+        if (speechListening) return;
+        pendingSpeechFinalText = '';
+        try {
+            recognizer.start();
+            speechListening = true;
+            voiceStartBtn.disabled = true;
+            voiceStopBtn.disabled = false;
+            setVoiceStatus('Luistert... spreek nu in.');
+        } catch (error) {
+            setVoiceStatus(`Spraakopname kon niet starten: ${String(error?.message || error)}`, 'error');
+        }
+    }
+
+    function stopVoiceRecording() {
+        if (!speechRecognizer || !speechListening) return;
+        try {
+            speechRecognizer.stop();
+        } catch (error) {
+            setVoiceStatus(`Spraakopname kon niet stoppen: ${String(error?.message || error)}`, 'error');
+        }
+    }
+
+    async function saveWorkspaceForActiveAppointment(options = {}) {
+        const apt = getActiveAppointment();
+        if (!apt) {
+            setWorkspaceStatus('Afspraak niet gevonden.', 'error');
+            return null;
+        }
+        if (workspaceBusy) return null;
+
+        workspaceBusy = true;
+        modalPrimaryBtn.disabled = true;
+        setWorkspaceStatus('Opslaan...', '');
+
+        try {
+            const payload = {
+                status: 'customer_wants_to_proceed',
+                transcript: String(workspaceTranscriptEl.value || '').trim(),
+                prompt: String(workspacePromptEl.value || '').trim(),
+                actor: 'premium-personeel-agenda',
+            };
+            const result = await postJsonWithFallback(
+                [
+                    `/api/agenda/appointments/${encodeURIComponent(String(apt.id))}/post-call`,
+                    `/api/agenda/appointment-post-call?appointmentId=${encodeURIComponent(String(apt.id))}`,
+                ],
+                payload
+            );
+            updateAppointmentPostCallFields(result?.appointment || payload);
+            const successMessage = options?.silent
+                ? 'Opgeslagen.'
+                : 'Klantwens + prompt opgeslagen bij deze afspraak.';
+            setWorkspaceStatus(successMessage, 'success');
+            return result;
+        } catch (error) {
+            setWorkspaceStatus(`Opslaan mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
+            return null;
+        } finally {
+            workspaceBusy = false;
+            modalPrimaryBtn.disabled = false;
+        }
+    }
+
+    async function generatePromptFromTranscript() {
+        const transcript = String(workspaceTranscriptEl.value || '').trim();
+        if (transcript.length < 10) {
+            setWorkspaceStatus('Voeg eerst transcriptie toe voordat je een prompt maakt.', 'error');
+            return;
+        }
+        if (workspaceBusy) return;
+
+        workspaceBusy = true;
+        workspaceGeneratePromptBtn.disabled = true;
+        setWorkspaceStatus('Prompt genereren...', '');
+
+        try {
+            const result = await postJsonWithFallback(
+                ['/api/ai/transcript-to-prompt', '/api/ai-transcript-to-prompt'],
+                {
+                    transcript,
+                    language: 'nl',
+                    appointmentId: activeAppointmentId,
+                }
+            );
+            workspacePromptEl.value = String(result?.prompt || '').trim();
+            setWorkspaceStatus('Prompt gegenereerd. Klik op Opslaan om te bewaren.', 'success');
+        } catch (error) {
+            setWorkspaceStatus(`Prompt genereren mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
+        } finally {
+            workspaceBusy = false;
+            workspaceGeneratePromptBtn.disabled = false;
+        }
     }
 
     async function loadServerAppointments() {
@@ -665,6 +1007,7 @@
     function openAppointment(id) {
         const apt = appointments.find((a) => a.id === id);
         if (!apt) return;
+        activeAppointmentId = apt.id;
 
         document.getElementById('modalBadge').textContent = 'Meeting';
         document.getElementById('modalBadge').className = 'modal-type-badge meeting';
@@ -675,13 +1018,43 @@
         document.getElementById('modalBranche').textContent = apt.branche;
         document.getElementById('modalSource').textContent = apt.source;
         document.getElementById('modalSummary').textContent = apt.summary;
+        fillWorkspaceFromAppointment(apt);
+        applyWorkspaceMode(false);
 
-        document.getElementById('modal').classList.add('show');
+        modalElement.classList.add('show');
     }
 
     function closeModal() {
-        document.getElementById('modal').classList.remove('show');
+        stopVoiceRecording();
+        modalElement.classList.remove('show');
     }
+
+    function handleModalPrimaryAction() {
+        if (!modalWorkspaceMode) {
+            applyWorkspaceMode(true);
+            return;
+        }
+        void saveWorkspaceForActiveAppointment();
+    }
+
+    function handleModalSecondaryAction() {
+        if (!modalWorkspaceMode) {
+            closeModal();
+            return;
+        }
+        stopVoiceRecording();
+        applyWorkspaceMode(false);
+    }
+
+    modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
+    modalSecondaryBtn.addEventListener('click', handleModalSecondaryAction);
+    workspaceGeneratePromptBtn.addEventListener('click', () => { void generatePromptFromTranscript(); });
+    voiceStartBtn.addEventListener('click', startVoiceRecording);
+    voiceStopBtn.addEventListener('click', stopVoiceRecording);
+    voiceClearBtn.addEventListener('click', () => {
+        workspaceTranscriptEl.value = '';
+        setVoiceStatus('Transcriptie gewist.');
+    });
 
     // Init
     renderCalendar();

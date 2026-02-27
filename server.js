@@ -1279,6 +1279,107 @@ async function generateTextSummaryWithAi(options = {}) {
   };
 }
 
+async function generateWebsitePromptFromTranscriptWithAi(options = {}) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) {
+    const err = new Error('OPENAI_API_KEY ontbreekt');
+    err.status = 503;
+    throw err;
+  }
+
+  const transcript = truncateText(normalizeString(options.transcript || options.text || ''), 20000);
+  if (!transcript) {
+    const err = new Error('Transcript ontbreekt');
+    err.status = 400;
+    throw err;
+  }
+
+  const language = normalizeString(options.language || 'nl') || 'nl';
+  const context = truncateText(normalizeString(options.context || ''), 2000);
+
+  const systemPrompt = [
+    'Je bent een senior digital strategist en prompt engineer.',
+    'Taak: zet een gesprekstranscript om naar EEN direct uitvoerbare prompt voor een AI die websites bouwt.',
+    'Belangrijk:',
+    '- Gebruik alleen feiten uit transcriptie/context, verzin niets.',
+    '- Als info ontbreekt, gebruik placeholders in vorm [VUL IN: ...].',
+    '- Output alleen de prompttekst, zonder markdown fences of extra uitleg.',
+    '- Schrijf in duidelijke professionele taal in de gevraagde taal.',
+  ].join('\n');
+
+  const userPrompt = [
+    `Taal: ${language}`,
+    '',
+    'Maak een complete prompt met deze secties en volgorde:',
+    '1) Rol en doel van de website-AI',
+    '2) Bedrijfscontext',
+    '3) Doelgroep(en)',
+    '4) Hoofddoel + conversiedoelen',
+    '5) Paginastructuur (navigatie + secties per pagina)',
+    '6) Copy-richting per sectie',
+    '7) Designrichting (stijl, kleur, typografie, tone-of-voice)',
+    '8) Functionaliteit (formulieren, CTA, contact, eventuele integraties)',
+    '9) SEO-basis (title, meta, headings, keywords, interne links)',
+    '10) Technische eisen (performance, mobile-first, toegankelijkheid)',
+    '11) Opleverchecklist',
+    '',
+    'Regels voor nauwkeurigheid:',
+    '- Gebruik concrete details uit de transcriptie waar beschikbaar.',
+    '- Houd placeholders zichtbaar voor alles wat ontbreekt.',
+    '- Schrijf zo dat de prompt direct in een AI website-builder geplakt kan worden.',
+    context ? `- Extra context: ${context}` : '',
+    '',
+    'Transcriptie bron:',
+    transcript,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const { response, data } = await fetchJsonWithTimeout(
+    `${OPENAI_API_BASE_URL}/chat/completions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.1,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+    },
+    30000
+  );
+
+  if (!response.ok) {
+    const err = new Error(`OpenAI prompt generatie mislukt (${response.status})`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+
+  const content = data?.choices?.[0]?.message?.content;
+  const prompt = normalizeString(extractOpenAiTextContent(content));
+  if (!prompt) {
+    const err = new Error('OpenAI gaf een lege prompt terug.');
+    err.status = 502;
+    err.data = data;
+    throw err;
+  }
+
+  return {
+    prompt: truncateText(prompt, 12000),
+    source: 'openai',
+    model: OPENAI_MODEL,
+    usage: data?.usage || null,
+    language,
+  };
+}
+
 function shouldAnalyzeCallUpdateWithAi(callUpdate) {
   if (!callUpdate || !getOpenAiApiKey()) return false;
 
@@ -1756,6 +1857,18 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
           normalizeString(existing?.confirmationTaskCreatedAt || '') ||
           normalizeString(existing?.createdAt || '') ||
           new Date().toISOString(),
+        postCallStatus:
+          normalizeString(existing?.postCallStatus || appointment?.postCallStatus || '') || null,
+        postCallNotesTranscript:
+          normalizeString(
+            existing?.postCallNotesTranscript || appointment?.postCallNotesTranscript || ''
+          ) || null,
+        postCallPrompt:
+          normalizeString(existing?.postCallPrompt || appointment?.postCallPrompt || '') || null,
+        postCallUpdatedAt:
+          normalizeString(existing?.postCallUpdatedAt || appointment?.postCallUpdatedAt || '') || null,
+        postCallUpdatedBy:
+          normalizeString(existing?.postCallUpdatedBy || appointment?.postCallUpdatedBy || '') || null,
       };
       if (!normalizeString(updated.confirmationEmailDraft || '')) {
         updated.confirmationEmailDraft = buildConfirmationEmailDraftFallback(updated, updated);
@@ -1791,6 +1904,11 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
     confirmationEmailLastError: null,
     confirmationEmailLastSentMessageId: null,
     confirmationTaskCreatedAt: createdAtIso,
+    postCallStatus: normalizeString(appointment?.postCallStatus || '') || null,
+    postCallNotesTranscript: normalizeString(appointment?.postCallNotesTranscript || '') || null,
+    postCallPrompt: normalizeString(appointment?.postCallPrompt || '') || null,
+    postCallUpdatedAt: normalizeString(appointment?.postCallUpdatedAt || '') || null,
+    postCallUpdatedBy: normalizeString(appointment?.postCallUpdatedBy || '') || null,
   };
   generatedAgendaAppointments.push(withId);
   agendaAppointmentIdByCallId.set(callId, withId.id);
@@ -3818,6 +3936,68 @@ app.post('/api/ai/summarize', async (req, res) => {
   }
 });
 
+async function sendAiTranscriptToPromptResponse(req, res) {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const transcript = normalizeString(body.transcript || body.text || '');
+    const language = normalizeString(body.language || 'nl') || 'nl';
+    const context = normalizeString(body.context || '');
+
+    if (!transcript) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Transcript ontbreekt',
+        detail: 'Stuur een JSON body met { transcript: "..." }',
+      });
+    }
+
+    if (transcript.length > 50000) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Transcript te lang',
+        detail: 'Maximaal 50.000 tekens per request.',
+      });
+    }
+
+    const result = await generateWebsitePromptFromTranscriptWithAi({
+      transcript,
+      language,
+      context,
+    });
+
+    return res.status(200).json({
+      ok: true,
+      prompt: result.prompt,
+      source: result.source,
+      model: result.model,
+      usage: result.usage,
+      language: result.language,
+      openAiEnabled: true,
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    const safeStatus = status >= 400 && status < 600 ? status : 500;
+    return res.status(safeStatus).json({
+      ok: false,
+      error:
+        safeStatus === 503
+          ? 'AI prompt generatie niet beschikbaar'
+          : 'AI prompt generatie mislukt',
+      detail: String(error?.message || 'Onbekende fout'),
+      openAiEnabled: Boolean(getOpenAiApiKey()),
+    });
+  }
+}
+
+app.post('/api/ai/transcript-to-prompt', async (req, res) => {
+  return sendAiTranscriptToPromptResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ai-transcript-to-prompt', async (req, res) => {
+  return sendAiTranscriptToPromptResponse(req, res);
+});
+
 app.get('/api/dashboard/activity', (req, res) => {
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
   return res.status(200).json({
@@ -3914,6 +4094,90 @@ app.get('/api/agenda/appointments', async (req, res) => {
     count: Math.min(limit, sorted.length),
     appointments: sorted.slice(0, limit),
   });
+});
+
+function normalizePostCallStatus(value) {
+  const raw = normalizeString(value).toLowerCase();
+  if (!raw) return 'customer_wants_to_proceed';
+  if (raw === 'customer_wants_to_proceed') return raw;
+  if (raw === 'klant_wil_door') return 'customer_wants_to_proceed';
+  return truncateText(raw, 80);
+}
+
+function sanitizePostCallText(value, maxLen = 20000) {
+  return truncateText(normalizeString(value || ''), maxLen);
+}
+
+function buildPostCallPayload(body = {}) {
+  return {
+    postCallStatus: normalizePostCallStatus(body.status || body.postCallStatus),
+    postCallNotesTranscript: sanitizePostCallText(
+      body.transcript || body.postCallNotesTranscript || body.voiceTranscript,
+      25000
+    ),
+    postCallPrompt: sanitizePostCallText(
+      body.prompt || body.postCallPrompt || body.generatedPrompt,
+      25000
+    ),
+    postCallUpdatedBy: truncateText(normalizeString(body.actor || body.doneBy || ''), 120),
+  };
+}
+
+function updateAgendaAppointmentPostCallDataById(req, res, appointmentIdRaw) {
+  const idx = getGeneratedAppointmentIndexById(appointmentIdRaw);
+  if (idx < 0) {
+    return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden' });
+  }
+
+  const appointment = generatedAgendaAppointments[idx];
+  const payload = buildPostCallPayload(req.body || {});
+  const nowIso = new Date().toISOString();
+  const updated = setGeneratedAgendaAppointmentAtIndex(
+    idx,
+    {
+      ...appointment,
+      postCallStatus: payload.postCallStatus || normalizePostCallStatus(appointment?.postCallStatus),
+      postCallNotesTranscript:
+        payload.postCallNotesTranscript ||
+        sanitizePostCallText(appointment?.postCallNotesTranscript || '', 25000),
+      postCallPrompt: payload.postCallPrompt || sanitizePostCallText(appointment?.postCallPrompt || '', 25000),
+      postCallUpdatedAt: nowIso,
+      postCallUpdatedBy: payload.postCallUpdatedBy || null,
+    },
+    'agenda_post_call_update'
+  );
+
+  if (!updated) {
+    return res.status(500).json({ ok: false, error: 'Kon afspraak niet opslaan' });
+  }
+
+  appendDashboardActivity(
+    {
+      type: 'post_call_notes_saved',
+      title: 'Klantwens opgeslagen',
+      detail: 'Na-afspraak transcriptie/prompt bijgewerkt.',
+      company: updated?.company || appointment?.company || '',
+      actor: payload.postCallUpdatedBy || '',
+      taskId: Number(updated?.id || appointment?.id || 0) || null,
+      callId: normalizeString(updated?.callId || appointment?.callId || ''),
+      source: 'premium-personeel-agenda',
+    },
+    'dashboard_activity_post_call_saved'
+  );
+
+  return res.status(200).json({
+    ok: true,
+    appointment: updated,
+  });
+}
+
+app.post('/api/agenda/appointments/:id/post-call', (req, res) => {
+  return updateAgendaAppointmentPostCallDataById(req, res, req.params.id);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/agenda/appointment-post-call', (req, res) => {
+  return updateAgendaAppointmentPostCallDataById(req, res, req.query.appointmentId);
 });
 
 app.get('/api/agenda/confirmation-tasks', async (req, res) => {
