@@ -76,6 +76,10 @@ const MAIL_IMAP_PASS = String(
   process.env.MAIL_IMAP_PASS || process.env.IMAP_PASS || process.env.STRATO_IMAP_PASS || MAIL_SMTP_PASS || ''
 ).trim();
 const MAIL_IMAP_MAILBOX = String(process.env.MAIL_IMAP_MAILBOX || process.env.IMAP_MAILBOX || 'INBOX').trim() || 'INBOX';
+const MAIL_IMAP_EXTRA_MAILBOXES = String(process.env.MAIL_IMAP_MAILBOXES || '')
+  .split(',')
+  .map((value) => String(value || '').trim())
+  .filter(Boolean);
 const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
   5_000,
   Math.min(300_000, Number(process.env.MAIL_IMAP_POLL_COOLDOWN_MS || 20_000) || 20_000)
@@ -2270,6 +2274,20 @@ function isImapMailConfigured() {
   );
 }
 
+function getImapMailboxesForSync() {
+  const defaults = ['INBOX', 'Spam', 'Junk', 'INBOX.Spam', 'INBOX.Junk'];
+  const combined = [MAIL_IMAP_MAILBOX, ...MAIL_IMAP_EXTRA_MAILBOXES, ...defaults].filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  for (const mailbox of combined) {
+    const key = String(mailbox || '').trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(String(mailbox || '').trim());
+  }
+  return out;
+}
+
 function normalizeMessageIdToken(value) {
   return normalizeString(String(value || '').trim()).replace(/[<>]/g, '').toLowerCase();
 }
@@ -2530,6 +2548,7 @@ async function syncInboundConfirmationEmailsFromImap(options = {}) {
       ok: true,
       startedAt: new Date().toISOString(),
       mailbox: MAIL_IMAP_MAILBOX,
+      mailboxes: getImapMailboxesForSync(),
       unseenFound: 0,
       scanned: 0,
       matched: 0,
@@ -2551,85 +2570,97 @@ async function syncInboundConfirmationEmailsFromImap(options = {}) {
       logger: false,
     });
 
-    let lock = null;
     try {
       await client.connect();
-      lock = await client.getMailboxLock(MAIL_IMAP_MAILBOX);
-      const unseenUids = await client.search(['UNSEEN']);
-      const allUids = await client.search(['ALL']);
-      stats.unseenFound = Array.isArray(unseenUids) ? unseenUids.length : 0;
+      const mailboxList = getImapMailboxesForSync();
+      for (const mailboxName of mailboxList) {
+        let lock = null;
+        try {
+          lock = await client.getMailboxLock(mailboxName);
+          const unseenUids = await client.search(['UNSEEN']);
+          const allUids = await client.search(['ALL']);
+          stats.unseenFound += Array.isArray(unseenUids) ? unseenUids.length : 0;
 
-      const selectedUidSet = new Set();
-      if (Array.isArray(allUids) && allUids.length) {
-        allUids.slice(-maxMessages).forEach((uid) => selectedUidSet.add(uid));
-      }
-      if (Array.isArray(unseenUids) && unseenUids.length) {
-        unseenUids.slice(-maxMessages).forEach((uid) => selectedUidSet.add(uid));
-      }
-      const selectedUids = Array.from(selectedUidSet).sort((a, b) => a - b);
+          const selectedUidSet = new Set();
+          if (Array.isArray(allUids) && allUids.length) {
+            allUids.slice(-maxMessages).forEach((uid) => selectedUidSet.add(uid));
+          }
+          if (Array.isArray(unseenUids) && unseenUids.length) {
+            unseenUids.slice(-maxMessages).forEach((uid) => selectedUidSet.add(uid));
+          }
+          const selectedUids = Array.from(selectedUidSet).sort((a, b) => a - b);
+          const uidsToMarkSeen = [];
 
-      const uidsToMarkSeen = [];
-      if (selectedUids.length) {
-        for await (const message of client.fetch(
-          selectedUids,
-          {
-            uid: true,
-            source: true,
-            envelope: true,
-            internalDate: true,
-            flags: true,
-          },
-          { uid: true }
-        )) {
-          stats.scanned += 1;
-          let parsedMail = null;
+          if (selectedUids.length) {
+            for await (const message of client.fetch(
+              selectedUids,
+              {
+                uid: true,
+                source: true,
+                envelope: true,
+                internalDate: true,
+                flags: true,
+              },
+              { uid: true }
+            )) {
+              stats.scanned += 1;
+              let parsedMail = null;
+              try {
+                parsedMail = await simpleParser(message.source);
+              } catch (error) {
+                stats.errors.push(
+                  `Parse error mailbox=${mailboxName} uid=${message.uid}: ${truncateText(error?.message || String(error), 120)}`
+                );
+                continue;
+              }
+
+              const idx = findAppointmentIndexForInboundConfirmationMail(parsedMail);
+              if (idx < 0) {
+                stats.ignored += 1;
+                continue;
+              }
+
+              stats.matched += 1;
+              const decision = detectInboundConfirmationDecision(parsedMail);
+              const from = getParsedMailFromEmail(parsedMail);
+              const result = applyInboundMailDecisionToAppointment(idx, decision.decision, {
+                fromEmail: from.address,
+                subject: normalizeString(parsedMail?.subject || ''),
+                bodyText: decision.bodyText,
+              });
+
+              if (result.changed && result.status === 'confirmed') stats.confirmed += 1;
+              if (result.changed && result.status === 'cancelled') stats.cancelled += 1;
+
+              const flagsSet = message.flags instanceof Set
+                ? message.flags
+                : new Set(Array.isArray(message.flags) ? message.flags : []);
+              const alreadySeen = flagsSet.has('\\Seen');
+              if (!alreadySeen) {
+                // Markeer alleen ongelezen matched replies als gelezen.
+                uidsToMarkSeen.push(message.uid);
+              }
+            }
+          }
+
+          if (uidsToMarkSeen.length) {
+            await client.messageFlagsAdd(uidsToMarkSeen, ['\\Seen'], { uid: true });
+            stats.markedSeen += uidsToMarkSeen.length;
+          }
+        } catch (error) {
+          stats.errors.push(
+            `Mailbox ${mailboxName}: ${truncateText(error?.message || String(error), 180)}`
+          );
+        } finally {
           try {
-            parsedMail = await simpleParser(message.source);
-          } catch (error) {
-            stats.errors.push(`Parse error uid=${message.uid}: ${truncateText(error?.message || String(error), 120)}`);
-            continue;
-          }
-
-          const idx = findAppointmentIndexForInboundConfirmationMail(parsedMail);
-          if (idx < 0) {
-            stats.ignored += 1;
-            continue;
-          }
-
-          stats.matched += 1;
-          const decision = detectInboundConfirmationDecision(parsedMail);
-          const from = getParsedMailFromEmail(parsedMail);
-          const result = applyInboundMailDecisionToAppointment(idx, decision.decision, {
-            fromEmail: from.address,
-            subject: normalizeString(parsedMail?.subject || ''),
-            bodyText: decision.bodyText,
-          });
-
-          if (result.changed && result.status === 'confirmed') stats.confirmed += 1;
-          if (result.changed && result.status === 'cancelled') stats.cancelled += 1;
-
-          const flagsSet = message.flags instanceof Set
-            ? message.flags
-            : new Set(Array.isArray(message.flags) ? message.flags : []);
-          const alreadySeen = flagsSet.has('\\Seen');
-          if (!alreadySeen) {
-            // Markeer alleen ongelezen matched replies als gelezen.
-            uidsToMarkSeen.push(message.uid);
-          }
+            if (lock) lock.release();
+          } catch (_) {}
         }
-      }
-
-      if (uidsToMarkSeen.length) {
-        await client.messageFlagsAdd(uidsToMarkSeen, ['\\Seen'], { uid: true });
-        stats.markedSeen = uidsToMarkSeen.length;
       }
     } catch (error) {
       stats.ok = false;
       stats.error = truncateText(error?.message || String(error), 500);
     } finally {
-      try {
-        if (lock) lock.release();
-      } catch (_) {}
       try {
         if (client.usable) await client.logout();
       } catch (_) {}
