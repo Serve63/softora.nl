@@ -4090,8 +4090,8 @@ app.get('/api/dashboard/activity', (req, res) => {
   });
 });
 
-app.get('/api/ui-state/:scope', async (req, res) => {
-  const scope = normalizeUiStateScope(req.params.scope);
+async function sendUiStateGetResponse(req, res, scopeRaw) {
+  const scope = normalizeUiStateScope(scopeRaw);
   if (!scope) {
     return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
   }
@@ -4108,10 +4108,19 @@ app.get('/api/ui-state/:scope', async (req, res) => {
     source: state.source || 'memory',
     updatedAt: state.updatedAt || null,
   });
+}
+
+app.get('/api/ui-state/:scope', async (req, res) => {
+  return sendUiStateGetResponse(req, res, req.params.scope);
 });
 
-app.post('/api/ui-state/:scope', async (req, res) => {
-  const scope = normalizeUiStateScope(req.params.scope);
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.get('/api/ui-state-get', async (req, res) => {
+  return sendUiStateGetResponse(req, res, req.query.scope);
+});
+
+async function sendUiStateSetResponse(req, res, scopeRaw) {
+  const scope = normalizeUiStateScope(scopeRaw);
   if (!scope) {
     return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
   }
@@ -4142,6 +4151,15 @@ app.post('/api/ui-state/:scope', async (req, res) => {
     values: state.values || {},
     source: state.source || 'memory',
   });
+}
+
+app.post('/api/ui-state/:scope', async (req, res) => {
+  return sendUiStateSetResponse(req, res, req.params.scope);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ui-state-set', async (req, res) => {
+  return sendUiStateSetResponse(req, res, req.query.scope);
 });
 
 app.post('/api/dashboard/activity', (req, res) => {

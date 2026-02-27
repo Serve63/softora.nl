@@ -1356,18 +1356,67 @@
             return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
+        async function fetchUiStateGetWithFallback(scope) {
+            const encodedScope = encodeURIComponent(String(scope || ''));
+            const urls = [
+                `/api/ui-state-get?scope=${encodedScope}`,
+                `/api/ui-state/${encodedScope}`
+            ];
+            let lastError = null;
+
+            for (const url of urls) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'GET',
+                        cache: 'no-store'
+                    });
+                    if (!res.ok) {
+                        throw new Error(`UI-state GET mislukt (${res.status})`);
+                    }
+                    return await res.json().catch(() => ({}));
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error('UI-state GET mislukt');
+        }
+
+        async function fetchUiStateSetWithFallback(scope, body) {
+            const encodedScope = encodeURIComponent(String(scope || ''));
+            const urls = [
+                `/api/ui-state-set?scope=${encodedScope}`,
+                `/api/ui-state/${encodedScope}`
+            ];
+            let lastError = null;
+
+            for (const url of urls) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body || {})
+                    });
+                    if (!res.ok) {
+                        throw new Error(`UI-state POST mislukt (${res.status})`);
+                    }
+                    return await res.json().catch(() => ({}));
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error('UI-state POST mislukt');
+        }
+
         async function loadRemoteUiState() {
             if (remoteUiStateLoaded) return true;
             if (remoteUiStateLoadPromise) return remoteUiStateLoadPromise;
 
             remoteUiStateLoadPromise = (async () => {
                 try {
-                    const res = await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
-                        method: 'GET',
-                        cache: 'no-store'
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (res.ok && data?.ok && data.values && typeof data.values === 'object') {
+                    const data = await fetchUiStateGetWithFallback(REMOTE_UI_STATE_SCOPE);
+                    if (data?.ok && data.values && typeof data.values === 'object') {
                         const next = {};
                         Object.entries(data.values).forEach(([k, v]) => {
                             next[String(k)] = String(v ?? '');
@@ -1408,14 +1457,10 @@
             remoteUiStatePendingPatch = {};
             remoteUiStateSaveInFlight = true;
             try {
-                await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        patch,
-                        source: 'premium-actieve-opdrachten',
-                        actor: 'browser'
-                    })
+                await fetchUiStateSetWithFallback(REMOTE_UI_STATE_SCOPE, {
+                    patch,
+                    source: 'premium-actieve-opdrachten',
+                    actor: 'browser'
                 });
             } catch (_) {
                 keys.forEach((key) => {
