@@ -2246,7 +2246,7 @@ async function sendConfirmationEmailViaSmtp({ appointment, recipientEmail, draft
   const info = await transporter.sendMail({
     from: formatMailFromHeader(),
     to: toEmail,
-    replyTo: MAIL_REPLY_TO || undefined,
+    replyTo: MAIL_REPLY_TO || MAIL_IMAP_USER || MAIL_FROM_ADDRESS || undefined,
     subject,
     text,
   });
