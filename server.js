@@ -2501,7 +2501,7 @@ function applyInboundMailDecisionToAppointment(idx, decision, metadata = {}) {
 
 async function syncInboundConfirmationEmailsFromImap(options = {}) {
   const force = Boolean(options?.force);
-  const maxMessages = Math.max(1, Math.min(50, Number(options?.maxMessages || 20) || 20));
+  const maxMessages = Math.max(10, Math.min(400, Number(options?.maxMessages || 120) || 120));
 
   if (!isImapMailConfigured()) {
     return {
@@ -2556,8 +2556,17 @@ async function syncInboundConfirmationEmailsFromImap(options = {}) {
       await client.connect();
       lock = await client.getMailboxLock(MAIL_IMAP_MAILBOX);
       const unseenUids = await client.search(['UNSEEN']);
-      const selectedUids = Array.isArray(unseenUids) ? unseenUids.slice(-maxMessages) : [];
+      const allUids = await client.search(['ALL']);
       stats.unseenFound = Array.isArray(unseenUids) ? unseenUids.length : 0;
+
+      const selectedUidSet = new Set();
+      if (Array.isArray(allUids) && allUids.length) {
+        allUids.slice(-maxMessages).forEach((uid) => selectedUidSet.add(uid));
+      }
+      if (Array.isArray(unseenUids) && unseenUids.length) {
+        unseenUids.slice(-maxMessages).forEach((uid) => selectedUidSet.add(uid));
+      }
+      const selectedUids = Array.from(selectedUidSet).sort((a, b) => a - b);
 
       const uidsToMarkSeen = [];
       if (selectedUids.length) {
@@ -2599,8 +2608,14 @@ async function syncInboundConfirmationEmailsFromImap(options = {}) {
           if (result.changed && result.status === 'confirmed') stats.confirmed += 1;
           if (result.changed && result.status === 'cancelled') stats.cancelled += 1;
 
-          // Behandel matched confirmation replies als "verwerkt" om eindeloze retry's te voorkomen.
-          uidsToMarkSeen.push(message.uid);
+          const flagsSet = message.flags instanceof Set
+            ? message.flags
+            : new Set(Array.isArray(message.flags) ? message.flags : []);
+          const alreadySeen = flagsSet.has('\\Seen');
+          if (!alreadySeen) {
+            // Markeer alleen ongelezen matched replies als gelezen.
+            uidsToMarkSeen.push(message.uid);
+          }
         }
       }
 
