@@ -507,6 +507,24 @@
             vertical-align: top;
         }
 
+        .order-api-cost {
+            margin-top: 0.45rem;
+            font-size: 0.73rem;
+            color: var(--text-tertiary);
+            font-weight: 400;
+            line-height: 1.35;
+        }
+
+        .order-api-cost .label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-tertiary);
+            margin-right: 0.35rem;
+        }
+
         .order-status { min-width: 110px; text-align: center; }
 
         .status-tag {
@@ -574,7 +592,6 @@
         .execute-btn.done {
             background: rgba(255,255,255,0.03);
             color: var(--text-tertiary);
-            pointer-events: none;
         }
 
         .view-btn {
@@ -1140,6 +1157,7 @@
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
                             <div class="order-price-value"><span class="currency">€</span>2.800</div>
+                            <div class="order-api-cost" id="api-cost-1"><span class="label">API kosten</span><span class="value">Nog niet berekend</span></div>
                         </div>
                         <div class="order-status"><span class="status-tag wacht" id="status-1">Wachtend</span></div>
                         <div class="order-actions">
@@ -1172,6 +1190,7 @@
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
                             <div class="order-price-value"><span class="currency">€</span>3.500</div>
+                            <div class="order-api-cost" id="api-cost-2"><span class="label">API kosten</span><span class="value">Nog niet berekend</span></div>
                         </div>
                         <div class="order-status"><span class="status-tag wacht" id="status-2">Wachtend</span></div>
                         <div class="order-actions">
@@ -1204,6 +1223,7 @@
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
                             <div class="order-price-value"><span class="currency">€</span>4.200</div>
+                            <div class="order-api-cost" id="api-cost-3"><span class="label">API kosten</span><span class="value">Nog niet berekend</span></div>
                         </div>
                         <div class="order-status"><span class="status-tag actief" id="status-3">Actief</span></div>
                         <div class="order-actions">
@@ -1236,6 +1256,7 @@
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
                             <div class="order-price-value"><span class="currency">€</span>5.500</div>
+                            <div class="order-api-cost" id="api-cost-4"><span class="label">API kosten</span><span class="value">Nog niet berekend</span></div>
                         </div>
                         <div class="order-status"><span class="status-tag wacht" id="status-4">Wachtend</span></div>
                         <div class="order-actions">
@@ -1268,6 +1289,7 @@
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
                             <div class="order-price-value"><span class="currency">€</span>22.200</div>
+                            <div class="order-api-cost" id="api-cost-5"><span class="label">API kosten</span><span class="value">Nog niet berekend</span></div>
                         </div>
                         <div class="order-status"><span class="status-tag wacht" id="status-5">Wachtend</span></div>
                         <div class="order-actions">
@@ -1581,6 +1603,44 @@
             return '€' + n.toLocaleString('nl-NL');
         }
 
+        function formatApiCostLabel(record) {
+            const amount = Number(record?.apiCostEur);
+            if (!Number.isFinite(amount) || amount < 0) return 'Nog niet berekend';
+            return '€' + amount.toLocaleString('nl-NL', {
+                minimumFractionDigits: 3,
+                maximumFractionDigits: 3
+            });
+        }
+
+        function getCustomOrderIndexById(id) {
+            const numericId = Number(id);
+            if (!Number.isFinite(numericId) || numericId <= 0) return -1;
+            return customOrders.findIndex((item) => Number(item?.id) === numericId);
+        }
+
+        function getCustomOrderById(id) {
+            const idx = getCustomOrderIndexById(id);
+            return idx >= 0 ? customOrders[idx] : null;
+        }
+
+        function updateCustomOrderById(id, patch = {}) {
+            const idx = getCustomOrderIndexById(id);
+            if (idx < 0) return null;
+            customOrders[idx] = {
+                ...customOrders[idx],
+                ...patch
+            };
+            persistCustomOrders();
+            return customOrders[idx];
+        }
+
+        function updateApiCostLabel(id, record) {
+            const el = document.getElementById(`api-cost-${id}`);
+            if (!el) return;
+            const text = formatApiCostLabel(record);
+            el.innerHTML = `<span class="label">API kosten</span><span class="value">${escapeHtml(text)}</span>`;
+        }
+
         function renderOrdersEmptyState() {
             const grid = document.getElementById('ordersGrid');
             if (!grid) return;
@@ -1677,6 +1737,16 @@
                         const location = String(item?.location || '').trim();
                         const title = String(item?.title || '').trim();
                         const description = String(item?.description || '').trim();
+                        const prompt = String(item?.prompt || '').trim();
+                        const transcript = String(item?.transcript || '').trim();
+                        const apiCostEur = Number(item?.apiCostEur);
+                        const apiCostUsd = Number(item?.apiCostUsd);
+                        const apiTokensInput = Number(item?.apiTokensInput);
+                        const apiTokensOutput = Number(item?.apiTokensOutput);
+                        const apiModel = String(item?.apiModel || '').trim();
+                        const lastRunAt = String(item?.lastRunAt || '').trim();
+                        const sourceAppointmentId = Number(item?.sourceAppointmentId);
+                        const sourceCallId = String(item?.sourceCallId || '').trim();
                         if (!Number.isFinite(id) || id <= 0) return null;
                         if (!clientName || !title || !description) return null;
                         if (!Number.isFinite(amount) || amount <= 0) return null;
@@ -1688,7 +1758,17 @@
                             title,
                             description,
                             amount: Math.round(amount),
-                            status: normalizeOrderStatus(item?.status).key
+                            status: normalizeOrderStatus(item?.status).key,
+                            prompt,
+                            transcript,
+                            apiCostEur: Number.isFinite(apiCostEur) && apiCostEur >= 0 ? apiCostEur : null,
+                            apiCostUsd: Number.isFinite(apiCostUsd) && apiCostUsd >= 0 ? apiCostUsd : null,
+                            apiTokensInput: Number.isFinite(apiTokensInput) && apiTokensInput >= 0 ? apiTokensInput : null,
+                            apiTokensOutput: Number.isFinite(apiTokensOutput) && apiTokensOutput >= 0 ? apiTokensOutput : null,
+                            apiModel,
+                            lastRunAt: lastRunAt || null,
+                            sourceAppointmentId: Number.isFinite(sourceAppointmentId) && sourceAppointmentId > 0 ? sourceAppointmentId : null,
+                            sourceCallId: sourceCallId || null
                         };
                     })
                     .filter(Boolean);
@@ -1784,8 +1864,13 @@
             if (viewBtnEl && pct > 0) {
                 viewBtnEl.classList.add('show');
                 if (pct >= 100) {
-                    viewBtnEl.textContent = 'Open preview';
-                    viewBtnEl.onclick = () => openPreview(id);
+                    if (hasGeneratedPreviewHtml(id)) {
+                        viewBtnEl.textContent = 'Open preview';
+                        viewBtnEl.onclick = () => openPreview(id);
+                    } else {
+                        viewBtnEl.textContent = 'Bekijk Voortgang';
+                        viewBtnEl.onclick = () => openModal(id);
+                    }
                 } else {
                     viewBtnEl.textContent = 'Bekijk Voortgang';
                     viewBtnEl.onclick = () => openModal(id);
@@ -1795,7 +1880,8 @@
                 if (pct >= 100) {
                     btnEl.classList.remove('running');
                     btnEl.classList.add('done');
-                    btnEl.innerHTML = '✓ Opgeleverd';
+                    btnEl.disabled = false;
+                    btnEl.innerHTML = '↻ Opnieuw runnen';
                 }
             }
         }
@@ -1833,6 +1919,7 @@
             const status = normalizeOrderStatus(record.status);
             const clientLine = [record.clientName, record.location].filter(Boolean).join(' — ');
             const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
+            const apiCostText = formatApiCostLabel(record);
 
             return `
                 <div class="order-card" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
@@ -1845,6 +1932,7 @@
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
                             <div class="order-price-value"><span class="currency">€</span>${amountText}</div>
+                            <div class="order-api-cost" id="api-cost-${id}"><span class="label">API kosten</span><span class="value">${escapeHtml(apiCostText)}</span></div>
                         </div>
                         <div class="order-status"><span class="status-tag ${status.className}" id="status-${id}">${status.text}</span></div>
                         <div class="order-actions">
@@ -1928,6 +2016,7 @@
 
             grid.appendChild(card);
             bindDynamicOrderCard(card);
+            updateApiCostLabel(id, record);
             refreshOrderSummaryCards();
 
             if (options.scrollIntoView) {
@@ -2004,7 +2093,15 @@
                 title,
                 description,
                 amount,
-                status
+                status,
+                prompt: '',
+                transcript: '',
+                apiCostEur: null,
+                apiCostUsd: null,
+                apiTokensInput: null,
+                apiTokensOutput: null,
+                apiModel: '',
+                lastRunAt: null
             };
 
             customOrders.push(record);
@@ -2047,104 +2144,281 @@
             const first = Object.keys(orders).map(Number).sort((a, b) => a - b)[0];
             return first || 1;
         }
-        function resolvePreviewUrl(meta) {
-            const text = (String(meta?.title || '') + ' ' + String(meta?.description || '')).toLowerCase();
-            const isSoftware = /(software|platform|database|saas|api|webapp|applicatie|dashboard)/.test(text);
-            return isSoftware ? '/maatwerk-platform' : '/premium-website';
+        function sleep(ms) {
+            return new Promise((resolve) => setTimeout(resolve, Number(ms) || 0));
+        }
+
+        function getPreviewStorageKey(orderId) {
+            return PREVIEW_HTML_PREFIX + String(orderId);
+        }
+
+        function saveGeneratedPreviewHtml(orderId, html) {
+            const key = getPreviewStorageKey(orderId);
+            const content = String(html || '');
+            try {
+                localStorage.setItem(key, content);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function hasGeneratedPreviewHtml(orderId) {
+            const key = getPreviewStorageKey(orderId);
+            try {
+                return Boolean(localStorage.getItem(key));
+            } catch (_) {
+                return false;
+            }
         }
 
         function openPreview(id) {
             const activeId = selectActiveOrderId(id);
-            const order = orders[activeId];
-            const meta = getOrderMeta(activeId) || {
-                id: String(activeId),
-                clientName: order?.name || 'Bedrijf',
-                title: order?.type || 'Project',
-                description: ''
-            };
-
-            const w = window.open(resolvePreviewUrl(meta), '_blank');
+            const w = window.open(`/premium-opdracht-preview?id=${encodeURIComponent(String(activeId))}`, '_blank');
             if (!w) {
                 alert('Pop-up geblokkeerd. Sta pop-ups toe om de preview te openen.');
             }
         }
 
-        function executeOrder(id) {
+        function buildFallbackSitePrompt(meta, customOrder) {
+            const company = String(meta?.clientName || customOrder?.clientName || 'bedrijf').trim();
+            const title = String(meta?.title || customOrder?.title || 'website').trim();
+            const description = String(meta?.description || customOrder?.description || '').trim();
+            return [
+                `Bouw een complete professionele HTML website voor ${company}.`,
+                `Projecttitel: ${title}.`,
+                description ? `Context: ${description}` : '',
+                'Lever één volledig HTML-bestand met inline CSS en eventuele inline JavaScript.',
+                'Eisen: responsive, duidelijke CTA, contactsectie, nette typografie, semantische HTML.',
+                'Taal van de website: Nederlands.',
+                'Output: alleen geldige HTML code zonder markdown.'
+            ].filter(Boolean).join('\n');
+        }
+
+        function setOrderProgress(id, pct, step) {
+            const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+            const bar = document.getElementById(`bar-${id}`);
+            if (bar) {
+                bar.style.width = clamped + '%';
+                bar.classList.toggle('green', clamped >= 100);
+            }
+            for (let s = 1; s <= 5; s += 1) {
+                const el = document.getElementById(`step-${id}-${s}`);
+                if (!el) continue;
+                if (clamped >= 100) {
+                    el.className = 'progress-step done';
+                    continue;
+                }
+                if (s < step) el.className = 'progress-step done';
+                else if (s === step) el.className = 'progress-step active';
+                else el.className = 'progress-step';
+            }
+            orders[id].progressPct = clamped;
+            orders[id].updatedAt = Date.now();
+            persistOrdersRuntime();
+        }
+
+        function appendOrderLog(id, msg, highlight = false) {
+            if (!orders[id]) return;
+            orders[id].logs.push({
+                time: getTime(),
+                msg: String(msg || ''),
+                highlight: Boolean(highlight)
+            });
+            orders[id].updatedAt = Date.now();
+            persistOrdersRuntime();
+        }
+
+        async function postGenerateSiteRequest(payload) {
+            const endpoints = [
+                '/api/active-order-generate-site',
+                '/api/active-orders/generate-site'
+            ];
+            let lastError = null;
+
+            for (const endpoint of endpoints) {
+                const controller = new AbortController();
+                const timer = window.setTimeout(() => controller.abort(), 120000);
+                try {
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload || {}),
+                        signal: controller.signal,
+                        cache: 'no-store'
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data?.ok) {
+                        throw new Error(String(data?.detail || data?.error || `Website generatie mislukt (${res.status})`));
+                    }
+                    return data;
+                } catch (error) {
+                    if (String(error?.name || '') === 'AbortError') {
+                        lastError = new Error('Timeout: AI website generatie duurde te lang.');
+                    } else {
+                        lastError = error;
+                    }
+                } finally {
+                    window.clearTimeout(timer);
+                }
+            }
+
+            throw lastError || new Error('Website generatie mislukt.');
+        }
+
+        async function executeOrder(id) {
             const activeId = selectActiveOrderId(id);
             const btn = document.getElementById(`btn-${id}`);
             const status = document.getElementById(`status-${id}`);
             const progress = document.getElementById(`progress-${id}`);
-            const bar = document.getElementById(`bar-${id}`);
             const viewBtn = document.getElementById(`view-${id}`);
+            if (!btn || btn.classList.contains('running') || !orders[id]) return;
 
-            if (!btn || btn.classList.contains('running') || btn.classList.contains('done')) return;
+            const meta = getOrderMeta(activeId) || {
+                id: String(activeId),
+                clientName: orders[id]?.name || 'Bedrijf',
+                title: orders[id]?.type || 'Project',
+                description: ''
+            };
+            const customOrder = getCustomOrderById(activeId);
+            const prompt = String(customOrder?.prompt || '').trim() || buildFallbackSitePrompt(meta, customOrder);
 
+            btn.classList.remove('done');
             btn.classList.add('running');
-            status.textContent = 'Bezig';
-            status.className = 'status-tag bezig';
+            btn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> AI site bouwen...';
+            btn.disabled = true;
 
-            progress.classList.add('show');
-            viewBtn.classList.add('show');
-            viewBtn.textContent = 'Bekijk Voortgang';
-            viewBtn.onclick = () => openModal(id);
+            if (status) {
+                status.textContent = 'Bezig';
+                status.className = 'status-tag bezig';
+            }
+            if (progress) progress.classList.add('show');
+            if (viewBtn) {
+                viewBtn.classList.add('show');
+                viewBtn.textContent = 'Bekijk Voortgang';
+                viewBtn.onclick = () => openModal(id);
+            }
 
             orders[id].logs = [];
-            orders[id].progressPct = 0;
             orders[id].statusKey = 'bezig';
             orders[id].updatedAt = Date.now();
             setLastActiveOrder(activeId);
             persistOrdersRuntime();
+            setOrderProgress(id, 3, 1);
+            appendOrderLog(id, 'Opdracht geladen en prompt voorbereid.');
+            await sleep(200);
 
-            let stepIndex = 0;
-            const buildSteps = getBuildSteps();
+            try {
+                setOrderProgress(id, 12, 1);
+                appendOrderLog(id, 'AI briefing en projectcontext opgebouwd.');
+                await sleep(300);
 
-            btn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Verwerken...';
+                setOrderProgress(id, 28, 2);
+                appendOrderLog(id, 'HTML structuur en sectie-opbouw genereren...');
 
-            function nextStep() {
-                if (stepIndex >= buildSteps.length) {
-                    btn.innerHTML = '✓ Opgeleverd';
-                    btn.classList.remove('running');
-                    btn.classList.add('done');
+                const result = await postGenerateSiteRequest({
+                    orderId: activeId,
+                    company: meta.clientName,
+                    title: meta.title,
+                    description: meta.description,
+                    prompt,
+                    buildMode: buildMode,
+                    language: 'nl'
+                });
 
+                setOrderProgress(id, 74, 3);
+                appendOrderLog(id, 'HTML, styling en interactie ontvangen van AI.');
+
+                const html = String(result?.html || '');
+                if (!html) {
+                    throw new Error('AI gaf geen HTML terug.');
+                }
+
+                const previewStored = saveGeneratedPreviewHtml(activeId, html);
+                if (!previewStored) {
+                    throw new Error('Preview kon niet lokaal worden opgeslagen.');
+                }
+
+                const apiCost = result?.apiCost || {};
+                const apiCostEur = Number(apiCost?.eur);
+                const apiCostUsd = Number(apiCost?.usd);
+                const apiTokensInput = Number(apiCost?.promptTokens);
+                const apiTokensOutput = Number(apiCost?.completionTokens);
+                const apiModel = String(result?.model || apiCost?.model || '');
+                const nowIso = new Date().toISOString();
+
+                if (customOrder) {
+                    updateCustomOrderById(activeId, {
+                        prompt,
+                        apiCostEur: Number.isFinite(apiCostEur) && apiCostEur >= 0 ? apiCostEur : null,
+                        apiCostUsd: Number.isFinite(apiCostUsd) && apiCostUsd >= 0 ? apiCostUsd : null,
+                        apiTokensInput: Number.isFinite(apiTokensInput) && apiTokensInput >= 0 ? apiTokensInput : null,
+                        apiTokensOutput: Number.isFinite(apiTokensOutput) && apiTokensOutput >= 0 ? apiTokensOutput : null,
+                        apiModel: apiModel || '',
+                        lastRunAt: nowIso,
+                        status: 'klaar'
+                    });
+                }
+                updateApiCostLabel(activeId, getCustomOrderById(activeId));
+
+                orders[id].artifact = {
+                    source: String(result?.source || 'openai'),
+                    model: apiModel || null,
+                    apiCostEur: Number.isFinite(apiCostEur) ? apiCostEur : null,
+                    apiCostUsd: Number.isFinite(apiCostUsd) ? apiCostUsd : null,
+                    generatedAt: nowIso
+                };
+                orders[id].previewHtml = html;
+                orders[id].statusKey = 'klaar';
+                setOrderProgress(id, 100, 5);
+
+                appendOrderLog(id, 'Preview HTML succesvol opgeslagen.', true);
+                if (Number.isFinite(apiCostEur) && apiCostEur >= 0) {
+                    appendOrderLog(id, `API kosten (geschat): €${apiCostEur.toFixed(3)} (${apiModel || 'model'})`, true);
+                }
+                appendOrderLog(id, 'Website opgeleverd. Open preview om te beoordelen.', true);
+
+                btn.classList.remove('running');
+                btn.classList.add('done');
+                btn.disabled = false;
+                btn.innerHTML = '↻ Opnieuw runnen';
+
+                if (status) {
                     status.textContent = 'Klaar';
                     status.className = 'status-tag klaar';
-                    bar.classList.add('green');
-                    orders[id].statusKey = 'klaar';
-
-                    orders[id].logs.push({
-                        time: getTime(),
-                        msg: 'Preview gereed. Open de vaste template-preview.',
-                        highlight: true
-                    });
-                    orders[id].updatedAt = Date.now();
-                    persistOrdersRuntime();
-
+                }
+                if (viewBtn) {
                     viewBtn.textContent = 'Open preview';
                     viewBtn.onclick = () => openPreview(activeId);
-                    return;
                 }
+            } catch (error) {
+                orders[id].statusKey = 'actief';
+                setOrderProgress(id, Math.max(5, Number(orders[id].progressPct) || 0), 1);
+                appendOrderLog(id, `Fout: ${String(error?.message || 'Website generatie mislukt.')}`, true);
 
-                const step = buildSteps[stepIndex];
-                bar.style.width = step.pct + '%';
+                btn.classList.remove('running');
+                btn.classList.remove('done');
+                btn.disabled = false;
+                btn.innerHTML = 'Opnieuw proberen';
 
-                for (let s = 1; s <= 5; s++) {
-                    const el = document.getElementById(`step-${id}-${s}`);
-                    if (!el) continue;
-                    if (s < step.step) el.className = 'progress-step done';
-                    else if (s === step.step) el.className = 'progress-step active';
-                    else el.className = 'progress-step';
+                if (status) {
+                    status.textContent = 'Actief';
+                    status.className = 'status-tag actief';
                 }
-
-                orders[id].progressPct = step.pct;
-                orders[id].logs.push({ time: getTime(), msg: step.msg, highlight: step.pct === 100 });
+                if (viewBtn) {
+                    viewBtn.classList.add('show');
+                    if (hasGeneratedPreviewHtml(activeId)) {
+                        viewBtn.textContent = 'Open laatste preview';
+                        viewBtn.onclick = () => openPreview(activeId);
+                    } else {
+                        viewBtn.textContent = 'Bekijk Voortgang';
+                        viewBtn.onclick = () => openModal(id);
+                    }
+                }
+            } finally {
                 orders[id].updatedAt = Date.now();
-                orders[id].statusKey = step.pct >= 100 ? 'klaar' : 'bezig';
                 persistOrdersRuntime();
-                stepIndex++;
-                setTimeout(nextStep, 650 + Math.random() * 700);
             }
-
-            nextStep();
         }
 
         function openModal(id) {
@@ -2183,7 +2457,7 @@
 
             pct.textContent = pctValue + '%';
 
-            if (pctValue === 100) {
+            if (pctValue === 100 && hasGeneratedPreviewHtml(id)) {
                 primaryBtn.style.display = 'block';
                 primaryBtn.onclick = () => {
                     openPreview(id);

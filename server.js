@@ -193,6 +193,14 @@ function truncateText(value, maxLength = 500) {
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
 }
 
+function clipText(value, maxLength = 500) {
+  const text = normalizeString(value);
+  if (!text) return '';
+  if (!Number.isFinite(Number(maxLength)) || Number(maxLength) <= 0) return '';
+  const limit = Math.floor(Number(maxLength));
+  return text.length > limit ? text.slice(0, limit) : text;
+}
+
 function isSupabaseConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 }
@@ -1442,6 +1450,203 @@ function buildWebsitePromptFallback(options = {}) {
   }
 
   return headerNl.join('\n');
+}
+
+function stripHtmlCodeFence(text) {
+  const raw = normalizeString(text || '');
+  if (!raw) return '';
+  const fenced = raw.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  return fenced ? normalizeString(fenced[1]) : raw;
+}
+
+function ensureHtmlDocument(rawHtml, meta = {}) {
+  const text = stripHtmlCodeFence(rawHtml);
+  if (!text) return '';
+
+  if (/<html[\s>]/i.test(text) && /<body[\s>]/i.test(text)) {
+    return clipText(text, 200000);
+  }
+
+  const title = truncateText(normalizeString(meta.title || meta.company || 'Generated Website'), 120);
+  const bodyContent = text;
+  const wrapped = `<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${title || 'Generated Website'}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+${bodyContent}
+</body>
+</html>`;
+  return clipText(wrapped, 200000);
+}
+
+function getOpenAiModelCostRates(model) {
+  const explicitInput = Number(process.env.OPENAI_COST_INPUT_PER_1M || '');
+  const explicitOutput = Number(process.env.OPENAI_COST_OUTPUT_PER_1M || '');
+  if (Number.isFinite(explicitInput) && Number.isFinite(explicitOutput) && explicitInput >= 0 && explicitOutput >= 0) {
+    return { inputPer1mUsd: explicitInput, outputPer1mUsd: explicitOutput, source: 'env' };
+  }
+
+  const key = normalizeString(model || OPENAI_MODEL).toLowerCase();
+  if (key.includes('gpt-5-mini')) return { inputPer1mUsd: 0.25, outputPer1mUsd: 2.0, source: 'default-mini' };
+  if (key.includes('gpt-5-nano')) return { inputPer1mUsd: 0.05, outputPer1mUsd: 0.4, source: 'default-nano' };
+  if (key.includes('gpt-5')) return { inputPer1mUsd: 1.25, outputPer1mUsd: 10.0, source: 'default-gpt5' };
+  if (key.includes('gpt-4.1-mini')) return { inputPer1mUsd: 0.4, outputPer1mUsd: 1.6, source: 'default-4.1-mini' };
+  if (key.includes('gpt-4.1')) return { inputPer1mUsd: 2.0, outputPer1mUsd: 8.0, source: 'default-4.1' };
+  if (key.includes('gpt-4o-mini')) return { inputPer1mUsd: 0.15, outputPer1mUsd: 0.6, source: 'default-4o-mini' };
+  return { inputPer1mUsd: 1.0, outputPer1mUsd: 4.0, source: 'default-generic' };
+}
+
+function estimateOpenAiUsageCost(usage, model) {
+  if (!usage || typeof usage !== 'object') return null;
+  const promptTokens = Number(
+    usage.prompt_tokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.inputTokens ?? 0
+  );
+  const completionTokens = Number(
+    usage.completion_tokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.outputTokens ?? 0
+  );
+  const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? promptTokens + completionTokens);
+  if (
+    !Number.isFinite(promptTokens) ||
+    !Number.isFinite(completionTokens) ||
+    promptTokens < 0 ||
+    completionTokens < 0
+  ) {
+    return null;
+  }
+
+  const rates = getOpenAiModelCostRates(model);
+  const usdToEur = Number(process.env.OPENAI_COST_USD_TO_EUR || 0.92);
+  const safeUsdToEur = Number.isFinite(usdToEur) && usdToEur > 0 ? usdToEur : 0.92;
+
+  const inputUsd = (promptTokens / 1_000_000) * rates.inputPer1mUsd;
+  const outputUsd = (completionTokens / 1_000_000) * rates.outputPer1mUsd;
+  const totalUsd = inputUsd + outputUsd;
+  const totalEur = totalUsd * safeUsdToEur;
+
+  return {
+    model: normalizeString(model || OPENAI_MODEL),
+    promptTokens: Math.round(promptTokens),
+    completionTokens: Math.round(completionTokens),
+    totalTokens: Number.isFinite(totalTokens) ? Math.round(totalTokens) : Math.round(promptTokens + completionTokens),
+    usd: Number(totalUsd.toFixed(6)),
+    eur: Number(totalEur.toFixed(6)),
+    rates,
+    usdToEur: safeUsdToEur,
+    estimated: true,
+  };
+}
+
+async function generateWebsiteHtmlWithAi(options = {}) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) {
+    const err = new Error('OPENAI_API_KEY ontbreekt');
+    err.status = 503;
+    throw err;
+  }
+
+  const promptText = truncateText(normalizeString(options.prompt || ''), 40000);
+  if (!promptText) {
+    const err = new Error('Prompt ontbreekt voor website generatie.');
+    err.status = 400;
+    throw err;
+  }
+
+  const company = truncateText(normalizeString(options.company || ''), 160);
+  const title = truncateText(normalizeString(options.title || ''), 200);
+  const description = truncateText(normalizeString(options.description || ''), 3000);
+  const language = normalizeString(options.language || 'nl') || 'nl';
+
+  const systemPrompt = [
+    'Je bent een senior front-end engineer en webdesigner.',
+    'Genereer exact één volledig HTML-document met inline CSS (en alleen indien nodig inline JS).',
+    'Gebruik semantische HTML, nette typografie, duidelijke CTA’s en mobielvriendelijke opbouw.',
+    'Geen markdown, geen uitleg, alleen de HTML-code.',
+    'Gebruik uitsluitend informatie uit de prompt/context; geen verzonnen bedrijfsclaims.',
+  ].join('\n');
+
+  const userPrompt = [
+    `Taal: ${language}`,
+    company ? `Bedrijf: ${company}` : '',
+    title ? `Projecttitel: ${title}` : '',
+    description ? `Projectomschrijving: ${description}` : '',
+    '',
+    'Bouw een complete marketingwebsite met minimaal:',
+    '- Hero met waardepropositie + CTA',
+    '- Diensten/aanbod sectie',
+    '- Resultaten/voordelen sectie',
+    '- Over ons sectie',
+    '- Contact sectie met formulier',
+    '- Footer',
+    '',
+    'Output regels:',
+    '- Start met <!doctype html>',
+    '- Gebruik alleen één HTML-bestand',
+    '- Geen placeholders zoals lorem ipsum tenzij info ontbreekt',
+    '',
+    'Projectprompt:',
+    promptText,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const { response, data } = await fetchJsonWithTimeout(
+    `${OPENAI_API_BASE_URL}/chat/completions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.3,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+    },
+    120000
+  );
+
+  if (!response.ok) {
+    const err = new Error(`OpenAI website generatie mislukt (${response.status})`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+
+  const content = data?.choices?.[0]?.message?.content;
+  const generatedText = normalizeString(extractOpenAiTextContent(content));
+  if (!generatedText) {
+    const err = new Error('OpenAI gaf lege HTML terug.');
+    err.status = 502;
+    err.data = data;
+    throw err;
+  }
+
+  const html = ensureHtmlDocument(generatedText, { title, company });
+  if (!html) {
+    const err = new Error('Kon HTML output niet valideren.');
+    err.status = 502;
+    err.data = data;
+    throw err;
+  }
+
+  return {
+    html,
+    source: 'openai',
+    model: OPENAI_MODEL,
+    usage: data?.usage || null,
+    apiCost: estimateOpenAiUsageCost(data?.usage || null, OPENAI_MODEL),
+  };
 }
 
 function shouldAnalyzeCallUpdateWithAi(callUpdate) {
@@ -4079,6 +4284,85 @@ app.post('/api/ai/transcript-to-prompt', async (req, res) => {
 // Vercel fallback voor diepe API-paths in sommige regio's.
 app.post('/api/ai-transcript-to-prompt', async (req, res) => {
   return sendAiTranscriptToPromptResponse(req, res);
+});
+
+async function sendActiveOrderGenerateSiteResponse(req, res) {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const prompt = normalizeString(body.prompt || '');
+    const company = truncateText(normalizeString(body.company || body.clientName || ''), 160);
+    const title = truncateText(normalizeString(body.title || ''), 200);
+    const description = truncateText(normalizeString(body.description || ''), 3000);
+    const language = normalizeString(body.language || 'nl') || 'nl';
+    const orderId = Number(body.orderId) || null;
+    const buildMode = normalizeString(body.buildMode || '') || null;
+
+    if (!prompt) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Prompt ontbreekt',
+        detail: 'Stuur een body met minimaal { prompt: "..." }',
+      });
+    }
+
+    const generated = await generateWebsiteHtmlWithAi({
+      prompt,
+      company,
+      title,
+      description,
+      language,
+    });
+
+    appendDashboardActivity(
+      {
+        type: 'active_order_generated',
+        title: 'AI website gegenereerd',
+        detail: `HTML-opzet gegenereerd${company ? ` voor ${company}` : ''}.`,
+        company,
+        actor: 'api',
+        taskId: Number.isFinite(orderId) ? orderId : null,
+        source: 'premium-actieve-opdrachten',
+      },
+      'dashboard_activity_active_order_generated'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      html: generated.html,
+      source: generated.source,
+      model: generated.model,
+      usage: generated.usage,
+      apiCost: generated.apiCost,
+      order: {
+        orderId,
+        company,
+        title,
+        buildMode,
+        generatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    const safeStatus = status >= 400 && status < 600 ? status : 500;
+    return res.status(safeStatus).json({
+      ok: false,
+      error:
+        safeStatus === 503
+          ? 'AI website generatie niet beschikbaar'
+          : 'AI website generatie mislukt',
+      detail: String(error?.message || 'Onbekende fout'),
+      openAiEnabled: Boolean(getOpenAiApiKey()),
+    });
+  }
+}
+
+app.post('/api/active-orders/generate-site', async (req, res) => {
+  return sendActiveOrderGenerateSiteResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/active-order-generate-site', async (req, res) => {
+  return sendActiveOrderGenerateSiteResponse(req, res);
 });
 
 app.get('/api/dashboard/activity', (req, res) => {

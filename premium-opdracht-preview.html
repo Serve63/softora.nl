@@ -71,7 +71,8 @@
 
   <script>
     (function () {
-      const PREVIEW_HTML_PREFIX = 'softora_preview_html_premium_v2_';
+      const PREVIEW_HTML_PREFIX = 'softora_preview_html_premium_v4_';
+      const PREVIEW_HTML_PREFIX_OLD = 'softora_preview_html_premium_v2_';
       const params = new URLSearchParams(window.location.search);
       const id = params.get('id');
       if (!id) return;
@@ -79,6 +80,7 @@
       let html = null;
       try {
         html = localStorage.getItem(PREVIEW_HTML_PREFIX + id);
+        if (!html) html = localStorage.getItem(PREVIEW_HTML_PREFIX_OLD + id);
       } catch (_) {
         html = null;
       }
