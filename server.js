@@ -3880,7 +3880,7 @@ app.post('/api/agenda/confirmation-mail-sync', async (req, res) => {
   }
   const result = await syncInboundConfirmationEmailsFromImap({
     force: true,
-    maxMessages: Math.max(1, Math.min(50, parseIntSafe(req.body?.maxMessages, 20))),
+    maxMessages: Math.max(10, Math.min(400, parseIntSafe(req.body?.maxMessages, 120))),
   });
   return res.status(result?.ok === false && !result?.skipped ? 500 : 200).json({
     ok: result?.ok !== false,
