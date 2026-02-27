@@ -52,7 +52,12 @@ const MAIL_REPLY_TO = String(
   process.env.CONFIRMATION_MAIL_REPLY_TO || process.env.MAIL_REPLY_TO || ''
 ).trim();
 const MAIL_IMAP_HOST = String(
-  process.env.MAIL_IMAP_HOST || process.env.IMAP_HOST || process.env.STRATO_IMAP_HOST || ''
+  process.env.MAIL_IMAP_HOST ||
+    process.env.IMAP_HOST ||
+    process.env.STRATO_IMAP_HOST ||
+    (/strato/i.test(String(process.env.MAIL_SMTP_HOST || process.env.SMTP_HOST || process.env.STRATO_SMTP_HOST || ''))
+      ? 'imap.strato.com'
+      : '')
 ).trim();
 const MAIL_IMAP_PORT = Number(
   process.env.MAIL_IMAP_PORT || process.env.IMAP_PORT || process.env.STRATO_IMAP_PORT || 993
