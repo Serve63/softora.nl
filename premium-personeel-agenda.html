@@ -722,15 +722,20 @@
         };
     }
 
-    async function postJsonWithFallback(urls, body) {
+    async function postJsonWithFallback(urls, body, options = {}) {
         let lastError = null;
         const endpointList = Array.isArray(urls) ? urls : [urls];
+        const timeoutMs = Math.max(3000, Math.min(60000, Number(options?.timeoutMs || 20000)));
         for (const url of endpointList) {
+            const controller = new AbortController();
+            const timer = window.setTimeout(() => controller.abort(), timeoutMs);
             try {
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body || {}),
+                    signal: controller.signal,
+                    cache: 'no-store',
                 });
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok || !data?.ok) {
@@ -740,7 +745,15 @@
                 }
                 return data;
             } catch (error) {
-                lastError = error;
+                if (String(error?.name || '') === 'AbortError') {
+                    const timeoutError = new Error(`Timeout na ${Math.round(timeoutMs / 1000)}s (${url})`);
+                    timeoutError.code = 'TIMEOUT';
+                    lastError = timeoutError;
+                } else {
+                    lastError = error;
+                }
+            } finally {
+                window.clearTimeout(timer);
             }
         }
         throw lastError || new Error('Request mislukt.');
@@ -876,12 +889,13 @@
 
         try {
             const result = await postJsonWithFallback(
-                ['/api/ai/transcript-to-prompt', '/api/ai-transcript-to-prompt'],
+                ['/api/ai-transcript-to-prompt', '/api/ai/transcript-to-prompt'],
                 {
                     transcript,
                     language: 'nl',
                     appointmentId: activeAppointmentId,
-                }
+                },
+                { timeoutMs: 15000 }
             );
             workspacePromptEl.value = String(result?.prompt || '').trim();
             setWorkspaceStatus('Prompt gegenereerd. Klik op Opslaan om te bewaren.', 'success');
