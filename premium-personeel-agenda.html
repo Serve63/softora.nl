@@ -402,6 +402,8 @@
         .modal-btn.primary:hover { background: var(--accent-light); box-shadow: 0 0 30px var(--accent-glow); }
         .modal-btn.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
         .modal-btn.secondary:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+        .modal-btn.danger { background: transparent; color: var(--red); border: 1px solid rgba(236, 94, 94, 0.45); }
+        .modal-btn.danger:hover { color: #ffd0d0; border-color: rgba(236, 94, 94, 0.75); box-shadow: 0 0 24px rgba(236, 94, 94, 0.2); }
         .modal-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
         .modal-overview.hide { display: none; }
@@ -496,7 +498,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Plaatsgevonden en klant wil door</button>
+            <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Akkoord</button>
+            <button class="modal-btn danger magnetic" id="modalNoDealBtn" type="button">Geen deal</button>
             <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
         </div>
     </div>
@@ -630,6 +633,7 @@
     const modalOverviewElement = document.getElementById('modalOverview');
     const modalWorkspaceElement = document.getElementById('modalWorkspace');
     const modalPrimaryBtn = document.getElementById('modalPrimaryBtn');
+    const modalNoDealBtn = document.getElementById('modalNoDealBtn');
     const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
     const workspaceTranscriptEl = document.getElementById('workspaceTranscript');
     const workspacePromptEl = document.getElementById('workspacePrompt');
@@ -692,6 +696,8 @@
         modalWorkspaceMode = Boolean(enabled);
         modalOverviewElement.classList.toggle('hide', modalWorkspaceMode);
         modalWorkspaceElement.classList.toggle('show', modalWorkspaceMode);
+        modalNoDealBtn.hidden = modalWorkspaceMode;
+        modalNoDealBtn.disabled = workspaceBusy || modalWorkspaceMode;
         refreshWorkspacePrimaryButtonLabel();
         modalSecondaryBtn.textContent = modalWorkspaceMode ? 'Terug' : 'Sluiten';
     }
@@ -711,8 +717,9 @@
 
     function refreshWorkspacePrimaryButtonLabel() {
         if (!modalWorkspaceMode) {
-            modalPrimaryBtn.textContent = 'Plaatsgevonden en klant wil door';
+            modalPrimaryBtn.textContent = 'Akkoord';
             modalPrimaryBtn.disabled = workspaceBusy;
+            modalNoDealBtn.disabled = workspaceBusy;
             return;
         }
 
@@ -726,6 +733,37 @@
             ? 'Toevoegen aan actieve opdrachten'
             : 'Opslaan';
         modalPrimaryBtn.disabled = workspaceBusy;
+    }
+
+    async function markActiveAppointmentNoDeal() {
+        const apt = getActiveAppointment();
+        if (!apt || workspaceBusy) return;
+
+        workspaceBusy = true;
+        refreshWorkspacePrimaryButtonLabel();
+
+        try {
+            const payload = {
+                status: 'no_deal',
+                transcript: String(apt?.postCallNotesTranscript || ''),
+                prompt: String(apt?.postCallPrompt || ''),
+                actor: 'premium-personeel-agenda',
+            };
+            const result = await postJsonWithFallback(
+                [
+                    `/api/agenda/appointments/${encodeURIComponent(String(apt.id))}/post-call`,
+                    `/api/agenda/appointment-post-call?appointmentId=${encodeURIComponent(String(apt.id))}`,
+                ],
+                payload
+            );
+            updateAppointmentPostCallFields(result?.appointment || payload);
+            closeModal();
+        } catch (error) {
+            window.alert(`Geen deal opslaan mislukt: ${String(error?.message || 'onbekende fout')}`);
+        } finally {
+            workspaceBusy = false;
+            refreshWorkspacePrimaryButtonLabel();
+        }
     }
 
     function fillWorkspaceFromAppointment(apt) {
@@ -1160,6 +1198,7 @@
     }
 
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
+    modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
     modalSecondaryBtn.addEventListener('click', handleModalSecondaryAction);
     workspaceGeneratePromptBtn.addEventListener('click', () => { void generatePromptFromTranscript(); });
     voiceStartBtn.addEventListener('click', startVoiceRecording);
