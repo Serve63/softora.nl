@@ -1884,6 +1884,18 @@
                                     ${mailSendBusy ? 'Bezig...' : (mailSent ? 'Bevestigingsmail verstuurd' : 'Bevestigingsmail sturen')}
                                 </button>
                             </div>
+                            ${mailSent ? `
+                                <div class="confirm-task-detail-actions" style="margin-top:0.35rem;">
+                                    <button
+                                        type="button"
+                                        class="confirm-task-detail-btn"
+                                        data-resend-confirmation-mail-id="${taskId}"
+                                        ${mailSendBusy ? 'disabled' : ''}
+                                    >
+                                        ${mailSendBusy ? 'Bezig...' : 'Nog een keer versturen'}
+                                    </button>
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                     <div class="confirm-task-flow">
@@ -2020,6 +2032,22 @@
                     const taskId = Number(btn.getAttribute('data-send-confirmation-mail-id'));
                     if (!taskId || isTaskActionBusy(taskId)) return;
                     if (getTaskById(taskId)?.mailSent) return;
+                    const recipientEmail = getConfirmationRecipientEmailInputValue(taskId);
+                    setTaskActionBusy(taskId, true);
+                    delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
+                    renderConfirmationTasks();
+                    const ok = await markConfirmationMailSent(taskId, recipientEmail);
+                    setTaskActionBusy(taskId, false);
+                    if (!ok) renderConfirmationTasks();
+                });
+            });
+
+            bodyEl.querySelectorAll('[data-resend-confirmation-mail-id]').forEach((btn) => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const taskId = Number(btn.getAttribute('data-resend-confirmation-mail-id'));
+                    if (!taskId || isTaskActionBusy(taskId)) return;
                     const recipientEmail = getConfirmationRecipientEmailInputValue(taskId);
                     setTaskActionBusy(taskId, true);
                     delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
