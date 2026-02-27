@@ -1380,6 +1380,68 @@ async function generateWebsitePromptFromTranscriptWithAi(options = {}) {
   };
 }
 
+function buildWebsitePromptFallback(options = {}) {
+  const language = normalizeString(options.language || 'nl') || 'nl';
+  const context = truncateText(normalizeString(options.context || ''), 2000);
+  const transcript = truncateText(normalizeString(options.transcript || options.text || ''), 12000);
+
+  const headerNl = [
+    'ROL',
+    'Je bent een senior webdesigner + conversion copywriter + front-end developer.',
+    '',
+    'DOEL',
+    'Bouw een conversiegerichte website op basis van de transcriptie hieronder.',
+    'Gebruik alleen feiten uit de transcriptie. Als iets ontbreekt: gebruik [VUL IN: ...].',
+    '',
+    'OUTPUTVORM',
+    'Lever concreet op in deze volgorde:',
+    '1) Merkprofiel (bedrijf, dienst, propositie)',
+    '2) Doelgroepen + pijnpunten',
+    '3) Sitemap met pagina-doelen',
+    '4) Wireframe per pagina (secties in volgorde)',
+    '5) Definitieve copy per sectie',
+    '6) Designrichting (kleur, typografie, sfeer, beeldstijl)',
+    '7) Conversie-elementen (CTA, formulieren, vertrouwen)',
+    '8) Technische bouwinstructies (responsive, performance, toegankelijkheid)',
+    '9) SEO-basis (title, meta, H1-H3, keywords)',
+    '10) TODO-lijst met open vragen [VUL IN: ...]',
+    '',
+    context ? `EXTRA CONTEXT\n${context}\n` : '',
+    'BRONTRANSCRIPTIE (LETTERLIJK)',
+    transcript || '[VUL IN: transcriptie ontbreekt]',
+  ];
+
+  if (language.toLowerCase().startsWith('en')) {
+    return [
+      'ROLE',
+      'You are a senior web designer + conversion copywriter + front-end developer.',
+      '',
+      'GOAL',
+      'Build a conversion-focused website from the transcript below.',
+      'Use only facts from the transcript. If something is missing: use [FILL IN: ...].',
+      '',
+      'OUTPUT FORMAT',
+      'Deliver in this order:',
+      '1) Brand profile',
+      '2) Target audiences + pain points',
+      '3) Sitemap with page goals',
+      '4) Wireframe per page',
+      '5) Final copy per section',
+      '6) Design direction',
+      '7) Conversion elements',
+      '8) Technical build instructions',
+      '9) SEO basics',
+      '10) Open questions [FILL IN: ...]',
+      '',
+      context ? `EXTRA CONTEXT\n${context}\n` : '',
+      'SOURCE TRANSCRIPT (VERBATIM)',
+      transcript || '[FILL IN: missing transcript]',
+    ].join('\n');
+  }
+
+  return headerNl.join('\n');
+}
+
 function shouldAnalyzeCallUpdateWithAi(callUpdate) {
   if (!callUpdate || !getOpenAiApiKey()) return false;
 
@@ -3937,28 +3999,28 @@ app.post('/api/ai/summarize', async (req, res) => {
 });
 
 async function sendAiTranscriptToPromptResponse(req, res) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const transcript = normalizeString(body.transcript || body.text || '');
+  const language = normalizeString(body.language || 'nl') || 'nl';
+  const context = normalizeString(body.context || '');
+
+  if (!transcript) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Transcript ontbreekt',
+      detail: 'Stuur een JSON body met { transcript: "..." }',
+    });
+  }
+
+  if (transcript.length > 50000) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Transcript te lang',
+      detail: 'Maximaal 50.000 tekens per request.',
+    });
+  }
+
   try {
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const transcript = normalizeString(body.transcript || body.text || '');
-    const language = normalizeString(body.language || 'nl') || 'nl';
-    const context = normalizeString(body.context || '');
-
-    if (!transcript) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Transcript ontbreekt',
-        detail: 'Stuur een JSON body met { transcript: "..." }',
-      });
-    }
-
-    if (transcript.length > 50000) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Transcript te lang',
-        detail: 'Maximaal 50.000 tekens per request.',
-      });
-    }
-
     const result = await generateWebsitePromptFromTranscriptWithAi({
       transcript,
       language,
@@ -3975,14 +4037,33 @@ async function sendAiTranscriptToPromptResponse(req, res) {
       openAiEnabled: true,
     });
   } catch (error) {
-    const status = Number(error?.status) || 500;
-    const safeStatus = status >= 400 && status < 600 ? status : 500;
-    return res.status(safeStatus).json({
-      ok: false,
-      error:
-        safeStatus === 503
-          ? 'AI prompt generatie niet beschikbaar'
-          : 'AI prompt generatie mislukt',
+    const fallbackPrompt = buildWebsitePromptFallback({
+      transcript,
+      language,
+      context,
+    });
+
+    console.error(
+      '[AI][TranscriptToPrompt][Fallback]',
+      JSON.stringify(
+        {
+          reason: String(error?.message || 'Onbekende fout'),
+          status: Number(error?.status || 0) || null,
+          openAiEnabled: Boolean(getOpenAiApiKey()),
+        },
+        null,
+        2
+      )
+    );
+
+    return res.status(200).json({
+      ok: true,
+      prompt: fallbackPrompt,
+      source: 'template-fallback',
+      model: null,
+      usage: null,
+      language,
+      warning: 'AI prompt generatie faalde, template fallback gebruikt.',
       detail: String(error?.message || 'Onbekende fout'),
       openAiEnabled: Boolean(getOpenAiApiKey()),
     });

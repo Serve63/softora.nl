@@ -739,7 +739,7 @@
                 });
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok || !data?.ok) {
-                    const err = new Error(String(data?.error || data?.detail || `Request mislukt (${response.status})`));
+                    const err = new Error(String(data?.detail || data?.error || `Request mislukt (${response.status})`));
                     err.status = response.status;
                     throw err;
                 }
@@ -898,7 +898,11 @@
                 { timeoutMs: 50000 }
             );
             workspacePromptEl.value = String(result?.prompt || '').trim();
-            setWorkspaceStatus('Prompt gegenereerd. Klik op Opslaan om te bewaren.', 'success');
+            if (String(result?.source || '') === 'template-fallback') {
+                setWorkspaceStatus('Prompt gemaakt via fallback-template. Klik op Opslaan om te bewaren.', 'success');
+            } else {
+                setWorkspaceStatus('Prompt gegenereerd. Klik op Opslaan om te bewaren.', 'success');
+            }
         } catch (error) {
             setWorkspaceStatus(`Prompt genereren mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
         } finally {
