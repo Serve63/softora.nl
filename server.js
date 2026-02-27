@@ -111,6 +111,8 @@ let supabaseHydrateRetryNotBeforeMs = 0;
 let supabaseLastHydrateError = '';
 let supabaseLastPersistError = '';
 const UI_STATE_SCOPE_PREFIX = 'ui_state:';
+const PREMIUM_ACTIVE_ORDERS_SCOPE = 'premium_active_orders';
+const PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
 const DEMO_CONFIRMATION_TASK_ENABLED = /^(1|true|yes)$/i.test(
   String(process.env.ENABLE_DEMO_CONFIRMATION_TASK || '')
 );
@@ -4252,6 +4254,236 @@ function updateAgendaAppointmentPostCallDataById(req, res, appointmentIdRaw) {
   });
 }
 
+function normalizeActiveOrderStatusKey(value) {
+  const key = normalizeString(value || '').toLowerCase();
+  if (key === 'actief') return 'actief';
+  if (key === 'bezig') return 'bezig';
+  if (key === 'klaar') return 'klaar';
+  return 'wacht';
+}
+
+function parseAmountFromEuroLabel(value) {
+  const raw = normalizeString(value || '');
+  if (!raw) return null;
+  const digitsOnly = raw.replace(/[^\d]/g, '');
+  const amount = Number(digitsOnly);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return Math.round(amount);
+}
+
+function parseCustomOrdersFromUiState(rawValue) {
+  const raw = normalizeString(rawValue || '');
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const id = Number(item.id);
+        const amount = Math.round(Number(item.amount));
+        const clientName = truncateText(normalizeString(item.clientName || ''), 160);
+        const location = truncateText(normalizeString(item.location || ''), 160);
+        const title = truncateText(normalizeString(item.title || ''), 200);
+        const description = truncateText(normalizeString(item.description || ''), 3000);
+        if (!Number.isFinite(id) || id <= 0) return null;
+        if (!clientName || !title || !description) return null;
+        if (!Number.isFinite(amount) || amount <= 0) return null;
+
+        return {
+          ...item,
+          id,
+          clientName,
+          location,
+          title,
+          description,
+          amount,
+          status: normalizeActiveOrderStatusKey(item.status),
+          sourceAppointmentId: Number(item.sourceAppointmentId) || null,
+          sourceCallId: normalizeString(item.sourceCallId || '') || null,
+          prompt: sanitizePostCallText(item.prompt || '', 25000),
+          transcript: sanitizePostCallText(item.transcript || '', 25000),
+          createdAt: normalizeString(item.createdAt || '') || null,
+          updatedAt: normalizeString(item.updatedAt || '') || null,
+        };
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function getNextCustomOrderId(customOrders) {
+  const maxId = (Array.isArray(customOrders) ? customOrders : [])
+    .map((item) => Number(item?.id))
+    .filter((id) => Number.isFinite(id) && id > 0)
+    .reduce((max, id) => (id > max ? id : max), 0);
+  return maxId + 1;
+}
+
+function buildActiveOrderDescriptionFromAppointment(appointment, transcript, prompt) {
+  const summary = normalizeString(appointment?.summary || '');
+  if (summary) return truncateText(summary, 1000);
+  if (transcript) return truncateText(transcript, 1000);
+  if (prompt) return truncateText(prompt, 1000);
+  return 'Nieuwe website-opdracht op basis van intakegesprek.';
+}
+
+function buildActiveOrderRecordFromAppointment(appointment, input = {}, nextId = 1) {
+  const company = truncateText(normalizeString(appointment?.company || ''), 160) || 'Nieuwe lead';
+  const contact = truncateText(normalizeString(appointment?.contact || ''), 160);
+  const prompt = sanitizePostCallText(input.prompt || appointment?.postCallPrompt || '', 25000);
+  const transcript = sanitizePostCallText(
+    input.transcript || appointment?.postCallNotesTranscript || '',
+    25000
+  );
+  const title =
+    truncateText(normalizeString(input.title || ''), 200) ||
+    `Website opdracht voor ${company}`;
+  const description =
+    truncateText(normalizeString(input.description || ''), 3000) ||
+    buildActiveOrderDescriptionFromAppointment(appointment, transcript, prompt);
+  const amountCandidate = Math.round(Number(input.amount));
+  const amount =
+    (Number.isFinite(amountCandidate) && amountCandidate > 0
+      ? amountCandidate
+      : parseAmountFromEuroLabel(appointment?.value || '')) || 2500;
+
+  return {
+    id: Number(nextId) || 1,
+    clientName: company,
+    location: truncateText(normalizeString(input.location || ''), 160),
+    title,
+    description,
+    amount,
+    status: normalizeActiveOrderStatusKey(input.status || 'wacht'),
+    source: 'agenda_post_call_prompt',
+    sourceAppointmentId: Number(appointment?.id) || null,
+    sourceCallId: normalizeString(appointment?.callId || '') || null,
+    contact,
+    prompt,
+    transcript,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentIdRaw) {
+  const idx = getGeneratedAppointmentIndexById(appointmentIdRaw);
+  if (idx < 0) {
+    return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden' });
+  }
+
+  const appointment = generatedAgendaAppointments[idx];
+  if (!appointment || typeof appointment !== 'object') {
+    return res.status(404).json({ ok: false, error: 'Afspraak niet gevonden' });
+  }
+
+  const actor = truncateText(normalizeString(req.body?.actor || req.body?.doneBy || ''), 120);
+  const promptText = sanitizePostCallText(req.body?.prompt || appointment?.postCallPrompt || '', 25000);
+  const transcriptText = sanitizePostCallText(
+    req.body?.transcript || appointment?.postCallNotesTranscript || '',
+    25000
+  );
+  if (!promptText) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Maak eerst een prompt voordat je toevoegt aan actieve opdrachten.',
+    });
+  }
+
+  const currentState = await getUiStateValues(PREMIUM_ACTIVE_ORDERS_SCOPE);
+  const currentValues =
+    currentState && currentState.values && typeof currentState.values === 'object'
+      ? currentState.values
+      : {};
+  const customOrders = parseCustomOrdersFromUiState(currentValues[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY]);
+
+  const appointmentId = Number(appointment?.id) || null;
+  let existingOrder = appointmentId
+    ? customOrders.find((item) => Number(item?.sourceAppointmentId) === appointmentId)
+    : null;
+  const hadExistingOrder = Boolean(existingOrder);
+
+  if (existingOrder) {
+    existingOrder = {
+      ...existingOrder,
+      prompt: promptText,
+      transcript: transcriptText || sanitizePostCallText(existingOrder?.transcript || '', 25000),
+      updatedAt: new Date().toISOString(),
+    };
+    for (let i = 0; i < customOrders.length; i += 1) {
+      if (Number(customOrders[i]?.id) !== Number(existingOrder.id)) continue;
+      customOrders[i] = existingOrder;
+      break;
+    }
+  } else {
+    const nextId = getNextCustomOrderId(customOrders);
+    const record = buildActiveOrderRecordFromAppointment(
+      {
+        ...appointment,
+        postCallPrompt: promptText,
+        postCallNotesTranscript: transcriptText,
+      },
+      req.body || {},
+      nextId
+    );
+    customOrders.push(record);
+    existingOrder = record;
+  }
+
+  const nextValues = {
+    ...currentValues,
+    [PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY]: JSON.stringify(customOrders),
+  };
+
+  const savedUiState = await setUiStateValues(PREMIUM_ACTIVE_ORDERS_SCOPE, nextValues, {
+    source: 'premium-personeel-agenda',
+    actor,
+  });
+  if (!savedUiState) {
+    return res.status(500).json({ ok: false, error: 'Kon actieve opdrachten niet opslaan.' });
+  }
+
+  const nowIso = new Date().toISOString();
+  const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+    idx,
+    {
+      ...appointment,
+      postCallStatus: normalizePostCallStatus(req.body?.status || appointment?.postCallStatus),
+      postCallNotesTranscript: transcriptText,
+      postCallPrompt: promptText,
+      postCallUpdatedAt: nowIso,
+      postCallUpdatedBy: actor || null,
+      activeOrderId: Number(existingOrder?.id) || null,
+      activeOrderAddedAt: nowIso,
+      activeOrderAddedBy: actor || null,
+    },
+    'agenda_add_active_order'
+  );
+
+  appendDashboardActivity(
+    {
+      type: 'active_order_added_from_agenda',
+      title: 'Toegevoegd aan actieve opdrachten',
+      detail: `Afspraak omgezet naar actieve opdracht (#${Number(existingOrder?.id) || '?'})`,
+      company: updatedAppointment?.company || appointment?.company || '',
+      actor,
+      taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
+      callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+      source: 'premium-personeel-agenda',
+    },
+    'dashboard_activity_active_order_added'
+  );
+
+  return res.status(200).json({
+    ok: true,
+    order: existingOrder,
+    appointment: updatedAppointment,
+    alreadyExisted: hadExistingOrder,
+  });
+}
+
 app.post('/api/agenda/appointments/:id/post-call', (req, res) => {
   return updateAgendaAppointmentPostCallDataById(req, res, req.params.id);
 });
@@ -4259,6 +4491,15 @@ app.post('/api/agenda/appointments/:id/post-call', (req, res) => {
 // Vercel fallback voor diepe API-paths in sommige regio's.
 app.post('/api/agenda/appointment-post-call', (req, res) => {
   return updateAgendaAppointmentPostCallDataById(req, res, req.query.appointmentId);
+});
+
+app.post('/api/agenda/appointments/:id/add-active-order', async (req, res) => {
+  return addAgendaAppointmentToPremiumActiveOrders(req, res, req.params.id);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/agenda/add-active-order', async (req, res) => {
+  return addAgendaAppointmentToPremiumActiveOrders(req, res, req.query.appointmentId);
 });
 
 app.get('/api/agenda/confirmation-tasks', async (req, res) => {

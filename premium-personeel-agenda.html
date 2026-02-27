@@ -672,6 +672,8 @@
             postCallNotesTranscript: String(item.postCallNotesTranscript || ''),
             postCallPrompt: String(item.postCallPrompt || ''),
             postCallUpdatedAt: String(item.postCallUpdatedAt || ''),
+            activeOrderId: Number(item.activeOrderId || 0) || null,
+            activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
         };
     }
 
@@ -689,7 +691,7 @@
         modalWorkspaceMode = Boolean(enabled);
         modalOverviewElement.classList.toggle('hide', modalWorkspaceMode);
         modalWorkspaceElement.classList.toggle('show', modalWorkspaceMode);
-        modalPrimaryBtn.textContent = modalWorkspaceMode ? 'Opslaan' : 'Plaatsgevonden en klant wil door';
+        refreshWorkspacePrimaryButtonLabel();
         modalSecondaryBtn.textContent = modalWorkspaceMode ? 'Terug' : 'Sluiten';
     }
 
@@ -697,16 +699,48 @@
         return appointments.find((item) => Number(item.id) === Number(activeAppointmentId)) || null;
     }
 
+    function hasWorkspacePromptReady() {
+        return String(workspacePromptEl.value || '').trim().length >= 10;
+    }
+
+    function hasWorkspaceLinkedOrder() {
+        const apt = getActiveAppointment();
+        return Boolean(apt?.activeOrderId || apt?.activeOrderAddedAt);
+    }
+
+    function refreshWorkspacePrimaryButtonLabel() {
+        if (!modalWorkspaceMode) {
+            modalPrimaryBtn.textContent = 'Plaatsgevonden en klant wil door';
+            modalPrimaryBtn.disabled = workspaceBusy;
+            return;
+        }
+
+        if (hasWorkspaceLinkedOrder()) {
+            modalPrimaryBtn.textContent = 'Toegevoegd aan actieve opdrachten';
+            modalPrimaryBtn.disabled = true;
+            return;
+        }
+
+        modalPrimaryBtn.textContent = hasWorkspacePromptReady()
+            ? 'Toevoegen aan actieve opdrachten'
+            : 'Opslaan';
+        modalPrimaryBtn.disabled = workspaceBusy;
+    }
+
     function fillWorkspaceFromAppointment(apt) {
         workspaceTranscriptEl.value = String(apt?.postCallNotesTranscript || '');
         workspacePromptEl.value = String(apt?.postCallPrompt || '');
         const updatedAt = String(apt?.postCallUpdatedAt || '');
-        if (updatedAt) {
+        const activeOrderId = Number(apt?.activeOrderId || 0) || null;
+        if (activeOrderId) {
+            setWorkspaceStatus(`Al toegevoegd aan actieve opdrachten (opdracht #${activeOrderId}).`, 'success');
+        } else if (updatedAt) {
             setWorkspaceStatus(`Laatst opgeslagen: ${new Date(updatedAt).toLocaleString('nl-NL')}`);
         } else {
             setWorkspaceStatus('');
         }
         setVoiceStatus('');
+        refreshWorkspacePrimaryButtonLabel();
     }
 
     function updateAppointmentPostCallFields(update) {
@@ -719,7 +753,10 @@
             postCallNotesTranscript: String(update?.postCallNotesTranscript || ''),
             postCallPrompt: String(update?.postCallPrompt || ''),
             postCallUpdatedAt: String(update?.postCallUpdatedAt || ''),
+            activeOrderId: Number(update?.activeOrderId || appointments[idx].activeOrderId || 0) || null,
+            activeOrderAddedAt: String(update?.activeOrderAddedAt || appointments[idx].activeOrderAddedAt || ''),
         };
+        refreshWorkspacePrimaryButtonLabel();
     }
 
     async function postJsonWithFallback(urls, body, options = {}) {
@@ -843,7 +880,7 @@
         if (workspaceBusy) return null;
 
         workspaceBusy = true;
-        modalPrimaryBtn.disabled = true;
+        refreshWorkspacePrimaryButtonLabel();
         setWorkspaceStatus('Opslaan...', '');
 
         try {
@@ -871,7 +908,58 @@
             return null;
         } finally {
             workspaceBusy = false;
-            modalPrimaryBtn.disabled = false;
+            refreshWorkspacePrimaryButtonLabel();
+        }
+    }
+
+    async function addActiveOrderForActiveAppointment() {
+        const apt = getActiveAppointment();
+        if (!apt) {
+            setWorkspaceStatus('Afspraak niet gevonden.', 'error');
+            return null;
+        }
+        if (!hasWorkspacePromptReady()) {
+            setWorkspaceStatus('Maak eerst een prompt voordat je toevoegt aan actieve opdrachten.', 'error');
+            return null;
+        }
+        if (hasWorkspaceLinkedOrder()) {
+            setWorkspaceStatus('Deze afspraak is al toegevoegd aan actieve opdrachten.', 'success');
+            return null;
+        }
+        if (workspaceBusy) return null;
+
+        workspaceBusy = true;
+        refreshWorkspacePrimaryButtonLabel();
+        setWorkspaceStatus('Toevoegen aan actieve opdrachten...', '');
+
+        try {
+            const payload = {
+                status: 'customer_wants_to_proceed',
+                transcript: String(workspaceTranscriptEl.value || '').trim(),
+                prompt: String(workspacePromptEl.value || '').trim(),
+                actor: 'premium-personeel-agenda',
+            };
+            const result = await postJsonWithFallback(
+                [
+                    `/api/agenda/appointments/${encodeURIComponent(String(apt.id))}/add-active-order`,
+                    `/api/agenda/add-active-order?appointmentId=${encodeURIComponent(String(apt.id))}`,
+                ],
+                payload,
+                { timeoutMs: 30000 }
+            );
+            updateAppointmentPostCallFields(result?.appointment || {});
+            if (result?.alreadyExisted) {
+                setWorkspaceStatus('Deze afspraak stond al bij actieve opdrachten en is bijgewerkt.', 'success');
+            } else {
+                setWorkspaceStatus('Toegevoegd aan actieve opdrachten. Je ziet hem nu op die pagina.', 'success');
+            }
+            return result;
+        } catch (error) {
+            setWorkspaceStatus(`Toevoegen mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
+            return null;
+        } finally {
+            workspaceBusy = false;
+            refreshWorkspacePrimaryButtonLabel();
         }
     }
 
@@ -899,15 +987,17 @@
             );
             workspacePromptEl.value = String(result?.prompt || '').trim();
             if (String(result?.source || '') === 'template-fallback') {
-                setWorkspaceStatus('Prompt gemaakt via fallback-template. Klik op Opslaan om te bewaren.', 'success');
+                setWorkspaceStatus('Prompt gemaakt via fallback-template. Klik op "Toevoegen aan actieve opdrachten".', 'success');
             } else {
-                setWorkspaceStatus('Prompt gegenereerd. Klik op Opslaan om te bewaren.', 'success');
+                setWorkspaceStatus('Prompt gegenereerd. Klik op "Toevoegen aan actieve opdrachten".', 'success');
             }
+            refreshWorkspacePrimaryButtonLabel();
         } catch (error) {
             setWorkspaceStatus(`Prompt genereren mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
         } finally {
             workspaceBusy = false;
             workspaceGeneratePromptBtn.disabled = false;
+            refreshWorkspacePrimaryButtonLabel();
         }
     }
 
@@ -1052,6 +1142,10 @@
             applyWorkspaceMode(true);
             return;
         }
+        if (hasWorkspacePromptReady()) {
+            void addActiveOrderForActiveAppointment();
+            return;
+        }
         void saveWorkspaceForActiveAppointment();
     }
 
@@ -1073,6 +1167,7 @@
         workspaceTranscriptEl.value = '';
         setVoiceStatus('Transcriptie gewist.');
     });
+    workspacePromptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);
 
     // Init
     renderCalendar();
