@@ -1249,7 +1249,7 @@ async function generateTextSummaryWithAi(options = {}) {
         ],
       }),
     },
-    30000
+    60000
   );
 
   if (!response.ok) {

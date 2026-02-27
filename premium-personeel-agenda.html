@@ -885,7 +885,7 @@
 
         workspaceBusy = true;
         workspaceGeneratePromptBtn.disabled = true;
-        setWorkspaceStatus('Prompt genereren...', '');
+        setWorkspaceStatus('Prompt genereren... (kan 20-45 sec duren)', '');
 
         try {
             const result = await postJsonWithFallback(
@@ -895,7 +895,7 @@
                     language: 'nl',
                     appointmentId: activeAppointmentId,
                 },
-                { timeoutMs: 15000 }
+                { timeoutMs: 50000 }
             );
             workspacePromptEl.value = String(result?.prompt || '').trim();
             setWorkspaceStatus('Prompt gegenereerd. Klik op Opslaan om te bewaren.', 'success');
