@@ -2159,6 +2159,23 @@ function normalizeEmailAddress(value) {
   return normalizeString(String(value || '').trim().toLowerCase());
 }
 
+function normalizeEmailAddressForMatching(value) {
+  const email = normalizeEmailAddress(value);
+  if (!email || !email.includes('@')) return '';
+  const [localRaw, domainRaw] = email.split('@');
+  const local = normalizeString(localRaw);
+  const domain = normalizeString(domainRaw);
+  if (!local || !domain) return '';
+
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    const noPlus = local.split('+')[0];
+    const noDots = noPlus.replace(/\./g, '');
+    return `${noDots}@gmail.com`;
+  }
+
+  return `${local}@${domain}`;
+}
+
 function isLikelyValidEmail(value) {
   const email = normalizeEmailAddress(value);
   return Boolean(email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
@@ -2397,7 +2414,7 @@ function findAppointmentIndexBySentMessageIdReference(refTokens) {
   return -1;
 }
 
-function findAppointmentIndexForInboundConfirmationMail(parsedMail) {
+function findAppointmentIndexForInboundConfirmationMail(parsedMail, decisionInfo = null) {
   const subject = normalizeString(parsedMail?.subject || '');
   const text = normalizeString(parsedMail?.text || '');
   const combined = `${subject}\n${text}`;
@@ -2414,11 +2431,38 @@ function findAppointmentIndexForInboundConfirmationMail(parsedMail) {
 
   const from = getParsedMailFromEmail(parsedMail);
   if (from.address) {
+    const normalizedFrom = normalizeEmailAddressForMatching(from.address);
     const candidates = generatedAgendaAppointments
       .map((appt, idx) => ({ appt, idx }))
       .filter(({ appt }) => appt && mapAppointmentToConfirmationTask(appt))
-      .filter(({ appt }) => normalizeEmailAddress(appt.contactEmail || appt.email || '') === from.address);
+      .filter(({ appt }) => {
+        const candidateEmail = normalizeEmailAddressForMatching(appt.contactEmail || appt.email || '');
+        return Boolean(candidateEmail && normalizedFrom && candidateEmail === normalizedFrom);
+      });
     if (candidates.length === 1) return candidates[0].idx;
+  }
+
+  const decision = normalizeString(decisionInfo?.decision || '');
+  if (decision === 'confirm' || decision === 'cancel') {
+    const fallbackCandidates = generatedAgendaAppointments
+      .map((appt, idx) => ({ appt, idx }))
+      .filter(({ appt }) => appt && mapAppointmentToConfirmationTask(appt))
+      .filter(({ appt }) => Boolean(appt.confirmationEmailSent || appt.confirmationEmailSentAt))
+      .filter(({ appt }) => {
+        const sentAt = Date.parse(normalizeString(appt.confirmationEmailSentAt || ''));
+        if (!Number.isFinite(sentAt)) return true;
+        const maxAgeMs = 14 * 24 * 60 * 60 * 1000;
+        return Date.now() - sentAt <= maxAgeMs;
+      })
+      .sort((a, b) => {
+        const aTs = Date.parse(normalizeString(a.appt?.confirmationEmailSentAt || '')) || 0;
+        const bTs = Date.parse(normalizeString(b.appt?.confirmationEmailSentAt || '')) || 0;
+        return bTs - aTs;
+      });
+
+    if (fallbackCandidates.length === 1) {
+      return fallbackCandidates[0].idx;
+    }
   }
 
   return -1;
@@ -2614,14 +2658,14 @@ async function syncInboundConfirmationEmailsFromImap(options = {}) {
                 continue;
               }
 
-              const idx = findAppointmentIndexForInboundConfirmationMail(parsedMail);
+              const decision = detectInboundConfirmationDecision(parsedMail);
+              const idx = findAppointmentIndexForInboundConfirmationMail(parsedMail, decision);
               if (idx < 0) {
                 stats.ignored += 1;
                 continue;
               }
 
               stats.matched += 1;
-              const decision = detectInboundConfirmationDecision(parsedMail);
               const from = getParsedMailFromEmail(parsedMail);
               const result = applyInboundMailDecisionToAppointment(idx, decision.decision, {
                 fromEmail: from.address,
