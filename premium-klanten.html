@@ -101,6 +101,170 @@
             background: rgba(79, 124, 255, 0.08);
         }
 
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 2.5rem 0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            text-decoration: none;
+            padding: 0 2rem;
+            margin-bottom: 3rem;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-section-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--text-tertiary);
+            padding: 0 2rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.8rem 2rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 400;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .sidebar-link::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar-link:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .sidebar-link.active {
+            color: var(--text-primary);
+            background: rgba(139, 34, 82, 0.06);
+        }
+
+        .sidebar-link.active::before {
+            opacity: 1;
+        }
+
+        .sidebar-link svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.5;
+            flex-shrink: 0;
+        }
+
+        .sidebar-link.active svg,
+        .sidebar-link:hover svg {
+            opacity: 1;
+        }
+
+        .sidebar-footer {
+            padding: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .sidebar-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .sidebar-user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sidebar-user-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .sidebar-user-role {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            padding: 0.3rem;
+            transition: color 0.2s;
+        }
+
+        .logout-btn:hover {
+            color: #d85f51;
+        }
+
+        .logout-btn svg {
+            width: 18px;
+            height: 18px;
+            transform: scaleX(-1);
+            transform-origin: center;
+        }
+
         h1,
         h2,
         h3 {
@@ -121,9 +285,14 @@
         .page-shell {
             position: relative;
             z-index: 1;
+            flex: 1;
+            margin-left: 280px;
+            padding: 42px 0 72px;
+        }
+
+        .page-content {
             width: min(1380px, calc(100% - 32px));
             margin: 0 auto;
-            padding: 42px 0 72px;
         }
 
         .hero {
@@ -650,10 +819,32 @@
             }
         }
 
+        @media (max-width: 900px) {
+            .dashboard-layout {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                position: static;
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .page-shell {
+                margin-left: 0;
+                padding-top: 24px;
+            }
+        }
+
         @media (max-width: 820px) {
             .page-shell {
-                width: min(100%, calc(100% - 20px));
                 padding-top: 24px;
+            }
+
+            .page-content {
+                width: min(100%, calc(100% - 20px));
             }
 
             .database-toolbar,
@@ -744,92 +935,154 @@
     </style>
 </head>
 <body>
-    <main class="page-shell">
-        <section class="hero">
-            <div class="hero-copy">
-                <a class="brand-link" href="/premium-personeel-dashboard">Softora.nl</a>
-                <div class="eyebrow">Premium klanten database</div>
-                <h1 class="hero-title">Klanten</h1>
-                <p class="hero-text">Zoek, beheer en update al je klanten op een plek. De pagina gebruikt de bestaande Softora-kleuren en kan automatisch starten met klanten uit je premium opdrachten.</p>
-            </div>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <a href="/premium-website" class="sidebar-logo">Softora.nl</a>
 
-            <div class="hero-actions">
-                <div class="date-badge" id="dateBadge">--</div>
-                <div class="theme-controls" role="group" aria-label="Thema kiezen">
-                    <button type="button" class="theme-switch-btn" data-theme-value="dark" aria-pressed="false">Donker</button>
-                    <button type="button" class="theme-switch-btn" data-theme-value="light" aria-pressed="false">Licht</button>
-                </div>
-            </div>
-        </section>
-
-        <section class="stats-grid" aria-label="Samenvatting">
-            <article class="stat-card">
-                <div class="stat-label">Totale klanten</div>
-                <div class="stat-value is-accent" id="statTotal">0</div>
-                <div class="stat-note">Unieke records in je klantenbestand.</div>
-            </article>
-
-            <article class="stat-card">
-                <div class="stat-label">Totale omzet</div>
-                <div class="stat-value" id="statRevenue">EUR 0</div>
-                <div class="stat-note">Som van alle bekende bedragen in de database.</div>
-            </article>
-
-            <article class="stat-card">
-                <div class="stat-label">Openstaand</div>
-                <div class="stat-value is-success" id="statOpen">EUR 0</div>
-                <div class="stat-note">Alle records die nog op open staan.</div>
-            </article>
-        </section>
-
-        <section class="database-card" aria-labelledby="databaseTitle">
-            <div class="database-toolbar">
-                <div class="database-toolbar-copy">
-                    <h2 id="databaseTitle">Klantenbestand</h2>
-                    <p>Gebaseerd op jouw voorbeeld, maar ingebouwd in de huidige Softora-stijl en zonder sidebar.</p>
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="/premium-personeel-dashboard" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="/premium-actieve-opdrachten" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg>
+                        Actieve Opdrachten
+                    </a>
+                    <a href="/premium-personeel-agenda" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+                        Agenda
+                    </a>
+                    <a href="/premium-bevestigingsmails" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15A2.25 2.25 0 0 1 2.25 17.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15A2.25 2.25 0 0 0 2.25 6.75m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.909a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
+                        Bevestigingsmails
+                    </a>
+                    <a href="/premium-ai-lead-generator" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-2.128a1.5 1.5 0 0 0-1.064-1.436l-3.084-.925a1.5 1.5 0 0 0-1.695.633l-.97 1.455a12.036 12.036 0 0 1-5.516-5.516l1.455-.97a1.5 1.5 0 0 0 .633-1.695l-.925-3.084A1.5 1.5 0 0 0 8.878 2.25H6.75A2.25 2.25 0 0 0 4.5 4.5v2.25z"/></svg>
+                        AI Coldcalling
+                    </a>
                 </div>
 
-                <button type="button" class="btn-primary" id="addCustomerButton">Klant toevoegen</button>
-            </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Beheer</div>
+                    <a href="/premium-klanten" class="sidebar-link active">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
+                        Klanten
+                    </a>
+                    <div class="sidebar-theme">
+                        <div class="sidebar-theme-label">Thema</div>
+                        <div class="sidebar-theme-options" role="group" aria-label="Thema kiezen">
+                            <button type="button" class="theme-switch-btn" data-theme-value="dark" aria-pressed="false">Donker</button>
+                            <button type="button" class="theme-switch-btn" data-theme-value="light" aria-pressed="false">Licht</button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
 
-            <div class="filter-row">
-                <label class="search-wrap" for="searchInput">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <circle cx="11" cy="11" r="7"></circle>
-                        <line x1="20" y1="20" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <input class="search-input" id="searchInput" type="text" placeholder="Zoek op naam, bedrijf, telefoon of project...">
-                </label>
-
-                <div class="results-meta">
-                    <span class="results-chip" id="visibleCount">0</span>
-                    <span>Zichtbare klanten</span>
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">SP</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">Softora Premium</div>
+                        <div class="sidebar-user-role">Administrator</div>
+                    </div>
+                    <a href="/premium-personeel-login" class="logout-btn" title="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/></svg>
+                    </a>
                 </div>
             </div>
+        </aside>
 
-            <div class="status-banner" id="statusBanner" aria-live="polite"></div>
+        <main class="page-shell">
+            <div class="page-content">
+                <section class="hero">
+                    <div class="hero-copy">
+                        <a class="brand-link" href="/premium-personeel-dashboard">Softora.nl</a>
+                        <div class="eyebrow">Premium klanten database</div>
+                        <h1 class="hero-title">Klanten</h1>
+                        <p class="hero-text">Zoek, beheer en update al je klanten op een plek. De pagina gebruikt de bestaande Softora-kleuren en kan automatisch starten met klanten uit je premium opdrachten.</p>
+                    </div>
 
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Klant</th>
-                            <th>Telefoonnummer</th>
-                            <th>Type</th>
-                            <th>Website / project</th>
-                            <th>Bedrag</th>
-                            <th>Status</th>
-                            <th>Betaaldatum</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="customersBody"></tbody>
-                </table>
+                    <div class="hero-actions">
+                        <div class="date-badge" id="dateBadge">--</div>
+                        <div class="theme-controls" role="group" aria-label="Thema kiezen">
+                            <button type="button" class="theme-switch-btn" data-theme-value="dark" aria-pressed="false">Donker</button>
+                            <button type="button" class="theme-switch-btn" data-theme-value="light" aria-pressed="false">Licht</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="stats-grid" aria-label="Samenvatting">
+                    <article class="stat-card">
+                        <div class="stat-label">Totale klanten</div>
+                        <div class="stat-value is-accent" id="statTotal">0</div>
+                        <div class="stat-note">Unieke records in je klantenbestand.</div>
+                    </article>
+
+                    <article class="stat-card">
+                        <div class="stat-label">Totale omzet</div>
+                        <div class="stat-value" id="statRevenue">EUR 0</div>
+                        <div class="stat-note">Som van alle bekende bedragen in de database.</div>
+                    </article>
+
+                    <article class="stat-card">
+                        <div class="stat-label">Openstaand</div>
+                        <div class="stat-value is-success" id="statOpen">EUR 0</div>
+                        <div class="stat-note">Alle records die nog op open staan.</div>
+                    </article>
+                </section>
+
+                <section class="database-card" aria-labelledby="databaseTitle">
+                    <div class="database-toolbar">
+                        <div class="database-toolbar-copy">
+                            <h2 id="databaseTitle">Klantenbestand</h2>
+                            <p>Gebaseerd op jouw voorbeeld, maar ingebouwd in de huidige Softora-stijl.</p>
+                        </div>
+
+                        <button type="button" class="btn-primary" id="addCustomerButton">Klant toevoegen</button>
+                    </div>
+
+                    <div class="filter-row">
+                        <label class="search-wrap" for="searchInput">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <circle cx="11" cy="11" r="7"></circle>
+                                <line x1="20" y1="20" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input class="search-input" id="searchInput" type="text" placeholder="Zoek op naam, bedrijf, telefoon of project...">
+                        </label>
+
+                        <div class="results-meta">
+                            <span class="results-chip" id="visibleCount">0</span>
+                            <span>Zichtbare klanten</span>
+                        </div>
+                    </div>
+
+                    <div class="status-banner" id="statusBanner" aria-live="polite"></div>
+
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Klant</th>
+                                    <th>Telefoonnummer</th>
+                                    <th>Type</th>
+                                    <th>Website / project</th>
+                                    <th>Bedrag</th>
+                                    <th>Status</th>
+                                    <th>Betaaldatum</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="customersBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="empty-state" id="emptyState" hidden>Geen klanten gevonden.</div>
+                </section>
             </div>
-
-            <div class="empty-state" id="emptyState" hidden>Geen klanten gevonden.</div>
-        </section>
-    </main>
+        </main>
+    </div>
 
     <div class="modal-overlay" id="modalOverlay" hidden>
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
