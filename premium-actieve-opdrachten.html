@@ -410,40 +410,57 @@
         .orders-filter-bar {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.9rem;
-            margin: -1.25rem 0 2rem;
+            align-items: center;
+            gap: 1.4rem;
+            margin: -1.4rem 0 2rem;
+            padding-bottom: 0.55rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
         }
 
         .orders-filter-btn {
-            border: 1px solid rgba(139,34,82,0.18);
-            background: rgba(255,255,255,0.78);
+            border: none;
+            background: transparent;
             color: var(--text-secondary);
             font-family: 'Oswald', sans-serif;
             font-size: 0.78rem;
             font-weight: 500;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            padding: 0.9rem 1rem;
-            min-width: 220px;
+            padding: 0.25rem 0 0.45rem;
             display: inline-flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
+            justify-content: flex-start;
+            gap: 0.65rem;
             cursor: none;
-            transition: all 0.22s var(--ease-out-expo);
+            transition: color 0.22s var(--ease-out-expo), opacity 0.22s var(--ease-out-expo);
+            position: relative;
         }
 
         .orders-filter-btn:hover {
             color: var(--accent-light);
-            border-color: rgba(139,34,82,0.35);
-            background: rgba(139,34,82,0.05);
         }
 
         .orders-filter-btn.active {
-            color: #fff;
-            border-color: var(--accent);
-            background: linear-gradient(135deg, var(--accent), var(--accent-light));
-            box-shadow: 0 0 24px rgba(139,34,82,0.18);
+            color: var(--accent-light);
+        }
+
+        .orders-filter-btn::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -0.56rem;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-light));
+            opacity: 0;
+            transform: scaleX(0.55);
+            transform-origin: left center;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .orders-filter-btn.active::after {
+            opacity: 1;
+            transform: scaleX(1);
         }
 
         .orders-filter-label {
@@ -465,12 +482,12 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 30px;
-            padding: 0.18rem 0.45rem;
-            border: 1px solid currentColor;
-            font-size: 0.72rem;
+            min-width: 22px;
+            padding: 0;
+            border: none;
+            font-size: 0.74rem;
             line-height: 1;
-            opacity: 0.9;
+            opacity: 0.82;
         }
 
         /* Orders */
