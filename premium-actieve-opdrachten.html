@@ -1930,8 +1930,11 @@
             const order = orders[id];
             const ui = resolveOrderUiState(order);
 
-            if (ui.isBuilt) {
+            if (ui.isPaid) {
                 return 'completed';
+            }
+            if (ui.isBuilt) {
+                return 'in_progress';
             }
             if (ui.status.key === 'bezig') {
                 return 'in_progress';
