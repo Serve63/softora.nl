@@ -33,8 +33,10 @@
   let remoteUiStateLoaded = false;
   let remoteUiStateLoadingPromise = null;
   let remoteUiStateSaveTimer = null;
-  let remoteUiStateSaveInFlight = false;
+  let remoteUiStateFlushPromise = null;
   let remoteUiStatePendingPatch = Object.create(null);
+  let remoteUiStateLastSource = '';
+  let remoteUiStateLastError = '';
 
   function byId(id) {
     return document.getElementById(id);
@@ -282,6 +284,18 @@
     return `Gestart met het bellen van ${started} ${personWord}${failedText}.${etaText}`;
   }
 
+  function cloneUiStateValues(values) {
+    const nextValues = Object.create(null);
+    if (!values || typeof values !== 'object') {
+      return nextValues;
+    }
+
+    Object.entries(values).forEach(([k, v]) => {
+      nextValues[String(k)] = String(v ?? '');
+    });
+    return nextValues;
+  }
+
   function readStorage(key) {
     if (!key) return '';
     return String(remoteUiStateCache[key] ?? '');
@@ -305,18 +319,29 @@
           method: 'GET',
           cache: 'no-store',
         });
-        if (!response.ok) return false;
+        if (!response.ok) {
+          remoteUiStateLastSource = '';
+          remoteUiStateLastError = `UI state load failed (${response.status})`;
+          remoteUiStateLoaded = true;
+          return false;
+        }
 
         const data = await response.json().catch(() => ({}));
         const values = data && data.ok && data.values && typeof data.values === 'object' ? data.values : {};
-        const nextCache = Object.create(null);
-        Object.entries(values).forEach(([k, v]) => {
-          nextCache[String(k)] = String(v ?? '');
-        });
-        remoteUiStateCache = nextCache;
+        remoteUiStateLastSource = String(data?.source || '').trim();
+        if (remoteUiStateLastSource !== 'supabase') {
+          remoteUiStateLastError = 'UI state wordt niet vanuit Supabase geladen.';
+          remoteUiStateLoaded = true;
+          return false;
+        }
+
+        remoteUiStateCache = cloneUiStateValues(values);
+        remoteUiStateLastError = '';
         remoteUiStateLoaded = true;
         return true;
       } catch {
+        remoteUiStateLastSource = '';
+        remoteUiStateLastError = 'UI state load crash';
         remoteUiStateLoaded = true;
         return false;
       } finally {
@@ -328,37 +353,59 @@
   }
 
   async function flushRemoteUiStateSave() {
-    if (remoteUiStateSaveInFlight) return;
+    if (remoteUiStateFlushPromise) return remoteUiStateFlushPromise;
 
     const patch = remoteUiStatePendingPatch;
     const patchKeys = Object.keys(patch);
-    if (patchKeys.length === 0) return;
+    if (patchKeys.length === 0) return { ok: true, source: remoteUiStateLastSource || 'supabase' };
 
     remoteUiStatePendingPatch = Object.create(null);
-    remoteUiStateSaveInFlight = true;
 
-    try {
-      await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          patch,
-          source: 'assets/coldcalling-vapi.js',
-          actor: 'browser',
-        }),
-      });
-    } catch {
-      patchKeys.forEach((key) => {
-        remoteUiStatePendingPatch[key] = String(patch[key] ?? '');
-      });
-    } finally {
-      remoteUiStateSaveInFlight = false;
-      if (Object.keys(remoteUiStatePendingPatch).length > 0) {
-        scheduleRemoteUiStateSave(800);
+    remoteUiStateFlushPromise = (async () => {
+      try {
+        const response = await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            patch,
+            source: 'assets/coldcalling-vapi.js',
+            actor: 'browser',
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(normalizeString(data?.error || '') || `UI state save failed (${response.status})`);
+        }
+
+        const source = String(data?.source || '').trim();
+        if (source !== 'supabase') {
+          throw new Error('UI state is niet in Supabase opgeslagen.');
+        }
+
+        remoteUiStateLastSource = source;
+        remoteUiStateLastError = '';
+        return { ok: true, source };
+      } catch (error) {
+        patchKeys.forEach((key) => {
+          remoteUiStatePendingPatch[key] = String(patch[key] ?? '');
+        });
+        remoteUiStateLastError = normalizeString(error?.message || '') || 'UI state save failed';
+        return {
+          ok: false,
+          source: remoteUiStateLastSource || 'memory',
+          error: remoteUiStateLastError,
+        };
+      } finally {
+        remoteUiStateFlushPromise = null;
+        if (Object.keys(remoteUiStatePendingPatch).length > 0) {
+          scheduleRemoteUiStateSave(800);
+        }
       }
-    }
+    })();
+
+    return remoteUiStateFlushPromise;
   }
 
   function scheduleRemoteUiStateSave(delayMs = 250) {
@@ -369,6 +416,14 @@
       remoteUiStateSaveTimer = null;
       void flushRemoteUiStateSave();
     }, delayMs);
+  }
+
+  async function persistRemoteUiStateNow() {
+    if (remoteUiStateSaveTimer) {
+      window.clearTimeout(remoteUiStateSaveTimer);
+      remoteUiStateSaveTimer = null;
+    }
+    return flushRemoteUiStateSave();
   }
 
   function getSavedDispatchMode() {
@@ -640,7 +695,14 @@
   }
 
   function saveLeadRows(rows) {
-    writeStorage(LEAD_ROWS_STORAGE_KEY, JSON.stringify((rows || []).map(normalizeLeadRow)));
+    const serialized = JSON.stringify((rows || []).map(normalizeLeadRow));
+    writeStorage(LEAD_ROWS_STORAGE_KEY, serialized);
+  }
+
+  function persistLeadRowsDraft(rows) {
+    const nextRows = Array.isArray(rows) ? rows : collectLeadRowsFromModal();
+    saveLeadRows(nextRows);
+    updateLeadListHint();
   }
 
   function setLeadModalDraftHint(message) {
@@ -875,7 +937,8 @@
     rowsWrap.querySelectorAll('input[data-field]').forEach((input) => {
       input.addEventListener('input', () => {
         setActiveSheetInput(input);
-        setLeadModalDraftHint('Concept aangepast. Klik "Opslaan lijst" om te bewaren.');
+        persistLeadRowsDraft();
+        setLeadModalDraftHint('Wijziging automatisch bewaard. Klik "Opslaan lijst" om direct te synchroniseren.');
       });
 
       input.addEventListener('focus', () => {
@@ -905,12 +968,13 @@
         const currentRows = collectLeadRowsFromModal();
         const nextRows = applyPasteGridToRows(currentRows, startRowIndex, startColIndex, grid);
         renderLeadRows(nextRows);
+        persistLeadRowsDraft(nextRows);
         const nextFocus = rowsWrap.querySelector(
           `input[data-row-index="${startRowIndex}"][data-col-index="${startColIndex}"]`
         );
         if (nextFocus) setActiveSheetInput(nextFocus);
         setLeadModalDraftHint(
-          `Excel/Sheets plak verwerkt: ${grid.length} rij(en) ingevoegd. Klik "Opslaan lijst".`
+          `Excel/Sheets plak verwerkt: ${grid.length} rij(en) ingevoegd en bewaard. Klik "Opslaan lijst" om direct te synchroniseren.`
         );
       });
     });
@@ -971,7 +1035,11 @@
       modal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
       renderLeadRows(getSavedLeadRows());
-      setLeadModalDraftHint('Excel/Sheets plakken wordt ondersteund. Lege regels worden genegeerd.');
+      setLeadModalDraftHint(
+        remoteUiStateLastSource === 'supabase'
+          ? 'Excel/Sheets plakken wordt ondersteund. Klik op "Opslaan lijst" om direct naar Supabase te bewaren.'
+          : 'Excel/Sheets plakken wordt ondersteund. Opslaan werkt alleen als Supabase actief is.'
+      );
     }
 
     modal.addEventListener('click', (event) => {
@@ -986,7 +1054,8 @@
     byId('leadSheetFormulaInput')?.addEventListener('input', (event) => {
       if (!activeSheetInput) return;
       activeSheetInput.value = event.target.value;
-      setLeadModalDraftHint('Cel aangepast via formulebalk. Klik "Opslaan lijst" om te bewaren.');
+      persistLeadRowsDraft();
+      setLeadModalDraftHint('Cel aangepast en automatisch bewaard. Klik "Opslaan lijst" om direct te synchroniseren.');
     });
 
     byId('leadListAddRowBtn')?.addEventListener('click', () => {
@@ -995,23 +1064,32 @@
         rows.push(getDefaultLeadRow());
       }
       renderLeadRows(rows);
-      setLeadModalDraftHint('10 rijen toegevoegd. Klik "Opslaan lijst" om te bewaren.');
+      persistLeadRowsDraft(rows);
+      setLeadModalDraftHint('10 rijen toegevoegd en automatisch bewaard.');
     });
 
     byId('leadListClearRowsBtn')?.addEventListener('click', () => {
       renderLeadRows([]);
-      setLeadModalDraftHint('Lijst geleegd in concept. Klik "Opslaan lijst" om leeg op te slaan.');
+      persistLeadRowsDraft([]);
+      setLeadModalDraftHint('Lijst gewist en automatisch bewaard.');
     });
 
-    byId('leadListSaveBtn')?.addEventListener('click', () => {
+    byId('leadListSaveBtn')?.addEventListener('click', async () => {
       const rows = collectLeadRowsFromModal();
       saveLeadRows(rows);
       updateLeadListHint();
+      const saveResult = await persistRemoteUiStateNow();
+      if (!saveResult.ok) {
+        setLeadModalDraftHint(
+          `Opslaan mislukt. Deze lijst staat nog niet in Supabase.${saveResult.error ? ` ${saveResult.error}` : ''}`
+        );
+        return;
+      }
       const parsed = parseLeadRows(rows);
       if (!parsed.hasInput) {
-        setLeadModalDraftHint('Lege lijst opgeslagen. Er worden geen calls gestart zonder geldige leads.');
+        setLeadModalDraftHint('Lege lijst opgeslagen in Supabase. Er worden geen calls gestart zonder geldige leads.');
       } else {
-        setLeadModalDraftHint(`Opgeslagen: ${parsed.leads.length} geldige lead(s).`);
+        setLeadModalDraftHint(`Opgeslagen in Supabase: ${parsed.leads.length} geldige lead(s).`);
       }
       closeModal();
     });
@@ -1264,7 +1342,14 @@
   }
 
   function saveAiNotebookRows(rows) {
-    writeStorage(AI_NOTEBOOK_ROWS_STORAGE_KEY, JSON.stringify((rows || []).map(normalizeAiNotebookRow)));
+    const serialized = JSON.stringify((rows || []).map(normalizeAiNotebookRow));
+    writeStorage(AI_NOTEBOOK_ROWS_STORAGE_KEY, serialized);
+  }
+
+  function persistAiNotebookRowsDraft(rows) {
+    const nextRows = Array.isArray(rows) ? rows : collectAiNotebookRowsFromModal();
+    saveAiNotebookRows(nextRows);
+    updateAiNotebookHint();
   }
 
   function setAiNotebookDraftHint(message) {
@@ -1461,7 +1546,8 @@
     rowsWrap.querySelectorAll('input[data-ai-field]').forEach((input) => {
       input.addEventListener('input', () => {
         setActiveSheetInput(input);
-        setAiNotebookDraftHint('Kladblok aangepast. Klik "Opslaan lijst" om te bewaren.');
+        persistAiNotebookRowsDraft();
+        setAiNotebookDraftHint('Kladblok automatisch bewaard. Klik "Opslaan lijst" om direct te synchroniseren.');
       });
       input.addEventListener('focus', () => setActiveSheetInput(input));
       input.addEventListener('click', () => setActiveSheetInput(input));
@@ -1479,12 +1565,13 @@
         const currentRows = collectAiNotebookRowsFromModal();
         const nextRows = applyPasteGridToAiNotebookRows(currentRows, startRowIndex, startColIndex, grid);
         renderAiNotebookRows(nextRows);
+        persistAiNotebookRowsDraft(nextRows);
         const nextFocus = rowsWrap.querySelector(
           `input[data-row-index="${startRowIndex}"][data-col-index="${startColIndex}"]`
         );
         if (nextFocus) setActiveSheetInput(nextFocus);
         setAiNotebookDraftHint(
-          `Excel/Sheets plak verwerkt: ${grid.length} rij(en) in AI kladblok. Klik "Opslaan lijst".`
+          `Excel/Sheets plak verwerkt: ${grid.length} rij(en) in AI kladblok en bewaard. Klik "Opslaan lijst" om direct te synchroniseren.`
         );
       });
     });
@@ -1583,7 +1670,9 @@
       document.body.style.overflow = 'hidden';
       renderAiNotebookRows(getSavedAiNotebookRows());
       setAiNotebookDraftHint(
-        'Excel/Sheets plakken wordt ondersteund. Kolommen A-F: bedrijf, telefoon, status, terugbellen, reden, onthouden.'
+        remoteUiStateLastSource === 'supabase'
+          ? 'Excel/Sheets plakken wordt ondersteund. Klik op "Opslaan lijst" om direct naar Supabase te bewaren.'
+          : 'Excel/Sheets plakken wordt ondersteund. Opslaan werkt alleen als Supabase actief is.'
       );
     }
 
@@ -1597,23 +1686,32 @@
       const rows = collectAiNotebookRowsFromModal();
       for (let i = 0; i < 10; i += 1) rows.push(getDefaultAiNotebookRow());
       renderAiNotebookRows(rows);
-      setAiNotebookDraftHint('10 rijen toegevoegd. Klik "Opslaan lijst" om te bewaren.');
+      persistAiNotebookRowsDraft(rows);
+      setAiNotebookDraftHint('10 rijen toegevoegd en automatisch bewaard.');
     });
 
     byId('aiNotebookClearRowsBtn')?.addEventListener('click', () => {
       renderAiNotebookRows([]);
-      setAiNotebookDraftHint('AI kladblok geleegd in concept. Klik "Opslaan lijst" om te bewaren.');
+      persistAiNotebookRowsDraft([]);
+      setAiNotebookDraftHint('AI kladblok gewist en automatisch bewaard.');
     });
 
-    byId('aiNotebookSaveBtn')?.addEventListener('click', () => {
+    byId('aiNotebookSaveBtn')?.addEventListener('click', async () => {
       const rows = collectAiNotebookRowsFromModal();
       saveAiNotebookRows(rows);
       updateAiNotebookHint();
+      const saveResult = await persistRemoteUiStateNow();
+      if (!saveResult.ok) {
+        setAiNotebookDraftHint(
+          `Opslaan mislukt. Dit kladblok staat nog niet in Supabase.${saveResult.error ? ` ${saveResult.error}` : ''}`
+        );
+        return;
+      }
       const parsed = parseAiNotebookRows(rows);
       setAiNotebookDraftHint(
         parsed.hasInput
-          ? `AI kladblok opgeslagen: ${parsed.nonEmptyRowCount} regel(s).`
-          : 'Leeg AI kladblok opgeslagen.'
+          ? `AI kladblok opgeslagen in Supabase: ${parsed.nonEmptyRowCount} regel(s).`
+          : 'Leeg AI kladblok opgeslagen in Supabase.'
       );
       closeModal();
     });

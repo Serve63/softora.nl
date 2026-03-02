@@ -293,6 +293,93 @@ async function upsertSupabaseStateRowViaRest(row) {
   }
 }
 
+async function fetchSupabaseRowByKeyViaRest(rowKey, selectColumns = 'payload,updated_at') {
+  const normalizedRowKey = normalizeString(rowKey);
+  if (!normalizedRowKey) {
+    return { ok: false, status: null, body: null, error: 'Ongeldige state key.' };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
+  }
+
+  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
+  const url =
+    `${baseUrl}/rest/v1/${encodeURIComponent(SUPABASE_STATE_TABLE)}` +
+    `?select=${encodeURIComponent(selectColumns)}` +
+    `&state_key=eq.${encodeURIComponent(normalizedRowKey)}` +
+    '&limit=1';
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
+
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = text;
+    }
+
+    return { ok: response.ok, status: response.status, body, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      status: null,
+      body: null,
+      error: truncateText(error?.message || String(error), 500),
+    };
+  }
+}
+
+async function upsertSupabaseRowViaRest(row) {
+  const stateKey = normalizeString(row?.state_key || '');
+  if (!stateKey) {
+    return { ok: false, status: null, body: null, error: 'Ongeldige state key.' };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
+  }
+
+  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
+  const url = `${baseUrl}/rest/v1/${encodeURIComponent(SUPABASE_STATE_TABLE)}?on_conflict=state_key`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify([row]),
+    });
+
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = text;
+    }
+
+    return { ok: response.ok, status: response.status, body, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      status: null,
+      body: null,
+      error: truncateText(error?.message || String(error), 500),
+    };
+  }
+}
+
 function getSupabaseClient() {
   if (!isSupabaseConfigured()) return null;
   if (supabaseClient) return supabaseClient;
@@ -604,8 +691,20 @@ async function getUiStateValues(scope) {
       .maybeSingle();
 
     if (error) {
-      console.error('[UI State][Supabase][GetError]', error.message || error);
-      return { values: { ...(inMemoryUiStateByScope.get(normalizedScope) || {}) }, source: 'memory' };
+      const fallback = await fetchSupabaseRowByKeyViaRest(rowKey, 'payload,updated_at');
+      if (!fallback.ok) {
+        console.error('[UI State][Supabase][GetError]', error.message || error);
+        return { values: { ...(inMemoryUiStateByScope.get(normalizedScope) || {}) }, source: 'memory' };
+      }
+
+      const row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
+      const values = sanitizeUiStateValues(row?.payload?.values || {});
+      inMemoryUiStateByScope.set(normalizedScope, values);
+      return {
+        values: { ...values },
+        updatedAt: normalizeString(row?.updated_at || '') || null,
+        source: 'supabase',
+      };
     }
 
     const values = sanitizeUiStateValues(data?.payload?.values || {});
@@ -626,10 +725,11 @@ async function setUiStateValues(scope, values, meta = {}) {
   if (!normalizedScope) return null;
 
   const sanitizedValues = sanitizeUiStateValues(values);
+  const updatedAt = new Date().toISOString();
   inMemoryUiStateByScope.set(normalizedScope, sanitizedValues);
 
   if (!isSupabaseConfigured()) {
-    return { values: { ...sanitizedValues }, source: 'memory' };
+    return { values: { ...sanitizedValues }, source: 'memory', updatedAt };
   }
 
   try {
@@ -647,7 +747,7 @@ async function setUiStateValues(scope, values, meta = {}) {
         source: normalizeString(meta.source || 'frontend'),
         actor: normalizeString(meta.actor || ''),
       },
-      updated_at: new Date().toISOString(),
+      updated_at: updatedAt,
     };
 
     const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
@@ -655,14 +755,18 @@ async function setUiStateValues(scope, values, meta = {}) {
     });
 
     if (error) {
-      console.error('[UI State][Supabase][SetError]', error.message || error);
-      return { values: { ...sanitizedValues }, source: 'memory' };
+      const fallback = await upsertSupabaseRowViaRest(row);
+      if (!fallback.ok) {
+        console.error('[UI State][Supabase][SetError]', error.message || error);
+        return { values: { ...sanitizedValues }, source: 'memory', updatedAt };
+      }
+      return { values: { ...sanitizedValues }, source: 'supabase', updatedAt };
     }
 
-    return { values: { ...sanitizedValues }, source: 'supabase' };
+    return { values: { ...sanitizedValues }, source: 'supabase', updatedAt };
   } catch (error) {
     console.error('[UI State][Supabase][SetCrash]', error?.message || error);
-    return { values: { ...sanitizedValues }, source: 'memory' };
+    return { values: { ...sanitizedValues }, source: 'memory', updatedAt };
   }
 }
 
@@ -4486,6 +4590,7 @@ async function sendUiStateSetResponse(req, res, scopeRaw) {
     scope,
     values: state.values || {},
     source: state.source || 'memory',
+    updatedAt: state.updatedAt || null,
   });
 }
 
