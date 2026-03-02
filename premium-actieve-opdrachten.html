@@ -1357,7 +1357,7 @@
                 </div>
                 <div class="summary-card">
                     <div>
-                        <div class="summary-label">Totale Waarde</div>
+                        <div class="summary-label">Openstaande Waarde</div>
                         <div class="summary-value" id="sumTotal">€0</div>
                     </div>
                     <div class="summary-icon">
@@ -2063,7 +2063,11 @@
 
         function refreshOrderSummaryCards() {
             const cards = Array.from(document.querySelectorAll('#ordersGrid .order-card'));
-            const totalValue = cards.reduce((sum, card) => {
+            const openValue = cards.reduce((sum, card) => {
+                const id = Number(String(card?.id || '').replace('order-', ''));
+                const order = orders[id];
+                const ui = resolveOrderUiState(order);
+                if (ui.isPaid) return sum;
                 const amount = moneyToNumber(card.querySelector('.order-price-value')?.textContent || '');
                 return sum + (Number.isFinite(amount) ? amount : 0);
             }, 0);
@@ -2073,7 +2077,7 @@
             if (sumActive) sumActive.textContent = String(cards.length);
 
             const sumTotal = document.getElementById('sumTotal');
-            if (sumTotal) sumTotal.textContent = '€' + totalValue.toLocaleString('nl-NL');
+            if (sumTotal) sumTotal.textContent = '€' + openValue.toLocaleString('nl-NL');
 
             const sumDelivered = document.getElementById('sumDelivered');
             if (sumDelivered) sumDelivered.textContent = String(deliveredCount);
