@@ -311,44 +311,13 @@
         }
 
         .hero {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 1rem;
+            display: block;
             margin-bottom: 2.5rem;
-        }
-
-        .hero-copy {
-            display: grid;
-            gap: 0.35rem;
-        }
-
-        .brand-link {
-            width: fit-content;
-            color: var(--text-tertiary);
-            text-decoration: none;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-        }
-
-        .eyebrow {
-            width: fit-content;
-            padding: 0.4rem 0.65rem;
-            border: 1px solid rgba(139, 34, 82, 0.26);
-            background: rgba(139, 34, 82, 0.08);
-            color: var(--accent-light);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
         }
 
         .hero-title {
             font-size: 2.35rem;
-            margin-top: 0.15rem;
+            margin-bottom: 0.35rem;
         }
 
         .hero-text {
@@ -358,47 +327,6 @@
             font-size: 0.95rem;
             font-weight: 300;
             line-height: 1.65;
-        }
-
-        .hero-actions {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.8rem;
-        }
-
-        .date-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.75rem 0.95rem;
-            border: 1px solid rgba(139, 34, 82, 0.26);
-            background: rgba(139, 34, 82, 0.08);
-            color: var(--accent-light);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.74rem;
-            font-weight: 600;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        .theme-controls {
-            display: flex;
-            gap: 0.35rem;
-            padding: 0.3rem;
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-        }
-
-        .theme-controls .theme-switch-btn {
-            min-width: 90px;
-            border-radius: 2px;
-            padding: 0.55rem 0.8rem;
-            border-color: transparent;
-            background: transparent;
-            font-size: 0.68rem;
-            letter-spacing: 0.08em;
         }
 
         .database-card {
@@ -771,11 +699,7 @@
 
         @media (max-width: 1100px) {
             .hero {
-                flex-direction: column;
-            }
-
-            .hero-actions {
-                align-items: flex-start;
+                display: block;
             }
         }
 
@@ -930,13 +854,6 @@
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
                         Klanten
                     </a>
-                    <div class="sidebar-theme">
-                        <div class="sidebar-theme-label">Thema</div>
-                        <div class="sidebar-theme-options" role="group" aria-label="Thema kiezen">
-                            <button type="button" class="theme-switch-btn" data-theme-value="dark" aria-pressed="false">Donker</button>
-                            <button type="button" class="theme-switch-btn" data-theme-value="light" aria-pressed="false">Licht</button>
-                        </div>
-                    </div>
                 </div>
             </nav>
 
@@ -957,20 +874,8 @@
         <main class="page-shell">
             <div class="page-content">
                 <section class="hero">
-                    <div class="hero-copy">
-                        <a class="brand-link" href="/premium-personeel-dashboard">Softora.nl</a>
-                        <div class="eyebrow">Premium klanten database</div>
-                        <h1 class="hero-title">Klanten</h1>
-                        <p class="hero-text">Zoek, beheer en update al je klanten op een plek. De pagina gebruikt de bestaande Softora-kleuren en kan automatisch starten met klanten uit je premium opdrachten.</p>
-                    </div>
-
-                    <div class="hero-actions">
-                        <div class="date-badge" id="dateBadge">--</div>
-                        <div class="theme-controls" role="group" aria-label="Thema kiezen">
-                            <button type="button" class="theme-switch-btn" data-theme-value="dark" aria-pressed="false">Donker</button>
-                            <button type="button" class="theme-switch-btn" data-theme-value="light" aria-pressed="false">Licht</button>
-                        </div>
-                    </div>
+                    <h1 class="hero-title">Klanten</h1>
+                    <p class="hero-text">Zoek, beheer en update al je klanten op een plek. De pagina gebruikt de bestaande Softora-kleuren en kan automatisch starten met klanten uit je premium opdrachten.</p>
                 </section>
 
                 <section class="database-card" aria-labelledby="databaseTitle">
@@ -1108,7 +1013,6 @@
             search: document.getElementById("searchInput"),
             visibleCount: document.getElementById("visibleCount"),
             statusBanner: document.getElementById("statusBanner"),
-            dateBadge: document.getElementById("dateBadge"),
             modalOverlay: document.getElementById("modalOverlay"),
             modalTitle: document.getElementById("modalTitle"),
             form: document.getElementById("customerForm"),
@@ -1198,16 +1102,6 @@
                 month: "short",
                 year: "numeric"
             }).format(date);
-        }
-
-        function setDateBadge() {
-            const now = new Date();
-            nodes.dateBadge.textContent = new Intl.DateTimeFormat("nl-NL", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric"
-            }).format(now).toUpperCase();
         }
 
         function setStatusMessage(message, tone, autoClear) {
@@ -1606,7 +1500,6 @@
 
         async function bootstrapCustomers() {
             setStatusMessage("Klantenbestand laden...", "info");
-            setDateBadge();
 
             try {
                 const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
