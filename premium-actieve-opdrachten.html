@@ -566,31 +566,54 @@
         }
 
         .order-card.paid {
-            border-color: rgba(58, 176, 108, 0.82);
-            box-shadow: 0 20px 54px rgba(33, 92, 58, 0.22), 0 0 64px rgba(58, 176, 108, 0.2);
-            background: linear-gradient(135deg, rgba(115, 197, 146, 0.96), rgba(79, 162, 113, 0.94));
+            border-color: rgba(62, 181, 112, 0.68);
+            box-shadow: 0 26px 68px rgba(17, 55, 33, 0.34), 0 0 82px rgba(52, 171, 102, 0.18);
+            background:
+                radial-gradient(circle at 18% 22%, rgba(116, 229, 162, 0.18), transparent 28%),
+                radial-gradient(circle at 84% 14%, rgba(194, 255, 217, 0.12), transparent 30%),
+                linear-gradient(135deg, rgba(36, 107, 67, 0.97), rgba(20, 56, 36, 0.97) 56%, rgba(42, 118, 73, 0.95));
         }
 
         .order-card.paid::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
             background:
-                linear-gradient(135deg, rgba(34, 123, 70, 0.2), rgba(34, 123, 70, 0.08) 30%, rgba(255,255,255,0.08) 58%, rgba(34, 123, 70, 0.14) 100%),
-                radial-gradient(circle at top right, rgba(190, 255, 214, 0.16), transparent 36%);
+                linear-gradient(135deg, rgba(8, 35, 20, 0.16), rgba(255,255,255,0.05) 44%, rgba(8, 35, 20, 0.22) 100%),
+                radial-gradient(circle at top right, rgba(212, 255, 225, 0.1), transparent 34%);
+            opacity: 1;
         }
 
         .order-card.paid::after {
             content: '✓ Betaald';
-            border-color: rgba(24, 96, 53, 0.28);
-            background: rgba(241, 255, 247, 0.76);
-            color: #0f5d32;
+            position: absolute;
+            top: 1.7rem;
+            right: 1.7rem;
+            z-index: 4;
+            padding: 0.72rem 1.3rem;
+            border: 1px solid rgba(183, 255, 211, 0.18);
+            background: rgba(8, 46, 27, 0.34);
+            color: #dfffe9;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.88rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            backdrop-filter: blur(10px);
         }
 
         .order-card.paid:hover {
-            border-color: rgba(58, 176, 108, 0.94);
-            box-shadow: 0 22px 58px rgba(33, 92, 58, 0.24), 0 0 68px rgba(58, 176, 108, 0.22);
+            border-color: rgba(90, 214, 144, 0.76);
+            box-shadow: 0 28px 74px rgba(17, 55, 33, 0.38), 0 0 90px rgba(52, 171, 102, 0.2);
         }
 
         .order-card.delivered .order-title {
             color: #123e27;
+        }
+
+        .order-card.paid .order-title {
+            color: #f3fff8;
         }
 
         .order-card.delivered .order-client,
@@ -602,6 +625,17 @@
         .order-card.delivered .order-price-value .currency,
         .order-card.delivered .order-api-cost .value {
             color: #2b6a45;
+        }
+
+        .order-card.paid .order-client,
+        .order-card.paid .order-desc,
+        .order-card.paid .order-price-label,
+        .order-card.paid .order-price-value,
+        .order-card.paid .order-api-cost,
+        .order-card.paid .order-api-cost .label,
+        .order-card.paid .order-price-value .currency,
+        .order-card.paid .order-api-cost .value {
+            color: rgba(233, 255, 242, 0.92);
         }
 
         .order-card.delivered .order-status,
@@ -715,7 +749,7 @@
         .status-tag.actief { color: var(--accent-light); background: rgba(139,34,82,0.1); }
         .status-tag.bezig { color: var(--green); background: var(--green-glow); }
         .status-tag.klaar { color: var(--accent-light); background: rgba(139,34,82,0.1); }
-        .status-tag.betaald { color: #7af0aa; background: rgba(46, 204, 113, 0.18); }
+        .status-tag.betaald { color: #e8fff0; background: rgba(12, 64, 35, 0.34); }
 
         /* Execute btn */
         .order-actions { min-width: 220px; }
@@ -802,14 +836,14 @@
         }
 
         .order-card.paid .view-btn {
-            color: #145e35;
-            border-color: rgba(46, 160, 92, 0.34);
-            background: rgba(255,255,255,0.44);
+            color: #f5fff8;
+            border-color: rgba(183, 255, 211, 0.22);
+            background: rgba(8, 46, 27, 0.22);
         }
 
         .order-card.paid .view-btn:hover {
-            background: rgba(255,255,255,0.62);
-            border-color: rgba(46, 160, 92, 0.48);
+            background: rgba(8, 46, 27, 0.34);
+            border-color: rgba(183, 255, 211, 0.34);
         }
 
         .payment-btn {
