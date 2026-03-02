@@ -407,6 +407,72 @@
         .summary-icon.green-bg { background: var(--green-glow); }
         .summary-icon.green-bg svg { color: var(--green); }
 
+        .orders-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.9rem;
+            margin: -1.25rem 0 2rem;
+        }
+
+        .orders-filter-btn {
+            border: 1px solid rgba(139,34,82,0.18);
+            background: rgba(255,255,255,0.78);
+            color: var(--text-secondary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.9rem 1rem;
+            min-width: 220px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            cursor: none;
+            transition: all 0.22s var(--ease-out-expo);
+        }
+
+        .orders-filter-btn:hover {
+            color: var(--accent-light);
+            border-color: rgba(139,34,82,0.35);
+            background: rgba(139,34,82,0.05);
+        }
+
+        .orders-filter-btn.active {
+            color: #fff;
+            border-color: var(--accent);
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            box-shadow: 0 0 24px rgba(139,34,82,0.18);
+        }
+
+        .orders-filter-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+        }
+
+        .orders-filter-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: currentColor;
+            opacity: 0.75;
+        }
+
+        .orders-filter-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 30px;
+            padding: 0.18rem 0.45rem;
+            border: 1px solid currentColor;
+            font-size: 0.72rem;
+            line-height: 1;
+            opacity: 0.9;
+        }
+
         /* Orders */
         .orders-grid {
             display: flex;
@@ -423,6 +489,10 @@
             line-height: 1.5;
             padding: 1.5rem 1.75rem;
             text-align: center;
+        }
+
+        .order-card[hidden] {
+            display: none !important;
         }
 
         .order-card {
@@ -1207,6 +1277,21 @@
                 </div>
             </div>
 
+            <div class="orders-filter-bar" aria-label="Opdrachten filter">
+                <button class="orders-filter-btn magnetic" type="button" data-order-filter="open" aria-pressed="false">
+                    <span class="orders-filter-label"><span class="orders-filter-dot"></span>Openstaande opdrachten</span>
+                    <span class="orders-filter-count" id="filterCountOpen">0</span>
+                </button>
+                <button class="orders-filter-btn magnetic" type="button" data-order-filter="completed" aria-pressed="false">
+                    <span class="orders-filter-label"><span class="orders-filter-dot"></span>Voltooide opdrachten</span>
+                    <span class="orders-filter-count" id="filterCountCompleted">0</span>
+                </button>
+                <button class="orders-filter-btn magnetic" type="button" data-order-filter="in_progress" aria-pressed="false">
+                    <span class="orders-filter-label"><span class="orders-filter-dot"></span>Nog bezig</span>
+                    <span class="orders-filter-count" id="filterCountProgress">0</span>
+                </button>
+            </div>
+
             <div class="orders-grid" id="ordersGrid">
 
                 <div class="order-card" id="order-1" role="button" tabindex="0" aria-label="Opdracht 1">
@@ -1435,6 +1520,7 @@
 
         let currentModalId = null;
         let buildMode = 'premium';
+        let activeOrderFilter = 'all';
         const activeProgressAnimations = {};
 
         function getTime() {
@@ -1724,7 +1810,9 @@
             const grid = document.getElementById('ordersGrid');
             if (!grid) return;
 
-            const hasCards = Boolean(grid.querySelector('.order-card'));
+            const cards = Array.from(grid.querySelectorAll('.order-card'));
+            const visibleCards = cards.filter((card) => !card.hidden);
+            const hasCards = cards.length > 0;
             let empty = grid.querySelector('.orders-empty-state');
 
             if (!hasCards) {
@@ -1737,7 +1825,83 @@
                 return;
             }
 
+            if (!visibleCards.length) {
+                const emptyTextByFilter = {
+                    open: 'Geen openstaande opdrachten.',
+                    completed: 'Geen voltooide opdrachten.',
+                    in_progress: 'Er is nu geen opdracht bezig.'
+                };
+                if (!empty) {
+                    empty = document.createElement('div');
+                    empty.className = 'orders-empty-state';
+                    grid.appendChild(empty);
+                }
+                empty.textContent = emptyTextByFilter[activeOrderFilter] || 'Geen opdrachten gevonden.';
+                return;
+            }
+
             if (empty) empty.remove();
+        }
+
+        function getOrderFilterGroupForCard(card) {
+            const id = Number(String(card?.id || '').replace('order-', ''));
+            const order = orders[id];
+            const pct = Math.max(0, Math.min(100, Number(order?.progressPct) || 0));
+            const status = normalizeOrderStatus(order?.statusKey || (pct >= 100 ? 'klaar' : pct > 0 ? 'bezig' : 'wacht')).key;
+
+            if (status === 'klaar' || pct >= 100 || card?.classList?.contains('delivered')) {
+                return 'completed';
+            }
+            if (status === 'bezig') {
+                return 'in_progress';
+            }
+            return 'open';
+        }
+
+        function updateOrderFilterButtonState() {
+            document.querySelectorAll('[data-order-filter]').forEach((btn) => {
+                const key = String(btn.getAttribute('data-order-filter') || '');
+                const isActive = activeOrderFilter === key;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+        }
+
+        function updateOrderFilterCounts(cards) {
+            const counts = {
+                open: 0,
+                completed: 0,
+                in_progress: 0
+            };
+
+            cards.forEach((card) => {
+                const group = getOrderFilterGroupForCard(card);
+                counts[group] = (counts[group] || 0) + 1;
+            });
+
+            const openEl = document.getElementById('filterCountOpen');
+            if (openEl) openEl.textContent = String(counts.open);
+            const completedEl = document.getElementById('filterCountCompleted');
+            if (completedEl) completedEl.textContent = String(counts.completed);
+            const progressEl = document.getElementById('filterCountProgress');
+            if (progressEl) progressEl.textContent = String(counts.in_progress);
+        }
+
+        function applyOrderFilter() {
+            const cards = Array.from(document.querySelectorAll('#ordersGrid .order-card'));
+            cards.forEach((card) => {
+                const group = getOrderFilterGroupForCard(card);
+                const shouldHide = activeOrderFilter !== 'all' && group !== activeOrderFilter;
+                card.hidden = shouldHide;
+            });
+            updateOrderFilterButtonState();
+            renderOrdersEmptyState();
+        }
+
+        function setOrderFilter(nextFilter) {
+            const normalized = String(nextFilter || '').trim().toLowerCase();
+            activeOrderFilter = activeOrderFilter === normalized ? 'all' : normalized;
+            applyOrderFilter();
         }
 
         function clearDemoOrdersOnLoad() {
@@ -1761,6 +1925,7 @@
             if (sumTotal) sumTotal.textContent = '€0';
             const sumDelivered = document.getElementById('sumDelivered');
             if (sumDelivered) sumDelivered.textContent = '0';
+            updateOrderFilterCounts([]);
 
             renderOrdersEmptyState();
         }
@@ -1790,7 +1955,8 @@
             const sumDelivered = document.getElementById('sumDelivered');
             if (sumDelivered) sumDelivered.textContent = String(deliveredCount);
 
-            renderOrdersEmptyState();
+            updateOrderFilterCounts(cards);
+            applyOrderFilter();
         }
 
         function getNextOrderId() {
@@ -2759,6 +2925,13 @@
                 const id = Number(b.getAttribute('data-order'));
                 if (b.dataset.action === 'preview') openPreview(id);
                 else openModal(id);
+            });
+        });
+
+        document.querySelectorAll('[data-order-filter]').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                setOrderFilter(btn.getAttribute('data-order-filter'));
             });
         });
 
