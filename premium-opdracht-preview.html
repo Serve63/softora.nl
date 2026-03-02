@@ -296,16 +296,16 @@
                   }
                   .btn {
                     appearance: none;
-                    border: 1px solid rgba(18, 32, 58, 0.12);
-                    background: rgba(255, 255, 255, 0.94);
-                    color: #11203a;
+                    border: 1px solid rgba(139, 34, 82, 0.22);
+                    background: rgba(255, 255, 255, 0.96);
+                    color: #8b2252;
                     border-radius: 14px;
                     padding: 12px 16px;
                     font: 700 13px/1.1 Inter, system-ui, sans-serif;
                     letter-spacing: 0.04em;
                     text-transform: uppercase;
                     cursor: pointer;
-                    box-shadow: 0 18px 45px rgba(17, 32, 58, 0.18);
+                    box-shadow: 0 18px 45px rgba(139, 34, 82, 0.16);
                     backdrop-filter: blur(20px);
                     display: inline-flex;
                     align-items: center;
@@ -314,20 +314,27 @@
                   }
                   .btn:hover:not(:disabled) {
                     transform: translateY(-1px);
-                    box-shadow: 0 20px 52px rgba(17, 32, 58, 0.24);
+                    box-shadow: 0 20px 52px rgba(139, 34, 82, 0.22);
                   }
                   .btn:disabled {
                     opacity: 0.55;
                     cursor: progress;
                   }
                   .btn.variant {
-                    background: linear-gradient(135deg, #133c78, #2f67c1);
-                    border-color: rgba(28, 78, 164, 0.32);
+                    background: linear-gradient(135deg, #8b2252, #a62d65);
+                    border-color: rgba(139, 34, 82, 0.42);
                     color: #fff;
                   }
+                  .btn.variant:hover:not(:disabled) {
+                    background: linear-gradient(135deg, #7a1d48, #98285d);
+                  }
                   .btn.copy {
-                    background: rgba(255, 255, 255, 0.92);
-                    color: #18345d;
+                    background: rgba(255, 255, 255, 0.97);
+                    border-color: rgba(139, 34, 82, 0.28);
+                    color: #8b2252;
+                  }
+                  .btn.copy:hover:not(:disabled) {
+                    background: rgba(166, 45, 101, 0.08);
                   }
                   .btn svg {
                     width: 15px;
@@ -341,7 +348,9 @@
                     align-items: center;
                     justify-content: center;
                     padding: 24px;
-                    background: rgba(7, 16, 31, 0.64);
+                    background:
+                      radial-gradient(circle at top left, rgba(166, 45, 101, 0.22), transparent 32%),
+                      rgba(13, 7, 11, 0.66);
                     backdrop-filter: blur(12px);
                   }
                   .overlay.show {
@@ -351,27 +360,27 @@
                     width: min(520px, calc(100vw - 40px));
                     border-radius: 24px;
                     padding: 28px 28px 24px;
-                    background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(241,246,255,0.97));
-                    color: #11203a;
-                    box-shadow: 0 30px 90px rgba(7, 16, 31, 0.25);
-                    border: 1px solid rgba(17, 32, 58, 0.08);
+                    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,247,251,0.98));
+                    color: #241321;
+                    box-shadow: 0 30px 90px rgba(93, 23, 55, 0.25);
+                    border: 1px solid rgba(139, 34, 82, 0.12);
                   }
                   .eyebrow {
                     margin: 0 0 10px;
-                    color: #2f67c1;
+                    color: #a62d65;
                     font: 800 12px/1 Inter, system-ui, sans-serif;
                     letter-spacing: 0.12em;
                     text-transform: uppercase;
                   }
                   .title {
                     margin: 0 0 10px;
-                    color: #0e1a2e;
+                    color: #1f1120;
                     font: 800 34px/1.02 Inter, system-ui, sans-serif;
                     letter-spacing: -0.03em;
                   }
                   .desc {
                     margin: 0;
-                    color: rgba(17, 32, 58, 0.74);
+                    color: rgba(36, 19, 33, 0.74);
                     font: 500 16px/1.6 Inter, system-ui, sans-serif;
                   }
                   .row {
@@ -384,21 +393,21 @@
                     width: 18px;
                     height: 18px;
                     border-radius: 999px;
-                    border: 2px solid rgba(47, 103, 193, 0.18);
-                    border-top-color: #2f67c1;
+                    border: 2px solid rgba(166, 45, 101, 0.16);
+                    border-top-color: #a62d65;
                     animation: spin 0.9s linear infinite;
                     flex-shrink: 0;
                   }
                   .status {
-                    color: #153059;
+                    color: #6f1b42;
                     font: 700 14px/1.4 Inter, system-ui, sans-serif;
                     letter-spacing: 0.02em;
                   }
                   .meta {
                     margin-top: 18px;
                     padding-top: 16px;
-                    border-top: 1px solid rgba(17, 32, 58, 0.08);
-                    color: rgba(17, 32, 58, 0.48);
+                    border-top: 1px solid rgba(139, 34, 82, 0.1);
+                    color: rgba(111, 27, 66, 0.58);
                     font: 600 12px/1.5 Inter, system-ui, sans-serif;
                     letter-spacing: 0.03em;
                     text-transform: uppercase;
@@ -413,9 +422,9 @@
                   }
                   .ghost {
                     appearance: none;
-                    border: 1px solid rgba(17, 32, 58, 0.14);
+                    border: 1px solid rgba(139, 34, 82, 0.2);
                     background: transparent;
-                    color: #153059;
+                    color: #8b2252;
                     border-radius: 12px;
                     padding: 10px 14px;
                     font: 700 12px/1 Inter, system-ui, sans-serif;
@@ -423,17 +432,20 @@
                     text-transform: uppercase;
                     cursor: pointer;
                   }
+                  .ghost:hover {
+                    background: rgba(166, 45, 101, 0.08);
+                  }
                   .overlay.error .spinner {
                     display: none;
                   }
                   .overlay.error .eyebrow {
-                    color: #b42318;
+                    color: #a62d65;
                   }
                   .overlay.error .title {
-                    color: #7a1010;
+                    color: #5a1533;
                   }
                   .overlay.error .status {
-                    color: #8e1c1c;
+                    color: #7a1d48;
                   }
                   @keyframes spin {
                     to { transform: rotate(360deg); }
