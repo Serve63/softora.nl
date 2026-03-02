@@ -535,9 +535,9 @@
         }
 
         .order-card.delivered {
-            border-color: rgba(46, 204, 113, 0.7);
-            box-shadow: 0 18px 48px rgba(0,0,0,0.28), 0 0 58px rgba(46, 204, 113, 0.22);
-            background: linear-gradient(135deg, rgba(14, 38, 26, 0.95), rgba(11, 30, 22, 0.92));
+            border-color: rgba(100, 208, 146, 0.52);
+            box-shadow: 0 14px 38px rgba(0,0,0,0.22), 0 0 42px rgba(100, 208, 146, 0.12);
+            background: linear-gradient(135deg, rgba(21, 52, 39, 0.82), rgba(15, 39, 29, 0.78));
         }
 
         .order-card.delivered::before {
@@ -546,8 +546,8 @@
             inset: 0;
             pointer-events: none;
             background:
-                linear-gradient(135deg, rgba(46, 204, 113, 0.3), rgba(46, 204, 113, 0.08) 32%, rgba(255,255,255,0.03) 60%, rgba(46, 204, 113, 0.2) 100%),
-                radial-gradient(circle at top right, rgba(126, 240, 168, 0.18), transparent 32%);
+                linear-gradient(135deg, rgba(86, 220, 146, 0.16), rgba(86, 220, 146, 0.06) 34%, rgba(255,255,255,0.03) 60%, rgba(86, 220, 146, 0.1) 100%),
+                radial-gradient(circle at top right, rgba(160, 244, 190, 0.12), transparent 32%);
             opacity: 1;
         }
 
@@ -557,14 +557,14 @@
         }
 
         .order-card.delivered::after {
-            content: '✓ Opgeleverd';
+            content: '✓ Website gebouwd';
             position: absolute;
             top: 18px;
             right: 22px;
             padding: 0.5rem 0.9rem;
-            border: 1px solid rgba(126, 240, 168, 0.4);
-            background: rgba(9, 31, 20, 0.48);
-            color: #9bf5bc;
+            border: 1px solid rgba(178, 248, 203, 0.32);
+            background: rgba(18, 53, 36, 0.4);
+            color: #c9f8d9;
             font-family: 'Oswald', sans-serif;
             font-size: 0.68rem;
             font-weight: 600;
@@ -574,6 +574,30 @@
         }
 
         .order-card.delivered:hover {
+            border-color: rgba(160, 244, 190, 0.58);
+            box-shadow: 0 18px 46px rgba(0,0,0,0.28), 0 0 48px rgba(100, 208, 146, 0.16);
+        }
+
+        .order-card.paid {
+            border-color: rgba(46, 204, 113, 0.78);
+            box-shadow: 0 20px 54px rgba(0,0,0,0.32), 0 0 66px rgba(46, 204, 113, 0.26);
+            background: linear-gradient(135deg, rgba(11, 35, 24, 0.96), rgba(9, 28, 20, 0.93));
+        }
+
+        .order-card.paid::before {
+            background:
+                linear-gradient(135deg, rgba(46, 204, 113, 0.3), rgba(46, 204, 113, 0.08) 32%, rgba(255,255,255,0.03) 60%, rgba(46, 204, 113, 0.2) 100%),
+                radial-gradient(circle at top right, rgba(126, 240, 168, 0.18), transparent 32%);
+        }
+
+        .order-card.paid::after {
+            content: '✓ Betaald';
+            border-color: rgba(126, 240, 168, 0.4);
+            background: rgba(9, 31, 20, 0.48);
+            color: #9bf5bc;
+        }
+
+        .order-card.paid:hover {
             border-color: rgba(126, 240, 168, 0.82);
             box-shadow: 0 22px 58px rgba(0,0,0,0.34), 0 0 62px rgba(46, 204, 113, 0.28);
         }
@@ -688,10 +712,11 @@
         .status-tag.wacht { color: var(--yellow); background: var(--yellow-glow); }
         .status-tag.actief { color: var(--accent-light); background: rgba(139,34,82,0.1); }
         .status-tag.bezig { color: var(--green); background: var(--green-glow); }
-        .status-tag.klaar { color: var(--green); background: rgba(46, 204, 113, 0.14); }
+        .status-tag.klaar { color: #78df9e; background: rgba(86, 220, 146, 0.12); }
+        .status-tag.betaald { color: #7af0aa; background: rgba(46, 204, 113, 0.18); }
 
         /* Execute btn */
-        .order-actions { min-width: 180px; }
+        .order-actions { min-width: 220px; }
 
         .execute-btn {
             width: 100%;
@@ -764,14 +789,52 @@
         .view-btn.show { display: block; }
 
         .order-card.delivered .view-btn {
+            color: #defdea;
+            border-color: rgba(126, 240, 168, 0.36);
+            background: rgba(126, 240, 168, 0.08);
+        }
+
+        .order-card.delivered .view-btn:hover {
+            background: rgba(126, 240, 168, 0.14);
+            border-color: rgba(126, 240, 168, 0.5);
+        }
+
+        .order-card.paid .view-btn {
             color: #d9ffe8;
             border-color: rgba(46, 204, 113, 0.4);
             background: rgba(46, 204, 113, 0.08);
         }
 
-        .order-card.delivered .view-btn:hover {
+        .order-card.paid .view-btn:hover {
             background: rgba(46, 204, 113, 0.16);
             border-color: rgba(46, 204, 113, 0.58);
+        }
+
+        .payment-btn {
+            width: 100%;
+            padding: 0.6rem 1.2rem;
+            background: rgba(255,255,255,0.06);
+            color: #d3fae2;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: 1px solid rgba(160, 244, 190, 0.28);
+            cursor: none;
+            margin-top: 0.5rem;
+            transition: all 0.2s;
+            display: none;
+        }
+
+        .payment-btn.show {
+            display: block;
+        }
+
+        .payment-btn:hover {
+            background: rgba(86, 220, 146, 0.14);
+            border-color: rgba(160, 244, 190, 0.54);
+            color: #f5fff9;
         }
 
         /* Progress */
@@ -1863,13 +1926,12 @@
         function getOrderFilterGroupForCard(card) {
             const id = Number(String(card?.id || '').replace('order-', ''));
             const order = orders[id];
-            const pct = Math.max(0, Math.min(100, Number(order?.progressPct) || 0));
-            const status = normalizeOrderStatus(order?.statusKey || (pct >= 100 ? 'klaar' : pct > 0 ? 'bezig' : 'wacht')).key;
+            const ui = resolveOrderUiState(order);
 
-            if (status === 'klaar' || pct >= 100 || card?.classList?.contains('delivered')) {
+            if (ui.isBuilt) {
                 return 'completed';
             }
-            if (status === 'bezig') {
+            if (ui.status.key === 'bezig') {
                 return 'in_progress';
             }
             return 'open';
@@ -1951,8 +2013,31 @@
             const key = String(value || '').toLowerCase().trim();
             if (key === 'actief') return { key: 'actief', text: 'Actief', className: 'actief' };
             if (key === 'bezig') return { key: 'bezig', text: 'Bezig', className: 'bezig' };
-            if (key === 'klaar') return { key: 'klaar', text: 'Klaar', className: 'klaar' };
+            if (key === 'betaald') return { key: 'betaald', text: 'Betaald', className: 'betaald' };
+            if (key === 'klaar') return { key: 'klaar', text: 'Gebouwd', className: 'klaar' };
             return { key: 'wacht', text: 'Wachtend', className: 'wacht' };
+        }
+
+        function resolveOrderUiState(orderLike) {
+            const pct = Math.max(0, Math.min(100, Number(orderLike?.progressPct) || 0));
+            const fallback = pct >= 100 ? 'klaar' : pct > 0 ? 'bezig' : 'wacht';
+            const baseStatus = normalizeOrderStatus(orderLike?.statusKey || orderLike?.status || fallback);
+            const paidAt = String(orderLike?.paidAt || '').trim();
+            const isBuilt = baseStatus.key === 'klaar' || baseStatus.key === 'betaald' || pct >= 100;
+            const isPaid = Boolean(paidAt) && isBuilt;
+            const status = isPaid
+                ? normalizeOrderStatus('betaald')
+                : isBuilt
+                    ? normalizeOrderStatus('klaar')
+                    : baseStatus;
+
+            return {
+                pct,
+                paidAt: paidAt || null,
+                isBuilt,
+                isPaid,
+                status
+            };
         }
 
         function refreshOrderSummaryCards() {
@@ -2011,6 +2096,7 @@
                         const apiTokensOutput = Number(item?.apiTokensOutput);
                         const apiModel = String(item?.apiModel || '').trim();
                         const lastRunAt = String(item?.lastRunAt || '').trim();
+                        const paidAt = String(item?.paidAt || '').trim();
                         const sourceAppointmentId = Number(item?.sourceAppointmentId);
                         const sourceCallId = String(item?.sourceCallId || '').trim();
                         if (!Number.isFinite(id) || id <= 0) return null;
@@ -2033,6 +2119,7 @@
                             apiTokensOutput: Number.isFinite(apiTokensOutput) && apiTokensOutput >= 0 ? apiTokensOutput : null,
                             apiModel,
                             lastRunAt: lastRunAt || null,
+                            paidAt: paidAt || null,
                             sourceAppointmentId: Number.isFinite(sourceAppointmentId) && sourceAppointmentId > 0 ? sourceAppointmentId : null,
                             sourceCallId: sourceCallId || null
                         };
@@ -2057,6 +2144,7 @@
                 logs: Array.isArray(prev.logs) ? prev.logs : [],
                 progressPct: Number(prev.progressPct) || 0,
                 statusKey: normalizeOrderStatus(prev.statusKey || record.status || 'wacht').key,
+                paidAt: String(record?.paidAt || prev.paidAt || '').trim() || null,
                 previewHtml: prev.previewHtml || null,
                 artifact: prev.artifact || null,
                 updatedAt: prev.updatedAt || null
@@ -2078,6 +2166,7 @@
                     })) : [],
                     progressPct: Math.max(0, Math.min(100, Number(order.progressPct) || 0)),
                     statusKey: normalizeOrderStatus(order.statusKey || '').key,
+                    paidAt: String(order.paidAt || '').trim() || null,
                     updatedAt: Number(order.updatedAt) || null
                 };
             });
@@ -2098,14 +2187,18 @@
             const barEl = document.getElementById(`bar-${id}`);
             const btnEl = document.getElementById(`btn-${id}`);
             const viewBtnEl = document.getElementById(`view-${id}`);
-            const pct = Math.max(0, Math.min(100, Number(order.progressPct) || 0));
-            const status = normalizeOrderStatus(order.statusKey || (pct >= 100 ? 'klaar' : pct > 0 ? 'bezig' : 'wacht'));
-            const isDelivered = status.key === 'klaar' || pct >= 100;
+            const paymentBtnEl = document.getElementById(`pay-${id}`);
+            const ui = resolveOrderUiState(order);
+            const pct = ui.pct;
+            const status = ui.status;
+            const isDelivered = ui.isBuilt;
+            const isPaid = ui.isPaid;
 
             order.statusKey = status.key;
 
             if (cardEl) {
                 cardEl.classList.toggle('delivered', isDelivered);
+                cardEl.classList.toggle('paid', isPaid);
                 if (isDelivered) {
                     cardEl.removeAttribute('role');
                     cardEl.removeAttribute('tabindex');
@@ -2158,8 +2251,13 @@
                     viewBtnEl.onclick = () => openModal(id);
                 }
             }
+            if (paymentBtnEl) {
+                const showPaymentAction = isDelivered && !isPaid;
+                paymentBtnEl.classList.toggle('show', showPaymentAction);
+                paymentBtnEl.disabled = !showPaymentAction;
+            }
             if (btnEl) {
-                if (pct >= 100) {
+                if (isDelivered) {
                     btnEl.style.display = 'none';
                     btnEl.classList.remove('running');
                     btnEl.classList.add('done');
@@ -2196,10 +2294,11 @@
                 let nextPct = pct;
                 let nextStatus = status.key;
                 let note = '';
+                const paidAt = String(order.paidAt || '').trim();
 
                 if (pct >= 100 && hasPreview) {
                     nextPct = 100;
-                    nextStatus = 'klaar';
+                    nextStatus = paidAt ? 'betaald' : 'klaar';
                 } else if (pct >= 100 && !hasPreview) {
                     nextPct = 0;
                     nextStatus = 'actief';
@@ -2211,7 +2310,7 @@
                 } else if (status.key === 'bezig') {
                     nextStatus = 'actief';
                     note = 'Vorige run stond nog op bezig maar draaide niet meer. Voer de opdracht opnieuw uit.';
-                } else if (status.key === 'klaar' && !hasPreview) {
+                } else if ((status.key === 'klaar' || status.key === 'betaald') && !hasPreview) {
                     nextStatus = 'actief';
                     note = 'Opdracht stond op klaar zonder preview en is teruggezet.';
                 }
@@ -2255,6 +2354,7 @@
                         logs: Array.isArray(value?.logs) ? value.logs.slice(-200) : (Array.isArray(prev.logs) ? prev.logs : []),
                         progressPct: Math.max(0, Math.min(100, Number(value?.progressPct) || 0)),
                         statusKey: normalizeOrderStatus(value?.statusKey || '').key,
+                        paidAt: String(value?.paidAt || prev.paidAt || '').trim() || null,
                         updatedAt: Number(value?.updatedAt) || prev.updatedAt || null
                     };
                 });
@@ -2268,14 +2368,20 @@
 
         function renderCustomOrderCardHtml(record) {
             const id = Number(record.id);
-            const status = normalizeOrderStatus(record.status);
-            const isDelivered = status.key === 'klaar';
+            const ui = resolveOrderUiState({
+                status: record.status,
+                paidAt: record.paidAt,
+                progressPct: record.status === 'klaar' || record.status === 'betaald' ? 100 : 0
+            });
+            const status = ui.status;
+            const isDelivered = ui.isBuilt;
+            const isPaid = ui.isPaid;
             const clientLine = [record.clientName, record.location].filter(Boolean).join(' — ');
             const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
             const apiCostText = formatApiCostLabel(record);
 
             return `
-                <div class="order-card ${isDelivered ? 'delivered' : ''}" id="order-${id}"${isDelivered ? '' : ` role="button" tabindex="0" aria-label="Opdracht ${id}"`}>
+                <div class="order-card ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}"${isDelivered ? '' : ` role="button" tabindex="0" aria-label="Opdracht ${id}"`}>
                     <div class="order-main">
                         <div class="order-info">
                             <div class="order-client">${escapeHtml(clientLine || 'Nieuwe opdracht')}</div>
@@ -2294,6 +2400,7 @@
                                 Voer Opdracht Uit
                             </button>
                             <button class="view-btn magnetic" id="view-${id}" type="button" data-order="${id}" data-action="modal">Bekijk Voortgang</button>
+                            <button class="payment-btn magnetic" id="pay-${id}" type="button" data-order="${id}">Klant heeft betaald</button>
                         </div>
                     </div>
                     <div class="order-progress" id="progress-${id}">
@@ -2332,6 +2439,15 @@
                     e.stopPropagation();
                     if (viewBtn.dataset.action === 'preview') openPreview(id);
                     else openModal(id);
+                });
+            }
+
+            const payBtn = card.querySelector('.payment-btn[data-order]');
+            if (payBtn && !payBtn.dataset.boundPay) {
+                payBtn.dataset.boundPay = '1';
+                payBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    markOrderAsPaid(id);
                 });
             }
 
@@ -2456,7 +2572,8 @@
                 apiTokensInput: null,
                 apiTokensOutput: null,
                 apiModel: '',
-                lastRunAt: null
+                lastRunAt: null,
+                paidAt: null
             };
 
             customOrders.push(record);
@@ -2529,6 +2646,28 @@
             if (!w) {
                 alert('Pop-up geblokkeerd. Sta pop-ups toe om de preview te openen.');
             }
+        }
+
+        function markOrderAsPaid(id) {
+            const order = orders[id];
+            if (!order) return;
+
+            const ui = resolveOrderUiState(order);
+            if (!ui.isBuilt || ui.isPaid) return;
+
+            const nowIso = new Date().toISOString();
+            order.paidAt = nowIso;
+            order.statusKey = 'betaald';
+            order.updatedAt = Date.now();
+
+            updateCustomOrderById(id, {
+                status: 'betaald',
+                paidAt: nowIso
+            });
+
+            appendOrderLog(id, 'Klant heeft betaald. Opdracht is volledig afgerond.', true);
+            persistOrdersRuntime();
+            applyOrderUiStateToCard(id);
         }
 
         function buildFallbackSitePrompt(meta, customOrder) {
@@ -2771,6 +2910,7 @@
                 const apiTokensOutput = Number(apiCost?.completionTokens);
                 const apiModel = String(result?.model || apiCost?.model || '');
                 const nowIso = new Date().toISOString();
+                const existingPaidAt = String(customOrder?.paidAt || orders[id]?.paidAt || '').trim() || null;
                 const apiCostRecord = {
                     apiCostEur: Number.isFinite(apiCostEur) && apiCostEur >= 0 ? apiCostEur : null,
                     apiCostUsd: Number.isFinite(apiCostUsd) && apiCostUsd >= 0 ? apiCostUsd : null,
@@ -2788,7 +2928,8 @@
                         apiTokensOutput: apiCostRecord.apiTokensOutput,
                         apiModel: apiCostRecord.apiModel,
                         lastRunAt: nowIso,
-                        status: 'klaar'
+                        paidAt: existingPaidAt,
+                        status: existingPaidAt ? 'betaald' : 'klaar'
                     });
                 }
                 updateApiCostLabel(activeId, getCustomOrderById(activeId) || apiCostRecord);
@@ -2803,7 +2944,8 @@
                     generatedAt: nowIso
                 };
                 orders[id].previewHtml = html;
-                orders[id].statusKey = 'klaar';
+                orders[id].paidAt = existingPaidAt;
+                orders[id].statusKey = existingPaidAt ? 'betaald' : 'klaar';
                 setOrderProgress(id, 100, 5);
 
                 appendOrderLog(id, 'Preview HTML succesvol opgeslagen.', true);
@@ -2812,20 +2954,7 @@
                 }
                 appendOrderLog(id, 'Website opgeleverd. Nieuwe tab wordt nu geopend.', true);
 
-                btn.style.display = 'none';
-                btn.classList.remove('running');
-                btn.classList.add('done');
-                btn.disabled = false;
-
-                if (status) {
-                    status.textContent = 'Klaar';
-                    status.className = 'status-tag klaar';
-                }
-                if (viewBtn) {
-                    viewBtn.textContent = 'Open website';
-                    viewBtn.dataset.action = 'preview';
-                    viewBtn.onclick = () => openPreview(activeId);
-                }
+                applyOrderUiStateToCard(id);
 
                 openPreview(activeId);
             } catch (error) {

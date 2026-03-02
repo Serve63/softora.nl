@@ -565,6 +565,11 @@
             background: rgba(46,204,113,0.12);
         }
 
+        .status-pill.paid {
+            color: #7af0aa;
+            background: rgba(46,204,113,0.18);
+        }
+
         .status-pill.progress {
             color: var(--accent-light);
             background: rgba(139,34,82,0.12);
@@ -878,6 +883,7 @@
                         const prompt = String(item?.prompt || '').trim();
                         const status = String(item?.status || '').trim().toLowerCase();
                         const lastRunAt = String(item?.lastRunAt || '').trim();
+                        const paidAt = String(item?.paidAt || '').trim();
                         if (!Number.isFinite(id) || id <= 0 || !clientName) return null;
                         return {
                             id,
@@ -888,7 +894,8 @@
                             description,
                             prompt,
                             status,
-                            lastRunAt: lastRunAt || null
+                            lastRunAt: lastRunAt || null,
+                            paidAt: paidAt || null
                         };
                     })
                     .filter(Boolean);
@@ -913,8 +920,9 @@
                 : 'website';
         }
 
-        function getStatusMeta(statusRaw) {
+        function getStatusMeta(statusRaw, paidAtRaw) {
             const status = String(statusRaw || '').toLowerCase().trim();
+            if (String(paidAtRaw || '').trim() || status === 'betaald') return { text: 'Betaald', className: 'paid' };
             if (status === 'klaar') return { text: 'Live', className: 'live' };
             if (status === 'bezig' || status === 'actief') return { text: 'In uitvoering', className: 'progress' };
             return { text: 'Intake', className: 'intake' };
@@ -934,7 +942,7 @@
                 const key = `${normalizeKey(record.clientName)}|${normalizeKey(record.location)}`;
                 if (seen.has(key)) return;
                 const packageType = getPackageType(record);
-                const status = getStatusMeta(record.status);
+                const status = getStatusMeta(record.status, record.paidAt);
                 seen.set(key, {
                     clientName: record.clientName,
                     location: record.location || '—',
