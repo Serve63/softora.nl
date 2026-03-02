@@ -1417,7 +1417,6 @@
         let currentModalId = null;
         let buildMode = 'premium';
         const activeProgressAnimations = {};
-        const activePreviewWindows = {};
 
         function getTime() {
             return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -2251,106 +2250,6 @@
             }
         }
 
-        function openPendingPreviewTab(id) {
-            const activeId = selectActiveOrderId(id);
-            const existing = activePreviewWindows[activeId];
-            if (existing && !existing.closed) {
-                return existing;
-            }
-
-            const popup = window.open('', '_blank');
-            if (!popup) return null;
-
-            try {
-                popup.document.write(`<!doctype html>
-<html lang="nl">
-  <head>
-    <meta charset="utf-8">
-    <title>Website wordt gebouwd...</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-      :root { color-scheme: dark; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        background: radial-gradient(circle at top, rgba(46, 204, 113, 0.16), rgba(139, 34, 82, 0.1) 42%, transparent 70%), #0f1117;
-        color: #f6f7fb;
-        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      }
-      .wrap { text-align: center; padding: 32px; }
-      .dot {
-        width: 14px;
-        height: 14px;
-        margin: 0 auto 18px;
-        border-radius: 999px;
-        background: #2ecc71;
-        box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.45);
-        animation: pulse 1.5s infinite;
-      }
-      h1 { margin: 0 0 10px; font-size: 28px; }
-      p { margin: 0; color: #b8bfd0; font-size: 16px; }
-      @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.45); }
-        70% { box-shadow: 0 0 0 18px rgba(46, 204, 113, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <div class="dot"></div>
-      <h1>Website wordt gebouwd</h1>
-      <p>Deze tab opent automatisch zodra de opdracht is opgeleverd.</p>
-    </div>
-  </body>
-</html>`);
-                popup.document.close();
-            } catch (_) {
-                // ignore
-            }
-
-            activePreviewWindows[activeId] = popup;
-            return popup;
-        }
-
-        function finalizePreviewTab(id, previewWindow) {
-            const activeId = selectActiveOrderId(id);
-            const target = `/premium-opdracht-preview?id=${encodeURIComponent(String(activeId))}`;
-            const targetWindow = previewWindow && !previewWindow.closed ? previewWindow : activePreviewWindows[activeId];
-            if (targetWindow && !targetWindow.closed) {
-                try {
-                    targetWindow.location.replace(target);
-                    targetWindow.focus();
-                    return;
-                } catch (_) {
-                    // ignore
-                }
-            }
-            openPreview(activeId);
-        }
-
-        function setPreviewTabError(id, previewWindow, message) {
-            const activeId = selectActiveOrderId(id);
-            const targetWindow = previewWindow && !previewWindow.closed ? previewWindow : activePreviewWindows[activeId];
-            if (!targetWindow || targetWindow.closed) return;
-
-            try {
-                targetWindow.document.title = 'Website bouwen mislukt';
-                targetWindow.document.body.innerHTML = `
-                    <div style="margin:0;min-height:100vh;display:grid;place-items:center;background:#11141b;color:#f6f7fb;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
-                        <div style="max-width:560px;padding:32px;text-align:center;">
-                            <h1 style="margin:0 0 12px;font-size:28px;">Website bouwen mislukt</h1>
-                            <p style="margin:0;color:#b8bfd0;line-height:1.6;">${escapeHtml(message || 'Onbekende fout tijdens het genereren van de website.')}</p>
-                        </div>
-                    </div>
-                `;
-            } catch (_) {
-                // ignore
-            }
-        }
-
         function buildFallbackSitePrompt(meta, customOrder) {
             const company = String(meta?.clientName || customOrder?.clientName || 'bedrijf').trim();
             const title = String(meta?.title || customOrder?.title || 'website').trim();
@@ -2523,7 +2422,6 @@
             const progress = document.getElementById(`progress-${id}`);
             const viewBtn = document.getElementById(`view-${id}`);
             if (!btn || btn.classList.contains('running') || !orders[id]) return;
-            const previewWindow = openPendingPreviewTab(activeId);
 
             const meta = getOrderMeta(activeId) || {
                 id: String(activeId),
@@ -2631,7 +2529,7 @@
                 if (Number.isFinite(apiCostEur) && apiCostEur >= 0) {
                     appendOrderLog(id, `API kosten (geschat): ${formatApiCostAmount(apiCostEur) || 'onbekend'} (${apiModel || 'model'})`, true);
                 }
-                appendOrderLog(id, 'Website opgeleverd. De website wordt automatisch geopend in een nieuw tabblad.', true);
+                appendOrderLog(id, 'Website opgeleverd. Nieuwe tab wordt nu geopend.', true);
 
                 btn.classList.remove('running');
                 btn.classList.add('done');
@@ -2648,7 +2546,7 @@
                     viewBtn.onclick = () => openPreview(activeId);
                 }
 
-                finalizePreviewTab(activeId, previewWindow);
+                openPreview(activeId);
             } catch (error) {
                 stopOrderProgressSimulation(id);
                 orders[id].statusKey = 'actief';
@@ -2676,8 +2574,6 @@
                         viewBtn.onclick = () => openModal(id);
                     }
                 }
-
-                setPreviewTabError(activeId, previewWindow, String(error?.message || 'Website generatie mislukt.'));
             } finally {
                 orders[id].updatedAt = Date.now();
                 persistOrdersRuntime();
