@@ -585,24 +585,6 @@
             opacity: 1;
         }
 
-        .order-card.paid::after {
-            content: '✓ Betaald';
-            position: absolute;
-            top: 1.7rem;
-            right: 1.7rem;
-            z-index: 4;
-            padding: 0.72rem 1.3rem;
-            border: 1px solid rgba(183, 255, 211, 0.18);
-            background: rgba(8, 46, 27, 0.34);
-            color: #dfffe9;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.88rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            backdrop-filter: blur(10px);
-        }
-
         .order-card.paid:hover {
             border-color: rgba(90, 214, 144, 0.76);
             box-shadow: 0 28px 74px rgba(17, 55, 33, 0.38), 0 0 90px rgba(52, 171, 102, 0.2);
@@ -2222,7 +2204,6 @@
 
             const cardEl = document.getElementById(`order-${id}`);
             const statusEl = document.getElementById(`status-${id}`);
-            const statusWrapEl = statusEl ? statusEl.parentElement : null;
             const progressEl = document.getElementById(`progress-${id}`);
             const barEl = document.getElementById(`bar-${id}`);
             const btnEl = document.getElementById(`btn-${id}`);
@@ -2251,9 +2232,6 @@
             if (statusEl) {
                 statusEl.textContent = status.text;
                 statusEl.className = `status-tag ${status.className}`;
-            }
-            if (statusWrapEl) {
-                statusWrapEl.style.display = isPaid ? 'none' : '';
             }
             if (progressEl) {
                 progressEl.classList.toggle('show', pct > 0 && !isDelivered);
