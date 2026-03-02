@@ -2224,7 +2224,7 @@
                 statusEl.className = `status-tag ${status.className}`;
             }
             if (progressEl) {
-                progressEl.classList.toggle('show', pct > 0 && !isPaid);
+                progressEl.classList.toggle('show', pct > 0 && !isDelivered);
             }
             if (barEl) {
                 barEl.style.width = pct + '%';
@@ -2233,7 +2233,7 @@
             for (let s = 1; s <= 5; s += 1) {
                 const stepEl = document.getElementById(`step-${id}-${s}`);
                 if (!stepEl) continue;
-                if (isPaid) {
+                if (isDelivered) {
                     stepEl.className = 'progress-step';
                     continue;
                 }
