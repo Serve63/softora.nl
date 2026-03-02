@@ -64,10 +64,14 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  function usesStandaloneCustomSliderValue() {
+    return String(leadSlider.dataset?.customValueMode || '').toLowerCase() !== 'sync-slider';
+  }
+
   function getLeadSliderAmount() {
     const rawValue = Math.max(1, parseNumber(leadSlider.value, 1));
     const customValue = Math.round(parseNumber(leadSlider.dataset?.customValue, NaN));
-    if (Number.isFinite(customValue) && customValue > 0) {
+    if (usesStandaloneCustomSliderValue() && Number.isFinite(customValue) && customValue > 0) {
       return customValue;
     }
     const mapRaw = String(leadSlider.dataset?.valueMap || '').trim();
@@ -123,8 +127,13 @@
     }
 
     const customAmount = readPositiveIntStorage(CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY, null);
-    if (Number.isFinite(customAmount)) {
+    if (usesStandaloneCustomSliderValue() && Number.isFinite(customAmount)) {
       leadSlider.dataset.customValue = String(customAmount);
+    } else if (!usesStandaloneCustomSliderValue() && Number.isFinite(customAmount)) {
+      const max = Math.max(1, Math.round(parseNumber(leadSlider.max, 1)));
+      const min = Math.max(1, Math.round(parseNumber(leadSlider.min, 1)));
+      leadSlider.value = String(Math.max(min, Math.min(max, customAmount)));
+      delete leadSlider.dataset.customValue;
     } else {
       delete leadSlider.dataset.customValue;
     }
@@ -168,9 +177,10 @@
     writeStorage(CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY, String(Math.max(0, sliderIndex)));
 
     const customValue = Math.round(parseNumber(leadSlider.dataset?.customValue, NaN));
-    if (Number.isFinite(customValue) && customValue > 0) {
+    if (usesStandaloneCustomSliderValue() && Number.isFinite(customValue) && customValue > 0) {
       writeStorage(CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY, String(customValue));
     } else {
+      delete leadSlider.dataset.customValue;
       writeStorage(CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY, '');
     }
 

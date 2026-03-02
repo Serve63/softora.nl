@@ -745,7 +745,7 @@
             appearance: none;
             background: var(--border);
             outline: none;
-            cursor: none;
+            cursor: ew-resize;
             border-radius: 0;
         }
 
@@ -755,7 +755,17 @@
             height: 24px;
             background: var(--accent);
             border: 3px solid var(--accent-light);
-            cursor: none;
+            cursor: ew-resize;
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: var(--accent);
+            border: 3px solid var(--accent-light);
+            border-radius: 0;
+            cursor: ew-resize;
             transition: all 0.2s;
         }
 
@@ -1396,11 +1406,13 @@
                                 <label class="form-label" style="margin-bottom: 0;">Hoeveel mensen bellen</label>
                                 <div class="slider-value" id="leadValue">1 <span>mensen</span></div>
                             </div>
-                            <input type="range" min="0" max="3" value="0" step="1" id="leadSlider" class="magnetic" data-value-map="1,50,100,250">
+                            <input type="range" min="1" max="250" value="1" step="1" id="leadSlider" data-custom-value-mode="sync-slider">
                             <div class="slider-labels">
                                 <span>1</span>
                                 <span>50</span>
                                 <span>100</span>
+                                <span>150</span>
+                                <span>200</span>
                                 <span>250</span>
                             </div>
                         </div>
@@ -1769,13 +1781,10 @@
 
         const slider = document.getElementById('leadSlider');
         const sliderValue = document.getElementById('leadValue');
-        const sliderValueMap = String(slider?.dataset?.valueMap || '')
-            .split(',')
-            .map((item) => Number(String(item).trim()))
-            .filter((item) => Number.isFinite(item) && item > 0);
         const sliderValueInput = document.createElement('input');
         sliderValueInput.type = 'number';
-        sliderValueInput.min = '1';
+        sliderValueInput.min = String(slider?.min || 1);
+        sliderValueInput.max = String(slider?.max || 250);
         sliderValueInput.step = '1';
         sliderValueInput.inputMode = 'numeric';
         sliderValueInput.autocomplete = 'off';
@@ -1791,14 +1800,7 @@
         sliderValue.title = 'Plaats je cursor en voer een aantal in';
 
         function getSliderDisplayAmount() {
-            const customValue = Math.round(Number(slider?.dataset?.customValue || NaN));
-            if (Number.isFinite(customValue) && customValue > 0) {
-                return customValue;
-            }
-            if (!sliderValueMap.length) return slider.value;
-            const rawIndex = Math.round(Number(slider.value) || 0);
-            const safeIndex = Math.max(0, Math.min(sliderValueMap.length - 1, rawIndex));
-            return sliderValueMap[safeIndex];
+            return Math.max(1, Math.round(Number(slider?.value) || 1));
         }
 
         function resizeSliderValueInput() {
@@ -1823,8 +1825,13 @@
                 return;
             }
 
-            slider.dataset.customValue = String(parsed);
+            const min = Math.max(1, Math.round(Number(slider.min) || 1));
+            const max = Math.max(min, Math.round(Number(slider.max) || min));
+            const clamped = Math.max(min, Math.min(max, parsed));
+            delete slider.dataset.customValue;
+            slider.value = String(clamped);
             renderSliderValue();
+            slider.dispatchEvent(new Event('input', { bubbles: true }));
             slider.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
@@ -2005,6 +2012,19 @@
                 elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
                 elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
             });
+
+            [slider, sliderValueInput].forEach((elem) => {
+                if (!elem) return;
+                elem.addEventListener('mouseenter', () => {
+                    cursor.style.opacity = '0';
+                    cursorDot.style.opacity = '0';
+                    cursor.classList.remove('hover');
+                });
+                elem.addEventListener('mouseleave', () => {
+                    cursor.style.opacity = '';
+                    cursorDot.style.opacity = '';
+                });
+            });
         } else {
             cursor.style.display = 'none';
             cursorDot.style.display = 'none';
@@ -2014,7 +2034,7 @@
             });
         }
     </script>
-    <script src="assets/coldcalling-vapi.js?v=20260302b"></script>
+    <script src="assets/coldcalling-vapi.js?v=20260302c"></script>
     <script>
         (function initConfirmationTasksInLiveActivity() {
             const listEl = document.getElementById('logTaskList');
