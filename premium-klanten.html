@@ -401,58 +401,6 @@
             letter-spacing: 0.08em;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 1.25rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-            border: 1px solid var(--border);
-            padding: 1.5rem 1.75rem;
-            min-height: 132px;
-            border: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .stat-card::after {
-            display: none;
-        }
-
-        .stat-label {
-            margin-bottom: 0.45rem;
-            color: var(--text-tertiary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 500;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-        }
-
-        .stat-value {
-            font-family: 'Oswald', sans-serif;
-            font-size: 2rem;
-            line-height: 1;
-        }
-
-        .stat-value.is-accent {
-            color: var(--accent);
-        }
-
-        .stat-value.is-success {
-            color: var(--success);
-        }
-
-        .stat-note {
-            margin-top: 0.45rem;
-            color: var(--text-secondary);
-            font-size: 0.82rem;
-        }
-
         .database-card {
             overflow: hidden;
             border: 1px solid var(--border);
@@ -829,10 +777,6 @@
             .hero-actions {
                 align-items: flex-start;
             }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
         }
 
         @media (max-width: 900px) {
@@ -1029,26 +973,6 @@
                     </div>
                 </section>
 
-                <section class="stats-grid" aria-label="Samenvatting">
-                    <article class="stat-card">
-                        <div class="stat-label">Totale klanten</div>
-                        <div class="stat-value is-accent" id="statTotal">0</div>
-                        <div class="stat-note">Unieke records in je klantenbestand.</div>
-                    </article>
-
-                    <article class="stat-card">
-                        <div class="stat-label">Totale omzet</div>
-                        <div class="stat-value" id="statRevenue">EUR 0</div>
-                        <div class="stat-note">Som van alle bekende bedragen in de database.</div>
-                    </article>
-
-                    <article class="stat-card">
-                        <div class="stat-label">Openstaand</div>
-                        <div class="stat-value is-success" id="statOpen">EUR 0</div>
-                        <div class="stat-note">Alle records die nog op open staan.</div>
-                    </article>
-                </section>
-
                 <section class="database-card" aria-labelledby="databaseTitle">
                     <div class="database-toolbar">
                         <div class="database-toolbar-copy">
@@ -1182,9 +1106,6 @@
             body: document.getElementById("customersBody"),
             empty: document.getElementById("emptyState"),
             search: document.getElementById("searchInput"),
-            statTotal: document.getElementById("statTotal"),
-            statRevenue: document.getElementById("statRevenue"),
-            statOpen: document.getElementById("statOpen"),
             visibleCount: document.getElementById("visibleCount"),
             statusBanner: document.getElementById("statusBanner"),
             dateBadge: document.getElementById("dateBadge"),
@@ -1509,16 +1430,7 @@
         }
 
         function updateStats() {
-            const totalRevenue = state.klanten.reduce(function (sum, customer) {
-                return sum + Number(customer.bedrag || 0);
-            }, 0);
-            const totalOpen = state.klanten.reduce(function (sum, customer) {
-                return customer.status === "Open" ? sum + Number(customer.bedrag || 0) : sum;
-            }, 0);
-
-            nodes.statTotal.textContent = String(state.klanten.length);
-            nodes.statRevenue.textContent = formatMoney(totalRevenue);
-            nodes.statOpen.textContent = formatMoney(totalOpen);
+            return;
         }
 
         function renderTable() {
