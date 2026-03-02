@@ -1503,21 +1503,8 @@ function getOpenAiModelCostRates(model) {
   return { inputPer1mUsd: 1.0, outputPer1mUsd: 4.0, source: 'default-generic' };
 }
 
-function estimateOpenAiUsageCost(usage, model) {
-  if (!usage || typeof usage !== 'object') return null;
-  const promptTokens = Number(
-    usage.prompt_tokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.inputTokens ?? 0
-  );
-  const completionTokens = Number(
-    usage.completion_tokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.outputTokens ?? 0
-  );
-  const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? promptTokens + completionTokens);
-  if (
-    !Number.isFinite(promptTokens) ||
-    !Number.isFinite(completionTokens) ||
-    promptTokens < 0 ||
-    completionTokens < 0
-  ) {
+function buildOpenAiCostEstimate({ promptTokens, completionTokens, totalTokens, model, method = 'usage' }) {
+  if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens) || promptTokens < 0 || completionTokens < 0) {
     return null;
   }
 
@@ -1534,13 +1521,76 @@ function estimateOpenAiUsageCost(usage, model) {
     model: normalizeString(model || OPENAI_MODEL),
     promptTokens: Math.round(promptTokens),
     completionTokens: Math.round(completionTokens),
-    totalTokens: Number.isFinite(totalTokens) ? Math.round(totalTokens) : Math.round(promptTokens + completionTokens),
-    usd: Number(totalUsd.toFixed(6)),
-    eur: Number(totalEur.toFixed(6)),
+    totalTokens: Number.isFinite(totalTokens)
+      ? Math.round(totalTokens)
+      : Math.round(promptTokens + completionTokens),
+    usd: Number(totalUsd.toFixed(8)),
+    eur: Number(totalEur.toFixed(8)),
     rates,
     usdToEur: safeUsdToEur,
     estimated: true,
+    method,
   };
+}
+
+function estimateTokenCountFromText(value) {
+  const text = normalizeString(value || '');
+  if (!text) return 0;
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function estimateOpenAiUsageCost(usage, model) {
+  if (!usage || typeof usage !== 'object') return null;
+  const hasTokenSignal = [
+    usage.prompt_tokens,
+    usage.input_tokens,
+    usage.promptTokens,
+    usage.inputTokens,
+    usage.completion_tokens,
+    usage.output_tokens,
+    usage.completionTokens,
+    usage.outputTokens,
+    usage.total_tokens,
+    usage.totalTokens,
+  ].some((value) => Number.isFinite(Number(value)));
+  if (!hasTokenSignal) return null;
+
+  const promptTokens = Number(
+    usage.prompt_tokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.inputTokens ?? 0
+  );
+  const completionTokens = Number(
+    usage.completion_tokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.outputTokens ?? 0
+  );
+  const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? promptTokens + completionTokens);
+  if (
+    !Number.isFinite(promptTokens) ||
+    !Number.isFinite(completionTokens) ||
+    promptTokens < 0 ||
+    completionTokens < 0
+  ) {
+    return null;
+  }
+
+  return buildOpenAiCostEstimate({
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    model,
+    method: 'usage',
+  });
+}
+
+function estimateOpenAiTextCost(inputText, outputText, model) {
+  const promptTokens = estimateTokenCountFromText(inputText);
+  const completionTokens = estimateTokenCountFromText(outputText);
+  if (promptTokens <= 0 && completionTokens <= 0) return null;
+  return buildOpenAiCostEstimate({
+    promptTokens,
+    completionTokens,
+    totalTokens: promptTokens + completionTokens,
+    model,
+    method: 'text-fallback',
+  });
 }
 
 async function generateWebsiteHtmlWithAi(options = {}) {
@@ -1645,7 +1695,9 @@ async function generateWebsiteHtmlWithAi(options = {}) {
     source: 'openai',
     model: OPENAI_MODEL,
     usage: data?.usage || null,
-    apiCost: estimateOpenAiUsageCost(data?.usage || null, OPENAI_MODEL),
+    apiCost:
+      estimateOpenAiUsageCost(data?.usage || null, OPENAI_MODEL) ||
+      estimateOpenAiTextCost(userPrompt, html, OPENAI_MODEL),
   };
 }
 

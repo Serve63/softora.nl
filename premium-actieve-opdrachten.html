@@ -634,7 +634,7 @@
             height: 100%;
             background: linear-gradient(90deg, var(--accent), var(--accent-light));
             width: 0%;
-            transition: width 0.5s var(--ease-out-expo);
+            transition: width 0.18s linear;
         }
 
         .progress-bar-fill.green {
@@ -1362,6 +1362,7 @@
 
         let currentModalId = null;
         let buildMode = 'premium';
+        const activeProgressAnimations = {};
 
         function getTime() {
             return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1592,13 +1593,23 @@
             return '€' + n.toLocaleString('nl-NL');
         }
 
+        function formatApiCostAmount(amount) {
+            if (!Number.isFinite(amount) || amount < 0) return null;
+            if (amount > 0 && amount < 0.000001) return '< €0,000001';
+
+            const decimals = amount < 0.01 ? 6 : amount < 1 ? 4 : 2;
+            return '€' + amount.toLocaleString('nl-NL', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
         function formatApiCostLabel(record) {
             const amount = Number(record?.apiCostEur);
-            if (!Number.isFinite(amount) || amount < 0) return 'Nog niet berekend';
-            return '€' + amount.toLocaleString('nl-NL', {
-                minimumFractionDigits: 3,
-                maximumFractionDigits: 3
-            });
+            const hasTokenData = Number.isFinite(Number(record?.apiTokensInput)) || Number.isFinite(Number(record?.apiTokensOutput));
+            if ((!Number.isFinite(amount) || amount < 0) || (amount === 0 && !hasTokenData)) return 'Nog niet berekend';
+            if (amount === 0 && hasTokenData) return '< €0,000001';
+            return formatApiCostAmount(amount) || 'Nog niet berekend';
         }
 
         function getCustomOrderIndexById(id) {
@@ -1627,7 +1638,13 @@
             const el = document.getElementById(`api-cost-${id}`);
             if (!el) return;
             const text = formatApiCostLabel(record);
-            el.innerHTML = `<span class="label">API kosten</span><span class="value">${escapeHtml(text)}</span>`;
+            const meta = [
+                String(record?.apiModel || '').trim(),
+                Number.isFinite(Number(record?.apiTokensInput)) && Number.isFinite(Number(record?.apiTokensOutput))
+                    ? `${Number(record.apiTokensInput)} in / ${Number(record.apiTokensOutput)} out`
+                    : ''
+            ].filter(Boolean).join(' · ');
+            el.innerHTML = `<span class="label">API kosten</span><span class="value"${meta ? ` title="${escapeHtml(meta)}"` : ''}>${escapeHtml(text)}</span>`;
         }
 
         function renderOrdersEmptyState() {
@@ -2133,10 +2150,6 @@
             const first = Object.keys(orders).map(Number).sort((a, b) => a - b)[0];
             return first || 1;
         }
-        function sleep(ms) {
-            return new Promise((resolve) => setTimeout(resolve, Number(ms) || 0));
-        }
-
         function getPreviewStorageKey(orderId) {
             return PREVIEW_HTML_PREFIX + String(orderId);
         }
@@ -2184,8 +2197,33 @@
             ].filter(Boolean).join('\n');
         }
 
-        function setOrderProgress(id, pct, step) {
+        function getProgressStepForPct(pct) {
             const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+            const steps = getBuildSteps();
+            let currentStep = 1;
+            steps.forEach((item) => {
+                if (clamped >= Number(item?.pct || 0)) currentStep = Number(item?.step || currentStep);
+            });
+            return Math.max(1, Math.min(5, currentStep));
+        }
+
+        function syncOpenModalProgress(id, pct) {
+            if (Number(currentModalId) !== Number(id)) return;
+            const modalBar = document.getElementById('modalBar');
+            const modalPct = document.getElementById('modalPct');
+            const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+            if (modalBar) {
+                modalBar.style.width = clamped + '%';
+                modalBar.classList.toggle('green', clamped >= 100);
+            }
+            if (modalPct) {
+                modalPct.textContent = `${Math.round(clamped)}%`;
+            }
+        }
+
+        function setOrderProgress(id, pct, step, options = {}) {
+            const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+            const resolvedStep = Math.max(1, Math.min(5, Number(step) || getProgressStepForPct(clamped)));
             const bar = document.getElementById(`bar-${id}`);
             if (bar) {
                 bar.style.width = clamped + '%';
@@ -2198,24 +2236,78 @@
                     el.className = 'progress-step done';
                     continue;
                 }
-                if (s < step) el.className = 'progress-step done';
-                else if (s === step) el.className = 'progress-step active';
+                if (s < resolvedStep) el.className = 'progress-step done';
+                else if (s === resolvedStep) el.className = 'progress-step active';
                 else el.className = 'progress-step';
             }
             orders[id].progressPct = clamped;
             orders[id].updatedAt = Date.now();
-            persistOrdersRuntime();
+            syncOpenModalProgress(id, clamped);
+            if (options.persist !== false) persistOrdersRuntime();
         }
 
         function appendOrderLog(id, msg, highlight = false) {
             if (!orders[id]) return;
-            orders[id].logs.push({
+            const entry = {
                 time: getTime(),
                 msg: String(msg || ''),
                 highlight: Boolean(highlight)
-            });
+            };
+            orders[id].logs.push(entry);
             orders[id].updatedAt = Date.now();
+
+            if (Number(currentModalId) === Number(id)) {
+                const log = document.getElementById('modalLog');
+                if (log) {
+                    const div = document.createElement('div');
+                    div.className = 'modal-log-entry';
+                    div.innerHTML = `<span class="time">[${escapeHtml(entry.time)}]</span> <span class="${entry.highlight ? 'success' : 'highlight'}">${escapeHtml(entry.msg)}</span>`;
+                    log.appendChild(div);
+                    log.scrollTop = log.scrollHeight;
+                }
+            }
             persistOrdersRuntime();
+        }
+
+        function stopOrderProgressSimulation(id) {
+            const state = activeProgressAnimations[id];
+            if (!state) return;
+            window.clearInterval(state.intervalId);
+            delete activeProgressAnimations[id];
+        }
+
+        function startOrderProgressSimulation(id) {
+            stopOrderProgressSimulation(id);
+            const milestones = getBuildSteps().filter((item) => Number(item?.pct || 0) > 0 && Number(item?.pct || 0) < 100);
+            const state = {
+                nextMilestoneIndex: milestones.findIndex((item) => Number(item.pct) > (Number(orders[id]?.progressPct) || 0)),
+                intervalId: null,
+            };
+            if (state.nextMilestoneIndex < 0) state.nextMilestoneIndex = milestones.length;
+
+            state.intervalId = window.setInterval(() => {
+                if (!orders[id]) {
+                    stopOrderProgressSimulation(id);
+                    return;
+                }
+
+                const current = Math.max(0, Math.min(100, Number(orders[id].progressPct) || 0));
+                const ceiling = 96;
+                if (current >= ceiling) return;
+
+                const remaining = ceiling - current;
+                const baseDelta = current < 20 ? 0.85 : current < 45 ? 0.55 : current < 72 ? 0.32 : 0.18;
+                const delta = Math.max(0.025, Math.min(baseDelta, remaining * 0.12));
+                const nextPct = Math.min(ceiling, current + delta);
+                setOrderProgress(id, nextPct, getProgressStepForPct(nextPct), { persist: false });
+
+                while (state.nextMilestoneIndex < milestones.length && nextPct >= Number(milestones[state.nextMilestoneIndex].pct)) {
+                    appendOrderLog(id, milestones[state.nextMilestoneIndex].msg);
+                    state.nextMilestoneIndex += 1;
+                }
+            }, 180);
+
+            activeProgressAnimations[id] = state;
         }
 
         async function postGenerateSiteRequest(payload) {
@@ -2293,18 +2385,11 @@
             orders[id].updatedAt = Date.now();
             setLastActiveOrder(activeId);
             persistOrdersRuntime();
-            setOrderProgress(id, 3, 1);
-            appendOrderLog(id, 'Opdracht geladen en prompt voorbereid.');
-            await sleep(200);
+            setOrderProgress(id, 2, 1);
+            appendOrderLog(id, 'AI workflow gestart.');
+            startOrderProgressSimulation(id);
 
             try {
-                setOrderProgress(id, 12, 1);
-                appendOrderLog(id, 'AI briefing en projectcontext opgebouwd.');
-                await sleep(300);
-
-                setOrderProgress(id, 28, 2);
-                appendOrderLog(id, 'HTML structuur en sectie-opbouw genereren...');
-
                 const result = await postGenerateSiteRequest({
                     orderId: activeId,
                     company: meta.clientName,
@@ -2315,7 +2400,8 @@
                     language: 'nl'
                 });
 
-                setOrderProgress(id, 74, 3);
+                stopOrderProgressSimulation(id);
+                setOrderProgress(id, Math.max(97, Number(orders[id].progressPct) || 0), 5);
                 appendOrderLog(id, 'HTML, styling en interactie ontvangen van AI.');
 
                 const html = String(result?.html || '');
@@ -2335,26 +2421,35 @@
                 const apiTokensOutput = Number(apiCost?.completionTokens);
                 const apiModel = String(result?.model || apiCost?.model || '');
                 const nowIso = new Date().toISOString();
+                const apiCostRecord = {
+                    apiCostEur: Number.isFinite(apiCostEur) && apiCostEur >= 0 ? apiCostEur : null,
+                    apiCostUsd: Number.isFinite(apiCostUsd) && apiCostUsd >= 0 ? apiCostUsd : null,
+                    apiTokensInput: Number.isFinite(apiTokensInput) && apiTokensInput >= 0 ? apiTokensInput : null,
+                    apiTokensOutput: Number.isFinite(apiTokensOutput) && apiTokensOutput >= 0 ? apiTokensOutput : null,
+                    apiModel: apiModel || '',
+                };
 
                 if (customOrder) {
                     updateCustomOrderById(activeId, {
                         prompt,
-                        apiCostEur: Number.isFinite(apiCostEur) && apiCostEur >= 0 ? apiCostEur : null,
-                        apiCostUsd: Number.isFinite(apiCostUsd) && apiCostUsd >= 0 ? apiCostUsd : null,
-                        apiTokensInput: Number.isFinite(apiTokensInput) && apiTokensInput >= 0 ? apiTokensInput : null,
-                        apiTokensOutput: Number.isFinite(apiTokensOutput) && apiTokensOutput >= 0 ? apiTokensOutput : null,
-                        apiModel: apiModel || '',
+                        apiCostEur: apiCostRecord.apiCostEur,
+                        apiCostUsd: apiCostRecord.apiCostUsd,
+                        apiTokensInput: apiCostRecord.apiTokensInput,
+                        apiTokensOutput: apiCostRecord.apiTokensOutput,
+                        apiModel: apiCostRecord.apiModel,
                         lastRunAt: nowIso,
                         status: 'klaar'
                     });
                 }
-                updateApiCostLabel(activeId, getCustomOrderById(activeId));
+                updateApiCostLabel(activeId, getCustomOrderById(activeId) || apiCostRecord);
 
                 orders[id].artifact = {
                     source: String(result?.source || 'openai'),
                     model: apiModel || null,
-                    apiCostEur: Number.isFinite(apiCostEur) ? apiCostEur : null,
-                    apiCostUsd: Number.isFinite(apiCostUsd) ? apiCostUsd : null,
+                    apiCostEur: apiCostRecord.apiCostEur,
+                    apiCostUsd: apiCostRecord.apiCostUsd,
+                    apiTokensInput: apiCostRecord.apiTokensInput,
+                    apiTokensOutput: apiCostRecord.apiTokensOutput,
                     generatedAt: nowIso
                 };
                 orders[id].previewHtml = html;
@@ -2363,7 +2458,7 @@
 
                 appendOrderLog(id, 'Preview HTML succesvol opgeslagen.', true);
                 if (Number.isFinite(apiCostEur) && apiCostEur >= 0) {
-                    appendOrderLog(id, `API kosten (geschat): €${apiCostEur.toFixed(3)} (${apiModel || 'model'})`, true);
+                    appendOrderLog(id, `API kosten (geschat): ${formatApiCostAmount(apiCostEur) || 'onbekend'} (${apiModel || 'model'})`, true);
                 }
                 appendOrderLog(id, 'Website opgeleverd. Open preview om te beoordelen.', true);
 
@@ -2381,8 +2476,9 @@
                     viewBtn.onclick = () => openPreview(activeId);
                 }
             } catch (error) {
+                stopOrderProgressSimulation(id);
                 orders[id].statusKey = 'actief';
-                setOrderProgress(id, Math.max(5, Number(orders[id].progressPct) || 0), 1);
+                setOrderProgress(id, Math.max(5, Number(orders[id].progressPct) || 0), getProgressStepForPct(Number(orders[id].progressPct) || 5));
                 appendOrderLog(id, `Fout: ${String(error?.message || 'Website generatie mislukt.')}`, true);
 
                 btn.classList.remove('running');
