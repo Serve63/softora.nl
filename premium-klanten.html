@@ -317,16 +317,11 @@
 
         .hero-title {
             font-size: 2.35rem;
-            margin-bottom: 0.35rem;
+            margin-bottom: 0;
         }
 
         .hero-text {
-            max-width: 50rem;
-            margin: 0;
-            color: var(--text-tertiary);
-            font-size: 0.95rem;
-            font-weight: 300;
-            line-height: 1.65;
+            display: none;
         }
 
         .database-card {
@@ -349,19 +344,16 @@
         }
 
         .database-toolbar-copy {
-            display: grid;
-            gap: 0.35rem;
+            display: block;
         }
 
         .database-toolbar-copy h2 {
             font-size: 1.18rem;
-            margin-bottom: 0.35rem;
+            margin-bottom: 0;
         }
 
         .database-toolbar-copy p {
-            margin: 0;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+            display: none;
         }
 
         .btn-primary,
@@ -855,14 +847,12 @@
             <div class="page-content">
                 <section class="hero">
                     <h1 class="hero-title">Klanten</h1>
-                    <p class="hero-text">Zoek, beheer en update al je klanten op een plek. De pagina gebruikt de bestaande Softora-kleuren en kan automatisch starten met klanten uit je premium opdrachten.</p>
                 </section>
 
                 <section class="database-card" aria-labelledby="databaseTitle">
                     <div class="database-toolbar">
                         <div class="database-toolbar-copy">
                             <h2 id="databaseTitle">Klantenbestand</h2>
-                            <p>Gebaseerd op jouw voorbeeld, maar ingebouwd in de huidige Softora-stijl.</p>
                         </div>
 
                         <button type="button" class="btn-primary" id="addCustomerButton">Klant toevoegen</button>
