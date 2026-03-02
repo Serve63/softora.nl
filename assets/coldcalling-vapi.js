@@ -296,6 +296,74 @@
     return nextValues;
   }
 
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  async function fetchUiStateGetWithFallback(scope) {
+    const encodedScope = encodeURIComponent(String(scope || ''));
+    const urls = [`/api/ui-state-get?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
+    let lastError = null;
+
+    for (const url of urls) {
+      try {
+        const response = await fetchWithTimeout(
+          url,
+          {
+            method: 'GET',
+            cache: 'no-store',
+          },
+          12000
+        );
+        if (!response.ok) {
+          throw new Error(`UI state GET mislukt (${response.status})`);
+        }
+        return await response.json().catch(() => ({}));
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('UI state GET mislukt');
+  }
+
+  async function fetchUiStateSetWithFallback(scope, body) {
+    const encodedScope = encodeURIComponent(String(scope || ''));
+    const urls = [`/api/ui-state-set?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
+    let lastError = null;
+
+    for (const url of urls) {
+      try {
+        const response = await fetchWithTimeout(
+          url,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body || {}),
+          },
+          12000
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(normalizeString(data?.error || '') || `UI state POST mislukt (${response.status})`);
+        }
+        return data;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('UI state POST mislukt');
+  }
+
   function readStorage(key) {
     if (!key) return '';
     return String(remoteUiStateCache[key] ?? '');
@@ -315,18 +383,7 @@
 
     remoteUiStateLoadingPromise = (async () => {
       try {
-        const response = await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
-          method: 'GET',
-          cache: 'no-store',
-        });
-        if (!response.ok) {
-          remoteUiStateLastSource = '';
-          remoteUiStateLastError = `UI state load failed (${response.status})`;
-          remoteUiStateLoaded = true;
-          return false;
-        }
-
-        const data = await response.json().catch(() => ({}));
+        const data = await fetchUiStateGetWithFallback(REMOTE_UI_STATE_SCOPE);
         const values = data && data.ok && data.values && typeof data.values === 'object' ? data.values : {};
         remoteUiStateLastSource = String(data?.source || '').trim();
         if (remoteUiStateLastSource !== 'supabase') {
@@ -339,9 +396,9 @@
         remoteUiStateLastError = '';
         remoteUiStateLoaded = true;
         return true;
-      } catch {
+      } catch (error) {
         remoteUiStateLastSource = '';
-        remoteUiStateLastError = 'UI state load crash';
+        remoteUiStateLastError = normalizeString(error?.message || '') || 'UI state load crash';
         remoteUiStateLoaded = true;
         return false;
       } finally {
@@ -363,22 +420,11 @@
 
     remoteUiStateFlushPromise = (async () => {
       try {
-        const response = await fetch(`/api/ui-state/${encodeURIComponent(REMOTE_UI_STATE_SCOPE)}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            patch,
-            source: 'assets/coldcalling-vapi.js',
-            actor: 'browser',
-          }),
+        const data = await fetchUiStateSetWithFallback(REMOTE_UI_STATE_SCOPE, {
+          patch,
+          source: 'assets/coldcalling-vapi.js',
+          actor: 'browser',
         });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(normalizeString(data?.error || '') || `UI state save failed (${response.status})`);
-        }
-
         const source = String(data?.source || '').trim();
         if (source !== 'supabase') {
           throw new Error('UI state is niet in Supabase opgeslagen.');
@@ -703,6 +749,18 @@
     const nextRows = Array.isArray(rows) ? rows : collectLeadRowsFromModal();
     saveLeadRows(nextRows);
     updateLeadListHint();
+  }
+
+  function setButtonSavingState(buttonId, isSaving, savingLabel = 'Opslaan...') {
+    const button = byId(buttonId);
+    if (!button) return;
+    if (!button.dataset.defaultLabel) {
+      button.dataset.defaultLabel = button.textContent || '';
+    }
+    button.disabled = Boolean(isSaving);
+    button.style.opacity = isSaving ? '0.7' : '1';
+    button.style.cursor = isSaving ? 'progress' : 'pointer';
+    button.textContent = isSaving ? savingLabel : button.dataset.defaultLabel;
   }
 
   function setLeadModalDraftHint(message) {
@@ -1078,20 +1136,26 @@
       const rows = collectLeadRowsFromModal();
       saveLeadRows(rows);
       updateLeadListHint();
-      const saveResult = await persistRemoteUiStateNow();
-      if (!saveResult.ok) {
-        setLeadModalDraftHint(
-          `Opslaan mislukt. Deze lijst staat nog niet in Supabase.${saveResult.error ? ` ${saveResult.error}` : ''}`
-        );
-        return;
+      setButtonSavingState('leadListSaveBtn', true, 'Opslaan...');
+      setLeadModalDraftHint('Bezig met opslaan naar Supabase...');
+      try {
+        const saveResult = await persistRemoteUiStateNow();
+        if (!saveResult.ok) {
+          setLeadModalDraftHint(
+            `Opslaan mislukt. Deze lijst staat nog niet in Supabase.${saveResult.error ? ` ${saveResult.error}` : ''}`
+          );
+          return;
+        }
+        const parsed = parseLeadRows(rows);
+        if (!parsed.hasInput) {
+          setLeadModalDraftHint('Lege lijst opgeslagen in Supabase. Er worden geen calls gestart zonder geldige leads.');
+        } else {
+          setLeadModalDraftHint(`Opgeslagen in Supabase: ${parsed.leads.length} geldige lead(s).`);
+        }
+        closeModal();
+      } finally {
+        setButtonSavingState('leadListSaveBtn', false);
       }
-      const parsed = parseLeadRows(rows);
-      if (!parsed.hasInput) {
-        setLeadModalDraftHint('Lege lijst opgeslagen in Supabase. Er worden geen calls gestart zonder geldige leads.');
-      } else {
-        setLeadModalDraftHint(`Opgeslagen in Supabase: ${parsed.leads.length} geldige lead(s).`);
-      }
-      closeModal();
     });
 
     window.addEventListener('keydown', (event) => {
@@ -1700,20 +1764,26 @@
       const rows = collectAiNotebookRowsFromModal();
       saveAiNotebookRows(rows);
       updateAiNotebookHint();
-      const saveResult = await persistRemoteUiStateNow();
-      if (!saveResult.ok) {
+      setButtonSavingState('aiNotebookSaveBtn', true, 'Opslaan...');
+      setAiNotebookDraftHint('Bezig met opslaan naar Supabase...');
+      try {
+        const saveResult = await persistRemoteUiStateNow();
+        if (!saveResult.ok) {
+          setAiNotebookDraftHint(
+            `Opslaan mislukt. Dit kladblok staat nog niet in Supabase.${saveResult.error ? ` ${saveResult.error}` : ''}`
+          );
+          return;
+        }
+        const parsed = parseAiNotebookRows(rows);
         setAiNotebookDraftHint(
-          `Opslaan mislukt. Dit kladblok staat nog niet in Supabase.${saveResult.error ? ` ${saveResult.error}` : ''}`
+          parsed.hasInput
+            ? `AI kladblok opgeslagen in Supabase: ${parsed.nonEmptyRowCount} regel(s).`
+            : 'Leeg AI kladblok opgeslagen in Supabase.'
         );
-        return;
+        closeModal();
+      } finally {
+        setButtonSavingState('aiNotebookSaveBtn', false);
       }
-      const parsed = parseAiNotebookRows(rows);
-      setAiNotebookDraftHint(
-        parsed.hasInput
-          ? `AI kladblok opgeslagen in Supabase: ${parsed.nonEmptyRowCount} regel(s).`
-          : 'Leeg AI kladblok opgeslagen in Supabase.'
-      );
-      closeModal();
     });
 
     window.addEventListener('keydown', (event) => {
