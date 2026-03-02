@@ -2222,6 +2222,7 @@
 
             const cardEl = document.getElementById(`order-${id}`);
             const statusEl = document.getElementById(`status-${id}`);
+            const statusWrapEl = statusEl ? statusEl.parentElement : null;
             const progressEl = document.getElementById(`progress-${id}`);
             const barEl = document.getElementById(`bar-${id}`);
             const btnEl = document.getElementById(`btn-${id}`);
@@ -2250,6 +2251,9 @@
             if (statusEl) {
                 statusEl.textContent = status.text;
                 statusEl.className = `status-tag ${status.className}`;
+            }
+            if (statusWrapEl) {
+                statusWrapEl.style.display = isPaid ? 'none' : '';
             }
             if (progressEl) {
                 progressEl.classList.toggle('show', pct > 0 && !isDelivered);
