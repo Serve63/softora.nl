@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Softora | Klantenbestand</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="assets/personnel-theme.css">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
+                var storageKey = isPremiumPersonnel
+                    ? "softora_premium_personnel_theme_mode"
+                    : "softora_software_personnel_theme_mode";
+                var mode = localStorage.getItem(storageKey);
+                if (mode === "light" || mode === "dark") {
+                    document.documentElement.setAttribute("data-theme-mode", mode);
+                    document.documentElement.setAttribute("data-theme", mode);
+                }
+            } catch (error) {
+                /* ignore storage errors */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #080808;
+            --bg-secondary: #0d0d0d;
+            --bg-tertiary: #111;
+            --accent: #8B2252;
+            --accent-dark: #6B1A3F;
+            --accent-glow: rgba(139, 34, 82, 0.4);
+            --accent-light: #A62D65;
+            --text-primary: #f5f5f5;
+            --text-secondary: #888;
+            --text-tertiary: #555;
+            --border: rgba(255, 255, 255, 0.06);
+            --green: #2ecc71;
+            --green-glow: rgba(46, 204, 113, 0.16);
+            --yellow: #f39c12;
+            --yellow-glow: rgba(243, 156, 18, 0.16);
+            --blue: #4f7cff;
+            --blue-glow: rgba(79, 124, 255, 0.16);
+            --red: #e74c3c;
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+
+        .noise-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .cursor {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--accent-light);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            transition: transform 0.1s var(--ease-out-expo), background 0.2s ease, width 0.3s var(--ease-out-expo), height 0.3s var(--ease-out-expo);
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+        }
+
+        .cursor.hover {
+            width: 80px;
+            height: 80px;
+            background: var(--accent-light);
+            border-color: transparent;
+        }
+
+        .cursor-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-light);
+            border-radius: 50%;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10001;
+            transform: translate(-50%, -50%);
+        }
+
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 2.5rem 0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 0 2rem;
+            margin-bottom: 3rem;
+            display: block;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-section-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--text-tertiary);
+            padding: 0 2rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.8rem 2rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 400;
+            transition: all 0.2s;
+            cursor: none;
+            position: relative;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar-link:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .sidebar-link.active {
+            color: var(--text-primary);
+            background: rgba(139, 34, 82, 0.06);
+        }
+
+        .sidebar-link.active::before {
+            opacity: 1;
+        }
+
+        .sidebar-link svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.5;
+            flex-shrink: 0;
+        }
+
+        .sidebar-link.active svg,
+        .sidebar-link:hover svg {
+            opacity: 1;
+        }
+
+        .sidebar-footer {
+            padding: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .sidebar-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .sidebar-user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sidebar-user-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .sidebar-user-role {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: none;
+            padding: 0.3rem;
+            transition: color 0.2s;
+        }
+
+        .logout-btn:hover {
+            color: var(--red);
+        }
+
+        .logout-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 3rem;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .topbar-left h1 {
+            font-size: 2.35rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .topbar-left p {
+            color: var(--text-tertiary);
+            font-size: 0.95rem;
+            font-weight: 300;
+        }
+
+        .topbar-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 1px solid rgba(139,34,82,0.26);
+            background: rgba(139,34,82,0.08);
+            color: var(--accent-light);
+            padding: 0.75rem 0.95rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.74rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .summary-bar {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+            border: 1px solid var(--border);
+            padding: 1.5rem 1.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 132px;
+        }
+
+        .summary-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.45rem;
+        }
+
+        .summary-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2rem;
+            line-height: 1;
+        }
+
+        .summary-value.accent {
+            color: var(--accent-light);
+        }
+
+        .summary-value.green {
+            color: var(--green);
+        }
+
+        .summary-value.blue {
+            color: var(--blue);
+        }
+
+        .summary-meta {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            margin-top: 0.45rem;
+        }
+
+        .summary-icon {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(139,34,82,0.08);
+            flex-shrink: 0;
+        }
+
+        .summary-icon svg {
+            width: 22px;
+            height: 22px;
+            color: var(--accent-light);
+        }
+
+        .summary-icon.green-bg {
+            background: var(--green-glow);
+        }
+
+        .summary-icon.green-bg svg {
+            color: var(--green);
+        }
+
+        .summary-icon.blue-bg {
+            background: var(--blue-glow);
+        }
+
+        .summary-icon.blue-bg svg {
+            color: var(--blue);
+        }
+
+        .load-state {
+            display: none;
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.1rem;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+        }
+
+        .load-state.show {
+            display: block;
+        }
+
+        .load-state.error {
+            border-color: rgba(231, 76, 60, 0.28);
+            color: #ffc6c0;
+            background: rgba(231, 76, 60, 0.08);
+        }
+
+        .clients-sections {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .clients-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .clients-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.35rem 1.5rem 1.1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .clients-panel-heading h2 {
+            font-size: 1.18rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .clients-panel-heading p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .panel-badge {
+            min-width: 58px;
+            padding: 0.45rem 0.9rem;
+            text-align: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent-light);
+            background: rgba(139,34,82,0.1);
+        }
+
+        .client-grid {
+            display: grid;
+            grid-template-columns: minmax(180px, 1.35fr) minmax(140px, 0.9fr) minmax(180px, 1.2fr) minmax(120px, 0.9fr) minmax(120px, 0.8fr) minmax(110px, 0.75fr) minmax(140px, 0.95fr);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .client-grid.header {
+            padding: 0.9rem 1.5rem;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .client-grid.header span {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--text-tertiary);
+        }
+
+        .client-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .client-row {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .client-row:last-child {
+            border-bottom: none;
+        }
+
+        .client-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+            min-width: 0;
+        }
+
+        .client-cell-label {
+            display: none;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.64rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--text-tertiary);
+        }
+
+        .client-cell-value {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            word-break: break-word;
+        }
+
+        .client-name {
+            font-weight: 600;
+            font-size: 0.98rem;
+            color: var(--text-primary);
+        }
+
+        .client-package {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            padding: 0.38rem 0.75rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .client-package.website {
+            color: var(--accent-light);
+            background: rgba(139,34,82,0.12);
+        }
+
+        .client-package.maintenance {
+            color: var(--green);
+            background: rgba(46,204,113,0.12);
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            padding: 0.35rem 0.72rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .status-pill.live {
+            color: var(--green);
+            background: rgba(46,204,113,0.12);
+        }
+
+        .status-pill.progress {
+            color: var(--accent-light);
+            background: rgba(139,34,82,0.12);
+        }
+
+        .status-pill.intake {
+            color: var(--yellow);
+            background: rgba(243,156,18,0.12);
+        }
+
+        .client-empty {
+            padding: 1.35rem 1.5rem;
+            color: var(--text-tertiary);
+            font-size: 0.92rem;
+        }
+
+        @media (max-width: 1280px) {
+            .summary-bar {
+                grid-template-columns: 1fr;
+            }
+
+            .client-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .client-grid.header {
+                display: none;
+            }
+
+            .client-row {
+                padding: 1.2rem 1.5rem;
+            }
+
+            .client-cell-label {
+                display: block;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .sidebar {
+                position: static;
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .dashboard-layout {
+                flex-direction: column;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 1.35rem;
+            }
+
+            .topbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                cursor: auto;
+            }
+
+            .cursor,
+            .cursor-dot {
+                display: none !important;
+            }
+
+            .client-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .clients-panel-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .panel-badge {
+                min-width: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="noise-overlay"></div>
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="/premium-personeel-dashboard" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Actieve Opdrachten
+                    </a>
+                    <a href="/premium-personeel-agenda" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+                        Agenda
+                    </a>
+                    <a href="/premium-bevestigingsmails" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                        Bevestigingsmails
+                    </a>
+                    <a href="/premium-ai-lead-generator" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
+                        AI Coldcalling
+                    </a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Beheer</div>
+                    <a href="/premium-klanten" class="sidebar-link active magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Klanten
+                    </a>
+                    <div class="sidebar-theme">
+                        <div class="sidebar-theme-label">Thema</div>
+                        <div class="sidebar-theme-options" role="group" aria-label="Thema kiezen">
+                            <button type="button" class="theme-switch-btn magnetic" data-theme-value="dark" aria-pressed="false">Donker</button>
+                            <button type="button" class="theme-switch-btn magnetic" data-theme-value="light" aria-pressed="false">Licht</button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">SP</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">Softora Premium</div>
+                        <div class="sidebar-user-role">Administrator</div>
+                    </div>
+                    <a href="/premium-personeel-login" class="logout-btn magnetic" title="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="topbar">
+                <div class="topbar-left">
+                    <h1>Klantenbestand</h1>
+                    <p>Alle premium klanten gegroepeerd op pakket: iedereen, enkel website en website + onderhoud.</p>
+                </div>
+                <div class="topbar-chip">Premium klantenoverzicht</div>
+            </div>
+
+            <div class="summary-bar">
+                <div class="summary-card">
+                    <div>
+                        <div class="summary-label">Alle klanten</div>
+                        <div class="summary-value accent" id="sumAll">0</div>
+                        <div class="summary-meta">Unieke klantrecords uit premium opdrachten</div>
+                    </div>
+                    <div class="summary-icon">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div>
+                        <div class="summary-label">Enkel website</div>
+                        <div class="summary-value blue" id="sumWebsite">0</div>
+                        <div class="summary-meta">Klanten zonder onderhoudspakket</div>
+                    </div>
+                    <div class="summary-icon blue-bg">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"/><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75h7.5"/></svg>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div>
+                        <div class="summary-label">Website + onderhoud</div>
+                        <div class="summary-value green" id="sumMaintenance">0</div>
+                        <div class="summary-meta">Klanten met onderhoud, support of beheer</div>
+                    </div>
+                    <div class="summary-icon green-bg">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l-1.5 3-3.75.75 2.625 2.625-.6 3.825 3.225-1.725 3.225 1.725-.6-3.825L16.5 8.25l-3.75-.75-1.5-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 15l.75 1.5 1.5.3-1.05 1.05.225 1.65-1.425-.75-1.425.75.225-1.65L14.25 16.8l1.5-.3.75-1.5z"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="load-state" id="loadState"></div>
+
+            <div class="clients-sections">
+                <section class="clients-panel">
+                    <div class="clients-panel-header">
+                        <div class="clients-panel-heading">
+                            <h2>Iedereen</h2>
+                            <p>Volledig premium klantenbestand op basis van je opdrachten.</p>
+                        </div>
+                        <div class="panel-badge" id="allBadge">0</div>
+                    </div>
+                    <div class="client-grid header">
+                        <span>Klant</span>
+                        <span>Pakket</span>
+                        <span>Opdracht</span>
+                        <span>Locatie</span>
+                        <span>Status</span>
+                        <span>Waarde</span>
+                        <span>Laatste update</span>
+                    </div>
+                    <div class="client-list" id="allClientsList"></div>
+                </section>
+
+                <section class="clients-panel">
+                    <div class="clients-panel-header">
+                        <div class="clients-panel-heading">
+                            <h2>Enkel website</h2>
+                            <p>Klanten met alleen een website-opdracht zonder onderhoudspakket.</p>
+                        </div>
+                        <div class="panel-badge" id="websiteBadge">0</div>
+                    </div>
+                    <div class="client-grid header">
+                        <span>Klant</span>
+                        <span>Pakket</span>
+                        <span>Opdracht</span>
+                        <span>Locatie</span>
+                        <span>Status</span>
+                        <span>Waarde</span>
+                        <span>Laatste update</span>
+                    </div>
+                    <div class="client-list" id="websiteClientsList"></div>
+                </section>
+
+                <section class="clients-panel">
+                    <div class="clients-panel-header">
+                        <div class="clients-panel-heading">
+                            <h2>Website + onderhoud</h2>
+                            <p>Klanten waarbij onderhoud, support of beheer onderdeel van het pakket is.</p>
+                        </div>
+                        <div class="panel-badge" id="maintenanceBadge">0</div>
+                    </div>
+                    <div class="client-grid header">
+                        <span>Klant</span>
+                        <span>Pakket</span>
+                        <span>Opdracht</span>
+                        <span>Locatie</span>
+                        <span>Status</span>
+                        <span>Waarde</span>
+                        <span>Laatste update</span>
+                    </div>
+                    <div class="client-list" id="maintenanceClientsList"></div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
+        const REMOTE_UI_STATE_SCOPE = 'premium_active_orders';
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        async function fetchUiStateGetWithFallback(scope) {
+            const encodedScope = encodeURIComponent(String(scope || ''));
+            const urls = [
+                `/api/ui-state-get?scope=${encodedScope}`,
+                `/api/ui-state/${encodedScope}`
+            ];
+            let lastError = null;
+
+            for (const url of urls) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'GET',
+                        cache: 'no-store'
+                    });
+                    if (!res.ok) {
+                        throw new Error(`UI-state GET mislukt (${res.status})`);
+                    }
+                    return await res.json().catch(() => ({}));
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error('UI-state GET mislukt');
+        }
+
+        function parseCustomOrders(raw) {
+            try {
+                const parsed = JSON.parse(String(raw || '[]'));
+                if (!Array.isArray(parsed)) return [];
+                return parsed
+                    .map((item) => {
+                        const id = Number(item?.id);
+                        const amount = Number(item?.amount);
+                        const clientName = String(item?.clientName || '').trim();
+                        const location = String(item?.location || '').trim();
+                        const title = String(item?.title || '').trim();
+                        const description = String(item?.description || '').trim();
+                        const prompt = String(item?.prompt || '').trim();
+                        const status = String(item?.status || '').trim().toLowerCase();
+                        const lastRunAt = String(item?.lastRunAt || '').trim();
+                        if (!Number.isFinite(id) || id <= 0 || !clientName) return null;
+                        return {
+                            id,
+                            amount: Number.isFinite(amount) && amount > 0 ? Math.round(amount) : null,
+                            clientName,
+                            location,
+                            title: title || 'Website opdracht',
+                            description,
+                            prompt,
+                            status,
+                            lastRunAt: lastRunAt || null
+                        };
+                    })
+                    .filter(Boolean);
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function normalizeKey(value) {
+            return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        }
+
+        function getPackageType(record) {
+            const haystack = [
+                record?.title,
+                record?.description,
+                record?.prompt
+            ].join(' ').toLowerCase();
+            const maintenanceKeywords = ['onderhoud', 'maintenance', 'support', 'beheer', 'hosting', 'servicecontract'];
+            return maintenanceKeywords.some((keyword) => haystack.includes(keyword))
+                ? 'maintenance'
+                : 'website';
+        }
+
+        function getStatusMeta(statusRaw) {
+            const status = String(statusRaw || '').toLowerCase().trim();
+            if (status === 'klaar') return { text: 'Live', className: 'live' };
+            if (status === 'bezig' || status === 'actief') return { text: 'In uitvoering', className: 'progress' };
+            return { text: 'Intake', className: 'intake' };
+        }
+
+        function getSortTimestamp(record) {
+            const dateTs = record?.lastRunAt ? Date.parse(record.lastRunAt) : NaN;
+            if (Number.isFinite(dateTs)) return dateTs;
+            return Number(record?.id) || 0;
+        }
+
+        function buildClientRecords(orderRecords) {
+            const seen = new Map();
+            const sorted = orderRecords.slice().sort((a, b) => getSortTimestamp(b) - getSortTimestamp(a));
+
+            sorted.forEach((record) => {
+                const key = `${normalizeKey(record.clientName)}|${normalizeKey(record.location)}`;
+                if (seen.has(key)) return;
+                const packageType = getPackageType(record);
+                const status = getStatusMeta(record.status);
+                seen.set(key, {
+                    clientName: record.clientName,
+                    location: record.location || '—',
+                    title: record.title || 'Website opdracht',
+                    amount: record.amount,
+                    packageType,
+                    packageLabel: packageType === 'maintenance' ? 'Website + onderhoud' : 'Website',
+                    statusText: status.text,
+                    statusClass: status.className,
+                    lastRunAt: record.lastRunAt
+                });
+            });
+
+            return Array.from(seen.values()).sort((a, b) => {
+                const nameCompare = a.clientName.localeCompare(b.clientName, 'nl');
+                if (nameCompare !== 0) return nameCompare;
+                return a.location.localeCompare(b.location, 'nl');
+            });
+        }
+
+        function formatMoney(amount) {
+            if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return '—';
+            return '€' + Number(amount).toLocaleString('nl-NL');
+        }
+
+        function formatDateTime(value) {
+            const ts = Date.parse(String(value || ''));
+            if (!Number.isFinite(ts)) return 'Nog niet uitgevoerd';
+            return new Date(ts).toLocaleString('nl-NL', {
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function renderClientRows(targetId, clients, emptyText) {
+            const target = document.getElementById(targetId);
+            if (!target) return;
+
+            if (!clients.length) {
+                target.innerHTML = `<div class="client-empty">${escapeHtml(emptyText)}</div>`;
+                return;
+            }
+
+            target.innerHTML = clients.map((client) => {
+                return `
+                    <div class="client-row">
+                        <div class="client-grid">
+                            <div class="client-cell">
+                                <span class="client-cell-label">Klant</span>
+                                <span class="client-cell-value client-name">${escapeHtml(client.clientName)}</span>
+                            </div>
+                            <div class="client-cell">
+                                <span class="client-cell-label">Pakket</span>
+                                <span class="client-package ${client.packageType === 'maintenance' ? 'maintenance' : 'website'}">${escapeHtml(client.packageLabel)}</span>
+                            </div>
+                            <div class="client-cell">
+                                <span class="client-cell-label">Opdracht</span>
+                                <span class="client-cell-value">${escapeHtml(client.title)}</span>
+                            </div>
+                            <div class="client-cell">
+                                <span class="client-cell-label">Locatie</span>
+                                <span class="client-cell-value">${escapeHtml(client.location)}</span>
+                            </div>
+                            <div class="client-cell">
+                                <span class="client-cell-label">Status</span>
+                                <span class="status-pill ${escapeHtml(client.statusClass)}">${escapeHtml(client.statusText)}</span>
+                            </div>
+                            <div class="client-cell">
+                                <span class="client-cell-label">Waarde</span>
+                                <span class="client-cell-value">${escapeHtml(formatMoney(client.amount))}</span>
+                            </div>
+                            <div class="client-cell">
+                                <span class="client-cell-label">Laatste update</span>
+                                <span class="client-cell-value">${escapeHtml(formatDateTime(client.lastRunAt))}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setSummaryCount(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = String(value);
+        }
+
+        function setLoadState(message, isError = false) {
+            const el = document.getElementById('loadState');
+            if (!el) return;
+            if (!message) {
+                el.className = 'load-state';
+                el.textContent = '';
+                return;
+            }
+            el.className = `load-state show${isError ? ' error' : ''}`;
+            el.textContent = String(message);
+        }
+
+        async function initializeClientsPage() {
+            setLoadState('Klantenbestand laden...');
+            try {
+                const data = await fetchUiStateGetWithFallback(REMOTE_UI_STATE_SCOPE);
+                const values = data?.values && typeof data.values === 'object' ? data.values : {};
+                const orders = parseCustomOrders(values[CUSTOM_ORDERS_KEY]);
+                const clients = buildClientRecords(orders);
+                const websiteClients = clients.filter((client) => client.packageType === 'website');
+                const maintenanceClients = clients.filter((client) => client.packageType === 'maintenance');
+
+                renderClientRows('allClientsList', clients, 'Nog geen klanten gevonden in premium opdrachten.');
+                renderClientRows('websiteClientsList', websiteClients, 'Nog geen klanten met alleen een websitepakket.');
+                renderClientRows('maintenanceClientsList', maintenanceClients, 'Nog geen klanten met website + onderhoud.');
+
+                setSummaryCount('sumAll', clients.length);
+                setSummaryCount('sumWebsite', websiteClients.length);
+                setSummaryCount('sumMaintenance', maintenanceClients.length);
+                setSummaryCount('allBadge', clients.length);
+                setSummaryCount('websiteBadge', websiteClients.length);
+                setSummaryCount('maintenanceBadge', maintenanceClients.length);
+                setLoadState('');
+            } catch (error) {
+                setLoadState(`Kon klantenbestand niet laden: ${String(error?.message || 'onbekende fout')}`, true);
+                renderClientRows('allClientsList', [], 'Klantenbestand kon niet geladen worden.');
+                renderClientRows('websiteClientsList', [], 'Klantenbestand kon niet geladen worden.');
+                renderClientRows('maintenanceClientsList', [], 'Klantenbestand kon niet geladen worden.');
+            }
+        }
+
+        void initializeClientsPage();
+
+        (function initCursor() {
+            const cursor = document.querySelector('.cursor');
+            const cursorDot = document.querySelector('.cursor-dot');
+            const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+
+            function disable() {
+                document.body.style.cursor = 'auto';
+                if (cursor) cursor.style.display = 'none';
+                if (cursorDot) cursorDot.style.display = 'none';
+            }
+
+            if (!cursor || !cursorDot || !enablePointerFx) {
+                disable();
+                return;
+            }
+
+            let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0, dotX = 0, dotY = 0;
+            let cursorRafId = null;
+
+            document.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            }, { passive: true });
+
+            function animateCursor() {
+                cursorX += (mouseX - cursorX);
+                cursorY += (mouseY - cursorY);
+                cursor.style.left = cursorX + 'px';
+                cursor.style.top = cursorY + 'px';
+                dotX += (mouseX - dotX);
+                dotY += (mouseY - dotY);
+                cursorDot.style.left = dotX + 'px';
+                cursorDot.style.top = dotY + 'px';
+                cursorRafId = requestAnimationFrame(animateCursor);
+            }
+
+            cursorRafId = requestAnimationFrame(animateCursor);
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    if (cursorRafId) cancelAnimationFrame(cursorRafId);
+                    cursorRafId = null;
+                } else if (!cursorRafId) {
+                    cursorRafId = requestAnimationFrame(animateCursor);
+                }
+            });
+
+            document.addEventListener('mouseover', (e) => {
+                if (e.target.closest('.magnetic')) cursor.classList.add('hover');
+            });
+
+            document.addEventListener('mouseout', (e) => {
+                if (e.target.closest('.magnetic')) cursor.classList.remove('hover');
+            });
+
+            window.addEventListener('error', disable);
+        })();
+    </script>
+</body>
+</html>
