@@ -444,27 +444,7 @@
         }
 
         .results-meta {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            color: var(--text-secondary);
-            font-size: 0.88rem;
-            white-space: nowrap;
-        }
-
-        .results-chip {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 48px;
-            padding: 0.3rem 0.65rem;
-            background: rgba(139,34,82,0.1);
-            color: var(--accent-light);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 500;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
+            display: none;
         }
 
         .status-banner {
@@ -897,10 +877,6 @@
                             <input class="search-input" id="searchInput" type="text" placeholder="Zoek op naam, bedrijf, telefoon of project...">
                         </label>
 
-                        <div class="results-meta">
-                            <span class="results-chip" id="visibleCount">0</span>
-                            <span>Zichtbare klanten</span>
-                        </div>
                     </div>
 
                     <div class="status-banner" id="statusBanner" aria-live="polite"></div>
@@ -1011,7 +987,6 @@
             body: document.getElementById("customersBody"),
             empty: document.getElementById("emptyState"),
             search: document.getElementById("searchInput"),
-            visibleCount: document.getElementById("visibleCount"),
             statusBanner: document.getElementById("statusBanner"),
             modalOverlay: document.getElementById("modalOverlay"),
             modalTitle: document.getElementById("modalTitle"),
@@ -1330,7 +1305,6 @@
         function renderTable() {
             const filtered = getFilteredCustomers();
 
-            nodes.visibleCount.textContent = String(filtered.length);
             nodes.empty.hidden = filtered.length !== 0;
 
             if (!filtered.length) {
