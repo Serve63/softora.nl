@@ -1044,19 +1044,19 @@
             <div class="kpi-grid">
                 <div class="kpi-card">
                     <div class="kpi-label">Omzet Dit Jaar</div>
-                    <div class="kpi-value">€0</div>
+                    <div class="kpi-value" id="kpiRevenueYear">€0</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Omzet Deze Maand</div>
-                    <div class="kpi-value">€0</div>
+                    <div class="kpi-value" id="kpiRevenueMonth">€0</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Totale Klanten</div>
-                    <div class="kpi-value">0</div>
+                    <div class="kpi-value" id="kpiTotalClients">0</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Actieve Opdrachten</div>
-                    <div class="kpi-value">0</div>
+                    <div class="kpi-value" id="kpiActiveOrders">0</div>
                 </div>
             </div>
 
@@ -1064,22 +1064,22 @@
 
                 <div class="panel">
                     <div class="panel-header">
-                        <span class="panel-title">Omzet 2025</span>
-                        <span class="panel-badge">Per Maand</span>
+                        <span class="panel-title" id="revenuePanelTitle">Omzet 2026</span>
+                        <span class="panel-badge" id="revenuePanelBadge">Betaald per maand</span>
                     </div>
-                    <div class="chart-area">
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Jan</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Feb</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Mrt</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Apr</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Mei</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Jun</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Jul</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Aug</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Sep</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Okt</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Nov</span></div>
-                        <div class="chart-bar-group"><div class="chart-bar" style="height: 0%;"></div><span class="chart-label">Dec</span></div>
+                    <div class="chart-area" id="revenueChart">
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="0" style="height: 0%;"></div><span class="chart-label">Jan</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="1" style="height: 0%;"></div><span class="chart-label">Feb</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="2" style="height: 0%;"></div><span class="chart-label">Mrt</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="3" style="height: 0%;"></div><span class="chart-label">Apr</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="4" style="height: 0%;"></div><span class="chart-label">Mei</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="5" style="height: 0%;"></div><span class="chart-label">Jun</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="6" style="height: 0%;"></div><span class="chart-label">Jul</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="7" style="height: 0%;"></div><span class="chart-label">Aug</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="8" style="height: 0%;"></div><span class="chart-label">Sep</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="9" style="height: 0%;"></div><span class="chart-label">Okt</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="10" style="height: 0%;"></div><span class="chart-label">Nov</span></div>
+                        <div class="chart-bar-group"><div class="chart-bar" data-month-bar="11" style="height: 0%;"></div><span class="chart-label">Dec</span></div>
                     </div>
                 </div>
 
@@ -1088,9 +1088,9 @@
             <div class="panel" style="animation-delay: 0.7s;">
                 <div class="panel-header">
                     <span class="panel-title">Lopende Projecten</span>
-                    <span class="panel-badge">0 Actief</span>
+                    <span class="panel-badge" id="activeProjectsBadge">0 Actief</span>
                 </div>
-                <div class="project-list">
+                <div class="project-list" id="activeProjectsList">
                     <div class="confirm-task-empty">Nog geen lopende projecten.</div>
                 </div>
             </div>
@@ -1102,6 +1102,14 @@
         const now = new Date();
         const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
         document.getElementById('currentDate').textContent = now.toLocaleDateString('nl-NL', options);
+        const PREMIUM_ACTIVE_ORDERS_SCOPE = 'premium_active_orders';
+        const PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
+        const PREMIUM_ACTIVE_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
+        const premiumDashboardState = {
+            loading: false,
+            orders: [],
+            pollTimer: null,
+        };
 
         const confirmationTaskState = {
             loading: false,
@@ -1120,6 +1128,227 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        function normalizePremiumOrderStatus(value) {
+            const key = String(value || '').trim().toLowerCase();
+            if (key === 'actief') return { key: 'actief', text: 'Openstaand' };
+            if (key === 'bezig') return { key: 'bezig', text: 'Nog bezig' };
+            if (key === 'klaar') return { key: 'klaar', text: 'Gebouwd' };
+            if (key === 'betaald') return { key: 'betaald', text: 'Betaald' };
+            return { key: 'wacht', text: 'Openstaand' };
+        }
+
+        function resolvePremiumOrderUiState(orderLike) {
+            const pct = Math.max(0, Math.min(100, Number(orderLike?.progressPct) || 0));
+            const paidAt = String(orderLike?.paidAt || '').trim();
+            const fallback = pct >= 100 ? 'klaar' : pct > 0 ? 'bezig' : 'wacht';
+            const baseStatus = normalizePremiumOrderStatus(orderLike?.statusKey || orderLike?.status || fallback);
+            const isBuilt = baseStatus.key === 'klaar' || baseStatus.key === 'betaald' || pct >= 100;
+            const isPaid = Boolean(paidAt) && isBuilt;
+            const status = isPaid
+                ? normalizePremiumOrderStatus('betaald')
+                : isBuilt
+                    ? normalizePremiumOrderStatus('klaar')
+                    : baseStatus;
+            return {
+                pct,
+                paidAt: paidAt || null,
+                isBuilt,
+                isPaid,
+                status
+            };
+        }
+
+        async function fetchPremiumUiState(scope) {
+            const encodedScope = encodeURIComponent(String(scope || ''));
+            const urls = [
+                `/api/ui-state-get?scope=${encodedScope}`,
+                `/api/ui-state/${encodedScope}`
+            ];
+            let lastError = null;
+
+            for (const url of urls) {
+                try {
+                    const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+                    if (!res.ok) throw new Error(`UI-state GET mislukt (${res.status})`);
+                    return await res.json().catch(() => ({}));
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error('UI-state GET mislukt');
+        }
+
+        function parsePremiumOrdersFromState(values) {
+            const safeValues = values && typeof values === 'object' ? values : {};
+            let customOrders = [];
+            let runtimeOrders = {};
+
+            try {
+                const parsed = JSON.parse(String(safeValues[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY] || '[]'));
+                if (Array.isArray(parsed)) customOrders = parsed;
+            } catch (_) {}
+
+            try {
+                const parsed = JSON.parse(String(safeValues[PREMIUM_ACTIVE_RUNTIME_KEY] || '{}'));
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) runtimeOrders = parsed;
+            } catch (_) {}
+
+            return customOrders
+                .map((item) => {
+                    const id = Number(item?.id);
+                    const amount = Math.round(Number(item?.amount));
+                    if (!Number.isFinite(id) || id <= 0) return null;
+                    if (!Number.isFinite(amount) || amount <= 0) return null;
+
+                    const runtime = runtimeOrders[String(id)] || {};
+                    const merged = {
+                        id,
+                        clientName: String(item?.clientName || runtime?.name || '').trim(),
+                        location: String(item?.location || '').trim(),
+                        title: String(item?.title || runtime?.type || 'Website opdracht').trim(),
+                        description: String(item?.description || '').trim(),
+                        amount,
+                        statusKey: String(runtime?.statusKey || item?.status || '').trim(),
+                        progressPct: Number(runtime?.progressPct),
+                        paidAt: String(runtime?.paidAt || item?.paidAt || '').trim() || null,
+                        updatedAt: Number(runtime?.updatedAt) || 0
+                    };
+                    const ui = resolvePremiumOrderUiState(merged);
+                    return {
+                        ...merged,
+                        ui
+                    };
+                })
+                .filter(Boolean)
+                .sort((a, b) => {
+                    const paidDelta = Number(b.ui?.isPaid) - Number(a.ui?.isPaid);
+                    if (paidDelta) return paidDelta;
+                    return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
+                });
+        }
+
+        function formatMoneyEUR(amount) {
+            const value = Number(amount) || 0;
+            return '€' + value.toLocaleString('nl-NL');
+        }
+
+        function formatProjectMeta(order) {
+            const parts = [];
+            if (order?.location) parts.push(order.location);
+            parts.push(formatMoneyEUR(order?.amount || 0));
+            if (order?.ui?.isBuilt && !order?.ui?.isPaid) parts.push('wacht op betaling');
+            return parts.join(' • ');
+        }
+
+        function getProjectStatusPresentation(order) {
+            if (order?.ui?.isPaid) {
+                return { text: 'Betaald', className: 'status-done' };
+            }
+            if (order?.ui?.isBuilt) {
+                return { text: 'Gebouwd', className: 'status-review' };
+            }
+            if (order?.ui?.status?.key === 'bezig') {
+                return { text: 'Nog bezig', className: 'status-active' };
+            }
+            return { text: 'Openstaand', className: 'status-active' };
+        }
+
+        function renderPremiumDashboardOrders() {
+            const orders = Array.isArray(premiumDashboardState.orders) ? premiumDashboardState.orders : [];
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+            const revenueByMonth = Array.from({ length: 12 }, () => 0);
+            const paidOrders = orders.filter((order) => order?.ui?.isPaid);
+            const activeOrders = orders.filter((order) => !order?.ui?.isPaid);
+            const uniqueClients = new Set();
+
+            let revenueYear = 0;
+            let revenueMonth = 0;
+
+            orders.forEach((order) => {
+                const clientKey = String(order?.clientName || '').trim().toLowerCase();
+                if (clientKey) uniqueClients.add(clientKey);
+            });
+
+            paidOrders.forEach((order) => {
+                const paidAt = order?.ui?.paidAt ? new Date(order.ui.paidAt) : null;
+                if (!paidAt || Number.isNaN(paidAt.getTime())) return;
+                if (paidAt.getFullYear() !== currentYear) return;
+                const amount = Number(order?.amount) || 0;
+                revenueYear += amount;
+                revenueByMonth[paidAt.getMonth()] += amount;
+                if (paidAt.getMonth() === currentMonth) {
+                    revenueMonth += amount;
+                }
+            });
+
+            const revenueYearEl = document.getElementById('kpiRevenueYear');
+            if (revenueYearEl) revenueYearEl.textContent = formatMoneyEUR(revenueYear);
+            const revenueMonthEl = document.getElementById('kpiRevenueMonth');
+            if (revenueMonthEl) revenueMonthEl.textContent = formatMoneyEUR(revenueMonth);
+            const totalClientsEl = document.getElementById('kpiTotalClients');
+            if (totalClientsEl) totalClientsEl.textContent = String(uniqueClients.size);
+            const activeOrdersEl = document.getElementById('kpiActiveOrders');
+            if (activeOrdersEl) activeOrdersEl.textContent = String(activeOrders.length);
+
+            const revenueTitleEl = document.getElementById('revenuePanelTitle');
+            if (revenueTitleEl) revenueTitleEl.textContent = `Omzet ${currentYear}`;
+            const revenueBadgeEl = document.getElementById('revenuePanelBadge');
+            if (revenueBadgeEl) revenueBadgeEl.textContent = paidOrders.length ? 'Betaald per maand' : 'Nog geen betalingen';
+
+            const maxRevenue = Math.max(...revenueByMonth, 0);
+            document.querySelectorAll('[data-month-bar]').forEach((bar) => {
+                const monthIndex = Number(bar.getAttribute('data-month-bar'));
+                const monthRevenue = Number.isFinite(monthIndex) ? revenueByMonth[monthIndex] || 0 : 0;
+                const height = maxRevenue > 0 ? Math.max(6, Math.round((monthRevenue / maxRevenue) * 100)) : 0;
+                bar.style.height = `${height}%`;
+                bar.title = monthRevenue > 0 ? formatMoneyEUR(monthRevenue) : '€0';
+            });
+
+            const badgeEl = document.getElementById('activeProjectsBadge');
+            if (badgeEl) badgeEl.textContent = `${activeOrders.length} ${activeOrders.length === 1 ? 'Project' : 'Projecten'}`;
+
+            const listEl = document.getElementById('activeProjectsList');
+            if (!listEl) return;
+
+            if (!activeOrders.length) {
+                listEl.innerHTML = '<div class="confirm-task-empty">Nog geen lopende projecten.</div>';
+                return;
+            }
+
+            listEl.innerHTML = activeOrders.map((order) => {
+                const statusMeta = getProjectStatusPresentation(order);
+                return `
+                    <div class="project-item">
+                        <div class="project-info">
+                            <div class="project-name">${escapeHtml(order.title || 'Website opdracht')}</div>
+                            <div class="project-client">${escapeHtml(order.clientName || 'Onbekende klant')} · ${escapeHtml(formatProjectMeta(order))}</div>
+                        </div>
+                        <div class="project-status ${statusMeta.className}">${escapeHtml(statusMeta.text)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadPremiumDashboardOrders() {
+            if (premiumDashboardState.loading) return false;
+            premiumDashboardState.loading = true;
+            try {
+                const data = await fetchPremiumUiState(PREMIUM_ACTIVE_ORDERS_SCOPE);
+                const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
+                premiumDashboardState.orders = parsePremiumOrdersFromState(values);
+                renderPremiumDashboardOrders();
+                return true;
+            } catch (_) {
+                premiumDashboardState.orders = [];
+                renderPremiumDashboardOrders();
+                return false;
+            } finally {
+                premiumDashboardState.loading = false;
+            }
         }
 
         function formatTaskDateTimeLabel(task) {
@@ -1489,6 +1718,20 @@
         }
 
         renderConfirmationTasks();
+        renderPremiumDashboardOrders();
+        void loadPremiumDashboardOrders();
+
+        premiumDashboardState.pollTimer = window.setInterval(() => {
+            void loadPremiumDashboardOrders();
+        }, 30000);
+
+        window.addEventListener('focus', () => {
+            void loadPremiumDashboardOrders();
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) void loadPremiumDashboardOrders();
+        });
 
         const cursor = document.querySelector('.cursor');
         const cursorDot = document.querySelector('.cursor-dot');
