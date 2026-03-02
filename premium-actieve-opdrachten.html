@@ -1969,16 +1969,18 @@
             }
             if (btnEl) {
                 if (pct >= 100) {
+                    btnEl.style.display = 'none';
                     btnEl.classList.remove('running');
                     btnEl.classList.add('done');
                     btnEl.disabled = false;
-                    btnEl.innerHTML = '↻ Opnieuw runnen';
                 } else if (status.key === 'bezig') {
+                    btnEl.style.display = 'flex';
                     btnEl.classList.remove('done');
                     btnEl.classList.add('running');
                     btnEl.disabled = true;
                     btnEl.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> AI site bouwen...';
                 } else {
+                    btnEl.style.display = 'flex';
                     btnEl.classList.remove('running');
                     btnEl.classList.remove('done');
                     btnEl.disabled = false;
@@ -2616,10 +2618,10 @@
                 }
                 appendOrderLog(id, 'Website opgeleverd. Nieuwe tab wordt nu geopend.', true);
 
+                btn.style.display = 'none';
                 btn.classList.remove('running');
                 btn.classList.add('done');
                 btn.disabled = false;
-                btn.innerHTML = '↻ Opnieuw runnen';
 
                 if (status) {
                     status.textContent = 'Klaar';
