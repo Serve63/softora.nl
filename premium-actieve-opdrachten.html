@@ -432,6 +432,8 @@
             opacity: 0;
             transform: translateY(15px);
             animation: fadeUp 0.5s var(--ease-out-expo) forwards;
+            position: relative;
+            overflow: hidden;
         }
 
         .order-card:nth-child(1) { animation-delay: 0.25s; }
@@ -443,6 +445,46 @@
         .order-card:hover {
             border-color: rgba(139,34,82,0.3);
             box-shadow: 0 8px 30px rgba(0,0,0,0.3), 0 0 40px rgba(139,34,82,0.05);
+        }
+
+        .order-card.delivered {
+            border-color: rgba(46, 204, 113, 0.55);
+            box-shadow: 0 16px 44px rgba(0,0,0,0.28), 0 0 48px rgba(46, 204, 113, 0.18);
+            background:
+                linear-gradient(135deg, rgba(46, 204, 113, 0.08), rgba(39, 174, 96, 0.02) 38%, rgba(255,255,255,0.02) 100%),
+                var(--bg-secondary);
+        }
+
+        .order-card.delivered::after {
+            content: 'Opgeleverd';
+            position: absolute;
+            top: 18px;
+            right: 22px;
+            padding: 0.45rem 0.8rem;
+            border: 1px solid rgba(46, 204, 113, 0.35);
+            background: rgba(46, 204, 113, 0.12);
+            color: var(--green);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            pointer-events: none;
+        }
+
+        .order-card.delivered:hover {
+            border-color: rgba(46, 204, 113, 0.7);
+            box-shadow: 0 20px 54px rgba(0,0,0,0.32), 0 0 54px rgba(46, 204, 113, 0.22);
+        }
+
+        .order-card.delivered .order-title {
+            color: #f2fff7;
+        }
+
+        .order-card.delivered .order-client,
+        .order-card.delivered .order-price-value .currency,
+        .order-card.delivered .order-api-cost .value {
+            color: #7ef0a8;
         }
 
         .order-main {
@@ -540,7 +582,7 @@
         .status-tag.wacht { color: var(--yellow); background: var(--yellow-glow); }
         .status-tag.actief { color: var(--accent-light); background: rgba(139,34,82,0.1); }
         .status-tag.bezig { color: var(--green); background: var(--green-glow); }
-        .status-tag.klaar { color: var(--text-tertiary); background: rgba(255,255,255,0.03); }
+        .status-tag.klaar { color: var(--green); background: rgba(46, 204, 113, 0.14); }
 
         /* Execute btn */
         .order-actions { min-width: 180px; }
@@ -590,8 +632,9 @@
         .execute-btn.running:hover { background: #27ae60; box-shadow: 0 0 30px var(--green-glow); }
 
         .execute-btn.done {
-            background: rgba(255,255,255,0.03);
-            color: var(--text-tertiary);
+            background: rgba(46, 204, 113, 0.12);
+            color: #d9ffe8;
+            border: 1px solid rgba(46, 204, 113, 0.28);
         }
 
         .view-btn {
@@ -613,6 +656,17 @@
 
         .view-btn:hover { background: rgba(139,34,82,0.05); border-color: var(--accent-light); }
         .view-btn.show { display: block; }
+
+        .order-card.delivered .view-btn {
+            color: #d9ffe8;
+            border-color: rgba(46, 204, 113, 0.4);
+            background: rgba(46, 204, 113, 0.08);
+        }
+
+        .order-card.delivered .view-btn:hover {
+            background: rgba(46, 204, 113, 0.16);
+            border-color: rgba(46, 204, 113, 0.58);
+        }
 
         /* Progress */
         .order-progress {
@@ -1363,6 +1417,7 @@
         let currentModalId = null;
         let buildMode = 'premium';
         const activeProgressAnimations = {};
+        const activePreviewWindows = {};
 
         function getTime() {
             return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1706,12 +1761,16 @@
                 const amount = moneyToNumber(card.querySelector('.order-price-value')?.textContent || '');
                 return sum + (Number.isFinite(amount) ? amount : 0);
             }, 0);
+            const deliveredCount = cards.filter((card) => card.classList.contains('delivered')).length;
 
             const sumActive = document.getElementById('sumActive');
             if (sumActive) sumActive.textContent = String(cards.length);
 
             const sumTotal = document.getElementById('sumTotal');
             if (sumTotal) sumTotal.textContent = '€' + totalValue.toLocaleString('nl-NL');
+
+            const sumDelivered = document.getElementById('sumDelivered');
+            if (sumDelivered) sumDelivered.textContent = String(deliveredCount);
 
             renderOrdersEmptyState();
         }
@@ -1832,6 +1891,7 @@
             const order = orders[id];
             if (!order) return;
 
+            const cardEl = document.getElementById(`order-${id}`);
             const statusEl = document.getElementById(`status-${id}`);
             const progressEl = document.getElementById(`progress-${id}`);
             const barEl = document.getElementById(`bar-${id}`);
@@ -1841,6 +1901,10 @@
             const status = normalizeOrderStatus(order.statusKey || (pct >= 100 ? 'klaar' : pct > 0 ? 'bezig' : 'wacht'));
 
             order.statusKey = status.key;
+
+            if (cardEl) {
+                cardEl.classList.toggle('delivered', status.key === 'klaar' || pct >= 100);
+            }
 
             if (statusEl) {
                 statusEl.textContent = status.text;
@@ -1871,14 +1935,17 @@
                 viewBtnEl.classList.add('show');
                 if (pct >= 100) {
                     if (hasGeneratedPreviewHtml(id)) {
-                        viewBtnEl.textContent = 'Open preview';
+                        viewBtnEl.textContent = 'Open website';
+                        viewBtnEl.dataset.action = 'preview';
                         viewBtnEl.onclick = () => openPreview(id);
                     } else {
                         viewBtnEl.textContent = 'Bekijk Voortgang';
+                        viewBtnEl.dataset.action = 'modal';
                         viewBtnEl.onclick = () => openModal(id);
                     }
                 } else {
                     viewBtnEl.textContent = 'Bekijk Voortgang';
+                    viewBtnEl.dataset.action = 'modal';
                     viewBtnEl.onclick = () => openModal(id);
                 }
             }
@@ -1890,6 +1957,8 @@
                     btnEl.innerHTML = '↻ Opnieuw runnen';
                 }
             }
+
+            refreshOrderSummaryCards();
         }
 
         function restoreOrdersRuntimeFromState() {
@@ -1928,7 +1997,7 @@
             const apiCostText = formatApiCostLabel(record);
 
             return `
-                <div class="order-card" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
+                <div class="order-card ${status.key === 'klaar' ? 'delivered' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
                     <div class="order-main">
                         <div class="order-info">
                             <div class="order-client">${escapeHtml(clientLine || 'Nieuwe opdracht')}</div>
@@ -1946,7 +2015,7 @@
                                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                 Voer Opdracht Uit
                             </button>
-                            <button class="view-btn magnetic" id="view-${id}" type="button" data-order="${id}">Bekijk Voortgang</button>
+                            <button class="view-btn magnetic" id="view-${id}" type="button" data-order="${id}" data-action="modal">Bekijk Voortgang</button>
                         </div>
                     </div>
                     <div class="order-progress" id="progress-${id}">
@@ -1983,7 +2052,7 @@
                 viewBtn.dataset.boundView = '1';
                 viewBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (viewBtn.textContent.trim().toLowerCase().includes('preview')) openPreview(id);
+                    if (viewBtn.dataset.action === 'preview') openPreview(id);
                     else openModal(id);
                 });
             }
@@ -2182,6 +2251,106 @@
             }
         }
 
+        function openPendingPreviewTab(id) {
+            const activeId = selectActiveOrderId(id);
+            const existing = activePreviewWindows[activeId];
+            if (existing && !existing.closed) {
+                return existing;
+            }
+
+            const popup = window.open('', '_blank');
+            if (!popup) return null;
+
+            try {
+                popup.document.write(`<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8">
+    <title>Website wordt gebouwd...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at top, rgba(46, 204, 113, 0.16), rgba(139, 34, 82, 0.1) 42%, transparent 70%), #0f1117;
+        color: #f6f7fb;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      .wrap { text-align: center; padding: 32px; }
+      .dot {
+        width: 14px;
+        height: 14px;
+        margin: 0 auto 18px;
+        border-radius: 999px;
+        background: #2ecc71;
+        box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.45);
+        animation: pulse 1.5s infinite;
+      }
+      h1 { margin: 0 0 10px; font-size: 28px; }
+      p { margin: 0; color: #b8bfd0; font-size: 16px; }
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.45); }
+        70% { box-shadow: 0 0 0 18px rgba(46, 204, 113, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="dot"></div>
+      <h1>Website wordt gebouwd</h1>
+      <p>Deze tab opent automatisch zodra de opdracht is opgeleverd.</p>
+    </div>
+  </body>
+</html>`);
+                popup.document.close();
+            } catch (_) {
+                // ignore
+            }
+
+            activePreviewWindows[activeId] = popup;
+            return popup;
+        }
+
+        function finalizePreviewTab(id, previewWindow) {
+            const activeId = selectActiveOrderId(id);
+            const target = `/premium-opdracht-preview?id=${encodeURIComponent(String(activeId))}`;
+            const targetWindow = previewWindow && !previewWindow.closed ? previewWindow : activePreviewWindows[activeId];
+            if (targetWindow && !targetWindow.closed) {
+                try {
+                    targetWindow.location.replace(target);
+                    targetWindow.focus();
+                    return;
+                } catch (_) {
+                    // ignore
+                }
+            }
+            openPreview(activeId);
+        }
+
+        function setPreviewTabError(id, previewWindow, message) {
+            const activeId = selectActiveOrderId(id);
+            const targetWindow = previewWindow && !previewWindow.closed ? previewWindow : activePreviewWindows[activeId];
+            if (!targetWindow || targetWindow.closed) return;
+
+            try {
+                targetWindow.document.title = 'Website bouwen mislukt';
+                targetWindow.document.body.innerHTML = `
+                    <div style="margin:0;min-height:100vh;display:grid;place-items:center;background:#11141b;color:#f6f7fb;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
+                        <div style="max-width:560px;padding:32px;text-align:center;">
+                            <h1 style="margin:0 0 12px;font-size:28px;">Website bouwen mislukt</h1>
+                            <p style="margin:0;color:#b8bfd0;line-height:1.6;">${escapeHtml(message || 'Onbekende fout tijdens het genereren van de website.')}</p>
+                        </div>
+                    </div>
+                `;
+            } catch (_) {
+                // ignore
+            }
+        }
+
         function buildFallbackSitePrompt(meta, customOrder) {
             const company = String(meta?.clientName || customOrder?.clientName || 'bedrijf').trim();
             const title = String(meta?.title || customOrder?.title || 'website').trim();
@@ -2354,6 +2523,7 @@
             const progress = document.getElementById(`progress-${id}`);
             const viewBtn = document.getElementById(`view-${id}`);
             if (!btn || btn.classList.contains('running') || !orders[id]) return;
+            const previewWindow = openPendingPreviewTab(activeId);
 
             const meta = getOrderMeta(activeId) || {
                 id: String(activeId),
@@ -2377,6 +2547,7 @@
             if (viewBtn) {
                 viewBtn.classList.add('show');
                 viewBtn.textContent = 'Bekijk Voortgang';
+                viewBtn.dataset.action = 'modal';
                 viewBtn.onclick = () => openModal(id);
             }
 
@@ -2460,7 +2631,7 @@
                 if (Number.isFinite(apiCostEur) && apiCostEur >= 0) {
                     appendOrderLog(id, `API kosten (geschat): ${formatApiCostAmount(apiCostEur) || 'onbekend'} (${apiModel || 'model'})`, true);
                 }
-                appendOrderLog(id, 'Website opgeleverd. Open preview om te beoordelen.', true);
+                appendOrderLog(id, 'Website opgeleverd. De website wordt automatisch geopend in een nieuw tabblad.', true);
 
                 btn.classList.remove('running');
                 btn.classList.add('done');
@@ -2472,9 +2643,12 @@
                     status.className = 'status-tag klaar';
                 }
                 if (viewBtn) {
-                    viewBtn.textContent = 'Open preview';
+                    viewBtn.textContent = 'Open website';
+                    viewBtn.dataset.action = 'preview';
                     viewBtn.onclick = () => openPreview(activeId);
                 }
+
+                finalizePreviewTab(activeId, previewWindow);
             } catch (error) {
                 stopOrderProgressSimulation(id);
                 orders[id].statusKey = 'actief';
@@ -2493,13 +2667,17 @@
                 if (viewBtn) {
                     viewBtn.classList.add('show');
                     if (hasGeneratedPreviewHtml(activeId)) {
-                        viewBtn.textContent = 'Open laatste preview';
+                        viewBtn.textContent = 'Open laatste website';
+                        viewBtn.dataset.action = 'preview';
                         viewBtn.onclick = () => openPreview(activeId);
                     } else {
                         viewBtn.textContent = 'Bekijk Voortgang';
+                        viewBtn.dataset.action = 'modal';
                         viewBtn.onclick = () => openModal(id);
                     }
                 }
+
+                setPreviewTabError(activeId, previewWindow, String(error?.message || 'Website generatie mislukt.'));
             } finally {
                 orders[id].updatedAt = Date.now();
                 persistOrdersRuntime();
@@ -2585,7 +2763,7 @@
             b.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const id = Number(b.getAttribute('data-order'));
-                if (b.textContent.trim().toLowerCase().includes('preview')) openPreview(id);
+                if (b.dataset.action === 'preview') openPreview(id);
                 else openModal(id);
             });
         });
