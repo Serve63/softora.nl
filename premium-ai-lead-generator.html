@@ -774,18 +774,10 @@
             box-shadow: 0 0 20px var(--accent-glow);
         }
 
-        input[type="range"]::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
-            background: var(--accent);
-            border: 3px solid var(--accent-light);
-            border-radius: 0;
-            cursor: none;
-        }
-
         .slider-labels {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             margin-top: 0.5rem;
         }
 
@@ -795,6 +787,21 @@
             font-family: 'Oswald', sans-serif;
             text-transform: uppercase;
             letter-spacing: 0.1em;
+        }
+
+        .slider-label-full {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: var(--accent-light);
+            white-space: nowrap;
+        }
+
+        .slider-label-full svg {
+            width: 15px;
+            height: 15px;
+            display: block;
+            stroke: currentColor;
         }
 
         /* Price input with prefix */
@@ -1413,7 +1420,12 @@
                                 <span>100</span>
                                 <span>150</span>
                                 <span>200</span>
-                                <span>250</span>
+                                <span class="slider-label-full" title="Volledige lijst">
+                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <path d="M5 7h14M5 12h14M5 17h14" stroke-width="2" stroke-linecap="square"/>
+                                    </svg>
+                                    Hele lijst
+                                </span>
                             </div>
                         </div>
                     </div>
