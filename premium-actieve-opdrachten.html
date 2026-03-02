@@ -714,7 +714,7 @@
         .status-tag.wacht { color: var(--yellow); background: var(--yellow-glow); }
         .status-tag.actief { color: var(--accent-light); background: rgba(139,34,82,0.1); }
         .status-tag.bezig { color: var(--green); background: var(--green-glow); }
-        .status-tag.klaar { color: #78df9e; background: rgba(86, 220, 146, 0.12); }
+        .status-tag.klaar { color: var(--accent-light); background: rgba(139,34,82,0.1); }
         .status-tag.betaald { color: #7af0aa; background: rgba(46, 204, 113, 0.18); }
 
         /* Execute btn */
@@ -791,14 +791,14 @@
         .view-btn.show { display: block; }
 
         .order-card.delivered .view-btn {
-            color: #216640;
-            border-color: rgba(74, 171, 113, 0.3);
-            background: rgba(255,255,255,0.38);
+            color: var(--accent-light);
+            border-color: rgba(139,34,82,0.28);
+            background: rgba(255,255,255,0.44);
         }
 
         .order-card.delivered .view-btn:hover {
-            background: rgba(255,255,255,0.56);
-            border-color: rgba(74, 171, 113, 0.44);
+            background: rgba(166,45,101,0.08);
+            border-color: rgba(139,34,82,0.44);
         }
 
         .order-card.paid .view-btn {
@@ -816,13 +816,13 @@
             width: 100%;
             padding: 0.6rem 1.2rem;
             background: rgba(255,255,255,0.4);
-            color: #1e6540;
+            color: var(--accent-light);
             font-family: 'Oswald', sans-serif;
             font-size: 0.72rem;
             font-weight: 500;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            border: 1px solid rgba(74, 171, 113, 0.28);
+            border: 1px solid rgba(139,34,82,0.28);
             cursor: none;
             margin-top: 0.5rem;
             transition: all 0.2s;
@@ -834,9 +834,9 @@
         }
 
         .payment-btn:hover {
-            background: rgba(255,255,255,0.58);
-            border-color: rgba(74, 171, 113, 0.46);
-            color: #144e31;
+            background: rgba(166,45,101,0.08);
+            border-color: rgba(139,34,82,0.46);
+            color: var(--accent);
         }
 
         /* Progress */
