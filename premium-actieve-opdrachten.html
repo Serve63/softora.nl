@@ -600,6 +600,34 @@
             color: #2b6a45;
         }
 
+        .order-card.delivered .order-status,
+        .order-card.delivered .order-actions {
+            position: relative;
+            z-index: 3;
+            align-self: center;
+            padding: 1rem;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.42);
+            border: 1px solid rgba(66, 154, 103, 0.18);
+            box-shadow: 0 16px 34px rgba(88, 156, 113, 0.12);
+            backdrop-filter: blur(12px);
+        }
+
+        .order-card.paid .order-status,
+        .order-card.paid .order-actions {
+            background: rgba(255,255,255,0.56);
+            border-color: rgba(52, 150, 92, 0.22);
+            box-shadow: 0 18px 38px rgba(72, 150, 100, 0.14);
+        }
+
+        .order-card.delivered .order-status {
+            min-width: 128px;
+        }
+
+        .order-card.delivered .order-actions {
+            min-width: 250px;
+        }
+
         .order-main {
             display: grid;
             grid-template-columns: 1fr auto auto auto;
