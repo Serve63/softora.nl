@@ -436,6 +436,10 @@
             position: relative;
         }
 
+        .orders-filter-btn[data-order-filter="open"] { order: 1; }
+        .orders-filter-btn[data-order-filter="in_progress"] { order: 2; }
+        .orders-filter-btn[data-order-filter="completed"] { order: 3; }
+
         .orders-filter-btn:hover {
             color: var(--accent-light);
         }
@@ -1598,7 +1602,7 @@
 
         let currentModalId = null;
         let buildMode = 'premium';
-        let activeOrderFilter = 'all';
+        let activeOrderFilter = 'open';
         const activeProgressAnimations = {};
 
         function getTime() {
@@ -1977,7 +1981,7 @@
 
         function setOrderFilter(nextFilter) {
             const normalized = String(nextFilter || '').trim().toLowerCase();
-            activeOrderFilter = activeOrderFilter === normalized ? 'all' : normalized;
+            activeOrderFilter = normalized || 'open';
             applyOrderFilter();
         }
 
