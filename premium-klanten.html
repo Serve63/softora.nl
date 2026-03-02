@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Softora | Klantenbestand</title>
+    <title>Softora | Klanten database</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,1113 +27,1506 @@
         })();
     </script>
     <script src="assets/personnel-theme.js" defer></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         * {
-            margin: 0;
-            padding: 0;
             box-sizing: border-box;
         }
 
         :root {
-            --bg-primary: #080808;
-            --bg-secondary: #0d0d0d;
-            --bg-tertiary: #111;
-            --accent: #8B2252;
-            --accent-dark: #6B1A3F;
-            --accent-glow: rgba(139, 34, 82, 0.4);
-            --accent-light: #A62D65;
-            --text-primary: #f5f5f5;
-            --text-secondary: #888;
-            --text-tertiary: #555;
-            --border: rgba(255, 255, 255, 0.06);
-            --green: #2ecc71;
-            --green-glow: rgba(46, 204, 113, 0.16);
-            --yellow: #f39c12;
-            --yellow-glow: rgba(243, 156, 18, 0.16);
-            --blue: #4f7cff;
-            --blue-glow: rgba(79, 124, 255, 0.16);
-            --red: #e74c3c;
-            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --accent: #8b2252;
+            --accent-strong: #68173d;
+            --accent-soft: rgba(139, 34, 82, 0.14);
+            --success: #2ecc71;
+            --success-soft: rgba(46, 204, 113, 0.14);
+            --info: #4f7cff;
+            --info-soft: rgba(79, 124, 255, 0.14);
+            --warning: #f39c12;
+            --warning-soft: rgba(243, 156, 18, 0.14);
+            --surface-strong: rgba(255, 255, 255, 0.94);
+            --surface-muted: rgba(255, 255, 255, 0.74);
+            --input-bg: rgba(15, 23, 42, 0.04);
+            --table-hover: rgba(139, 34, 82, 0.05);
+            --shadow-soft: 0 28px 70px rgba(14, 18, 36, 0.08);
+        }
+
+        :root[data-theme="dark"] {
+            --surface-strong: rgba(255, 255, 255, 0.05);
+            --surface-muted: rgba(255, 255, 255, 0.03);
+            --input-bg: rgba(255, 255, 255, 0.04);
+            --table-hover: rgba(255, 255, 255, 0.025);
+            --shadow-soft: 0 28px 70px rgba(0, 0, 0, 0.38);
+        }
+
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--bg-primary);
             color: var(--text-primary);
-            line-height: 1.6;
-            overflow-x: hidden;
-            cursor: none;
-        }
-
-        h1, h2, h3, h4 {
-            font-family: 'Oswald', sans-serif;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-            line-height: 1;
-        }
-
-        .noise-overlay {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 9999;
-            opacity: 0.03;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-        }
-
-        .cursor {
-            width: 24px;
-            height: 24px;
-            border: 2px solid var(--accent-light);
-            border-radius: 50%;
-            position: fixed;
-            pointer-events: none;
-            z-index: 10000;
-            transition: transform 0.1s var(--ease-out-expo), background 0.2s ease, width 0.3s var(--ease-out-expo), height 0.3s var(--ease-out-expo);
-            transform: translate(-50%, -50%);
-            mix-blend-mode: difference;
-        }
-
-        .cursor.hover {
-            width: 80px;
-            height: 80px;
-            background: var(--accent-light);
-            border-color: transparent;
-        }
-
-        .cursor-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--accent-light);
-            border-radius: 50%;
-            position: fixed;
-            pointer-events: none;
-            z-index: 10001;
-            transform: translate(-50%, -50%);
-        }
-
-        .dashboard-layout {
-            display: flex;
-            min-height: 100vh;
-        }
-
-        .sidebar {
-            width: 280px;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border);
-            padding: 2.5rem 0;
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            z-index: 100;
-        }
-
-        .sidebar-logo {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            text-decoration: none;
-            padding: 0 2rem;
-            margin-bottom: 3rem;
-            display: block;
-        }
-
-        .sidebar-nav {
-            flex: 1;
-        }
-
-        .sidebar-section {
-            margin-bottom: 2rem;
-        }
-
-        .sidebar-section-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            color: var(--text-tertiary);
-            padding: 0 2rem;
-            margin-bottom: 0.8rem;
-        }
-
-        .sidebar-link {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            padding: 0.8rem 2rem;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.9rem;
-            font-weight: 400;
-            transition: all 0.2s;
-            cursor: none;
+            background:
+                linear-gradient(180deg, rgba(139, 34, 82, 0.12) 0, rgba(139, 34, 82, 0) 24%),
+                var(--bg-primary);
             position: relative;
+            overflow-x: hidden;
         }
 
-        .sidebar-link::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 3px;
-            height: 100%;
-            background: var(--accent);
-            opacity: 0;
-            transition: opacity 0.2s;
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            border-radius: 999px;
+            pointer-events: none;
+            filter: blur(18px);
+            z-index: 0;
         }
 
-        .sidebar-link:hover {
-            color: var(--text-primary);
-            background: rgba(255,255,255,0.02);
+        body::before {
+            width: 22rem;
+            height: 22rem;
+            top: -7rem;
+            right: -7rem;
+            background: rgba(139, 34, 82, 0.1);
         }
 
-        .sidebar-link.active {
-            color: var(--text-primary);
-            background: rgba(139, 34, 82, 0.06);
+        body::after {
+            width: 18rem;
+            height: 18rem;
+            left: -6rem;
+            bottom: 4rem;
+            background: rgba(79, 124, 255, 0.08);
         }
 
-        .sidebar-link.active::before {
-            opacity: 1;
+        h1,
+        h2,
+        h3 {
+            margin: 0;
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            line-height: 1;
+            letter-spacing: 0.03em;
         }
 
-        .sidebar-link svg {
-            width: 18px;
-            height: 18px;
-            opacity: 0.5;
-            flex-shrink: 0;
+        button,
+        input,
+        select {
+            font: inherit;
         }
 
-        .sidebar-link.active svg,
-        .sidebar-link:hover svg {
-            opacity: 1;
+        .page-shell {
+            position: relative;
+            z-index: 1;
+            width: min(1380px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 42px 0 72px;
         }
 
-        .sidebar-footer {
-            padding: 2rem;
-            border-top: 1px solid var(--border);
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) auto;
+            gap: 1.5rem;
+            align-items: end;
+            margin-bottom: 1.5rem;
         }
 
-        .sidebar-user {
-            display: flex;
-            align-items: center;
+        .hero-copy {
+            display: grid;
             gap: 0.8rem;
         }
 
-        .sidebar-avatar {
-            width: 36px;
-            height: 36px;
-            background: var(--accent);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .brand-link {
+            width: fit-content;
+            color: var(--accent);
+            text-decoration: none;
             font-family: 'Oswald', sans-serif;
-            font-size: 0.85rem;
+            font-size: 1.4rem;
             font-weight: 600;
-            color: white;
-            flex-shrink: 0;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
 
-        .sidebar-user-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .sidebar-user-name {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .sidebar-user-role {
-            font-size: 0.75rem;
-            color: var(--text-tertiary);
-        }
-
-        .logout-btn {
-            background: none;
-            border: none;
-            color: var(--text-tertiary);
-            cursor: none;
-            padding: 0.3rem;
-            transition: color 0.2s;
-        }
-
-        .logout-btn:hover {
-            color: var(--red);
-        }
-
-        .logout-btn svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .main-content {
-            flex: 1;
-            margin-left: 280px;
-            padding: 3rem;
-        }
-
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 1rem;
-            margin-bottom: 2.5rem;
-        }
-
-        .topbar-left h1 {
-            font-size: 2.35rem;
-            margin-bottom: 0.35rem;
-        }
-
-        .topbar-left p {
-            color: var(--text-tertiary);
-            font-size: 0.95rem;
-            font-weight: 300;
-        }
-
-        .topbar-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            border: 1px solid rgba(139,34,82,0.26);
-            background: rgba(139,34,82,0.08);
-            color: var(--accent-light);
-            padding: 0.75rem 0.95rem;
+        .eyebrow {
+            width: fit-content;
+            padding: 0.42rem 0.75rem;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
             font-family: 'Oswald', sans-serif;
             font-size: 0.74rem;
-            font-weight: 600;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
-            letter-spacing: 0.12em;
         }
 
-        .summary-bar {
+        .hero-title {
+            font-size: clamp(2.8rem, 7vw, 5.2rem);
+        }
+
+        .hero-text {
+            max-width: 52rem;
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.85rem;
+        }
+
+        .date-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
+            padding: 0.85rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--surface-strong);
+            color: var(--text-secondary);
+            box-shadow: var(--shadow-soft);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.76rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .theme-controls {
+            display: flex;
+            gap: 0.45rem;
+            padding: 0.35rem;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--surface-strong);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .theme-controls .theme-switch-btn {
+            min-width: 96px;
+            border-radius: 999px;
+            padding: 0.65rem 0.9rem;
+        }
+
+        .stats-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 1.25rem;
-            margin-bottom: 2rem;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
         }
 
-        .summary-card {
-            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+            padding: 1.5rem;
             border: 1px solid var(--border);
-            padding: 1.5rem 1.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            min-height: 132px;
+            border-radius: 24px;
+            background: var(--surface-strong);
+            box-shadow: var(--shadow-soft);
         }
 
-        .summary-label {
+        .stat-card::after {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 4px;
+            background: linear-gradient(180deg, var(--accent), transparent);
+            opacity: 0.9;
+        }
+
+        .stat-label {
+            margin-bottom: 0.7rem;
+            color: var(--text-tertiary);
             font-family: 'Oswald', sans-serif;
             font-size: 0.72rem;
-            font-weight: 500;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
-            letter-spacing: 0.18em;
-            color: var(--text-tertiary);
-            margin-bottom: 0.45rem;
         }
 
-        .summary-value {
+        .stat-value {
             font-family: 'Oswald', sans-serif;
-            font-size: 2rem;
+            font-size: clamp(2rem, 5vw, 3rem);
             line-height: 1;
         }
 
-        .summary-value.accent {
-            color: var(--accent-light);
+        .stat-value.is-accent {
+            color: var(--accent);
         }
 
-        .summary-value.green {
-            color: var(--green);
+        .stat-value.is-success {
+            color: var(--success);
         }
 
-        .summary-value.blue {
-            color: var(--blue);
-        }
-
-        .summary-meta {
-            font-size: 0.82rem;
+        .stat-note {
+            margin-top: 0.65rem;
             color: var(--text-secondary);
-            margin-top: 0.45rem;
-        }
-
-        .summary-icon {
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(139,34,82,0.08);
-            flex-shrink: 0;
-        }
-
-        .summary-icon svg {
-            width: 22px;
-            height: 22px;
-            color: var(--accent-light);
-        }
-
-        .summary-icon.green-bg {
-            background: var(--green-glow);
-        }
-
-        .summary-icon.green-bg svg {
-            color: var(--green);
-        }
-
-        .summary-icon.blue-bg {
-            background: var(--blue-glow);
-        }
-
-        .summary-icon.blue-bg svg {
-            color: var(--blue);
-        }
-
-        .load-state {
-            display: none;
-            margin-bottom: 1.5rem;
-            padding: 1rem 1.1rem;
-            border: 1px solid var(--border);
-            background: rgba(255,255,255,0.03);
-            color: var(--text-secondary);
-        }
-
-        .load-state.show {
-            display: block;
-        }
-
-        .load-state.error {
-            border-color: rgba(231, 76, 60, 0.28);
-            color: #ffc6c0;
-            background: rgba(231, 76, 60, 0.08);
-        }
-
-        .clients-sections {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .clients-panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            overflow: hidden;
-        }
-
-        .clients-panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            padding: 1.35rem 1.5rem 1.1rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .clients-panel-heading h2 {
-            font-size: 1.18rem;
-            margin-bottom: 0.35rem;
-        }
-
-        .clients-panel-heading p {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-
-        .panel-badge {
-            min-width: 58px;
-            padding: 0.45rem 0.9rem;
-            text-align: center;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.82rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--accent-light);
-            background: rgba(139,34,82,0.1);
-        }
-
-        .client-grid {
-            display: grid;
-            grid-template-columns: minmax(180px, 1.35fr) minmax(140px, 0.9fr) minmax(180px, 1.2fr) minmax(120px, 0.9fr) minmax(120px, 0.8fr) minmax(110px, 0.75fr) minmax(140px, 0.95fr);
-            gap: 1rem;
-            align-items: start;
-        }
-
-        .client-grid.header {
-            padding: 0.9rem 1.5rem;
-            background: rgba(255,255,255,0.02);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .client-grid.header span {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            color: var(--text-tertiary);
-        }
-
-        .client-list {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .client-row {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
-
-        .client-row:last-child {
-            border-bottom: none;
-        }
-
-        .client-cell {
-            display: flex;
-            flex-direction: column;
-            gap: 0.15rem;
-            min-width: 0;
-        }
-
-        .client-cell-label {
-            display: none;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.64rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            color: var(--text-tertiary);
-        }
-
-        .client-cell-value {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            word-break: break-word;
-        }
-
-        .client-name {
-            font-weight: 600;
-            font-size: 0.98rem;
-            color: var(--text-primary);
-        }
-
-        .client-package {
-            display: inline-flex;
-            align-items: center;
-            width: fit-content;
-            padding: 0.38rem 0.75rem;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        .client-package.website {
-            color: var(--accent-light);
-            background: rgba(139,34,82,0.12);
-        }
-
-        .client-package.maintenance {
-            color: var(--green);
-            background: rgba(46,204,113,0.12);
-        }
-
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            width: fit-content;
-            padding: 0.35rem 0.72rem;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        .status-pill.live {
-            color: var(--green);
-            background: rgba(46,204,113,0.12);
-        }
-
-        .status-pill.paid {
-            color: #7af0aa;
-            background: rgba(46,204,113,0.18);
-        }
-
-        .status-pill.progress {
-            color: var(--accent-light);
-            background: rgba(139,34,82,0.12);
-        }
-
-        .status-pill.intake {
-            color: var(--yellow);
-            background: rgba(243,156,18,0.12);
-        }
-
-        .client-empty {
-            padding: 1.35rem 1.5rem;
-            color: var(--text-tertiary);
             font-size: 0.92rem;
         }
 
-        @media (max-width: 1280px) {
-            .summary-bar {
+        .database-card {
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            background: var(--surface-strong);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .database-toolbar,
+        .filter-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1.5rem 1.75rem;
+        }
+
+        .database-toolbar {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .database-toolbar-copy {
+            display: grid;
+            gap: 0.35rem;
+        }
+
+        .database-toolbar-copy h2 {
+            font-size: 1.5rem;
+        }
+
+        .database-toolbar-copy p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .btn-primary,
+        .btn-secondary,
+        .action-btn {
+            appearance: none;
+            border-radius: 999px;
+            transition: transform 0.16s ease, opacity 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+        }
+
+        .btn-primary {
+            border: none;
+            padding: 0.9rem 1.35rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: #fff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .btn-secondary {
+            border: 1px solid var(--border);
+            padding: 0.8rem 1.1rem;
+            background: transparent;
+            color: var(--text-secondary);
+        }
+
+        .btn-primary:hover,
+        .btn-secondary:hover,
+        .action-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .search-wrap {
+            position: relative;
+            flex: 1;
+            max-width: 460px;
+        }
+
+        .search-wrap svg {
+            position: absolute;
+            top: 50%;
+            left: 1rem;
+            width: 18px;
+            height: 18px;
+            color: var(--text-tertiary);
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+
+        .search-input,
+        .form-input,
+        .form-select {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.16s ease, background 0.16s ease;
+        }
+
+        .search-input {
+            padding: 0.95rem 1rem 0.95rem 2.9rem;
+            font-size: 0.95rem;
+        }
+
+        .search-input:focus,
+        .form-input:focus,
+        .form-select:focus {
+            border-color: rgba(139, 34, 82, 0.42);
+        }
+
+        .results-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+            white-space: nowrap;
+        }
+
+        .results-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 52px;
+            padding: 0.42rem 0.75rem;
+            border-radius: 999px;
+            background: var(--surface-muted);
+            color: var(--accent);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .status-banner {
+            display: none;
+            margin: 0 1.75rem 1rem;
+            padding: 0.95rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: var(--surface-muted);
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+        }
+
+        .status-banner.is-visible {
+            display: block;
+        }
+
+        .status-banner[data-tone="success"] {
+            border-color: rgba(46, 204, 113, 0.26);
+            background: var(--success-soft);
+            color: var(--success);
+        }
+
+        .status-banner[data-tone="error"] {
+            border-color: rgba(231, 76, 60, 0.24);
+            background: rgba(231, 76, 60, 0.08);
+            color: #d85f51;
+        }
+
+        .table-wrap {
+            padding: 0 1rem 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        thead th {
+            padding: 0.95rem 1rem;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+            color: var(--text-tertiary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        tbody td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        tbody tr:hover td {
+            background: var(--table-hover);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .client-name {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .client-company {
+            margin-top: 0.25rem;
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+        }
+
+        .muted-cell {
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.4rem 0.75rem;
+            border-radius: 999px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .badge.is-website {
+            background: var(--info-soft);
+            color: var(--info);
+        }
+
+        .badge.is-maintenance {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .badge.is-paid {
+            background: var(--success-soft);
+            color: var(--success);
+        }
+
+        .badge.is-open {
+            background: var(--warning-soft);
+            color: var(--warning);
+        }
+
+        .amount {
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .amount.is-paid {
+            color: var(--success);
+        }
+
+        .amount.is-open {
+            color: var(--accent);
+        }
+
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            border: 1px solid var(--border);
+            padding: 0.55rem 0.85rem;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        .action-btn:hover {
+            border-color: rgba(139, 34, 82, 0.35);
+            color: var(--accent);
+        }
+
+        .empty-state {
+            padding: 3rem 1.75rem 3.25rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .empty-state[hidden] {
+            display: none;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: rgba(5, 6, 12, 0.58);
+            backdrop-filter: blur(10px);
+        }
+
+        .modal-overlay[hidden] {
+            display: none;
+        }
+
+        .modal {
+            width: min(560px, calc(100% - 24px));
+            border: 1px solid var(--border);
+            border-radius: 26px;
+            background: var(--bg-secondary);
+            box-shadow: 0 28px 90px rgba(0, 0, 0, 0.24);
+            padding: 1.6rem;
+        }
+
+        .modal-header {
+            display: grid;
+            gap: 0.35rem;
+            margin-bottom: 1.3rem;
+        }
+
+        .modal-header h3 {
+            font-size: 1.35rem;
+        }
+
+        .modal-header p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.95rem;
+        }
+
+        .form-group {
+            display: grid;
+            gap: 0.4rem;
+        }
+
+        .form-group.is-full {
+            grid-column: 1 / -1;
+        }
+
+        .form-label {
+            color: var(--text-tertiary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.66rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .form-input,
+        .form-select {
+            padding: 0.9rem 0.95rem;
+            font-size: 0.95rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1.3rem;
+        }
+
+        @media (max-width: 1100px) {
+            .hero {
                 grid-template-columns: 1fr;
             }
 
-            .client-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+            .hero-actions {
+                align-items: flex-start;
             }
 
-            .client-grid.header {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 820px) {
+            .page-shell {
+                width: min(100%, calc(100% - 20px));
+                padding-top: 24px;
+            }
+
+            .database-toolbar,
+            .filter-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-wrap {
+                max-width: none;
+            }
+
+            .results-meta {
+                justify-content: space-between;
+            }
+
+            .table-wrap {
+                padding: 0 0.9rem 0.9rem;
+            }
+
+            thead {
                 display: none;
             }
 
-            .client-row {
-                padding: 1.2rem 1.5rem;
+            tbody {
+                display: grid;
+                gap: 0.75rem;
             }
 
-            .client-cell-label {
-                display: block;
+            tbody tr {
+                display: grid;
+                border: 1px solid var(--border);
+                border-radius: 20px;
+                overflow: hidden;
+                background: var(--surface-muted);
             }
-        }
 
-        @media (max-width: 900px) {
-            .sidebar {
-                position: static;
-                width: 100%;
-                height: auto;
-                border-right: none;
+            tbody td {
+                display: flex;
+                justify-content: space-between;
+                gap: 1rem;
+                padding: 0.9rem 1rem;
                 border-bottom: 1px solid var(--border);
             }
 
-            .dashboard-layout {
-                flex-direction: column;
+            tbody td::before {
+                content: attr(data-label);
+                flex-shrink: 0;
+                color: var(--text-tertiary);
+                font-family: 'Oswald', sans-serif;
+                font-size: 0.66rem;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
             }
 
-            .main-content {
-                margin-left: 0;
-                padding: 1.35rem;
+            tbody tr:hover td {
+                background: transparent;
             }
 
-            .topbar {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-        }
-
-        @media (max-width: 640px) {
-            body {
-                cursor: auto;
+            td.cell-client,
+            td.cell-actions {
+                display: block;
             }
 
-            .cursor,
-            .cursor-dot {
-                display: none !important;
+            td.cell-client::before,
+            td.cell-actions::before {
+                display: none;
             }
 
-            .client-grid {
+            .actions {
+                justify-content: flex-start;
+            }
+
+            .form-grid {
                 grid-template-columns: 1fr;
             }
 
-            .clients-panel-header {
-                flex-direction: column;
-                align-items: flex-start;
+            .modal-actions {
+                flex-direction: column-reverse;
             }
 
-            .panel-badge {
-                min-width: 0;
+            .btn-primary,
+            .btn-secondary {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
 </head>
 <body>
-    <div class="noise-overlay"></div>
-    <div class="cursor"></div>
-    <div class="cursor-dot"></div>
-
-    <div class="dashboard-layout">
-        <aside class="sidebar">
-            <a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
-
-            <nav class="sidebar-nav">
-                <div class="sidebar-section">
-                    <div class="sidebar-section-label">Overzicht</div>
-                    <a href="/premium-personeel-dashboard" class="sidebar-link magnetic">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                        Dashboard
-                    </a>
-                    <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        Actieve Opdrachten
-                    </a>
-                    <a href="/premium-personeel-agenda" class="sidebar-link magnetic">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
-                        Agenda
-                    </a>
-                    <a href="/premium-bevestigingsmails" class="sidebar-link magnetic">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
-                        Bevestigingsmails
-                    </a>
-                    <a href="/premium-ai-lead-generator" class="sidebar-link magnetic">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-2.128a1.5 1.5 0 00-1.064-1.436l-3.084-.925a1.5 1.5 0 00-1.695.633l-.97 1.455a12.036 12.036 0 01-5.516-5.516l1.455-.97a1.5 1.5 0 00.633-1.695l-.925-3.084A1.5 1.5 0 008.878 2.25H6.75A2.25 2.25 0 004.5 4.5v2.25z"/></svg>
-                        AI Coldcalling
-                    </a>
-                </div>
-
-                <div class="sidebar-section">
-                    <div class="sidebar-section-label">Beheer</div>
-                    <a href="/premium-klanten" class="sidebar-link active magnetic">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        Klanten
-                    </a>
-                    <div class="sidebar-theme">
-                        <div class="sidebar-theme-label">Thema</div>
-                        <div class="sidebar-theme-options" role="group" aria-label="Thema kiezen">
-                            <button type="button" class="theme-switch-btn magnetic" data-theme-value="dark" aria-pressed="false">Donker</button>
-                            <button type="button" class="theme-switch-btn magnetic" data-theme-value="light" aria-pressed="false">Licht</button>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="sidebar-user">
-                    <div class="sidebar-avatar">SP</div>
-                    <div class="sidebar-user-info">
-                        <div class="sidebar-user-name">Softora Premium</div>
-                        <div class="sidebar-user-role">Administrator</div>
-                    </div>
-                    <a href="/premium-personeel-login" class="logout-btn magnetic" title="Uitloggen">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                    </a>
-                </div>
-            </div>
-        </aside>
-
-        <main class="main-content">
-            <div class="topbar">
-                <div class="topbar-left">
-                    <h1>Klantenbestand</h1>
-                    <p>Alle premium klanten gegroepeerd op pakket: iedereen, enkel website en website + onderhoud.</p>
-                </div>
-                <div class="topbar-chip">Premium klantenoverzicht</div>
+    <main class="page-shell">
+        <section class="hero">
+            <div class="hero-copy">
+                <a class="brand-link" href="/premium-personeel-dashboard">Softora.nl</a>
+                <div class="eyebrow">Premium klanten database</div>
+                <h1 class="hero-title">Klanten</h1>
+                <p class="hero-text">Zoek, beheer en update al je klanten op een plek. De pagina gebruikt de bestaande Softora-kleuren en kan automatisch starten met klanten uit je premium opdrachten.</p>
             </div>
 
-            <div class="summary-bar">
-                <div class="summary-card">
-                    <div>
-                        <div class="summary-label">Alle klanten</div>
-                        <div class="summary-value accent" id="sumAll">0</div>
-                        <div class="summary-meta">Unieke klantrecords uit premium opdrachten</div>
-                    </div>
-                    <div class="summary-icon">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    </div>
+            <div class="hero-actions">
+                <div class="date-badge" id="dateBadge">--</div>
+                <div class="theme-controls" role="group" aria-label="Thema kiezen">
+                    <button type="button" class="theme-switch-btn" data-theme-value="dark" aria-pressed="false">Donker</button>
+                    <button type="button" class="theme-switch-btn" data-theme-value="light" aria-pressed="false">Licht</button>
                 </div>
-                <div class="summary-card">
-                    <div>
-                        <div class="summary-label">Enkel website</div>
-                        <div class="summary-value blue" id="sumWebsite">0</div>
-                        <div class="summary-meta">Klanten zonder onderhoudspakket</div>
-                    </div>
-                    <div class="summary-icon blue-bg">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"/><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75h7.5"/></svg>
-                    </div>
+            </div>
+        </section>
+
+        <section class="stats-grid" aria-label="Samenvatting">
+            <article class="stat-card">
+                <div class="stat-label">Totale klanten</div>
+                <div class="stat-value is-accent" id="statTotal">0</div>
+                <div class="stat-note">Unieke records in je klantenbestand.</div>
+            </article>
+
+            <article class="stat-card">
+                <div class="stat-label">Totale omzet</div>
+                <div class="stat-value" id="statRevenue">EUR 0</div>
+                <div class="stat-note">Som van alle bekende bedragen in de database.</div>
+            </article>
+
+            <article class="stat-card">
+                <div class="stat-label">Openstaand</div>
+                <div class="stat-value is-success" id="statOpen">EUR 0</div>
+                <div class="stat-note">Alle records die nog op open staan.</div>
+            </article>
+        </section>
+
+        <section class="database-card" aria-labelledby="databaseTitle">
+            <div class="database-toolbar">
+                <div class="database-toolbar-copy">
+                    <h2 id="databaseTitle">Klantenbestand</h2>
+                    <p>Gebaseerd op jouw voorbeeld, maar ingebouwd in de huidige Softora-stijl en zonder sidebar.</p>
                 </div>
-                <div class="summary-card">
-                    <div>
-                        <div class="summary-label">Website + onderhoud</div>
-                        <div class="summary-value green" id="sumMaintenance">0</div>
-                        <div class="summary-meta">Klanten met onderhoud, support of beheer</div>
-                    </div>
-                    <div class="summary-icon green-bg">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l-1.5 3-3.75.75 2.625 2.625-.6 3.825 3.225-1.725 3.225 1.725-.6-3.825L16.5 8.25l-3.75-.75-1.5-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 15l.75 1.5 1.5.3-1.05 1.05.225 1.65-1.425-.75-1.425.75.225-1.65L14.25 16.8l1.5-.3.75-1.5z"/></svg>
-                    </div>
+
+                <button type="button" class="btn-primary" id="addCustomerButton">Klant toevoegen</button>
+            </div>
+
+            <div class="filter-row">
+                <label class="search-wrap" for="searchInput">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <line x1="20" y1="20" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input class="search-input" id="searchInput" type="text" placeholder="Zoek op naam, bedrijf, telefoon of project...">
+                </label>
+
+                <div class="results-meta">
+                    <span class="results-chip" id="visibleCount">0</span>
+                    <span>Zichtbare klanten</span>
                 </div>
             </div>
 
-            <div class="load-state" id="loadState"></div>
+            <div class="status-banner" id="statusBanner" aria-live="polite"></div>
 
-            <div class="clients-sections">
-                <section class="clients-panel">
-                    <div class="clients-panel-header">
-                        <div class="clients-panel-heading">
-                            <h2>Iedereen</h2>
-                            <p>Volledig premium klantenbestand op basis van je opdrachten.</p>
-                        </div>
-                        <div class="panel-badge" id="allBadge">0</div>
-                    </div>
-                    <div class="client-grid header">
-                        <span>Klant</span>
-                        <span>Pakket</span>
-                        <span>Opdracht</span>
-                        <span>Locatie</span>
-                        <span>Status</span>
-                        <span>Waarde</span>
-                        <span>Laatste update</span>
-                    </div>
-                    <div class="client-list" id="allClientsList"></div>
-                </section>
-
-                <section class="clients-panel">
-                    <div class="clients-panel-header">
-                        <div class="clients-panel-heading">
-                            <h2>Enkel website</h2>
-                            <p>Klanten met alleen een website-opdracht zonder onderhoudspakket.</p>
-                        </div>
-                        <div class="panel-badge" id="websiteBadge">0</div>
-                    </div>
-                    <div class="client-grid header">
-                        <span>Klant</span>
-                        <span>Pakket</span>
-                        <span>Opdracht</span>
-                        <span>Locatie</span>
-                        <span>Status</span>
-                        <span>Waarde</span>
-                        <span>Laatste update</span>
-                    </div>
-                    <div class="client-list" id="websiteClientsList"></div>
-                </section>
-
-                <section class="clients-panel">
-                    <div class="clients-panel-header">
-                        <div class="clients-panel-heading">
-                            <h2>Website + onderhoud</h2>
-                            <p>Klanten waarbij onderhoud, support of beheer onderdeel van het pakket is.</p>
-                        </div>
-                        <div class="panel-badge" id="maintenanceBadge">0</div>
-                    </div>
-                    <div class="client-grid header">
-                        <span>Klant</span>
-                        <span>Pakket</span>
-                        <span>Opdracht</span>
-                        <span>Locatie</span>
-                        <span>Status</span>
-                        <span>Waarde</span>
-                        <span>Laatste update</span>
-                    </div>
-                    <div class="client-list" id="maintenanceClientsList"></div>
-                </section>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Klant</th>
+                            <th>Telefoonnummer</th>
+                            <th>Type</th>
+                            <th>Website / project</th>
+                            <th>Bedrag</th>
+                            <th>Status</th>
+                            <th>Betaaldatum</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="customersBody"></tbody>
+                </table>
             </div>
-        </main>
+
+            <div class="empty-state" id="emptyState" hidden>Geen klanten gevonden.</div>
+        </section>
+    </main>
+
+    <div class="modal-overlay" id="modalOverlay" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <div class="modal-header">
+                <h3 id="modalTitle">Klant toevoegen</h3>
+                <p>Beheer contactgegevens, type werk en betaalstatus vanuit een centrale lijst.</p>
+            </div>
+
+            <form id="customerForm" novalidate>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="fieldName">Naam</label>
+                        <input class="form-input" id="fieldName" name="naam" autocomplete="name" placeholder="Jan de Vries" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fieldCompany">Bedrijf</label>
+                        <input class="form-input" id="fieldCompany" name="bedrijf" autocomplete="organization" placeholder="De Vries BV">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fieldPhone">Telefoonnummer</label>
+                        <input class="form-input" id="fieldPhone" name="telefoon" autocomplete="tel" placeholder="+31 6 12345678">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fieldType">Type</label>
+                        <select class="form-select" id="fieldType" name="type">
+                            <option value="Website">Website</option>
+                            <option value="Onderhoud">Onderhoud</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group is-full">
+                        <label class="form-label" for="fieldProject">Website / project</label>
+                        <input class="form-input" id="fieldProject" name="website" placeholder="softora.nl">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fieldAmount">Bedrag (EUR)</label>
+                        <input class="form-input" id="fieldAmount" name="bedrag" type="number" min="0" step="1" placeholder="1500">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fieldStatus">Status</label>
+                        <select class="form-select" id="fieldStatus" name="status">
+                            <option value="Betaald">Betaald</option>
+                            <option value="Open">Open</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group is-full">
+                        <label class="form-label" for="fieldDate">Betaaldatum</label>
+                        <input class="form-input" id="fieldDate" name="datum" type="date">
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="cancelButton">Annuleren</button>
+                    <button type="submit" class="btn-primary">Opslaan</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
-        const CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
-        const REMOTE_UI_STATE_SCOPE = 'premium_active_orders';
+        const CUSTOMER_DB_SCOPE = "premium_customers_database";
+        const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
+        const CUSTOMER_LOCAL_KEY = "softora_customers_premium_local_v1";
+        const ORDER_SCOPE = "premium_active_orders";
+        const ORDER_KEY = "softora_custom_orders_premium_v1";
 
-        function escapeHtml(str) {
-            return String(str || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
+        const state = {
+            klanten: [],
+            query: "",
+            editId: null,
+            messageTimer: null
+        };
+
+        const nodes = {
+            body: document.getElementById("customersBody"),
+            empty: document.getElementById("emptyState"),
+            search: document.getElementById("searchInput"),
+            statTotal: document.getElementById("statTotal"),
+            statRevenue: document.getElementById("statRevenue"),
+            statOpen: document.getElementById("statOpen"),
+            visibleCount: document.getElementById("visibleCount"),
+            statusBanner: document.getElementById("statusBanner"),
+            dateBadge: document.getElementById("dateBadge"),
+            modalOverlay: document.getElementById("modalOverlay"),
+            modalTitle: document.getElementById("modalTitle"),
+            form: document.getElementById("customerForm"),
+            addButton: document.getElementById("addCustomerButton"),
+            cancelButton: document.getElementById("cancelButton"),
+            fieldName: document.getElementById("fieldName"),
+            fieldCompany: document.getElementById("fieldCompany"),
+            fieldPhone: document.getElementById("fieldPhone"),
+            fieldType: document.getElementById("fieldType"),
+            fieldProject: document.getElementById("fieldProject"),
+            fieldAmount: document.getElementById("fieldAmount"),
+            fieldStatus: document.getElementById("fieldStatus"),
+            fieldDate: document.getElementById("fieldDate")
+        };
+
+        function createId() {
+            return "klant-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+        }
+
+        function normalizeString(value) {
+            return String(value || "").trim();
+        }
+
+        function normalizeSearchValue(value) {
+            return normalizeString(value).toLowerCase();
+        }
+
+        function normalizeDate(value) {
+            const raw = normalizeString(value);
+            return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
+        }
+
+        function normalizeCustomer(raw, fallbackId) {
+            const amount = Number(raw && raw.bedrag);
+            const type = normalizeString(raw && raw.type) === "Onderhoud" ? "Onderhoud" : "Website";
+            const status = normalizeString(raw && raw.status) === "Open" ? "Open" : "Betaald";
+
+            return {
+                id: normalizeString(raw && raw.id) || fallbackId || createId(),
+                naam: normalizeString(raw && raw.naam) || "Onbekend",
+                bedrijf: normalizeString(raw && raw.bedrijf) || "-",
+                telefoon: normalizeString(raw && raw.telefoon) || "-",
+                type: type,
+                website: normalizeString(raw && raw.website) || "-",
+                bedrag: Number.isFinite(amount) && amount >= 0 ? Math.round(amount) : 0,
+                status: status,
+                datum: normalizeDate(raw && raw.datum)
+            };
+        }
+
+        function sortCustomers(list) {
+            return list.slice().sort(function (a, b) {
+                const nameCompare = a.naam.localeCompare(b.naam, "nl");
+                if (nameCompare !== 0) return nameCompare;
+                return a.bedrijf.localeCompare(b.bedrijf, "nl");
+            });
+        }
+
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function formatMoney(value) {
+            const amount = Number(value) || 0;
+            return new Intl.NumberFormat("nl-NL", {
+                style: "currency",
+                currency: "EUR",
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function formatDate(value) {
+            const raw = normalizeDate(value);
+            if (!raw) return "-";
+
+            const date = new Date(raw + "T12:00:00");
+            if (Number.isNaN(date.getTime())) return "-";
+
+            return new Intl.DateTimeFormat("nl-NL", {
+                day: "numeric",
+                month: "short",
+                year: "numeric"
+            }).format(date);
+        }
+
+        function setDateBadge() {
+            const now = new Date();
+            nodes.dateBadge.textContent = new Intl.DateTimeFormat("nl-NL", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric"
+            }).format(now).toUpperCase();
+        }
+
+        function setStatusMessage(message, tone, autoClear) {
+            if (state.messageTimer) {
+                clearTimeout(state.messageTimer);
+                state.messageTimer = null;
+            }
+
+            if (!message) {
+                nodes.statusBanner.textContent = "";
+                nodes.statusBanner.classList.remove("is-visible");
+                nodes.statusBanner.dataset.tone = "";
+                return;
+            }
+
+            nodes.statusBanner.textContent = String(message);
+            nodes.statusBanner.dataset.tone = tone || "info";
+            nodes.statusBanner.classList.add("is-visible");
+
+            if (autoClear) {
+                state.messageTimer = window.setTimeout(function () {
+                    setStatusMessage("");
+                }, 3200);
+            }
         }
 
         async function fetchUiStateGetWithFallback(scope) {
-            const encodedScope = encodeURIComponent(String(scope || ''));
+            const encodedScope = encodeURIComponent(String(scope || ""));
             const urls = [
-                `/api/ui-state-get?scope=${encodedScope}`,
-                `/api/ui-state/${encodedScope}`
+                "/api/ui-state-get?scope=" + encodedScope,
+                "/api/ui-state/" + encodedScope
             ];
             let lastError = null;
 
             for (const url of urls) {
                 try {
-                    const res = await fetch(url, {
-                        method: 'GET',
-                        cache: 'no-store'
+                    const response = await fetch(url, {
+                        method: "GET",
+                        cache: "no-store"
                     });
-                    if (!res.ok) {
-                        throw new Error(`UI-state GET mislukt (${res.status})`);
+                    if (!response.ok) {
+                        throw new Error("UI-state GET mislukt (" + response.status + ")");
                     }
-                    return await res.json().catch(() => ({}));
+                    return await response.json().catch(function () {
+                        return {};
+                    });
                 } catch (error) {
                     lastError = error;
                 }
             }
 
-            throw lastError || new Error('UI-state GET mislukt');
+            throw lastError || new Error("UI-state GET mislukt");
         }
 
-        function parseCustomOrders(raw) {
+        async function fetchUiStateSetWithFallback(scope, body) {
+            const encodedScope = encodeURIComponent(String(scope || ""));
+            const urls = [
+                "/api/ui-state-set?scope=" + encodedScope,
+                "/api/ui-state/" + encodedScope
+            ];
+            let lastError = null;
+
+            for (const url of urls) {
+                try {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body || {})
+                    });
+                    if (!response.ok) {
+                        throw new Error("UI-state POST mislukt (" + response.status + ")");
+                    }
+                    return await response.json().catch(function () {
+                        return {};
+                    });
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error("UI-state POST mislukt");
+        }
+
+        function parseCustomers(raw) {
             try {
-                const parsed = JSON.parse(String(raw || '[]'));
+                const parsed = JSON.parse(String(raw || "[]"));
                 if (!Array.isArray(parsed)) return [];
-                return parsed
-                    .map((item) => {
-                        const id = Number(item?.id);
-                        const amount = Number(item?.amount);
-                        const clientName = String(item?.clientName || '').trim();
-                        const location = String(item?.location || '').trim();
-                        const title = String(item?.title || '').trim();
-                        const description = String(item?.description || '').trim();
-                        const prompt = String(item?.prompt || '').trim();
-                        const status = String(item?.status || '').trim().toLowerCase();
-                        const lastRunAt = String(item?.lastRunAt || '').trim();
-                        const paidAt = String(item?.paidAt || '').trim();
-                        if (!Number.isFinite(id) || id <= 0 || !clientName) return null;
-                        return {
-                            id,
-                            amount: Number.isFinite(amount) && amount > 0 ? Math.round(amount) : null,
-                            clientName,
-                            location,
-                            title: title || 'Website opdracht',
-                            description,
-                            prompt,
-                            status,
-                            lastRunAt: lastRunAt || null,
-                            paidAt: paidAt || null
-                        };
-                    })
-                    .filter(Boolean);
-            } catch (_) {
+                return sortCustomers(parsed.map(function (item, index) {
+                    return normalizeCustomer(item, "klant-import-" + index);
+                }));
+            } catch (error) {
                 return [];
             }
         }
 
-        function normalizeKey(value) {
-            return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
-        }
-
-        function getPackageType(record) {
-            const haystack = [
-                record?.title,
-                record?.description,
-                record?.prompt
-            ].join(' ').toLowerCase();
-            const maintenanceKeywords = ['onderhoud', 'maintenance', 'support', 'beheer', 'hosting', 'servicecontract'];
-            return maintenanceKeywords.some((keyword) => haystack.includes(keyword))
-                ? 'maintenance'
-                : 'website';
-        }
-
-        function getStatusMeta(statusRaw, paidAtRaw) {
-            const status = String(statusRaw || '').toLowerCase().trim();
-            if (String(paidAtRaw || '').trim() || status === 'betaald') return { text: 'Betaald', className: 'paid' };
-            if (status === 'klaar') return { text: 'Live', className: 'live' };
-            if (status === 'bezig' || status === 'actief') return { text: 'In uitvoering', className: 'progress' };
-            return { text: 'Intake', className: 'intake' };
-        }
-
-        function getSortTimestamp(record) {
-            const dateTs = record?.lastRunAt ? Date.parse(record.lastRunAt) : NaN;
-            if (Number.isFinite(dateTs)) return dateTs;
-            return Number(record?.id) || 0;
-        }
-
-        function buildClientRecords(orderRecords) {
-            const seen = new Map();
-            const sorted = orderRecords.slice().sort((a, b) => getSortTimestamp(b) - getSortTimestamp(a));
-
-            sorted.forEach((record) => {
-                const key = `${normalizeKey(record.clientName)}|${normalizeKey(record.location)}`;
-                if (seen.has(key)) return;
-                const packageType = getPackageType(record);
-                const status = getStatusMeta(record.status, record.paidAt);
-                seen.set(key, {
-                    clientName: record.clientName,
-                    location: record.location || '—',
-                    title: record.title || 'Website opdracht',
-                    amount: record.amount,
-                    packageType,
-                    packageLabel: packageType === 'maintenance' ? 'Website + onderhoud' : 'Website',
-                    statusText: status.text,
-                    statusClass: status.className,
-                    lastRunAt: record.lastRunAt
-                });
-            });
-
-            return Array.from(seen.values()).sort((a, b) => {
-                const nameCompare = a.clientName.localeCompare(b.clientName, 'nl');
-                if (nameCompare !== 0) return nameCompare;
-                return a.location.localeCompare(b.location, 'nl');
-            });
-        }
-
-        function formatMoney(amount) {
-            if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return '—';
-            return '€' + Number(amount).toLocaleString('nl-NL');
-        }
-
-        function formatDateTime(value) {
-            const ts = Date.parse(String(value || ''));
-            if (!Number.isFinite(ts)) return 'Nog niet uitgevoerd';
-            return new Date(ts).toLocaleString('nl-NL', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-
-        function renderClientRows(targetId, clients, emptyText) {
-            const target = document.getElementById(targetId);
-            if (!target) return;
-
-            if (!clients.length) {
-                target.innerHTML = `<div class="client-empty">${escapeHtml(emptyText)}</div>`;
-                return;
-            }
-
-            target.innerHTML = clients.map((client) => {
-                return `
-                    <div class="client-row">
-                        <div class="client-grid">
-                            <div class="client-cell">
-                                <span class="client-cell-label">Klant</span>
-                                <span class="client-cell-value client-name">${escapeHtml(client.clientName)}</span>
-                            </div>
-                            <div class="client-cell">
-                                <span class="client-cell-label">Pakket</span>
-                                <span class="client-package ${client.packageType === 'maintenance' ? 'maintenance' : 'website'}">${escapeHtml(client.packageLabel)}</span>
-                            </div>
-                            <div class="client-cell">
-                                <span class="client-cell-label">Opdracht</span>
-                                <span class="client-cell-value">${escapeHtml(client.title)}</span>
-                            </div>
-                            <div class="client-cell">
-                                <span class="client-cell-label">Locatie</span>
-                                <span class="client-cell-value">${escapeHtml(client.location)}</span>
-                            </div>
-                            <div class="client-cell">
-                                <span class="client-cell-label">Status</span>
-                                <span class="status-pill ${escapeHtml(client.statusClass)}">${escapeHtml(client.statusText)}</span>
-                            </div>
-                            <div class="client-cell">
-                                <span class="client-cell-label">Waarde</span>
-                                <span class="client-cell-value">${escapeHtml(formatMoney(client.amount))}</span>
-                            </div>
-                            <div class="client-cell">
-                                <span class="client-cell-label">Laatste update</span>
-                                <span class="client-cell-value">${escapeHtml(formatDateTime(client.lastRunAt))}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function setSummaryCount(id, value) {
-            const el = document.getElementById(id);
-            if (el) el.textContent = String(value);
-        }
-
-        function setLoadState(message, isError = false) {
-            const el = document.getElementById('loadState');
-            if (!el) return;
-            if (!message) {
-                el.className = 'load-state';
-                el.textContent = '';
-                return;
-            }
-            el.className = `load-state show${isError ? ' error' : ''}`;
-            el.textContent = String(message);
-        }
-
-        async function initializeClientsPage() {
-            setLoadState('Klantenbestand laden...');
+        function readLocalCustomers() {
             try {
-                const data = await fetchUiStateGetWithFallback(REMOTE_UI_STATE_SCOPE);
-                const values = data?.values && typeof data.values === 'object' ? data.values : {};
-                const orders = parseCustomOrders(values[CUSTOM_ORDERS_KEY]);
-                const clients = buildClientRecords(orders);
-                const websiteClients = clients.filter((client) => client.packageType === 'website');
-                const maintenanceClients = clients.filter((client) => client.packageType === 'maintenance');
-
-                renderClientRows('allClientsList', clients, 'Nog geen klanten gevonden in premium opdrachten.');
-                renderClientRows('websiteClientsList', websiteClients, 'Nog geen klanten met alleen een websitepakket.');
-                renderClientRows('maintenanceClientsList', maintenanceClients, 'Nog geen klanten met website + onderhoud.');
-
-                setSummaryCount('sumAll', clients.length);
-                setSummaryCount('sumWebsite', websiteClients.length);
-                setSummaryCount('sumMaintenance', maintenanceClients.length);
-                setSummaryCount('allBadge', clients.length);
-                setSummaryCount('websiteBadge', websiteClients.length);
-                setSummaryCount('maintenanceBadge', maintenanceClients.length);
-                setLoadState('');
+                return parseCustomers(localStorage.getItem(CUSTOMER_LOCAL_KEY));
             } catch (error) {
-                setLoadState(`Kon klantenbestand niet laden: ${String(error?.message || 'onbekende fout')}`, true);
-                renderClientRows('allClientsList', [], 'Klantenbestand kon niet geladen worden.');
-                renderClientRows('websiteClientsList', [], 'Klantenbestand kon niet geladen worden.');
-                renderClientRows('maintenanceClientsList', [], 'Klantenbestand kon niet geladen worden.');
+                return [];
             }
         }
 
-        void initializeClientsPage();
-
-        (function initCursor() {
-            const cursor = document.querySelector('.cursor');
-            const cursorDot = document.querySelector('.cursor-dot');
-            const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
-            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            const enablePointerFx = hasFinePointer && !prefersReducedMotion;
-
-            function disable() {
-                document.body.style.cursor = 'auto';
-                if (cursor) cursor.style.display = 'none';
-                if (cursorDot) cursorDot.style.display = 'none';
+        function writeLocalCustomers(customers) {
+            try {
+                localStorage.setItem(CUSTOMER_LOCAL_KEY, JSON.stringify(customers));
+            } catch (error) {
+                /* ignore storage errors */
             }
+        }
 
-            if (!cursor || !cursorDot || !enablePointerFx) {
-                disable();
+        function parseOrders(raw) {
+            try {
+                const parsed = JSON.parse(String(raw || "[]"));
+                if (!Array.isArray(parsed)) return [];
+
+                return parsed
+                    .map(function (item) {
+                        const id = Number(item && item.id);
+                        const amount = Number(item && item.amount);
+                        const clientName = normalizeString(item && item.clientName);
+                        if (!Number.isFinite(id) || id <= 0 || !clientName) return null;
+
+                        return {
+                            id: id,
+                            clientName: clientName,
+                            location: normalizeString(item && item.location),
+                            title: normalizeString(item && item.title) || "Website opdracht",
+                            description: normalizeString(item && item.description),
+                            prompt: normalizeString(item && item.prompt),
+                            amount: Number.isFinite(amount) && amount > 0 ? Math.round(amount) : 0,
+                            status: normalizeString(item && item.status).toLowerCase(),
+                            paidAt: normalizeString(item && item.paidAt),
+                            lastRunAt: normalizeString(item && item.lastRunAt)
+                        };
+                    })
+                    .filter(Boolean);
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function inferTypeFromOrder(order) {
+            const haystack = [
+                order && order.title,
+                order && order.description,
+                order && order.prompt
+            ].join(" ").toLowerCase();
+            const maintenanceKeywords = ["onderhoud", "maintenance", "support", "beheer", "hosting", "servicecontract"];
+            return maintenanceKeywords.some(function (keyword) {
+                return haystack.indexOf(keyword) !== -1;
+            }) ? "Onderhoud" : "Website";
+        }
+
+        function deriveCustomersFromOrders(orders) {
+            const seen = new Map();
+
+            orders.forEach(function (order) {
+                const key = normalizeSearchValue(order.clientName) + "|" + normalizeSearchValue(order.location);
+                if (seen.has(key)) return;
+
+                const paidDate = normalizeString(order.paidAt).slice(0, 10);
+                const status = paidDate || order.status === "betaald" ? "Betaald" : "Open";
+
+                seen.set(key, normalizeCustomer({
+                    id: "seed-" + order.id,
+                    naam: order.clientName,
+                    bedrijf: order.location || "-",
+                    telefoon: "-",
+                    type: inferTypeFromOrder(order),
+                    website: order.title || "-",
+                    bedrag: order.amount || 0,
+                    status: status,
+                    datum: paidDate
+                }));
+            });
+
+            return sortCustomers(Array.from(seen.values()));
+        }
+
+        async function persistCustomerList(customers) {
+            const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
+                return normalizeCustomer(item, "klant-save-" + index);
+            }));
+
+            writeLocalCustomers(normalizedCustomers);
+
+            try {
+                await fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
+                    patch: {
+                        [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers)
+                    },
+                    source: "premium-klanten",
+                    actor: "Premium klanten database"
+                });
+                return { ok: true };
+            } catch (error) {
+                return {
+                    ok: false,
+                    error: error
+                };
+            }
+        }
+
+        function getFilteredCustomers() {
+            const query = normalizeSearchValue(state.query);
+            if (!query) return state.klanten.slice();
+
+            return state.klanten.filter(function (customer) {
+                const haystack = [
+                    customer.naam,
+                    customer.bedrijf,
+                    customer.telefoon,
+                    customer.website,
+                    customer.type,
+                    customer.status
+                ].join(" ").toLowerCase();
+                return haystack.indexOf(query) !== -1;
+            });
+        }
+
+        function updateStats() {
+            const totalRevenue = state.klanten.reduce(function (sum, customer) {
+                return sum + Number(customer.bedrag || 0);
+            }, 0);
+            const totalOpen = state.klanten.reduce(function (sum, customer) {
+                return customer.status === "Open" ? sum + Number(customer.bedrag || 0) : sum;
+            }, 0);
+
+            nodes.statTotal.textContent = String(state.klanten.length);
+            nodes.statRevenue.textContent = formatMoney(totalRevenue);
+            nodes.statOpen.textContent = formatMoney(totalOpen);
+        }
+
+        function renderTable() {
+            const filtered = getFilteredCustomers();
+
+            nodes.visibleCount.textContent = String(filtered.length);
+            nodes.empty.hidden = filtered.length !== 0;
+
+            if (!filtered.length) {
+                nodes.body.innerHTML = "";
                 return;
             }
 
-            let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0, dotX = 0, dotY = 0;
-            let cursorRafId = null;
+            nodes.body.innerHTML = filtered.map(function (customer) {
+                const typeClass = customer.type === "Onderhoud" ? "is-maintenance" : "is-website";
+                const statusClass = customer.status === "Betaald" ? "is-paid" : "is-open";
+                const amountClass = customer.status === "Betaald" ? "is-paid" : "is-open";
 
-            document.addEventListener('mousemove', (e) => {
-                mouseX = e.clientX;
-                mouseY = e.clientY;
-            }, { passive: true });
+                return [
+                    "<tr>",
+                        "<td class=\"cell-client\" data-label=\"Klant\">",
+                            "<div class=\"client-name\">" + escapeHtml(customer.naam) + "</div>",
+                            "<div class=\"client-company\">" + escapeHtml(customer.bedrijf) + "</div>",
+                        "</td>",
+                        "<td data-label=\"Telefoonnummer\" class=\"muted-cell\">" + escapeHtml(customer.telefoon) + "</td>",
+                        "<td data-label=\"Type\"><span class=\"badge " + typeClass + "\">" + escapeHtml(customer.type) + "</span></td>",
+                        "<td data-label=\"Website / project\" class=\"muted-cell\">" + escapeHtml(customer.website) + "</td>",
+                        "<td data-label=\"Bedrag\"><span class=\"amount " + amountClass + "\">" + escapeHtml(formatMoney(customer.bedrag)) + "</span></td>",
+                        "<td data-label=\"Status\"><span class=\"badge " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
+                        "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
+                        "<td class=\"cell-actions\" data-label=\"Acties\">",
+                            "<div class=\"actions\">",
+                                "<button type=\"button\" class=\"action-btn\" data-action=\"edit\" data-id=\"" + escapeHtml(customer.id) + "\">Bewerk</button>",
+                                "<button type=\"button\" class=\"action-btn\" data-action=\"delete\" data-id=\"" + escapeHtml(customer.id) + "\">Verwijder</button>",
+                            "</div>",
+                        "</td>",
+                    "</tr>"
+                ].join("");
+            }).join("");
+        }
 
-            function animateCursor() {
-                cursorX += (mouseX - cursorX);
-                cursorY += (mouseY - cursorY);
-                cursor.style.left = cursorX + 'px';
-                cursor.style.top = cursorY + 'px';
-                dotX += (mouseX - dotX);
-                dotY += (mouseY - dotY);
-                cursorDot.style.left = dotX + 'px';
-                cursorDot.style.top = dotY + 'px';
-                cursorRafId = requestAnimationFrame(animateCursor);
+        function renderPage() {
+            updateStats();
+            renderTable();
+        }
+
+        function resetForm() {
+            nodes.form.reset();
+            nodes.fieldType.value = "Website";
+            nodes.fieldStatus.value = "Betaald";
+            nodes.fieldDate.value = "";
+        }
+
+        function openModal(customerId) {
+            const nextEditId = customerId || null;
+
+            if (nextEditId) {
+                const customer = state.klanten.find(function (item) {
+                    return item.id === nextEditId;
+                });
+
+                if (!customer) {
+                    state.editId = null;
+                    return;
+                }
+
+                state.editId = nextEditId;
+                nodes.modalTitle.textContent = "Klant bewerken";
+                nodes.fieldName.value = customer.naam;
+                nodes.fieldCompany.value = customer.bedrijf === "-" ? "" : customer.bedrijf;
+                nodes.fieldPhone.value = customer.telefoon === "-" ? "" : customer.telefoon;
+                nodes.fieldType.value = customer.type;
+                nodes.fieldProject.value = customer.website === "-" ? "" : customer.website;
+                nodes.fieldAmount.value = String(customer.bedrag || "");
+                nodes.fieldStatus.value = customer.status;
+                nodes.fieldDate.value = customer.datum || "";
+            } else {
+                nodes.modalTitle.textContent = "Klant toevoegen";
+                resetForm();
             }
 
-            cursorRafId = requestAnimationFrame(animateCursor);
+            nodes.modalOverlay.hidden = false;
+            window.requestAnimationFrame(function () {
+                nodes.fieldName.focus();
+            });
+        }
 
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    if (cursorRafId) cancelAnimationFrame(cursorRafId);
-                    cursorRafId = null;
-                } else if (!cursorRafId) {
-                    cursorRafId = requestAnimationFrame(animateCursor);
+        function closeModal() {
+            nodes.modalOverlay.hidden = true;
+            state.editId = null;
+            resetForm();
+        }
+
+        function collectFormCustomer() {
+            const naam = normalizeString(nodes.fieldName.value);
+            if (!naam) {
+                nodes.fieldName.focus();
+                throw new Error("Vul minimaal een naam in.");
+            }
+
+            return normalizeCustomer({
+                id: state.editId || createId(),
+                naam: naam,
+                bedrijf: normalizeString(nodes.fieldCompany.value),
+                telefoon: normalizeString(nodes.fieldPhone.value),
+                type: nodes.fieldType.value,
+                website: normalizeString(nodes.fieldProject.value),
+                bedrag: Number(nodes.fieldAmount.value || 0),
+                status: nodes.fieldStatus.value,
+                datum: nodes.fieldDate.value
+            });
+        }
+
+        async function saveCustomer(event) {
+            event.preventDefault();
+
+            let nextCustomer;
+            try {
+                nextCustomer = collectFormCustomer();
+            } catch (error) {
+                setStatusMessage(error.message || "Controleer de ingevoerde gegevens.", "error");
+                return;
+            }
+
+            const isEditing = Boolean(state.editId);
+            const nextCustomers = isEditing
+                ? state.klanten.map(function (customer) {
+                    return customer.id === state.editId ? nextCustomer : customer;
+                })
+                : state.klanten.concat(nextCustomer);
+
+            state.klanten = sortCustomers(nextCustomers);
+            renderPage();
+            closeModal();
+
+            const result = await persistCustomerList(state.klanten);
+            if (result.ok) {
+                setStatusMessage(isEditing ? "Klant bijgewerkt." : "Klant toegevoegd.", "success", true);
+                return;
+            }
+
+            setStatusMessage(
+                "Wijziging lokaal opgeslagen, maar server-sync mislukte: " + String(result.error && result.error.message || "onbekende fout"),
+                "error"
+            );
+        }
+
+        async function deleteCustomer(customerId) {
+            const customer = state.klanten.find(function (item) {
+                return item.id === customerId;
+            });
+            if (!customer) return;
+
+            const confirmed = window.confirm("Klant \"" + customer.naam + "\" verwijderen?");
+            if (!confirmed) return;
+
+            state.klanten = state.klanten.filter(function (item) {
+                return item.id !== customerId;
+            });
+            renderPage();
+
+            const result = await persistCustomerList(state.klanten);
+            if (result.ok) {
+                setStatusMessage("Klant verwijderd.", "success", true);
+                return;
+            }
+
+            setStatusMessage(
+                "Verwijderd in deze browser, maar server-sync mislukte: " + String(result.error && result.error.message || "onbekende fout"),
+                "error"
+            );
+        }
+
+        async function bootstrapCustomers() {
+            setStatusMessage("Klantenbestand laden...", "info");
+            setDateBadge();
+
+            try {
+                const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
+                const remoteCustomers = parseCustomers(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
+
+                if (remoteCustomers.length) {
+                    state.klanten = remoteCustomers;
+                    writeLocalCustomers(remoteCustomers);
+                    renderPage();
+                    setStatusMessage("");
+                    return;
                 }
-            });
+            } catch (error) {
+                /* continue with local fallback */
+            }
 
-            document.addEventListener('mouseover', (e) => {
-                if (e.target.closest('.magnetic')) cursor.classList.add('hover');
-            });
+            const localCustomers = readLocalCustomers();
+            if (localCustomers.length) {
+                state.klanten = localCustomers;
+                renderPage();
 
-            document.addEventListener('mouseout', (e) => {
-                if (e.target.closest('.magnetic')) cursor.classList.remove('hover');
-            });
+                const syncResult = await persistCustomerList(localCustomers);
+                if (syncResult.ok) {
+                    setStatusMessage("Lokale klantenlijst gesynchroniseerd.", "success", true);
+                } else {
+                    setStatusMessage("Lokale klantenlijst geladen. Server-sync mislukte.", "error");
+                }
+                return;
+            }
 
-            window.addEventListener('error', disable);
-        })();
+            try {
+                const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
+                const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
+                const importedCustomers = deriveCustomersFromOrders(orders);
+
+                state.klanten = importedCustomers;
+                renderPage();
+
+                if (importedCustomers.length) {
+                    const persistResult = await persistCustomerList(importedCustomers);
+                    if (persistResult.ok) {
+                        setStatusMessage("Klanten uit actieve opdrachten geimporteerd.", "success", true);
+                    } else {
+                        setStatusMessage("Klanten geimporteerd, maar server-sync mislukte.", "error");
+                    }
+                    return;
+                }
+            } catch (error) {
+                /* ignore import errors */
+            }
+
+            state.klanten = [];
+            renderPage();
+            setStatusMessage("");
+        }
+
+        nodes.search.addEventListener("input", function (event) {
+            state.query = normalizeString(event.target.value);
+            renderTable();
+        });
+
+        nodes.addButton.addEventListener("click", function () {
+            openModal();
+        });
+
+        nodes.cancelButton.addEventListener("click", function () {
+            closeModal();
+        });
+
+        nodes.form.addEventListener("submit", saveCustomer);
+
+        nodes.body.addEventListener("click", function (event) {
+            const button = event.target.closest("[data-action][data-id]");
+            if (!button) return;
+
+            const action = button.getAttribute("data-action");
+            const customerId = button.getAttribute("data-id");
+
+            if (action === "edit") {
+                openModal(customerId);
+                return;
+            }
+
+            if (action === "delete") {
+                void deleteCustomer(customerId);
+            }
+        });
+
+        nodes.modalOverlay.addEventListener("click", function (event) {
+            if (event.target === nodes.modalOverlay) {
+                closeModal();
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && !nodes.modalOverlay.hidden) {
+                closeModal();
+            }
+        });
+
+        void bootstrapCustomers();
     </script>
 </body>
 </html>
