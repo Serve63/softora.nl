@@ -1917,11 +1917,19 @@
             const viewBtnEl = document.getElementById(`view-${id}`);
             const pct = Math.max(0, Math.min(100, Number(order.progressPct) || 0));
             const status = normalizeOrderStatus(order.statusKey || (pct >= 100 ? 'klaar' : pct > 0 ? 'bezig' : 'wacht'));
+            const isDelivered = status.key === 'klaar' || pct >= 100;
 
             order.statusKey = status.key;
 
             if (cardEl) {
-                cardEl.classList.toggle('delivered', status.key === 'klaar' || pct >= 100);
+                cardEl.classList.toggle('delivered', isDelivered);
+                if (isDelivered) {
+                    cardEl.removeAttribute('role');
+                    cardEl.removeAttribute('tabindex');
+                } else {
+                    cardEl.setAttribute('role', 'button');
+                    cardEl.setAttribute('tabindex', '0');
+                }
             }
 
             if (statusEl) {
@@ -2774,9 +2782,11 @@
             if (!id) return;
             card.addEventListener('click', (e) => {
                 if (e.target.closest('button,a')) return;
+                if (card.classList.contains('delivered')) return;
                 openModal(id);
             });
             card.addEventListener('keydown', (e) => {
+                if (card.classList.contains('delivered')) return;
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     openModal(id);
