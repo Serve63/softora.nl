@@ -199,15 +199,7 @@
         }
 
         .sidebar-link::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 3px;
-            height: 100%;
-            background: var(--accent);
-            opacity: 0;
-            transition: opacity 0.2s;
+            content: none;
         }
 
         .sidebar-link:hover { color: var(--text-primary); background: rgba(255,255,255,0.02); }
@@ -216,8 +208,6 @@
             color: var(--text-primary);
             background: rgba(139, 34, 82, 0.06);
         }
-
-        .sidebar-link.active::before { opacity: 1; }
 
         .sidebar-link svg { width: 18px; height: 18px; opacity: 0.5; flex-shrink: 0; }
         .sidebar-link.active svg, .sidebar-link:hover svg { opacity: 1; }
