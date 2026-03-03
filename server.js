@@ -12,6 +12,14 @@ const PORT = Number(process.env.PORT) || 3000;
 const VAPI_BASE_URL = process.env.VAPI_BASE_URL || 'https://api.vapi.ai';
 const OPENAI_API_BASE_URL = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const ANTHROPIC_API_BASE_URL = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com/v1';
+const ANTHROPIC_MODEL =
+  process.env.ANTHROPIC_MODEL || process.env.CLAUDE_MODEL || 'claude-opus-4-6';
+const WEBSITE_GENERATION_PROVIDER = String(
+  process.env.WEBSITE_GENERATION_PROVIDER || process.env.SITE_GENERATION_PROVIDER || ''
+)
+  .trim()
+  .toLowerCase();
 const VERBOSE_VAPI_WEBHOOK_LOGS = /^(1|true|yes)$/i.test(
   String(process.env.VERBOSE_VAPI_WEBHOOK_LOGS || '')
 );
@@ -1420,6 +1428,46 @@ function getOpenAiApiKey() {
   return normalizeString(process.env.OPENAI_API_KEY);
 }
 
+function getAnthropicApiKey() {
+  return normalizeString(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY);
+}
+
+function getWebsiteGenerationProvider() {
+  if (WEBSITE_GENERATION_PROVIDER === 'anthropic' || WEBSITE_GENERATION_PROVIDER === 'claude') {
+    return 'anthropic';
+  }
+  if (WEBSITE_GENERATION_PROVIDER === 'openai') {
+    return 'openai';
+  }
+  return getAnthropicApiKey() ? 'anthropic' : 'openai';
+}
+
+function extractAnthropicTextContent(content) {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (!part) return '';
+        if (typeof part === 'string') return part;
+        if (Array.isArray(part.content)) return extractAnthropicTextContent(part.content);
+        if (part.type === 'text') return normalizeString(part.text || '');
+        return normalizeString(part.text || part.content || '');
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (content && typeof content === 'object') {
+    if (Array.isArray(content.content)) return extractAnthropicTextContent(content.content);
+    return normalizeString(content.text || content.content || '');
+  }
+
+  return '';
+}
+
 function normalizeAiSummaryStyle(value) {
   const raw = normalizeString(value).toLowerCase();
   if (!raw) return 'medium';
@@ -1828,14 +1876,92 @@ function estimateOpenAiTextCost(inputText, outputText, model) {
   });
 }
 
-async function generateWebsiteHtmlWithAi(options = {}) {
-  const apiKey = getOpenAiApiKey();
-  if (!apiKey) {
-    const err = new Error('OPENAI_API_KEY ontbreekt');
-    err.status = 503;
-    throw err;
+function getAnthropicModelCostRates(model) {
+  const explicitInput = Number(process.env.ANTHROPIC_COST_INPUT_PER_1M || '');
+  const explicitOutput = Number(process.env.ANTHROPIC_COST_OUTPUT_PER_1M || '');
+  if (Number.isFinite(explicitInput) && Number.isFinite(explicitOutput) && explicitInput >= 0 && explicitOutput >= 0) {
+    return { inputPer1mUsd: explicitInput, outputPer1mUsd: explicitOutput, source: 'env' };
   }
 
+  const key = normalizeString(model || ANTHROPIC_MODEL).toLowerCase();
+  if (key.includes('claude-opus-4-6')) {
+    return { inputPer1mUsd: 5, outputPer1mUsd: 25, source: 'default-opus-4.6' };
+  }
+  if (key.includes('claude-opus')) return { inputPer1mUsd: 15, outputPer1mUsd: 75, source: 'default-opus' };
+  if (key.includes('claude-sonnet')) return { inputPer1mUsd: 3, outputPer1mUsd: 15, source: 'default-sonnet' };
+  if (key.includes('claude-haiku')) return { inputPer1mUsd: 0.8, outputPer1mUsd: 4, source: 'default-haiku' };
+  return null;
+}
+
+function buildAnthropicCostEstimate({ promptTokens, completionTokens, totalTokens, model, method = 'usage' }) {
+  if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens) || promptTokens < 0 || completionTokens < 0) {
+    return null;
+  }
+
+  const rates = getAnthropicModelCostRates(model);
+  if (!rates) return null;
+
+  const usdToEur = Number(process.env.AI_COST_USD_TO_EUR || process.env.OPENAI_COST_USD_TO_EUR || 0.92);
+  const safeUsdToEur = Number.isFinite(usdToEur) && usdToEur > 0 ? usdToEur : 0.92;
+
+  const inputUsd = (promptTokens / 1_000_000) * rates.inputPer1mUsd;
+  const outputUsd = (completionTokens / 1_000_000) * rates.outputPer1mUsd;
+  const totalUsd = inputUsd + outputUsd;
+  const totalEur = totalUsd * safeUsdToEur;
+
+  return {
+    model: normalizeString(model || ANTHROPIC_MODEL),
+    promptTokens: Math.round(promptTokens),
+    completionTokens: Math.round(completionTokens),
+    totalTokens: Number.isFinite(totalTokens)
+      ? Math.round(totalTokens)
+      : Math.round(promptTokens + completionTokens),
+    usd: Number(totalUsd.toFixed(8)),
+    eur: Number(totalEur.toFixed(8)),
+    rates,
+    usdToEur: safeUsdToEur,
+    estimated: true,
+    method,
+  };
+}
+
+function estimateAnthropicUsageCost(usage, model) {
+  if (!usage || typeof usage !== 'object') return null;
+  const promptTokens = Number(usage.input_tokens ?? usage.prompt_tokens ?? usage.inputTokens ?? 0);
+  const completionTokens = Number(usage.output_tokens ?? usage.completion_tokens ?? usage.outputTokens ?? 0);
+  const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? promptTokens + completionTokens);
+  if (
+    !Number.isFinite(promptTokens) ||
+    !Number.isFinite(completionTokens) ||
+    promptTokens < 0 ||
+    completionTokens < 0
+  ) {
+    return null;
+  }
+
+  return buildAnthropicCostEstimate({
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    model,
+    method: 'usage',
+  });
+}
+
+function estimateAnthropicTextCost(inputText, outputText, model) {
+  const promptTokens = estimateTokenCountFromText(inputText);
+  const completionTokens = estimateTokenCountFromText(outputText);
+  if (promptTokens <= 0 && completionTokens <= 0) return null;
+  return buildAnthropicCostEstimate({
+    promptTokens,
+    completionTokens,
+    totalTokens: promptTokens + completionTokens,
+    model,
+    method: 'text-fallback',
+  });
+}
+
+function buildWebsiteGenerationPrompts(options = {}) {
   const promptText = truncateText(normalizeString(options.prompt || ''), 40000);
   if (!promptText) {
     const err = new Error('Prompt ontbreekt voor website generatie.');
@@ -1880,6 +2006,27 @@ async function generateWebsiteHtmlWithAi(options = {}) {
   ]
     .filter(Boolean)
     .join('\n');
+
+  return {
+    company,
+    title,
+    description,
+    language,
+    promptText,
+    systemPrompt,
+    userPrompt,
+  };
+}
+
+async function generateWebsiteHtmlWithOpenAi(options = {}) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) {
+    const err = new Error('OPENAI_API_KEY ontbreekt');
+    err.status = 503;
+    throw err;
+  }
+
+  const { company, title, userPrompt, systemPrompt } = buildWebsiteGenerationPrompts(options);
 
   const { response, data } = await fetchJsonWithTimeout(
     `${OPENAI_API_BASE_URL}/chat/completions`,
@@ -1934,6 +2081,87 @@ async function generateWebsiteHtmlWithAi(options = {}) {
       estimateOpenAiUsageCost(data?.usage || null, OPENAI_MODEL) ||
       estimateOpenAiTextCost(userPrompt, html, OPENAI_MODEL),
   };
+}
+
+async function generateWebsiteHtmlWithAnthropic(options = {}) {
+  const apiKey = getAnthropicApiKey();
+  if (!apiKey) {
+    const err = new Error('ANTHROPIC_API_KEY ontbreekt');
+    err.status = 503;
+    throw err;
+  }
+
+  const { company, title, userPrompt, systemPrompt } = buildWebsiteGenerationPrompts(options);
+  const maxTokens = Math.max(
+    2000,
+    Math.min(32000, Number(process.env.ANTHROPIC_MAX_TOKENS || 12000) || 12000)
+  );
+
+  const { response, data } = await fetchJsonWithTimeout(
+    `${ANTHROPIC_API_BASE_URL}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': process.env.ANTHROPIC_API_VERSION || '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: maxTokens,
+        temperature: 0.3,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: userPrompt }],
+          },
+        ],
+      }),
+    },
+    120000
+  );
+
+  if (!response.ok) {
+    const err = new Error(`Anthropic website generatie mislukt (${response.status})`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+
+  const generatedText = normalizeString(extractAnthropicTextContent(data?.content));
+  if (!generatedText) {
+    const err = new Error('Anthropic gaf lege HTML terug.');
+    err.status = 502;
+    err.data = data;
+    throw err;
+  }
+
+  const html = ensureHtmlDocument(generatedText, { title, company });
+  if (!html) {
+    const err = new Error('Kon HTML output niet valideren.');
+    err.status = 502;
+    err.data = data;
+    throw err;
+  }
+
+  return {
+    html,
+    source: 'anthropic',
+    model: ANTHROPIC_MODEL,
+    usage: data?.usage || null,
+    apiCost:
+      estimateAnthropicUsageCost(data?.usage || null, ANTHROPIC_MODEL) ||
+      estimateAnthropicTextCost(userPrompt, html, ANTHROPIC_MODEL),
+  };
+}
+
+async function generateWebsiteHtmlWithAi(options = {}) {
+  const provider = getWebsiteGenerationProvider();
+  if (provider === 'anthropic') {
+    return generateWebsiteHtmlWithAnthropic(options);
+  }
+  return generateWebsiteHtmlWithOpenAi(options);
 }
 
 function shouldAnalyzeCallUpdateWithAi(callUpdate) {
@@ -4687,6 +4915,10 @@ async function sendActiveOrderGenerateSiteResponse(req, res) {
           : 'AI website generatie mislukt',
       detail: String(error?.message || 'Onbekende fout'),
       openAiEnabled: Boolean(getOpenAiApiKey()),
+      anthropicEnabled: Boolean(getAnthropicApiKey()),
+      websiteGenerationProvider: getWebsiteGenerationProvider(),
+      websiteGenerationModel:
+        getWebsiteGenerationProvider() === 'anthropic' ? ANTHROPIC_MODEL : OPENAI_MODEL,
     });
   }
 }
