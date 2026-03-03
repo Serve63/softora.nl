@@ -566,16 +566,10 @@
         }
 
         .amount {
-            font-weight: 700;
+            font-weight: 400;
             white-space: nowrap;
-        }
-
-        .amount.is-paid {
-            color: var(--success);
-        }
-
-        .amount.is-open {
-            color: var(--accent);
+            color: var(--text-secondary);
+            font-size: 0.92rem;
         }
 
         .actions {
@@ -1339,7 +1333,6 @@
 
             nodes.body.innerHTML = filtered.map(function (customer) {
                 const statusClass = customer.status === "Betaald" ? "is-paid" : "is-open";
-                const amountClass = customer.status === "Betaald" ? "is-paid" : "is-open";
 
                 return [
                     "<tr>",
@@ -1351,7 +1344,7 @@
                         "<td data-label=\"Project\" class=\"muted-cell\">",
                             "<div class=\"project-type\">" + escapeHtml(customer.type) + "</div>",
                         "</td>",
-                        "<td data-label=\"Bedrag\"><span class=\"amount " + amountClass + "\">" + escapeHtml(formatMoney(customer.bedrag)) + "</span></td>",
+                        "<td data-label=\"Bedrag\"><span class=\"amount\">" + escapeHtml(formatMoney(customer.bedrag)) + "</span></td>",
                         "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
                         "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td class=\"cell-actions\" data-label=\"Acties\">",
