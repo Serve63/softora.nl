@@ -1679,11 +1679,13 @@
     const hint = byId('aiNotebookHint');
     if (!hint) return;
     const count = Math.max(0, parseNumber(hint.dataset.callCount, 0) || 0);
+    if (count > 0) {
+      hint.textContent = '';
+      hint.style.display = 'none';
+      return;
+    }
     hint.style.display = 'block';
-    hint.textContent =
-      count > 0
-        ? `${count} telefoongesprek${count === 1 ? '' : 'ken'} beschikbaar. Bekijk transcriptie, conclusie en opname per gesprek.`
-        : 'Bekijk hier per gesprek wie gebeld is, of er is opgenomen, de duur, conclusie, transcriptie en opname.';
+    hint.textContent = 'Bekijk hier per gesprek wie gebeld is, of er is opgenomen, de duur, conclusie, transcriptie en opname.';
   }
 
   function getConversationRecordUpdatedMs(record) {
