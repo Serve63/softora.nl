@@ -1798,7 +1798,7 @@
         const slider = document.getElementById('leadSlider');
         const sliderValue = document.getElementById('leadValue');
         const sliderValueInput = document.createElement('input');
-        sliderValueInput.type = 'number';
+        sliderValueInput.type = 'text';
         sliderValueInput.min = String(slider?.min || 1);
         sliderValueInput.max = String(slider?.max || 250);
         sliderValueInput.step = '1';
@@ -1819,13 +1819,18 @@
             return Math.max(1, Math.round(Number(slider?.value) || 1));
         }
 
+        function formatSliderDisplayAmount(amount) {
+            const max = Math.max(1, Math.round(Number(slider?.max) || 1));
+            return amount >= max ? '∞' : String(amount);
+        }
+
         function resizeSliderValueInput() {
             const length = Math.max(1, String(sliderValueInput.value || '').length);
             sliderValueInput.style.width = `${Math.max(2, length)}ch`;
         }
 
         function renderSliderValue() {
-            sliderValueInput.value = String(getSliderDisplayAmount());
+            sliderValueInput.value = formatSliderDisplayAmount(getSliderDisplayAmount());
             resizeSliderValueInput();
         }
 
@@ -1835,14 +1840,17 @@
         });
 
         function commitInlineSliderValue(rawValue) {
-            const parsed = Math.round(Number(String(rawValue).trim().replace(',', '.')));
+            const min = Math.max(1, Math.round(Number(slider.min) || 1));
+            const max = Math.max(min, Math.round(Number(slider.max) || min));
+            const normalizedValue = String(rawValue).trim();
+            const parsed = normalizedValue === '∞'
+                ? max
+                : Math.round(Number(normalizedValue.replace(',', '.')));
             if (!Number.isFinite(parsed) || parsed < 1) {
                 renderSliderValue();
                 return;
             }
 
-            const min = Math.max(1, Math.round(Number(slider.min) || 1));
-            const max = Math.max(min, Math.round(Number(slider.max) || min));
             const clamped = Math.max(min, Math.min(max, parsed));
             delete slider.dataset.customValue;
             slider.value = String(clamped);
@@ -2050,7 +2058,7 @@
             });
         }
     </script>
-    <script src="assets/coldcalling-vapi.js?v=20260303h"></script>
+    <script src="assets/coldcalling-vapi.js?v=20260303i"></script>
     <script>
         (function initConfirmationTasksInLiveActivity() {
             const listEl = document.getElementById('logTaskList');

@@ -98,14 +98,16 @@
     const leadValueEl = byId('leadValue');
     if (!leadValueEl) return;
     const amount = getLeadSliderAmount();
+    const maxAmount = Math.max(1, Math.round(parseNumber(leadSlider?.max, 1)));
+    const displayAmount = amount >= maxAmount ? '&infin;' : String(amount);
     const inlineInput = leadValueEl.querySelector('.slider-value-input');
     if (inlineInput) {
-      inlineInput.value = String(amount);
+      inlineInput.value = displayAmount === '&infin;' ? '∞' : String(amount);
       const length = Math.max(1, String(inlineInput.value || '').length);
       inlineInput.style.width = `${Math.max(2, length)}ch`;
       return;
     }
-    leadValueEl.innerHTML = `${amount} <span>mensen</span>`;
+    leadValueEl.innerHTML = `${displayAmount} <span>mensen</span>`;
   }
 
   function readPositiveIntStorage(key, fallback = null) {
