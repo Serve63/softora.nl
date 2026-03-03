@@ -371,6 +371,30 @@
             border: 1px solid var(--border);
         }
 
+        .topbar-theme-toggle {
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-tertiary);
+            cursor: none;
+            transition: background 0.2s var(--ease-out-expo), border-color 0.2s var(--ease-out-expo), color 0.2s var(--ease-out-expo);
+        }
+
+        .topbar-theme-toggle:hover {
+            background: rgba(139, 34, 82, 0.08);
+            border-color: rgba(139, 34, 82, 0.24);
+            color: var(--text-primary);
+        }
+
+        .topbar-theme-toggle svg {
+            width: 18px;
+            height: 18px;
+        }
+
         /* KPI Cards */
         .kpi-grid {
             display: grid;
@@ -1043,6 +1067,12 @@
                     <p>Overzicht van je bedrijfsprestaties</p>
                 </div>
                 <div class="topbar-right">
+                    <button type="button" class="topbar-theme-toggle magnetic" id="topbarThemeToggle" aria-label="Wissel thema" title="Wissel thema">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7">
+                            <circle cx="12" cy="12" r="4"></circle>
+                            <path stroke-linecap="round" d="M12 2.5v2.2M12 19.3v2.2M4.93 4.93l1.56 1.56M17.51 17.51l1.56 1.56M2.5 12h2.2M19.3 12h2.2M4.93 19.07l1.56-1.56M17.51 6.49l1.56-1.56"></path>
+                        </svg>
+                    </button>
                     <div class="topbar-date">
                         <span id="currentDate"></span>
                     </div>
@@ -1740,6 +1770,37 @@
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) void loadPremiumDashboardOrders();
         });
+
+        (function initTopbarThemeToggle() {
+            const toggle = document.getElementById('topbarThemeToggle');
+            if (!toggle) return;
+
+            const root = document.documentElement;
+
+            function getCurrentMode() {
+                const mode = String(root.getAttribute('data-theme-mode') || root.getAttribute('data-theme') || '').toLowerCase();
+                return mode === 'light' ? 'light' : 'dark';
+            }
+
+            function syncToggleLabel() {
+                const nextMode = getCurrentMode() === 'light' ? 'donker' : 'licht';
+                const label = `Wissel naar ${nextMode} thema`;
+                toggle.setAttribute('aria-label', label);
+                toggle.setAttribute('title', label);
+            }
+
+            toggle.addEventListener('click', () => {
+                const targetMode = getCurrentMode() === 'light' ? 'dark' : 'light';
+                const sourceButton = document.querySelector(`.sidebar-theme .theme-switch-btn[data-theme-value="${targetMode}"]`);
+                if (sourceButton instanceof HTMLButtonElement) {
+                    sourceButton.click();
+                }
+            });
+
+            const observer = new MutationObserver(syncToggleLabel);
+            observer.observe(root, { attributes: true, attributeFilter: ['data-theme-mode', 'data-theme'] });
+            syncToggleLabel();
+        })();
 
         const cursor = document.querySelector('.cursor');
         const cursorDot = document.querySelector('.cursor-dot');
