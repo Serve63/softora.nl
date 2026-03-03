@@ -1793,6 +1793,73 @@
     return String(record?.transcriptFull || record?.transcriptSnippet || '').trim();
   }
 
+  function getConversationThemeMode() {
+    const root = document.documentElement;
+    const mode = String(root.getAttribute('data-theme') || root.getAttribute('data-theme-mode') || '').toLowerCase();
+    return mode === 'light' ? 'light' : 'dark';
+  }
+
+  function getConversationThemeTokens() {
+    const mode = getConversationThemeMode();
+    if (mode === 'light') {
+      return {
+        overlay: 'rgba(232, 228, 221, 0.72)',
+        shellBg: '#f8f7f4',
+        shellBorder: 'rgba(0, 0, 0, 0.08)',
+        shellShadow: '0 30px 90px rgba(33, 33, 44, 0.18)',
+        text: '#1a1a2e',
+        textSoft: '#606272',
+        textMuted: '#9599a8',
+        chromeBg: '#ffffff',
+        chromeAltBg: '#f3f1ec',
+        panelBg: '#ffffff',
+        panelAltBg: '#faf8f4',
+        blockBg: 'rgba(15, 23, 42, 0.03)',
+        border: 'rgba(0, 0, 0, 0.08)',
+        borderStrong: 'rgba(139, 34, 82, 0.24)',
+        accent: '#8b2252',
+        accentSoftBg: 'rgba(139, 34, 82, 0.08)',
+        accentSoftBgActive: 'rgba(139, 34, 82, 0.12)',
+        accentSoftText: '#8b2252',
+        positive: '#2d8a5e',
+        warning: '#b26b16',
+        buttonBg: 'rgba(0, 0, 0, 0.03)',
+        buttonBorder: 'rgba(0, 0, 0, 0.08)',
+        buttonText: '#1a1a2e',
+        buttonMutedText: '#606272',
+        emptyBg: 'rgba(15, 23, 42, 0.03)',
+      };
+    }
+
+    return {
+      overlay: 'rgba(8, 10, 16, 0.82)',
+      shellBg: '#0d0d0d',
+      shellBorder: 'rgba(255,255,255,0.08)',
+      shellShadow: '0 30px 90px rgba(0,0,0,0.55)',
+      text: '#f5f5f5',
+      textSoft: '#d6d6d6',
+      textMuted: '#8f95a3',
+      chromeBg: '#080808',
+      chromeAltBg: '#080808',
+      panelBg: '#0d0d0d',
+      panelAltBg: '#0a0a0a',
+      blockBg: 'rgba(255,255,255,0.02)',
+      border: 'rgba(255,255,255,0.06)',
+      borderStrong: 'rgba(139,34,82,0.42)',
+      accent: '#a62d65',
+      accentSoftBg: 'rgba(139,34,82,0.08)',
+      accentSoftBgActive: 'rgba(139,34,82,0.12)',
+      accentSoftText: '#f4d6e4',
+      positive: '#7ce2aa',
+      warning: '#f0b37a',
+      buttonBg: 'rgba(255,255,255,0.03)',
+      buttonBorder: 'rgba(255,255,255,0.08)',
+      buttonText: '#f5f5f5',
+      buttonMutedText: '#8f95a3',
+      emptyBg: 'rgba(255,255,255,0.02)',
+    };
+  }
+
   function ensureAiNotebookModal() {
     let modal = byId('aiNotebookModalOverlay');
     if (modal) return modal;
@@ -1812,7 +1879,6 @@
     modal.id = 'aiNotebookModalOverlay';
     modal.style.position = 'fixed';
     modal.style.inset = '0';
-    modal.style.background = 'rgba(8, 10, 16, 0.82)';
     modal.style.display = 'none';
     modal.style.alignItems = 'center';
     modal.style.justifyContent = 'center';
@@ -1820,38 +1886,103 @@
     modal.style.zIndex = '9999';
 
     modal.innerHTML = [
-      '<div style="width:min(1560px, 96vw); height:min(900px, 94vh); overflow:hidden; border:1px solid rgba(255,255,255,0.08); background:#0d0d0d; box-shadow:0 30px 90px rgba(0,0,0,0.55); color:#f5f5f5; display:flex; flex-direction:column;">',
-      '  <div style="min-height:72px; background:#080808; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:space-between; padding:0 20px; gap:12px;">',
+      '<div id="aiNotebookModalShell" style="width:min(1560px, 96vw); height:min(900px, 94vh); overflow:hidden; display:flex; flex-direction:column;">',
+      '  <div id="aiNotebookModalHeader" style="min-height:72px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; gap:12px;">',
       '    <div>',
-      '      <div style="font-family:Oswald,sans-serif; font-size:30px; line-height:1; letter-spacing:0.03em; text-transform:uppercase;">Telefoongesprekken</div>',
-      '      <div id="aiNotebookDraftHint" style="margin-top:8px; color:#8f95a3; font-size:13px;">Alle AI coldcalls met transcriptie, conclusie en opname op een plek.</div>',
+      '      <div id="aiNotebookModalTitle" style="font-family:Oswald,sans-serif; font-size:30px; line-height:1; letter-spacing:0.03em; text-transform:uppercase;">Telefoongesprekken</div>',
+      '      <div id="aiNotebookDraftHint" style="margin-top:8px; font-size:13px;">Alle AI coldcalls met transcriptie, conclusie en opname op een plek.</div>',
       '    </div>',
       '    <div style="display:flex; align-items:center; gap:10px;">',
-      '      <button type="button" id="aiNotebookRefreshBtn" style="height:40px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:#f5f5f5; padding:0 14px; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;">Verversen</button>',
-      '      <button type="button" id="aiNotebookCancelBtn" style="height:40px; border:1px solid rgba(255,255,255,0.08); background:transparent; color:#8f95a3; padding:0 14px; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;">Sluiten</button>',
+      '      <button type="button" id="aiNotebookRefreshBtn" style="height:40px; padding:0 14px; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;">Verversen</button>',
+      '      <button type="button" id="aiNotebookCancelBtn" style="height:40px; padding:0 14px; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;">Sluiten</button>',
       '    </div>',
       '  </div>',
-      '  <div style="padding:14px 20px; background:#080808; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">',
-      '    <div id="aiNotebookConversationStatus" style="font-size:12px; color:#8f95a3;">Gesprekken laden...</div>',
-      '    <div id="aiNotebookConversationCount" style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#a62d65;">0 gesprekken</div>',
+      '  <div id="aiNotebookModalMetaBar" style="padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">',
+      '    <div id="aiNotebookConversationStatus" style="font-size:12px;">Gesprekken laden...</div>',
+      '    <div id="aiNotebookConversationCount" style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase;">0 gesprekken</div>',
       '  </div>',
       '  <div style="display:grid; grid-template-columns:minmax(340px, 420px) 1fr; min-height:0; flex:1;">',
-      '    <div style="min-height:0; border-right:1px solid rgba(255,255,255,0.06); background:#0a0a0a; display:flex; flex-direction:column;">',
-      '      <div style="padding:16px 18px 12px; border-bottom:1px solid rgba(255,255,255,0.06); font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3;">Laatste gesprekken</div>',
+      '    <div id="aiNotebookConversationPane" style="min-height:0; display:flex; flex-direction:column;">',
+      '      <div id="aiNotebookConversationPaneHeader" style="padding:16px 18px 12px; font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Laatste gesprekken</div>',
       '      <div id="aiNotebookConversationList" style="flex:1; min-height:0; overflow:auto; padding:10px;"></div>',
       '    </div>',
-      '    <div style="min-height:0; overflow:auto; background:#0d0d0d; padding:22px;">',
+      '    <div id="aiNotebookConversationDetailPane" style="min-height:0; overflow:auto; padding:22px;">',
       '      <div id="aiNotebookConversationDetail"></div>',
       '    </div>',
       '  </div>',
-      '  <div style="min-height:48px; background:#080808; border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 20px; font-size:12px; color:#8f95a3;">',
-      '    <div>Per gesprek zie je: wie is gebeld, opgenomen ja/nee, duur, conclusie, transcriptie en opname.</div>',
-      '    <div style="font-family:Oswald,sans-serif; letter-spacing:0.12em; text-transform:uppercase; color:#a62d65;">Softora Premium</div>',
+      '  <div id="aiNotebookModalFooter" style="min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 20px; font-size:12px;">',
+      '    <div id="aiNotebookModalFooterText">Per gesprek zie je: wie is gebeld, opgenomen ja/nee, duur, conclusie, transcriptie en opname.</div>',
+      '    <div id="aiNotebookModalFooterBrand" style="font-family:Oswald,sans-serif; letter-spacing:0.12em; text-transform:uppercase;">Softora Premium</div>',
       '  </div>',
       '</div>',
     ].join('');
 
     document.body.appendChild(modal);
+
+    function applyConversationModalTheme() {
+      const theme = getConversationThemeTokens();
+      modal.style.background = theme.overlay;
+
+      const shell = byId('aiNotebookModalShell');
+      const header = byId('aiNotebookModalHeader');
+      const metaBar = byId('aiNotebookModalMetaBar');
+      const listPane = byId('aiNotebookConversationPane');
+      const listPaneHeader = byId('aiNotebookConversationPaneHeader');
+      const detailPane = byId('aiNotebookConversationDetailPane');
+      const footer = byId('aiNotebookModalFooter');
+      const title = byId('aiNotebookModalTitle');
+      const hint = byId('aiNotebookDraftHint');
+      const status = byId('aiNotebookConversationStatus');
+      const count = byId('aiNotebookConversationCount');
+      const footerText = byId('aiNotebookModalFooterText');
+      const footerBrand = byId('aiNotebookModalFooterBrand');
+      const refreshBtn = byId('aiNotebookRefreshBtn');
+      const cancelBtn = byId('aiNotebookCancelBtn');
+
+      if (shell) {
+        shell.style.border = `1px solid ${theme.shellBorder}`;
+        shell.style.background = theme.shellBg;
+        shell.style.boxShadow = theme.shellShadow;
+        shell.style.color = theme.text;
+      }
+      if (header) {
+        header.style.background = theme.chromeBg;
+        header.style.borderBottom = `1px solid ${theme.border}`;
+      }
+      if (metaBar) {
+        metaBar.style.background = theme.chromeAltBg;
+        metaBar.style.borderBottom = `1px solid ${theme.border}`;
+      }
+      if (listPane) {
+        listPane.style.background = theme.panelAltBg;
+        listPane.style.borderRight = `1px solid ${theme.border}`;
+      }
+      if (listPaneHeader) {
+        listPaneHeader.style.borderBottom = `1px solid ${theme.border}`;
+        listPaneHeader.style.color = theme.textMuted;
+      }
+      if (detailPane) {
+        detailPane.style.background = theme.panelBg;
+      }
+      if (footer) {
+        footer.style.background = theme.chromeBg;
+        footer.style.borderTop = `1px solid ${theme.border}`;
+        footer.style.color = theme.textMuted;
+      }
+      if (title) title.style.color = theme.text;
+      if (hint) hint.style.color = theme.textMuted;
+      if (status) status.style.color = state.error ? '#d66f8b' : theme.textMuted;
+      if (count) count.style.color = theme.accent;
+      if (footerText) footerText.style.color = theme.textMuted;
+      if (footerBrand) footerBrand.style.color = theme.accent;
+
+      [refreshBtn, cancelBtn].forEach((button, index) => {
+        if (!button) return;
+        button.style.border = `1px solid ${theme.buttonBorder}`;
+        button.style.background = index === 0 ? theme.buttonBg : 'transparent';
+        button.style.color = index === 0 ? theme.buttonText : theme.buttonMutedText;
+      });
+    }
 
     function getSelectedConversationRecord() {
       const selectedBase = state.calls.find((item) => item.callId === state.selectedCallId) || null;
@@ -1863,13 +1994,14 @@
     }
 
     function renderConversationDetail() {
+      const theme = getConversationThemeTokens();
       const detailEl = byId('aiNotebookConversationDetail');
       if (!detailEl) return;
 
       const record = getSelectedConversationRecord();
       if (!record) {
         detailEl.innerHTML = [
-          '<div style="height:100%; min-height:300px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); color:#8f95a3; font-size:14px;">',
+          `<div style="height:100%; min-height:300px; display:flex; align-items:center; justify-content:center; border:1px solid ${theme.border}; background:${theme.emptyBg}; color:${theme.textMuted}; font-size:14px;">`,
           'Selecteer een gesprek om de details te bekijken.',
           '</div>',
         ].join('');
@@ -1885,36 +2017,36 @@
       detailEl.innerHTML = [
         '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:22px; flex-wrap:wrap;">',
         '  <div>',
-        `    <div style="font-family:Oswald,sans-serif; font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
-        `    <div style="font-family:Oswald,sans-serif; font-size:34px; line-height:1; text-transform:uppercase; letter-spacing:0.03em;">${escapeHtml(getConversationLeadLabel(record))}</div>`,
-        `    <div style="margin-top:12px; color:#8f95a3; font-size:14px;">${escapeHtml(record.phone || 'Geen telefoonnummer beschikbaar')}</div>`,
+        `    <div style="font-family:Oswald,sans-serif; font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:8px;">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
+        `    <div style="font-family:Oswald,sans-serif; font-size:34px; line-height:1; text-transform:uppercase; letter-spacing:0.03em; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div>`,
+        `    <div style="margin-top:12px; color:${theme.textMuted}; font-size:14px;">${escapeHtml(record.phone || 'Geen telefoonnummer beschikbaar')}</div>`,
         '  </div>',
-        `  <div style="display:inline-flex; align-items:center; gap:8px; border:1px solid rgba(139,34,82,0.28); background:rgba(139,34,82,0.08); color:#f4d6e4; padding:10px 14px; font-family:Oswald,sans-serif; font-size:13px; letter-spacing:0.12em; text-transform:uppercase;">${escapeHtml(String(record.status || 'Onbekend'))}</div>`,
+        `  <div style="display:inline-flex; align-items:center; gap:8px; border:1px solid ${theme.borderStrong}; background:${theme.accentSoftBg}; color:${theme.accentSoftText}; padding:10px 14px; font-family:Oswald,sans-serif; font-size:13px; letter-spacing:0.12em; text-transform:uppercase;">${escapeHtml(String(record.status || 'Onbekend'))}</div>`,
         '</div>',
         '<div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:14px; margin-bottom:22px;">',
-        `  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">Gebelde lead</div><div style="font-size:15px; line-height:1.4;">${escapeHtml(getConversationLeadLabel(record))}</div></div>`,
-        `  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">Opgenomen</div><div style="font-size:15px; line-height:1.4;">${escapeHtml(formatConversationAnsweredLabel(record))}</div></div>`,
-        `  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">Gespreksduur</div><div style="font-size:15px; line-height:1.4;">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div></div>`,
-        `  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">Call ID</div><div style="font-size:15px; line-height:1.4; word-break:break-all;">${callId}</div></div>`,
+        `  <div style="border:1px solid ${theme.border}; background:${theme.blockBg}; padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:8px;">Gebelde lead</div><div style="font-size:15px; line-height:1.4; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div></div>`,
+        `  <div style="border:1px solid ${theme.border}; background:${theme.blockBg}; padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:8px;">Opgenomen</div><div style="font-size:15px; line-height:1.4; color:${theme.text};">${escapeHtml(formatConversationAnsweredLabel(record))}</div></div>`,
+        `  <div style="border:1px solid ${theme.border}; background:${theme.blockBg}; padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:8px;">Gespreksduur</div><div style="font-size:15px; line-height:1.4; color:${theme.text};">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div></div>`,
+        `  <div style="border:1px solid ${theme.border}; background:${theme.blockBg}; padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:8px;">Call ID</div><div style="font-size:15px; line-height:1.4; word-break:break-all; color:${theme.text};">${callId}</div></div>`,
         '</div>',
         '<div style="display:grid; grid-template-columns:1fr; gap:18px;">',
-        '  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:18px;">',
-        '    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:10px;">Conclusie in 1 zin</div>',
-        `    <div style="font-size:15px; line-height:1.7; color:#f5f5f5;">${escapeHtml(getConversationConclusion(record))}</div>`,
+        `  <div style="border:1px solid ${theme.border}; background:${theme.blockBg}; padding:18px;">`,
+        `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:10px;">Conclusie in 1 zin</div>`,
+        `    <div style="font-size:15px; line-height:1.7; color:${theme.text};">${escapeHtml(getConversationConclusion(record))}</div>`,
         '  </div>',
-        '  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:18px;">',
+        `  <div style="border:1px solid ${theme.border}; background:${theme.blockBg}; padding:18px;">`,
         '    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px;">',
-        '      <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3;">Volledige transcriptie</div>',
-        detailLoading ? '      <div style="font-size:12px; color:#8f95a3;">Extra details laden...</div>' : '',
-        detailError ? `      <div style="font-size:12px; color:#f4a0bc;">${escapeHtml(detailError)}</div>` : '',
+        `      <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted};">Volledige transcriptie</div>`,
+        detailLoading ? `      <div style="font-size:12px; color:${theme.textMuted};">Extra details laden...</div>` : '',
+        detailError ? `      <div style="font-size:12px; color:#d66f8b;">${escapeHtml(detailError)}</div>` : '',
         '    </div>',
-        `    <div style="white-space:pre-wrap; font-size:14px; line-height:1.7; color:${transcript ? '#f5f5f5' : '#8f95a3'}; min-height:120px;">${transcript || 'Nog geen transcriptie beschikbaar voor dit gesprek.'}</div>`,
+        `    <div style="white-space:pre-wrap; font-size:14px; line-height:1.7; color:${transcript ? theme.text : theme.textMuted}; min-height:120px;">${transcript || 'Nog geen transcriptie beschikbaar voor dit gesprek.'}</div>`,
         '  </div>',
-        '  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:18px;">',
-        '    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:12px;">Gesprek terugluisteren</div>',
+        `  <div style="border:1px solid ${theme.border}; background:${theme.blockBg}; padding:18px;">`,
+        `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:12px;">Gesprek terugluisteren</div>`,
         recordingUrl
-          ? `    <div style="display:flex; flex-direction:column; gap:12px;"><button type="button" data-conversation-play="${callId}" style="align-self:flex-start; height:42px; border:1px solid rgba(139,34,82,0.4); background:rgba(139,34,82,0.14); color:#f5d7e4; padding:0 16px; font-family:Oswald,sans-serif; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer;">Afspelen</button><audio id="conversationAudioPlayer" controls preload="none" style="width:100%;"><source src="${escapeHtml(recordingUrl)}"></audio></div>`
-          : '    <div style="font-size:14px; color:#8f95a3;">Nog geen opname beschikbaar voor dit gesprek.</div>',
+          ? `    <div style="display:flex; flex-direction:column; gap:12px;"><button type="button" data-conversation-play="${callId}" style="align-self:flex-start; height:42px; border:1px solid ${theme.borderStrong}; background:${theme.accentSoftBg}; color:${theme.accentSoftText}; padding:0 16px; font-family:Oswald,sans-serif; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer;">Afspelen</button><audio id="conversationAudioPlayer" controls preload="none" style="width:100%; color-scheme:${getConversationThemeMode()};"><source src="${escapeHtml(recordingUrl)}"></audio></div>`
+          : `    <div style="font-size:14px; color:${theme.textMuted};">Nog geen opname beschikbaar voor dit gesprek.</div>`,
         '  </div>',
         '</div>',
       ].join('');
@@ -1929,6 +2061,7 @@
     }
 
     function renderConversationList() {
+      const theme = getConversationThemeTokens();
       const listEl = byId('aiNotebookConversationList');
       const countEl = byId('aiNotebookConversationCount');
       const statusEl = byId('aiNotebookConversationStatus');
@@ -1947,7 +2080,7 @@
       }
 
       if (!state.calls.length) {
-        listEl.innerHTML = '<div style="padding:18px; color:#8f95a3; font-size:14px; line-height:1.6;">Nog geen gesprekken beschikbaar. Zodra Vapi calls terugschrijft verschijnen ze hier automatisch.</div>';
+        listEl.innerHTML = `<div style="padding:18px; color:${theme.textMuted}; font-size:14px; line-height:1.6;">Nog geen gesprekken beschikbaar. Zodra Vapi calls terugschrijft verschijnen ze hier automatisch.</div>`;
         renderConversationDetail();
         return;
       }
@@ -1957,14 +2090,14 @@
           const isActive = record.callId === state.selectedCallId;
           const summary = escapeHtml(getConversationConclusion(record));
           return [
-            `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:14px; border:1px solid ${isActive ? 'rgba(139,34,82,0.42)' : 'rgba(255,255,255,0.06)'}; background:${isActive ? 'rgba(139,34,82,0.12)' : 'rgba(255,255,255,0.02)'}; color:#f5f5f5; margin-bottom:10px; cursor:pointer; transition:all 0.2s ease;">`,
+            `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:14px; border:1px solid ${isActive ? theme.borderStrong : theme.border}; background:${isActive ? theme.accentSoftBgActive : theme.blockBg}; color:${theme.text}; margin-bottom:10px; cursor:pointer; transition:all 0.2s ease;">`,
             `  <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:8px;">`,
-            `    <div style="font-family:Oswald,sans-serif; font-size:18px; line-height:1.1; text-transform:uppercase; letter-spacing:0.03em;">${escapeHtml(getConversationLeadLabel(record))}</div>`,
-            `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:${inferConversationAnswered(record) === true ? '#7ce2aa' : inferConversationAnswered(record) === false ? '#f0b37a' : '#8f95a3'};">${escapeHtml(formatConversationAnsweredLabel(record))}</div>`,
+            `    <div style="font-family:Oswald,sans-serif; font-size:18px; line-height:1.1; text-transform:uppercase; letter-spacing:0.03em; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div>`,
+            `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:${inferConversationAnswered(record) === true ? theme.positive : inferConversationAnswered(record) === false ? theme.warning : theme.textMuted};">${escapeHtml(formatConversationAnsweredLabel(record))}</div>`,
             '  </div>',
-            `  <div style="font-size:12px; color:#8f95a3; margin-bottom:8px;">${escapeHtml(record.phone || 'Geen telefoonnummer')} · ${escapeHtml(formatConversationDuration(record.durationSeconds))}</div>`,
-            `  <div style="font-size:13px; color:#d6d6d6; line-height:1.5;">${summary}</div>`,
-            `  <div style="margin-top:10px; font-size:11px; color:#8f95a3;">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
+            `  <div style="font-size:12px; color:${theme.textMuted}; margin-bottom:8px;">${escapeHtml(record.phone || 'Geen telefoonnummer')} · ${escapeHtml(formatConversationDuration(record.durationSeconds))}</div>`,
+            `  <div style="font-size:13px; color:${theme.textSoft}; line-height:1.5;">${summary}</div>`,
+            `  <div style="margin-top:10px; font-size:11px; color:${theme.textMuted};">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
             '</button>',
           ].join('');
         })
@@ -2075,6 +2208,7 @@
     }
 
     function openModal() {
+      applyConversationModalTheme();
       modal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
       void loadConversations();
@@ -2095,10 +2229,22 @@
       void loadConversations();
     });
 
+    const themeObserver = new MutationObserver(() => {
+      applyConversationModalTheme();
+      if (modal.style.display !== 'none') {
+        renderConversationList();
+      }
+    });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'data-theme-mode'],
+    });
+
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && modal.style.display !== 'none') closeModal();
     });
 
+    applyConversationModalTheme();
     modal.openAiNotebookModal = openModal;
     return modal;
   }
