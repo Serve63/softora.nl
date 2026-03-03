@@ -1791,6 +1791,19 @@
     return company || name || 'Onbekende lead';
   }
 
+  function getConversationListLabel(record) {
+    const company = String(record?.company || '').trim();
+    if (company) return company;
+
+    const name = String(record?.name || '').trim();
+    if (name) {
+      const [firstName] = name.split(/\s+/).filter(Boolean);
+      if (firstName) return firstName;
+    }
+
+    return 'Onbekend';
+  }
+
   function getConversationTranscript(record) {
     return String(record?.transcriptFull || record?.transcriptSnippet || '').trim();
   }
@@ -1906,7 +1919,7 @@
       '  <div style="display:grid; grid-template-columns:minmax(340px, 420px) 1fr; min-height:0; flex:1;">',
       '    <div id="aiNotebookConversationPane" style="min-height:0; display:flex; flex-direction:column;">',
       '      <div id="aiNotebookConversationPaneHeader" style="padding:16px 18px 12px; font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Laatste gesprekken</div>',
-      '      <div id="aiNotebookConversationList" style="flex:1; min-height:0; overflow:auto; padding:10px;"></div>',
+      '      <div id="aiNotebookConversationList" style="flex:1; min-height:0; overflow:auto; padding:0;"></div>',
       '    </div>',
       '    <div id="aiNotebookConversationDetailPane" style="min-height:0; overflow:auto; padding:22px;">',
       '      <div id="aiNotebookConversationDetail"></div>',
@@ -2090,16 +2103,21 @@
       listEl.innerHTML = state.calls
         .map((record) => {
           const isActive = record.callId === state.selectedCallId;
-          const summary = escapeHtml(getConversationConclusion(record));
+          const label = escapeHtml(getConversationListLabel(record));
+          const answered = escapeHtml(formatConversationAnsweredLabel(record));
+          const answeredColor =
+            inferConversationAnswered(record) === true
+              ? theme.positive
+              : inferConversationAnswered(record) === false
+                ? theme.warning
+                : theme.textMuted;
           return [
-            `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:14px; border:1px solid ${isActive ? theme.borderStrong : theme.border}; background:${isActive ? theme.accentSoftBgActive : theme.blockBg}; color:${theme.text}; margin-bottom:10px; cursor:pointer; transition:all 0.2s ease;">`,
-            `  <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:8px;">`,
-            `    <div style="font-family:Oswald,sans-serif; font-size:18px; line-height:1.1; text-transform:uppercase; letter-spacing:0.03em; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div>`,
-            `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:${inferConversationAnswered(record) === true ? theme.positive : inferConversationAnswered(record) === false ? theme.warning : theme.textMuted};">${escapeHtml(formatConversationAnsweredLabel(record))}</div>`,
+            `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:11px 16px; border:none; border-bottom:1px solid ${theme.border}; border-left:3px solid ${isActive ? theme.accent : 'transparent'}; background:${isActive ? theme.accentSoftBgActive : 'transparent'}; color:${theme.text}; cursor:pointer; transition:background 0.2s ease, border-color 0.2s ease;">`,
+            '  <div style="display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px;">',
+            `    <div style="min-width:0; font-family:Oswald,sans-serif; font-size:15px; line-height:1; text-transform:uppercase; letter-spacing:0.04em; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</div>`,
+            `    <div style="font-size:12px; color:${theme.textMuted}; white-space:nowrap;">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div>`,
+            `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:${answeredColor}; white-space:nowrap;">${answered}</div>`,
             '  </div>',
-            `  <div style="font-size:12px; color:${theme.textMuted}; margin-bottom:8px;">${escapeHtml(record.phone || 'Geen telefoonnummer')} · ${escapeHtml(formatConversationDuration(record.durationSeconds))}</div>`,
-            `  <div style="font-size:13px; color:${theme.textSoft}; line-height:1.5;">${summary}</div>`,
-            `  <div style="margin-top:10px; font-size:11px; color:${theme.textMuted};">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
             '</button>',
           ].join('');
         })
