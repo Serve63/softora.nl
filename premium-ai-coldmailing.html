@@ -172,23 +172,12 @@
         .sidebar-flow-section::before {
             content: '';
             position: absolute;
-            left: 1.15rem;
-            top: 2.45rem;
-            bottom: 0.8rem;
-            width: 1px;
-            background: linear-gradient(180deg, rgba(139, 34, 82, 0.72) 0%, rgba(139, 34, 82, 0.18) 100%);
-            pointer-events: none;
-        }
-
-        .sidebar-flow-section::after {
-            content: '↑';
-            position: absolute;
-            left: 0.82rem;
+            left: 0.72rem;
             top: 1.55rem;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.85rem;
-            line-height: 1;
-            color: var(--accent-light);
+            bottom: 0.8rem;
+            width: 0.9rem;
+            background: linear-gradient(180deg, rgba(139, 34, 82, 0.72) 0%, rgba(139, 34, 82, 0.18) 100%);
+            clip-path: polygon(50% 0, 100% 0.6rem, 66% 0.6rem, 66% 100%, 34% 100%, 34% 0.6rem, 0 0.6rem);
             pointer-events: none;
         }
 
