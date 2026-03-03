@@ -53,8 +53,6 @@
         }, { once: true });
     }
 
-    if (!themeButtons.length) return;
-
     function normalizeThemeMode(mode) {
         if (mode === "dark" || mode === "light") return mode;
         return null;
@@ -141,6 +139,13 @@
         }
     }
 
+    window.SoftoraPersonnelTheme = window.SoftoraPersonnelTheme || {};
+    window.SoftoraPersonnelTheme.getMode = function getMode() {
+        return normalizeThemeMode(root.getAttribute("data-theme-mode"))
+            || normalizeThemeMode(root.getAttribute("data-theme"))
+            || inferBaseTheme();
+    };
+
     function persistPublicTheme(mode) {
         if (!isPremiumPersonnelContext) return;
         const nextMode = normalizeThemeMode(mode);
@@ -225,18 +230,25 @@
         });
     }
 
+    window.SoftoraPersonnelTheme.applyMode = function applyMode(mode) {
+        const requestedMode = normalizeThemeMode(mode);
+        if (!requestedMode) {
+            return Promise.resolve(false);
+        }
+
+        return askThemeScope(requestedMode).then(function (scope) {
+            if (!scope) return false;
+            applyTheme(requestedMode, true);
+            if (scope === "both") {
+                persistPublicTheme(requestedMode);
+            }
+            return true;
+        });
+    };
+
     themeButtons.forEach(function (button) {
         button.addEventListener("click", function () {
-            const requestedMode = normalizeThemeMode(button.dataset.themeValue);
-            if (!requestedMode) return;
-
-            askThemeScope(requestedMode).then(function (scope) {
-                if (!scope) return;
-                applyTheme(requestedMode, true);
-                if (scope === "both") {
-                    persistPublicTheme(requestedMode);
-                }
-            });
+            window.SoftoraPersonnelTheme.applyMode(button.dataset.themeValue);
         });
     });
 
