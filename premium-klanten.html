@@ -524,12 +524,29 @@
         .client-name {
             font-weight: 700;
             color: var(--text-primary);
+            font-size: 0.88rem;
+            line-height: 1.35;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .client-company {
             margin-top: 0.25rem;
             color: var(--text-secondary);
             font-size: 0.88rem;
+        }
+
+        .project-title {
+            color: var(--text-primary);
+            font-size: 0.92rem;
+            line-height: 1.45;
+        }
+
+        .project-type {
+            margin-top: 0.2rem;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
         }
 
         .muted-cell {
@@ -912,7 +929,7 @@
                                     <th>Klant</th>
                                     <th>Telefoonnummer</th>
                                     <th>Type</th>
-                                    <th>Website / project</th>
+                                    <th>Project</th>
                                     <th>Bedrag</th>
                                     <th>Status</th>
                                     <th>Betaaldatum</th>
@@ -958,6 +975,7 @@
                         <select class="form-select" id="fieldType" name="type">
                             <option value="Website">Website</option>
                             <option value="Onderhoud">Onderhoud</option>
+                            <option value="Website + onderhoud">Website + onderhoud</option>
                         </select>
                     </div>
 
@@ -1048,7 +1066,10 @@
 
         function normalizeCustomer(raw, fallbackId) {
             const amount = Number(raw && raw.bedrag);
-            const type = normalizeString(raw && raw.type) === "Onderhoud" ? "Onderhoud" : "Website";
+            const rawType = normalizeString(raw && raw.type);
+            const type = rawType === "Onderhoud" || rawType === "Website + onderhoud"
+                ? rawType
+                : "Website";
             const status = normalizeString(raw && raw.status) === "Open" ? "Open" : "Betaald";
 
             return {
@@ -1254,7 +1275,7 @@
             const maintenanceKeywords = ["onderhoud", "maintenance", "support", "beheer", "hosting", "servicecontract"];
             return maintenanceKeywords.some(function (keyword) {
                 return haystack.indexOf(keyword) !== -1;
-            }) ? "Onderhoud" : "Website";
+            }) ? "Website + onderhoud" : "Website";
         }
 
         function deriveCustomersFromOrders(orders) {
@@ -1339,7 +1360,7 @@
             }
 
             nodes.body.innerHTML = filtered.map(function (customer) {
-                const typeClass = customer.type === "Onderhoud" ? "is-maintenance" : "is-website";
+                const typeClass = customer.type === "Website" ? "is-website" : "is-maintenance";
                 const statusClass = customer.status === "Betaald" ? "is-paid" : "is-open";
                 const amountClass = customer.status === "Betaald" ? "is-paid" : "is-open";
 
@@ -1351,7 +1372,10 @@
                         "</td>",
                         "<td data-label=\"Telefoonnummer\" class=\"muted-cell\">" + escapeHtml(customer.telefoon) + "</td>",
                         "<td data-label=\"Type\"><span class=\"badge " + typeClass + "\">" + escapeHtml(customer.type) + "</span></td>",
-                        "<td data-label=\"Website / project\" class=\"muted-cell\">" + escapeHtml(customer.website) + "</td>",
+                        "<td data-label=\"Project\" class=\"muted-cell\">",
+                            "<div class=\"project-title\">" + escapeHtml(customer.website) + "</div>",
+                            "<div class=\"project-type\">" + escapeHtml(customer.type) + "</div>",
+                        "</td>",
                         "<td data-label=\"Bedrag\"><span class=\"amount " + amountClass + "\">" + escapeHtml(formatMoney(customer.bedrag)) + "</span></td>",
                         "<td data-label=\"Status\"><span class=\"badge " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
                         "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
