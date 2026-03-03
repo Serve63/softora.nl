@@ -1912,10 +1912,6 @@
       '      <button type="button" id="aiNotebookCancelBtn" style="height:40px; padding:0 14px; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;">Sluiten</button>',
       '    </div>',
       '  </div>',
-      '  <div id="aiNotebookModalMetaBar" style="padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">',
-      '    <div id="aiNotebookConversationStatus" style="font-size:12px;">Gesprekken laden...</div>',
-      '    <div id="aiNotebookConversationCount" style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase;">0 gesprekken</div>',
-      '  </div>',
       '  <div style="display:grid; grid-template-columns:minmax(340px, 420px) 1fr; min-height:0; flex:1;">',
       '    <div id="aiNotebookConversationPane" style="min-height:0; display:flex; flex-direction:column;">',
       '      <div id="aiNotebookConversationPaneHeader" style="padding:16px 18px 12px; font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Laatste gesprekken</div>',
@@ -1940,15 +1936,12 @@
 
       const shell = byId('aiNotebookModalShell');
       const header = byId('aiNotebookModalHeader');
-      const metaBar = byId('aiNotebookModalMetaBar');
       const listPane = byId('aiNotebookConversationPane');
       const listPaneHeader = byId('aiNotebookConversationPaneHeader');
       const detailPane = byId('aiNotebookConversationDetailPane');
       const footer = byId('aiNotebookModalFooter');
       const title = byId('aiNotebookModalTitle');
       const hint = byId('aiNotebookDraftHint');
-      const status = byId('aiNotebookConversationStatus');
-      const count = byId('aiNotebookConversationCount');
       const footerText = byId('aiNotebookModalFooterText');
       const footerBrand = byId('aiNotebookModalFooterBrand');
       const refreshBtn = byId('aiNotebookRefreshBtn');
@@ -1963,10 +1956,6 @@
       if (header) {
         header.style.background = theme.chromeBg;
         header.style.borderBottom = `1px solid ${theme.border}`;
-      }
-      if (metaBar) {
-        metaBar.style.background = theme.chromeAltBg;
-        metaBar.style.borderBottom = `1px solid ${theme.border}`;
       }
       if (listPane) {
         listPane.style.background = theme.panelAltBg;
@@ -1986,8 +1975,6 @@
       }
       if (title) title.style.color = theme.text;
       if (hint) hint.style.color = theme.textMuted;
-      if (status) status.style.color = state.error ? '#d66f8b' : theme.textMuted;
-      if (count) count.style.color = theme.accent;
       if (footerText) footerText.style.color = theme.textMuted;
       if (footerBrand) footerBrand.style.color = theme.accent;
 
@@ -2078,21 +2065,7 @@
     function renderConversationList() {
       const theme = getConversationThemeTokens();
       const listEl = byId('aiNotebookConversationList');
-      const countEl = byId('aiNotebookConversationCount');
-      const statusEl = byId('aiNotebookConversationStatus');
-      if (!listEl || !countEl || !statusEl) return;
-
-      countEl.textContent = `${state.calls.length} gesprek${state.calls.length === 1 ? '' : 'ken'}`;
-
-      if (state.loading) {
-        statusEl.textContent = 'Telefoongesprekken laden...';
-      } else if (state.error) {
-        statusEl.textContent = state.error;
-      } else if (!state.calls.length) {
-        statusEl.textContent = 'Nog geen telefoongesprekken gevonden.';
-      } else {
-        statusEl.textContent = 'Klik op een gesprek om transcriptie, conclusie en opname te bekijken.';
-      }
+      if (!listEl) return;
 
       if (!state.calls.length) {
         listEl.innerHTML = `<div style="padding:18px; color:${theme.textMuted}; font-size:14px; line-height:1.6;">Nog geen gesprekken beschikbaar. Zodra Vapi calls terugschrijft verschijnen ze hier automatisch.</div>`;
