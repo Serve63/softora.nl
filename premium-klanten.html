@@ -362,6 +362,7 @@
 
         .btn-primary,
         .btn-secondary,
+        .btn-danger,
         .action-btn {
             appearance: none;
             transition: all 0.2s var(--ease-out-expo);
@@ -398,6 +399,20 @@
         .btn-secondary:hover {
             color: var(--text-primary);
             border-color: var(--accent);
+        }
+
+        .btn-danger {
+            border: 1px solid rgba(231, 76, 60, 0.28);
+            padding: 0.78rem 1rem;
+            background: rgba(231, 76, 60, 0.08);
+            color: #ffc6c0;
+            font-size: 0.88rem;
+        }
+
+        .btn-danger:hover {
+            background: rgba(231, 76, 60, 0.14);
+            border-color: rgba(231, 76, 60, 0.44);
+            color: #fff1ee;
         }
 
         .search-wrap {
@@ -673,6 +688,14 @@
             margin-top: 1.3rem;
         }
 
+        .modal-delete {
+            margin-right: auto;
+        }
+
+        .modal-delete[hidden] {
+            display: none;
+        }
+
         @media (max-width: 1100px) {
             .hero {
                 display: block;
@@ -786,9 +809,14 @@
             }
 
             .btn-primary,
-            .btn-secondary {
+            .btn-secondary,
+            .btn-danger {
                 width: 100%;
                 justify-content: center;
+            }
+
+            .modal-delete {
+                margin-right: 0;
             }
         }
     </style>
@@ -957,6 +985,7 @@
                 </div>
 
                 <div class="modal-actions">
+                    <button type="button" class="btn-danger modal-delete" id="deleteCustomerButton" hidden>Klant verwijderen</button>
                     <button type="button" class="btn-secondary" id="cancelButton">Annuleren</button>
                     <button type="submit" class="btn-primary">Opslaan</button>
                 </div>
@@ -987,6 +1016,7 @@
             modalTitle: document.getElementById("modalTitle"),
             form: document.getElementById("customerForm"),
             addButton: document.getElementById("addCustomerButton"),
+            deleteButton: document.getElementById("deleteCustomerButton"),
             cancelButton: document.getElementById("cancelButton"),
             fieldName: document.getElementById("fieldName"),
             fieldCompany: document.getElementById("fieldCompany"),
@@ -1362,6 +1392,7 @@
 
                 state.editId = nextEditId;
                 nodes.modalTitle.textContent = "Klant bewerken";
+                nodes.deleteButton.hidden = false;
                 nodes.fieldName.value = customer.naam;
                 nodes.fieldCompany.value = customer.bedrijf === "-" ? "" : customer.bedrijf;
                 nodes.fieldPhone.value = customer.telefoon === "-" ? "" : customer.telefoon;
@@ -1372,6 +1403,7 @@
                 nodes.fieldDate.value = customer.datum || "";
             } else {
                 nodes.modalTitle.textContent = "Klant toevoegen";
+                nodes.deleteButton.hidden = true;
                 resetForm();
             }
 
@@ -1383,8 +1415,16 @@
 
         function closeModal() {
             nodes.modalOverlay.hidden = true;
+            nodes.deleteButton.hidden = true;
             state.editId = null;
             resetForm();
+        }
+
+        function deleteCurrentCustomerFromModal() {
+            const customerId = state.editId;
+            if (!customerId) return;
+            closeModal();
+            void deleteCustomer(customerId);
         }
 
         function collectFormCustomer() {
@@ -1536,6 +1576,10 @@
 
         nodes.cancelButton.addEventListener("click", function () {
             closeModal();
+        });
+
+        nodes.deleteButton.addEventListener("click", function () {
+            deleteCurrentCustomerFromModal();
         });
 
         nodes.form.addEventListener("submit", saveCustomer);
