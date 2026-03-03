@@ -47,10 +47,7 @@
 }
 
 .sidebar-theme {
-    padding: 0.5rem 2rem 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    display: none !important;
 }
 
 .sidebar-theme-label {
