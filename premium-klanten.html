@@ -548,35 +548,20 @@
             font-size: 0.92rem;
         }
 
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.38rem 0.7rem;
+        .status-text {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
+            font-size: 0.78rem;
+            font-weight: 500;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             white-space: nowrap;
         }
 
-        .badge.is-website {
-            background: var(--info-soft);
-            color: var(--info);
-        }
-
-        .badge.is-maintenance {
-            background: var(--accent-soft);
-            color: var(--accent);
-        }
-
-        .badge.is-paid {
-            background: var(--success-soft);
+        .status-text.is-paid {
             color: var(--success);
         }
 
-        .badge.is-open {
-            background: var(--warning-soft);
+        .status-text.is-open {
             color: var(--warning);
         }
 
@@ -1353,7 +1338,6 @@
             }
 
             nodes.body.innerHTML = filtered.map(function (customer) {
-                const typeClass = customer.type === "Website" ? "is-website" : "is-maintenance";
                 const statusClass = customer.status === "Betaald" ? "is-paid" : "is-open";
                 const amountClass = customer.status === "Betaald" ? "is-paid" : "is-open";
 
@@ -1368,7 +1352,7 @@
                             "<div class=\"project-type\">" + escapeHtml(customer.type) + "</div>",
                         "</td>",
                         "<td data-label=\"Bedrag\"><span class=\"amount " + amountClass + "\">" + escapeHtml(formatMoney(customer.bedrag)) + "</span></td>",
-                        "<td data-label=\"Status\"><span class=\"badge " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
+                        "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
                         "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td class=\"cell-actions\" data-label=\"Acties\">",
                             "<div class=\"actions\">",
