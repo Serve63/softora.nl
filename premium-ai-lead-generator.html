@@ -211,15 +211,7 @@
         }
 
         .sidebar-link::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 3px;
-            height: 100%;
-            background: var(--accent);
-            opacity: 0;
-            transition: opacity 0.2s;
+            content: none;
         }
 
         .sidebar-link:hover {
@@ -231,8 +223,6 @@
             color: var(--text-primary);
             background: rgba(139, 34, 82, 0.06);
         }
-
-        .sidebar-link.active::before { opacity: 1; }
 
         .sidebar-link svg {
             width: 18px;
