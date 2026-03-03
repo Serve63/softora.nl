@@ -1140,9 +1140,13 @@
         const PREMIUM_ACTIVE_ORDERS_SCOPE = 'premium_active_orders';
         const PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
         const PREMIUM_ACTIVE_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
+        const PREMIUM_CUSTOMERS_SCOPE = 'premium_customers_database';
+        const PREMIUM_CUSTOMERS_KEY = 'softora_customers_premium_v1';
+        const PREMIUM_CUSTOMERS_LOCAL_KEY = 'softora_customers_premium_local_v1';
         const premiumDashboardState = {
             loading: false,
             orders: [],
+            customers: [],
             pollTimer: null,
         };
 
@@ -1163,6 +1167,15 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        function normalizeDashboardString(value) {
+            return String(value || '').trim();
+        }
+
+        function normalizeDashboardDate(value) {
+            const raw = normalizeDashboardString(value);
+            return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
         }
 
         function normalizePremiumOrderStatus(value) {
@@ -1265,6 +1278,37 @@
                 });
         }
 
+        function parsePremiumCustomers(raw) {
+            try {
+                const parsed = JSON.parse(String(raw || '[]'));
+                if (!Array.isArray(parsed)) return [];
+                return parsed
+                    .map((item, index) => {
+                        const amount = Number(item && item.bedrag);
+                        const status = normalizeDashboardString(item && item.status) === 'Open' ? 'Open' : 'Betaald';
+                        return {
+                            id: normalizeDashboardString(item && item.id) || `dashboard-customer-${index}`,
+                            naam: normalizeDashboardString(item && item.naam) || 'Onbekend',
+                            bedrijf: normalizeDashboardString(item && item.bedrijf) || '-',
+                            bedrag: Number.isFinite(amount) && amount >= 0 ? Math.round(amount) : 0,
+                            status,
+                            datum: normalizeDashboardDate(item && item.datum)
+                        };
+                    })
+                    .filter((customer) => customer.id);
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function readPremiumCustomersFromLocal() {
+            try {
+                return parsePremiumCustomers(localStorage.getItem(PREMIUM_CUSTOMERS_LOCAL_KEY));
+            } catch (_) {
+                return [];
+            }
+        }
+
         function formatMoneyEUR(amount) {
             const value = Number(amount) || 0;
             return '€' + value.toLocaleString('nl-NL');
@@ -1293,12 +1337,14 @@
 
         function renderPremiumDashboardOrders() {
             const orders = Array.isArray(premiumDashboardState.orders) ? premiumDashboardState.orders : [];
+            const customers = Array.isArray(premiumDashboardState.customers) ? premiumDashboardState.customers : [];
             const currentYear = now.getFullYear();
             const currentMonth = now.getMonth();
             const revenueByMonth = Array.from({ length: 12 }, () => 0);
             const paidOrders = orders.filter((order) => order?.ui?.isPaid);
             const activeOrders = orders.filter((order) => !order?.ui?.isPaid);
             const uniqueClients = new Set();
+            const hasCustomerDatabase = customers.length > 0;
 
             let revenueYear = 0;
             let revenueMonth = 0;
@@ -1308,31 +1354,55 @@
                 if (clientKey) uniqueClients.add(clientKey);
             });
 
-            paidOrders.forEach((order) => {
-                const paidAt = order?.ui?.paidAt ? new Date(order.ui.paidAt) : null;
-                if (!paidAt || Number.isNaN(paidAt.getTime())) return;
-                if (paidAt.getFullYear() !== currentYear) return;
-                const amount = Number(order?.amount) || 0;
-                revenueYear += amount;
-                revenueByMonth[paidAt.getMonth()] += amount;
-                if (paidAt.getMonth() === currentMonth) {
-                    revenueMonth += amount;
-                }
-            });
+            if (hasCustomerDatabase) {
+                customers.forEach((customer) => {
+                    if (customer?.status !== 'Betaald') return;
+
+                    const amount = Number(customer?.bedrag) || 0;
+                    if (amount <= 0) return;
+
+                    const paidAt = customer?.datum ? new Date(customer.datum + 'T12:00:00') : new Date();
+                    if (!paidAt || Number.isNaN(paidAt.getTime())) return;
+                    if (paidAt.getFullYear() !== currentYear) return;
+
+                    revenueYear += amount;
+                    revenueByMonth[paidAt.getMonth()] += amount;
+                    if (paidAt.getMonth() === currentMonth) {
+                        revenueMonth += amount;
+                    }
+                });
+            } else {
+                paidOrders.forEach((order) => {
+                    const paidAt = order?.ui?.paidAt ? new Date(order.ui.paidAt) : null;
+                    if (!paidAt || Number.isNaN(paidAt.getTime())) return;
+                    if (paidAt.getFullYear() !== currentYear) return;
+                    const amount = Number(order?.amount) || 0;
+                    revenueYear += amount;
+                    revenueByMonth[paidAt.getMonth()] += amount;
+                    if (paidAt.getMonth() === currentMonth) {
+                        revenueMonth += amount;
+                    }
+                });
+            }
 
             const revenueYearEl = document.getElementById('kpiRevenueYear');
             if (revenueYearEl) revenueYearEl.textContent = formatMoneyEUR(revenueYear);
             const revenueMonthEl = document.getElementById('kpiRevenueMonth');
             if (revenueMonthEl) revenueMonthEl.textContent = formatMoneyEUR(revenueMonth);
             const totalClientsEl = document.getElementById('kpiTotalClients');
-            if (totalClientsEl) totalClientsEl.textContent = String(uniqueClients.size);
+            if (totalClientsEl) totalClientsEl.textContent = String(hasCustomerDatabase ? customers.length : uniqueClients.size);
             const activeOrdersEl = document.getElementById('kpiActiveOrders');
             if (activeOrdersEl) activeOrdersEl.textContent = String(activeOrders.length);
 
             const revenueTitleEl = document.getElementById('revenuePanelTitle');
             if (revenueTitleEl) revenueTitleEl.textContent = `Omzet ${currentYear}`;
             const revenueBadgeEl = document.getElementById('revenuePanelBadge');
-            if (revenueBadgeEl) revenueBadgeEl.textContent = paidOrders.length ? 'Betaald per maand' : 'Nog geen betalingen';
+            if (revenueBadgeEl) {
+                const paidCount = hasCustomerDatabase
+                    ? customers.filter((customer) => customer?.status === 'Betaald').length
+                    : paidOrders.length;
+                revenueBadgeEl.textContent = paidCount ? 'Betaald per maand' : 'Nog geen betalingen';
+            }
 
             const maxRevenue = Math.max(...revenueByMonth, 0);
             document.querySelectorAll('[data-month-bar]').forEach((bar) => {
@@ -1383,6 +1453,21 @@
                 return false;
             } finally {
                 premiumDashboardState.loading = false;
+            }
+        }
+
+        async function loadPremiumDashboardCustomers() {
+            try {
+                const data = await fetchPremiumUiState(PREMIUM_CUSTOMERS_SCOPE);
+                const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
+                const customers = parsePremiumCustomers(values[PREMIUM_CUSTOMERS_KEY]);
+                premiumDashboardState.customers = customers.length ? customers : readPremiumCustomersFromLocal();
+                renderPremiumDashboardOrders();
+                return true;
+            } catch (_) {
+                premiumDashboardState.customers = readPremiumCustomersFromLocal();
+                renderPremiumDashboardOrders();
+                return false;
             }
         }
 
@@ -1754,18 +1839,24 @@
 
         renderConfirmationTasks();
         renderPremiumDashboardOrders();
+        void loadPremiumDashboardCustomers();
         void loadPremiumDashboardOrders();
 
         premiumDashboardState.pollTimer = window.setInterval(() => {
+            void loadPremiumDashboardCustomers();
             void loadPremiumDashboardOrders();
         }, 30000);
 
         window.addEventListener('focus', () => {
+            void loadPremiumDashboardCustomers();
             void loadPremiumDashboardOrders();
         });
 
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) void loadPremiumDashboardOrders();
+            if (!document.hidden) {
+                void loadPremiumDashboardCustomers();
+                void loadPremiumDashboardOrders();
+            }
         });
 
         (function initTopbarThemeToggle() {
