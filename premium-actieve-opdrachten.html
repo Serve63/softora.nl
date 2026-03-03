@@ -1040,6 +1040,19 @@
 
         .modal-btn.secondary:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
 
+        .modal-btn.danger {
+            background: rgba(139, 34, 82, 0.12);
+            color: var(--accent-light);
+            border: 1px solid rgba(139, 34, 82, 0.36);
+            margin-top: 0.5rem;
+        }
+
+        .modal-btn.danger:hover {
+            color: #fff2f7;
+            border-color: rgba(139, 34, 82, 0.65);
+            background: rgba(139, 34, 82, 0.2);
+        }
+
         .modal.create-order-dialog {
             max-width: 760px;
             padding: 2rem;
@@ -1211,6 +1224,7 @@
             </div>
             <div class="modal-log" id="modalLog"></div>
             <button class="modal-btn primary magnetic" id="modalBtn" type="button" style="display: none;">Oplevering Bekijken</button>
+            <button class="modal-btn danger magnetic" id="modalDeleteBtn" type="button" style="display: none;">Project uit systeem halen</button>
             <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
         </div>
     </div>
@@ -1567,6 +1581,9 @@
         const CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
         const ORDER_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
         const REMOTE_UI_STATE_SCOPE = 'premium_active_orders';
+        const CUSTOMER_DB_SCOPE = 'premium_customers_database';
+        const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
+        const CUSTOMER_LOCAL_KEY = 'softora_customers_premium_local_v1';
         let remoteUiStateCache = {};
         let remoteUiStateLoaded = false;
         let remoteUiStateLoadPromise = null;
@@ -1790,6 +1807,129 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        function normalizeMatchValue(value) {
+            return String(value || '').trim().toLowerCase();
+        }
+
+        function getOrderCustomerMatchKey(record) {
+            const name = normalizeMatchValue(record?.clientName || record?.naam);
+            const location = normalizeMatchValue(record?.location || record?.bedrijf);
+            if (!name) return '';
+            return `${name}|${location}`;
+        }
+
+        function parseCustomerDatabase(raw) {
+            try {
+                const parsed = JSON.parse(String(raw || '[]'));
+                if (!Array.isArray(parsed)) return [];
+
+                return parsed
+                    .filter((item) => item && typeof item === 'object')
+                    .map((item, index) => {
+                        const amount = Math.round(Number(item?.bedrag) || 0);
+                        return {
+                            ...item,
+                            id: String(item?.id || `klant-import-${index}`),
+                            naam: String(item?.naam || '').trim() || 'Onbekend',
+                            bedrijf: String(item?.bedrijf || '').trim() || '-',
+                            telefoon: String(item?.telefoon || '').trim() || '-',
+                            type: String(item?.type || '').trim() || 'Website',
+                            website: String(item?.website || '').trim() || '-',
+                            bedrag: Number.isFinite(amount) && amount > 0 ? amount : 0,
+                            status: String(item?.status || '').trim() === 'Open' ? 'Open' : 'Betaald',
+                            datum: String(item?.datum || '').trim()
+                        };
+                    });
+            } catch (_) {
+                return [];
+            }
+        }
+
+        async function readCustomerDatabase() {
+            try {
+                const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
+                const remoteCustomers = parseCustomerDatabase(remoteState?.values?.[CUSTOMER_DB_KEY]);
+                if (remoteCustomers.length) return remoteCustomers;
+            } catch (_) {
+                // fall back to local cache
+            }
+
+            try {
+                return parseCustomerDatabase(localStorage.getItem(CUSTOMER_LOCAL_KEY));
+            } catch (_) {
+                return [];
+            }
+        }
+
+        async function persistCustomerDatabase(customers) {
+            const serialized = JSON.stringify(Array.isArray(customers) ? customers : []);
+            try {
+                localStorage.setItem(CUSTOMER_LOCAL_KEY, serialized);
+            } catch (_) {
+                // ignore storage errors
+            }
+
+            await fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
+                patch: {
+                    [CUSTOMER_DB_KEY]: serialized
+                },
+                source: 'premium-actieve-opdrachten',
+                actor: 'browser'
+            });
+        }
+
+        function removeGeneratedPreviewHtml(orderId) {
+            try {
+                localStorage.removeItem(getPreviewStorageKey(orderId));
+            } catch (_) {
+                // ignore storage errors
+            }
+        }
+
+        function syncLastActiveOrderAfterRemoval(removedId) {
+            const nextId = Object.keys(orders)
+                .map((id) => Number(id))
+                .filter((id) => Number.isFinite(id) && id > 0 && id !== Number(removedId))
+                .sort((a, b) => {
+                    const updatedDiff = Number(orders[b]?.updatedAt || 0) - Number(orders[a]?.updatedAt || 0);
+                    return updatedDiff || a - b;
+                })[0] || null;
+
+            if (nextId) {
+                setLastActiveOrder(nextId);
+                return;
+            }
+
+            writeStateValue(ORDER_STATE_KEY, '');
+        }
+
+        async function syncCustomerDatabaseAfterOrderRemoval(record) {
+            const customerKey = getOrderCustomerMatchKey(record);
+            if (!customerKey) return;
+
+            const hasRemainingOrder = customOrders.some((item) => {
+                return Number(item?.id) !== Number(record?.id) && getOrderCustomerMatchKey(item) === customerKey;
+            });
+            if (hasRemainingOrder) return;
+
+            const customers = await readCustomerDatabase();
+            if (!customers.length) return;
+
+            const nextCustomers = customers.filter((customer) => {
+                return getOrderCustomerMatchKey(customer) !== customerKey;
+            });
+
+            if (nextCustomers.length === customers.length) return;
+            await persistCustomerDatabase(nextCustomers);
+        }
+
+        function setModalDeleteButtonState(label, disabled) {
+            const deleteBtn = document.getElementById('modalDeleteBtn');
+            if (!deleteBtn) return;
+            deleteBtn.textContent = label || 'Project uit systeem halen';
+            deleteBtn.disabled = Boolean(disabled);
         }
 
         function slugify(s) {
@@ -2224,13 +2364,8 @@
             if (cardEl) {
                 cardEl.classList.toggle('delivered', isDelivered);
                 cardEl.classList.toggle('paid', isPaid);
-                if (isDelivered) {
-                    cardEl.removeAttribute('role');
-                    cardEl.removeAttribute('tabindex');
-                } else {
-                    cardEl.setAttribute('role', 'button');
-                    cardEl.setAttribute('tabindex', '0');
-                }
+                cardEl.setAttribute('role', 'button');
+                cardEl.setAttribute('tabindex', '0');
             }
 
             if (statusEl) {
@@ -2410,7 +2545,7 @@
             const apiCostText = formatApiCostLabel(record);
 
             return `
-                <div class="order-card ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}"${isDelivered ? '' : ` role="button" tabindex="0" aria-label="Opdracht ${id}"`}>
+                <div class="order-card ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
                     <div class="order-main">
                         <div class="order-info">
                             <div class="order-client">${escapeHtml(clientLine || 'Nieuwe opdracht')}</div>
@@ -2484,11 +2619,9 @@
                 card.dataset.boundCardOpen = '1';
                 card.addEventListener('click', (e) => {
                     if (e.target.closest('button,a')) return;
-                    if (card.classList.contains('delivered')) return;
                     openModal(id);
                 });
                 card.addEventListener('keydown', (e) => {
-                    if (card.classList.contains('delivered')) return;
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         openModal(id);
@@ -3027,6 +3160,8 @@
             const title = document.getElementById('modalTitle');
             const subtitle = document.getElementById('modalSubtitle');
             const primaryBtn = document.getElementById('modalBtn');
+            const deleteBtn = document.getElementById('modalDeleteBtn');
+            const isCustomOrder = Boolean(getCustomOrderById(id));
 
             currentModalId = id;
 
@@ -3066,6 +3201,19 @@
                 primaryBtn.onclick = null;
             }
 
+            if (deleteBtn) {
+                if (isCustomOrder) {
+                    setModalDeleteButtonState('Project uit systeem halen', false);
+                    deleteBtn.style.display = 'block';
+                    deleteBtn.onclick = () => {
+                        void removeProjectFromSystem(id);
+                    };
+                } else {
+                    deleteBtn.style.display = 'none';
+                    deleteBtn.onclick = null;
+                }
+            }
+
             log.scrollTop = log.scrollHeight;
             modal.classList.add('show');
             modal.setAttribute('aria-hidden', 'false');
@@ -3073,8 +3221,91 @@
 
         function closeModal() {
             const modal = document.getElementById('modal');
+            const deleteBtn = document.getElementById('modalDeleteBtn');
             modal.classList.remove('show');
             modal.setAttribute('aria-hidden', 'true');
+            currentModalId = null;
+            if (deleteBtn) {
+                deleteBtn.style.display = 'none';
+                deleteBtn.onclick = null;
+                setModalDeleteButtonState('Project uit systeem halen', false);
+            }
+        }
+
+        async function removeProjectFromSystem(id) {
+            const numericId = Number(id);
+            const record = getCustomOrderById(numericId);
+            if (!record) {
+                alert('Dit project kan hier niet verwijderd worden.');
+                return;
+            }
+
+            const projectLabel = String(record.title || record.clientName || 'dit project').trim();
+            const confirmed = window.confirm(`Project "${projectLabel}" volledig uit het systeem halen? Dit verwijdert het ook uit het klantenbestand en dashboard.`);
+            if (!confirmed) return;
+
+            const previousCustomOrders = customOrders.slice();
+            const previousOrder = orders[numericId]
+                ? {
+                    ...orders[numericId],
+                    logs: Array.isArray(orders[numericId].logs) ? orders[numericId].logs.slice() : []
+                }
+                : null;
+            const previousOrderStateValue = readStateValue(ORDER_STATE_KEY);
+            let previousPreviewHtml = null;
+            try {
+                previousPreviewHtml = localStorage.getItem(getPreviewStorageKey(numericId));
+            } catch (_) {
+                previousPreviewHtml = null;
+            }
+
+            setModalDeleteButtonState('Project wordt verwijderd...', true);
+
+            try {
+                stopOrderProgressSimulation(numericId);
+                customOrders = customOrders.filter((item) => Number(item?.id) !== numericId);
+                persistCustomOrders();
+                delete orders[numericId];
+                persistOrdersRuntime();
+                syncLastActiveOrderAfterRemoval(numericId);
+                await flushRemoteUiStateSave();
+                const activeStateStillPending = [
+                    CUSTOM_ORDERS_KEY,
+                    ORDER_RUNTIME_KEY,
+                    ORDER_STATE_KEY
+                ].some((key) => Object.prototype.hasOwnProperty.call(remoteUiStatePendingPatch, key));
+                if (activeStateStillPending) {
+                    throw new Error('Remote opdrachtstatus kon niet worden opgeslagen.');
+                }
+                removeGeneratedPreviewHtml(numericId);
+
+                const card = document.getElementById(`order-${numericId}`);
+                if (card) card.remove();
+
+                await syncCustomerDatabaseAfterOrderRemoval(record);
+                refreshOrderSummaryCards();
+                closeModal();
+            } catch (error) {
+                console.error('Project verwijderen mislukt:', error);
+                customOrders = previousCustomOrders;
+                persistCustomOrders();
+                if (previousOrder) {
+                    orders[numericId] = previousOrder;
+                }
+                persistOrdersRuntime();
+                writeStateValue(ORDER_STATE_KEY, previousOrderStateValue);
+                if (previousPreviewHtml !== null) {
+                    try {
+                        localStorage.setItem(getPreviewStorageKey(numericId), previousPreviewHtml);
+                    } catch (_) {
+                        // ignore restore errors
+                    }
+                }
+                await flushRemoteUiStateSave();
+                if (previousOrder) applyOrderUiStateToCard(numericId);
+                setModalDeleteButtonState('Project uit systeem halen', false);
+                alert('Project verwijderen mislukt. Probeer het opnieuw.');
+            }
         }
 
         // Build mode UI
@@ -3133,11 +3364,9 @@
             if (!id) return;
             card.addEventListener('click', (e) => {
                 if (e.target.closest('button,a')) return;
-                if (card.classList.contains('delivered')) return;
                 openModal(id);
             });
             card.addEventListener('keydown', (e) => {
-                if (card.classList.contains('delivered')) return;
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     openModal(id);
