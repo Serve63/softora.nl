@@ -968,6 +968,120 @@ function extractSummaryFromVapiPayload(payload) {
   return '';
 }
 
+function normalizeIsoTimestamp(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  const ts = Date.parse(raw);
+  if (!Number.isFinite(ts)) return '';
+  return new Date(ts).toISOString();
+}
+
+function looksLikeAudioUrl(value) {
+  const raw = normalizeString(value);
+  return /^https?:\/\//i.test(raw) || /^data:audio\//i.test(raw);
+}
+
+function extractTimestampFromVapiPayload(payload, directPaths, keyRegex) {
+  for (const path of directPaths) {
+    const normalized = normalizeIsoTimestamp(getByPath(payload, path));
+    if (normalized) return normalized;
+  }
+
+  const candidates = collectStringValuesByKey(payload, keyRegex, {
+    maxItems: 10,
+    minLength: 10,
+  });
+
+  for (const candidate of candidates) {
+    const normalized = normalizeIsoTimestamp(candidate);
+    if (normalized) return normalized;
+  }
+
+  return '';
+}
+
+function extractCallStartedAt(payload) {
+  return extractTimestampFromVapiPayload(
+    payload,
+    ['message.call.startedAt', 'call.startedAt', 'message.startedAt', 'startedAt'],
+    /startedat|starttime|start(ed)?/i
+  );
+}
+
+function extractCallEndedAt(payload) {
+  return extractTimestampFromVapiPayload(
+    payload,
+    ['message.call.endedAt', 'call.endedAt', 'message.endedAt', 'endedAt'],
+    /endedat|endtime|end(ed)?/i
+  );
+}
+
+function extractCallDurationSeconds(payload) {
+  const directPaths = [
+    'message.call.durationSeconds',
+    'message.call.duration',
+    'message.call.artifact.durationSeconds',
+    'message.call.artifact.duration',
+    'call.durationSeconds',
+    'call.duration',
+    'message.durationSeconds',
+    'message.duration',
+    'durationSeconds',
+    'duration',
+  ];
+
+  for (const path of directPaths) {
+    const numeric = parseNumberSafe(getByPath(payload, path), null);
+    if (!Number.isFinite(numeric) || numeric <= 0) continue;
+    if (numeric > 86400 && numeric < 86400000) {
+      return Math.max(1, Math.round(numeric / 1000));
+    }
+    if (numeric <= 86400) {
+      return Math.max(1, Math.round(numeric));
+    }
+  }
+
+  const startedAt = extractCallStartedAt(payload);
+  const endedAt = extractCallEndedAt(payload);
+  const startTs = Date.parse(startedAt);
+  const endTs = Date.parse(endedAt);
+  if (Number.isFinite(startTs) && Number.isFinite(endTs) && endTs > startTs) {
+    return Math.max(1, Math.round((endTs - startTs) / 1000));
+  }
+
+  return null;
+}
+
+function extractCallRecordingUrl(payload) {
+  const directPaths = [
+    'message.call.recordingUrl',
+    'message.call.recording.url',
+    'message.call.artifact.recordingUrl',
+    'message.call.artifact.recording.url',
+    'message.artifact.recordingUrl',
+    'message.artifact.recording.url',
+    'call.recordingUrl',
+    'call.recording.url',
+    'call.artifact.recordingUrl',
+    'call.artifact.recording.url',
+    'recordingUrl',
+    'audioUrl',
+    'mediaUrl',
+  ];
+
+  for (const path of directPaths) {
+    const value = normalizeString(getByPath(payload, path));
+    if (looksLikeAudioUrl(value)) return value;
+  }
+
+  const candidates = collectStringValuesByKey(payload, /recording|audio|media/i, {
+    maxItems: 20,
+    minLength: 8,
+  });
+
+  return candidates.find((candidate) => looksLikeAudioUrl(candidate)) || '';
+}
+
 function extractCallUpdateFromWebhookPayload(payload) {
   const messageType = normalizeString(payload?.message?.type || payload?.type || 'unknown');
   const call = payload?.message?.call || payload?.call || {};
@@ -994,6 +1108,10 @@ function extractCallUpdateFromWebhookPayload(payload) {
     normalizeString(call?.endedReason) ||
     normalizeString(getByPath(payload, 'message.call.endedReason')) ||
     normalizeString(getByPath(payload, 'message.endedReason'));
+  const startedAt = extractCallStartedAt(payload);
+  const endedAt = extractCallEndedAt(payload);
+  const durationSeconds = extractCallDurationSeconds(payload);
+  const recordingUrl = extractCallRecordingUrl(payload);
 
   if (!callId && !phone && !company && !summary && !transcriptSnippet && !status) {
     return null;
@@ -1010,6 +1128,10 @@ function extractCallUpdateFromWebhookPayload(payload) {
     transcriptSnippet,
     transcriptFull,
     endedReason,
+    startedAt,
+    endedAt,
+    durationSeconds,
+    recordingUrl,
     updatedAt: new Date().toISOString(),
     updatedAtMs: Date.now(),
   };
@@ -1101,6 +1223,15 @@ function upsertRecentCallUpdate(update) {
         transcriptSnippet: update.transcriptSnippet || existing.transcriptSnippet || '',
         transcriptFull: update.transcriptFull || existing.transcriptFull || '',
         endedReason: update.endedReason || existing.endedReason || '',
+        startedAt: update.startedAt || existing.startedAt || '',
+        endedAt: update.endedAt || existing.endedAt || '',
+        durationSeconds:
+          Number.isFinite(Number(update.durationSeconds)) && Number(update.durationSeconds) > 0
+            ? Math.round(Number(update.durationSeconds))
+            : Number.isFinite(Number(existing.durationSeconds)) && Number(existing.durationSeconds) > 0
+              ? Math.round(Number(existing.durationSeconds))
+              : null,
+        recordingUrl: update.recordingUrl || existing.recordingUrl || '',
         messageType: update.messageType || existing.messageType || '',
         updatedAt: update.updatedAt,
         updatedAtMs: update.updatedAtMs,
@@ -4033,20 +4164,44 @@ app.get('/api/coldcalling/call-status/:callId', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
   }
 
+  const cached = callUpdatesById.get(callId) || null;
+
   if (!normalizeString(process.env.VAPI_API_KEY)) {
+    if (cached) {
+      return res.status(200).json({
+        ok: true,
+        source: 'cache',
+        callId: normalizeString(cached.callId || callId),
+        status: normalizeString(cached.status || ''),
+        endedReason: normalizeString(cached.endedReason || ''),
+        startedAt: normalizeString(cached.startedAt || ''),
+        endedAt: normalizeString(cached.endedAt || ''),
+        durationSeconds: parseNumberSafe(cached.durationSeconds, null),
+        recordingUrl: normalizeString(cached.recordingUrl || ''),
+      });
+    }
     return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
   }
 
   try {
     const { endpoint, data } = await fetchVapiCallStatusById(callId);
+    const update = extractCallUpdateFromVapiCallStatusResponse(callId, data);
+    if (update) {
+      upsertRecentCallUpdate(update);
+    }
     const call = data?.call && typeof data.call === 'object' ? data.call : data;
 
     return res.status(200).json({
       ok: true,
       endpoint,
-      callId: normalizeString(call?.id || callId),
-      status: normalizeString(call?.status || data?.status || ''),
-      endedReason: normalizeString(call?.endedReason || data?.endedReason || ''),
+      source: 'vapi',
+      callId: normalizeString(update?.callId || call?.id || callId),
+      status: normalizeString(update?.status || call?.status || data?.status || ''),
+      endedReason: normalizeString(update?.endedReason || call?.endedReason || data?.endedReason || ''),
+      startedAt: normalizeString(update?.startedAt || ''),
+      endedAt: normalizeString(update?.endedAt || ''),
+      durationSeconds: parseNumberSafe(update?.durationSeconds, null),
+      recordingUrl: normalizeString(update?.recordingUrl || ''),
     });
   } catch (error) {
     return res.status(Number(error?.status || 500)).json({
@@ -4066,20 +4221,44 @@ app.get('/api/coldcalling/status', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
   }
 
+  const cached = callUpdatesById.get(callId) || null;
+
   if (!normalizeString(process.env.VAPI_API_KEY)) {
+    if (cached) {
+      return res.status(200).json({
+        ok: true,
+        source: 'cache',
+        callId: normalizeString(cached.callId || callId),
+        status: normalizeString(cached.status || ''),
+        endedReason: normalizeString(cached.endedReason || ''),
+        startedAt: normalizeString(cached.startedAt || ''),
+        endedAt: normalizeString(cached.endedAt || ''),
+        durationSeconds: parseNumberSafe(cached.durationSeconds, null),
+        recordingUrl: normalizeString(cached.recordingUrl || ''),
+      });
+    }
     return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
   }
 
   try {
     const { endpoint, data } = await fetchVapiCallStatusById(callId);
+    const update = extractCallUpdateFromVapiCallStatusResponse(callId, data);
+    if (update) {
+      upsertRecentCallUpdate(update);
+    }
     const call = data?.call && typeof data.call === 'object' ? data.call : data;
 
     return res.status(200).json({
       ok: true,
       endpoint,
-      callId: normalizeString(call?.id || callId),
-      status: normalizeString(call?.status || data?.status || ''),
-      endedReason: normalizeString(call?.endedReason || data?.endedReason || ''),
+      source: 'vapi',
+      callId: normalizeString(update?.callId || call?.id || callId),
+      status: normalizeString(update?.status || call?.status || data?.status || ''),
+      endedReason: normalizeString(update?.endedReason || call?.endedReason || data?.endedReason || ''),
+      startedAt: normalizeString(update?.startedAt || ''),
+      endedAt: normalizeString(update?.endedAt || ''),
+      durationSeconds: parseNumberSafe(update?.durationSeconds, null),
+      recordingUrl: normalizeString(update?.recordingUrl || ''),
     });
   } catch (error) {
     return res.status(Number(error?.status || 500)).json({
@@ -5745,6 +5924,9 @@ function seedDemoConfirmationTaskForUiTesting() {
       'assistant: Helemaal goed, dan zetten we dat zo door.',
     ].join('\n'),
     endedReason: 'completed',
+    durationSeconds: 94,
+    recordingUrl:
+      'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==',
     updatedAt: now.toISOString(),
     updatedAtMs: now.getTime(),
   });

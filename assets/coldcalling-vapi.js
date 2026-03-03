@@ -1678,28 +1678,141 @@
   function updateAiNotebookHint() {
     const hint = byId('aiNotebookHint');
     if (!hint) return;
+    const count = Math.max(0, parseNumber(hint.dataset.callCount, 0) || 0);
+    hint.style.display = 'block';
+    hint.textContent =
+      count > 0
+        ? `${count} telefoongesprek${count === 1 ? '' : 'ken'} beschikbaar. Bekijk transcriptie, conclusie en opname per gesprek.`
+        : 'Bekijk hier per gesprek wie gebeld is, of er is opgenomen, de duur, conclusie, transcriptie en opname.';
+  }
 
-    const parsed = parseAiNotebookRows(getSavedAiNotebookRows());
-    if (!parsed.hasInput) {
-      hint.style.display = 'block';
-      hint.textContent =
-        'Nog leeg. Gebruik dit kladblok om callstatus, terugbelreden en geheugenpunten voor AI bij te houden.';
-      return;
+  function getConversationRecordUpdatedMs(record) {
+    const updatedAtMs = Number(record?.updatedAtMs);
+    if (Number.isFinite(updatedAtMs) && updatedAtMs > 0) return updatedAtMs;
+    const updatedAt = Date.parse(String(record?.updatedAt || '').trim());
+    return Number.isFinite(updatedAt) ? updatedAt : 0;
+  }
+
+  function buildConversationRecordsFromUpdates(updates) {
+    const byId = new Map();
+
+    (Array.isArray(updates) ? updates : []).forEach((item, index) => {
+      if (!item || typeof item !== 'object') return;
+      const callId = String(item.callId || `call-${index}`).trim() || `call-${index}`;
+      const previous = byId.get(callId) || { callId };
+      const durationSeconds = Number(item.durationSeconds);
+      const updatedAtMs = getConversationRecordUpdatedMs(item);
+
+      byId.set(callId, {
+        ...previous,
+        ...item,
+        callId,
+        company: String(item.company || previous.company || '').trim(),
+        name: String(item.name || previous.name || '').trim(),
+        phone: String(item.phone || previous.phone || '').trim(),
+        status: String(item.status || previous.status || '').trim(),
+        endedReason: String(item.endedReason || previous.endedReason || '').trim(),
+        summary: String(item.summary || previous.summary || '').trim(),
+        transcriptSnippet: String(item.transcriptSnippet || previous.transcriptSnippet || '').trim(),
+        transcriptFull: String(item.transcriptFull || previous.transcriptFull || '').trim(),
+        startedAt: String(item.startedAt || previous.startedAt || '').trim(),
+        endedAt: String(item.endedAt || previous.endedAt || '').trim(),
+        recordingUrl: String(item.recordingUrl || previous.recordingUrl || '').trim(),
+        durationSeconds:
+          Number.isFinite(durationSeconds) && durationSeconds > 0
+            ? Math.round(durationSeconds)
+            : Number.isFinite(Number(previous.durationSeconds)) && Number(previous.durationSeconds) > 0
+              ? Math.round(Number(previous.durationSeconds))
+              : null,
+        updatedAt: String(item.updatedAt || previous.updatedAt || '').trim(),
+        updatedAtMs,
+      });
+    });
+
+    return Array.from(byId.values()).sort((a, b) => getConversationRecordUpdatedMs(b) - getConversationRecordUpdatedMs(a));
+  }
+
+  function inferConversationAnswered(record) {
+    const status = String(record?.status || '').toLowerCase();
+    const endedReason = String(record?.endedReason || '').toLowerCase();
+    const hasConversationContent = Boolean(record?.summary || record?.transcriptFull || record?.transcriptSnippet);
+    if (hasConversationContent) return true;
+    if (Number(record?.durationSeconds) >= 15) return true;
+    if (/(busy|voicemail|no[- ]?answer|failed|cancelled|canceled|rejected)/.test(`${status} ${endedReason}`)) {
+      return false;
     }
+    return null;
+  }
 
-    hint.textContent = '';
-    hint.style.display = 'none';
+  function formatConversationAnsweredLabel(record) {
+    const answered = inferConversationAnswered(record);
+    if (answered === true) return 'Ja';
+    if (answered === false) return 'Nee';
+    return 'Onbekend';
+  }
+
+  function formatConversationDuration(seconds) {
+    const totalSeconds = Math.round(Number(seconds) || 0);
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return 'Onbekend';
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    if (mins <= 0) return `${secs}s`;
+    return `${mins}m ${String(secs).padStart(2, '0')}s`;
+  }
+
+  function formatConversationTimestamp(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return 'Onbekend';
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleString('nl-NL', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function getConversationConclusion(record) {
+    const source = String(record?.summary || record?.transcriptSnippet || '').replace(/\s+/g, ' ').trim();
+    if (!source) return 'Nog geen conclusie beschikbaar.';
+    const match = source.match(/[^.!?]+[.!?]/);
+    const sentence = String(match ? match[0] : source).trim();
+    return sentence.length > 180 ? `${sentence.slice(0, 177).trim()}...` : sentence;
+  }
+
+  function getConversationLeadLabel(record) {
+    const company = String(record?.company || '').trim();
+    const name = String(record?.name || '').trim();
+    if (company && name && company !== name) return `${company} · ${name}`;
+    return company || name || 'Onbekende lead';
+  }
+
+  function getConversationTranscript(record) {
+    return String(record?.transcriptFull || record?.transcriptSnippet || '').trim();
   }
 
   function ensureAiNotebookModal() {
     let modal = byId('aiNotebookModalOverlay');
     if (modal) return modal;
 
+    const state = {
+      loading: false,
+      error: '',
+      calls: [],
+      selectedCallId: '',
+      detailLoadingId: '',
+      detailErrorById: Object.create(null),
+      detailsById: Object.create(null),
+      pollTimer: null,
+    };
+
     modal = document.createElement('div');
     modal.id = 'aiNotebookModalOverlay';
     modal.style.position = 'fixed';
     modal.style.inset = '0';
-    modal.style.background = 'rgba(8, 10, 16, 0.72)';
+    modal.style.background = 'rgba(8, 10, 16, 0.82)';
     modal.style.display = 'none';
     modal.style.alignItems = 'center';
     modal.style.justifyContent = 'center';
@@ -1707,47 +1820,270 @@
     modal.style.zIndex = '9999';
 
     modal.innerHTML = [
-      '<div style="width:min(1680px, 99vw); height:min(920px, 94vh); overflow:hidden; border-radius:14px; border:1px solid #c7c9cc; background:#f1f3f4; box-shadow:0 20px 80px rgba(0,0,0,0.45); color:#202124; display:flex; flex-direction:column;">',
-      '  <div style="height:56px; background:#ffffff; border-bottom:1px solid #dadce0; display:flex; align-items:center; justify-content:space-between; padding:0 16px; gap:8px;">',
-      '    <button type="button" id="aiNotebookCancelBtn" style="height:34px; border:1px solid #dadce0; background:#fff; border-radius:8px; padding:0 12px; cursor:pointer;">Sluiten</button>',
-      '    <button type="button" id="aiNotebookSaveBtn" style="height:34px; border:1px solid #c6dafc; background:#d2e3fc; color:#174ea6; border-radius:8px; padding:0 12px; font-weight:600; cursor:pointer;">Opslaan lijst</button>',
-      '  </div>',
-      '  <div style="padding:8px 12px 6px; background:#f1f3f4;">',
-      '    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:11px; color:#3c4043;">',
-      '      <span id="aiNotebookDraftHint" style="color:#5f6368;">Excel/Sheets plakken wordt ondersteund. Kolommen A-F: bedrijf, telefoon, status, terugbellen, reden, onthouden.</span>',
+      '<div style="width:min(1560px, 96vw); height:min(900px, 94vh); overflow:hidden; border:1px solid rgba(255,255,255,0.08); background:#0d0d0d; box-shadow:0 30px 90px rgba(0,0,0,0.55); color:#f5f5f5; display:flex; flex-direction:column;">',
+      '  <div style="min-height:72px; background:#080808; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:space-between; padding:0 20px; gap:12px;">',
+      '    <div>',
+      '      <div style="font-family:Oswald,sans-serif; font-size:30px; line-height:1; letter-spacing:0.03em; text-transform:uppercase;">Telefoongesprekken</div>',
+      '      <div id="aiNotebookDraftHint" style="margin-top:8px; color:#8f95a3; font-size:13px;">Alle AI coldcalls met transcriptie, conclusie en opname op een plek.</div>',
+      '    </div>',
+      '    <div style="display:flex; align-items:center; gap:10px;">',
+      '      <button type="button" id="aiNotebookRefreshBtn" style="height:40px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:#f5f5f5; padding:0 14px; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;">Verversen</button>',
+      '      <button type="button" id="aiNotebookCancelBtn" style="height:40px; border:1px solid rgba(255,255,255,0.08); background:transparent; color:#8f95a3; padding:0 14px; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;">Sluiten</button>',
       '    </div>',
       '  </div>',
-      '  <div style="padding:0 12px 8px; flex:1; min-height:0; background:#f1f3f4;">',
-      '    <div id="aiNotebookRowsWrap" style="height:100%;"></div>',
+      '  <div style="padding:14px 20px; background:#080808; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">',
+      '    <div id="aiNotebookConversationStatus" style="font-size:12px; color:#8f95a3;">Gesprekken laden...</div>',
+      '    <div id="aiNotebookConversationCount" style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#a62d65;">0 gesprekken</div>',
       '  </div>',
-      '  <div style="height:46px; background:#ffffff; border-top:1px solid #dadce0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 12px;">',
-      '    <div style="display:flex; align-items:center; gap:8px;">',
-      '      <button type="button" id="aiNotebookAddRowBtn" style="height:30px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 10px; cursor:pointer;">+10 rijen</button>',
-      '      <button type="button" id="aiNotebookClearRowsBtn" style="height:30px; border:1px solid #dadce0; background:#fff; border-radius:6px; padding:0 10px; cursor:pointer;">Lijst wissen</button>',
-      '      <div style="margin-left:8px; width:1px; height:18px; background:#dadce0;"></div>',
-      '      <div style="padding:0 10px; height:30px; border:1px solid #dadce0; border-radius:6px; display:flex; align-items:center; font-size:12px; background:#f8f9fa;">AI Kladblok</div>',
+      '  <div style="display:grid; grid-template-columns:minmax(340px, 420px) 1fr; min-height:0; flex:1;">',
+      '    <div style="min-height:0; border-right:1px solid rgba(255,255,255,0.06); background:#0a0a0a; display:flex; flex-direction:column;">',
+      '      <div style="padding:16px 18px 12px; border-bottom:1px solid rgba(255,255,255,0.06); font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3;">Laatste gesprekken</div>',
+      '      <div id="aiNotebookConversationList" style="flex:1; min-height:0; overflow:auto; padding:10px;"></div>',
       '    </div>',
-      '    <div style="font-size:11px; color:#5f6368;">A-F: Bedrijf, Telefoon, Status, Opnieuw bellen?, Waarom, Onthouden</div>',
+      '    <div style="min-height:0; overflow:auto; background:#0d0d0d; padding:22px;">',
+      '      <div id="aiNotebookConversationDetail"></div>',
+      '    </div>',
+      '  </div>',
+      '  <div style="min-height:48px; background:#080808; border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 20px; font-size:12px; color:#8f95a3;">',
+      '    <div>Per gesprek zie je: wie is gebeld, opgenomen ja/nee, duur, conclusie, transcriptie en opname.</div>',
+      '    <div style="font-family:Oswald,sans-serif; letter-spacing:0.12em; text-transform:uppercase; color:#a62d65;">Softora Premium</div>',
       '  </div>',
       '</div>',
     ].join('');
 
     document.body.appendChild(modal);
 
+    function getSelectedConversationRecord() {
+      const selectedBase = state.calls.find((item) => item.callId === state.selectedCallId) || null;
+      if (!selectedBase) return null;
+      return {
+        ...selectedBase,
+        ...(state.detailsById[state.selectedCallId] || {}),
+      };
+    }
+
+    function renderConversationDetail() {
+      const detailEl = byId('aiNotebookConversationDetail');
+      if (!detailEl) return;
+
+      const record = getSelectedConversationRecord();
+      if (!record) {
+        detailEl.innerHTML = [
+          '<div style="height:100%; min-height:300px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); color:#8f95a3; font-size:14px;">',
+          'Selecteer een gesprek om de details te bekijken.',
+          '</div>',
+        ].join('');
+        return;
+      }
+
+      const callId = escapeHtml(record.callId);
+      const transcript = escapeHtml(getConversationTranscript(record));
+      const recordingUrl = String(record.recordingUrl || '').trim();
+      const detailLoading = state.detailLoadingId === record.callId;
+      const detailError = state.detailErrorById[record.callId] || '';
+
+      detailEl.innerHTML = [
+        '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:22px; flex-wrap:wrap;">',
+        '  <div>',
+        `    <div style="font-family:Oswald,sans-serif; font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
+        `    <div style="font-family:Oswald,sans-serif; font-size:34px; line-height:1; text-transform:uppercase; letter-spacing:0.03em;">${escapeHtml(getConversationLeadLabel(record))}</div>`,
+        `    <div style="margin-top:12px; color:#8f95a3; font-size:14px;">${escapeHtml(record.phone || 'Geen telefoonnummer beschikbaar')}</div>`,
+        '  </div>',
+        `  <div style="display:inline-flex; align-items:center; gap:8px; border:1px solid rgba(139,34,82,0.28); background:rgba(139,34,82,0.08); color:#f4d6e4; padding:10px 14px; font-family:Oswald,sans-serif; font-size:13px; letter-spacing:0.12em; text-transform:uppercase;">${escapeHtml(String(record.status || 'Onbekend'))}</div>`,
+        '</div>',
+        '<div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:14px; margin-bottom:22px;">',
+        `  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">Gebelde lead</div><div style="font-size:15px; line-height:1.4;">${escapeHtml(getConversationLeadLabel(record))}</div></div>`,
+        `  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">Opgenomen</div><div style="font-size:15px; line-height:1.4;">${escapeHtml(formatConversationAnsweredLabel(record))}</div></div>`,
+        `  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">Gespreksduur</div><div style="font-size:15px; line-height:1.4;">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div></div>`,
+        `  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:16px;"><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:8px;">Call ID</div><div style="font-size:15px; line-height:1.4; word-break:break-all;">${callId}</div></div>`,
+        '</div>',
+        '<div style="display:grid; grid-template-columns:1fr; gap:18px;">',
+        '  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:18px;">',
+        '    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:10px;">Conclusie in 1 zin</div>',
+        `    <div style="font-size:15px; line-height:1.7; color:#f5f5f5;">${escapeHtml(getConversationConclusion(record))}</div>`,
+        '  </div>',
+        '  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:18px;">',
+        '    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px;">',
+        '      <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3;">Volledige transcriptie</div>',
+        detailLoading ? '      <div style="font-size:12px; color:#8f95a3;">Extra details laden...</div>' : '',
+        detailError ? `      <div style="font-size:12px; color:#f4a0bc;">${escapeHtml(detailError)}</div>` : '',
+        '    </div>',
+        `    <div style="white-space:pre-wrap; font-size:14px; line-height:1.7; color:${transcript ? '#f5f5f5' : '#8f95a3'}; min-height:120px;">${transcript || 'Nog geen transcriptie beschikbaar voor dit gesprek.'}</div>`,
+        '  </div>',
+        '  <div style="border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); padding:18px;">',
+        '    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8f95a3; margin-bottom:12px;">Gesprek terugluisteren</div>',
+        recordingUrl
+          ? `    <div style="display:flex; flex-direction:column; gap:12px;"><button type="button" data-conversation-play="${callId}" style="align-self:flex-start; height:42px; border:1px solid rgba(139,34,82,0.4); background:rgba(139,34,82,0.14); color:#f5d7e4; padding:0 16px; font-family:Oswald,sans-serif; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer;">Afspelen</button><audio id="conversationAudioPlayer" controls preload="none" style="width:100%;"><source src="${escapeHtml(recordingUrl)}"></audio></div>`
+          : '    <div style="font-size:14px; color:#8f95a3;">Nog geen opname beschikbaar voor dit gesprek.</div>',
+        '  </div>',
+        '</div>',
+      ].join('');
+
+      detailEl.querySelectorAll('[data-conversation-play]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const audio = detailEl.querySelector('#conversationAudioPlayer');
+          if (!audio) return;
+          audio.play().catch(() => {});
+        });
+      });
+    }
+
+    function renderConversationList() {
+      const listEl = byId('aiNotebookConversationList');
+      const countEl = byId('aiNotebookConversationCount');
+      const statusEl = byId('aiNotebookConversationStatus');
+      if (!listEl || !countEl || !statusEl) return;
+
+      countEl.textContent = `${state.calls.length} gesprek${state.calls.length === 1 ? '' : 'ken'}`;
+
+      if (state.loading) {
+        statusEl.textContent = 'Telefoongesprekken laden...';
+      } else if (state.error) {
+        statusEl.textContent = state.error;
+      } else if (!state.calls.length) {
+        statusEl.textContent = 'Nog geen telefoongesprekken gevonden.';
+      } else {
+        statusEl.textContent = 'Klik op een gesprek om transcriptie, conclusie en opname te bekijken.';
+      }
+
+      if (!state.calls.length) {
+        listEl.innerHTML = '<div style="padding:18px; color:#8f95a3; font-size:14px; line-height:1.6;">Nog geen gesprekken beschikbaar. Zodra Vapi calls terugschrijft verschijnen ze hier automatisch.</div>';
+        renderConversationDetail();
+        return;
+      }
+
+      listEl.innerHTML = state.calls
+        .map((record) => {
+          const isActive = record.callId === state.selectedCallId;
+          const summary = escapeHtml(getConversationConclusion(record));
+          return [
+            `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:14px; border:1px solid ${isActive ? 'rgba(139,34,82,0.42)' : 'rgba(255,255,255,0.06)'}; background:${isActive ? 'rgba(139,34,82,0.12)' : 'rgba(255,255,255,0.02)'}; color:#f5f5f5; margin-bottom:10px; cursor:pointer; transition:all 0.2s ease;">`,
+            `  <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:8px;">`,
+            `    <div style="font-family:Oswald,sans-serif; font-size:18px; line-height:1.1; text-transform:uppercase; letter-spacing:0.03em;">${escapeHtml(getConversationLeadLabel(record))}</div>`,
+            `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:${inferConversationAnswered(record) === true ? '#7ce2aa' : inferConversationAnswered(record) === false ? '#f0b37a' : '#8f95a3'};">${escapeHtml(formatConversationAnsweredLabel(record))}</div>`,
+            '  </div>',
+            `  <div style="font-size:12px; color:#8f95a3; margin-bottom:8px;">${escapeHtml(record.phone || 'Geen telefoonnummer')} · ${escapeHtml(formatConversationDuration(record.durationSeconds))}</div>`,
+            `  <div style="font-size:13px; color:#d6d6d6; line-height:1.5;">${summary}</div>`,
+            `  <div style="margin-top:10px; font-size:11px; color:#8f95a3;">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
+            '</button>',
+          ].join('');
+        })
+        .join('');
+
+      listEl.querySelectorAll('[data-conversation-id]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const callId = String(button.getAttribute('data-conversation-id') || '').trim();
+          if (!callId) return;
+          state.selectedCallId = callId;
+          renderConversationList();
+          void loadConversationDetail(callId);
+        });
+      });
+
+      renderConversationDetail();
+    }
+
+    async function loadConversationDetail(callId) {
+      const record = state.calls.find((item) => item.callId === callId);
+      if (!record) return;
+
+      const alreadyHasDetail =
+        (Number(record.durationSeconds) > 0 || Number(state.detailsById[callId]?.durationSeconds) > 0) &&
+        (String(record.recordingUrl || '').trim() || String(state.detailsById[callId]?.recordingUrl || '').trim());
+      if (alreadyHasDetail) return;
+
+      state.detailLoadingId = callId;
+      state.detailErrorById[callId] = '';
+      renderConversationDetail();
+
+      try {
+        const response = await fetchWithTimeout(
+          `/api/coldcalling/status?callId=${encodeURIComponent(callId)}`,
+          { method: 'GET', cache: 'no-store' },
+          12000
+        );
+        const data = await parseApiResponse(response);
+        if (!response.ok || !data?.ok) {
+          throw new Error(String(data?.error || `Call details laden mislukt (${response.status})`));
+        }
+
+        state.detailsById[callId] = {
+          status: String(data.status || '').trim(),
+          endedReason: String(data.endedReason || '').trim(),
+          startedAt: String(data.startedAt || '').trim(),
+          endedAt: String(data.endedAt || '').trim(),
+          durationSeconds: Number.isFinite(Number(data.durationSeconds)) && Number(data.durationSeconds) > 0
+            ? Math.round(Number(data.durationSeconds))
+            : null,
+          recordingUrl: String(data.recordingUrl || '').trim(),
+        };
+      } catch (error) {
+        state.detailErrorById[callId] = error?.message || 'Kon extra details niet laden.';
+      } finally {
+        if (state.detailLoadingId === callId) {
+          state.detailLoadingId = '';
+        }
+        renderConversationDetail();
+      }
+    }
+
+    async function loadConversations() {
+      state.loading = true;
+      state.error = '';
+      renderConversationList();
+
+      try {
+        const response = await fetchWithTimeout('/api/vapi/call-updates?limit=200', {
+          method: 'GET',
+          cache: 'no-store',
+        }, 12000);
+        const data = await parseApiResponse(response);
+        if (!response.ok || !data?.ok || !Array.isArray(data?.updates)) {
+          throw new Error(String(data?.error || `Telefoongesprekken laden mislukt (${response.status})`));
+        }
+
+        state.calls = buildConversationRecordsFromUpdates(data.updates);
+        if (!state.selectedCallId || !state.calls.some((item) => item.callId === state.selectedCallId)) {
+          state.selectedCallId = state.calls[0]?.callId || '';
+        }
+
+        const hint = byId('aiNotebookHint');
+        if (hint) {
+          hint.dataset.callCount = String(state.calls.length);
+        }
+        updateAiNotebookHint();
+      } catch (error) {
+        state.calls = [];
+        state.selectedCallId = '';
+        state.error = error?.message || 'Kon telefoongesprekken niet laden.';
+      } finally {
+        state.loading = false;
+        renderConversationList();
+        if (state.selectedCallId) {
+          void loadConversationDetail(state.selectedCallId);
+        }
+      }
+    }
+
     function closeModal() {
       modal.style.display = 'none';
       document.body.style.overflow = '';
+      if (state.pollTimer) {
+        window.clearInterval(state.pollTimer);
+        state.pollTimer = null;
+      }
     }
 
     function openModal() {
       modal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
-      renderAiNotebookRows(getSavedAiNotebookRows());
-      setAiNotebookDraftHint(
-        remoteUiStateLastSource === 'supabase'
-          ? 'Excel/Sheets plakken wordt ondersteund. Klik op "Opslaan lijst" om direct naar Supabase te bewaren.'
-          : 'Excel/Sheets plakken wordt ondersteund. Opslaan werkt alleen als Supabase actief is.'
-      );
+      void loadConversations();
+      if (state.pollTimer) {
+        window.clearInterval(state.pollTimer);
+      }
+      state.pollTimer = window.setInterval(() => {
+        void loadConversations();
+      }, 15000);
     }
 
     modal.addEventListener('click', (event) => {
@@ -1755,45 +2091,8 @@
     });
 
     byId('aiNotebookCancelBtn')?.addEventListener('click', closeModal);
-
-    byId('aiNotebookAddRowBtn')?.addEventListener('click', () => {
-      const rows = collectAiNotebookRowsFromModal();
-      for (let i = 0; i < 10; i += 1) rows.push(getDefaultAiNotebookRow());
-      renderAiNotebookRows(rows);
-      persistAiNotebookRowsDraft(rows);
-      setAiNotebookDraftHint('10 rijen toegevoegd en automatisch bewaard.');
-    });
-
-    byId('aiNotebookClearRowsBtn')?.addEventListener('click', () => {
-      renderAiNotebookRows([]);
-      persistAiNotebookRowsDraft([]);
-      setAiNotebookDraftHint('AI kladblok gewist en automatisch bewaard.');
-    });
-
-    byId('aiNotebookSaveBtn')?.addEventListener('click', async () => {
-      const rows = collectAiNotebookRowsFromModal();
-      saveAiNotebookRows(rows);
-      updateAiNotebookHint();
-      setButtonSavingState('aiNotebookSaveBtn', true, 'Opslaan...');
-      setAiNotebookDraftHint('Bezig met opslaan naar Supabase...');
-      try {
-        const saveResult = await persistRemoteUiStateNow();
-        if (!saveResult.ok) {
-          setAiNotebookDraftHint(
-            `Opslaan mislukt. Dit kladblok staat nog niet in Supabase.${saveResult.error ? ` ${saveResult.error}` : ''}`
-          );
-          return;
-        }
-        const parsed = parseAiNotebookRows(rows);
-        setAiNotebookDraftHint(
-          parsed.hasInput
-            ? `AI kladblok opgeslagen in Supabase: ${parsed.nonEmptyRowCount} regel(s).`
-            : 'Leeg AI kladblok opgeslagen in Supabase.'
-        );
-        closeModal();
-      } finally {
-        setButtonSavingState('aiNotebookSaveBtn', false);
-      }
+    byId('aiNotebookRefreshBtn')?.addEventListener('click', () => {
+      void loadConversations();
     });
 
     window.addEventListener('keydown', (event) => {
@@ -1817,11 +2116,11 @@
     wrap.id = 'aiNotebookControlWrap';
     wrap.style.marginTop = '12px';
     wrap.innerHTML = [
-      '<label class="form-label">Kladblok voor AI</label>',
+      '<label class="form-label">Telefoongesprekken</label>',
       '<button type="button" class="form-input magnetic" id="openAiNotebookModalBtn" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">',
-      '  <span>Open kladblok</span>',
+      '  <span>Open gesprekken</span>',
       '</button>',
-      '<div id="aiNotebookHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85;">Nog leeg. Gebruik dit kladblok om callstatus, terugbelreden en geheugenpunten voor AI bij te houden.</div>',
+      '<div id="aiNotebookHint" data-call-count="0" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85;">Bekijk hier per gesprek wie is gebeld, of er is opgenomen, de duur, conclusie, transcriptie en opname.</div>',
     ].join('');
 
     if (dispatchControl) {
