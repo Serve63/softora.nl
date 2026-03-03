@@ -1338,7 +1338,9 @@
                     "<tr>",
                         "<td class=\"cell-client\" data-label=\"Klant\">",
                             "<div class=\"client-name\">" + escapeHtml(customer.naam) + "</div>",
-                            "<div class=\"client-company\">" + escapeHtml(customer.bedrijf) + "</div>",
+                            (customer.bedrijf && customer.bedrijf !== "-"
+                                ? "<div class=\"client-company\">" + escapeHtml(customer.bedrijf) + "</div>"
+                                : ""),
                         "</td>",
                         "<td data-label=\"Telefoonnummer\" class=\"muted-cell\">" + escapeHtml(customer.telefoon) + "</td>",
                         "<td data-label=\"Project\" class=\"muted-cell\">",
