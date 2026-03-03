@@ -1678,14 +1678,8 @@
   function updateAiNotebookHint() {
     const hint = byId('aiNotebookHint');
     if (!hint) return;
-    const count = Math.max(0, parseNumber(hint.dataset.callCount, 0) || 0);
-    if (count > 0) {
-      hint.textContent = '';
-      hint.style.display = 'none';
-      return;
-    }
-    hint.style.display = 'block';
-    hint.textContent = 'Bekijk hier per gesprek wie gebeld is, of er is opgenomen, de duur, conclusie, transcriptie en opname.';
+    hint.textContent = '';
+    hint.style.display = 'none';
   }
 
   function getConversationRecordUpdatedMs(record) {
@@ -1921,8 +1915,7 @@
       '      <div id="aiNotebookConversationDetail"></div>',
       '    </div>',
       '  </div>',
-      '  <div id="aiNotebookModalFooter" style="min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 20px; font-size:12px;">',
-      '    <div id="aiNotebookModalFooterText">Per gesprek zie je: wie is gebeld, opgenomen ja/nee, duur, conclusie, transcriptie en opname.</div>',
+      '  <div id="aiNotebookModalFooter" style="min-height:48px; display:flex; align-items:center; justify-content:flex-end; gap:12px; padding:0 20px; font-size:12px;">',
       '    <div id="aiNotebookModalFooterBrand" style="font-family:Oswald,sans-serif; letter-spacing:0.12em; text-transform:uppercase;">Softora Premium</div>',
       '  </div>',
       '</div>',
@@ -1942,7 +1935,6 @@
       const footer = byId('aiNotebookModalFooter');
       const title = byId('aiNotebookModalTitle');
       const hint = byId('aiNotebookDraftHint');
-      const footerText = byId('aiNotebookModalFooterText');
       const footerBrand = byId('aiNotebookModalFooterBrand');
       const refreshBtn = byId('aiNotebookRefreshBtn');
       const cancelBtn = byId('aiNotebookCancelBtn');
@@ -1975,7 +1967,6 @@
       }
       if (title) title.style.color = theme.text;
       if (hint) hint.style.color = theme.textMuted;
-      if (footerText) footerText.style.color = theme.textMuted;
       if (footerBrand) footerBrand.style.color = theme.accent;
 
       [refreshBtn, cancelBtn].forEach((button, index) => {
@@ -2255,7 +2246,7 @@
       '<button type="button" class="form-input magnetic" id="openAiNotebookModalBtn" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">',
       '  <span>Open gesprekken</span>',
       '</button>',
-      '<div id="aiNotebookHint" data-call-count="0" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85;">Bekijk hier per gesprek wie is gebeld, of er is opgenomen, de duur, conclusie, transcriptie en opname.</div>',
+      '<div id="aiNotebookHint" data-call-count="0" style="display:none;"></div>',
     ].join('');
 
     if (dispatchControl) {
