@@ -1895,13 +1895,13 @@
     modal.style.position = 'fixed';
     modal.style.inset = '0';
     modal.style.display = 'none';
-    modal.style.alignItems = 'center';
-    modal.style.justifyContent = 'center';
-    modal.style.padding = '16px';
+    modal.style.alignItems = 'stretch';
+    modal.style.justifyContent = 'stretch';
+    modal.style.padding = '0';
     modal.style.zIndex = '9999';
 
     modal.innerHTML = [
-      '<div id="aiNotebookModalShell" style="width:min(1560px, 96vw); height:min(900px, 94vh); overflow:hidden; display:flex; flex-direction:column;">',
+      '<div id="aiNotebookModalShell" style="width:100vw; height:100vh; overflow:hidden; display:flex; flex-direction:column;">',
       '  <div id="aiNotebookModalHeader" style="min-height:72px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; gap:12px;">',
       '    <div>',
       '      <div id="aiNotebookModalTitle" style="font-family:Oswald,sans-serif; font-size:30px; line-height:1; letter-spacing:0.03em; text-transform:uppercase;">Telefoongesprekken</div>',
@@ -1948,9 +1948,9 @@
       const cancelBtn = byId('aiNotebookCancelBtn');
 
       if (shell) {
-        shell.style.border = `1px solid ${theme.shellBorder}`;
+        shell.style.border = 'none';
         shell.style.background = theme.shellBg;
-        shell.style.boxShadow = theme.shellShadow;
+        shell.style.boxShadow = 'none';
         shell.style.color = theme.text;
       }
       if (header) {
