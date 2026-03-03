@@ -537,16 +537,10 @@
             font-size: 0.88rem;
         }
 
-        .project-title {
-            color: var(--text-primary);
-            font-size: 0.92rem;
-            line-height: 1.45;
-        }
-
         .project-type {
-            margin-top: 0.2rem;
-            color: var(--text-secondary);
-            font-size: 0.82rem;
+            color: var(--text-primary);
+            font-size: 0.88rem;
+            line-height: 1.45;
         }
 
         .muted-cell {
@@ -1373,7 +1367,6 @@
                         "<td data-label=\"Telefoonnummer\" class=\"muted-cell\">" + escapeHtml(customer.telefoon) + "</td>",
                         "<td data-label=\"Type\"><span class=\"badge " + typeClass + "\">" + escapeHtml(customer.type) + "</span></td>",
                         "<td data-label=\"Project\" class=\"muted-cell\">",
-                            "<div class=\"project-title\">" + escapeHtml(customer.website) + "</div>",
                             "<div class=\"project-type\">" + escapeHtml(customer.type) + "</div>",
                         "</td>",
                         "<td data-label=\"Bedrag\"><span class=\"amount " + amountClass + "\">" + escapeHtml(formatMoney(customer.bedrag)) + "</span></td>",
