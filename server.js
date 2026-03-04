@@ -1455,6 +1455,19 @@ function getAnthropicApiKey() {
   return normalizeString(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY);
 }
 
+function getWebsiteAnthropicModel() {
+  const candidates = [
+    normalizeString(process.env.WEBSITE_ANTHROPIC_MODEL || ''),
+    normalizeString(process.env.ANTHROPIC_WEBSITE_MODEL || ''),
+    normalizeString(WEBSITE_ANTHROPIC_MODEL || ''),
+    normalizeString(process.env.ANTHROPIC_MODEL || ''),
+    normalizeString(process.env.CLAUDE_MODEL || ''),
+    normalizeString(ANTHROPIC_MODEL || ''),
+    'claude-opus-4-6',
+  ];
+  return candidates.find((value) => Boolean(value)) || 'claude-opus-4-6';
+}
+
 function getWebsiteGenerationProvider() {
   if (WEBSITE_GENERATION_PROVIDER === 'anthropic' || WEBSITE_GENERATION_PROVIDER === 'claude') {
     return 'anthropic';
@@ -2273,7 +2286,12 @@ async function sendAnthropicMessage(options = {}) {
   }
 
   const maxTokens = Math.max(2000, Math.min(48000, Number(options.maxTokens || 12000) || 12000));
-  const model = normalizeString(options.model || WEBSITE_ANTHROPIC_MODEL || ANTHROPIC_MODEL);
+  const model = normalizeString(options.model || getWebsiteAnthropicModel());
+  if (!model) {
+    const err = new Error('Anthropic model voor website generatie ontbreekt.');
+    err.status = 500;
+    throw err;
+  }
   const effort = getAnthropicWebsiteStageEffort(options.stage || 'build');
   const basePayload = {
     model,
@@ -2314,7 +2332,7 @@ async function sendAnthropicMessage(options = {}) {
   if (
     !result.response.ok &&
     enhancedPayload !== basePayload &&
-    /thinking|output_config|adaptive|effort/i.test(JSON.stringify(result.data || {}))
+    Number(result.response.status) === 400
   ) {
     result = await sendRequest(basePayload);
   }
@@ -2396,7 +2414,7 @@ async function generateWebsiteHtmlWithOpenAi(options = {}) {
 
 async function generateWebsiteHtmlWithAnthropic(options = {}) {
   const blueprintText = buildLocalWebsiteBlueprint(options);
-  const websiteModel = normalizeString(WEBSITE_ANTHROPIC_MODEL || ANTHROPIC_MODEL || 'claude-opus-4-6');
+  const websiteModel = getWebsiteAnthropicModel();
   const buildPrompts = buildAnthropicWebsiteHtmlPrompts(options, blueprintText);
   const htmlData = await sendAnthropicMessage({
     model: websiteModel,
@@ -5204,6 +5222,16 @@ async function sendActiveOrderGenerateSiteResponse(req, res) {
   } catch (error) {
     const status = Number(error?.status) || 500;
     const safeStatus = status >= 400 && status < 600 ? status : 500;
+    const upstreamDetail = truncateText(
+      normalizeString(
+        error?.data?.error?.message ||
+          error?.data?.error?.detail ||
+          error?.data?.error ||
+          error?.data?.detail ||
+          ''
+      ),
+      500
+    );
     return res.status(safeStatus).json({
       ok: false,
       error:
@@ -5215,7 +5243,8 @@ async function sendActiveOrderGenerateSiteResponse(req, res) {
       anthropicEnabled: Boolean(getAnthropicApiKey()),
       websiteGenerationProvider: getWebsiteGenerationProvider(),
       websiteGenerationModel:
-        getWebsiteGenerationProvider() === 'anthropic' ? ANTHROPIC_MODEL : OPENAI_MODEL,
+        getWebsiteGenerationProvider() === 'anthropic' ? getWebsiteAnthropicModel() : OPENAI_MODEL,
+      upstreamDetail: upstreamDetail || null,
     });
   }
 }
