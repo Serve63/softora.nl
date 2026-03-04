@@ -18,6 +18,14 @@
       --accent: #A62D65;
     }
 
+    html[data-preview-loading="true"] body {
+      opacity: 0;
+    }
+
+    html[data-preview-ready="true"] body {
+      opacity: 1;
+    }
+
     body {
       margin: 0;
       font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
@@ -30,6 +38,7 @@
       display: grid;
       place-items: center;
       padding: 2rem;
+      transition: opacity 0.12s ease;
     }
 
     .card {
@@ -71,6 +80,7 @@
 
   <script>
     (function () {
+      document.documentElement.setAttribute('data-preview-loading', 'true');
       const PREVIEW_HTML_PREFIX = 'softora_preview_html_premium_v4_';
       const PREVIEW_HTML_PREFIX_OLD = 'softora_preview_html_premium_v2_';
       const ORDER_STATE_KEY = 'softora_order_state_premium_v1';
@@ -278,8 +288,8 @@
               host.style.cssText = [
                 'all: initial',
                 'position: fixed',
-                'top: 18px',
-                'left: 18px',
+                'right: 18px',
+                'bottom: 18px',
                 'z-index: 2147483647',
                 'font-family: Inter, system-ui, sans-serif'
               ].join(';');
@@ -292,20 +302,20 @@
                   .toolbar {
                     display: flex;
                     align-items: center;
-                    gap: 12px;
+                    gap: 10px;
                   }
                   .btn {
                     appearance: none;
                     border: 1px solid rgba(139, 34, 82, 0.22);
                     background: rgba(255, 255, 255, 0.96);
                     color: #8b2252;
-                    border-radius: 14px;
-                    padding: 12px 16px;
-                    font: 700 13px/1.1 Inter, system-ui, sans-serif;
+                    border-radius: 999px;
+                    padding: 10px 14px;
+                    font: 700 12px/1.1 Inter, system-ui, sans-serif;
                     letter-spacing: 0.04em;
                     text-transform: uppercase;
                     cursor: pointer;
-                    box-shadow: 0 18px 45px rgba(139, 34, 82, 0.16);
+                    box-shadow: 0 14px 36px rgba(139, 34, 82, 0.14);
                     backdrop-filter: blur(20px);
                     display: inline-flex;
                     align-items: center;
@@ -314,7 +324,7 @@
                   }
                   .btn:hover:not(:disabled) {
                     transform: translateY(-1px);
-                    box-shadow: 0 20px 52px rgba(139, 34, 82, 0.22);
+                    box-shadow: 0 16px 40px rgba(139, 34, 82, 0.2);
                   }
                   .btn:disabled {
                     opacity: 0.55;
@@ -337,8 +347,8 @@
                     background: rgba(166, 45, 101, 0.08);
                   }
                   .btn svg {
-                    width: 15px;
-                    height: 15px;
+                    width: 13px;
+                    height: 13px;
                     flex-shrink: 0;
                   }
                   .overlay {
@@ -452,11 +462,10 @@
                   }
                   @media (max-width: 640px) {
                     .toolbar {
-                      flex-direction: column;
-                      align-items: stretch;
+                      flex-direction: row;
+                      align-items: center;
                     }
                     .btn {
-                      width: 100%;
                       justify-content: center;
                     }
                     .panel {
@@ -748,7 +757,11 @@
         html = null;
       }
 
-      if (!html) return;
+      if (!html) {
+        document.documentElement.removeAttribute('data-preview-loading');
+        document.documentElement.setAttribute('data-preview-ready', 'true');
+        return;
+      }
 
       html = injectPreviewChrome(html, id);
       document.open();

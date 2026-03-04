@@ -2126,6 +2126,8 @@ function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
     'Schrijf exact één volledig HTML-document met inline CSS en alleen functioneel noodzakelijke inline JavaScript.',
     'Lever maatwerk, geen templategevoel: sterke hero, duidelijke visuele hiërarchie, ritme, compositie, contrast en polish.',
     'De pagina moet coherent zijn op desktop EN mobiel. Geen overlappende elementen, geen vreemde lege stroken, geen kapotte breedtes, geen debugtekst.',
+    'De bovenkant van de site moet uitzonderlijk sterk zijn: header en hero moeten als één premium geheel voelen.',
+    'Vermijd een klein los contentblok in het midden van een groot leeg vlak. Above-the-fold moet breed, intentioneel en visueel kloppend zijn.',
     'Gebruik semantische HTML, logische CTA-flow en copy die geloofwaardig blijft.',
     'Geen markdown of uitleg. Alleen HTML die begint met <!doctype html>.',
     'Voer intern eerst een kwaliteitscontrole uit op spacing, alignment, section flow, readability, responsiveness en visuele consistentie voordat je antwoordt.',
@@ -2147,6 +2149,9 @@ function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
     '- Bouw een premium single-page marketingwebsite tenzij de brief expliciet meerdere pagina’s vereist.',
     '- Gebruik een duidelijke container-structuur en consistente max-widths.',
     '- Geef elke sectie een heldere functie; geen willekeurige kaarten of losse blokken.',
+    '- Zorg dat de hero visueel royaal is en de bovenkant van de pagina overtuigend opent.',
+    '- Laat header en hero dezelfde sfeer delen; geen top die voelt alsof componenten uit verschillende templates komen.',
+    '- Vermijd een smalle gecentreerde hero-card op een willekeurige achtergrond tenzij de briefing dat expliciet vraagt.',
     '- Laat navigatie, hero, aanbod, vertrouwen, over-ons, contact en footer als één logisch verhaal voelen.',
     '- Gebruik onderscheidende maar betrouwbare typografie en een kleurpalet dat past bij de briefing.',
     '- Geen fake testimonials, nep-statistieken of verzonnen adressen.',
@@ -2180,7 +2185,7 @@ function buildLocalWebsiteBlueprint(options = {}) {
       `Primaire conversie: ${industry.cta}. Secundair: vertrouwen opbouwen en contact laagdrempelig maken.`
     )}</conversion_goal>`,
     `<art_direction>${escapeHtml(
-      `${industry.style} Werk met een duidelijke hero-compositie, sterke typografie, ritme tussen secties en een kleurpalet dat premium voelt zonder onlogisch te worden.`
+      `${industry.style} Werk met een duidelijke hero-compositie, sterke typografie, ritme tussen secties en een kleurpalet dat premium voelt zonder onlogisch te worden. Laat de bovenkant breed, rijk en samenhangend openen in plaats van als een klein los blok te voelen.`
     )}</art_direction>`,
     `<page_structure>${escapeHtml(
       'Header/navigatie, hero met kernbelofte en CTA, aanbod of diensten, onderscheidend vermogen of voordelen, vertrouwen/social proof zonder nepclaims, over ons of vakmanschap, contact/afspraaksectie en footer.'
@@ -2192,7 +2197,7 @@ function buildLocalWebsiteBlueprint(options = {}) {
       `Gebruik de bronprompt en projectomschrijving als primaire waarheid. Omschrijving: ${description || 'niet opgegeven'}. Verzin geen concrete feitelijke claims, adressen, cijfers of reviews. Bronprompt: ${promptText}`
     )}</content_plan>`,
     `<quality_checks>${escapeHtml(
-      'Geen templategevoel, geen overlapping, geen slordige spacing, consistente containerbreedtes, mobiele logica, sterke CTA-flow, geloofwaardige copy en een visueel samenhangend geheel.'
+      'Geen templategevoel, geen overlapping, geen slordige spacing, consistente containerbreedtes, mobiele logica, sterke CTA-flow, geloofwaardige copy, een overtuigende above-the-fold en een visueel samenhangend geheel.'
     )}</quality_checks>`,
     '</website_blueprint>',
   ].join('\n');
