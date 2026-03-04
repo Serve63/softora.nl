@@ -2912,7 +2912,8 @@
             ];
             let lastError = null;
 
-            for (const endpoint of endpoints) {
+            for (let i = 0; i < endpoints.length; i++) {
+                const endpoint = endpoints[i];
                 const controller = new AbortController();
                 const timer = window.setTimeout(() => controller.abort(), 300000);
                 try {
@@ -2923,14 +2924,42 @@
                         signal: controller.signal,
                         cache: 'no-store'
                     });
-                    const data = await res.json().catch(() => ({}));
+                    const raw = await res.text();
+                    let data = {};
+                    try {
+                        data = raw ? JSON.parse(raw) : {};
+                    } catch (_) {
+                        data = {};
+                    }
                     if (!res.ok || !data?.ok) {
-                        throw new Error(String(data?.detail || data?.error || `Website generatie mislukt (${res.status})`));
+                        const message = String(
+                            data?.detail ||
+                            data?.error ||
+                            raw ||
+                            `Website generatie mislukt (${res.status})`
+                        ).trim();
+                        const error = new Error(message || `Website generatie mislukt (${res.status})`);
+                        error.status = Number(res.status) || 0;
+                        const canTryNextEndpoint =
+                            i < endpoints.length - 1 &&
+                            (error.status === 404 || error.status === 405 || error.status >= 500);
+                        if (canTryNextEndpoint) {
+                            lastError = error;
+                            continue;
+                        }
+                        throw error;
                     }
                     return data;
                 } catch (error) {
                     if (String(error?.name || '') === 'AbortError') {
                         lastError = new Error('Timeout: AI website generatie duurde te lang.');
+                    } else if (
+                        Number(error?.status) >= 400 &&
+                        Number(error?.status) < 500 &&
+                        Number(error?.status) !== 404 &&
+                        Number(error?.status) !== 405
+                    ) {
+                        throw error;
                     } else {
                         lastError = error;
                     }
