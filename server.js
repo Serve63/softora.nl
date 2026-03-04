@@ -15,11 +15,21 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const ANTHROPIC_API_BASE_URL = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com/v1';
 const ANTHROPIC_MODEL =
   process.env.ANTHROPIC_MODEL || process.env.CLAUDE_MODEL || 'claude-opus-4-6';
+const WEBSITE_ANTHROPIC_MODEL =
+  process.env.WEBSITE_ANTHROPIC_MODEL ||
+  process.env.ANTHROPIC_WEBSITE_MODEL ||
+  'claude-opus-4-6';
 const WEBSITE_GENERATION_PROVIDER = String(
   process.env.WEBSITE_GENERATION_PROVIDER || process.env.SITE_GENERATION_PROVIDER || ''
 )
   .trim()
   .toLowerCase();
+const WEBSITE_GENERATION_STRICT_ANTHROPIC = !/^(0|false|no)$/i.test(
+  String(process.env.WEBSITE_GENERATION_STRICT_ANTHROPIC || 'true')
+);
+const WEBSITE_GENERATION_STRICT_HTML = !/^(0|false|no)$/i.test(
+  String(process.env.WEBSITE_GENERATION_STRICT_HTML || 'true')
+);
 const WEBSITE_GENERATION_TIMEOUT_MS = Math.max(
   60_000,
   Math.min(600_000, Number(process.env.WEBSITE_GENERATION_TIMEOUT_MS || 300_000) || 300_000)
@@ -1782,6 +1792,15 @@ ${bodyContent}
   return clipText(wrapped, 200000);
 }
 
+function ensureStrictAnthropicHtml(rawHtml) {
+  const text = stripHtmlCodeFence(rawHtml);
+  if (!text) return '';
+  const trimmed = clipText(text, 200000);
+  const hasHtmlRoot = /<html[\s>]/i.test(trimmed) && /<body[\s>]/i.test(trimmed);
+  if (!hasHtmlRoot) return '';
+  return trimmed;
+}
+
 function getOpenAiModelCostRates(model) {
   const explicitInput = Number(process.env.OPENAI_COST_INPUT_PER_1M || '');
   const explicitOutput = Number(process.env.OPENAI_COST_OUTPUT_PER_1M || '');
@@ -2254,9 +2273,10 @@ async function sendAnthropicMessage(options = {}) {
   }
 
   const maxTokens = Math.max(2000, Math.min(48000, Number(options.maxTokens || 12000) || 12000));
+  const model = normalizeString(options.model || WEBSITE_ANTHROPIC_MODEL || ANTHROPIC_MODEL);
   const effort = getAnthropicWebsiteStageEffort(options.stage || 'build');
   const basePayload = {
-    model: ANTHROPIC_MODEL,
+    model,
     max_tokens: maxTokens,
     system: systemPrompt,
     messages: [
@@ -2267,7 +2287,7 @@ async function sendAnthropicMessage(options = {}) {
     ],
   };
 
-  const enhancedPayload = supportsAnthropicAdaptiveThinking(ANTHROPIC_MODEL)
+  const enhancedPayload = supportsAnthropicAdaptiveThinking(model)
     ? {
         ...basePayload,
         thinking: { type: 'adaptive' },
@@ -2376,8 +2396,10 @@ async function generateWebsiteHtmlWithOpenAi(options = {}) {
 
 async function generateWebsiteHtmlWithAnthropic(options = {}) {
   const blueprintText = buildLocalWebsiteBlueprint(options);
+  const websiteModel = normalizeString(WEBSITE_ANTHROPIC_MODEL || ANTHROPIC_MODEL || 'claude-opus-4-6');
   const buildPrompts = buildAnthropicWebsiteHtmlPrompts(options, blueprintText);
   const htmlData = await sendAnthropicMessage({
+    model: websiteModel,
     systemPrompt: buildPrompts.systemPrompt,
     userPrompt: buildPrompts.userPrompt,
     maxTokens: getAnthropicWebsiteStageMaxTokens('build'),
@@ -2392,10 +2414,12 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
     throw err;
   }
 
-  const html = ensureHtmlDocument(generatedText, {
-    title: buildPrompts.title,
-    company: buildPrompts.company,
-  });
+  const html = WEBSITE_GENERATION_STRICT_HTML
+    ? ensureStrictAnthropicHtml(generatedText)
+    : ensureHtmlDocument(generatedText, {
+        title: buildPrompts.title,
+        company: buildPrompts.company,
+      });
   if (!html) {
     const err = new Error('Kon HTML output niet valideren.');
     err.status = 502;
@@ -2403,23 +2427,30 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
     throw err;
   }
 
+  const resolvedModel = normalizeString(htmlData?.model || websiteModel || ANTHROPIC_MODEL);
+
   return {
     html,
     source: 'anthropic',
-    model: ANTHROPIC_MODEL,
+    model: resolvedModel,
     usage: htmlData?.usage || null,
     apiCost:
-      estimateAnthropicUsageCost(htmlData?.usage || null, ANTHROPIC_MODEL) ||
+      estimateAnthropicUsageCost(htmlData?.usage || null, resolvedModel) ||
       estimateAnthropicTextCost(
         `${buildPrompts.userPrompt}\n\n${blueprintText}`,
         html,
-        ANTHROPIC_MODEL
+        resolvedModel
       ),
   };
 }
 
 async function generateWebsiteHtmlWithAi(options = {}) {
   const provider = getWebsiteGenerationProvider();
+  if (WEBSITE_GENERATION_STRICT_ANTHROPIC && provider !== 'anthropic') {
+    const err = new Error('Website generatie is strict op Anthropic/Claude gezet.');
+    err.status = 503;
+    throw err;
+  }
   if (provider === 'anthropic') {
     return generateWebsiteHtmlWithAnthropic(options);
   }
@@ -5156,6 +5187,10 @@ async function sendActiveOrderGenerateSiteResponse(req, res) {
       html: generated.html,
       source: generated.source,
       model: generated.model,
+      generator: {
+        strictAnthropic: WEBSITE_GENERATION_STRICT_ANTHROPIC,
+        strictHtml: WEBSITE_GENERATION_STRICT_HTML,
+      },
       usage: generated.usage,
       apiCost: generated.apiCost,
       order: {
