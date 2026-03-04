@@ -1473,6 +1473,7 @@
         let buildMode = 'premium';
         let activeOrderFilter = 'open';
         const activeProgressAnimations = {};
+        const pendingPreviewWindows = {};
 
         function getTime() {
             return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -2636,12 +2637,116 @@
             }
         }
 
-        function openPreview(id) {
+        function getPreviewUrl(id) {
             const activeId = selectActiveOrderId(id);
-            const w = window.open(`/premium-opdracht-preview?id=${encodeURIComponent(String(activeId))}`, '_blank');
-            if (!w) {
-                alert('Pop-up geblokkeerd. Sta pop-ups toe om de preview te openen.');
+            return `/premium-opdracht-preview?id=${encodeURIComponent(String(activeId))}`;
+        }
+
+        function claimPendingPreviewWindow(id) {
+            const activeId = selectActiveOrderId(id);
+            const key = String(activeId);
+            const pending = pendingPreviewWindows[key] || null;
+            delete pendingPreviewWindows[key];
+            return pending;
+        }
+
+        function openPreviewPlaceholder(id) {
+            const activeId = selectActiveOrderId(id);
+            const key = String(activeId);
+            const w = window.open('about:blank', '_blank');
+            if (!w) return null;
+
+            pendingPreviewWindows[key] = w;
+
+            try {
+                w.document.open();
+                w.document.write(`<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preview wordt geladen...</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+      background: #f8f7f4;
+      color: #1a1a2e;
+      font-family: Inter, system-ui, sans-serif;
+    }
+    .shell {
+      width: min(560px, 100%);
+      padding: 32px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: #ffffff;
+    }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #979cad;
+      font: 500 12px/1 Oswald, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+    h1 {
+      margin: 0 0 12px;
+      color: #1a1a2e;
+      font: 700 42px/1 Oswald, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    p {
+      margin: 0;
+      color: #606272;
+      font-size: 16px;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <p class="eyebrow">Softora Premium</p>
+    <h1>Website wordt gebouwd</h1>
+    <p>De preview opent automatisch zodra de AI-build klaar is.</p>
+  </div>
+</body>
+</html>`);
+                w.document.close();
+            } catch (_) {
+                // Ignore placeholder render errors.
             }
+
+            return w;
+        }
+
+        function openPreview(id, options = {}) {
+            const previewUrl = getPreviewUrl(id);
+            const suppliedWindow = options && options.windowRef;
+            if (suppliedWindow && !suppliedWindow.closed) {
+                try {
+                    suppliedWindow.location.replace(previewUrl);
+                    suppliedWindow.focus();
+                    return true;
+                } catch (_) {
+                    // Fall through to normal open logic.
+                }
+            }
+
+            const w = window.open(previewUrl, '_blank');
+            if (w) {
+                try {
+                    w.focus();
+                } catch (_) {
+                    // ignore focus errors
+                }
+                return true;
+            }
+
+            window.location.href = previewUrl;
+            return false;
         }
 
         function markOrderAsPaid(id) {
@@ -2868,6 +2973,7 @@
             orders[id].logs = [];
             orders[id].statusKey = 'bezig';
             orders[id].updatedAt = Date.now();
+            const previewWindow = openPreviewPlaceholder(activeId);
             setLastActiveOrder(activeId);
             persistOrdersRuntime();
             setOrderProgress(id, 2, 1);
@@ -2952,8 +3058,16 @@
 
                 applyOrderUiStateToCard(id);
 
-                openPreview(activeId);
+                openPreview(activeId, { windowRef: previewWindow || claimPendingPreviewWindow(activeId) });
             } catch (error) {
+                const pendingWindow = previewWindow || claimPendingPreviewWindow(activeId);
+                if (pendingWindow && !pendingWindow.closed) {
+                    try {
+                        pendingWindow.close();
+                    } catch (_) {
+                        // ignore close errors
+                    }
+                }
                 stopOrderProgressSimulation(id);
                 orders[id].statusKey = 'actief';
                 setOrderProgress(id, Math.max(5, Number(orders[id].progressPct) || 0), getProgressStepForPct(Number(orders[id].progressPct) || 5));
