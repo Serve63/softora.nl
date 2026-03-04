@@ -90,7 +90,8 @@
       const REMOTE_UI_STATE_SCOPE = 'premium_active_orders';
       const params = new URLSearchParams(window.location.search);
       const id = params.get('id');
-      const enablePreviewChrome = /^(1|true|yes)$/i.test(String(params.get('tools') || ''));
+      const toolsParam = String(params.get('tools') || '').trim().toLowerCase();
+      const enablePreviewChrome = !/^(0|false|no)$/i.test(toolsParam);
       if (!id) return;
 
       function encodeBase64Utf8(value) {

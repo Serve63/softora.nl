@@ -1814,6 +1814,31 @@ function ensureStrictAnthropicHtml(rawHtml) {
   return trimmed;
 }
 
+function extractVisibleTextFromHtml(html) {
+  const raw = normalizeString(html || '');
+  if (!raw) return '';
+  return raw
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isLikelyUsableWebsiteHtml(html) {
+  const raw = normalizeString(html || '');
+  if (!raw) return false;
+  const lower = raw.toLowerCase();
+
+  const semanticCount = (lower.match(/<(header|main|section|footer|nav|form)\b/g) || []).length;
+  const ctaCount = (lower.match(/<(a|button)\b/g) || []).length;
+  const headingCount = (lower.match(/<h[1-4]\b/g) || []).length;
+  const textLen = extractVisibleTextFromHtml(raw).length;
+
+  return semanticCount >= 3 && ctaCount >= 2 && headingCount >= 2 && textLen >= 180;
+}
+
 function getOpenAiModelCostRates(model) {
   const explicitInput = Number(process.env.OPENAI_COST_INPUT_PER_1M || '');
   const explicitOutput = Number(process.env.OPENAI_COST_OUTPUT_PER_1M || '');
@@ -2440,6 +2465,13 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
       });
   if (!html) {
     const err = new Error('Kon HTML output niet valideren.');
+    err.status = 502;
+    err.data = htmlData;
+    throw err;
+  }
+
+  if (!isLikelyUsableWebsiteHtml(html)) {
+    const err = new Error('AI output lijkt onvolledig of visueel defect.');
     err.status = 502;
     err.data = htmlData;
     throw err;
