@@ -1978,6 +1978,7 @@ function buildWebsiteGenerationPrompts(options = {}) {
     'Je bent een senior front-end engineer en webdesigner.',
     'Genereer exact één volledig HTML-document met inline CSS (en alleen indien nodig inline JS).',
     'Gebruik semantische HTML, nette typografie, duidelijke CTA’s en mobielvriendelijke opbouw.',
+    'Houd de output compact en productiegericht: beknopte copy, compacte CSS, geen overbodige secties of comments.',
     'Geen markdown, geen uitleg, alleen de HTML-code.',
     'Gebruik uitsluitend informatie uit de prompt/context; geen verzonnen bedrijfsclaims.',
   ].join('\n');
@@ -1995,6 +1996,12 @@ function buildWebsiteGenerationPrompts(options = {}) {
     '- Over ons sectie',
     '- Contact sectie met formulier',
     '- Footer',
+    '',
+    'Compactheidsregels:',
+    '- Gebruik maximaal 6 inhoudssecties exclusief footer',
+    '- Houd copy per sectie kort en concreet',
+    '- Houd CSS compact en vermijd overmatige visuele effecten',
+    '- Schrijf productiegerichte HTML zonder overbodige herhaling',
     '',
     'Output regels:',
     '- Start met <!doctype html>',
@@ -2093,8 +2100,8 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
 
   const { company, title, userPrompt, systemPrompt } = buildWebsiteGenerationPrompts(options);
   const maxTokens = Math.max(
-    2000,
-    Math.min(32000, Number(process.env.ANTHROPIC_MAX_TOKENS || 12000) || 12000)
+    1500,
+    Math.min(8000, Number(process.env.ANTHROPIC_MAX_TOKENS || 4000) || 4000)
   );
 
   const { response, data } = await fetchJsonWithTimeout(
