@@ -2117,58 +2117,6 @@ function buildWebsiteGenerationPrompts(options = {}) {
   };
 }
 
-function buildAnthropicWebsiteBlueprintPrompts(options = {}) {
-  const context = buildWebsiteGenerationContext(options);
-  const { company, title, description, language, promptText, industry } = context;
-
-  const systemPrompt = [
-    'Je bent een world-class creative director, UX strategist en conversion copywriter.',
-    'Je taak is NIET om direct code te schrijven, maar eerst een premium website-blueprint te maken.',
-    'Werk alsof de klant normaal via claude.com een high-end website verwacht: intentional, visueel sterk, logisch en conversiegericht.',
-    'Vermijd generieke templates. Ontwerp eerst de merkhoek, hiërarchie, compositie, sfeer, sectievolgorde en copy-aanpak.',
-    'Je mag standaardaanbod afleiden uit het type bedrijf, maar verzin geen concrete awards, adressen, reviewcijfers of feitelijke claims zonder bron.',
-    'Geef alleen XML terug volgens het gevraagde schema.',
-  ].join('\n');
-
-  const userPrompt = [
-    '<website_brief_request>',
-    `<language>${escapeHtml(language)}</language>`,
-    company ? `<company>${escapeHtml(company)}</company>` : '',
-    title ? `<project_title>${escapeHtml(title)}</project_title>` : '',
-    description ? `<project_description>${escapeHtml(description)}</project_description>` : '',
-    `<industry>${escapeHtml(industry.label)}</industry>`,
-    `<likely_audience>${escapeHtml(industry.audience)}</likely_audience>`,
-    `<likely_offers>${escapeHtml(industry.offers)}</likely_offers>`,
-    `<style_hint>${escapeHtml(industry.style)}</style_hint>`,
-    `<trust_hint>${escapeHtml(industry.trust)}</trust_hint>`,
-    `<primary_cta>${escapeHtml(industry.cta)}</primary_cta>`,
-    '<source_prompt>',
-    promptText,
-    '</source_prompt>',
-    '<required_output>',
-    '<website_blueprint>',
-    '<brand_core>kern van positionering, tone en waardepropositie</brand_core>',
-    '<audience>primaire doelgroep, intentie en belangrijkste bezwaren</audience>',
-    '<conversion_goal>hoofdconversie en secundaire conversies</conversion_goal>',
-    '<art_direction>visuele richting, sfeer, kleurgebruik, materiaalgevoel, typografie en layout-benadering</art_direction>',
-    '<page_structure>globale volgorde van secties met doel per sectie</page_structure>',
-    '<section_notes>korte maar concrete bouw- en copy-instructie per sectie</section_notes>',
-    '<content_plan>welke content mag impliciet worden afgeleid uit branche en wat absoluut niet verzonnen mag worden</content_plan>',
-    '<quality_checks>maximaal 8 checks die de uiteindelijke HTML moet halen</quality_checks>',
-    '</website_blueprint>',
-    '</required_output>',
-    '</website_brief_request>',
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  return {
-    ...context,
-    systemPrompt,
-    userPrompt,
-  };
-}
-
 function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
   const context = buildWebsiteGenerationContext(options);
   const { company, title, description, language, promptText } = context;
@@ -2217,6 +2165,39 @@ function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
   };
 }
 
+function buildLocalWebsiteBlueprint(options = {}) {
+  const context = buildWebsiteGenerationContext(options);
+  const { company, title, description, industry, promptText } = context;
+  const brandName = company || title || industry.label;
+
+  return [
+    '<website_blueprint>',
+    `<brand_core>${escapeHtml(
+      `${brandName}: premium positionering, duidelijke waardepropositie en een geloofwaardige lokale of specialistische uitstraling.`
+    )}</brand_core>`,
+    `<audience>${escapeHtml(industry.audience)}</audience>`,
+    `<conversion_goal>${escapeHtml(
+      `Primaire conversie: ${industry.cta}. Secundair: vertrouwen opbouwen en contact laagdrempelig maken.`
+    )}</conversion_goal>`,
+    `<art_direction>${escapeHtml(
+      `${industry.style} Werk met een duidelijke hero-compositie, sterke typografie, ritme tussen secties en een kleurpalet dat premium voelt zonder onlogisch te worden.`
+    )}</art_direction>`,
+    `<page_structure>${escapeHtml(
+      'Header/navigatie, hero met kernbelofte en CTA, aanbod of diensten, onderscheidend vermogen of voordelen, vertrouwen/social proof zonder nepclaims, over ons of vakmanschap, contact/afspraaksectie en footer.'
+    )}</page_structure>`,
+    `<section_notes>${escapeHtml(
+      `Zorg dat elke sectie een eigen functie heeft. Verwerk ${industry.offers} alleen voor zover geloofwaardig binnen de prompt en hou de tekst concreet, conversiegericht en logisch opgebouwd.`
+    )}</section_notes>`,
+    `<content_plan>${escapeHtml(
+      `Gebruik de bronprompt en projectomschrijving als primaire waarheid. Omschrijving: ${description || 'niet opgegeven'}. Verzin geen concrete feitelijke claims, adressen, cijfers of reviews. Bronprompt: ${promptText}`
+    )}</content_plan>`,
+    `<quality_checks>${escapeHtml(
+      'Geen templategevoel, geen overlapping, geen slordige spacing, consistente containerbreedtes, mobiele logica, sterke CTA-flow, geloofwaardige copy en een visueel samenhangend geheel.'
+    )}</quality_checks>`,
+    '</website_blueprint>',
+  ].join('\n');
+}
+
 function getAnthropicWebsiteStageEffort(stage = 'build') {
   const envKey =
     stage === 'blueprint'
@@ -2238,41 +2219,13 @@ function getAnthropicWebsiteStageMaxTokens(stage = 'build') {
       : stage === 'review'
         ? 'ANTHROPIC_WEBSITE_REVIEW_MAX_TOKENS'
         : 'ANTHROPIC_WEBSITE_MAX_TOKENS';
-  const fallback = stage === 'blueprint' ? 6000 : stage === 'review' ? 8000 : 24000;
+  const fallback = stage === 'blueprint' ? 6000 : stage === 'review' ? 8000 : 18000;
   return Math.max(2000, Math.min(48000, Number(process.env[envKey] || fallback) || fallback));
 }
 
 function supportsAnthropicAdaptiveThinking(model = ANTHROPIC_MODEL) {
   const key = normalizeString(model).toLowerCase();
   return key.includes('claude-opus-4-6') || key.includes('claude-sonnet-4-6');
-}
-
-function sumAnthropicUsage(usages = []) {
-  let input = 0;
-  let output = 0;
-  let total = 0;
-  let hasUsage = false;
-
-  for (const usage of usages) {
-    if (!usage || typeof usage !== 'object') continue;
-    const inputTokens = Number(usage.input_tokens ?? usage.prompt_tokens ?? usage.inputTokens ?? 0);
-    const outputTokens = Number(usage.output_tokens ?? usage.completion_tokens ?? usage.outputTokens ?? 0);
-    const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? inputTokens + outputTokens);
-    if (!Number.isFinite(inputTokens) || !Number.isFinite(outputTokens) || !Number.isFinite(totalTokens)) {
-      continue;
-    }
-    input += inputTokens;
-    output += outputTokens;
-    total += totalTokens;
-    hasUsage = true;
-  }
-
-  if (!hasUsage) return null;
-  return {
-    input_tokens: Math.round(input),
-    output_tokens: Math.round(output),
-    total_tokens: Math.round(total || input + output),
-  };
 }
 
 async function sendAnthropicMessage(options = {}) {
@@ -2413,22 +2366,7 @@ async function generateWebsiteHtmlWithOpenAi(options = {}) {
 }
 
 async function generateWebsiteHtmlWithAnthropic(options = {}) {
-  const blueprintPrompts = buildAnthropicWebsiteBlueprintPrompts(options);
-  const blueprintData = await sendAnthropicMessage({
-    systemPrompt: blueprintPrompts.systemPrompt,
-    userPrompt: blueprintPrompts.userPrompt,
-    maxTokens: getAnthropicWebsiteStageMaxTokens('blueprint'),
-    stage: 'blueprint',
-  });
-
-  const blueprintText = normalizeString(extractAnthropicTextContent(blueprintData?.content));
-  if (!blueprintText) {
-    const err = new Error('Anthropic gaf een lege website-blueprint terug.');
-    err.status = 502;
-    err.data = blueprintData;
-    throw err;
-  }
-
+  const blueprintText = buildLocalWebsiteBlueprint(options);
   const buildPrompts = buildAnthropicWebsiteHtmlPrompts(options, blueprintText);
   const htmlData = await sendAnthropicMessage({
     systemPrompt: buildPrompts.systemPrompt,
@@ -2456,17 +2394,15 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
     throw err;
   }
 
-  const usage = sumAnthropicUsage([blueprintData?.usage || null, htmlData?.usage || null]);
-
   return {
     html,
     source: 'anthropic',
     model: ANTHROPIC_MODEL,
-    usage,
+    usage: htmlData?.usage || null,
     apiCost:
-      estimateAnthropicUsageCost(usage, ANTHROPIC_MODEL) ||
+      estimateAnthropicUsageCost(htmlData?.usage || null, ANTHROPIC_MODEL) ||
       estimateAnthropicTextCost(
-        `${blueprintPrompts.userPrompt}\n\n${buildPrompts.userPrompt}\n\n${blueprintText}`,
+        `${buildPrompts.userPrompt}\n\n${blueprintText}`,
         html,
         ANTHROPIC_MODEL
       ),
