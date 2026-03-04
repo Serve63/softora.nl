@@ -1,11 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/*.js": {
-      "maxDuration": 300
+    "api/[...path].js": {
+      "maxDuration": 800
     },
-    "api/**/*.js": {
-      "maxDuration": 300
+    "api/index.js": {
+      "maxDuration": 800
+    },
+    "api/agenda/[...path].js": {
+      "maxDuration": 800
+    },
+    "api/ai/[...path].js": {
+      "maxDuration": 800
+    },
+    "api/coldcalling/[...path].js": {
+      "maxDuration": 800
+    },
+    "api/vapi/[...path].js": {
+      "maxDuration": 800
     }
   },
   "rewrites": [
