@@ -20,6 +20,10 @@ const WEBSITE_GENERATION_PROVIDER = String(
 )
   .trim()
   .toLowerCase();
+const WEBSITE_GENERATION_TIMEOUT_MS = Math.max(
+  60_000,
+  Math.min(600_000, Number(process.env.WEBSITE_GENERATION_TIMEOUT_MS || 300_000) || 300_000)
+);
 const VERBOSE_VAPI_WEBHOOK_LOGS = /^(1|true|yes)$/i.test(
   String(process.env.VERBOSE_VAPI_WEBHOOK_LOGS || '')
 );
@@ -1978,7 +1982,6 @@ function buildWebsiteGenerationPrompts(options = {}) {
     'Je bent een senior front-end engineer en webdesigner.',
     'Genereer exact één volledig HTML-document met inline CSS (en alleen indien nodig inline JS).',
     'Gebruik semantische HTML, nette typografie, duidelijke CTA’s en mobielvriendelijke opbouw.',
-    'Houd de output compact en productiegericht: beknopte copy, compacte CSS, geen overbodige secties of comments.',
     'Geen markdown, geen uitleg, alleen de HTML-code.',
     'Gebruik uitsluitend informatie uit de prompt/context; geen verzonnen bedrijfsclaims.',
   ].join('\n');
@@ -1996,12 +1999,6 @@ function buildWebsiteGenerationPrompts(options = {}) {
     '- Over ons sectie',
     '- Contact sectie met formulier',
     '- Footer',
-    '',
-    'Compactheidsregels:',
-    '- Gebruik maximaal 6 inhoudssecties exclusief footer',
-    '- Houd copy per sectie kort en concreet',
-    '- Houd CSS compact en vermijd overmatige visuele effecten',
-    '- Schrijf productiegerichte HTML zonder overbodige herhaling',
     '',
     'Output regels:',
     '- Start met <!doctype html>',
@@ -2052,7 +2049,7 @@ async function generateWebsiteHtmlWithOpenAi(options = {}) {
         ],
       }),
     },
-    120000
+    WEBSITE_GENERATION_TIMEOUT_MS
   );
 
   if (!response.ok) {
@@ -2100,8 +2097,8 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
 
   const { company, title, userPrompt, systemPrompt } = buildWebsiteGenerationPrompts(options);
   const maxTokens = Math.max(
-    1500,
-    Math.min(8000, Number(process.env.ANTHROPIC_MAX_TOKENS || 4000) || 4000)
+    2000,
+    Math.min(32000, Number(process.env.ANTHROPIC_MAX_TOKENS || 12000) || 12000)
   );
 
   const { response, data } = await fetchJsonWithTimeout(
@@ -2126,7 +2123,7 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
         ],
       }),
     },
-    120000
+    WEBSITE_GENERATION_TIMEOUT_MS
   );
 
   if (!response.ok) {

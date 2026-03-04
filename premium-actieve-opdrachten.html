@@ -2908,7 +2908,7 @@
 
             for (const endpoint of endpoints) {
                 const controller = new AbortController();
-                const timer = window.setTimeout(() => controller.abort(), 120000);
+                const timer = window.setTimeout(() => controller.abort(), 300000);
                 try {
                     const res = await fetch(endpoint, {
                         method: 'POST',
