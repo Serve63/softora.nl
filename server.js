@@ -2219,11 +2219,15 @@ function getAnthropicWebsiteStageMaxTokens(stage = 'build') {
       : stage === 'review'
         ? 'ANTHROPIC_WEBSITE_REVIEW_MAX_TOKENS'
         : 'ANTHROPIC_WEBSITE_MAX_TOKENS';
-  const fallback = stage === 'blueprint' ? 6000 : stage === 'review' ? 8000 : 18000;
+  const fallback = stage === 'blueprint' ? 6000 : stage === 'review' ? 8000 : 12000;
   return Math.max(2000, Math.min(48000, Number(process.env[envKey] || fallback) || fallback));
 }
 
 function supportsAnthropicAdaptiveThinking(model = ANTHROPIC_MODEL) {
+  const enabled = /^(1|true|yes)$/i.test(
+    String(process.env.ANTHROPIC_WEBSITE_ENABLE_ADAPTIVE_THINKING || '')
+  );
+  if (!enabled) return false;
   const key = normalizeString(model).toLowerCase();
   return key.includes('claude-opus-4-6') || key.includes('claude-sonnet-4-6');
 }
