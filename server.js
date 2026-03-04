@@ -199,6 +199,15 @@ function normalizeString(value, fallback = '') {
   return String(value).trim();
 }
 
+function escapeHtml(value) {
+  return normalizeString(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function truncateText(value, maxLength = 500) {
   const text = normalizeString(value);
   if (!text) return '';
@@ -1965,7 +1974,80 @@ function estimateAnthropicTextCost(inputText, outputText, model) {
   });
 }
 
-function buildWebsiteGenerationPrompts(options = {}) {
+function inferWebsiteIndustryProfile(context = {}) {
+  const sourceText = [
+    normalizeString(context.company || ''),
+    normalizeString(context.title || ''),
+    normalizeString(context.description || ''),
+    normalizeString(context.promptText || ''),
+  ]
+    .filter(Boolean)
+    .join(' \n ')
+    .toLowerCase();
+
+  const profiles = [
+    {
+      key: 'hair_salon',
+      pattern: /\b(kapper|kapsalon|barber|barbershop|hairstyl|haarstudio|salon)\b/i,
+      label: 'Kapsalon / barber',
+      audience:
+        'Lokale bezoekers die snel vertrouwen willen voelen en direct een afspraak willen boeken.',
+      offers:
+        'Knippen, kleuren, stylen, baardverzorging, advies, arrangementen en terugkerende afspraken.',
+      style:
+        'Editorial, verzorgd, premium maar toegankelijk, met tastbare sfeer en een modieuze uitstraling.',
+      trust:
+        'Laat openingstijden, locatie, service-overzicht, reviews, voor/na-proof of klantgericht vakmanschap duidelijk terugkomen.',
+      cta: 'Plan een afspraak',
+    },
+    {
+      key: 'restaurant',
+      pattern: /\b(restaurant|bistro|brasserie|cafe|café|horeca|lunchroom|eten|menu)\b/i,
+      label: 'Restaurant / horeca',
+      audience: 'Bezoekers die sfeer, menukeuze en praktische info razendsnel willen begrijpen.',
+      offers: 'Menu, specialiteiten, reserveren, openingstijden, locatie, groepsmogelijkheden.',
+      style: 'Sfeervol, smaakvol, warm en gastvrij met duidelijke hiërarchie en ambiance.',
+      trust: 'Laat sfeer, specialiteiten, locatie, openingstijden en reserverings-CTA sterk landen.',
+      cta: 'Reserveer nu',
+    },
+    {
+      key: 'construction',
+      pattern: /\b(aannemer|bouw|verbouw|renovatie|schilder|klus|dak|installatie|timmer)\b/i,
+      label: 'Bouw / vakwerk',
+      audience:
+        'Huiseigenaren en bedrijven die betrouwbaarheid, aanpak en tastbaar vakmanschap willen zien.',
+      offers: 'Projecttypen, werkwijze, offerte-aanvraag, servicegebied, referenties, garanties.',
+      style: 'Stevig, betrouwbaar, helder en professioneel met veel structuur en vertrouwen.',
+      trust: 'Gebruik een no-nonsense opbouw met proces, voorbeelden, contact en duidelijke CTA.',
+      cta: 'Vraag een offerte aan',
+    },
+    {
+      key: 'consulting',
+      pattern: /\b(coach|consult|advies|consultant|marketing|agency|bureau|seo|strateg)\b/i,
+      label: 'Consultancy / bureau',
+      audience: 'Beslissers die snel grip willen op resultaat, expertise en vervolgstap.',
+      offers: 'Diensten, trajecten, aanpak, cases, expertise, intake of strategiegesprek.',
+      style: 'Scherp, modern, intelligent en conversion-first met een duidelijke premium uitstraling.',
+      trust: 'Laat expertise, werkwijze, resultaat en heldere CTA’s de kern vormen.',
+      cta: 'Plan een gesprek',
+    },
+  ];
+
+  const matched = profiles.find((profile) => profile.pattern.test(sourceText));
+  if (matched) return matched;
+
+  return {
+    key: 'local_service',
+    label: 'Lokale dienstverlener',
+    audience: 'Mensen die snel willen begrijpen wat het aanbod is en direct contact willen opnemen.',
+    offers: 'Kernservices, voordelen, werkwijze, vertrouwen, contact en conversiegerichte CTA’s.',
+    style: 'Premium, helder, eigentijds en doelgericht zonder generieke template-uitstraling.',
+    trust: 'Focus op helder aanbod, sterke positionering, vertrouwen en een logische contactflow.',
+    cta: 'Neem contact op',
+  };
+}
+
+function buildWebsiteGenerationContext(options = {}) {
   const promptText = truncateText(normalizeString(options.prompt || ''), 40000);
   if (!promptText) {
     const err = new Error('Prompt ontbreekt voor website generatie.');
@@ -1977,39 +2059,7 @@ function buildWebsiteGenerationPrompts(options = {}) {
   const title = truncateText(normalizeString(options.title || ''), 200);
   const description = truncateText(normalizeString(options.description || ''), 3000);
   const language = normalizeString(options.language || 'nl') || 'nl';
-
-  const systemPrompt = [
-    'Je bent een senior front-end engineer en webdesigner.',
-    'Genereer exact één volledig HTML-document met inline CSS (en alleen indien nodig inline JS).',
-    'Gebruik semantische HTML, nette typografie, duidelijke CTA’s en mobielvriendelijke opbouw.',
-    'Geen markdown, geen uitleg, alleen de HTML-code.',
-    'Gebruik uitsluitend informatie uit de prompt/context; geen verzonnen bedrijfsclaims.',
-  ].join('\n');
-
-  const userPrompt = [
-    `Taal: ${language}`,
-    company ? `Bedrijf: ${company}` : '',
-    title ? `Projecttitel: ${title}` : '',
-    description ? `Projectomschrijving: ${description}` : '',
-    '',
-    'Bouw een complete marketingwebsite met minimaal:',
-    '- Hero met waardepropositie + CTA',
-    '- Diensten/aanbod sectie',
-    '- Resultaten/voordelen sectie',
-    '- Over ons sectie',
-    '- Contact sectie met formulier',
-    '- Footer',
-    '',
-    'Output regels:',
-    '- Start met <!doctype html>',
-    '- Gebruik alleen één HTML-bestand',
-    '- Geen placeholders zoals lorem ipsum tenzij info ontbreekt',
-    '',
-    'Projectprompt:',
-    promptText,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const industry = inferWebsiteIndustryProfile({ company, title, description, promptText });
 
   return {
     company,
@@ -2017,9 +2067,284 @@ function buildWebsiteGenerationPrompts(options = {}) {
     description,
     language,
     promptText,
+    industry,
+  };
+}
+
+function buildWebsiteGenerationPrompts(options = {}) {
+  const context = buildWebsiteGenerationContext(options);
+  const { company, title, description, language, promptText, industry } = context;
+
+  const systemPrompt = [
+    'Je bent een elite webdesigner, conversion strategist en senior front-end engineer.',
+    'Genereer exact één volledig HTML-document met inline CSS en alleen indien functioneel nodig inline JavaScript.',
+    'Werk als een art director: intentional, premium, logisch, ruimtelijk sterk en consistent.',
+    'Geen markdown, geen uitleg, alleen de HTML-code.',
+    'Je mag wel logische standaard-aanbodstructuur afleiden uit het type bedrijf, maar verzin geen concrete awards, adressen, reviews of claims die niet onderbouwd zijn.',
+    'Voorkom generieke blokken, slordige spacing, vreemde overlaps of sections die los van elkaar voelen.',
+  ].join('\n');
+
+  const userPrompt = [
+    '<website_request>',
+    `<language>${escapeHtml(language)}</language>`,
+    company ? `<company>${escapeHtml(company)}</company>` : '',
+    title ? `<project_title>${escapeHtml(title)}</project_title>` : '',
+    description ? `<project_description>${escapeHtml(description)}</project_description>` : '',
+    `<industry>${escapeHtml(industry.label)}</industry>`,
+    `<likely_audience>${escapeHtml(industry.audience)}</likely_audience>`,
+    `<likely_offers>${escapeHtml(industry.offers)}</likely_offers>`,
+    `<style_direction>${escapeHtml(industry.style)}</style_direction>`,
+    `<trust_notes>${escapeHtml(industry.trust)}</trust_notes>`,
+    `<primary_cta>${escapeHtml(industry.cta)}</primary_cta>`,
+    '<quality_bar>',
+    'Maak een premium website die voelt als maatwerk, niet als template.',
+    'Zorg dat compositie, breedtes, hiërarchie, witruimte, CTA-flow en mobiele layout coherent zijn.',
+    'Gebruik een duidelijk visueel systeem: sterke typografie, ritme tussen secties, onderscheidende hero en consequente componenten.',
+    'Als informatie ontbreekt, vul dan geen nep-feiten in maar ontwerp de structuur slim en geloofwaardig.',
+    '</quality_bar>',
+    '<project_prompt>',
+    promptText,
+    '</project_prompt>',
+    '</website_request>',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    ...context,
     systemPrompt,
     userPrompt,
   };
+}
+
+function buildAnthropicWebsiteBlueprintPrompts(options = {}) {
+  const context = buildWebsiteGenerationContext(options);
+  const { company, title, description, language, promptText, industry } = context;
+
+  const systemPrompt = [
+    'Je bent een world-class creative director, UX strategist en conversion copywriter.',
+    'Je taak is NIET om direct code te schrijven, maar eerst een premium website-blueprint te maken.',
+    'Werk alsof de klant normaal via claude.com een high-end website verwacht: intentional, visueel sterk, logisch en conversiegericht.',
+    'Vermijd generieke templates. Ontwerp eerst de merkhoek, hiërarchie, compositie, sfeer, sectievolgorde en copy-aanpak.',
+    'Je mag standaardaanbod afleiden uit het type bedrijf, maar verzin geen concrete awards, adressen, reviewcijfers of feitelijke claims zonder bron.',
+    'Geef alleen XML terug volgens het gevraagde schema.',
+  ].join('\n');
+
+  const userPrompt = [
+    '<website_brief_request>',
+    `<language>${escapeHtml(language)}</language>`,
+    company ? `<company>${escapeHtml(company)}</company>` : '',
+    title ? `<project_title>${escapeHtml(title)}</project_title>` : '',
+    description ? `<project_description>${escapeHtml(description)}</project_description>` : '',
+    `<industry>${escapeHtml(industry.label)}</industry>`,
+    `<likely_audience>${escapeHtml(industry.audience)}</likely_audience>`,
+    `<likely_offers>${escapeHtml(industry.offers)}</likely_offers>`,
+    `<style_hint>${escapeHtml(industry.style)}</style_hint>`,
+    `<trust_hint>${escapeHtml(industry.trust)}</trust_hint>`,
+    `<primary_cta>${escapeHtml(industry.cta)}</primary_cta>`,
+    '<source_prompt>',
+    promptText,
+    '</source_prompt>',
+    '<required_output>',
+    '<website_blueprint>',
+    '<brand_core>kern van positionering, tone en waardepropositie</brand_core>',
+    '<audience>primaire doelgroep, intentie en belangrijkste bezwaren</audience>',
+    '<conversion_goal>hoofdconversie en secundaire conversies</conversion_goal>',
+    '<art_direction>visuele richting, sfeer, kleurgebruik, materiaalgevoel, typografie en layout-benadering</art_direction>',
+    '<page_structure>globale volgorde van secties met doel per sectie</page_structure>',
+    '<section_notes>korte maar concrete bouw- en copy-instructie per sectie</section_notes>',
+    '<content_plan>welke content mag impliciet worden afgeleid uit branche en wat absoluut niet verzonnen mag worden</content_plan>',
+    '<quality_checks>maximaal 8 checks die de uiteindelijke HTML moet halen</quality_checks>',
+    '</website_blueprint>',
+    '</required_output>',
+    '</website_brief_request>',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    ...context,
+    systemPrompt,
+    userPrompt,
+  };
+}
+
+function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
+  const context = buildWebsiteGenerationContext(options);
+  const { company, title, description, language, promptText } = context;
+
+  const systemPrompt = [
+    'Je bent een elite front-end designer en engineer die premium marketingwebsites bouwt.',
+    'Schrijf exact één volledig HTML-document met inline CSS en alleen functioneel noodzakelijke inline JavaScript.',
+    'Lever maatwerk, geen templategevoel: sterke hero, duidelijke visuele hiërarchie, ritme, compositie, contrast en polish.',
+    'De pagina moet coherent zijn op desktop EN mobiel. Geen overlappende elementen, geen vreemde lege stroken, geen kapotte breedtes, geen debugtekst.',
+    'Gebruik semantische HTML, logische CTA-flow en copy die geloofwaardig blijft.',
+    'Geen markdown of uitleg. Alleen HTML die begint met <!doctype html>.',
+    'Voer intern eerst een kwaliteitscontrole uit op spacing, alignment, section flow, readability, responsiveness en visuele consistentie voordat je antwoordt.',
+  ].join('\n');
+
+  const userPrompt = [
+    '<website_build_request>',
+    `<language>${escapeHtml(language)}</language>`,
+    company ? `<company>${escapeHtml(company)}</company>` : '',
+    title ? `<project_title>${escapeHtml(title)}</project_title>` : '',
+    description ? `<project_description>${escapeHtml(description)}</project_description>` : '',
+    '<source_prompt>',
+    promptText,
+    '</source_prompt>',
+    '<approved_blueprint>',
+    blueprintText,
+    '</approved_blueprint>',
+    '<build_rules>',
+    '- Bouw een premium single-page marketingwebsite tenzij de brief expliciet meerdere pagina’s vereist.',
+    '- Gebruik een duidelijke container-structuur en consistente max-widths.',
+    '- Geef elke sectie een heldere functie; geen willekeurige kaarten of losse blokken.',
+    '- Laat navigatie, hero, aanbod, vertrouwen, over-ons, contact en footer als één logisch verhaal voelen.',
+    '- Gebruik onderscheidende maar betrouwbare typografie en een kleurpalet dat past bij de briefing.',
+    '- Geen fake testimonials, nep-statistieken of verzonnen adressen.',
+    '- Contactformulier en CTA moeten visueel kloppen en logisch geplaatst zijn.',
+    '- Alle content moet direct renderen zonder externe assets of libraries.',
+    '</build_rules>',
+    '</website_build_request>',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    ...context,
+    systemPrompt,
+    userPrompt,
+  };
+}
+
+function getAnthropicWebsiteStageEffort(stage = 'build') {
+  const envKey =
+    stage === 'blueprint'
+      ? 'ANTHROPIC_WEBSITE_BLUEPRINT_EFFORT'
+      : stage === 'review'
+        ? 'ANTHROPIC_WEBSITE_REVIEW_EFFORT'
+        : 'ANTHROPIC_WEBSITE_BUILD_EFFORT';
+  const raw = normalizeString(process.env[envKey] || '').toLowerCase();
+  if (['low', 'medium', 'high', 'max'].includes(raw)) return raw;
+  if (stage === 'blueprint') return 'medium';
+  if (stage === 'review') return 'medium';
+  return 'high';
+}
+
+function getAnthropicWebsiteStageMaxTokens(stage = 'build') {
+  const envKey =
+    stage === 'blueprint'
+      ? 'ANTHROPIC_WEBSITE_BLUEPRINT_MAX_TOKENS'
+      : stage === 'review'
+        ? 'ANTHROPIC_WEBSITE_REVIEW_MAX_TOKENS'
+        : 'ANTHROPIC_WEBSITE_MAX_TOKENS';
+  const fallback = stage === 'blueprint' ? 6000 : stage === 'review' ? 8000 : 24000;
+  return Math.max(2000, Math.min(48000, Number(process.env[envKey] || fallback) || fallback));
+}
+
+function supportsAnthropicAdaptiveThinking(model = ANTHROPIC_MODEL) {
+  const key = normalizeString(model).toLowerCase();
+  return key.includes('claude-opus-4-6') || key.includes('claude-sonnet-4-6');
+}
+
+function sumAnthropicUsage(usages = []) {
+  let input = 0;
+  let output = 0;
+  let total = 0;
+  let hasUsage = false;
+
+  for (const usage of usages) {
+    if (!usage || typeof usage !== 'object') continue;
+    const inputTokens = Number(usage.input_tokens ?? usage.prompt_tokens ?? usage.inputTokens ?? 0);
+    const outputTokens = Number(usage.output_tokens ?? usage.completion_tokens ?? usage.outputTokens ?? 0);
+    const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? inputTokens + outputTokens);
+    if (!Number.isFinite(inputTokens) || !Number.isFinite(outputTokens) || !Number.isFinite(totalTokens)) {
+      continue;
+    }
+    input += inputTokens;
+    output += outputTokens;
+    total += totalTokens;
+    hasUsage = true;
+  }
+
+  if (!hasUsage) return null;
+  return {
+    input_tokens: Math.round(input),
+    output_tokens: Math.round(output),
+    total_tokens: Math.round(total || input + output),
+  };
+}
+
+async function sendAnthropicMessage(options = {}) {
+  const apiKey = getAnthropicApiKey();
+  if (!apiKey) {
+    const err = new Error('ANTHROPIC_API_KEY ontbreekt');
+    err.status = 503;
+    throw err;
+  }
+
+  const systemPrompt = normalizeString(options.systemPrompt || '');
+  const userPrompt = normalizeString(options.userPrompt || '');
+  if (!systemPrompt || !userPrompt) {
+    const err = new Error('Anthropic prompt is onvolledig.');
+    err.status = 500;
+    throw err;
+  }
+
+  const maxTokens = Math.max(2000, Math.min(48000, Number(options.maxTokens || 12000) || 12000));
+  const effort = getAnthropicWebsiteStageEffort(options.stage || 'build');
+  const basePayload = {
+    model: ANTHROPIC_MODEL,
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages: [
+      {
+        role: 'user',
+        content: [{ type: 'text', text: userPrompt }],
+      },
+    ],
+  };
+
+  const enhancedPayload = supportsAnthropicAdaptiveThinking(ANTHROPIC_MODEL)
+    ? {
+        ...basePayload,
+        thinking: { type: 'adaptive' },
+        output_config: { effort },
+      }
+    : basePayload;
+
+  const sendRequest = async (payload) =>
+    fetchJsonWithTimeout(
+      `${ANTHROPIC_API_BASE_URL}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': process.env.ANTHROPIC_API_VERSION || '2023-06-01',
+        },
+        body: JSON.stringify(payload),
+      },
+      WEBSITE_GENERATION_TIMEOUT_MS
+    );
+
+  let result = await sendRequest(enhancedPayload);
+  if (
+    !result.response.ok &&
+    enhancedPayload !== basePayload &&
+    /thinking|output_config|adaptive|effort/i.test(JSON.stringify(result.data || {}))
+  ) {
+    result = await sendRequest(basePayload);
+  }
+
+  if (!result.response.ok) {
+    const err = new Error(`Anthropic website generatie mislukt (${result.response.status})`);
+    err.status = result.response.status;
+    err.data = result.data;
+    throw err;
+  }
+
+  return result.data;
 }
 
 async function generateWebsiteHtmlWithOpenAi(options = {}) {
@@ -2088,75 +2413,63 @@ async function generateWebsiteHtmlWithOpenAi(options = {}) {
 }
 
 async function generateWebsiteHtmlWithAnthropic(options = {}) {
-  const apiKey = getAnthropicApiKey();
-  if (!apiKey) {
-    const err = new Error('ANTHROPIC_API_KEY ontbreekt');
-    err.status = 503;
+  const blueprintPrompts = buildAnthropicWebsiteBlueprintPrompts(options);
+  const blueprintData = await sendAnthropicMessage({
+    systemPrompt: blueprintPrompts.systemPrompt,
+    userPrompt: blueprintPrompts.userPrompt,
+    maxTokens: getAnthropicWebsiteStageMaxTokens('blueprint'),
+    stage: 'blueprint',
+  });
+
+  const blueprintText = normalizeString(extractAnthropicTextContent(blueprintData?.content));
+  if (!blueprintText) {
+    const err = new Error('Anthropic gaf een lege website-blueprint terug.');
+    err.status = 502;
+    err.data = blueprintData;
     throw err;
   }
 
-  const { company, title, userPrompt, systemPrompt } = buildWebsiteGenerationPrompts(options);
-  const maxTokens = Math.max(
-    2000,
-    Math.min(32000, Number(process.env.ANTHROPIC_MAX_TOKENS || 12000) || 12000)
-  );
+  const buildPrompts = buildAnthropicWebsiteHtmlPrompts(options, blueprintText);
+  const htmlData = await sendAnthropicMessage({
+    systemPrompt: buildPrompts.systemPrompt,
+    userPrompt: buildPrompts.userPrompt,
+    maxTokens: getAnthropicWebsiteStageMaxTokens('build'),
+    stage: 'build',
+  });
 
-  const { response, data } = await fetchJsonWithTimeout(
-    `${ANTHROPIC_API_BASE_URL}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': process.env.ANTHROPIC_API_VERSION || '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: maxTokens,
-        temperature: 0.3,
-        system: systemPrompt,
-        messages: [
-          {
-            role: 'user',
-            content: [{ type: 'text', text: userPrompt }],
-          },
-        ],
-      }),
-    },
-    WEBSITE_GENERATION_TIMEOUT_MS
-  );
-
-  if (!response.ok) {
-    const err = new Error(`Anthropic website generatie mislukt (${response.status})`);
-    err.status = response.status;
-    err.data = data;
-    throw err;
-  }
-
-  const generatedText = normalizeString(extractAnthropicTextContent(data?.content));
+  const generatedText = normalizeString(extractAnthropicTextContent(htmlData?.content));
   if (!generatedText) {
     const err = new Error('Anthropic gaf lege HTML terug.');
     err.status = 502;
-    err.data = data;
+    err.data = htmlData;
     throw err;
   }
 
-  const html = ensureHtmlDocument(generatedText, { title, company });
+  const html = ensureHtmlDocument(generatedText, {
+    title: buildPrompts.title,
+    company: buildPrompts.company,
+  });
   if (!html) {
     const err = new Error('Kon HTML output niet valideren.');
     err.status = 502;
-    err.data = data;
+    err.data = htmlData;
     throw err;
   }
+
+  const usage = sumAnthropicUsage([blueprintData?.usage || null, htmlData?.usage || null]);
 
   return {
     html,
     source: 'anthropic',
     model: ANTHROPIC_MODEL,
-    usage: data?.usage || null,
+    usage,
     apiCost:
-      estimateAnthropicUsageCost(data?.usage || null, ANTHROPIC_MODEL) ||
-      estimateAnthropicTextCost(userPrompt, html, ANTHROPIC_MODEL),
+      estimateAnthropicUsageCost(usage, ANTHROPIC_MODEL) ||
+      estimateAnthropicTextCost(
+        `${blueprintPrompts.userPrompt}\n\n${buildPrompts.userPrompt}\n\n${blueprintText}`,
+        html,
+        ANTHROPIC_MODEL
+      ),
   };
 }
 
