@@ -88,17 +88,6 @@ De repo bevat nu een `render.yaml`, zodat je backend + statische frontend als 1 
    - `WEBHOOK_SECRET` (zelfde waarde als in Vapi webhook config, optioneel maar aanbevolen)
    - `OPENAI_API_KEY` (optioneel, voor AI-samenvatting + afspraakextractie)
 5. Deploy de service.
-6. Voor de nieuwe low-latency belroute voeg je daarnaast toe:
-   - `COLDCALL_LOW_LATENCY_ENABLED=true`
-   - `COLDCALL_DEFAULT_ENGINE=low-latency`
-   - `COLDCALL_LOW_LATENCY_PUBLIC_BASE_URL=https://<jouw-render-service>.onrender.com`
-   - `COLDCALL_LOW_LATENCY_WS_BASE_URL=wss://<jouw-render-service>.onrender.com`
-   - `TWILIO_ACCOUNT_SID`
-   - `TWILIO_AUTH_TOKEN`
-   - `TWILIO_PHONE_NUMBER`
-   - `DEEPGRAM_API_KEY`
-   - `ELEVENLABS_API_KEY`
-   - `COLDCALL_LOW_LATENCY_ELEVEN_VOICE_ID`
 
 ### Na deploy
 
@@ -108,15 +97,12 @@ De repo bevat nu een `render.yaml`, zodat je backend + statische frontend als 1 
   - `https://<jouw-render-service>.onrender.com/api/vapi/webhook`
 - Healthcheck (voor controle):
   - `https://<jouw-render-service>.onrender.com/healthz`
-- Low-latency statuscheck:
-  - `https://<jouw-render-service>.onrender.com/api/healthz`
 
 Belangrijk:
 
 - Ook al staat er nu lokaal/zelfs in je repo een `.env`, Render gebruikt zijn eigen environment variables.
 - Zet je echte secrets altijd in Render service settings (niet vertrouwen op repo-`.env` voor live).
 - Rotate je `VAPI_API_KEY` zodra je `.env` per ongeluk of bewust publiek hebt gemaakt.
-- De low-latency belroute draait niet bruikbaar op alleen Vercel serverless; gebruik daarvoor de Render web service of een andere always-on Node host met WebSockets.
 
 ## 5) API gedrag (backend)
 

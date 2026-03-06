@@ -25,23 +25,3 @@ services:
         value: softora_runtime_state
       - key: SUPABASE_STATE_KEY
         value: core
-      - key: COLDCALL_LOW_LATENCY_ENABLED
-        value: false
-      - key: COLDCALL_DEFAULT_ENGINE
-        value: vapi
-      - key: COLDCALL_LOW_LATENCY_PUBLIC_BASE_URL
-        sync: false
-      - key: COLDCALL_LOW_LATENCY_WS_BASE_URL
-        sync: false
-      - key: TWILIO_ACCOUNT_SID
-        sync: false
-      - key: TWILIO_AUTH_TOKEN
-        sync: false
-      - key: TWILIO_PHONE_NUMBER
-        sync: false
-      - key: DEEPGRAM_API_KEY
-        sync: false
-      - key: ELEVENLABS_API_KEY
-        sync: false
-      - key: COLDCALL_LOW_LATENCY_ELEVEN_VOICE_ID
-        sync: false
