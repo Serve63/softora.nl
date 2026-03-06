@@ -93,6 +93,7 @@ De repo bevat nu een `render.yaml`, zodat je backend + statische frontend als 1 
    - `COLDCALL_DEFAULT_ENGINE=low-latency`
    - `COLDCALL_LOW_LATENCY_PUBLIC_BASE_URL=https://<jouw-render-service>.onrender.com`
    - `COLDCALL_LOW_LATENCY_WS_BASE_URL=wss://<jouw-render-service>.onrender.com`
+   - `CORS_ALLOWED_ORIGINS=https://softora.nl,https://www.softora.nl`
    - `TWILIO_ACCOUNT_SID`
    - `TWILIO_AUTH_TOKEN`
    - `TWILIO_PHONE_NUMBER`
