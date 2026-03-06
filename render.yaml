@@ -29,8 +29,6 @@ services:
         value: false
       - key: COLDCALL_DEFAULT_ENGINE
         value: vapi
-      - key: CORS_ALLOWED_ORIGINS
-        value: https://softora.nl,https://www.softora.nl
       - key: COLDCALL_LOW_LATENCY_PUBLIC_BASE_URL
         sync: false
       - key: COLDCALL_LOW_LATENCY_WS_BASE_URL

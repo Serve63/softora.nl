@@ -176,34 +176,7 @@ function toPrettyPagePathFromHtmlFile(fileName) {
   return `/${base}`;
 }
 
-function getAllowedCorsOrigins() {
-  const configured = String(process.env.CORS_ALLOWED_ORIGINS || '')
-    .split(',')
-    .map((value) => String(value || '').trim())
-    .filter(Boolean);
-  const defaults = ['https://softora.nl', 'https://www.softora.nl', 'http://localhost:3000'];
-  return Array.from(new Set([...defaults, ...configured]));
-}
-
 app.disable('x-powered-by');
-
-app.use((req, res, next) => {
-  const origin = normalizeString(req.get('origin'));
-  const allowedOrigins = getAllowedCorsOrigins();
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, X-Vapi-Secret, X-Vapi-Signature'
-  );
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-  return next();
-});
 
 app.use(
   express.json({
