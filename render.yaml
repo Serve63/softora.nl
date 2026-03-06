@@ -47,3 +47,7 @@ services:
         sync: false
       - key: COLDCALL_LOW_LATENCY_ELEVEN_VOICE_ID
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-6
