@@ -1,10 +1,12 @@
 const express = require('express');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-js');
+const { createLowLatencyColdcallingService } = require('./lib/low-latency-coldcalling');
 require('dotenv').config();
 
 const app = express();
@@ -115,12 +117,17 @@ const inMemoryUiStateByScope = new Map();
 const aiCallInsightsByCallId = new Map();
 const aiAnalysisFingerprintByCallId = new Map();
 const aiAnalysisInFlightCallIds = new Set();
+const vapiAssistantConfigCacheById = new Map();
 const generatedAgendaAppointments = [];
 const agendaAppointmentIdByCallId = new Map();
 let nextGeneratedAgendaAppointmentId = 100000;
 const sequentialDispatchQueues = new Map();
 const sequentialDispatchQueueIdByCallId = new Map();
 let nextSequentialDispatchQueueId = 1;
+const VAPI_ASSISTANT_CONFIG_CACHE_TTL_MS = Math.max(
+  10_000,
+  Math.min(10 * 60 * 1000, Number(process.env.VAPI_ASSISTANT_CONFIG_CACHE_TTL_MS || 2 * 60 * 1000) || 2 * 60 * 1000)
+);
 let supabaseClient = null;
 let smtpTransporter = null;
 let inboundConfirmationMailSyncPromise = null;
@@ -177,6 +184,13 @@ app.use(
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
+  })
+);
+
+app.use(
+  express.urlencoded({
+    extended: false,
+    limit: '1mb',
   })
 );
 
@@ -1361,6 +1375,22 @@ function toBooleanSafe(value, fallback = false) {
   return fallback;
 }
 
+const lowLatencyColdcallingService = createLowLatencyColdcallingService({
+  env: process.env,
+  normalizeString,
+  normalizeNlPhoneToE164,
+  parseIntSafe,
+  parseNumberSafe,
+  getAnthropicApiKey,
+  onCallUpdate: (update) => {
+    if (!update || !normalizeString(update.callId)) return;
+    const merged = upsertRecentCallUpdate(update);
+    if (merged) {
+      handleSequentialDispatchQueueWebhookProgress(merged);
+    }
+  },
+});
+
 function normalizeDateYyyyMmDd(value) {
   const raw = normalizeString(value);
   if (!raw) return '';
@@ -2133,12 +2163,15 @@ function buildWebsiteGenerationPrompts(options = {}) {
   const { company, title, description, language, promptText, industry } = context;
 
   const systemPrompt = [
-    'Je bent een elite webdesigner, conversion strategist en senior front-end engineer.',
+    'Je bent een world-class independent creative director, conversion strategist en senior front-end engineer.',
+    'Ontwerp alsof een betalende premium klant dit morgen live zet: bespoke, geloofwaardig, onderscheidend en production-ready.',
     'Genereer exact één volledig HTML-document met inline CSS en alleen indien functioneel nodig inline JavaScript.',
-    'Werk als een art director: intentional, premium, logisch, ruimtelijk sterk en consistent.',
+    'Werk als een art director: intentional, premium, logisch, ruimtelijk sterk, visueel scherp en consequent van hero tot footer.',
     'Geen markdown, geen uitleg, alleen de HTML-code.',
     'Je mag wel logische standaard-aanbodstructuur afleiden uit het type bedrijf, maar verzin geen concrete awards, adressen, reviews of claims die niet onderbouwd zijn.',
     'Voorkom generieke blokken, slordige spacing, vreemde overlaps of sections die los van elkaar voelen.',
+    'Vermijd brave standaard-UI: kies een duidelijke visuele richting, sterke typografie, gelaagde achtergronden en een hero die echt spanning en kwaliteit uitstraalt.',
+    'Gebruik de briefing als creatieve bron, niet als trigger voor een vaste template. Verschillende opdrachten moeten zichtbaar tot verschillende composities, ritmes, hero-opzetten en componenttalen leiden.',
   ].join('\n');
 
   const userPrompt = [
@@ -2157,7 +2190,10 @@ function buildWebsiteGenerationPrompts(options = {}) {
     'Maak een premium website die voelt als maatwerk, niet als template.',
     'Zorg dat compositie, breedtes, hiërarchie, witruimte, CTA-flow en mobiele layout coherent zijn.',
     'Gebruik een duidelijk visueel systeem: sterke typografie, ritme tussen secties, onderscheidende hero en consequente componenten.',
+    'Vermijd vlakke witte standaardlayouts; gebruik diepte, contrast, kleurregie en compositie met overtuiging.',
+    'Google Fonts en inline SVG zijn toegestaan als ze de art direction zichtbaar verbeteren; externe JavaScript libraries niet.',
     'Als informatie ontbreekt, vul dan geen nep-feiten in maar ontwerp de structuur slim en geloofwaardig.',
+    'Uniformiteit is geen doel: section order, hero-compositie, CTA-vorm en visuele sfeer mogen per project sterk verschillen als dat de briefing beter dient.',
     '</quality_bar>',
     '<project_prompt>',
     promptText,
@@ -2179,15 +2215,17 @@ function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
   const { company, title, description, language, promptText } = context;
 
   const systemPrompt = [
-    'Je bent een elite front-end designer en engineer die premium marketingwebsites bouwt.',
+    'Je bent een world-class creative director, conversion strategist en senior front-end engineer die top-tier marketingwebsites bouwt.',
     'Schrijf exact één volledig HTML-document met inline CSS en alleen functioneel noodzakelijke inline JavaScript.',
-    'Lever maatwerk, geen templategevoel: sterke hero, duidelijke visuele hiërarchie, ritme, compositie, contrast en polish.',
+    'Lever maatwerk, geen templategevoel: sterke hero, duidelijke visuele hiërarchie, ritme, compositie, contrast, polish en een uitgesproken visuele identiteit.',
     'De pagina moet coherent zijn op desktop EN mobiel. Geen overlappende elementen, geen vreemde lege stroken, geen kapotte breedtes, geen debugtekst.',
     'De bovenkant van de site moet uitzonderlijk sterk zijn: header en hero moeten als één premium geheel voelen.',
     'Vermijd een klein los contentblok in het midden van een groot leeg vlak. Above-the-fold moet breed, intentioneel en visueel kloppend zijn.',
     'Gebruik semantische HTML, logische CTA-flow en copy die geloofwaardig blijft.',
+    'Durf een duidelijke visuele richting te kiezen: expressieve typografie, gelaagde achtergronden, consistente componenttaal en een hoogwaardige compositie.',
     'Geen markdown of uitleg. Alleen HTML die begint met <!doctype html>.',
     'Voer intern eerst een kwaliteitscontrole uit op spacing, alignment, section flow, readability, responsiveness en visuele consistentie voordat je antwoordt.',
+    'Gebruik geen vaste Softora-huislayout. Laat structuur, hero-opbouw, ritme, kleuren en componentvorm volgen uit de briefing zodat websites onderling echt verschillend kunnen zijn.',
   ].join('\n');
 
   const userPrompt = [
@@ -2211,9 +2249,12 @@ function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
     '- Vermijd een smalle gecentreerde hero-card op een willekeurige achtergrond tenzij de briefing dat expliciet vraagt.',
     '- Laat navigatie, hero, aanbod, vertrouwen, over-ons, contact en footer als één logisch verhaal voelen.',
     '- Gebruik onderscheidende maar betrouwbare typografie en een kleurpalet dat past bij de briefing.',
+    '- Vermijd brave standaardstacks en vlakke witte layouts als de briefing ruimte geeft voor meer karakter.',
+    '- Google Fonts en inline SVG zijn toegestaan. Externe JavaScript libraries zijn verboden.',
+    '- Section order, hero-structuur, CTA-vorm, grid en achtergrondbehandeling mogen per project sterk verschillen als dat een sterker resultaat geeft.',
     '- Geen fake testimonials, nep-statistieken of verzonnen adressen.',
     '- Contactformulier en CTA moeten visueel kloppen en logisch geplaatst zijn.',
-    '- Alle content moet direct renderen zonder externe assets of libraries.',
+    '- Kerncontent moet direct renderen zonder build-step; fonts en een beperkt aantal remote media-assets zijn toegestaan als ze de kwaliteit echt verhogen.',
     '</build_rules>',
     '</website_build_request>',
   ]
@@ -2245,7 +2286,7 @@ function buildLocalWebsiteBlueprint(options = {}) {
       `${industry.style} Werk met een duidelijke hero-compositie, sterke typografie, ritme tussen secties en een kleurpalet dat premium voelt zonder onlogisch te worden. Laat de bovenkant breed, rijk en samenhangend openen in plaats van als een klein los blok te voelen.`
     )}</art_direction>`,
     `<page_structure>${escapeHtml(
-      'Header/navigatie, hero met kernbelofte en CTA, aanbod of diensten, onderscheidend vermogen of voordelen, vertrouwen/social proof zonder nepclaims, over ons of vakmanschap, contact/afspraaksectie en footer.'
+      'Kies een paginastructuur die past bij de briefing en de propositie. Vaak werkt een route via header/navigatie, hero, aanbod, onderscheidend vermogen, vertrouwen, context/vakmanschap, contact en footer, maar wijk daar gerust van af als het verhaal daardoor sterker en unieker wordt.'
     )}</page_structure>`,
     `<section_notes>${escapeHtml(
       `Zorg dat elke sectie een eigen functie heeft. Verwerk ${industry.offers} alleen voor zover geloofwaardig binnen de prompt en hou de tekst concreet, conversiegericht en logisch opgebouwd.`
@@ -2254,10 +2295,238 @@ function buildLocalWebsiteBlueprint(options = {}) {
       `Gebruik de bronprompt en projectomschrijving als primaire waarheid. Omschrijving: ${description || 'niet opgegeven'}. Verzin geen concrete feitelijke claims, adressen, cijfers of reviews. Bronprompt: ${promptText}`
     )}</content_plan>`,
     `<quality_checks>${escapeHtml(
-      'Geen templategevoel, geen overlapping, geen slordige spacing, consistente containerbreedtes, mobiele logica, sterke CTA-flow, geloofwaardige copy, een overtuigende above-the-fold en een visueel samenhangend geheel.'
+      'Geen templategevoel, geen overlapping, geen slordige spacing, consistente containerbreedtes, mobiele logica, sterke CTA-flow, geloofwaardige copy, een overtuigende above-the-fold, een visueel samenhangend geheel en een projectspecifieke art direction.'
     )}</quality_checks>`,
     '</website_blueprint>',
   ].join('\n');
+}
+
+function buildAnthropicWebsiteBlueprintPrompts(options = {}, localBlueprint = '') {
+  const context = buildWebsiteGenerationContext(options);
+  const { company, title, description, language, promptText, industry } = context;
+
+  const systemPrompt = [
+    'Je bent een world-class creative director, brand strategist, UX lead en conversion architect.',
+    'Taak: maak GEEN HTML, maar een scherpe website-blueprint die leidt tot een bespoke premium website van uitzonderlijk niveau.',
+    'Kies een duidelijke creatieve richting; vermijd veilige middelmaat.',
+    'Verzin geen feitelijke claims buiten de input.',
+    'Geef alleen XML terug met root <website_masterplan>.',
+  ].join('\n');
+
+  const userPrompt = [
+    '<website_blueprint_request>',
+    `<language>${escapeHtml(language)}</language>`,
+    company ? `<company>${escapeHtml(company)}</company>` : '',
+    title ? `<project_title>${escapeHtml(title)}</project_title>` : '',
+    description ? `<project_description>${escapeHtml(description)}</project_description>` : '',
+    `<industry>${escapeHtml(industry.label)}</industry>`,
+    `<likely_audience>${escapeHtml(industry.audience)}</likely_audience>`,
+    `<likely_offers>${escapeHtml(industry.offers)}</likely_offers>`,
+    `<style_direction>${escapeHtml(industry.style)}</style_direction>`,
+    `<trust_notes>${escapeHtml(industry.trust)}</trust_notes>`,
+    `<primary_cta>${escapeHtml(industry.cta)}</primary_cta>`,
+    '<source_prompt>',
+    promptText,
+    '</source_prompt>',
+    localBlueprint ? '<local_blueprint>' : '',
+    localBlueprint || '',
+    localBlueprint ? '</local_blueprint>' : '',
+    '<output_contract>',
+    '- Lever uitsluitend XML binnen <website_masterplan>...</website_masterplan>.',
+    '- Gebruik minimaal deze tags: <positioning>, <creative_direction>, <hero_strategy>, <layout_principles>, <visual_system>, <section_plan>, <conversion_flow>, <trust_strategy>, <mobile_strategy>, <interaction_notes>, <risk_checks>, <build_priorities>.',
+    '- Wees concreet en richtinggevend. Geef keuzes, geen vrijblijvende brainstorm.',
+    '- Laat duidelijk merken hoe deze site visueel en commercieel boven standaard AI-werk uitstijgt.',
+    '- Kies een richting die past bij deze briefing; herhaling van dezelfde section-volgorde of visuele formule is geen doel.',
+    '</output_contract>',
+    '</website_blueprint_request>',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    ...context,
+    systemPrompt,
+    userPrompt,
+  };
+}
+
+function buildAnthropicWebsiteReviewPrompts(options = {}, blueprintText = '', candidateHtml = '') {
+  const context = buildWebsiteGenerationContext(options);
+  const { company, title, description, language, promptText } = context;
+
+  const systemPrompt = [
+    'Je bent een compromisloze design director, CRO lead, accessibility reviewer en senior front-end QA.',
+    'Beoordeel de kandidaat-HTML alsof deze direct aan een high-end betalende klant wordt opgeleverd.',
+    'Schrijf GEEN HTML.',
+    'Geef alleen een compacte remediation brief terug in XML met root <website_review>.',
+  ].join('\n');
+
+  const userPrompt = [
+    '<website_review_request>',
+    `<language>${escapeHtml(language)}</language>`,
+    company ? `<company>${escapeHtml(company)}</company>` : '',
+    title ? `<project_title>${escapeHtml(title)}</project_title>` : '',
+    description ? `<project_description>${escapeHtml(description)}</project_description>` : '',
+    '<source_prompt>',
+    promptText,
+    '</source_prompt>',
+    blueprintText ? '<approved_blueprint>' : '',
+    blueprintText || '',
+    blueprintText ? '</approved_blueprint>' : '',
+    '<candidate_html>',
+    candidateHtml,
+    '</candidate_html>',
+    '<review_focus>',
+    '- Bepaal of de website echt bespoke en premium oogt of nog te veel template-signalen heeft.',
+    '- Zoek zwakke punten in hero, layout, sectieritme, typografie, spacing, CTA-flow, vertrouwen, mobiele logica en polish.',
+    '- Let specifiek op veilige of generieke ontwerpkeuzes die topkwaliteit in de weg zitten.',
+    '- Benoem ook of de site te inwisselbaar voelt voor andere lokale dienstverleners en welke keuzes hem unieker moeten maken.',
+    '</review_focus>',
+    '<output_contract>',
+    '- Lever uitsluitend XML binnen <website_review>...</website_review>.',
+    '- Gebruik minimaal deze tags: <overall_assessment>, <blocking_issues>, <premium_gaps>, <conversion_gaps>, <responsive_gaps>, <rewrite_brief>.',
+    '- De inhoud van <rewrite_brief> moet direct bruikbaar zijn voor een tweede modelpass die de HTML herschrijft.',
+    '</output_contract>',
+    '</website_review_request>',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    ...context,
+    systemPrompt,
+    userPrompt,
+  };
+}
+
+function buildAnthropicWebsiteRefinementPrompts(options = {}, blueprintText = '', critiqueText = '', currentHtml = '') {
+  const context = buildWebsiteGenerationContext(options);
+  const { company, title, description, language, promptText } = context;
+
+  const systemPrompt = [
+    'Je bent een world-class creative director, conversion strategist en senior front-end engineer.',
+    'Herschrijf de kandidaat-HTML tot een finale premium website van topniveau.',
+    'Los de volledige critique op, niet cosmetisch maar structureel.',
+    'Behoud feiten uit de input, verzin geen nepclaims.',
+    'Geef exact één volledig HTML-document terug en niets anders.',
+  ].join('\n');
+
+  const userPrompt = [
+    '<website_refinement_request>',
+    `<language>${escapeHtml(language)}</language>`,
+    company ? `<company>${escapeHtml(company)}</company>` : '',
+    title ? `<project_title>${escapeHtml(title)}</project_title>` : '',
+    description ? `<project_description>${escapeHtml(description)}</project_description>` : '',
+    '<source_prompt>',
+    promptText,
+    '</source_prompt>',
+    blueprintText ? '<approved_blueprint>' : '',
+    blueprintText || '',
+    blueprintText ? '</approved_blueprint>' : '',
+    critiqueText ? '<review_brief>' : '',
+    critiqueText || '',
+    critiqueText ? '</review_brief>' : '',
+    '<current_html>',
+    currentHtml,
+    '</current_html>',
+    '<rewrite_rules>',
+    '- Lever een volledige herschreven HTML-output; geen patch, geen diff, geen uitleg.',
+    '- Maak de hero sterker, de compositie rijker, de hiërarchie scherper en de CTA-flow overtuigender als de review daar aanleiding toe geeft.',
+    '- Verwijder template-signalen en brave tussenoplossingen.',
+    '- Zorg dat mobiel niet een krimpversie is maar een bewust ontworpen flow.',
+    '- Google Fonts en inline SVG zijn toegestaan. Externe JavaScript libraries zijn verboden.',
+    '- Verbeter kwaliteit zonder alles naar dezelfde veilige standaardformule te trekken; behoud of versterk projectspecifieke keuzes.',
+    '</rewrite_rules>',
+    '</website_refinement_request>',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    ...context,
+    systemPrompt,
+    userPrompt,
+  };
+}
+
+function shouldUseAnthropicWebsiteBlueprintStage() {
+  return !/^(0|false|no)$/i.test(String(process.env.ANTHROPIC_WEBSITE_ENABLE_BLUEPRINT_STAGE || 'true'));
+}
+
+function shouldUseAnthropicWebsiteReviewLoop() {
+  return /^(1|true|yes)$/i.test(String(process.env.ANTHROPIC_WEBSITE_ENABLE_REVIEW_LOOP || ''));
+}
+
+function getAnthropicWebsiteStageModel(stage = 'build') {
+  const envKey =
+    stage === 'blueprint'
+      ? 'ANTHROPIC_WEBSITE_BLUEPRINT_MODEL'
+      : stage === 'review'
+        ? 'ANTHROPIC_WEBSITE_REVIEW_MODEL'
+        : 'ANTHROPIC_WEBSITE_BUILD_MODEL';
+  const explicit = normalizeString(process.env[envKey] || '');
+  if (explicit) return explicit;
+  if (stage === 'blueprint' || stage === 'review') return 'claude-sonnet-4-6';
+  return getWebsiteAnthropicModel();
+}
+
+function mergeAnthropicUsage() {
+  const usageItems = Array.prototype.slice.call(arguments).filter(Boolean);
+  if (!usageItems.length) return null;
+
+  const merged = {
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
+  };
+  let hasAny = false;
+
+  usageItems.forEach((usage) => {
+    if (!usage || typeof usage !== 'object') return;
+    const inputTokens = Number(
+      usage.input_tokens ??
+      usage.prompt_tokens ??
+      usage.inputTokens ??
+      usage.promptTokens ??
+      0
+    );
+    const outputTokens = Number(
+      usage.output_tokens ??
+      usage.completion_tokens ??
+      usage.outputTokens ??
+      usage.completionTokens ??
+      0
+    );
+    const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? inputTokens + outputTokens);
+
+    if (Number.isFinite(inputTokens) && inputTokens >= 0) {
+      merged.input_tokens += inputTokens;
+      hasAny = true;
+    }
+    if (Number.isFinite(outputTokens) && outputTokens >= 0) {
+      merged.output_tokens += outputTokens;
+      hasAny = true;
+    }
+    if (Number.isFinite(totalTokens) && totalTokens >= 0) {
+      merged.total_tokens += totalTokens;
+      hasAny = true;
+    }
+  });
+
+  if (!hasAny) return null;
+  if (!merged.total_tokens) {
+    merged.total_tokens = merged.input_tokens + merged.output_tokens;
+  }
+  return merged;
+}
+
+function normalizeAnthropicWebsiteHtml(rawHtml, meta = {}) {
+  return WEBSITE_GENERATION_STRICT_HTML
+    ? ensureStrictAnthropicHtml(rawHtml)
+    : ensureHtmlDocument(rawHtml, {
+        title: meta.title,
+        company: meta.company,
+      });
 }
 
 function getAnthropicWebsiteStageEffort(stage = 'build') {
@@ -2281,15 +2550,13 @@ function getAnthropicWebsiteStageMaxTokens(stage = 'build') {
       : stage === 'review'
         ? 'ANTHROPIC_WEBSITE_REVIEW_MAX_TOKENS'
         : 'ANTHROPIC_WEBSITE_MAX_TOKENS';
-  const fallback = stage === 'blueprint' ? 6000 : stage === 'review' ? 8000 : 12000;
+  const fallback = stage === 'blueprint' ? 4000 : stage === 'review' ? 5000 : 16000;
   return Math.max(2000, Math.min(48000, Number(process.env[envKey] || fallback) || fallback));
 }
 
 function supportsAnthropicAdaptiveThinking(model = ANTHROPIC_MODEL) {
-  const enabled = /^(1|true|yes)$/i.test(
-    String(process.env.ANTHROPIC_WEBSITE_ENABLE_ADAPTIVE_THINKING || '')
-  );
-  if (!enabled) return false;
+  const raw = String(process.env.ANTHROPIC_WEBSITE_ENABLE_ADAPTIVE_THINKING || 'true').trim().toLowerCase();
+  if (/^(0|false|no)$/i.test(raw)) return false;
   const key = normalizeString(model).toLowerCase();
   return key.includes('claude-opus-4-6') || key.includes('claude-sonnet-4-6');
 }
@@ -2438,11 +2705,50 @@ async function generateWebsiteHtmlWithOpenAi(options = {}) {
 }
 
 async function generateWebsiteHtmlWithAnthropic(options = {}) {
-  const blueprintText = buildLocalWebsiteBlueprint(options);
-  const websiteModel = getWebsiteAnthropicModel();
-  const buildPrompts = buildAnthropicWebsiteHtmlPrompts(options, blueprintText);
+  const localBlueprint = buildLocalWebsiteBlueprint(options);
+  const buildModel = getAnthropicWebsiteStageModel('build');
+  const blueprintModel = getAnthropicWebsiteStageModel('blueprint');
+  const reviewModel = getAnthropicWebsiteStageModel('review');
+  let approvedBlueprint = localBlueprint;
+  let blueprintData = null;
+  let reviewData = null;
+  let refinedData = null;
+
+  if (shouldUseAnthropicWebsiteBlueprintStage()) {
+    try {
+      const blueprintPrompts = buildAnthropicWebsiteBlueprintPrompts(options, localBlueprint);
+      blueprintData = await sendAnthropicMessage({
+        model: blueprintModel,
+        systemPrompt: blueprintPrompts.systemPrompt,
+        userPrompt: blueprintPrompts.userPrompt,
+        maxTokens: getAnthropicWebsiteStageMaxTokens('blueprint'),
+        stage: 'blueprint',
+      });
+      const aiBlueprint = truncateText(
+        normalizeString(extractAnthropicTextContent(blueprintData?.content)),
+        24000
+      );
+      if (aiBlueprint) {
+        approvedBlueprint = [localBlueprint, aiBlueprint].filter(Boolean).join('\n\n');
+      }
+    } catch (error) {
+      console.error(
+        '[Anthropic][Website][BlueprintFallback]',
+        JSON.stringify(
+          {
+            reason: String(error?.message || 'Onbekende fout'),
+            status: Number(error?.status || 0) || null,
+          },
+          null,
+          2
+        )
+      );
+    }
+  }
+
+  const buildPrompts = buildAnthropicWebsiteHtmlPrompts(options, approvedBlueprint);
   const htmlData = await sendAnthropicMessage({
-    model: websiteModel,
+    model: buildModel,
     systemPrompt: buildPrompts.systemPrompt,
     userPrompt: buildPrompts.userPrompt,
     maxTokens: getAnthropicWebsiteStageMaxTokens('build'),
@@ -2457,12 +2763,10 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
     throw err;
   }
 
-  const html = WEBSITE_GENERATION_STRICT_HTML
-    ? ensureStrictAnthropicHtml(generatedText)
-    : ensureHtmlDocument(generatedText, {
-        title: buildPrompts.title,
-        company: buildPrompts.company,
-      });
+  let html = normalizeAnthropicWebsiteHtml(generatedText, {
+    title: buildPrompts.title,
+    company: buildPrompts.company,
+  });
   if (!html) {
     const err = new Error('Kon HTML output niet valideren.');
     err.status = 502;
@@ -2477,17 +2781,90 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
     throw err;
   }
 
-  const resolvedModel = normalizeString(htmlData?.model || websiteModel || ANTHROPIC_MODEL);
+  if (shouldUseAnthropicWebsiteReviewLoop()) {
+    try {
+      const reviewPrompts = buildAnthropicWebsiteReviewPrompts(options, approvedBlueprint, html);
+      reviewData = await sendAnthropicMessage({
+        model: reviewModel,
+        systemPrompt: reviewPrompts.systemPrompt,
+        userPrompt: reviewPrompts.userPrompt,
+        maxTokens: getAnthropicWebsiteStageMaxTokens('review'),
+        stage: 'review',
+      });
+
+      const reviewText = truncateText(
+        normalizeString(extractAnthropicTextContent(reviewData?.content)),
+        24000
+      );
+      if (reviewText) {
+        const refinementPrompts = buildAnthropicWebsiteRefinementPrompts(
+          options,
+          approvedBlueprint,
+          reviewText,
+          html
+        );
+        refinedData = await sendAnthropicMessage({
+          model: buildModel,
+          systemPrompt: refinementPrompts.systemPrompt,
+          userPrompt: refinementPrompts.userPrompt,
+          maxTokens: getAnthropicWebsiteStageMaxTokens('build'),
+          stage: 'build',
+        });
+
+        const refinedText = normalizeString(extractAnthropicTextContent(refinedData?.content));
+        if (refinedText) {
+          const refinedHtml = normalizeAnthropicWebsiteHtml(refinedText, {
+            title: refinementPrompts.title,
+            company: refinementPrompts.company,
+          });
+          if (refinedHtml && isLikelyUsableWebsiteHtml(refinedHtml)) {
+            html = refinedHtml;
+          }
+        }
+      }
+    } catch (error) {
+      console.error(
+        '[Anthropic][Website][ReviewFallback]',
+        JSON.stringify(
+          {
+            reason: String(error?.message || 'Onbekende fout'),
+            status: Number(error?.status || 0) || null,
+          },
+          null,
+          2
+        )
+      );
+    }
+  }
+
+  const resolvedModel = normalizeString(
+    refinedData?.model ||
+    reviewData?.model ||
+    htmlData?.model ||
+    blueprintData?.model ||
+    buildModel ||
+    ANTHROPIC_MODEL
+  );
+  const mergedUsage = mergeAnthropicUsage(
+    blueprintData?.usage || null,
+    htmlData?.usage || null,
+    reviewData?.usage || null,
+    refinedData?.usage || null
+  );
 
   return {
     html,
     source: 'anthropic',
     model: resolvedModel,
-    usage: htmlData?.usage || null,
+    usage: mergedUsage || htmlData?.usage || null,
     apiCost:
-      estimateAnthropicUsageCost(htmlData?.usage || null, resolvedModel) ||
+      estimateAnthropicUsageCost(mergedUsage || htmlData?.usage || null, resolvedModel) ||
       estimateAnthropicTextCost(
-        `${buildPrompts.userPrompt}\n\n${blueprintText}`,
+        [
+          buildPrompts.userPrompt,
+          approvedBlueprint,
+          reviewData ? buildAnthropicWebsiteReviewPrompts(options, approvedBlueprint, html).userPrompt : '',
+        ].filter(Boolean).join('\n\n'),
         html,
         resolvedModel
       ),
@@ -4264,7 +4641,249 @@ function buildVariableValues(lead, campaign) {
   };
 }
 
-function buildVapiPayload(lead, campaign) {
+function clonePlainData(value, fallback = null) {
+  if (value === undefined) return fallback;
+  if (value === null) return null;
+  if (typeof value !== 'object') return value;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return fallback;
+  }
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = parseNumberSafe(value, fallback);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+async function fetchVapiAssistantConfig(assistantId, options = {}) {
+  const normalizedAssistantId = normalizeString(assistantId);
+  if (!normalizedAssistantId || !normalizeString(process.env.VAPI_API_KEY)) {
+    return null;
+  }
+
+  const force = Boolean(options?.force);
+  const now = Date.now();
+  const cached = vapiAssistantConfigCacheById.get(normalizedAssistantId) || null;
+  if (!force && cached?.data && cached.expiresAt > now) {
+    return clonePlainData(cached.data, null);
+  }
+  if (!force && cached?.promise) {
+    return cached.promise;
+  }
+
+  const promise = (async () => {
+    const { response, data } = await fetchJsonWithTimeout(
+      `${VAPI_BASE_URL}/assistant/${encodeURIComponent(normalizedAssistantId)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${process.env.VAPI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      },
+      10_000
+    );
+
+    if (!response.ok) {
+      const error = new Error(
+        data?.message || data?.error || data?.raw || `Vapi assistant config fout (${response.status})`
+      );
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+
+    const cloned = clonePlainData(data, null);
+    vapiAssistantConfigCacheById.set(normalizedAssistantId, {
+      data: cloned,
+      expiresAt: Date.now() + VAPI_ASSISTANT_CONFIG_CACHE_TTL_MS,
+      promise: null,
+    });
+    return clonePlainData(cloned, null);
+  })().finally(() => {
+    const current = vapiAssistantConfigCacheById.get(normalizedAssistantId);
+    if (current?.promise) {
+      current.promise = null;
+      vapiAssistantConfigCacheById.set(normalizedAssistantId, current);
+    }
+  });
+
+  vapiAssistantConfigCacheById.set(normalizedAssistantId, {
+    data: cached?.data || null,
+    expiresAt: cached?.expiresAt || 0,
+    promise,
+  });
+
+  return promise;
+}
+
+function cloneVapiMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages
+    .map((message) => {
+      if (!message || typeof message !== 'object') return null;
+      return clonePlainData(message, null);
+    })
+    .filter(Boolean);
+}
+
+function injectColdcallingLatencyPromptMessages(messages) {
+  const promptSuffix = [
+    'GESPREKSTEMPO:',
+    '- Reageer direct zodra de prospect klaar lijkt met praten.',
+    '- Laat geen stiltes vallen.',
+    '- Houd standaardbeurten compact en natuurlijk en stel daarna meteen 1 gerichte vervolgvraag.',
+    '- Geef geen speeches, geen lange intro en geen uitgebreide uitleg tenzij de prospect daar expliciet om vraagt.',
+    '- Als de prospect heel kort reageert, antwoord jij nog korter en directer.',
+    '- Als de situatie om meer uitleg vraagt, mag je volledig antwoorden; kap jezelf niet kunstmatig af.',
+    '- Houd het ritme menselijk, snel en natuurlijk.',
+  ].join('\n');
+  const nextMessages = cloneVapiMessages(messages);
+  const promptFingerprint = 'GESPREKSTEMPO:';
+
+  const firstSystemIndex = nextMessages.findIndex((message) => normalizeString(message?.role).toLowerCase() === 'system');
+  if (firstSystemIndex >= 0) {
+    const existing = normalizeString(nextMessages[firstSystemIndex]?.content);
+    if (!existing.includes(promptFingerprint)) {
+      nextMessages[firstSystemIndex].content = `${existing.trim()}\n\n${promptSuffix}`.trim();
+    }
+    return nextMessages;
+  }
+
+  return [{ role: 'system', content: promptSuffix }, ...nextMessages];
+}
+
+function isRealtimeVapiModel(modelName) {
+  return /realtime/i.test(normalizeString(modelName).toLowerCase());
+}
+
+function buildColdcallingFastModelOverride(baseAssistant) {
+  const baseModel = clonePlainData(baseAssistant?.model, {}) || {};
+  const override = {
+    provider: normalizeString(process.env.VAPI_COLDCALL_FAST_MODEL_PROVIDER || 'openai') || 'openai',
+    model: normalizeString(process.env.VAPI_COLDCALL_FAST_MODEL || 'gpt-4.1-mini') || 'gpt-4.1-mini',
+    messages: injectColdcallingLatencyPromptMessages(baseModel.messages),
+  };
+  const explicitMaxTokens = parseIntSafe(process.env.VAPI_COLDCALL_FAST_MAX_TOKENS, 0);
+  if (explicitMaxTokens > 0) {
+    override.maxTokens = Math.max(120, Math.min(4000, explicitMaxTokens));
+  }
+  const explicitTemperature = parseNumberSafe(process.env.VAPI_COLDCALL_FAST_TEMPERATURE, null);
+  if (Number.isFinite(explicitTemperature)) {
+    override.temperature = clampNumber(explicitTemperature, 0, 1, 0.35);
+  }
+  return override;
+}
+
+function buildColdcallingConservativeModelOverride(baseAssistant) {
+  const baseModel = clonePlainData(baseAssistant?.model, {}) || {};
+  const override = {
+    provider: normalizeString(baseModel.provider || 'anthropic') || 'anthropic',
+    model: normalizeString(baseModel.model || process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001'),
+    messages: injectColdcallingLatencyPromptMessages(baseModel.messages),
+  };
+  const explicitMaxTokens = parseIntSafe(process.env.VAPI_COLDCALL_FALLBACK_MAX_TOKENS, 0);
+  if (explicitMaxTokens > 0) {
+    override.maxTokens = Math.max(120, Math.min(4000, explicitMaxTokens));
+  }
+  const explicitTemperature = parseNumberSafe(process.env.VAPI_COLDCALL_FALLBACK_TEMPERATURE, null);
+  if (Number.isFinite(explicitTemperature)) {
+    override.temperature = clampNumber(
+      explicitTemperature,
+      0,
+      1,
+      clampNumber(baseModel.temperature, 0, 1, 0.45)
+    );
+  } else if (Number.isFinite(parseNumberSafe(baseModel.temperature, null))) {
+    override.temperature = clampNumber(baseModel.temperature, 0, 1, 0.45);
+  }
+  return override;
+}
+
+function buildColdcallingVoiceOverride(baseAssistant) {
+  const baseVoice = clonePlainData(baseAssistant?.voice, {}) || {};
+  const provider = normalizeString(baseVoice.provider || '11labs').toLowerCase();
+  if (provider !== '11labs' && provider !== 'elevenlabs') {
+    return Object.keys(baseVoice).length ? baseVoice : null;
+  }
+
+  const override = {
+    provider: normalizeString(baseVoice.provider || '11labs') || '11labs',
+    voiceId: normalizeString(process.env.VAPI_COLDCALL_VOICE_ID || baseVoice.voiceId),
+    model: normalizeString(process.env.VAPI_COLDCALL_11LABS_MODEL || baseVoice.model || 'eleven_v3') || 'eleven_v3',
+    optimizeStreamingLatency: Math.max(
+      0,
+      Math.min(4, parseIntSafe(process.env.VAPI_COLDCALL_11LABS_STREAMING_LATENCY, parseIntSafe(baseVoice.optimizeStreamingLatency, 4)))
+    ),
+  };
+
+  const speed = normalizeString(process.env.VAPI_COLDCALL_VOICE_SPEED)
+    ? clampNumber(process.env.VAPI_COLDCALL_VOICE_SPEED, 0.85, 1.25, 1)
+    : parseNumberSafe(baseVoice.speed, null);
+  if (Number.isFinite(speed)) {
+    override.speed = clampNumber(speed, 0.85, 1.25, 1);
+  }
+
+  const style = normalizeString(process.env.VAPI_COLDCALL_VOICE_STYLE)
+    ? clampNumber(process.env.VAPI_COLDCALL_VOICE_STYLE, 0, 1, 0)
+    : parseNumberSafe(baseVoice.style, null);
+  if (Number.isFinite(style)) {
+    override.style = clampNumber(style, 0, 1, 0);
+  }
+
+  const stability = normalizeString(process.env.VAPI_COLDCALL_VOICE_STABILITY)
+    ? clampNumber(process.env.VAPI_COLDCALL_VOICE_STABILITY, 0, 1, 0.5)
+    : parseNumberSafe(baseVoice.stability, null);
+  if (Number.isFinite(stability)) {
+    override.stability = clampNumber(stability, 0, 1, 0.5);
+  }
+
+  const similarityBoost = normalizeString(process.env.VAPI_COLDCALL_VOICE_SIMILARITY_BOOST)
+    ? clampNumber(process.env.VAPI_COLDCALL_VOICE_SIMILARITY_BOOST, 0, 1, 0.75)
+    : parseNumberSafe(baseVoice.similarityBoost, null);
+  if (Number.isFinite(similarityBoost)) {
+    override.similarityBoost = clampNumber(similarityBoost, 0, 1, 0.75);
+  }
+
+  if (typeof baseVoice.useSpeakerBoost === 'boolean') {
+    override.useSpeakerBoost = baseVoice.useSpeakerBoost;
+  }
+
+  return override;
+}
+
+function buildColdcallingTranscriberOverride(baseAssistant) {
+  const baseTranscriber = clonePlainData(baseAssistant?.transcriber, {}) || {};
+  return {
+    provider: normalizeString(process.env.VAPI_COLDCALL_TRANSCRIBER_PROVIDER || baseTranscriber.provider || 'deepgram') || 'deepgram',
+    model: normalizeString(process.env.VAPI_COLDCALL_TRANSCRIBER_MODEL || baseTranscriber.model || 'nova-3') || 'nova-3',
+    language: normalizeString(process.env.VAPI_COLDCALL_TRANSCRIBER_LANGUAGE || baseTranscriber.language || 'nl') || 'nl',
+  };
+}
+
+function buildColdcallingStartSpeakingPlan() {
+  return {
+    waitSeconds: clampNumber(process.env.VAPI_COLDCALL_WAIT_SECONDS, 0, 1.5, 0.06),
+    transcriptionEndpointingPlan: {
+      onPunctuationSeconds: clampNumber(process.env.VAPI_COLDCALL_ON_PUNCTUATION_SECONDS, 0, 2, 0.08),
+      onNoPunctuationSeconds: clampNumber(process.env.VAPI_COLDCALL_ON_NO_PUNCTUATION_SECONDS, 0, 3, 0.45),
+      onNumberSeconds: clampNumber(process.env.VAPI_COLDCALL_ON_NUMBER_SECONDS, 0, 2, 0.25),
+    },
+  };
+}
+
+function buildColdcallingStopSpeakingPlan() {
+  return {
+    numWords: Math.max(0, parseIntSafe(process.env.VAPI_COLDCALL_STOP_NUM_WORDS, 0)),
+    voiceSeconds: clampNumber(process.env.VAPI_COLDCALL_STOP_VOICE_SECONDS, 0, 2, 0.18),
+    backoffSeconds: clampNumber(process.env.VAPI_COLDCALL_STOP_BACKOFF_SECONDS, 0, 3, 0.35),
+  };
+}
+
+function buildVapiCallEnvelope(lead, campaign) {
   const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
 
@@ -4295,11 +4914,112 @@ function buildVapiPayload(lead, campaign) {
   };
 }
 
+async function buildVapiPayloadVariants(lead, campaign) {
+  const basePayload = buildVapiCallEnvelope(lead, campaign);
+  const variableValues = buildVariableValues(
+    {
+      ...lead,
+      phone: basePayload.customer.number,
+    },
+    campaign
+  );
+  const variants = [];
+
+  let baseAssistant = null;
+  try {
+    baseAssistant = await fetchVapiAssistantConfig(process.env.VAPI_ASSISTANT_ID);
+  } catch (error) {
+    console.warn('[Coldcalling][Latency] Kon Vapi assistant config niet ophalen:', error?.message || error);
+  }
+
+  variants.push({
+    label: 'assistant-default',
+    payload: {
+      ...clonePlainData(basePayload, basePayload),
+      metadata: {
+        ...(clonePlainData(basePayload.metadata, {}) || {}),
+        latencyProfile: 'assistant-default',
+        assistantModel: normalizeString(baseAssistant?.model?.model || ''),
+        assistantVoiceProvider: normalizeString(baseAssistant?.voice?.provider || ''),
+      },
+      assistantOverrides: {
+        variableValues,
+      },
+    },
+  });
+
+  return variants;
+}
+
+function shouldRetryColdcallingPayloadVariant(error) {
+  const status = Number(error?.status || 0);
+  const message = String(error?.message || '').toLowerCase();
+  const detailText = JSON.stringify(error?.data || {}).toLowerCase();
+  const combined = `${message} ${detailText}`;
+
+  if (![400, 401, 403, 404, 409, 422, 500, 502].includes(status)) {
+    return false;
+  }
+
+  return /(assistantoverride|assistant override|model|voice|transcriber|provider|credential|openai|anthropic|eleven|deepgram|schema|validation|unsupported|unknown field|invalid field)/.test(
+    combined
+  );
+}
+
+async function processLowLatencyColdcallingLead(lead, campaign, index) {
+  const result = await lowLatencyColdcallingService.startLead(lead, campaign, index);
+  return {
+    ...result,
+    provider: 'low-latency-rt',
+    latencyProfile: 'low-latency-rt',
+    vapi: {
+      callId: normalizeString(result?.vapi?.callId || result?.realtime?.callSid || result?.realtime?.sessionId || ''),
+      status: normalizeString(result?.vapi?.status || ''),
+    },
+  };
+}
+
 async function processColdcallingLead(lead, campaign, index) {
   try {
-    const payload = buildVapiPayload(lead, campaign);
-    const normalizedPhone = payload.customer.number;
-    const { endpoint, data } = await createVapiOutboundCall(payload);
+    const provider = resolveColdcallingProvider(campaign);
+    if (provider === 'low-latency') {
+      return await processLowLatencyColdcallingLead(lead, campaign, index);
+    }
+
+    const payloadVariants = await buildVapiPayloadVariants(lead, campaign);
+    const primaryPayload = payloadVariants[0]?.payload || buildVapiCallEnvelope(lead, campaign);
+    const normalizedPhone = primaryPayload.customer.number;
+    let selectedProfile = 'assistant-default';
+    let endpoint = null;
+    let data = null;
+    let lastVariantError = null;
+
+    for (let variantIndex = 0; variantIndex < payloadVariants.length; variantIndex += 1) {
+      const variant = payloadVariants[variantIndex];
+      try {
+        const response = await createVapiOutboundCall(variant.payload);
+        endpoint = response.endpoint;
+        data = response.data;
+        selectedProfile = variant.label || selectedProfile;
+        break;
+      } catch (error) {
+        lastVariantError = error;
+        const hasMoreVariants = variantIndex < payloadVariants.length - 1;
+        if (!hasMoreVariants || !shouldRetryColdcallingPayloadVariant(error)) {
+          throw error;
+        }
+        console.warn(
+          `[Coldcalling][Latency] Profiel ${variant.label || variantIndex} afgewezen, val terug op volgende variant: ${
+            error?.message || error
+          }`
+        );
+      }
+    }
+
+    if (!data) {
+      throw lastVariantError || new Error('Vapi call start leverde geen data op.');
+    }
+
     const callId = data?.id || data?.call?.id || null;
     const callStatus = data?.status || data?.call?.status || null;
 
@@ -4314,6 +5034,7 @@ async function processColdcallingLead(lead, campaign, index) {
         summary: '',
         transcriptSnippet: '',
         endedReason: '',
+        latencyProfile: selectedProfile,
         updatedAt: new Date().toISOString(),
         updatedAtMs: Date.now(),
       });
@@ -4333,6 +5054,7 @@ async function processColdcallingLead(lead, campaign, index) {
         endpoint,
         callId,
         status: callStatus,
+        latencyProfile: selectedProfile,
       },
     };
   } catch (error) {
@@ -4403,6 +5125,13 @@ function validateStartPayload(body) {
     minProjectValue: parseNumberSafe(campaign.minProjectValue, null),
     maxDiscountPct: parseNumberSafe(campaign.maxDiscountPct, null),
     extraInstructions: normalizeString(campaign.extraInstructions),
+    provider: normalizeString(
+      campaign.provider ||
+        campaign.engine ||
+        campaign.callEngine ||
+        campaign.voiceEngine ||
+        campaign.transport
+    ),
     dispatchMode,
     dispatchDelaySeconds,
   };
@@ -4410,6 +5139,54 @@ function validateStartPayload(body) {
   return {
     campaign: normalizedCampaign,
     leads,
+  };
+}
+
+function normalizeColdcallingProvider(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  if (!normalized) return 'vapi';
+  if (
+    normalized === 'low-latency' ||
+    normalized === 'low_latency' ||
+    normalized === 'lowlatency' ||
+    normalized === 'realtime' ||
+    normalized === 'rt' ||
+    normalized === 'twilio'
+  ) {
+    return 'low-latency';
+  }
+  return 'vapi';
+}
+
+function resolveColdcallingProvider(campaign = {}) {
+  return normalizeColdcallingProvider(
+    campaign.provider ||
+      campaign.engine ||
+      campaign.callEngine ||
+      campaign.voiceEngine ||
+      process.env.COLDCALL_PROVIDER ||
+      process.env.COLDCALL_ENGINE ||
+      process.env.COLDCALL_DEFAULT_ENGINE
+  );
+}
+
+function isLowLatencyCallUpdate(callUpdate) {
+  const source = normalizeString(callUpdate?.source || '').toLowerCase();
+  const profile = normalizeString(callUpdate?.latencyProfile || '').toLowerCase();
+  return source === 'twilio-low-latency' || profile === 'low-latency-rt';
+}
+
+function buildCachedCallStatusResponse(callUpdate = {}) {
+  return {
+    ok: true,
+    source: isLowLatencyCallUpdate(callUpdate) ? 'low-latency-cache' : 'cache',
+    callId: normalizeString(callUpdate.callId || ''),
+    status: normalizeString(callUpdate.status || ''),
+    endedReason: normalizeString(callUpdate.endedReason || ''),
+    startedAt: normalizeString(callUpdate.startedAt || ''),
+    endedAt: normalizeString(callUpdate.endedAt || ''),
+    durationSeconds: parseNumberSafe(callUpdate.durationSeconds, null),
+    recordingUrl: normalizeString(callUpdate.recordingUrl || ''),
   };
 }
 
@@ -4636,7 +5413,40 @@ function isWebhookAuthorized(req) {
 }
 
 app.post('/api/coldcalling/start', async (req, res) => {
-  const missingEnv = getMissingEnvVars();
+  const validated = validateStartPayload(req.body);
+  if (validated.error) {
+    return res.status(400).json({ ok: false, error: validated.error });
+  }
+
+  const { campaign, leads } = validated;
+  const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
+  const provider = resolveColdcallingProvider(campaign);
+  const missingEnv = provider === 'vapi' ? getMissingEnvVars() : [];
+
+  if (provider === 'low-latency') {
+    const runtime = lowLatencyColdcallingService.getHealth();
+    if (!runtime.enabled) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Low-latency coldcalling route staat uit. Zet COLDCALL_LOW_LATENCY_ENABLED=true.',
+        runtime,
+      });
+    }
+    if (!runtime.runtimeCapable) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Low-latency coldcalling vereist een always-on Node runtime met WebSockets.',
+        runtime,
+      });
+    }
+    if (runtime.missingEnv.length > 0) {
+      return res.status(500).json({
+        ok: false,
+        error: `Low-latency coldcalling mist env vars: ${runtime.missingEnv.join(', ')}`,
+        runtime,
+      });
+    }
+  }
 
   if (missingEnv.length > 0) {
     return res.status(500).json({
@@ -4646,16 +5456,8 @@ app.post('/api/coldcalling/start', async (req, res) => {
     });
   }
 
-  const validated = validateStartPayload(req.body);
-  if (validated.error) {
-    return res.status(400).json({ ok: false, error: validated.error });
-  }
-
-  const { campaign, leads } = validated;
-  const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
-
   console.log(
-    `[Coldcalling] Start campagne ontvangen: ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
+    `[Coldcalling] Start campagne ontvangen: ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", provider="${provider}", delay=${campaign.dispatchDelaySeconds}s`
   );
 
   let results = [];
@@ -4684,6 +5486,7 @@ app.post('/api/coldcalling/start', async (req, res) => {
         attempted: leadsToProcess.length,
         started: startedNow,
         failed: failedNow,
+        provider,
         dispatchMode: campaign.dispatchMode,
         dispatchDelaySeconds: 0,
         sequentialWaitForCallEnd: true,
@@ -4722,11 +5525,77 @@ app.post('/api/coldcalling/start', async (req, res) => {
       attempted: leadsToProcess.length,
       started,
       failed,
+      provider,
       dispatchMode: campaign.dispatchMode,
       dispatchDelaySeconds: campaign.dispatchMode === 'delay' ? campaign.dispatchDelaySeconds : 0,
     },
     results,
   });
+});
+
+app.post('/api/coldcalling/low-latency/start', async (req, res) => {
+  const validated = validateStartPayload(req.body);
+  if (validated.error) {
+    return res.status(400).json({ ok: false, error: validated.error });
+  }
+
+  try {
+    const results = await lowLatencyColdcallingService.startBatch({
+      campaign: validated.campaign,
+      leads: validated.leads,
+      sleep,
+    });
+    const started = results.filter((item) => item.success).length;
+    const failed = results.length - started;
+
+    return res.status(200).json({
+      ok: true,
+      summary: {
+        requested: validated.leads.length,
+        attempted: results.length,
+        started,
+        failed,
+        dispatchMode: validated.campaign.dispatchMode,
+        dispatchDelaySeconds:
+          validated.campaign.dispatchMode === 'delay' ? validated.campaign.dispatchDelaySeconds : 0,
+        provider: 'low-latency-rt',
+      },
+      results,
+      runtime: lowLatencyColdcallingService.getHealth(),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: error?.message || 'Kon low-latency coldcalling niet starten.',
+      runtime: lowLatencyColdcallingService.getHealth(),
+    });
+  }
+});
+
+app.get('/api/coldcalling/low-latency/status', (req, res) => {
+  const sessionId = normalizeString(req.query?.sessionId);
+  const callSid = normalizeString(req.query?.callSid);
+  if (!sessionId && !callSid) {
+    return res.status(400).json({ ok: false, error: 'sessionId of callSid ontbreekt.' });
+  }
+
+  const status = lowLatencyColdcallingService.getSessionStatus(sessionId, callSid);
+  if (!status) {
+    return res.status(404).json({ ok: false, error: 'Low-latency sessie niet gevonden.' });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    status,
+  });
+});
+
+app.all('/api/twilio/voice/low-latency', (req, res) => {
+  return lowLatencyColdcallingService.handleVoiceWebhook(req, res);
+});
+
+app.post('/api/twilio/voice/low-latency-status', (req, res) => {
+  return lowLatencyColdcallingService.handleStatusWebhook(req, res);
 });
 
 app.get('/api/coldcalling/call-status/:callId', async (req, res) => {
@@ -4736,20 +5605,17 @@ app.get('/api/coldcalling/call-status/:callId', async (req, res) => {
   }
 
   const cached = callUpdatesById.get(callId) || null;
+  if (cached && isLowLatencyCallUpdate(cached)) {
+    const realtimeStatus = lowLatencyColdcallingService.getSessionStatus('', callId);
+    return res.status(200).json({
+      ...buildCachedCallStatusResponse(cached),
+      realtime: realtimeStatus || null,
+    });
+  }
 
   if (!normalizeString(process.env.VAPI_API_KEY)) {
     if (cached) {
-      return res.status(200).json({
-        ok: true,
-        source: 'cache',
-        callId: normalizeString(cached.callId || callId),
-        status: normalizeString(cached.status || ''),
-        endedReason: normalizeString(cached.endedReason || ''),
-        startedAt: normalizeString(cached.startedAt || ''),
-        endedAt: normalizeString(cached.endedAt || ''),
-        durationSeconds: parseNumberSafe(cached.durationSeconds, null),
-        recordingUrl: normalizeString(cached.recordingUrl || ''),
-      });
+      return res.status(200).json(buildCachedCallStatusResponse(cached));
     }
     return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
   }
@@ -4793,20 +5659,17 @@ app.get('/api/coldcalling/status', async (req, res) => {
   }
 
   const cached = callUpdatesById.get(callId) || null;
+  if (cached && isLowLatencyCallUpdate(cached)) {
+    const realtimeStatus = lowLatencyColdcallingService.getSessionStatus('', callId);
+    return res.status(200).json({
+      ...buildCachedCallStatusResponse(cached),
+      realtime: realtimeStatus || null,
+    });
+  }
 
   if (!normalizeString(process.env.VAPI_API_KEY)) {
     if (cached) {
-      return res.status(200).json({
-        ok: true,
-        source: 'cache',
-        callId: normalizeString(cached.callId || callId),
-        status: normalizeString(cached.status || ''),
-        endedReason: normalizeString(cached.endedReason || ''),
-        startedAt: normalizeString(cached.startedAt || ''),
-        endedAt: normalizeString(cached.endedAt || ''),
-        durationSeconds: parseNumberSafe(cached.durationSeconds, null),
-        recordingUrl: normalizeString(cached.recordingUrl || ''),
-      });
+      return res.status(200).json(buildCachedCallStatusResponse(cached));
     }
     return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
   }
@@ -6230,6 +7093,7 @@ app.get('/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
+    lowLatencyColdcalling: lowLatencyColdcallingService.getHealth(),
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
@@ -6245,6 +7109,7 @@ app.get('/api/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
+    lowLatencyColdcalling: lowLatencyColdcallingService.getHealth(),
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
@@ -6595,7 +7460,21 @@ void ensureRuntimeStateHydratedFromSupabase();
 function startServer() {
   seedDemoConfirmationTaskForUiTesting();
   void ensureRuntimeStateHydratedFromSupabase();
-  app.listen(PORT, () => {
+  const server = http.createServer(app);
+  if (lowLatencyColdcallingService.isEnabled()) {
+    if (lowLatencyColdcallingService.isRuntimeCapable()) {
+      const websocketInfo = lowLatencyColdcallingService.attachWebSocketServer(server);
+      console.log(
+        `[Startup] Low-latency coldcalling websocket actief op ${websocketInfo.path}.`
+      );
+      void lowLatencyColdcallingService.warmBridgeAudioCache();
+    } else {
+      console.warn(
+        '[Startup] Low-latency coldcalling staat aan, maar deze runtime ondersteunt geen persistente WebSockets.'
+      );
+    }
+  }
+  server.listen(PORT, () => {
     console.log(`Softora Vapi backend draait op http://localhost:${PORT}`);
     const missingEnv = getMissingEnvVars();
     if (missingEnv.length > 0) {
@@ -6609,6 +7488,14 @@ function startServer() {
       );
     } else {
       console.log('[Startup] Supabase state persistence uit (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY ontbreken).');
+    }
+    if (lowLatencyColdcallingService.isEnabled()) {
+      const lowLatencyHealth = lowLatencyColdcallingService.getHealth();
+      if (lowLatencyHealth.missingEnv.length > 0) {
+        console.warn(
+          `[Startup] Low-latency coldcalling mist env vars (${lowLatencyHealth.missingEnv.join(', ')}).`
+        );
+      }
     }
   });
 }
@@ -6626,3 +7513,4 @@ module.exports = app;
 module.exports.app = app;
 module.exports.normalizeNlPhoneToE164 = normalizeNlPhoneToE164;
 module.exports.startServer = startServer;
+module.exports.lowLatencyColdcallingService = lowLatencyColdcallingService;
