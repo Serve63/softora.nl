@@ -28,6 +28,7 @@
   const CAMPAIGN_MIN_PRICE_STORAGE_KEY = 'softora_campaign_min_price';
   const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
   const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
+  const API_BASE_URL_STORAGE_KEY = 'softora_api_base_url';
   const REMOTE_UI_STATE_SCOPE = 'coldcalling';
   let remoteUiStateCache = Object.create(null);
   let remoteUiStateLoaded = false;
@@ -63,6 +64,37 @@
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
+
+  function normalizeApiBaseUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return raw.replace(/\/+$/, '');
+  }
+
+  function getConfiguredApiBaseUrl() {
+    const runtimeBase =
+      normalizeApiBaseUrl(window.SOFTORA_API_BASE_URL) ||
+      normalizeApiBaseUrl(document.documentElement?.dataset?.apiBaseUrl) ||
+      normalizeApiBaseUrl(readStorage(API_BASE_URL_STORAGE_KEY));
+    return runtimeBase;
+  }
+
+  function getApiUrl(path) {
+    const normalizedPath = String(path || '');
+    if (!normalizedPath.startsWith('/')) return normalizedPath;
+    const baseUrl = getConfiguredApiBaseUrl();
+    return baseUrl ? `${baseUrl}${normalizedPath}` : normalizedPath;
+  }
+
+  (function hydrateApiBaseUrlFromQuery() {
+    try {
+      const queryValue = normalizeApiBaseUrl(new URLSearchParams(window.location.search).get('apiBaseUrl'));
+      if (!queryValue) return;
+      writeStorage(API_BASE_URL_STORAGE_KEY, queryValue);
+    } catch (_error) {
+      // negeer query-parse issues in oudere browsers
+    }
+  })();
 
   function usesStandaloneCustomSliderValue() {
     return String(leadSlider.dataset?.customValueMode || '').toLowerCase() !== 'sync-slider';
@@ -320,7 +352,10 @@
 
   async function fetchUiStateGetWithFallback(scope) {
     const encodedScope = encodeURIComponent(String(scope || ''));
-    const urls = [`/api/ui-state-get?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
+    const urls = [
+      getApiUrl(`/api/ui-state-get?scope=${encodedScope}`),
+      getApiUrl(`/api/ui-state/${encodedScope}`),
+    ];
     let lastError = null;
 
     for (const url of urls) {
@@ -347,7 +382,10 @@
 
   async function fetchUiStateSetWithFallback(scope, body) {
     const encodedScope = encodeURIComponent(String(scope || ''));
-    const urls = [`/api/ui-state-set?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
+    const urls = [
+      getApiUrl(`/api/ui-state-set?scope=${encodedScope}`),
+      getApiUrl(`/api/ui-state/${encodedScope}`),
+    ];
     let lastError = null;
 
     for (const url of urls) {
@@ -2113,7 +2151,7 @@
 
       try {
         const response = await fetchWithTimeout(
-          `/api/coldcalling/status?callId=${encodeURIComponent(callId)}`,
+          getApiUrl(`/api/coldcalling/status?callId=${encodeURIComponent(callId)}`),
           { method: 'GET', cache: 'no-store' },
           12000
         );
@@ -2148,7 +2186,7 @@
       renderConversationList();
 
       try {
-        const response = await fetchWithTimeout('/api/vapi/call-updates?limit=200', {
+        const response = await fetchWithTimeout(getApiUrl('/api/vapi/call-updates?limit=200'), {
           method: 'GET',
           cache: 'no-store',
         }, 12000);
@@ -2482,7 +2520,7 @@
   }
 
   async function startSingleLeadRequestForSequential(run, lead, leadIndex) {
-    const response = await fetch('/api/coldcalling/start', {
+    const response = await fetch(getApiUrl('/api/coldcalling/start'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2632,7 +2670,7 @@
     isPollingSequentialClientDirectStatus = true;
     try {
       const response = await fetch(
-        `/api/coldcalling/status?callId=${encodeURIComponent(run.waitingCallId)}`,
+        getApiUrl(`/api/coldcalling/status?callId=${encodeURIComponent(run.waitingCallId)}`),
         { method: 'GET' }
       );
       if (!response.ok) return;
@@ -2679,7 +2717,9 @@
     isPollingVapiCallUpdates = true;
 
     try {
-      const url = `/api/vapi/call-updates?limit=200${lastVapiCallUpdateSeenMs ? `&sinceMs=${lastVapiCallUpdateSeenMs}` : ''}`;
+      const url = getApiUrl(
+        `/api/vapi/call-updates?limit=200${lastVapiCallUpdateSeenMs ? `&sinceMs=${lastVapiCallUpdateSeenMs}` : ''}`
+      );
       const response = await fetch(url, { method: 'GET' });
       if (!response.ok) return;
 
@@ -2871,7 +2911,7 @@
         return;
       }
 
-      const response = await fetch('/api/coldcalling/start', {
+      const response = await fetch(getApiUrl('/api/coldcalling/start'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
