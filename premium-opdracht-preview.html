@@ -9,13 +9,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; }
+
     :root {
       --bg: #080808;
       --panel: #0d0d0d;
       --text: #f5f5f5;
       --muted: #888;
       --border: rgba(255,255,255,0.06);
-      --accent: #A62D65;
+      --accent: #a62d65;
+      --canvas: #eef0f4;
+      --toolbar-shadow: 0 14px 36px rgba(139, 34, 82, 0.14);
+      --toolbar-shadow-hover: 0 16px 40px rgba(139, 34, 82, 0.2);
     }
 
     html[data-preview-loading="true"] body {
@@ -28,17 +32,26 @@
 
     body {
       margin: 0;
+      min-height: 100vh;
       font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
       background:
         radial-gradient(circle at 15% 0%, rgba(139, 34, 82, 0.22), transparent 45%),
         radial-gradient(circle at 95% 5%, rgba(139, 34, 82, 0.10), transparent 40%),
         var(--bg);
       color: var(--text);
-      min-height: 100vh;
+      transition: opacity 0.12s ease;
+    }
+
+    body[data-preview-mode="fallback"] {
       display: grid;
       place-items: center;
       padding: 2rem;
-      transition: opacity 0.12s ease;
+    }
+
+    body[data-preview-mode="frame"] {
+      padding: 0;
+      overflow: hidden;
+      background: var(--canvas);
     }
 
     .card {
@@ -57,7 +70,11 @@
       font-size: 2rem;
     }
 
-    p { margin: 0 0 1.4rem; color: var(--muted); line-height: 1.7; }
+    p {
+      margin: 0 0 1.4rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
 
     a {
       color: var(--accent);
@@ -68,10 +85,379 @@
       font-size: 0.8rem;
     }
 
-    a:hover { text-decoration: underline; }
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .preview-shell {
+      position: fixed;
+      inset: 0;
+      background: var(--canvas);
+    }
+
+    .preview-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #fff;
+    }
+
+    .toolbar {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(139, 34, 82, 0.22);
+      background: rgba(255, 255, 255, 0.96);
+      color: #8b2252;
+      border-radius: 999px;
+      padding: 10px 14px;
+      font: 700 12px/1.1 Inter, system-ui, sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: var(--toolbar-shadow);
+      backdrop-filter: blur(20px);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: var(--toolbar-shadow-hover);
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: progress;
+    }
+
+    .btn.variant {
+      background: linear-gradient(135deg, #8b2252, #a62d65);
+      border-color: rgba(139, 34, 82, 0.42);
+      color: #fff;
+    }
+
+    .btn.variant:hover:not(:disabled) {
+      background: linear-gradient(135deg, #7a1d48, #98285d);
+    }
+
+    .btn.copy {
+      background: rgba(255, 255, 255, 0.97);
+      border-color: rgba(139, 34, 82, 0.28);
+      color: #8b2252;
+    }
+
+    .btn.copy:hover:not(:disabled) {
+      background: rgba(166, 45, 101, 0.08);
+    }
+
+    .btn svg {
+      width: 13px;
+      height: 13px;
+      flex-shrink: 0;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483646;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(166, 45, 101, 0.22), transparent 32%),
+        rgba(13, 7, 11, 0.66);
+      backdrop-filter: blur(12px);
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .panel {
+      width: min(520px, calc(100vw - 40px));
+      border-radius: 24px;
+      padding: 28px 28px 24px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,247,251,0.98));
+      color: #241321;
+      box-shadow: 0 30px 90px rgba(93, 23, 55, 0.25);
+      border: 1px solid rgba(139, 34, 82, 0.12);
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: #a62d65;
+      font: 800 12px/1 Inter, system-ui, sans-serif;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .title {
+      margin: 0 0 10px;
+      color: #1f1120;
+      font: 800 34px/1.02 Inter, system-ui, sans-serif;
+      letter-spacing: -0.03em;
+    }
+
+    .desc {
+      margin: 0;
+      color: rgba(36, 19, 33, 0.74);
+      font: 500 16px/1.6 Inter, system-ui, sans-serif;
+    }
+
+    .row {
+      margin-top: 22px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 2px solid rgba(166, 45, 101, 0.16);
+      border-top-color: #a62d65;
+      animation: spin 0.9s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .status {
+      color: #6f1b42;
+      font: 700 14px/1.4 Inter, system-ui, sans-serif;
+      letter-spacing: 0.02em;
+    }
+
+    .meta {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(139, 34, 82, 0.1);
+      color: rgba(111, 27, 66, 0.58);
+      font: 600 12px/1.5 Inter, system-ui, sans-serif;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .actions {
+      margin-top: 18px;
+      display: none;
+      justify-content: flex-end;
+    }
+
+    .actions.show {
+      display: flex;
+    }
+
+    .ghost {
+      appearance: none;
+      border: 1px solid rgba(139, 34, 82, 0.2);
+      background: transparent;
+      color: #8b2252;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font: 700 12px/1 Inter, system-ui, sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .ghost:hover {
+      background: rgba(166, 45, 101, 0.08);
+    }
+
+    .overlay.error .spinner {
+      display: none;
+    }
+
+    .overlay.loading {
+      background: linear-gradient(180deg, rgba(238, 240, 244, 0.98), rgba(247, 240, 244, 0.98));
+      backdrop-filter: none;
+    }
+
+    .overlay.loading .panel {
+      width: min(420px, calc(100vw - 40px));
+      padding: 0;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      text-align: center;
+    }
+
+    .overlay.loading .eyebrow,
+    .overlay.loading .meta {
+      color: rgba(111, 27, 66, 0.62);
+    }
+
+    .overlay.loading .title {
+      font-size: 40px;
+      margin-bottom: 14px;
+    }
+
+    .overlay.loading .desc {
+      max-width: 360px;
+      margin: 0 auto;
+      color: rgba(36, 19, 33, 0.66);
+    }
+
+    .overlay.loading .row {
+      justify-content: center;
+      margin-top: 18px;
+    }
+
+    .prompt-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483646;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(13, 7, 11, 0.62);
+      backdrop-filter: blur(10px);
+    }
+
+    .prompt-modal.show {
+      display: flex;
+    }
+
+    .prompt-panel {
+      width: min(620px, calc(100vw - 40px));
+    }
+
+    .prompt-label {
+      display: block;
+      margin-top: 22px;
+      margin-bottom: 10px;
+      color: #6f1b42;
+      font: 800 12px/1 Inter, system-ui, sans-serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .prompt-input {
+      width: 100%;
+      min-height: 160px;
+      resize: vertical;
+      border-radius: 18px;
+      border: 1px solid rgba(139, 34, 82, 0.16);
+      background: rgba(255, 255, 255, 0.98);
+      color: #241321;
+      padding: 16px 18px;
+      font: 500 15px/1.6 Inter, system-ui, sans-serif;
+      outline: none;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .prompt-input:focus {
+      border-color: rgba(166, 45, 101, 0.42);
+      box-shadow: 0 0 0 4px rgba(166, 45, 101, 0.1);
+    }
+
+    .prompt-actions {
+      margin-top: 18px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .primary {
+      appearance: none;
+      border: 1px solid rgba(139, 34, 82, 0.42);
+      background: linear-gradient(135deg, #8b2252, #a62d65);
+      color: #fff;
+      border-radius: 12px;
+      padding: 11px 16px;
+      font: 800 12px/1 Inter, system-ui, sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 16px 32px rgba(139, 34, 82, 0.16);
+    }
+
+    .primary:hover {
+      background: linear-gradient(135deg, #7a1d48, #98285d);
+    }
+
+    .primary:disabled {
+      opacity: 0.55;
+      cursor: progress;
+    }
+
+    .preview-warning {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      z-index: 2147483645;
+      display: none;
+      width: min(420px, calc(100vw - 170px));
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(20, 12, 18, 0.88);
+      color: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 24px 48px rgba(0,0,0,0.22);
+      font: 500 13px/1.55 Inter, system-ui, sans-serif;
+    }
+
+    .preview-warning.show {
+      display: block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 640px) {
+      .toolbar {
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        justify-content: flex-end;
+      }
+
+      .panel {
+        padding: 24px 22px 20px;
+      }
+
+      .title {
+        font-size: 28px;
+      }
+
+      .overlay.loading .title {
+        font-size: 32px;
+      }
+
+      .prompt-actions {
+        flex-direction: column-reverse;
+      }
+
+      .prompt-actions .ghost,
+      .prompt-actions .primary {
+        width: 100%;
+      }
+
+      .preview-warning {
+        left: 12px;
+        right: 12px;
+        width: auto;
+        bottom: 78px;
+      }
+    }
   </style>
 </head>
-<body>
+<body data-preview-mode="fallback">
   <div class="card" id="fallback">
     <h1>Preview niet gevonden</h1>
     <p>Deze preview staat (nog) niet lokaal opgeslagen. Ga terug naar Actieve Opdrachten en voer de opdracht opnieuw uit.</p>
@@ -81,6 +467,7 @@
   <script>
     (function () {
       document.documentElement.setAttribute('data-preview-loading', 'true');
+
       const PREVIEW_HTML_PREFIX = 'softora_preview_html_premium_v4_';
       const PREVIEW_HTML_PREFIX_OLD = 'softora_preview_html_premium_v2_';
       const ORDER_STATE_KEY = 'softora_order_state_premium_v1';
@@ -92,713 +479,778 @@
       const id = params.get('id');
       const toolsParam = String(params.get('tools') || '').trim().toLowerCase();
       const enablePreviewChrome = !/^(0|false|no)$/i.test(toolsParam);
-      if (!id) return;
 
-      function encodeBase64Utf8(value) {
-        const input = String(value || '');
-        const bytes = new TextEncoder().encode(input);
-        let binary = '';
-        const chunkSize = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      const state = {
+        currentHtml: '',
+        renderedHtml: '',
+        frame: null,
+        shell: null,
+        toolbar: null,
+        warning: null,
+        variantBtn: null,
+        copyBtn: null,
+        overlay: null,
+        overlayEyebrow: null,
+        overlayTitle: null,
+        overlayDesc: null,
+        overlayStatus: null,
+        overlayMeta: null,
+        overlayActions: null,
+        closeOverlayBtn: null,
+        promptModal: null,
+        promptInput: null,
+        cancelPromptBtn: null,
+        confirmPromptBtn: null,
+        overlayTimer: null,
+        frameLoadToken: 0,
+        recoveryMode: false,
+        hideOverlayOnNextReady: false
+      }
+
+      function safeJsonParse(raw, fallback) {
+        try {
+          return JSON.parse(raw);
+        } catch (_) {
+          return fallback;
         }
-        return btoa(binary);
       }
 
-      function buildPreviewControlsScript(state) {
-        return `<script>
-          (function () {
-            const state = ${JSON.stringify(state)};
-            const UI_STATE_SCOPE = ${JSON.stringify(REMOTE_UI_STATE_SCOPE)};
-            const CUSTOM_ORDERS_KEY = ${JSON.stringify(CUSTOM_ORDERS_KEY)};
-            const ORDER_RUNTIME_KEY = ${JSON.stringify(ORDER_RUNTIME_KEY)};
-            const ORDER_STATE_KEY = ${JSON.stringify(ORDER_STATE_KEY)};
-            const BUILD_MODE_KEY = ${JSON.stringify(BUILD_MODE_KEY)};
-            const PREVIEW_HTML_KEY = ${JSON.stringify(PREVIEW_HTML_PREFIX)} + String(state.orderId);
-            const overlayMessages = [
-              'Briefing analyseren...',
-              'Nieuwe variant ontwerpen...',
-              'HTML en styling opbouwen...',
-              'Laatste polish en controle...'
-            ];
-            let overlayTimer = null;
-
-            function decodeBase64Utf8(value) {
-              const binary = atob(String(value || ''));
-              const bytes = Uint8Array.from(binary, function (char) { return char.charCodeAt(0); });
-              return new TextDecoder().decode(bytes);
-            }
-
-            function safeJsonParse(raw, fallback) {
-              try {
-                return JSON.parse(raw);
-              } catch (_) {
-                return fallback;
-              }
-            }
-
-            function escapeHtml(value) {
-              return String(value || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-            }
-
-            function getTime() {
-              return new Date().toLocaleTimeString('nl-NL', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-              });
-            }
-
-            async function fetchUiStateGetWithFallback(scope) {
-              const encodedScope = encodeURIComponent(String(scope || ''));
-              const urls = [
-                '/api/ui-state-get?scope=' + encodedScope,
-                '/api/ui-state/' + encodedScope
-              ];
-              let lastError = null;
-
-              for (const url of urls) {
-                try {
-                  const res = await fetch(url, {
-                    method: 'GET',
-                    cache: 'no-store'
-                  });
-                  if (!res.ok) throw new Error('UI-state GET mislukt (' + res.status + ')');
-                  return await res.json().catch(function () { return {}; });
-                } catch (error) {
-                  lastError = error;
-                }
-              }
-
-              throw lastError || new Error('UI-state GET mislukt');
-            }
-
-            async function fetchUiStateSetWithFallback(scope, body) {
-              const encodedScope = encodeURIComponent(String(scope || ''));
-              const urls = [
-                '/api/ui-state-set?scope=' + encodedScope,
-                '/api/ui-state/' + encodedScope
-              ];
-              let lastError = null;
-
-              for (const url of urls) {
-                try {
-                  const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body || {})
-                  });
-                  if (!res.ok) throw new Error('UI-state POST mislukt (' + res.status + ')');
-                  return await res.json().catch(function () { return {}; });
-                } catch (error) {
-                  lastError = error;
-                }
-              }
-
-              throw lastError || new Error('UI-state POST mislukt');
-            }
-
-            async function postGenerateSiteRequest(payload) {
-              const endpoints = [
-                '/api/active-order-generate-site',
-                '/api/active-orders/generate-site'
-              ];
-              let lastError = null;
-
-              for (let i = 0; i < endpoints.length; i++) {
-                const endpoint = endpoints[i];
-                const controller = new AbortController();
-                const timer = window.setTimeout(function () {
-                  controller.abort();
-                }, 300000);
-
-                try {
-                  const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload || {}),
-                    signal: controller.signal,
-                    cache: 'no-store'
-                  });
-                  const raw = await res.text();
-                  let data = {};
-                  try {
-                    data = raw ? JSON.parse(raw) : {};
-                  } catch (_) {
-                    data = {};
-                  }
-                  if (!res.ok || !data || !data.ok) {
-                    const message = String(
-                      (data && (data.detail || data.error)) ||
-                      raw ||
-                      ('Website generatie mislukt (' + res.status + ')')
-                    ).trim();
-                    const error = new Error(message || ('Website generatie mislukt (' + res.status + ')'));
-                    error.status = Number(res.status) || 0;
-                    const canTryNextEndpoint =
-                      i < endpoints.length - 1 &&
-                      (error.status === 404 || error.status === 405 || error.status >= 500);
-                    if (canTryNextEndpoint) {
-                      lastError = error;
-                      continue;
-                    }
-                    throw error;
-                  }
-                  return data;
-                } catch (error) {
-                  if (String(error && error.name || '') === 'AbortError') {
-                    lastError = new Error('Timeout: AI website generatie duurde te lang.');
-                  } else if (
-                    Number(error && error.status) >= 400 &&
-                    Number(error && error.status) < 500 &&
-                    Number(error && error.status) !== 404 &&
-                    Number(error && error.status) !== 405
-                  ) {
-                    throw error;
-                  } else {
-                    lastError = error;
-                  }
-                } finally {
-                  window.clearTimeout(timer);
-                }
-              }
-
-              throw lastError || new Error('Website generatie mislukt.');
-            }
-
-            function buildFallbackSitePrompt(order) {
-              const company = String(order && order.clientName || 'bedrijf').trim();
-              const title = String(order && order.title || 'website').trim();
-              const description = String(order && order.description || '').trim();
-              return [
-                'Bouw een complete professionele HTML website voor ' + company + '.',
-                'Projecttitel: ' + title + '.',
-                description ? ('Context: ' + description) : '',
-                'Lever een volledig HTML-bestand met inline CSS en eventuele inline JavaScript.',
-                'Eisen: responsive, duidelijke CTA, contactsectie, nette typografie, semantische HTML.',
-                'Taal van de website: Nederlands.',
-                'Output: alleen geldige HTML code zonder markdown.'
-              ].filter(Boolean).join('\\n');
-            }
-
-            function copyText(text) {
-              const value = String(text || '');
-              if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                return navigator.clipboard.writeText(value);
-              }
-              return new Promise(function (resolve, reject) {
-                try {
-                  const input = document.createElement('textarea');
-                  input.value = value;
-                  input.setAttribute('readonly', 'readonly');
-                  input.style.position = 'fixed';
-                  input.style.opacity = '0';
-                  input.style.pointerEvents = 'none';
-                  document.body.appendChild(input);
-                  input.focus();
-                  input.select();
-                  const ok = document.execCommand('copy');
-                  input.remove();
-                  if (!ok) throw new Error('Kopieren mislukt.');
-                  resolve();
-                } catch (error) {
-                  reject(error);
-                }
-              });
-            }
-
-            function createChrome() {
-              const host = document.createElement('div');
-              host.id = 'softora-preview-host';
-              host.style.cssText = [
-                'all: initial',
-                'position: fixed',
-                'right: 18px',
-                'bottom: 18px',
-                'z-index: 2147483647',
-                'font-family: Inter, system-ui, sans-serif'
-              ].join(';');
-              document.documentElement.appendChild(host);
-
-              const shadow = host.attachShadow({ mode: 'open' });
-              shadow.innerHTML = \`
-                <style>
-                  :host, * { box-sizing: border-box; }
-                  .toolbar {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                  }
-                  .btn {
-                    appearance: none;
-                    border: 1px solid rgba(139, 34, 82, 0.22);
-                    background: rgba(255, 255, 255, 0.96);
-                    color: #8b2252;
-                    border-radius: 999px;
-                    padding: 10px 14px;
-                    font: 700 12px/1.1 Inter, system-ui, sans-serif;
-                    letter-spacing: 0.04em;
-                    text-transform: uppercase;
-                    cursor: pointer;
-                    box-shadow: 0 14px 36px rgba(139, 34, 82, 0.14);
-                    backdrop-filter: blur(20px);
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, color 0.16s ease, opacity 0.16s ease;
-                  }
-                  .btn:hover:not(:disabled) {
-                    transform: translateY(-1px);
-                    box-shadow: 0 16px 40px rgba(139, 34, 82, 0.2);
-                  }
-                  .btn:disabled {
-                    opacity: 0.55;
-                    cursor: progress;
-                  }
-                  .btn.variant {
-                    background: linear-gradient(135deg, #8b2252, #a62d65);
-                    border-color: rgba(139, 34, 82, 0.42);
-                    color: #fff;
-                  }
-                  .btn.variant:hover:not(:disabled) {
-                    background: linear-gradient(135deg, #7a1d48, #98285d);
-                  }
-                  .btn.copy {
-                    background: rgba(255, 255, 255, 0.97);
-                    border-color: rgba(139, 34, 82, 0.28);
-                    color: #8b2252;
-                  }
-                  .btn.copy:hover:not(:disabled) {
-                    background: rgba(166, 45, 101, 0.08);
-                  }
-                  .btn svg {
-                    width: 13px;
-                    height: 13px;
-                    flex-shrink: 0;
-                  }
-                  .overlay {
-                    position: fixed;
-                    inset: 0;
-                    display: none;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 24px;
-                    background:
-                      radial-gradient(circle at top left, rgba(166, 45, 101, 0.22), transparent 32%),
-                      rgba(13, 7, 11, 0.66);
-                    backdrop-filter: blur(12px);
-                  }
-                  .overlay.show {
-                    display: flex;
-                  }
-                  .panel {
-                    width: min(520px, calc(100vw - 40px));
-                    border-radius: 24px;
-                    padding: 28px 28px 24px;
-                    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,247,251,0.98));
-                    color: #241321;
-                    box-shadow: 0 30px 90px rgba(93, 23, 55, 0.25);
-                    border: 1px solid rgba(139, 34, 82, 0.12);
-                  }
-                  .eyebrow {
-                    margin: 0 0 10px;
-                    color: #a62d65;
-                    font: 800 12px/1 Inter, system-ui, sans-serif;
-                    letter-spacing: 0.12em;
-                    text-transform: uppercase;
-                  }
-                  .title {
-                    margin: 0 0 10px;
-                    color: #1f1120;
-                    font: 800 34px/1.02 Inter, system-ui, sans-serif;
-                    letter-spacing: -0.03em;
-                  }
-                  .desc {
-                    margin: 0;
-                    color: rgba(36, 19, 33, 0.74);
-                    font: 500 16px/1.6 Inter, system-ui, sans-serif;
-                  }
-                  .row {
-                    margin-top: 22px;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                  }
-                  .spinner {
-                    width: 18px;
-                    height: 18px;
-                    border-radius: 999px;
-                    border: 2px solid rgba(166, 45, 101, 0.16);
-                    border-top-color: #a62d65;
-                    animation: spin 0.9s linear infinite;
-                    flex-shrink: 0;
-                  }
-                  .status {
-                    color: #6f1b42;
-                    font: 700 14px/1.4 Inter, system-ui, sans-serif;
-                    letter-spacing: 0.02em;
-                  }
-                  .meta {
-                    margin-top: 18px;
-                    padding-top: 16px;
-                    border-top: 1px solid rgba(139, 34, 82, 0.1);
-                    color: rgba(111, 27, 66, 0.58);
-                    font: 600 12px/1.5 Inter, system-ui, sans-serif;
-                    letter-spacing: 0.03em;
-                    text-transform: uppercase;
-                  }
-                  .actions {
-                    margin-top: 18px;
-                    display: none;
-                    justify-content: flex-end;
-                  }
-                  .actions.show {
-                    display: flex;
-                  }
-                  .ghost {
-                    appearance: none;
-                    border: 1px solid rgba(139, 34, 82, 0.2);
-                    background: transparent;
-                    color: #8b2252;
-                    border-radius: 12px;
-                    padding: 10px 14px;
-                    font: 700 12px/1 Inter, system-ui, sans-serif;
-                    letter-spacing: 0.08em;
-                    text-transform: uppercase;
-                    cursor: pointer;
-                  }
-                  .ghost:hover {
-                    background: rgba(166, 45, 101, 0.08);
-                  }
-                  .overlay.error .spinner {
-                    display: none;
-                  }
-                  .overlay.error .eyebrow {
-                    color: #a62d65;
-                  }
-                  .overlay.error .title {
-                    color: #5a1533;
-                  }
-                  .overlay.error .status {
-                    color: #7a1d48;
-                  }
-                  @keyframes spin {
-                    to { transform: rotate(360deg); }
-                  }
-                  @media (max-width: 640px) {
-                    .toolbar {
-                      flex-direction: row;
-                      align-items: center;
-                    }
-                    .btn {
-                      justify-content: center;
-                    }
-                    .panel {
-                      padding: 24px 22px 20px;
-                    }
-                    .title {
-                      font-size: 28px;
-                    }
-                  }
-                </style>
-                <div class="toolbar">
-                  <button class="btn variant" id="variantBtn" type="button">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    Nieuwe variant
-                  </button>
-                  <button class="btn copy" id="copyBtn" type="button">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="9" y="9" width="13" height="13" rx="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    HTML copy
-                  </button>
-                </div>
-                <div class="overlay" id="overlay" aria-live="polite">
-                  <div class="panel">
-                    <p class="eyebrow" id="overlayEyebrow">Nieuwe variant</p>
-                    <h2 class="title" id="overlayTitle">Website wordt opnieuw gebouwd</h2>
-                    <p class="desc" id="overlayDesc">De AI maakt nu een verse variant van deze pagina. Dit tabblad ververst automatisch zodra de nieuwe versie klaarstaat.</p>
-                    <div class="row">
-                      <div class="spinner"></div>
-                      <div class="status" id="overlayStatus">Briefing analyseren...</div>
-                    </div>
-                    <div class="meta" id="overlayMeta">Opdracht #\${escapeHtml(String(state.orderId || ''))}</div>
-                    <div class="actions" id="overlayActions">
-                      <button class="ghost" id="closeOverlayBtn" type="button">Sluiten</button>
-                    </div>
-                  </div>
-                </div>
-              \`;
-
-              return {
-                shadow: shadow,
-                variantBtn: shadow.getElementById('variantBtn'),
-                copyBtn: shadow.getElementById('copyBtn'),
-                overlay: shadow.getElementById('overlay'),
-                overlayEyebrow: shadow.getElementById('overlayEyebrow'),
-                overlayTitle: shadow.getElementById('overlayTitle'),
-                overlayDesc: shadow.getElementById('overlayDesc'),
-                overlayStatus: shadow.getElementById('overlayStatus'),
-                overlayMeta: shadow.getElementById('overlayMeta'),
-                overlayActions: shadow.getElementById('overlayActions'),
-                closeOverlayBtn: shadow.getElementById('closeOverlayBtn')
-              };
-            }
-
-            const ui = createChrome();
-
-            function setButtonsDisabled(disabled) {
-              ui.variantBtn.disabled = Boolean(disabled);
-              ui.copyBtn.disabled = Boolean(disabled);
-            }
-
-            function setOverlayVisible(visible) {
-              ui.overlay.classList.toggle('show', Boolean(visible));
-              document.documentElement.style.overflow = visible ? 'hidden' : '';
-              document.body.style.overflow = visible ? 'hidden' : '';
-            }
-
-            function startOverlay(message) {
-              window.clearInterval(overlayTimer);
-              ui.overlay.classList.remove('error');
-              ui.overlayActions.classList.remove('show');
-              ui.overlayEyebrow.textContent = 'Nieuwe variant';
-              ui.overlayTitle.textContent = 'Website wordt opnieuw gebouwd';
-              ui.overlayDesc.textContent = 'De AI maakt nu een verse variant van deze pagina. Dit tabblad ververst automatisch zodra de nieuwe versie klaarstaat.';
-              ui.overlayStatus.textContent = message || overlayMessages[0];
-              ui.overlayMeta.textContent = 'Opdracht #' + String(state.orderId || '');
-              setOverlayVisible(true);
-
-              let index = 0;
-              overlayTimer = window.setInterval(function () {
-                index = (index + 1) % overlayMessages.length;
-                ui.overlayStatus.textContent = overlayMessages[index];
-              }, 1600);
-            }
-
-            function finishOverlay(message) {
-              window.clearInterval(overlayTimer);
-              ui.overlay.classList.remove('error');
-              ui.overlayActions.classList.remove('show');
-              ui.overlayEyebrow.textContent = 'Klaar';
-              ui.overlayTitle.textContent = 'Nieuwe variant staat klaar';
-              ui.overlayDesc.textContent = 'De pagina wordt nu vernieuwd met de nieuwe HTML.';
-              ui.overlayStatus.textContent = message || 'Nieuwe website laden...';
-              ui.overlayMeta.textContent = 'Opdracht #' + String(state.orderId || '');
-              setOverlayVisible(true);
-            }
-
-            function showOverlayError(message) {
-              window.clearInterval(overlayTimer);
-              ui.overlay.classList.add('error');
-              ui.overlayActions.classList.add('show');
-              ui.overlayEyebrow.textContent = 'Generatie mislukt';
-              ui.overlayTitle.textContent = 'Nieuwe variant kon niet worden gebouwd';
-              ui.overlayDesc.textContent = 'De huidige preview blijft staan. Sluit dit venster en probeer het opnieuw zodra de API weer reageert.';
-              ui.overlayStatus.textContent = String(message || 'Onbekende fout');
-              ui.overlayMeta.textContent = 'Opdracht #' + String(state.orderId || '');
-              setOverlayVisible(true);
-            }
-
-            function readCustomOrders(values) {
-              const parsed = safeJsonParse(String(values && values[CUSTOM_ORDERS_KEY] || '[]'), []);
-              return Array.isArray(parsed) ? parsed : [];
-            }
-
-            function readRuntime(values) {
-              const parsed = safeJsonParse(String(values && values[ORDER_RUNTIME_KEY] || '{}'), {});
-              return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-            }
-
-            function resolveBuildMode(values) {
-              const value = String(values && values[BUILD_MODE_KEY] || '').trim().toLowerCase();
-              return value === 'quick' ? 'quick' : 'premium';
-            }
-
-            function findOrderRecord(values) {
-              const orders = readCustomOrders(values);
-              const match = orders.find(function (item) {
-                return Number(item && item.id) === Number(state.orderId);
-              });
-              if (!match) throw new Error('Opdrachtdata niet gevonden voor deze preview.');
-              return match;
-            }
-
-            async function persistVariantMetadata(values, order, result, promptUsed) {
-              const customOrders = readCustomOrders(values);
-              const runtime = readRuntime(values);
-              const orderIndex = customOrders.findIndex(function (item) {
-                return Number(item && item.id) === Number(state.orderId);
-              });
-              const apiCost = result && result.apiCost || {};
-              const nowIso = new Date().toISOString();
-              const nextOrder = {
-                ...(order || {}),
-                prompt: String(promptUsed || ''),
-                apiCostEur: Number.isFinite(Number(apiCost && apiCost.eur)) ? Number(apiCost.eur) : null,
-                apiCostUsd: Number.isFinite(Number(apiCost && apiCost.usd)) ? Number(apiCost.usd) : null,
-                apiTokensInput: Number.isFinite(Number(apiCost && apiCost.promptTokens)) ? Number(apiCost.promptTokens) : null,
-                apiTokensOutput: Number.isFinite(Number(apiCost && apiCost.completionTokens)) ? Number(apiCost.completionTokens) : null,
-                apiModel: String((result && result.model) || (apiCost && apiCost.model) || ''),
-                lastRunAt: nowIso,
-                status: 'klaar'
-              };
-
-              if (orderIndex >= 0) {
-                customOrders[orderIndex] = nextOrder;
-              }
-
-              const existingRuntime = runtime[String(state.orderId)] && typeof runtime[String(state.orderId)] === 'object'
-                ? runtime[String(state.orderId)]
-                : {};
-              const logs = Array.isArray(existingRuntime.logs) ? existingRuntime.logs.slice(-199) : [];
-              logs.push({
-                time: getTime(),
-                msg: 'Nieuwe variant gegenereerd vanuit preview.',
-                highlight: true
-              });
-
-              runtime[String(state.orderId)] = {
-                name: String(nextOrder.clientName || existingRuntime.name || ''),
-                type: String(nextOrder.title || existingRuntime.type || ''),
-                logs: logs,
-                progressPct: 100,
-                statusKey: 'klaar',
-                updatedAt: Date.now()
-              };
-
-              const patch = {
-                [ORDER_RUNTIME_KEY]: JSON.stringify(runtime),
-                [ORDER_STATE_KEY]: JSON.stringify({
-                  lastOrderId: String(state.orderId),
-                  updatedAt: nowIso
-                })
-              };
-              if (orderIndex >= 0) {
-                patch[CUSTOM_ORDERS_KEY] = JSON.stringify(customOrders);
-              }
-
-              await fetchUiStateSetWithFallback(UI_STATE_SCOPE, {
-                patch: patch,
-                source: 'premium-opdracht-preview',
-                actor: 'browser'
-              });
-            }
-
-            async function generateNewVariant() {
-              setButtonsDisabled(true);
-              startOverlay('Briefing analyseren...');
-
-              try {
-                const uiState = await fetchUiStateGetWithFallback(UI_STATE_SCOPE);
-                if (!uiState || !uiState.ok || !uiState.values) {
-                  throw new Error('Opdrachtdata kon niet worden geladen.');
-                }
-
-                const values = uiState.values;
-                const order = findOrderRecord(values);
-                const prompt = String(order && order.prompt || '').trim() || buildFallbackSitePrompt(order);
-                const result = await postGenerateSiteRequest({
-                  orderId: Number(state.orderId),
-                  company: String(order && order.clientName || 'Bedrijf'),
-                  title: String(order && order.title || 'Project'),
-                  description: String(order && order.description || ''),
-                  prompt: prompt,
-                  buildMode: resolveBuildMode(values),
-                  language: 'nl'
-                });
-
-                const html = String(result && result.html || '');
-                if (!html) throw new Error('AI gaf geen HTML terug.');
-
-                localStorage.setItem(PREVIEW_HTML_KEY, html);
-                await persistVariantMetadata(values, order, result, prompt);
-
-                finishOverlay('Nieuwe website laden...');
-                window.setTimeout(function () {
-                  window.location.reload();
-                }, 450);
-              } catch (error) {
-                showOverlayError(String(error && error.message || 'Website generatie mislukt.'));
-                setButtonsDisabled(false);
-              }
-            }
-
-            async function copyHtml() {
-              const originalHtml = decodeBase64Utf8(String(state.htmlBase64 || ''));
-              const originalLabel = ui.copyBtn.innerHTML;
-              try {
-                await copyText(originalHtml);
-                ui.copyBtn.textContent = 'HTML gekopieerd';
-                window.setTimeout(function () {
-                  ui.copyBtn.innerHTML = originalLabel;
-                }, 1800);
-              } catch (error) {
-                ui.copyBtn.textContent = 'Kopieren mislukt';
-                window.setTimeout(function () {
-                  ui.copyBtn.innerHTML = originalLabel;
-                }, 1800);
-              }
-            }
-
-            ui.variantBtn.addEventListener('click', function () {
-              void generateNewVariant();
-            });
-
-            ui.copyBtn.addEventListener('click', function () {
-              void copyHtml();
-            });
-
-            ui.closeOverlayBtn.addEventListener('click', function () {
-              setOverlayVisible(false);
-              setButtonsDisabled(false);
-            });
-          })();
-        <\/script>`;
+      function getPreviewStorageKey(orderId) {
+        return PREVIEW_HTML_PREFIX + String(orderId);
       }
 
-      function injectPreviewChrome(html, orderId) {
-        const controlsScript = buildPreviewControlsScript({
-          orderId: String(orderId),
-          htmlBase64: encodeBase64Utf8(html)
+      function getTime() {
+        return new Date().toLocaleTimeString('nl-NL', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
         });
-        if (/<\/body>/i.test(html)) {
-          return html.replace(/<\/body>/i, controlsScript + '</body>');
-        }
-        if (/<\/html>/i.test(html)) {
-          return html.replace(/<\/html>/i, controlsScript + '</html>');
-        }
-        return html + controlsScript;
       }
 
-      let html = null;
-      try {
-        html = localStorage.getItem(PREVIEW_HTML_PREFIX + id);
-        if (!html) html = localStorage.getItem(PREVIEW_HTML_PREFIX_OLD + id);
-      } catch (_) {
-        html = null;
+      function copyText(text) {
+        const value = String(text || '');
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          return navigator.clipboard.writeText(value);
+        }
+        return new Promise(function (resolve, reject) {
+          try {
+            const input = document.createElement('textarea');
+            input.value = value;
+            input.setAttribute('readonly', 'readonly');
+            input.style.position = 'fixed';
+            input.style.opacity = '0';
+            input.style.pointerEvents = 'none';
+            document.body.appendChild(input);
+            input.focus();
+            input.select();
+            const ok = document.execCommand('copy');
+            input.remove();
+            if (!ok) throw new Error('Kopieren mislukt.');
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
       }
 
-      if (!html) {
+      async function fetchUiStateGetWithFallback(scope) {
+        const encodedScope = encodeURIComponent(String(scope || ''));
+        const urls = [
+          '/api/ui-state-get?scope=' + encodedScope,
+          '/api/ui-state/' + encodedScope
+        ];
+        let lastError = null;
+
+        for (const url of urls) {
+          try {
+            const res = await fetch(url, {
+              method: 'GET',
+              cache: 'no-store'
+            });
+            if (!res.ok) throw new Error('UI-state GET mislukt (' + res.status + ')');
+            return await res.json().catch(function () { return {}; });
+          } catch (error) {
+            lastError = error;
+          }
+        }
+
+        throw lastError || new Error('UI-state GET mislukt');
+      }
+
+      async function fetchUiStateSetWithFallback(scope, body) {
+        const encodedScope = encodeURIComponent(String(scope || ''));
+        const urls = [
+          '/api/ui-state-set?scope=' + encodedScope,
+          '/api/ui-state/' + encodedScope
+        ];
+        let lastError = null;
+
+        for (const url of urls) {
+          try {
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body || {})
+            });
+            if (!res.ok) throw new Error('UI-state POST mislukt (' + res.status + ')');
+            return await res.json().catch(function () { return {}; });
+          } catch (error) {
+            lastError = error;
+          }
+        }
+
+        throw lastError || new Error('UI-state POST mislukt');
+      }
+
+      async function postGenerateSiteRequest(payload) {
+        const endpoints = [
+          '/api/active-order-generate-site',
+          '/api/active-orders/generate-site'
+        ];
+        let lastError = null;
+
+        for (let i = 0; i < endpoints.length; i++) {
+          const endpoint = endpoints[i];
+          const controller = new AbortController();
+          const timer = window.setTimeout(function () {
+            controller.abort();
+          }, 480000);
+
+          try {
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload || {}),
+              signal: controller.signal,
+              cache: 'no-store'
+            });
+            const raw = await res.text();
+            let data = {};
+            try {
+              data = raw ? JSON.parse(raw) : {};
+            } catch (_) {
+              data = {};
+            }
+            if (!res.ok || !data || !data.ok) {
+              const message = String(
+                (data && (data.detail || data.error)) ||
+                raw ||
+                ('Website generatie mislukt (' + res.status + ')')
+              ).trim();
+              const error = new Error(message || ('Website generatie mislukt (' + res.status + ')'));
+              error.status = Number(res.status) || 0;
+              const canTryNextEndpoint =
+                i < endpoints.length - 1 &&
+                (error.status === 404 || error.status === 405 || error.status >= 500);
+              if (canTryNextEndpoint) {
+                lastError = error;
+                continue;
+              }
+              throw error;
+            }
+            return data;
+          } catch (error) {
+            if (String(error && error.name || '') === 'AbortError') {
+              lastError = new Error('Timeout: AI website generatie duurde te lang.');
+            } else if (
+              Number(error && error.status) >= 400 &&
+              Number(error && error.status) < 500 &&
+              Number(error && error.status) !== 404 &&
+              Number(error && error.status) !== 405
+            ) {
+              throw error;
+            } else {
+              lastError = error;
+            }
+          } finally {
+            window.clearTimeout(timer);
+          }
+        }
+
+        throw lastError || new Error('Website generatie mislukt.');
+      }
+
+      function buildFallbackSitePrompt(order) {
+        const company = String(order && order.clientName || 'bedrijf').trim();
+        const title = String(order && order.title || 'website').trim();
+        const description = String(order && order.description || '').trim();
+        return [
+          'Bouw een complete professionele HTML website voor ' + company + '.',
+          'Projecttitel: ' + title + '.',
+          description ? ('Context: ' + description) : '',
+          'Lever een volledig HTML-bestand met inline CSS en eventuele inline JavaScript.',
+          'Eisen: responsive, duidelijke CTA, contactsectie, nette typografie, semantische HTML.',
+          'Taal van de website: Nederlands.',
+          'Output: alleen geldige HTML code zonder markdown.'
+        ].filter(Boolean).join('\n');
+      }
+
+      function buildVariantPrompt(basePrompt, extraInstructions) {
+        const cleanedBase = String(basePrompt || '')
+          .replace(/\n*\[SOFTORA_VARIANT_INSTRUCTIONS_START\][\s\S]*?\[SOFTORA_VARIANT_INSTRUCTIONS_END\]\n*/g, '\n')
+          .trim();
+        const cleanedInstructions = String(extraInstructions || '').trim();
+
+        if (!cleanedInstructions) return cleanedBase;
+
+        return [
+          cleanedBase,
+          '[SOFTORA_VARIANT_INSTRUCTIONS_START]',
+          'Maak nu een nieuwe variant van deze website.',
+          'Verwerk expliciet deze aanvullende revisie-instructies:',
+          cleanedInstructions,
+          'Behoud verder de kwaliteit, premium uitstraling en de rest van de briefing, tenzij deze instructies daar bewust van afwijken.',
+          '[SOFTORA_VARIANT_INSTRUCTIONS_END]'
+        ].filter(Boolean).join('\n\n');
+      }
+
+      function buildStaticPreviewHtml(html) {
+        const raw = String(html || '');
+        if (!raw) return '';
+
+        const withoutScripts = raw.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+        const recoveryStyle = [
+          '<style id="softora-static-preview-recovery">',
+          'html, body { opacity: 1 !important; visibility: visible !important; display: block !important; min-height: 100vh !important; }',
+          'body > * { opacity: 1 !important; visibility: visible !important; }',
+          'main, header, section, article, footer, nav, div, form { opacity: 1 !important; visibility: visible !important; }',
+          '</style>'
+        ].join('');
+
+        if (/<\/head>/i.test(withoutScripts)) {
+          return withoutScripts.replace(/<\/head>/i, recoveryStyle + '</head>');
+        }
+        if (/<\/body>/i.test(withoutScripts)) {
+          return withoutScripts.replace(/<\/body>/i, recoveryStyle + '</body>');
+        }
+        return withoutScripts + recoveryStyle;
+      }
+
+      function readCustomOrders(values) {
+        const parsed = safeJsonParse(String(values && values[CUSTOM_ORDERS_KEY] || '[]'), []);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+
+      function readRuntime(values) {
+        const parsed = safeJsonParse(String(values && values[ORDER_RUNTIME_KEY] || '{}'), {});
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+      }
+
+      function resolveBuildMode(values) {
+        const value = String(values && values[BUILD_MODE_KEY] || '').trim().toLowerCase();
+        return value === 'quick' ? 'quick' : 'premium';
+      }
+
+      function findOrderRecord(values) {
+        const orders = readCustomOrders(values);
+        const match = orders.find(function (item) {
+          return Number(item && item.id) === Number(id);
+        });
+        if (!match) throw new Error('Opdrachtdata niet gevonden voor deze preview.');
+        return match;
+      }
+
+      async function persistVariantMetadata(values, order, result, promptUsed) {
+        const customOrders = readCustomOrders(values);
+        const runtime = readRuntime(values);
+        const orderIndex = customOrders.findIndex(function (item) {
+          return Number(item && item.id) === Number(id);
+        });
+        const apiCost = result && result.apiCost || {};
+        const nowIso = new Date().toISOString();
+        const nextOrder = {
+          ...(order || {}),
+          prompt: String(promptUsed || ''),
+          apiCostEur: Number.isFinite(Number(apiCost && apiCost.eur)) ? Number(apiCost.eur) : null,
+          apiCostUsd: Number.isFinite(Number(apiCost && apiCost.usd)) ? Number(apiCost.usd) : null,
+          apiTokensInput: Number.isFinite(Number(apiCost && apiCost.promptTokens)) ? Number(apiCost.promptTokens) : null,
+          apiTokensOutput: Number.isFinite(Number(apiCost && apiCost.completionTokens)) ? Number(apiCost.completionTokens) : null,
+          apiModel: String((result && result.model) || (apiCost && apiCost.model) || ''),
+          lastRunAt: nowIso,
+          status: 'klaar'
+        };
+
+        if (orderIndex >= 0) {
+          customOrders[orderIndex] = nextOrder;
+        }
+
+        const existingRuntime = runtime[String(id)] && typeof runtime[String(id)] === 'object'
+          ? runtime[String(id)]
+          : {};
+        const logs = Array.isArray(existingRuntime.logs) ? existingRuntime.logs.slice(-199) : [];
+        logs.push({
+          time: getTime(),
+          msg: 'Nieuwe variant gegenereerd vanuit preview.',
+          highlight: true
+        });
+
+        runtime[String(id)] = {
+          name: String(nextOrder.clientName || existingRuntime.name || ''),
+          type: String(nextOrder.title || existingRuntime.type || ''),
+          logs: logs,
+          progressPct: 100,
+          statusKey: 'klaar',
+          updatedAt: Date.now()
+        };
+
+        const patch = {
+          [ORDER_RUNTIME_KEY]: JSON.stringify(runtime),
+          [ORDER_STATE_KEY]: JSON.stringify({
+            lastOrderId: String(id),
+            updatedAt: nowIso
+          })
+        };
+        if (orderIndex >= 0) {
+          patch[CUSTOM_ORDERS_KEY] = JSON.stringify(customOrders);
+        }
+
+        await fetchUiStateSetWithFallback(REMOTE_UI_STATE_SCOPE, {
+          patch: patch,
+          source: 'premium-opdracht-preview',
+          actor: 'browser'
+        });
+      }
+
+      function setButtonsDisabled(disabled) {
+        if (state.variantBtn) state.variantBtn.disabled = Boolean(disabled);
+        if (state.copyBtn) state.copyBtn.disabled = Boolean(disabled);
+      }
+
+      function setOverlayVisible(visible) {
+        if (!state.overlay) return;
+        state.overlay.classList.toggle('show', Boolean(visible));
+        document.documentElement.style.overflow = visible ? 'hidden' : '';
+        document.body.style.overflow = visible ? 'hidden' : (document.body.dataset.previewMode === 'frame' ? 'hidden' : '');
+      }
+
+      function startOverlay(message) {
+        if (!state.overlay) return;
+        window.clearInterval(state.overlayTimer);
+        state.overlay.classList.add('loading');
+        state.overlay.classList.remove('error');
+        state.overlayActions.classList.remove('show');
+        state.overlayEyebrow.textContent = 'Nieuwe variant';
+        state.overlayTitle.textContent = 'Even geduld';
+        state.overlayDesc.textContent = 'De AI maakt nu een nieuwe versie. Je ziet de preview automatisch zodra die klaar is.';
+        state.overlayStatus.textContent = message || 'Nieuwe website genereren...';
+        state.overlayMeta.textContent = 'Opdracht #' + String(id || '');
+        setOverlayVisible(true);
+      }
+
+      function showOverlayError(message) {
+        if (!state.overlay) return;
+        window.clearInterval(state.overlayTimer);
+        state.overlay.classList.remove('loading');
+        state.overlay.classList.add('error');
+        state.overlayActions.classList.add('show');
+        state.overlayEyebrow.textContent = 'Generatie mislukt';
+        state.overlayTitle.textContent = 'Nieuwe variant kon niet worden gebouwd';
+        state.overlayDesc.textContent = 'De huidige preview blijft staan. Sluit dit venster en probeer het opnieuw zodra de API weer reageert.';
+        state.overlayStatus.textContent = String(message || 'Onbekende fout');
+        state.overlayMeta.textContent = 'Opdracht #' + String(id || '');
+        setOverlayVisible(true);
+      }
+
+      function setWarning(message) {
+        if (!state.warning) return;
+        state.warning.textContent = String(message || '');
+        state.warning.classList.toggle('show', Boolean(message));
+      }
+
+      function setPromptVisible(visible) {
+        if (!state.promptModal) return;
+        state.promptModal.classList.toggle('show', Boolean(visible));
+        state.promptModal.setAttribute('aria-hidden', visible ? 'false' : 'true');
+      }
+
+      function openVariantPrompt() {
+        if (!state.promptModal || !state.promptInput) {
+          void generateNewVariant('');
+          return;
+        }
+        state.promptInput.value = '';
+        setPromptVisible(true);
+        window.setTimeout(function () {
+          try {
+            state.promptInput.focus();
+          } catch (_) {}
+        }, 30);
+      }
+
+      function closeVariantPrompt() {
+        if (!state.promptModal) return;
+        setPromptVisible(false);
+      }
+
+      function createPreviewShell() {
+        if (state.shell) return;
+
+        const shell = document.createElement('div');
+        shell.className = 'preview-shell';
+        shell.innerHTML = [
+          '<iframe',
+          ' class="preview-frame"',
+          ' id="previewFrame"',
+          ' title="Website preview"',
+          ' sandbox="allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads allow-same-origin"',
+          ' referrerpolicy="no-referrer"',
+          '></iframe>',
+          enablePreviewChrome ? (
+            '<div class="toolbar" id="previewToolbar">' +
+              '<button class="btn variant" id="variantBtn" type="button">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                  '<path d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"></path>' +
+                '</svg>' +
+                'Nieuwe variant' +
+              '</button>' +
+              '<button class="btn copy" id="copyBtn" type="button">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                  '<rect x="9" y="9" width="13" height="13" rx="2"></rect>' +
+                  '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>' +
+                '</svg>' +
+                'HTML copy' +
+              '</button>' +
+            '</div>' +
+            '<div class="overlay" id="overlay" aria-live="polite">' +
+              '<div class="panel">' +
+                '<p class="eyebrow" id="overlayEyebrow">Nieuwe variant</p>' +
+                '<h2 class="title" id="overlayTitle">Even geduld</h2>' +
+                '<p class="desc" id="overlayDesc">De AI maakt nu een nieuwe versie. Je ziet de preview automatisch zodra die klaar is.</p>' +
+                '<div class="row">' +
+                  '<div class="spinner"></div>' +
+                  '<div class="status" id="overlayStatus">Nieuwe website genereren...</div>' +
+                '</div>' +
+                '<div class="meta" id="overlayMeta">Opdracht #' + String(id || '') + '</div>' +
+                '<div class="actions" id="overlayActions">' +
+                  '<button class="ghost" id="closeOverlayBtn" type="button">Sluiten</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="prompt-modal" id="promptModal" aria-hidden="true">' +
+              '<div class="panel prompt-panel">' +
+                '<p class="eyebrow">Nieuwe variant</p>' +
+                '<h2 class="title">Extra instructies</h2>' +
+                '<p class="desc">Geef hier aan wat anders of beter moet in de volgende versie. Laat leeg als je gewoon een nieuwe variant wilt.</p>' +
+                '<label class="prompt-label" for="variantPromptInput">Aanvullende instructies</label>' +
+                '<textarea class="prompt-input" id="variantPromptInput" placeholder="Bijvoorbeeld: maak hem luxer, meer witruimte, sterker gericht op conversie, andere kleurwereld, meer premium fotografie-look."></textarea>' +
+                '<div class="prompt-actions">' +
+                  '<button class="ghost" id="cancelPromptBtn" type="button">Annuleren</button>' +
+                  '<button class="primary" id="confirmPromptBtn" type="button">Bevestigen</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="preview-warning" id="previewWarning"></div>'
+          ) : ''
+        ].join('');
+
+        document.body.innerHTML = '';
+        document.body.appendChild(shell);
+        document.body.setAttribute('data-preview-mode', 'frame');
+
+        state.shell = shell;
+        state.frame = shell.querySelector('#previewFrame');
+        state.toolbar = shell.querySelector('#previewToolbar');
+        state.warning = shell.querySelector('#previewWarning');
+        state.variantBtn = shell.querySelector('#variantBtn');
+        state.copyBtn = shell.querySelector('#copyBtn');
+        state.overlay = shell.querySelector('#overlay');
+        state.overlayEyebrow = shell.querySelector('#overlayEyebrow');
+        state.overlayTitle = shell.querySelector('#overlayTitle');
+        state.overlayDesc = shell.querySelector('#overlayDesc');
+        state.overlayStatus = shell.querySelector('#overlayStatus');
+        state.overlayMeta = shell.querySelector('#overlayMeta');
+        state.overlayActions = shell.querySelector('#overlayActions');
+        state.closeOverlayBtn = shell.querySelector('#closeOverlayBtn');
+        state.promptModal = shell.querySelector('#promptModal');
+        state.promptInput = shell.querySelector('#variantPromptInput');
+        state.cancelPromptBtn = shell.querySelector('#cancelPromptBtn');
+        state.confirmPromptBtn = shell.querySelector('#confirmPromptBtn');
+
+        if (state.variantBtn) {
+          state.variantBtn.addEventListener('click', function () {
+            openVariantPrompt();
+          });
+        }
+
+        if (state.copyBtn) {
+          state.copyBtn.addEventListener('click', function () {
+            void copyHtml();
+          });
+        }
+
+        if (state.closeOverlayBtn) {
+          state.closeOverlayBtn.addEventListener('click', function () {
+            setOverlayVisible(false);
+            setButtonsDisabled(false);
+          });
+        }
+
+        if (state.cancelPromptBtn) {
+          state.cancelPromptBtn.addEventListener('click', function () {
+            closeVariantPrompt();
+          });
+        }
+
+        if (state.confirmPromptBtn) {
+          state.confirmPromptBtn.addEventListener('click', function () {
+            const instructions = state.promptInput ? state.promptInput.value : '';
+            closeVariantPrompt();
+            void generateNewVariant(instructions);
+          });
+        }
+
+        if (state.promptModal) {
+          state.promptModal.addEventListener('click', function (event) {
+            if (event.target === state.promptModal) closeVariantPrompt();
+          });
+        }
+
+        window.addEventListener('keydown', function (event) {
+          if (event.key !== 'Escape') return;
+          if (state.promptModal && state.promptModal.classList.contains('show')) {
+            closeVariantPrompt();
+            return;
+          }
+          if (state.overlay && state.overlay.classList.contains('show') && state.overlay.classList.contains('error')) {
+            setOverlayVisible(false);
+            setButtonsDisabled(false);
+          }
+        });
+      }
+
+      function applyRecoveryStyle(doc, aggressive) {
+        if (!doc || !doc.documentElement) return;
+        const styleId = aggressive ? 'softora-preview-recovery-style-aggressive' : 'softora-preview-recovery-style';
+        if (doc.getElementById(styleId)) return;
+
+        const style = doc.createElement('style');
+        style.id = styleId;
+        style.textContent = aggressive
+          ? [
+              'html, body { opacity: 1 !important; visibility: visible !important; display: block !important; min-height: 100vh !important; }',
+              'body > * { opacity: 1 !important; visibility: visible !important; }',
+              'main, header, section, article, footer, nav, div, form { opacity: 1 !important; visibility: visible !important; }',
+              '.reveal, .hidden, .is-hidden, [hidden], [data-reveal], [data-hidden], [data-state=\"hidden\"] { opacity: 1 !important; visibility: visible !important; transform: none !important; filter: none !important; clip-path: none !important; }'
+            ].join('\n')
+          : [
+              'html, body { opacity: 1 !important; visibility: visible !important; }',
+              'body { min-height: 100vh !important; }'
+            ].join('\n');
+
+        (doc.head || doc.documentElement).appendChild(style);
+      }
+
+      function revealLikelyHiddenRoots(frameWindow, doc) {
+        if (!frameWindow || !doc || !doc.body) return;
+
+        const elements = [doc.documentElement, doc.body].concat(Array.from(doc.body.children || []).slice(0, 8));
+        elements.forEach(function (element) {
+          if (!element || !element.style) return;
+          let computed;
+          try {
+            computed = frameWindow.getComputedStyle(element);
+          } catch (_) {
+            computed = null;
+          }
+          if (!computed) return;
+
+          if (computed.opacity === '0') {
+            element.style.setProperty('opacity', '1', 'important');
+          }
+          if (computed.visibility === 'hidden') {
+            element.style.setProperty('visibility', 'visible', 'important');
+          }
+          if (computed.display === 'none' && (element === doc.body || element === doc.documentElement)) {
+            element.style.setProperty('display', 'block', 'important');
+          }
+        });
+      }
+
+      function frameLooksBlank(frameWindow, doc) {
+        if (!frameWindow || !doc || !doc.body || !doc.documentElement) return true;
+
+        let bodyStyle;
+        try {
+          bodyStyle = frameWindow.getComputedStyle(doc.body);
+        } catch (_) {
+          bodyStyle = null;
+        }
+
+        const textLen = String(doc.body.textContent || '').replace(/\s+/g, '').length;
+        const semanticCount = doc.querySelectorAll('main,section,header,footer,nav,form,h1,h2,h3,h4,a,button,img,svg').length;
+        const height = Math.max(doc.body.scrollHeight || 0, doc.documentElement.scrollHeight || 0);
+        const hasMainVisual = doc.querySelector('main, header, section, img, svg, video, canvas');
+
+        return Boolean(
+          (bodyStyle && (
+            bodyStyle.display === 'none' ||
+            bodyStyle.visibility === 'hidden' ||
+            bodyStyle.opacity === '0'
+          )) ||
+          (!hasMainVisual && semanticCount < 3 && textLen < 60 && height < 240)
+        );
+      }
+
+      function stabilizePreviewFrame(loadToken) {
+        if (!state.frame || loadToken !== state.frameLoadToken) return;
+
+        const frameWindow = state.frame.contentWindow;
+        const doc = state.frame.contentDocument;
+        if (!frameWindow || !doc) return;
+
+        applyRecoveryStyle(doc, false);
+        revealLikelyHiddenRoots(frameWindow, doc);
+        setWarning('');
+
+        window.setTimeout(function () {
+          if (loadToken !== state.frameLoadToken) return;
+          if (!frameLooksBlank(frameWindow, doc)) return;
+          applyRecoveryStyle(doc, true);
+          revealLikelyHiddenRoots(frameWindow, doc);
+        }, 180);
+
+        window.setTimeout(function () {
+          if (loadToken !== state.frameLoadToken) return;
+          if (!frameLooksBlank(frameWindow, doc)) return;
+          if (!state.recoveryMode) {
+            const recoveredHtml = buildStaticPreviewHtml(state.currentHtml);
+            if (recoveredHtml && recoveredHtml !== state.renderedHtml) {
+              setWarning('Live preview bleef leeg. Een stabiele statische versie wordt geladen.');
+              renderPreview(recoveredHtml, {
+                preserveSource: true,
+                recoveryMode: true
+              });
+              return;
+            }
+          }
+          setWarning('Deze variant lijkt visueel leeg of verborgen in de preview. De HTML is wel geladen. Gebruik eventueel "Nieuwe variant" of "HTML copy".');
+        }, 900);
+      }
+
+      function markPreviewReady() {
         document.documentElement.removeAttribute('data-preview-loading');
         document.documentElement.setAttribute('data-preview-ready', 'true');
+        if (state.hideOverlayOnNextReady) {
+          state.hideOverlayOnNextReady = false;
+          setOverlayVisible(false);
+          setButtonsDisabled(false);
+        }
+      }
+
+      function renderPreview(html, options) {
+        const opts = options || {};
+        createPreviewShell();
+        const markup = String(html || '');
+        if (!opts.preserveSource) {
+          state.currentHtml = markup;
+        }
+        state.renderedHtml = markup;
+        state.recoveryMode = Boolean(opts.recoveryMode);
+        state.frameLoadToken += 1;
+        const currentToken = state.frameLoadToken;
+
+        if (state.frame) {
+          state.frame.onload = function () {
+            stabilizePreviewFrame(currentToken);
+            markPreviewReady();
+          };
+          state.frame.srcdoc = markup;
+        }
+
+        window.setTimeout(function () {
+          if (currentToken !== state.frameLoadToken) return;
+          markPreviewReady();
+          stabilizePreviewFrame(currentToken);
+        }, 1500);
+      }
+
+      async function generateNewVariant(extraInstructions) {
+        setButtonsDisabled(true);
+        state.hideOverlayOnNextReady = false;
+        startOverlay('Nieuwe website genereren...');
+
+        try {
+          const uiState = await fetchUiStateGetWithFallback(REMOTE_UI_STATE_SCOPE);
+          if (!uiState || !uiState.ok || !uiState.values) {
+            throw new Error('Opdrachtdata kon niet worden geladen.');
+          }
+
+          const values = uiState.values;
+          const order = findOrderRecord(values);
+          const basePrompt = String(order && order.prompt || '').trim() || buildFallbackSitePrompt(order);
+          const prompt = buildVariantPrompt(basePrompt, extraInstructions);
+          const result = await postGenerateSiteRequest({
+            orderId: Number(id),
+            company: String(order && order.clientName || 'Bedrijf'),
+            title: String(order && order.title || 'Project'),
+            description: String(order && order.description || ''),
+            prompt: prompt,
+            buildMode: resolveBuildMode(values),
+            language: 'nl'
+          });
+
+          const html = String(result && result.html || '');
+          if (!html) throw new Error('AI gaf geen HTML terug.');
+
+          localStorage.setItem(getPreviewStorageKey(id), html);
+          await persistVariantMetadata(values, order, result, prompt);
+
+          state.hideOverlayOnNextReady = true;
+          renderPreview(html);
+        } catch (error) {
+          state.hideOverlayOnNextReady = false;
+          showOverlayError(String(error && error.message || 'Website generatie mislukt.'));
+          setButtonsDisabled(false);
+        }
+      }
+
+      async function copyHtml() {
+        if (!state.copyBtn) return;
+        const originalLabel = state.copyBtn.innerHTML;
+        try {
+          await copyText(state.currentHtml);
+          state.copyBtn.textContent = 'HTML gekopieerd';
+          window.setTimeout(function () {
+            state.copyBtn.innerHTML = originalLabel;
+          }, 1800);
+        } catch (_) {
+          state.copyBtn.textContent = 'Kopieren mislukt';
+          window.setTimeout(function () {
+            state.copyBtn.innerHTML = originalLabel;
+          }, 1800);
+        }
+      }
+
+      function loadStoredPreview() {
+        let html = null;
+        try {
+          html = localStorage.getItem(getPreviewStorageKey(id));
+          if (!html) html = localStorage.getItem(PREVIEW_HTML_PREFIX_OLD + id);
+        } catch (_) {
+          html = null;
+        }
+        return html;
+      }
+
+      window.addEventListener('storage', function (event) {
+        if (!id) return;
+        if (event.key !== getPreviewStorageKey(id) && event.key !== PREVIEW_HTML_PREFIX_OLD + id) return;
+        if (!event.newValue || event.newValue === state.currentHtml) return;
+        renderPreview(event.newValue);
+      });
+
+      if (!id) {
+        markPreviewReady();
         return;
       }
 
-      if (enablePreviewChrome) {
-        html = injectPreviewChrome(html, id);
+      const html = loadStoredPreview();
+      if (!html) {
+        markPreviewReady();
+        return;
       }
-      document.open();
-      document.write(html);
-      document.close();
+
+      renderPreview(html);
     })();
   </script>
 </body>

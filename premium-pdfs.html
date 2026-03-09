@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Softora | PDF'S</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="assets/personnel-theme.css">
+    <script>
+        (function () {
+            document.documentElement.setAttribute('data-personnel-loading', 'true');
+            try {
+                var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf('/premium-') !== -1;
+                var storageKey = isPremiumPersonnel
+                    ? 'softora_premium_personnel_theme_mode'
+                    : 'softora_software_personnel_theme_mode';
+                var mode = localStorage.getItem(storageKey);
+                if (mode === 'light' || mode === 'dark') {
+                    document.documentElement.setAttribute('data-theme-mode', mode);
+                    document.documentElement.setAttribute('data-theme', mode);
+                }
+            } catch (error) {
+                /* ignore storage errors */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            min-height: 100%;
+        }
+
+        body {
+            font-family: 'Barlow', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        .noise-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 2.5rem 0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            text-decoration: none;
+            padding: 0 2rem;
+            margin-bottom: 3rem;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-flow-section {
+            position: relative;
+        }
+
+        .sidebar-flow-section::before {
+            content: '';
+            position: absolute;
+            left: 0.82rem;
+            top: 6.45rem;
+            bottom: 1.35rem;
+            width: 0.7rem;
+            background: rgba(139, 34, 82, 0.72);
+            clip-path: polygon(50% 0, 100% 0.46rem, 66% 0.46rem, 66% 100%, 34% 100%, 34% 0.46rem, 0 0.46rem);
+            pointer-events: none;
+        }
+
+        .sidebar-flow-section .sidebar-link {
+            padding-left: 2.8rem;
+        }
+
+        .sidebar-section-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--text-tertiary);
+            padding: 0 2rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.8rem 2rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 400;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .sidebar-link:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .sidebar-link.active {
+            color: var(--text-primary);
+            background: rgba(139, 34, 82, 0.06);
+        }
+
+        .sidebar-link svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.5;
+            flex-shrink: 0;
+        }
+
+        .sidebar-link.active svg,
+        .sidebar-link:hover svg {
+            opacity: 1;
+        }
+
+        .sidebar-footer {
+            padding: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .sidebar-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .sidebar-user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sidebar-user-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .sidebar-user-role {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+
+        .logout-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+
+        .logout-btn:hover {
+            color: var(--text-primary);
+            border-color: rgba(139, 34, 82, 0.35);
+            background: rgba(139, 34, 82, 0.08);
+        }
+
+        .logout-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .main {
+            margin-left: 280px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow: hidden;
+            background: var(--bg-primary);
+        }
+
+        .topbar {
+            padding: 34px 40px 0;
+            flex-shrink: 0;
+        }
+
+        .page-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .page-subtitle {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            padding: 18px 40px 0;
+            border-bottom: 2px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .tab {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            padding: 10px 24px;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.15s;
+            border: none;
+            background: none;
+        }
+
+        .tab:hover { color: var(--text-primary); }
+        .tab.active { color: var(--accent); }
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .tab-panel {
+            display: none;
+            height: 100%;
+        }
+
+        .tab-panel.active {
+            display: flex;
+        }
+
+        .split {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            gap: 0;
+        }
+
+        .form-panel {
+            width: 380px;
+            flex-shrink: 0;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+            background: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-inner {
+            padding: 20px 22px;
+            flex: 1;
+        }
+
+        .section-label {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 10px;
+            margin-top: 16px;
+        }
+
+        .section-label:first-child { margin-top: 0; }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
+
+        .form-group label {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 9px 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: 'Barlow', sans-serif;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+            transition: border-color .15s, background .15s;
+            outline: none;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.03);
+        }
+
+        :root[data-theme='light'] .form-group input,
+        :root[data-theme='light'] .form-group select,
+        :root[data-theme='light'] .form-group textarea {
+            background: #fff;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 68px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 14px 0 6px;
+        }
+
+        .regels-head {
+            display: grid;
+            grid-template-columns: 3fr 1fr 1.2fr 28px;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .regels-head span {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .regel-row {
+            display: grid;
+            grid-template-columns: 3fr 1fr 1.2fr 28px;
+            gap: 6px;
+            margin-bottom: 6px;
+            align-items: center;
+        }
+
+        .regel-row input {
+            padding: 8px 8px;
+            font-size: 0.8rem;
+        }
+
+        .btn-remove {
+            width: 26px;
+            height: 26px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: transparent;
+            cursor: pointer;
+            color: var(--text-tertiary);
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .15s;
+            flex-shrink: 0;
+        }
+
+        .btn-remove:hover {
+            border-color: #e44;
+            color: #e44;
+        }
+
+        .btn-add {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--accent);
+            background: none;
+            border: 1px dashed rgba(155, 35, 85, .4);
+            border-radius: 4px;
+            padding: 7px 14px;
+            cursor: pointer;
+            transition: all .15s;
+            margin-top: 2px;
+        }
+
+        .btn-add:hover {
+            border-color: var(--accent);
+            background: rgba(155, 35, 85, .04);
+        }
+
+        .form-footer {
+            padding: 14px 22px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-tertiary);
+            flex-shrink: 0;
+        }
+
+        .btn-download {
+            width: 100%;
+            padding: 11px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background .15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-download:hover {
+            background: var(--accent-light);
+        }
+
+        .preview-panel {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 20px;
+            gap: 0;
+        }
+
+        .preview-label {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 12px;
+            align-self: flex-start;
+            padding-left: 4px;
+        }
+
+        .pdf-page {
+            width: 595px;
+            min-height: 842px;
+            background: #fff;
+            box-shadow: 0 4px 40px rgba(0,0,0,.25);
+            font-family: 'Barlow', sans-serif;
+            position: relative;
+            flex-shrink: 0;
+            color: #1a1a2e;
+        }
+
+        .pdf-header { background: #9b2355; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
+        .pdf-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; color: #fff; letter-spacing: 1px; }
+        .pdf-doctype { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 2px; color: rgba(255,200,220,.9); text-transform: uppercase; }
+        .pdf-body { padding: 20px 28px 60px; }
+        .pdf-addresses { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+        .pdf-addr-box { background: #f7f4f0; padding: 12px 14px; border-radius: 2px; }
+        .pdf-addr-label { font-size: 8px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #999; margin-bottom: 6px; }
+        .pdf-addr-name { font-size: 11px; font-weight: 700; color: #1a1a2e; margin-bottom: 3px; }
+        .pdf-addr-line { font-size: 10px; color: #777; line-height: 1.5; }
+        .pdf-meta-strip { background: #9b2355; padding: 6px 14px; display: flex; gap: 0; margin-bottom: 18px; }
+        .pdf-meta-cell { flex: 1; }
+        .pdf-meta-key { font-size: 7px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,200,220,.8); margin-bottom: 2px; }
+        .pdf-meta-val { font-size: 10px; font-weight: 600; color: #fff; }
+        .pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 0; font-size: 10px; }
+        .pdf-table thead tr { background: #9b2355; }
+        .pdf-table thead th { padding: 6px 10px; text-align: left; font-size: 8px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #fff; }
+        .pdf-table thead th:not(:first-child) { text-align: right; width: 70px; }
+        .pdf-table tbody tr:nth-child(even) { background: #f7f4f0; }
+        .pdf-table tbody td { padding: 7px 10px; color: #333; border-bottom: 1px solid #eee; }
+        .pdf-table tbody td:not(:first-child) { text-align: right; font-weight: 500; }
+        .pdf-table .empty-row td { color: #bbb; font-style: italic; }
+        .pdf-totals { display: flex; flex-direction: column; align-items: flex-end; margin-top: 8px; gap: 3px; }
+        .pdf-total-row { display: flex; gap: 28px; font-size: 10px; color: #777; }
+        .pdf-total-row span:last-child { width: 80px; text-align: right; font-weight: 500; color: #333; }
+        .pdf-total-grand { display: flex; align-items: center; justify-content: space-between; background: #9b2355; color: #fff; padding: 6px 10px; margin-top: 4px; width: 220px; }
+        .pdf-total-grand-label { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+        .pdf-total-grand-amount { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 800; }
+        .pdf-notes { margin-top: 18px; }
+        .pdf-notes-label { font-size: 8px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #999; margin-bottom: 6px; }
+        .pdf-notes-text { font-size: 9.5px; color: #666; line-height: 1.6; background: #f7f4f0; padding: 10px 12px; border-radius: 2px; }
+        .pdf-footer-bar { position: absolute; bottom: 0; left: 0; right: 0; background: #f7f4f0; padding: 8px 28px; text-align: center; font-size: 8px; color: #aaa; border-top: 1px solid #eee; }
+        .pdf-herinnering-banner { padding: 8px 14px; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 14px; }
+        .pdf-body-text { font-size: 10px; color: #444; line-height: 1.7; margin-bottom: 16px; }
+        .pdf-invoice-ref { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; background: #f7f4f0; margin-bottom: 14px; }
+        .pdf-invoice-ref-cell { padding: 8px 12px; }
+        .pdf-invoice-ref-label { font-size: 7px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #999; margin-bottom: 3px; }
+        .pdf-invoice-ref-val { font-size: 10.5px; font-weight: 700; color: #1a1a2e; }
+        .pdf-betaal-strip { padding: 10px 14px; color: #fff; display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .pdf-betaal-strip-left { font-size: 10px; }
+        .pdf-betaal-strip-left strong { display: block; font-size: 12px; }
+        .pdf-betaal-strip-right { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all .3s;
+            z-index: 999;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (max-width: 1280px) {
+            .form-panel { width: 350px; }
+            .pdf-page { transform: scale(0.9); transform-origin: top center; }
+        }
+
+        @media (max-width: 1100px) {
+            body { overflow: auto; }
+            .main { overflow: visible; }
+            .tab-panel.active, .split { flex-direction: column; }
+            .form-panel { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+            .preview-panel { align-items: flex-start; }
+            .pdf-page { transform: scale(0.78); transform-origin: top left; }
+        }
+    </style>
+</head>
+<body>
+    <div class="noise-overlay"></div>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <a href="/premium-website" class="sidebar-logo">Softora.nl</a>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section sidebar-flow-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="/premium-personeel-dashboard" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="/premium-actieve-opdrachten" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg>
+                        Actieve Opdrachten
+                    </a>
+                    <a href="/premium-personeel-agenda" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+                        Agenda
+                    </a>
+                    <a href="/premium-bevestigingsmails" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15A2.25 2.25 0 0 1 2.25 17.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15A2.25 2.25 0 0 0 2.25 6.75m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.909a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
+                        Bevestigingsmails
+                    </a>
+                    <a href="/premium-ai-lead-generator" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"/></svg>
+                        AI Coldcalling
+                    </a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Beheer</div>
+                    <a href="/premium-klanten" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
+                        Klanten
+                    </a>
+                    <a href="/premium-pakketten" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"/></svg>
+                        Pakketten
+                    </a>
+                    <a href="/premium-pdfs" class="sidebar-link active">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"/></svg>
+                        PDF'S
+                    </a>
+                    <a href="/premium-instellingen" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"/></svg>
+                        Instellingen
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">SP</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">Softora Premium</div>
+                        <div class="sidebar-user-role">Administrator</div>
+                    </div>
+                    <a href="/premium-personeel-login" class="logout-btn" title="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <div class="main">
+            <div class="topbar">
+                <div class="page-title">PDF'S</div>
+                <div class="page-subtitle">Vul links in — de preview wordt realtime bijgewerkt</div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" type="button" onclick="switchTab('offerte', this)">Offerte</button>
+                <button class="tab" type="button" onclick="switchTab('factuur', this)">Factuur</button>
+                <button class="tab" type="button" onclick="switchTab('herinnering', this)">Betalingsherinnering</button>
+            </div>
+
+            <div id="tab-offerte" class="tab-panel active">
+                <div class="split">
+                    <div class="form-panel">
+                        <div class="form-inner">
+                            <div class="section-label">Klantgegevens</div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Bedrijfsnaam</label><input type="text" id="o-bedrijf" oninput="updatePreview()" placeholder="De Vries B.V."></div>
+                                <div class="form-group"><label>Contactpersoon</label><input type="text" id="o-contact" oninput="updatePreview()" placeholder="Dhr. De Vries"></div>
+                            </div>
+                            <div class="form-group"><label>E-mailadres</label><input type="email" id="o-email" oninput="updatePreview()" placeholder="info@devries.nl"></div>
+                            <div class="form-group"><label>Adres</label><input type="text" id="o-adres" oninput="updatePreview()" placeholder="Hoofdstraat 1, 1234 AB Amsterdam"></div>
+                            <div class="form-row">
+                                <div class="form-group"><label>KvK-nummer</label><input type="text" id="o-kvk" oninput="updatePreview()" placeholder="12345678"></div>
+                                <div class="form-group"><label>Telefoonnummer</label><input type="text" id="o-tel" oninput="updatePreview()" placeholder="+31 6 12 34 56 78"></div>
+                            </div>
+
+                            <hr class="divider">
+                            <div class="section-label">Offerte details</div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Offertenummer</label><input type="text" id="o-nummer" oninput="updatePreview()" placeholder="OFF-2026-001"></div>
+                                <div class="form-group"><label>Datum</label><input type="date" id="o-datum" oninput="updatePreview()"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Geldig tot</label><input type="date" id="o-geldig" oninput="updatePreview()"></div>
+                                <div class="form-group"><label>Project / onderwerp</label><input type="text" id="o-onderwerp" oninput="updatePreview()" placeholder="Website Business pakket"></div>
+                            </div>
+
+                            <hr class="divider">
+                            <div class="section-label">Regelomschrijvingen</div>
+                            <div class="regels-head"><span>Omschrijving</span><span>Aantal</span><span>Prijs</span><span></span></div>
+                            <div id="o-regels"></div>
+                            <button class="btn-add" type="button" onclick="addRegel('o')">+ Regel toevoegen</button>
+
+                            <hr class="divider">
+                            <div class="section-label">Opmerkingen</div>
+                            <div class="form-group"><textarea id="o-notities" oninput="updatePreview()" placeholder="Bijv. betalingstermijn, voorwaarden…"></textarea></div>
+                        </div>
+                        <div class="form-footer">
+                            <button class="btn-download" type="button" onclick="downloadPDF('offerte')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                PDF Downloaden
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="preview-panel">
+                        <div class="preview-label">Live Preview</div>
+                        <div class="pdf-page" id="preview-offerte"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-factuur" class="tab-panel">
+                <div class="split">
+                    <div class="form-panel">
+                        <div class="form-inner">
+                            <div class="section-label">Klantgegevens</div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Bedrijfsnaam</label><input type="text" id="f-bedrijf" oninput="updatePreview()" placeholder="De Vries B.V."></div>
+                                <div class="form-group"><label>Contactpersoon</label><input type="text" id="f-contact" oninput="updatePreview()" placeholder="Dhr. De Vries"></div>
+                            </div>
+                            <div class="form-group"><label>E-mailadres</label><input type="email" id="f-email" oninput="updatePreview()" placeholder="info@devries.nl"></div>
+                            <div class="form-group"><label>Adres</label><input type="text" id="f-adres" oninput="updatePreview()" placeholder="Hoofdstraat 1, 1234 AB Amsterdam"></div>
+                            <div class="form-row">
+                                <div class="form-group"><label>KvK-nummer</label><input type="text" id="f-kvk" oninput="updatePreview()" placeholder="12345678"></div>
+                                <div class="form-group"><label>BTW-nummer</label><input type="text" id="f-btwnum" oninput="updatePreview()" placeholder="NL123456789B01"></div>
+                            </div>
+
+                            <hr class="divider">
+                            <div class="section-label">Factuurdetails</div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Factuurnummer</label><input type="text" id="f-nummer" oninput="updatePreview()" placeholder="FACT-2026-001"></div>
+                                <div class="form-group"><label>Factuurdatum</label><input type="date" id="f-datum" oninput="updatePreview()"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Vervaldatum</label><input type="date" id="f-verval" oninput="updatePreview()"></div>
+                                <div class="form-group"><label>IBAN</label><input type="text" id="f-iban" oninput="updatePreview()" placeholder="NL91 ABNA 0417 …"></div>
+                            </div>
+                            <div class="form-group"><label>Referentie / Project</label><input type="text" id="f-ref" oninput="updatePreview()" placeholder="Website Business pakket"></div>
+
+                            <hr class="divider">
+                            <div class="section-label">Regelomschrijvingen</div>
+                            <div class="regels-head"><span>Omschrijving</span><span>Aantal</span><span>Prijs</span><span></span></div>
+                            <div id="f-regels"></div>
+                            <button class="btn-add" type="button" onclick="addRegel('f')">+ Regel toevoegen</button>
+
+                            <hr class="divider">
+                            <div class="section-label">Opmerkingen</div>
+                            <div class="form-group"><textarea id="f-notities" oninput="updatePreview()" placeholder="Bijv. betaalverzoek, referentienummer…"></textarea></div>
+                        </div>
+                        <div class="form-footer">
+                            <button class="btn-download" type="button" onclick="downloadPDF('factuur')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                PDF Downloaden
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="preview-panel">
+                        <div class="preview-label">Live Preview</div>
+                        <div class="pdf-page" id="preview-factuur"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-herinnering" class="tab-panel">
+                <div class="split">
+                    <div class="form-panel">
+                        <div class="form-inner">
+                            <div class="section-label">Klantgegevens</div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Bedrijfsnaam</label><input type="text" id="h-bedrijf" oninput="updatePreview()" placeholder="De Vries B.V."></div>
+                                <div class="form-group"><label>Contactpersoon</label><input type="text" id="h-contact" oninput="updatePreview()" placeholder="Dhr. De Vries"></div>
+                            </div>
+                            <div class="form-group"><label>E-mailadres</label><input type="email" id="h-email" oninput="updatePreview()" placeholder="info@devries.nl"></div>
+                            <div class="form-group"><label>Adres</label><input type="text" id="h-adres" oninput="updatePreview()" placeholder="Hoofdstraat 1, 1234 AB Amsterdam"></div>
+
+                            <hr class="divider">
+                            <div class="section-label">Factuurgegevens</div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Factuurnummer</label><input type="text" id="h-factnr" oninput="updatePreview()" placeholder="FACT-2026-001"></div>
+                                <div class="form-group"><label>Factuurdatum</label><input type="date" id="h-factdatum" oninput="updatePreview()"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Vervallen op</label><input type="date" id="h-verval" oninput="updatePreview()"></div>
+                                <div class="form-group"><label>Openstaand bedrag</label><input type="text" id="h-bedrag" oninput="updatePreview()" placeholder="€1.813,50"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>IBAN</label><input type="text" id="h-iban" oninput="updatePreview()" placeholder="NL91 ABNA 0417 …"></div>
+                                <div class="form-group"><label>Nieuwe betaaldatum</label><input type="date" id="h-nieuwdatum" oninput="updatePreview()"></div>
+                            </div>
+                            <div class="form-group">
+                                <label>Type herinnering</label>
+                                <select id="h-type" onchange="updatePreview()">
+                                    <option value="1">1e Herinnering – vriendelijk</option>
+                                    <option value="2">2e Herinnering – dringend</option>
+                                    <option value="3">Aanmaning – formeel</option>
+                                </select>
+                            </div>
+
+                            <hr class="divider">
+                            <div class="section-label">Extra toelichting</div>
+                            <div class="form-group"><textarea id="h-notities" oninput="updatePreview()" placeholder="Persoonlijke boodschap (optioneel)…"></textarea></div>
+                        </div>
+                        <div class="form-footer">
+                            <button class="btn-download" type="button" onclick="downloadPDF('herinnering')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                PDF Downloaden
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="preview-panel">
+                        <div class="preview-label">Live Preview</div>
+                        <div class="pdf-page" id="preview-herinnering"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let activeTab = 'offerte';
+
+        function switchTab(name, el) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + name).classList.add('active');
+            el.classList.add('active');
+            activeTab = name;
+            updatePreview();
+        }
+
+        function v(id) { const el = document.getElementById(id); return el ? (el.value || '') : ''; }
+        function fmtEur(n) { return '€\u00A0' + (isNaN(n) ? '0,00' : n.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })); }
+        function fmtDate(s) { if (!s) return '—'; const [y, m, d] = s.split('-'); return `${d}-${m}-${y}`; }
+
+        const regelData = { o: [], f: [] };
+        let rc = 0;
+
+        function addRegel(p) {
+            regelData[p].push({ id: ++rc, omschrijving: '', aantal: 1, prijs: 0 });
+            renderRegels(p);
+        }
+
+        function removeRegel(p, id) {
+            regelData[p] = regelData[p].filter(r => r.id !== id);
+            renderRegels(p);
+        }
+
+        function updateRegel(p, id, field, val) {
+            const r = regelData[p].find(item => item.id === id);
+            if (!r) return;
+            r[field] = field === 'omschrijving' ? val : (parseFloat(val) || 0);
+            renderRegels(p);
+        }
+
+        function renderRegels(p) {
+            const c = document.getElementById(p + '-regels');
+            c.innerHTML = '';
+            regelData[p].forEach(r => {
+                const d = document.createElement('div');
+                d.className = 'regel-row';
+                d.innerHTML = `
+                    <input type="text" value="${r.omschrijving}" placeholder="Dienst omschrijving" oninput="updateRegel('${p}',${r.id},'omschrijving',this.value)">
+                    <input type="number" value="${r.aantal}" min="1" oninput="updateRegel('${p}',${r.id},'aantal',this.value)">
+                    <input type="number" value="${r.prijs || ''}" placeholder="0,00" step="0.01" min="0" oninput="updateRegel('${p}',${r.id},'prijs',this.value)">
+                    <button class="btn-remove" type="button" onclick="removeRegel('${p}',${r.id})">×</button>`;
+                c.appendChild(d);
+            });
+            updatePreview();
+        }
+
+        function getSubtotaal(p) {
+            return regelData[p].reduce((s, r) => s + r.aantal * r.prijs, 0);
+        }
+
+        function setDefaults() {
+            const fmt = d => d.toISOString().split('T')[0];
+            const add = n => { const d = new Date(); d.setDate(d.getDate() + n); return fmt(d); };
+            const today = fmt(new Date());
+            ['o-datum', 'f-datum'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && !el.value) el.value = today;
+            });
+            const og = document.getElementById('o-geldig'); if (og && !og.value) og.value = add(30);
+            const fv = document.getElementById('f-verval'); if (fv && !fv.value) fv.value = add(14);
+            const hn = document.getElementById('h-nieuwdatum'); if (hn && !hn.value) hn.value = add(7);
+        }
+
+        function buildAdresses(vanLines, aanLines) {
+            const vanHtml = vanLines.filter(Boolean).map((l, i) => i === 0 ? `<div class="pdf-addr-name">${l}</div>` : `<div class="pdf-addr-line">${l}</div>`).join('');
+            const aanHtml = aanLines.filter(Boolean).map((l, i) => i === 0 ? `<div class="pdf-addr-name">${l}</div>` : `<div class="pdf-addr-line">${l}</div>`).join('');
+            return `<div class="pdf-addresses"><div class="pdf-addr-box"><div class="pdf-addr-label">Van</div>${vanHtml}</div><div class="pdf-addr-box"><div class="pdf-addr-label">Aan</div>${aanHtml}</div></div>`;
+        }
+
+        function buildRegelsTable(regels) {
+            const rows = regels.length === 0
+                ? `<tr class="empty-row"><td colspan="4">Nog geen regels toegevoegd…</td></tr>`
+                : regels.map(r => `<tr><td>${r.omschrijving || '—'}</td><td style="text-align:right">${r.aantal}</td><td style="text-align:right">${fmtEur(r.prijs)}</td><td style="text-align:right;font-weight:700">${fmtEur(r.aantal * r.prijs)}</td></tr>`).join('');
+            return `<table class="pdf-table"><thead><tr><th>Omschrijving</th><th style="text-align:right">Aantal</th><th style="text-align:right">Prijs</th><th style="text-align:right">Totaal</th></tr></thead><tbody>${rows}</tbody></table>`;
+        }
+
+        function buildTotals(p) {
+            const sub = getSubtotaal(p), btw = sub * 0.21, grand = sub + btw;
+            return `<div class="pdf-totals"><div class="pdf-total-row"><span>Subtotaal excl. BTW</span><span>${fmtEur(sub)}</span></div><div class="pdf-total-row"><span>BTW (21%)</span><span>${fmtEur(btw)}</span></div><div class="pdf-total-grand"><span class="pdf-total-grand-label">Totaal</span><span class="pdf-total-grand-amount">${fmtEur(grand)}</span></div></div>`;
+        }
+
+        function buildNotes(text) {
+            if (!text) return '';
+            return `<div class="pdf-notes"><div class="pdf-notes-label">Opmerkingen</div><div class="pdf-notes-text">${text.replace(/\n/g, '<br>')}</div></div>`;
+        }
+
+        function buildOfferte() {
+            return `
+                <div class="pdf-header"><div class="pdf-logo">SOFTORA.NL</div><div class="pdf-doctype">Offerte</div></div>
+                <div class="pdf-body">
+                    ${buildAdresses(['Softora.nl', 'info@softora.nl', 'www.softora.nl', 'KvK: 12345678'], [v('o-bedrijf') || '—', v('o-contact'), v('o-adres'), v('o-email'), v('o-kvk') ? 'KvK: ' + v('o-kvk') : ''])}
+                    <div class="pdf-meta-strip">
+                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Offertenummer</div><div class="pdf-meta-val">${v('o-nummer') || '—'}</div></div>
+                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Datum</div><div class="pdf-meta-val">${fmtDate(v('o-datum'))}</div></div>
+                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Geldig tot</div><div class="pdf-meta-val">${fmtDate(v('o-geldig'))}</div></div>
+                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Onderwerp</div><div class="pdf-meta-val">${v('o-onderwerp') || '—'}</div></div>
+                    </div>
+                    ${buildRegelsTable(regelData.o)}
+                    ${buildTotals('o')}
+                    ${buildNotes(v('o-notities'))}
+                </div>
+                <div class="pdf-footer-bar">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
+        }
+
+        function buildFactuur() {
+            return `
+                <div class="pdf-header"><div class="pdf-logo">SOFTORA.NL</div><div class="pdf-doctype">Factuur</div></div>
+                <div class="pdf-body">
+                    ${buildAdresses(['Softora.nl', 'info@softora.nl', v('f-iban') ? 'IBAN: ' + v('f-iban') : '', 'KvK: 12345678'], [v('f-bedrijf') || '—', v('f-contact'), v('f-adres'), v('f-email'), v('f-kvk') ? 'KvK: ' + v('f-kvk') : '', v('f-btwnum') ? 'BTW: ' + v('f-btwnum') : ''])}
+                    <div class="pdf-meta-strip">
+                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurnummer</div><div class="pdf-meta-val">${v('f-nummer') || '—'}</div></div>
+                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurdatum</div><div class="pdf-meta-val">${fmtDate(v('f-datum'))}</div></div>
+                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Vervaldatum</div><div class="pdf-meta-val">${fmtDate(v('f-verval'))}</div></div>
+                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Referentie</div><div class="pdf-meta-val">${v('f-ref') || '—'}</div></div>
+                    </div>
+                    ${buildRegelsTable(regelData.f)}
+                    ${buildTotals('f')}
+                    ${buildNotes(v('f-notities'))}
+                </div>
+                <div class="pdf-footer-bar">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
+        }
+
+        function buildHerinnering() {
+            const htype = v('h-type') || '1';
+            const colors = { '1': '#16733c', '2': '#b45a00', '3': '#b41e1e' };
+            const labels = { '1': '1e Betalingsherinnering', '2': '2e Betalingsherinnering – Dringend', '3': 'Aanmaning' };
+            const col = colors[htype];
+            const contact = v('h-contact') || 'relatie';
+            const msgs = {
+                '1': `Geachte ${contact},\n\nWij willen u er vriendelijk op attenderen dat de betaling van onderstaande factuur nog niet door ons is ontvangen.\n\nMogelijk is de betaling reeds voldaan of onderweg. In dat geval kunt u deze herinnering als niet verzonden beschouwen.`,
+                '2': `Geachte ${contact},\n\nOndanks onze eerdere herinnering hebben wij uw betaling nog niet mogen ontvangen. Wij verzoeken u dringend het openstaande bedrag zo spoedig mogelijk te voldoen.\n\nIndien u reeds betaald heeft, verzoeken wij u contact op te nemen.`,
+                '3': `Geachte ${contact},\n\nNadat wij u reeds meerdere malen hebben verzocht te betalen, is betaling tot op heden uitgebleven. Wij sommeren u hierbij het verschuldigde bedrag uiterlijk op de vermelde datum te voldoen.\n\nBij uitblijven zijn wij genoodzaakt verdere incassomaatregelen te treffen.`
+            };
+            const notities = v('h-notities');
+            return `
+                <div class="pdf-header"><div class="pdf-logo">SOFTORA.NL</div><div class="pdf-doctype" style="color:rgba(255,220,200,.9)">${labels[htype]}</div></div>
+                <div class="pdf-body">
+                    ${buildAdresses(['Softora.nl', 'info@softora.nl', 'www.softora.nl'], [v('h-bedrijf') || '—', v('h-contact'), v('h-adres'), v('h-email')])}
+                    <div class="pdf-herinnering-banner" style="background:${col}">${labels[htype]}</div>
+                    <div class="pdf-body-text">${msgs[htype].replace(/\n/g, '<br>')}</div>
+                    <div class="pdf-invoice-ref">
+                        <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Factuurnummer</div><div class="pdf-invoice-ref-val">${v('h-factnr') || '—'}</div></div>
+                        <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Factuurdatum</div><div class="pdf-invoice-ref-val">${fmtDate(v('h-factdatum'))}</div></div>
+                        <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Vervallen op</div><div class="pdf-invoice-ref-val">${fmtDate(v('h-verval'))}</div></div>
+                        <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Openstaand</div><div class="pdf-invoice-ref-val" style="color:${col}">${v('h-bedrag') || '—'}</div></div>
+                    </div>
+                    <div class="pdf-betaal-strip" style="background:${col}">
+                        <div class="pdf-betaal-strip-left"><strong>Betaal uiterlijk: ${fmtDate(v('h-nieuwdatum'))}</strong>IBAN: ${v('h-iban') || '—'} · t.n.v. Softora.nl</div>
+                        <div class="pdf-betaal-strip-right">${v('h-bedrag') || '—'}</div>
+                    </div>
+                    ${notities ? `<div class="pdf-notes"><div class="pdf-notes-label">Toelichting</div><div class="pdf-notes-text">${notities.replace(/\n/g, '<br>')}</div></div>` : ''}
+                </div>
+                <div class="pdf-footer-bar">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
+        }
+
+        function updatePreview() {
+            const builders = { offerte: buildOfferte, factuur: buildFactuur, herinnering: buildHerinnering };
+            const previewEl = document.getElementById('preview-' + activeTab);
+            if (previewEl && builders[activeTab]) previewEl.innerHTML = builders[activeTab]();
+        }
+
+        function downloadPDF(type) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+            const W = 210, PL = 20, PR = 190;
+            const CR = [155, 35, 85], DK = [26, 26, 46], MD = [100, 100, 110], BG = [247, 244, 240];
+            doc.setFillColor(...CR); doc.rect(0, 0, W, 26, 'F');
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(255, 255, 255);
+            doc.text('SOFTORA.NL', PL, 16);
+            const tLabel = type === 'offerte' ? 'OFFERTE' : type === 'factuur' ? 'FACTUUR' : 'BETALINGSHERINNERING';
+            doc.setFontSize(9); doc.setTextColor(255, 200, 220); doc.text(tLabel, PR, 16, { align: 'right' });
+            let y = 34;
+            const fmtD = s => { if (!s) return '—'; const [yy, mm, dd] = s.split('-'); return `${dd}-${mm}-${yy}`; };
+            const fmtN = n => n.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            function addrBox(x, w, label, lines) {
+                doc.setFillColor(...BG); doc.rect(x, y, w, 38, 'F');
+                doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...MD); doc.text(label, x + 3, y + 5);
+                lines.filter(Boolean).forEach((l, i) => {
+                    if (i === 0) { doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...DK); }
+                    else { doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(...MD); }
+                    doc.text(String(l), x + 3, y + 10 + i * 5.5);
+                });
+            }
+            if (type === 'offerte' || type === 'factuur') {
+                const p = type === 'offerte' ? 'o' : 'f';
+                addrBox(PL, 80, 'VAN', ['Softora.nl', 'info@softora.nl', 'www.softora.nl', 'KvK: 12345678']);
+                addrBox(112, 78, 'AAN', [v(p + '-bedrijf') || '—', v(p + '-contact'), v(p + '-adres'), v(p + '-email'), v(p + '-kvk') ? 'KvK: ' + v(p + '-kvk') : null, type === 'factuur' && v('f-btwnum') ? 'BTW: ' + v('f-btwnum') : null]);
+                y += 44;
+                doc.setFillColor(...CR); doc.rect(PL, y, 170, 11, 'F');
+                doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 200, 220);
+                const mcols = type === 'offerte'
+                    ? [[PL + 2, 'NUMMER', v('o-nummer')], [62, 'DATUM', fmtD(v('o-datum'))], [102, 'GELDIG TOT', fmtD(v('o-geldig'))], [142, 'ONDERWERP', v('o-onderwerp')]]
+                    : [[PL + 2, 'NUMMER', v('f-nummer')], [62, 'DATUM', fmtD(v('f-datum'))], [102, 'VERVALDATUM', fmtD(v('f-verval'))], [142, 'REFERENTIE', v('f-ref')]];
+                mcols.forEach(([x, lbl, val]) => {
+                    doc.text(lbl, x, y + 4); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+                    doc.text(val || '—', x, y + 9); doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(255, 200, 220);
+                });
+                y += 16;
+                doc.setFillColor(...CR); doc.rect(PL, y, 170, 7, 'F');
+                doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+                doc.text('OMSCHRIJVING', PL + 2, y + 4.8); doc.text('AANTAL', 128, y + 4.8); doc.text('PRIJS', 152, y + 4.8); doc.text('TOTAAL', 172, y + 4.8);
+                y += 7;
+                const regels = regelData[p];
+                if (regels.length === 0) {
+                    doc.setFillColor(...BG); doc.rect(PL, y, 170, 7, 'F');
+                    doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(...MD); doc.text('Geen regels', PL + 2, y + 4.8); y += 7;
+                } else {
+                    regels.forEach((r, i) => {
+                        const bg = i % 2 === 0 ? [255, 255, 255] : BG;
+                        doc.setFillColor(...bg); doc.rect(PL, y, 170, 7, 'F');
+                        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...DK);
+                        doc.text(r.omschrijving || '—', PL + 2, y + 4.8);
+                        doc.text(String(r.aantal), 134, y + 4.8, { align: 'right' });
+                        doc.text('€' + fmtN(r.prijs), 162, y + 4.8, { align: 'right' });
+                        doc.setFont('helvetica', 'bold'); doc.text('€' + fmtN(r.aantal * r.prijs), 188, y + 4.8, { align: 'right' });
+                        y += 7;
+                    });
+                }
+                const sub = getSubtotaal(p), btw = sub * .21, grand = sub + btw;
+                y += 4;
+                doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...MD);
+                doc.text('Subtotaal excl. BTW:', 140, y); doc.text('€' + fmtN(sub), 188, y, { align: 'right' }); y += 5.5;
+                doc.text('BTW (21%):', 140, y); doc.text('€' + fmtN(btw), 188, y, { align: 'right' }); y += 3;
+                doc.setFillColor(...CR); doc.rect(142, y, 48, 9, 'F');
+                doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+                doc.text('TOTAAL', 145, y + 6); doc.text('€' + fmtN(grand), 188, y + 6, { align: 'right' });
+                y += 14;
+                if (type === 'factuur' && v('f-iban')) {
+                    doc.setFillColor(...BG); doc.rect(PL, y, 170, 8, 'F');
+                    doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(...MD);
+                    doc.text('IBAN: ' + v('f-iban') + '  ·  t.n.v. Softora.nl', PL + 3, y + 5.5); y += 12;
+                }
+                const notes = type === 'offerte' ? v('o-notities') : v('f-notities');
+                if (notes) {
+                    doc.setFillColor(...BG); doc.rect(PL, y, 170, 6, 'F');
+                    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...MD); doc.text('OPMERKINGEN', PL + 3, y + 4); y += 6;
+                    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60, 60, 70);
+                    const ls = doc.splitTextToSize(notes, 164); doc.text(ls, PL + 3, y + 5); y += ls.length * 5 + 6;
+                }
+            } else {
+                const htype = v('h-type') || '1';
+                const hcolors = { '1': [22, 115, 60], '2': [180, 90, 0], '3': [176, 30, 30] };
+                const hlabels = { '1': '1E BETALINGSHERINNERING', '2': '2E BETALINGSHERINNERING – DRINGEND', '3': 'AANMANING' };
+                const hc = hcolors[htype];
+                addrBox(PL, 80, 'VAN', ['Softora.nl', 'info@softora.nl', 'www.softora.nl']);
+                addrBox(112, 78, 'AAN', [v('h-bedrijf') || '—', v('h-contact'), v('h-adres'), v('h-email')]);
+                y += 44;
+                doc.setFillColor(...hc); doc.rect(PL, y, 170, 9, 'F');
+                doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+                doc.text(hlabels[htype], PL + 4, y + 6.5); y += 14;
+                const contact = v('h-contact') || 'relatie';
+                const msgs = {
+                    '1': `Geachte ${contact},\n\nWij willen u er vriendelijk op attenderen dat de betaling van onderstaande factuur nog niet door ons is ontvangen. Mogelijk is de betaling reeds voldaan. In dat geval kunt u dit als niet verzonden beschouwen.`,
+                    '2': `Geachte ${contact},\n\nOndanks onze eerdere herinnering hebben wij uw betaling nog niet mogen ontvangen. Wij verzoeken u dringend het openstaande bedrag zo spoedig mogelijk te voldoen.`,
+                    '3': `Geachte ${contact},\n\nNadat wij u reeds meerdere malen hebben verzocht te betalen, is betaling tot op heden uitgebleven. Wij sommeren u hierbij het verschuldigde bedrag uiterlijk op de vermelde datum te voldoen. Bij uitblijven zijn wij genoodzaakt verdere incassomaatregelen te treffen.`
+                };
+                doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(...DK);
+                const mls = doc.splitTextToSize(msgs[htype], 170); doc.text(mls, PL, y); y += mls.length * 5 + 8;
+                doc.setFillColor(...BG); doc.rect(PL, y, 170, 8, 'F');
+                doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...MD);
+                [[PL + 2, 'FACTUURNR'], [62, 'FACTUURDATUM'], [102, 'VERVALLEN OP'], [145, 'OPENSTAAND']].forEach(([x, l]) => doc.text(l, x, y + 5));
+                y += 8; doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...DK);
+                doc.text(v('h-factnr') || '—', PL + 2, y + 5);
+                doc.text(fmtD(v('h-factdatum')), 62, y + 5);
+                doc.text(fmtD(v('h-verval')), 102, y + 5);
+                doc.setFont('helvetica', 'bold'); doc.setTextColor(...hc); doc.text(v('h-bedrag') || '—', 145, y + 5);
+                y += 13;
+                doc.setFillColor(...hc); doc.rect(PL, y, 170, 11, 'F');
+                doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+                doc.text('Betaal uiterlijk: ' + fmtD(v('h-nieuwdatum')), PL + 4, y + 5);
+                doc.text('IBAN: ' + (v('h-iban') || '—') + ' · t.n.v. Softora.nl', PL + 4, y + 9.5);
+                doc.setFontSize(11); doc.text(v('h-bedrag') || '—', 188, y + 7, { align: 'right' });
+                y += 16;
+                const hn = v('h-notities');
+                if (hn) {
+                    doc.setFillColor(...BG); doc.rect(PL, y, 170, 6, 'F');
+                    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...MD); doc.text('TOELICHTING', PL + 3, y + 4); y += 6;
+                    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60, 60, 70);
+                    const ls = doc.splitTextToSize(hn, 164); doc.text(ls, PL + 3, y + 5); y += ls.length * 5 + 6;
+                }
+            }
+            doc.setFillColor(...BG); doc.rect(0, 284, 210, 13, 'F');
+            doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(180, 175, 168);
+            doc.text('Softora.nl  ·  info@softora.nl  ·  www.softora.nl  ·  KvK: 12345678', 105, 292, { align: 'center' });
+            const fname = `${type}-${new Date().toISOString().split('T')[0]}.pdf`;
+            doc.save(fname);
+            showToast('✓ ' + fname + ' gedownload');
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        setDefaults();
+        addRegel('o');
+        addRegel('f');
+        updatePreview();
+    </script>
+</body>
+</html>

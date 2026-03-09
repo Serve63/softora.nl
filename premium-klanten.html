@@ -545,15 +545,38 @@
             font-size: 0.88rem;
         }
 
-        .project-type {
-            color: var(--text-primary);
-            font-size: 0.88rem;
-            line-height: 1.45;
-        }
-
         .muted-cell {
             color: var(--text-secondary);
             font-size: 0.92rem;
+        }
+
+        .service-cell {
+            min-width: 180px;
+        }
+
+        .service-stack {
+            display: grid;
+            gap: 0.2rem;
+        }
+
+        .service-name {
+            color: var(--text-primary);
+            font-size: 0.88rem;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+
+        .service-price {
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            line-height: 1.45;
+            white-space: nowrap;
+        }
+
+        .service-na {
+            color: var(--text-tertiary);
+            font-size: 0.86rem;
+            line-height: 1.45;
         }
 
         .status-text {
@@ -571,13 +594,6 @@
 
         .status-text.is-open {
             color: var(--warning);
-        }
-
-        .amount {
-            font-weight: 400;
-            white-space: nowrap;
-            color: var(--text-secondary);
-            font-size: 0.92rem;
         }
 
         .actions {
@@ -651,6 +667,21 @@
             font-size: 0.92rem;
         }
 
+        .modal-error {
+            display: none;
+            margin-bottom: 1rem;
+            padding: 0.9rem 1rem;
+            border: 1px solid rgba(231, 76, 60, 0.24);
+            background: rgba(231, 76, 60, 0.08);
+            color: #b33b33;
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+
+        .modal-error.is-visible {
+            display: block;
+        }
+
         .form-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -660,6 +691,10 @@
         .form-group {
             display: grid;
             gap: 0.4rem;
+        }
+
+        .form-group[hidden] {
+            display: none;
         }
 
         .form-group.is-full {
@@ -678,6 +713,12 @@
         .form-select {
             padding: 0.82rem 0.9rem;
             font-size: 0.92rem;
+        }
+
+        .form-input.is-invalid,
+        .form-select.is-invalid {
+            border-color: rgba(231, 76, 60, 0.55);
+            background: rgba(231, 76, 60, 0.04);
         }
 
         .modal-actions {
@@ -846,7 +887,7 @@
                         Bevestigingsmails
                     </a>
                     <a href="/premium-ai-lead-generator" class="sidebar-link">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-2.128a1.5 1.5 0 0 0-1.064-1.436l-3.084-.925a1.5 1.5 0 0 0-1.695.633l-.97 1.455a12.036 12.036 0 0 1-5.516-5.516l1.455-.97a1.5 1.5 0 0 0 .633-1.695l-.925-3.084A1.5 1.5 0 0 0 8.878 2.25H6.75A2.25 2.25 0 0 0 4.5 4.5v2.25z"/></svg>
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"/></svg>
                         AI Coldcalling
                     </a>
                 </div>
@@ -856,6 +897,18 @@
                     <a href="/premium-klanten" class="sidebar-link active">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
                         Klanten
+                    </a>
+                    <a href="/premium-pakketten" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"/></svg>
+                        Pakketten
+                    </a>
+                    <a href="/premium-pdfs" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"/></svg>
+                        PDF'S
+                    </a>
+                    <a href="/premium-instellingen" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"/></svg>
+                        Instellingen
                     </a>
                 </div>
             </nav>
@@ -909,8 +962,8 @@
                                 <tr>
                                     <th>Klant</th>
                                     <th>Telefoonnummer</th>
-                                    <th>Project</th>
-                                    <th>Bedrag</th>
+                                    <th>Website</th>
+                                    <th>Onderhoud</th>
                                     <th>Status</th>
                                     <th>Betaaldatum</th>
                                     <th></th>
@@ -934,6 +987,7 @@
             </div>
 
             <form id="customerForm" novalidate>
+                <div class="modal-error" id="modalError" aria-live="polite"></div>
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label" for="fieldName">Naam</label>
@@ -941,27 +995,27 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="fieldCompany">Bedrijf</label>
-                        <input class="form-input" id="fieldCompany" name="bedrijf" autocomplete="organization" placeholder="De Vries BV">
+                        <label class="form-label" for="fieldProject">Website</label>
+                        <input class="form-input" id="fieldProject" name="website" placeholder="softora.nl" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fieldCompany">Bedrijfsnaam</label>
+                        <input class="form-input" id="fieldCompany" name="bedrijf" autocomplete="organization" placeholder="De Vries BV" required>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label" for="fieldPhone">Telefoonnummer</label>
-                        <input class="form-input" id="fieldPhone" name="telefoon" autocomplete="tel" placeholder="+31 6 12345678">
+                        <input class="form-input" id="fieldPhone" name="telefoon" autocomplete="tel" placeholder="+31 6 12345678" required>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label" for="fieldType">Type</label>
-                        <select class="form-select" id="fieldType" name="type">
+                        <select class="form-select" id="fieldType" name="type" required>
                             <option value="Website">Website</option>
                             <option value="Onderhoud">Onderhoud</option>
                             <option value="Website + onderhoud">Website + onderhoud</option>
                         </select>
-                    </div>
-
-                    <div class="form-group is-full">
-                        <label class="form-label" for="fieldProject">Website / project</label>
-                        <input class="form-input" id="fieldProject" name="website" placeholder="softora.nl">
                     </div>
 
                     <div class="form-group">
@@ -969,9 +1023,19 @@
                         <input class="form-input" id="fieldAmount" name="bedrag" type="number" min="0" step="1" placeholder="1500">
                     </div>
 
+                    <div class="form-group" id="websiteAmountGroup">
+                        <label class="form-label" for="fieldWebsiteAmount">Website prijs (EUR)</label>
+                        <input class="form-input" id="fieldWebsiteAmount" name="websiteBedrag" type="number" min="0" step="1" placeholder="1500" required>
+                    </div>
+
+                    <div class="form-group" id="maintenanceAmountGroup">
+                        <label class="form-label" for="fieldMaintenanceAmount">Onderhoud per maand (EUR)</label>
+                        <input class="form-input" id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="1" placeholder="49" required>
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label" for="fieldStatus">Status</label>
-                        <select class="form-select" id="fieldStatus" name="status">
+                        <select class="form-select" id="fieldStatus" name="status" required>
                             <option value="Betaald">Betaald</option>
                             <option value="Open">Open</option>
                         </select>
@@ -979,7 +1043,7 @@
 
                     <div class="form-group is-full">
                         <label class="form-label" for="fieldDate">Betaaldatum</label>
-                        <input class="form-input" id="fieldDate" name="datum" type="date">
+                        <input class="form-input" id="fieldDate" name="datum" type="date" required>
                     </div>
                 </div>
 
@@ -1013,6 +1077,7 @@
             statusBanner: document.getElementById("statusBanner"),
             modalOverlay: document.getElementById("modalOverlay"),
             modalTitle: document.getElementById("modalTitle"),
+            modalError: document.getElementById("modalError"),
             form: document.getElementById("customerForm"),
             addButton: document.getElementById("addCustomerButton"),
             deleteButton: document.getElementById("deleteCustomerButton"),
@@ -1023,6 +1088,10 @@
             fieldType: document.getElementById("fieldType"),
             fieldProject: document.getElementById("fieldProject"),
             fieldAmount: document.getElementById("fieldAmount"),
+            websiteAmountGroup: document.getElementById("websiteAmountGroup"),
+            maintenanceAmountGroup: document.getElementById("maintenanceAmountGroup"),
+            fieldWebsiteAmount: document.getElementById("fieldWebsiteAmount"),
+            fieldMaintenanceAmount: document.getElementById("fieldMaintenanceAmount"),
             fieldStatus: document.getElementById("fieldStatus"),
             fieldDate: document.getElementById("fieldDate")
         };
@@ -1044,13 +1113,71 @@
             return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
         }
 
+        function normalizeOptionalAmount(value) {
+            if (value === null || value === undefined || value === "") return null;
+            const amount = Number(value);
+            if (!Number.isFinite(amount) || amount < 0) return null;
+            return Math.round(amount);
+        }
+
+        function setModalError(message) {
+            if (!nodes.modalError) return;
+            const text = normalizeString(message);
+            nodes.modalError.textContent = text;
+            nodes.modalError.classList.toggle("is-visible", Boolean(text));
+        }
+
+        function getModalFieldNodes() {
+            return [
+                nodes.fieldName,
+                nodes.fieldCompany,
+                nodes.fieldPhone,
+                nodes.fieldType,
+                nodes.fieldProject,
+                nodes.fieldWebsiteAmount,
+                nodes.fieldMaintenanceAmount,
+                nodes.fieldStatus,
+                nodes.fieldDate
+            ].filter(Boolean);
+        }
+
+        function clearModalValidationState() {
+            setModalError("");
+            getModalFieldNodes().forEach(function (node) {
+                node.classList.remove("is-invalid");
+            });
+        }
+
+        function markFieldInvalid(node) {
+            if (!node) return;
+            node.classList.add("is-invalid");
+        }
+
+        function isFieldVisible(node) {
+            if (!node) return false;
+            const group = node.closest(".form-group");
+            if (!group) return true;
+            return !group.hidden;
+        }
+
         function normalizeCustomer(raw, fallbackId) {
-            const amount = Number(raw && raw.bedrag);
+            const legacyAmount = normalizeOptionalAmount(raw && raw.bedrag);
             const rawType = normalizeString(raw && raw.type);
             const type = rawType === "Onderhoud" || rawType === "Website + onderhoud"
                 ? rawType
                 : "Website";
             const status = normalizeString(raw && raw.status) === "Open" ? "Open" : "Betaald";
+            const websiteAmountRaw = normalizeOptionalAmount(raw && raw.websiteBedrag);
+            const maintenanceAmountRaw = normalizeOptionalAmount(raw && raw.onderhoudPerMaand);
+            const websiteBedrag = websiteAmountRaw !== null
+                ? websiteAmountRaw
+                : ((type === "Website" || type === "Website + onderhoud") ? legacyAmount : null);
+            const onderhoudPerMaand = maintenanceAmountRaw !== null
+                ? maintenanceAmountRaw
+                : (type === "Onderhoud" ? legacyAmount : null);
+            const bedrag = legacyAmount !== null
+                ? legacyAmount
+                : (websiteBedrag !== null ? websiteBedrag : (onderhoudPerMaand !== null ? onderhoudPerMaand : 0));
 
             return {
                 id: normalizeString(raw && raw.id) || fallbackId || createId(),
@@ -1059,7 +1186,9 @@
                 telefoon: normalizeString(raw && raw.telefoon) || "-",
                 type: type,
                 website: normalizeString(raw && raw.website) || "-",
-                bedrag: Number.isFinite(amount) && amount >= 0 ? Math.round(amount) : 0,
+                websiteBedrag: websiteBedrag,
+                onderhoudPerMaand: onderhoudPerMaand,
+                bedrag: bedrag,
                 status: status,
                 datum: normalizeDate(raw && raw.datum)
             };
@@ -1104,6 +1233,76 @@
                 month: "short",
                 year: "numeric"
             }).format(date);
+        }
+
+        function customerHasWebsite(customer) {
+            const type = normalizeString(customer && customer.type);
+            return type === "Website" || type === "Website + onderhoud";
+        }
+
+        function customerHasMaintenance(customer) {
+            const type = normalizeString(customer && customer.type);
+            return type === "Onderhoud" || type === "Website + onderhoud";
+        }
+
+        function getServiceAmount(customer, kind) {
+            if (kind === "website") {
+                return normalizeOptionalAmount(customer && customer.websiteBedrag);
+            }
+            return normalizeOptionalAmount(customer && customer.onderhoudPerMaand);
+        }
+
+        function renderServiceCell(customer, kind) {
+            const isWebsite = kind === "website";
+            const isApplicable = isWebsite ? customerHasWebsite(customer) : customerHasMaintenance(customer);
+
+            if (!isApplicable) {
+                return "<span class=\"service-na\">Niet van toepassing</span>";
+            }
+
+            const serviceName = "";
+            const serviceAmount = getServiceAmount(customer, kind);
+            const priceLabel = serviceAmount !== null
+                ? (isWebsite ? formatMoney(serviceAmount) : (formatMoney(serviceAmount) + " p/m"))
+                : "Nog niet ingevuld";
+            const priceClass = serviceAmount !== null ? "service-price" : "service-price service-na";
+
+            return [
+                "<div class=\"service-stack\">",
+                    (serviceName ? "<div class=\"service-name\">" + escapeHtml(serviceName) + "</div>" : ""),
+                    "<div class=\"" + priceClass + "\">" + escapeHtml(priceLabel) + "</div>",
+                "</div>"
+            ].join("");
+        }
+
+        function updateAmountFieldVisibility() {
+            const type = normalizeString(nodes.fieldType.value) || "Website";
+            const showWebsiteAmount = type === "Website" || type === "Website + onderhoud";
+            const showMaintenanceAmount = type === "Onderhoud" || type === "Website + onderhoud";
+
+            if (nodes.fieldAmount) {
+                nodes.fieldAmount.closest(".form-group").hidden = true;
+                nodes.fieldAmount.required = false;
+                nodes.fieldAmount.disabled = true;
+                nodes.fieldAmount.value = "";
+            }
+            if (nodes.websiteAmountGroup) {
+                nodes.websiteAmountGroup.hidden = !showWebsiteAmount;
+            }
+            if (nodes.maintenanceAmountGroup) {
+                nodes.maintenanceAmountGroup.hidden = !showMaintenanceAmount;
+            }
+            if (nodes.fieldWebsiteAmount) {
+                nodes.fieldWebsiteAmount.required = showWebsiteAmount;
+                nodes.fieldWebsiteAmount.disabled = !showWebsiteAmount;
+                if (!showWebsiteAmount) nodes.fieldWebsiteAmount.value = "";
+            }
+            if (nodes.fieldMaintenanceAmount) {
+                nodes.fieldMaintenanceAmount.required = showMaintenanceAmount;
+                nodes.fieldMaintenanceAmount.disabled = !showMaintenanceAmount;
+                if (!showMaintenanceAmount) nodes.fieldMaintenanceAmount.value = "";
+            }
+            clearModalValidationState();
         }
 
         function setStatusMessage(message, tone, autoClear) {
@@ -1341,20 +1540,26 @@
 
             nodes.body.innerHTML = filtered.map(function (customer) {
                 const statusClass = customer.status === "Betaald" ? "is-paid" : "is-open";
+                const websiteLabel = normalizeString(customer && customer.website);
+                const customerSubLabel = websiteLabel && websiteLabel !== "-"
+                    ? websiteLabel
+                    : ((customer.bedrijf && customer.bedrijf !== "-") ? customer.bedrijf : "");
 
                 return [
                     "<tr>",
                         "<td class=\"cell-client\" data-label=\"Klant\">",
                             "<div class=\"client-name\">" + escapeHtml(customer.naam) + "</div>",
-                            (customer.bedrijf && customer.bedrijf !== "-"
-                                ? "<div class=\"client-company\">" + escapeHtml(customer.bedrijf) + "</div>"
+                            (customerSubLabel
+                                ? "<div class=\"client-company\">" + escapeHtml(customerSubLabel) + "</div>"
                                 : ""),
                         "</td>",
                         "<td data-label=\"Telefoonnummer\" class=\"muted-cell\">" + escapeHtml(customer.telefoon) + "</td>",
-                        "<td data-label=\"Project\" class=\"muted-cell\">",
-                            "<div class=\"project-type\">" + escapeHtml(customer.type) + "</div>",
+                        "<td data-label=\"Website\" class=\"service-cell\">",
+                            renderServiceCell(customer, "website"),
                         "</td>",
-                        "<td data-label=\"Bedrag\"><span class=\"amount\">" + escapeHtml(formatMoney(customer.bedrag)) + "</span></td>",
+                        "<td data-label=\"Onderhoud\" class=\"service-cell\">",
+                            renderServiceCell(customer, "maintenance"),
+                        "</td>",
                         "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
                         "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td class=\"cell-actions\" data-label=\"Acties\">",
@@ -1377,6 +1582,10 @@
             nodes.fieldType.value = "Website";
             nodes.fieldStatus.value = "Betaald";
             nodes.fieldDate.value = "";
+            if (nodes.fieldWebsiteAmount) nodes.fieldWebsiteAmount.value = "";
+            if (nodes.fieldMaintenanceAmount) nodes.fieldMaintenanceAmount.value = "";
+            clearModalValidationState();
+            updateAmountFieldVisibility();
         }
 
         function openModal(customerId) {
@@ -1400,9 +1609,19 @@
                 nodes.fieldPhone.value = customer.telefoon === "-" ? "" : customer.telefoon;
                 nodes.fieldType.value = customer.type;
                 nodes.fieldProject.value = customer.website === "-" ? "" : customer.website;
-                nodes.fieldAmount.value = String(customer.bedrag || "");
+                if (nodes.fieldWebsiteAmount) {
+                    nodes.fieldWebsiteAmount.value = customer.websiteBedrag !== null && customer.websiteBedrag !== undefined
+                        ? String(customer.websiteBedrag)
+                        : "";
+                }
+                if (nodes.fieldMaintenanceAmount) {
+                    nodes.fieldMaintenanceAmount.value = customer.onderhoudPerMaand !== null && customer.onderhoudPerMaand !== undefined
+                        ? String(customer.onderhoudPerMaand)
+                        : "";
+                }
                 nodes.fieldStatus.value = customer.status;
                 nodes.fieldDate.value = customer.datum || "";
+                updateAmountFieldVisibility();
             } else {
                 nodes.modalTitle.textContent = "Klant toevoegen";
                 nodes.deleteButton.hidden = true;
@@ -1410,6 +1629,7 @@
             }
 
             nodes.modalOverlay.hidden = false;
+            clearModalValidationState();
             window.requestAnimationFrame(function () {
                 nodes.fieldName.focus();
             });
@@ -1430,10 +1650,41 @@
         }
 
         function collectFormCustomer() {
+            clearModalValidationState();
+
+            const missingFields = [];
+            let firstInvalidField = null;
+
+            function addMissingField(node, label) {
+                missingFields.push(label);
+                markFieldInvalid(node);
+                if (!firstInvalidField && isFieldVisible(node) && !node.disabled) {
+                    firstInvalidField = node;
+                }
+            }
+
+            if (!normalizeString(nodes.fieldName.value)) addMissingField(nodes.fieldName, "naam");
+            if (!normalizeString(nodes.fieldProject.value)) addMissingField(nodes.fieldProject, "website");
+            if (!normalizeString(nodes.fieldCompany.value)) addMissingField(nodes.fieldCompany, "bedrijfsnaam");
+            if (!normalizeString(nodes.fieldPhone.value)) addMissingField(nodes.fieldPhone, "telefoonnummer");
+            if (!normalizeDate(nodes.fieldDate.value)) addMissingField(nodes.fieldDate, "betaaldatum");
+
             const naam = normalizeString(nodes.fieldName.value);
-            if (!naam) {
-                nodes.fieldName.focus();
-                throw new Error("Vul minimaal een naam in.");
+            const websiteBedrag = normalizeOptionalAmount(nodes.fieldWebsiteAmount && nodes.fieldWebsiteAmount.value);
+            const onderhoudPerMaand = normalizeOptionalAmount(nodes.fieldMaintenanceAmount && nodes.fieldMaintenanceAmount.value);
+
+            if (isFieldVisible(nodes.fieldWebsiteAmount) && websiteBedrag === null) {
+                addMissingField(nodes.fieldWebsiteAmount, "website prijs");
+            }
+            if (isFieldVisible(nodes.fieldMaintenanceAmount) && onderhoudPerMaand === null) {
+                addMissingField(nodes.fieldMaintenanceAmount, "onderhoud per maand");
+            }
+
+            if (missingFields.length) {
+                if (firstInvalidField && typeof firstInvalidField.focus === "function") {
+                    firstInvalidField.focus();
+                }
+                throw new Error("Vul deze velden in: " + missingFields.join(", ") + ".");
             }
 
             return normalizeCustomer({
@@ -1443,7 +1694,8 @@
                 telefoon: normalizeString(nodes.fieldPhone.value),
                 type: nodes.fieldType.value,
                 website: normalizeString(nodes.fieldProject.value),
-                bedrag: Number(nodes.fieldAmount.value || 0),
+                websiteBedrag: websiteBedrag,
+                onderhoudPerMaand: onderhoudPerMaand,
                 status: nodes.fieldStatus.value,
                 datum: nodes.fieldDate.value
             });
@@ -1456,7 +1708,7 @@
             try {
                 nextCustomer = collectFormCustomer();
             } catch (error) {
-                setStatusMessage(error.message || "Controleer de ingevoerde gegevens.", "error");
+                setModalError(error.message || "Controleer de ingevoerde gegevens.");
                 return;
             }
 
@@ -1574,6 +1826,25 @@
 
         nodes.addButton.addEventListener("click", function () {
             openModal();
+        });
+
+        nodes.fieldType.addEventListener("change", function () {
+            updateAmountFieldVisibility();
+        });
+
+        getModalFieldNodes().forEach(function (node) {
+            node.addEventListener("input", function () {
+                node.classList.remove("is-invalid");
+                if (nodes.modalError && nodes.modalError.classList.contains("is-visible")) {
+                    setModalError("");
+                }
+            });
+            node.addEventListener("change", function () {
+                node.classList.remove("is-invalid");
+                if (nodes.modalError && nodes.modalError.classList.contains("is-visible")) {
+                    setModalError("");
+                }
+            });
         });
 
         nodes.cancelButton.addEventListener("click", function () {

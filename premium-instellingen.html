@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Softora | Instellingen</title>
+
+<link rel="stylesheet" href="assets/personnel-theme.css">
+<script>
+    (function () {
+        document.documentElement.setAttribute("data-personnel-loading", "true");
+        try {
+            var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
+            var storageKey = isPremiumPersonnel
+                ? "softora_premium_personnel_theme_mode"
+                : "softora_software_personnel_theme_mode";
+            var mode = localStorage.getItem(storageKey);
+            if (mode === "light" || mode === "dark") {
+                document.documentElement.setAttribute("data-theme-mode", mode);
+                document.documentElement.setAttribute("data-theme", mode);
+            }
+        } catch (error) {
+            /* ignore storage errors */
+        }
+    })();
+</script>
+<script src="assets/personnel-theme.js" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+    --bg-primary: #080808;
+    --bg-secondary: #0d0d0d;
+    --bg-tertiary: #111111;
+    --bg-card: rgba(255, 255, 255, 0.02);
+    --accent: #8b2252;
+    --accent-dark: #6b1a3f;
+    --accent-glow: rgba(139, 34, 82, 0.4);
+    --accent-light: #a62d65;
+    --accent-soft: rgba(139, 34, 82, 0.12);
+    --text-primary: #f5f5f5;
+    --text-secondary: #8a8a94;
+    --text-tertiary: #5f5f68;
+    --border: rgba(255, 255, 255, 0.08);
+    --input-bg: rgba(255, 255, 255, 0.03);
+    --table-hover: rgba(255, 255, 255, 0.02);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root[data-theme="dark"] {
+    --bg-primary: #080808;
+    --bg-secondary: #0d0d0d;
+    --bg-tertiary: #111111;
+    --bg-card: rgba(255, 255, 255, 0.02);
+    --text-primary: #f5f5f5;
+    --text-secondary: #8a8a94;
+    --text-tertiary: #5f5f68;
+    --border: rgba(255, 255, 255, 0.08);
+    --input-bg: rgba(255, 255, 255, 0.04);
+    --table-hover: rgba(255, 255, 255, 0.025);
+}
+
+:root[data-theme="light"] {
+    --bg-primary: #f8f7f4;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #efeee9;
+    --bg-card: rgba(15, 23, 42, 0.03);
+    --text-primary: #1a1a2e;
+    --text-secondary: #606272;
+    --text-tertiary: #9599a8;
+    --border: rgba(0, 0, 0, 0.08);
+    --input-bg: rgba(15, 23, 42, 0.04);
+    --table-hover: rgba(0, 0, 0, 0.02);
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+.noise-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+.dashboard-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f6f2ec;
+  --sidebar-bg: #fcfaf7;
+  --crimson: #8b2252;
+  --crimson-light: #a62d65;
+  --crimson-soft: rgba(139, 34, 82, 0.08);
+  --text-dark: #1a1a2e;
+  --text-mid: #606272;
+  --text-light: #9a9cac;
+  --border: rgba(20, 24, 35, 0.09);
+  --white: #ffffff;
+  --card-bg: #ffffff;
+  --tag-bg: #f4efe9;
+  --green: #16733c;
+  --red: #c0392b;
+  --shadow: 0 18px 40px rgba(26, 26, 46, 0.08);
+}
+
+html, body {
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Barlow', sans-serif;
+  background: radial-gradient(circle at top left, rgba(166, 45, 101, 0.06), transparent 28%), var(--bg);
+  color: var(--text-dark);
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 280px;
+  min-height: 100vh;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+.sidebar-logo {
+  padding: 30px 28px 22px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+}
+
+.sidebar-nav {
+  flex: 1;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-light);
+  padding: 22px 28px 8px;
+  text-transform: uppercase;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 28px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  position: relative;
+}
+
+.nav-item:hover {
+  color: var(--text-dark);
+  background: rgba(0, 0, 0, 0.025);
+}
+
+.nav-item.active {
+  color: var(--text-dark);
+  background: rgba(139, 34, 82, 0.06);
+  font-weight: 600;
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--crimson);
+  border-radius: 0 2px 2px 0;
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.62;
+  flex-shrink: 0;
+}
+
+.nav-item.active .nav-icon,
+.nav-item:hover .nav-icon {
+  opacity: 1;
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--border);
+  padding: 16px 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-sm {
+  width: 38px;
+  height: 38px;
+  background: var(--crimson);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.footer-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.footer-role {
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+.logout-btn {
+  margin-left: auto;
+  opacity: 0.42;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  display: inline-flex;
+  color: inherit;
+}
+
+.logout-btn:hover {
+  opacity: 0.82;
+}
+
+.main {
+  margin-left: 280px;
+  flex: 1;
+  padding: 40px 48px;
+  min-height: 100vh;
+}
+
+.screen {
+  display: none;
+}
+
+.screen.active {
+  display: block;
+}
+
+.page-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--text-light);
+  margin-bottom: 36px;
+}
+
+.tegel {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 30px 26px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+  width: 280px;
+  box-shadow: 0 8px 24px rgba(26, 26, 46, 0.04);
+}
+
+.tegel::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--crimson);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease;
+}
+
+.tegel:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+  border-color: rgba(139, 34, 82, 0.28);
+}
+
+.tegel:hover::after {
+  transform: scaleX(1);
+}
+
+.tegel-icon-wrap {
+  width: 48px;
+  height: 48px;
+  background: rgba(139, 34, 82, 0.08);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tegel-icon-wrap svg {
+  width: 22px;
+  height: 22px;
+  color: var(--crimson);
+}
+
+.tegel-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tegel-desc {
+  font-size: 12px;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+.tegel-arrow {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: var(--border);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.tegel:hover .tegel-arrow {
+  color: var(--crimson);
+  transform: translateX(3px);
+}
+
+.tegel-count {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  background: rgba(139, 34, 82, 0.08);
+  padding: 3px 10px;
+  border-radius: 20px;
+  align-self: flex-start;
+}
+
+.beheer-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.back-btn:hover {
+  border-color: var(--crimson);
+  color: var(--crimson);
+}
+
+.back-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.beheer-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.beheer-subtitle {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+.beheer-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.table-card,
+.form-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.table-card-header,
+.form-card-header {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--tag-bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.table-card-title,
+.form-card-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.table-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s ease;
+}
+
+.person-row:last-child {
+  border-bottom: none;
+}
+
+.person-row:hover {
+  background: var(--tag-bg);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.active {
+  background: var(--green);
+  box-shadow: 0 0 0 2px rgba(22, 115, 60, 0.15);
+}
+
+.status-dot.inactive {
+  background: #ccc;
+}
+
+.person-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.person-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.person-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.person-email {
+  font-size: 11px;
+  color: var(--text-light);
+  margin-top: 1px;
+}
+
+.role-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+
+.role-admin {
+  background: rgba(139, 34, 82, 0.1);
+  color: var(--crimson);
+}
+
+.role-medewerker {
+  background: rgba(22, 115, 60, 0.1);
+  color: var(--green);
+}
+
+.person-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-icon {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  color: var(--text-light);
+}
+
+.btn-icon:hover {
+  border-color: var(--crimson);
+  color: var(--crimson);
+  background: rgba(139, 34, 82, 0.04);
+}
+
+.btn-icon.del:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: rgba(192, 57, 43, 0.04);
+}
+
+.btn-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.empty-state {
+  padding: 40px 22px;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 13px;
+}
+
+.form-card {
+  position: sticky;
+  top: 20px;
+}
+
+.form-card-body {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-group label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.form-group input,
+.form-group select {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  color: var(--text-dark);
+  background: var(--bg);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--crimson);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.08);
+}
+
+.form-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pw-wrap {
+  position: relative;
+}
+
+.pw-wrap input {
+  padding-right: 38px;
+}
+
+.pw-toggle {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  padding: 2px;
+}
+
+.pw-toggle:hover {
+  color: var(--text-dark);
+}
+
+.pw-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-add {
+  width: 100%;
+  padding: 10px;
+  background: var(--crimson);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-add:hover,
+.btn-save:hover {
+  background: var(--crimson-light);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay.open {
+  display: flex;
+}
+
+.modal,
+.confirm-modal {
+  background: var(--card-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+  animation: pop 0.18s ease;
+}
+
+.modal {
+  width: 400px;
+}
+
+.confirm-modal {
+  width: 360px;
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.modal-head {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--tag-bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-head-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modal-x {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  font-size: 17px;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.modal-x:hover {
+  color: var(--text-dark);
+  border-color: var(--text-dark);
+}
+
+.modal-body,
+.confirm-body {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirm-body {
+  padding: 26px 24px;
+}
+
+.confirm-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 10px;
+}
+
+.confirm-text {
+  font-size: 13px;
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+
+.modal-foot,
+.confirm-foot {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+  background: var(--tag-bg);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-save,
+.btn-cancel,
+.btn-del {
+  padding: 9px 22px;
+  border-radius: 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-save {
+  background: var(--crimson);
+  color: #fff;
+  border: none;
+}
+
+.btn-cancel {
+  background: none;
+  color: var(--text-dark);
+  border: 1px solid var(--border);
+}
+
+.btn-cancel:hover {
+  border-color: var(--text-dark);
+}
+
+.btn-del {
+  background: var(--red);
+  color: #fff;
+  border: none;
+}
+
+.btn-del:hover {
+  background: #a93226;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--text-dark);
+  color: #fff;
+  padding: 11px 18px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.25s ease;
+  z-index: 999;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 1180px) {
+  .beheer-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .form-card {
+    position: static;
+  }
+}
+
+@media (max-width: 860px) {
+  body {
+    display: block;
+  }
+
+  .sidebar {
+    position: static;
+    width: 100%;
+    min-height: auto;
+  }
+
+  .main {
+    margin-left: 0;
+    padding: 28px 22px;
+  }
+
+  .form-row2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Standard premium sidebar */
+.sidebar {
+  width: 280px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  padding: 2.5rem 0;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 100;
+}
+
+.sidebar-logo {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--crimson);
+  text-decoration: none;
+  padding: 0 2rem;
+  margin-bottom: 3rem;
+  display: block;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  border-bottom: none;
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar-section {
+  margin-bottom: 2rem;
+}
+
+.sidebar-flow-section {
+  position: relative;
+}
+
+.sidebar-flow-section::before {
+  content: '';
+  position: absolute;
+  left: 0.82rem;
+  top: 6.45rem;
+  bottom: 1.35rem;
+  width: 0.7rem;
+  background: rgba(139, 34, 82, 0.72);
+  clip-path: polygon(50% 0, 100% 0.46rem, 66% 0.46rem, 66% 100%, 34% 100%, 34% 0.46rem, 0 0.46rem);
+  pointer-events: none;
+}
+
+.sidebar-flow-section .sidebar-link {
+  padding-left: 2.8rem;
+}
+
+.sidebar-section-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--text-light);
+  padding: 0 2rem;
+  margin-bottom: 0.8rem;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.8rem 2rem;
+  color: var(--text-mid);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.sidebar-link:hover {
+  color: var(--text-dark);
+  background: rgba(0, 0, 0, 0.025);
+}
+
+.sidebar-link.active {
+  color: var(--text-dark);
+  background: rgba(139, 34, 82, 0.06);
+}
+
+.sidebar-link svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.sidebar-link.active svg,
+.sidebar-link:hover svg {
+  opacity: 1;
+}
+
+.sidebar-footer {
+  padding: 2rem;
+  border-top: 1px solid var(--border);
+  display: block;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.sidebar-avatar {
+  width: 36px;
+  height: 36px;
+  background: var(--crimson);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.sidebar-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-user-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  color: var(--text-dark);
+  line-height: 1.2;
+}
+
+.sidebar-user-role {
+  color: var(--text-light);
+  font-size: 0.82rem;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.2;
+}
+
+.logout-btn {
+  margin-left: auto;
+  color: var(--text-light);
+  display: inline-flex;
+  align-items: center;
+  opacity: 1;
+}
+
+.logout-btn:hover {
+  color: var(--text-dark);
+  opacity: 1;
+}
+
+.logout-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+
+/* Exact premium sidebar override */
+.sidebar {
+  width: 280px;
+  background: #ffffff;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 2.5rem 0;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 100;
+  font-family: 'Inter', sans-serif;
+}
+
+html[data-theme="dark"] .sidebar {
+  background: #0d0d0d;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-logo {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #8b2252;
+  text-decoration: none;
+  padding: 0 2rem;
+  margin-bottom: 3rem;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  border-bottom: none;
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar-section {
+  margin-bottom: 2rem;
+}
+
+.sidebar-flow-section {
+  position: relative;
+}
+
+.sidebar-flow-section::before {
+  content: '';
+  position: absolute;
+  left: 0.82rem;
+  top: 6.45rem;
+  bottom: 1.35rem;
+  width: 0.7rem;
+  background: rgba(139, 34, 82, 0.72);
+  clip-path: polygon(50% 0, 100% 0.46rem, 66% 0.46rem, 66% 100%, 34% 100%, 34% 0.46rem, 0 0.46rem);
+  pointer-events: none;
+}
+
+.sidebar-flow-section .sidebar-link {
+  padding-left: 2.8rem;
+}
+
+.sidebar-section-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #9599a8;
+  padding: 0 2rem;
+  margin-bottom: 0.8rem;
+}
+
+html[data-theme="dark"] .sidebar-section-label {
+  color: #5f5f68;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.8rem 2rem;
+  color: #606272;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 400;
+  transition: all 0.2s;
+  position: relative;
+}
+
+html[data-theme="dark"] .sidebar-link {
+  color: #8a8a94;
+}
+
+.sidebar-link:hover {
+  color: #1a1a2e;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+html[data-theme="dark"] .sidebar-link:hover {
+  color: #f5f5f5;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sidebar-link.active {
+  color: #1a1a2e;
+  background: rgba(139, 34, 82, 0.06);
+}
+
+html[data-theme="dark"] .sidebar-link.active {
+  color: #f5f5f5;
+}
+
+.sidebar-link svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.sidebar-link.active svg,
+.sidebar-link:hover svg {
+  opacity: 1;
+}
+
+.sidebar-footer {
+  padding: 2rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  display: block;
+}
+
+html[data-theme="dark"] .sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.sidebar-avatar,
+.avatar,
+.avatar-sm {
+  width: 36px;
+  height: 36px;
+  background: #8b2252;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.sidebar-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-user-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+html[data-theme="dark"] .sidebar-user-name {
+  color: #f5f5f5;
+}
+
+.sidebar-user-role {
+  font-size: 0.75rem;
+  color: #9599a8;
+}
+
+html[data-theme="dark"] .sidebar-user-role {
+  color: #5f5f68;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  color: #9599a8;
+  padding: 0.3rem;
+  margin-left: auto;
+  transition: color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  opacity: 1;
+}
+
+html[data-theme="dark"] .logout-btn {
+  color: #5f5f68;
+}
+
+.logout-btn:hover {
+  color: #d85f51;
+  opacity: 1;
+}
+
+.logout-btn svg {
+  width: 18px;
+  height: 18px;
+  transform: scaleX(-1);
+  transform-origin: center;
+}
+
+
+/* Match standard premium page background */
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
+  --bg: var(--bg-primary);
+  --sidebar-bg: var(--bg-secondary);
+  --card-bg: var(--bg-secondary);
+  --tag-bg: var(--bg-tertiary);
+  --text-dark: var(--text-primary);
+  --text-mid: var(--text-secondary);
+  --text-light: var(--text-tertiary);
+}
+
+body {
+  background: var(--bg-primary) !important;
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.main,
+.page-shell {
+  background: transparent !important;
+}
+
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="dashboard-layout">
+        <aside class="sidebar">
+            <a href="/premium-website" class="sidebar-logo">Softora.nl</a>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section sidebar-flow-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="/premium-personeel-dashboard" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Dashboard
+                    </a>
+                    <a href="/premium-actieve-opdrachten" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg>
+                        Actieve Opdrachten
+                    </a>
+                    <a href="/premium-personeel-agenda" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+                        Agenda
+                    </a>
+                    <a href="/premium-bevestigingsmails" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15A2.25 2.25 0 0 1 2.25 17.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15A2.25 2.25 0 0 0 2.25 6.75m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.909a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
+                        Bevestigingsmails
+                    </a>
+                    <a href="/premium-ai-lead-generator" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"/></svg>
+                        AI Coldcalling
+                    </a>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Beheer</div>
+                    <a href="/premium-klanten" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
+                        Klanten
+                    </a>
+                    <a href="/premium-pakketten" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"/></svg>
+                        Pakketten
+                    </a>
+                    <a href="/premium-pdfs" class="sidebar-link">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"/></svg>
+                        PDF'S
+                    </a>
+                    <a href="/premium-instellingen" class="sidebar-link active">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"/></svg>
+                        Instellingen
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">SP</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">Softora Premium</div>
+                        <div class="sidebar-user-role">Administrator</div>
+                    </div>
+                    <a href="/premium-personeel-login" class="logout-btn" title="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+<main class="main">
+  <div class="screen active" id="screen-overzicht">
+    <div class="page-title">Instellingen</div>
+    <div class="page-subtitle">Kies een categorie om te beheren</div>
+    <div>
+      <div class="tegel" onclick="goTo('screen-personeel')">
+        <svg class="tegel-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        <div class="tegel-icon-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg>
+        </div>
+        <div class="tegel-label">Personeel</div>
+        <div class="tegel-desc">Beheer wie kan inloggen. Voeg medewerkers toe, wijzig wachtwoorden en stel rollen in.</div>
+        <div class="tegel-count" id="tegel-count">2 medewerkers</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-personeel">
+    <div class="beheer-header">
+      <button class="back-btn" onclick="goTo('screen-overzicht')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+        Instellingen
+      </button>
+      <div>
+        <div class="beheer-title">Personeelsbeheer</div>
+        <div class="beheer-subtitle">Inloggegevens en toegangsrollen</div>
+      </div>
+    </div>
+
+    <div class="beheer-layout">
+      <div class="table-card">
+        <div class="table-card-header">
+          <div class="table-card-title">Medewerkers</div>
+          <div class="table-count" id="list-count"></div>
+        </div>
+        <div id="personeel-list"></div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-card-header"><div class="form-card-title">Toevoegen</div></div>
+        <div class="form-card-body">
+          <div class="form-row2">
+            <div class="form-group"><label>Voornaam</label><input type="text" id="new-voornaam" placeholder="Jan"></div>
+            <div class="form-group"><label>Achternaam</label><input type="text" id="new-achternaam" placeholder="Jansen"></div>
+          </div>
+          <div class="form-group"><label>E-mail</label><input type="email" id="new-email" placeholder="jan@softora.nl"></div>
+          <div class="form-group">
+            <label>Wachtwoord</label>
+            <div class="pw-wrap">
+              <input type="password" id="new-pw" placeholder="Minimaal 8 tekens">
+              <button class="pw-toggle" onclick="togglePw('new-pw', this)" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            </div>
+          </div>
+          <div class="form-group"><label>Rol</label><select id="new-rol"><option value="medewerker">Medewerker</option><option value="admin">Administrator</option></select></div>
+          <button class="btn-add" onclick="addPersoneel()">Toevoegen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+</div>
+
+<div class="overlay" id="edit-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-head-title">Bewerken</div>
+      <button class="modal-x" onclick="closeOverlay('edit-overlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-row2">
+        <div class="form-group"><label>Voornaam</label><input type="text" id="edit-voornaam"></div>
+        <div class="form-group"><label>Achternaam</label><input type="text" id="edit-achternaam"></div>
+      </div>
+      <div class="form-group"><label>E-mail</label><input type="email" id="edit-email"></div>
+      <div class="form-group">
+        <label>Nieuw wachtwoord <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-light)">(leeg = ongewijzigd)</span></label>
+        <div class="pw-wrap">
+          <input type="password" id="edit-pw" placeholder="Laat leeg om te behouden">
+          <button class="pw-toggle" onclick="togglePw('edit-pw', this)" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+      <div class="form-row2">
+        <div class="form-group"><label>Rol</label><select id="edit-rol"><option value="medewerker">Medewerker</option><option value="admin">Administrator</option></select></div>
+        <div class="form-group"><label>Status</label><select id="edit-status"><option value="active">Actief</option><option value="inactive">Inactief</option></select></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeOverlay('edit-overlay')">Annuleren</button>
+      <button class="btn-save" onclick="saveEdit()">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="confirm-overlay">
+  <div class="confirm-modal">
+    <div class="confirm-body">
+      <div class="confirm-title">Verwijderen</div>
+      <div class="confirm-text">Weet je zeker dat je <strong id="confirm-name"></strong> wilt verwijderen? Dit kan niet ongedaan worden gemaakt.</div>
+    </div>
+    <div class="confirm-foot">
+      <button class="btn-cancel" onclick="closeOverlay('confirm-overlay')">Annuleren</button>
+      <button class="btn-del" onclick="confirmDelete()">Verwijderen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var team = [
+  { id: 1, voornaam: 'Serve', achternaam: 'Premium', email: 'serve@softora.nl', rol: 'admin', status: 'active' },
+  { id: 2, voornaam: 'Lisa', achternaam: 'Janssen', email: 'lisa@softora.nl', rol: 'medewerker', status: 'active' }
+];
+var nextId = 3;
+var pendingDelete = null;
+var colors = ['#8b2252', '#16733c', '#1a5f7a', '#7b3f00', '#4a1a6b', '#b45a00'];
+
+function getColor(id) {
+  return colors[id % colors.length];
+}
+
+function initials(voornaam, achternaam) {
+  return ((voornaam[0] || '') + (achternaam[0] || '')).toUpperCase();
+}
+
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(function (screen) {
+    screen.classList.remove('active');
+  });
+  document.getElementById(id).classList.add('active');
+  if (id === 'screen-personeel') {
+    render();
+  }
+}
+
+function render() {
+  var list = document.getElementById('personeel-list');
+  var activeCount = team.filter(function (persoon) { return persoon.status === 'active'; }).length;
+  document.getElementById('list-count').textContent = activeCount + ' actief';
+  document.getElementById('tegel-count').textContent = team.length + ' medewerker' + (team.length !== 1 ? 's' : '');
+  if (team.length === 0) {
+    list.innerHTML = '<div class="empty-state">Nog geen medewerkers.</div>';
+    return;
+  }
+  list.innerHTML = team.map(function (persoon) {
+    return '<div class="person-row">'
+      + '<div class="status-dot ' + persoon.status + '"></div>'
+      + '<div class="person-avatar" style="background:' + getColor(persoon.id) + '">' + initials(persoon.voornaam, persoon.achternaam) + '</div>'
+      + '<div class="person-info"><div class="person-name">' + escapeHtml(persoon.voornaam + ' ' + persoon.achternaam) + '</div><div class="person-email">' + escapeHtml(persoon.email) + '</div></div>'
+      + '<span class="role-badge role-' + persoon.rol + '">' + (persoon.rol === 'admin' ? 'Admin' : 'Medewerker') + '</span>'
+      + '<div class="person-actions">'
+      + '<button class="btn-icon" onclick="openEdit(' + persoon.id + ')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+      + '<button class="btn-icon del" onclick="openDelete(' + persoon.id + ')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function addPersoneel() {
+  function value(id) {
+    return document.getElementById(id).value.trim();
+  }
+  var voornaam = value('new-voornaam');
+  var email = value('new-email');
+  var wachtwoord = document.getElementById('new-pw').value;
+  if (!voornaam || !email || !wachtwoord) {
+    return showToast('Vul naam, e-mail en wachtwoord in');
+  }
+  if (wachtwoord.length < 8) {
+    return showToast('Wachtwoord minimaal 8 tekens');
+  }
+  if (team.find(function (persoon) { return persoon.email === email; })) {
+    return showToast('E-mailadres bestaat al');
+  }
+  team.push({
+    id: nextId++,
+    voornaam: voornaam,
+    achternaam: value('new-achternaam'),
+    email: email,
+    rol: document.getElementById('new-rol').value,
+    status: 'active'
+  });
+  render();
+  ['new-voornaam', 'new-achternaam', 'new-email', 'new-pw'].forEach(function (id) {
+    document.getElementById(id).value = '';
+  });
+  showToast('✓ ' + voornaam + ' toegevoegd');
+}
+
+function openEdit(id) {
+  var persoon = team.find(function (item) { return item.id === id; });
+  if (!persoon) {
+    return;
+  }
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-voornaam').value = persoon.voornaam;
+  document.getElementById('edit-achternaam').value = persoon.achternaam;
+  document.getElementById('edit-email').value = persoon.email;
+  document.getElementById('edit-pw').value = '';
+  document.getElementById('edit-rol').value = persoon.rol;
+  document.getElementById('edit-status').value = persoon.status;
+  openOverlay('edit-overlay');
+}
+
+function saveEdit() {
+  var id = parseInt(document.getElementById('edit-id').value, 10);
+  var persoon = team.find(function (item) { return item.id === id; });
+  if (!persoon) {
+    return;
+  }
+  var email = document.getElementById('edit-email').value.trim();
+  var wachtwoord = document.getElementById('edit-pw').value;
+  if (!email) {
+    return showToast('E-mail is verplicht');
+  }
+  if (wachtwoord && wachtwoord.length < 8) {
+    return showToast('Wachtwoord minimaal 8 tekens');
+  }
+  if (team.find(function (item) { return item.email === email && item.id !== id; })) {
+    return showToast('E-mailadres al in gebruik');
+  }
+  persoon.voornaam = document.getElementById('edit-voornaam').value.trim() || persoon.voornaam;
+  persoon.achternaam = document.getElementById('edit-achternaam').value.trim();
+  persoon.email = email;
+  persoon.rol = document.getElementById('edit-rol').value;
+  persoon.status = document.getElementById('edit-status').value;
+  render();
+  closeOverlay('edit-overlay');
+  showToast('✓ Opgeslagen');
+}
+
+function openDelete(id) {
+  var persoon = team.find(function (item) { return item.id === id; });
+  if (!persoon) {
+    return;
+  }
+  pendingDelete = id;
+  document.getElementById('confirm-name').textContent = persoon.voornaam + ' ' + persoon.achternaam;
+  openOverlay('confirm-overlay');
+}
+
+function confirmDelete() {
+  team = team.filter(function (persoon) {
+    return persoon.id !== pendingDelete;
+  });
+  pendingDelete = null;
+  render();
+  closeOverlay('confirm-overlay');
+  showToast('✓ Verwijderd');
+}
+
+function openOverlay(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+function closeOverlay(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+document.querySelectorAll('.overlay').forEach(function (overlay) {
+  overlay.addEventListener('click', function (event) {
+    if (event.target === overlay) {
+      overlay.classList.remove('open');
+    }
+  });
+});
+
+function togglePw(inputId, btn) {
+  var input = document.getElementById(inputId);
+  var show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.innerHTML = show
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+}
+
+function showToast(msg) {
+  var toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(function () {
+    toast.classList.remove('show');
+  }, 2800);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+render();
+</script>
+</body>
+</html>
