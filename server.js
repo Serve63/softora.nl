@@ -10,6 +10,7 @@ require('dotenv').config();
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const VAPI_BASE_URL = process.env.VAPI_BASE_URL || 'https://api.vapi.ai';
+const ELEVENLABS_API_BASE_URL = process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io/v1';
 const OPENAI_API_BASE_URL = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const ANTHROPIC_API_BASE_URL = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com/v1';
@@ -109,6 +110,12 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
+const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
+let elevenLabsConversationListCache = {
+  fetchedAtMs: 0,
+  agentId: '',
+  conversations: [],
+};
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
 const inMemoryUiStateByScope = new Map();
@@ -1263,6 +1270,7 @@ function upsertRecentCallUpdate(update) {
               ? Math.round(Number(existing.durationSeconds))
               : null,
         recordingUrl: update.recordingUrl || existing.recordingUrl || '',
+        provider: update.provider || existing.provider || '',
         messageType: update.messageType || existing.messageType || '',
         updatedAt: update.updatedAt,
         updatedAtMs: update.updatedAtMs,
@@ -1347,7 +1355,29 @@ function getRequiredVapiEnv() {
   return ['VAPI_API_KEY', 'VAPI_ASSISTANT_ID', 'VAPI_PHONE_NUMBER_ID'];
 }
 
-function getMissingEnvVars() {
+function getRequiredElevenLabsEnv() {
+  return ['ELEVENLABS_API_KEY', 'ELEVENLABS_PHONE_NUMBER_ID'];
+}
+
+function getConfiguredElevenLabsAgentId() {
+  return normalizeString(process.env.ELEVENLABS_AGENT_ID || DEFAULT_ELEVENLABS_AGENT_ID);
+}
+
+function isElevenLabsColdcallingConfigured() {
+  return getRequiredElevenLabsEnv().every((key) => normalizeString(process.env[key]));
+}
+
+function getColdcallingProvider() {
+  const configured = normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase();
+  if (configured === 'elevenlabs') return 'elevenlabs';
+  if (configured === 'vapi') return 'vapi';
+  return isElevenLabsColdcallingConfigured() ? 'elevenlabs' : 'vapi';
+}
+
+function getMissingEnvVars(provider = getColdcallingProvider()) {
+  if (provider === 'elevenlabs') {
+    return getRequiredElevenLabsEnv().filter((key) => !process.env[key]);
+  }
   return getRequiredVapiEnv().filter((key) => !process.env[key]);
 }
 
@@ -4264,6 +4294,376 @@ function buildVariableValues(lead, campaign) {
   };
 }
 
+function buildElevenLabsApiUrl(relativePath, searchParams = null) {
+  const normalizedBase = `${normalizeString(ELEVENLABS_API_BASE_URL).replace(/\/+$/, '')}/`;
+  const url = new URL(String(relativePath || '').replace(/^\/+/, ''), normalizedBase);
+
+  if (searchParams && typeof searchParams === 'object') {
+    Object.entries(searchParams).forEach(([key, value]) => {
+      const normalizedValue = normalizeString(value);
+      if (!normalizedValue) return;
+      url.searchParams.set(key, normalizedValue);
+    });
+  }
+
+  return url;
+}
+
+function toIsoFromUnixSeconds(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return '';
+  return new Date(numeric * 1000).toISOString();
+}
+
+function buildElevenLabsRecordingProxyUrl(callId) {
+  const normalizedCallId = normalizeString(callId);
+  if (!normalizedCallId) return '';
+  return `/api/coldcalling/recording?callId=${encodeURIComponent(normalizedCallId)}`;
+}
+
+function isTerminalColdcallingStatus(status, endedReason = '') {
+  const combined = `${normalizeString(status).toLowerCase()} ${normalizeString(endedReason).toLowerCase()}`;
+  return /(ended|completed|failed|cancelled|canceled|busy|no-answer|no answer|voicemail|hungup|hangup|disconnected|done)/.test(
+    combined
+  );
+}
+
+function extractElevenLabsTranscriptText(transcript) {
+  if (!transcript) return '';
+  if (typeof transcript === 'string') return normalizeString(transcript);
+  if (!Array.isArray(transcript)) return '';
+
+  return transcript
+    .map((item) => {
+      if (!item || typeof item !== 'object') return '';
+      const text =
+        normalizeString(item.message) ||
+        normalizeString(item.text) ||
+        normalizeString(item.transcript) ||
+        normalizeString(item.content);
+      if (!text) return '';
+      const role =
+        normalizeString(item.role) ||
+        normalizeString(item.speaker) ||
+        normalizeString(item.source) ||
+        normalizeString(item.type);
+      return role ? `${role}: ${text}` : text;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+function buildElevenLabsConversationInitiationData(lead, campaign, normalizedPhone) {
+  return {
+    dynamic_variables: {
+      ...buildVariableValues(
+        {
+          ...lead,
+          phone: normalizedPhone,
+        },
+        campaign
+      ),
+      phone: normalizedPhone,
+    },
+  };
+}
+
+function buildElevenLabsConversationUpdate(callId, details, fallback = {}) {
+  const metadata = details?.metadata && typeof details.metadata === 'object' ? details.metadata : {};
+  const transcriptFull = extractElevenLabsTranscriptText(details?.transcript);
+  const transcriptSnippet = transcriptFull
+    ? truncateText(transcriptFull.replace(/\s+/g, ' '), 280)
+    : normalizeString(fallback.transcriptSnippet || '');
+  const summary =
+    normalizeString(details?.analysis?.transcript_summary) ||
+    normalizeString(details?.analysis?.summary) ||
+    normalizeString(fallback.summary || '');
+  const startedAt =
+    toIsoFromUnixSeconds(metadata.start_time_unix_secs) ||
+    normalizeString(details?.created_at) ||
+    normalizeString(fallback.startedAt || '');
+  const durationSeconds =
+    parseNumberSafe(metadata.call_duration_secs, null) ||
+    parseNumberSafe(details?.call_duration_secs, null) ||
+    parseNumberSafe(fallback.durationSeconds, null);
+  const endedAt =
+    toIsoFromUnixSeconds(metadata.end_time_unix_secs) ||
+    (startedAt && Number.isFinite(durationSeconds) && durationSeconds > 0
+      ? new Date(Date.parse(startedAt) + durationSeconds * 1000).toISOString()
+      : normalizeString(fallback.endedAt || ''));
+  const status = normalizeString(details?.status || fallback.status || '');
+  const endedReason =
+    normalizeString(details?.analysis?.call_successful === false ? 'unsuccessful' : '') ||
+    normalizeString(details?.termination_reason) ||
+    normalizeString(details?.error?.message) ||
+    normalizeString(fallback.endedReason || '');
+  const hasAudio = Boolean(details?.has_audio);
+  const updatedAtMs =
+    isTerminalColdcallingStatus(status, endedReason) && endedAt
+      ? Date.parse(endedAt) || Date.now()
+      : Date.now();
+
+  return {
+    callId,
+    phone: normalizeString(fallback.phone || ''),
+    company: normalizeString(fallback.company || ''),
+    name: normalizeString(fallback.name || ''),
+    status,
+    messageType: 'elevenlabs.conversation',
+    summary,
+    transcriptSnippet,
+    transcriptFull: transcriptFull || normalizeString(fallback.transcriptFull || ''),
+    endedReason,
+    startedAt,
+    endedAt,
+    durationSeconds: Number.isFinite(durationSeconds) && durationSeconds > 0 ? Math.round(durationSeconds) : null,
+    recordingUrl: hasAudio ? buildElevenLabsRecordingProxyUrl(callId) : normalizeString(fallback.recordingUrl || ''),
+    updatedAt: new Date(updatedAtMs).toISOString(),
+    updatedAtMs,
+    provider: 'elevenlabs',
+  };
+}
+
+async function createElevenLabsOutboundCall(lead, campaign) {
+  const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
+  const payload = {
+    agent_id: getConfiguredElevenLabsAgentId(),
+    agent_phone_number_id: normalizeString(process.env.ELEVENLABS_PHONE_NUMBER_ID),
+    to_number: normalizedPhone,
+    conversation_initiation_client_data: buildElevenLabsConversationInitiationData(
+      lead,
+      campaign,
+      normalizedPhone
+    ),
+  };
+
+  const endpoint = '/convai/twilio/outbound-call';
+  const response = await fetch(buildElevenLabsApiUrl(endpoint), {
+    method: 'POST',
+    headers: {
+      'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs outbound call fout (${response.status})`
+    );
+    error.status = response.status;
+    error.data = data;
+    error.endpoint = endpoint;
+    throw error;
+  }
+
+  return { endpoint, data, normalizedPhone };
+}
+
+async function fetchElevenLabsConversationById(callId) {
+  const normalizedCallId = normalizeString(callId);
+  const endpoint = `/convai/conversations/${encodeURIComponent(normalizedCallId)}`;
+  const response = await fetch(buildElevenLabsApiUrl(endpoint), {
+    method: 'GET',
+    headers: {
+      'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+    },
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs conversation ophalen mislukt (${response.status})`
+    );
+    error.status = response.status;
+    error.data = data;
+    error.endpoint = endpoint;
+    throw error;
+  }
+
+  return { endpoint, data };
+}
+
+async function fetchElevenLabsConversationAudioResponse(callId) {
+  const normalizedCallId = normalizeString(callId);
+  const endpoint = `/convai/conversations/${encodeURIComponent(normalizedCallId)}/audio`;
+  const response = await fetch(buildElevenLabsApiUrl(endpoint), {
+    method: 'GET',
+    headers: {
+      'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs audio ophalen mislukt (${response.status})`
+    );
+    error.status = response.status;
+    error.data = data;
+    error.endpoint = endpoint;
+    throw error;
+  }
+
+  return { endpoint, response };
+}
+
+function buildElevenLabsListCallUpdate(item, fallback = {}) {
+  const callId = normalizeString(item?.conversation_id || fallback.callId || '');
+  const status = normalizeString(item?.status || fallback.status || '');
+  const summary = normalizeString(item?.transcript_summary || fallback.summary || '');
+  const startedAt =
+    toIsoFromUnixSeconds(item?.start_time_unix_secs) ||
+    normalizeString(fallback.startedAt || '');
+  const durationSeconds =
+    parseNumberSafe(item?.call_duration_secs, null) ||
+    parseNumberSafe(fallback.durationSeconds, null);
+  const endedAt =
+    isTerminalColdcallingStatus(status, fallback.endedReason) && startedAt && Number.isFinite(durationSeconds)
+      ? new Date(Date.parse(startedAt) + durationSeconds * 1000).toISOString()
+      : normalizeString(fallback.endedAt || '');
+  const fingerprint = JSON.stringify({
+    status,
+    summary,
+    durationSeconds: Number.isFinite(durationSeconds) ? Math.round(durationSeconds) : null,
+    endedAt,
+  });
+  const previousFingerprint = JSON.stringify({
+    status: normalizeString(fallback.status || ''),
+    summary: normalizeString(fallback.summary || ''),
+    durationSeconds: Number.isFinite(Number(fallback.durationSeconds))
+      ? Math.round(Number(fallback.durationSeconds))
+      : null,
+    endedAt: normalizeString(fallback.endedAt || ''),
+  });
+  const changed = fingerprint !== previousFingerprint;
+  const updatedAtMs = changed
+    ? Date.now()
+    : Number(fallback.updatedAtMs || Date.parse(startedAt) || Date.now());
+
+  return {
+    callId,
+    phone: normalizeString(fallback.phone || ''),
+    company: normalizeString(fallback.company || ''),
+    name: normalizeString(fallback.name || ''),
+    status,
+    messageType: 'elevenlabs.conversation.list',
+    summary,
+    transcriptSnippet: normalizeString(fallback.transcriptSnippet || ''),
+    transcriptFull: normalizeString(fallback.transcriptFull || ''),
+    endedReason: normalizeString(fallback.endedReason || ''),
+    startedAt,
+    endedAt,
+    durationSeconds: Number.isFinite(durationSeconds) && durationSeconds > 0 ? Math.round(durationSeconds) : null,
+    recordingUrl:
+      Number.isFinite(durationSeconds) && durationSeconds > 0
+        ? buildElevenLabsRecordingProxyUrl(callId)
+        : normalizeString(fallback.recordingUrl || ''),
+    updatedAt: new Date(updatedAtMs).toISOString(),
+    updatedAtMs,
+    provider: 'elevenlabs',
+  };
+}
+
+async function listElevenLabsConversations(pageSize = 100) {
+  const agentId = getConfiguredElevenLabsAgentId();
+  const now = Date.now();
+  if (
+    elevenLabsConversationListCache.agentId === agentId &&
+    now - Number(elevenLabsConversationListCache.fetchedAtMs || 0) < 3000
+  ) {
+    return elevenLabsConversationListCache.conversations.slice();
+  }
+
+  const endpoint = '/convai/conversations';
+  const response = await fetch(
+    buildElevenLabsApiUrl(endpoint, {
+      agent_id: agentId,
+      page_size: String(Math.max(1, Math.min(100, pageSize))),
+      summary_mode: 'include',
+    }),
+    {
+      method: 'GET',
+      headers: {
+        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+      },
+    }
+  );
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs conversations laden mislukt (${response.status})`
+    );
+    error.status = response.status;
+    error.data = data;
+    error.endpoint = endpoint;
+    throw error;
+  }
+
+  const conversations = Array.isArray(data?.conversations) ? data.conversations : [];
+  elevenLabsConversationListCache = {
+    fetchedAtMs: now,
+    agentId,
+    conversations: conversations.slice(),
+  };
+  return conversations;
+}
+
+async function refreshElevenLabsRecentCallUpdates(limit = 200) {
+  const conversations = await listElevenLabsConversations(limit);
+  conversations.forEach((conversation) => {
+    const callId = normalizeString(conversation?.conversation_id);
+    if (!callId) return;
+    const fallback = callUpdatesById.get(callId) || {};
+    const update = upsertRecentCallUpdate(buildElevenLabsListCallUpdate(conversation, fallback));
+    triggerPostCallAutomation(update);
+  });
+}
+
+function classifyElevenLabsFailure(error) {
+  const status = Number(error?.status || 0);
+  const combined = `${normalizeString(error?.message)} ${JSON.stringify(error?.data || {})}`.toLowerCase();
+
+  if (status === 401 || /unauthorized|invalid api key|xi-api-key/.test(combined)) {
+    return {
+      cause: 'wrong elevenlabs api key',
+      explanation: 'ELEVENLABS_API_KEY lijkt ongeldig of ontbreekt.',
+    };
+  }
+
+  if (/phone number|agent_phone_number_id|phnum_/.test(combined) && /(invalid|unknown|not found|missing)/.test(combined)) {
+    return {
+      cause: 'wrong elevenlabs phone number',
+      explanation: 'ELEVENLABS_PHONE_NUMBER_ID lijkt ongeldig of niet beschikbaar voor outbound calls.',
+    };
+  }
+
+  if (/agent/.test(combined) && /(invalid|unknown|not found|missing)/.test(combined)) {
+    return {
+      cause: 'wrong elevenlabs agent',
+      explanation: 'ELEVENLABS_AGENT_ID lijkt ongeldig of niet beschikbaar.',
+    };
+  }
+
+  if (/twilio|carrier|telecom|rate limit|timeout|temporar|service unavailable/.test(combined) || status >= 500) {
+    return {
+      cause: 'provider issue',
+      explanation: 'Waarschijnlijk een issue bij ElevenLabs/Twilio/provider (tijdelijk of extern).',
+    };
+  }
+
+  return {
+    cause: 'unknown',
+    explanation: 'Oorzaak kon niet eenduidig worden bepaald. Controleer de exacte ElevenLabs response body.',
+  };
+}
+
 function buildVapiPayload(lead, campaign) {
   const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
@@ -4295,7 +4695,7 @@ function buildVapiPayload(lead, campaign) {
   };
 }
 
-async function processColdcallingLead(lead, campaign, index) {
+async function processVapiColdcallingLead(lead, campaign, index) {
   try {
     const payload = buildVapiPayload(lead, campaign);
     const normalizedPhone = payload.customer.number;
@@ -4373,6 +4773,104 @@ async function processColdcallingLead(lead, campaign, index) {
       details: error.data || null,
     };
   }
+}
+
+async function processElevenLabsColdcallingLead(lead, campaign, index) {
+  try {
+    const { endpoint, data, normalizedPhone } = await createElevenLabsOutboundCall(lead, campaign);
+    const callId = normalizeString(data?.conversation_id || data?.conversationId || data?.id);
+    const callStatus = normalizeString(data?.status || 'initiated');
+    const callSid = normalizeString(data?.callSid || data?.call_sid);
+
+    if (callId) {
+      upsertRecentCallUpdate({
+        callId,
+        phone: normalizedPhone,
+        company: normalizeString(lead.company),
+        name: normalizeString(lead.name),
+        status: callStatus,
+        messageType: 'coldcalling.start.response',
+        summary: '',
+        transcriptSnippet: '',
+        endedReason: '',
+        startedAt: new Date().toISOString(),
+        endedAt: '',
+        durationSeconds: null,
+        recordingUrl: '',
+        updatedAt: new Date().toISOString(),
+        updatedAtMs: Date.now(),
+        provider: 'elevenlabs',
+      });
+    }
+
+    return {
+      index,
+      success: true,
+      lead: {
+        name: normalizeString(lead.name),
+        company: normalizeString(lead.company),
+        phone: normalizeString(lead.phone),
+        region: normalizeString(lead.region),
+        phoneE164: normalizedPhone,
+      },
+      vapi: {
+        endpoint,
+        callId,
+        status: callStatus,
+      },
+      elevenlabs: {
+        endpoint,
+        conversationId: callId,
+        callSid,
+        status: callStatus,
+      },
+    };
+  } catch (error) {
+    const failure = classifyElevenLabsFailure(error);
+    console.error(
+      '[Coldcalling][Lead Error]',
+      JSON.stringify(
+        {
+          provider: 'elevenlabs',
+          lead: {
+            name: normalizeString(lead?.name),
+            company: normalizeString(lead?.company),
+            phone: normalizeString(lead?.phone),
+          },
+          error: error.message || 'Onbekende fout',
+          statusCode: error.status || null,
+          cause: failure.cause,
+          explanation: failure.explanation,
+          responseBody: error.data || null,
+        },
+        null,
+        2
+      )
+    );
+
+    return {
+      index,
+      success: false,
+      lead: {
+        name: normalizeString(lead?.name),
+        company: normalizeString(lead?.company),
+        phone: normalizeString(lead?.phone),
+        region: normalizeString(lead?.region),
+      },
+      error: error.message || 'Onbekende fout',
+      statusCode: error.status || null,
+      cause: failure.cause,
+      causeExplanation: failure.explanation,
+      details: error.data || null,
+    };
+  }
+}
+
+async function processColdcallingLead(lead, campaign, index) {
+  if (getColdcallingProvider() === 'elevenlabs') {
+    return processElevenLabsColdcallingLead(lead, campaign, index);
+  }
+  return processVapiColdcallingLead(lead, campaign, index);
 }
 
 function validateStartPayload(body) {
@@ -4612,6 +5110,29 @@ function handleSequentialDispatchQueueWebhookProgress(callUpdate) {
   });
 }
 
+function triggerPostCallAutomation(callUpdate) {
+  if (!callUpdate) return;
+
+  handleSequentialDispatchQueueWebhookProgress(callUpdate);
+  ensureRuleBasedInsightAndAppointment(callUpdate);
+
+  void maybeAnalyzeCallUpdateWithAi(callUpdate).catch((error) => {
+    console.error(
+      '[AI Call Insight Error]',
+      JSON.stringify(
+        {
+          callId: callUpdate.callId,
+          message: error?.message || 'Onbekende fout',
+          status: error?.status || null,
+          data: error?.data || null,
+        },
+        null,
+        2
+      )
+    );
+  });
+}
+
 function isWebhookAuthorized(req) {
   const secret = process.env.WEBHOOK_SECRET;
 
@@ -4635,14 +5156,131 @@ function isWebhookAuthorized(req) {
   return false;
 }
 
+async function fetchElevenLabsCallStatusPayload(callId) {
+  const cached = callUpdatesById.get(callId) || null;
+  const { endpoint, data } = await fetchElevenLabsConversationById(callId);
+  const update = upsertRecentCallUpdate(
+    buildElevenLabsConversationUpdate(callId, data, cached || {})
+  );
+  triggerPostCallAutomation(update);
+
+  return {
+    endpoint,
+    update,
+    data,
+  };
+}
+
+async function sendColdcallingStatusResponse(res, callId) {
+  const cached = callUpdatesById.get(callId) || null;
+  const provider = normalizeString(cached?.provider || getColdcallingProvider());
+
+  if (provider === 'elevenlabs') {
+    if (!normalizeString(process.env.ELEVENLABS_API_KEY)) {
+      if (cached) {
+        return res.status(200).json({
+          ok: true,
+          source: 'cache',
+          provider: 'elevenlabs',
+          callId: normalizeString(cached.callId || callId),
+          status: normalizeString(cached.status || ''),
+          endedReason: normalizeString(cached.endedReason || ''),
+          startedAt: normalizeString(cached.startedAt || ''),
+          endedAt: normalizeString(cached.endedAt || ''),
+          durationSeconds: parseNumberSafe(cached.durationSeconds, null),
+          recordingUrl: normalizeString(cached.recordingUrl || ''),
+        });
+      }
+      return res.status(500).json({ ok: false, error: 'ELEVENLABS_API_KEY ontbreekt op server.' });
+    }
+
+    try {
+      const { endpoint, update } = await fetchElevenLabsCallStatusPayload(callId);
+      return res.status(200).json({
+        ok: true,
+        endpoint,
+        source: 'elevenlabs',
+        provider: 'elevenlabs',
+        callId: normalizeString(update?.callId || callId),
+        status: normalizeString(update?.status || ''),
+        endedReason: normalizeString(update?.endedReason || ''),
+        startedAt: normalizeString(update?.startedAt || ''),
+        endedAt: normalizeString(update?.endedAt || ''),
+        durationSeconds: parseNumberSafe(update?.durationSeconds, null),
+        recordingUrl: normalizeString(update?.recordingUrl || ''),
+      });
+    } catch (error) {
+      return res.status(Number(error?.status || 500)).json({
+        ok: false,
+        error: error?.message || 'Kon ElevenLabs call status niet ophalen.',
+        endpoint: error?.endpoint || null,
+        details: error?.data || null,
+      });
+    }
+  }
+
+  if (!normalizeString(process.env.VAPI_API_KEY)) {
+    if (cached) {
+      return res.status(200).json({
+        ok: true,
+        source: 'cache',
+        provider: 'vapi',
+        callId: normalizeString(cached.callId || callId),
+        status: normalizeString(cached.status || ''),
+        endedReason: normalizeString(cached.endedReason || ''),
+        startedAt: normalizeString(cached.startedAt || ''),
+        endedAt: normalizeString(cached.endedAt || ''),
+        durationSeconds: parseNumberSafe(cached.durationSeconds, null),
+        recordingUrl: normalizeString(cached.recordingUrl || ''),
+      });
+    }
+    return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
+  }
+
+  try {
+    const { endpoint, data } = await fetchVapiCallStatusById(callId);
+    const update = extractCallUpdateFromVapiCallStatusResponse(callId, data);
+    if (update) {
+      upsertRecentCallUpdate(update);
+    }
+    const call = data?.call && typeof data.call === 'object' ? data.call : data;
+
+    return res.status(200).json({
+      ok: true,
+      endpoint,
+      source: 'vapi',
+      provider: 'vapi',
+      callId: normalizeString(update?.callId || call?.id || callId),
+      status: normalizeString(update?.status || call?.status || data?.status || ''),
+      endedReason: normalizeString(update?.endedReason || call?.endedReason || data?.endedReason || ''),
+      startedAt: normalizeString(update?.startedAt || ''),
+      endedAt: normalizeString(update?.endedAt || ''),
+      durationSeconds: parseNumberSafe(update?.durationSeconds, null),
+      recordingUrl: normalizeString(update?.recordingUrl || ''),
+    });
+  } catch (error) {
+    return res.status(Number(error?.status || 500)).json({
+      ok: false,
+      error: error?.message || 'Kon Vapi call status niet ophalen.',
+      endpoint: error?.endpoint || null,
+      details: error?.data || null,
+    });
+  }
+}
+
 app.post('/api/coldcalling/start', async (req, res) => {
-  const missingEnv = getMissingEnvVars();
+  const provider = getColdcallingProvider();
+  const missingEnv = getMissingEnvVars(provider);
 
   if (missingEnv.length > 0) {
     return res.status(500).json({
       ok: false,
-      error: 'Server mist vereiste environment variables voor Vapi.',
+      error:
+        provider === 'elevenlabs'
+          ? 'Server mist vereiste environment variables voor ElevenLabs outbound calling.'
+          : 'Server mist vereiste environment variables voor Vapi.',
       missingEnv,
+      provider,
     });
   }
 
@@ -4655,7 +5293,7 @@ app.post('/api/coldcalling/start', async (req, res) => {
   const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
 
   console.log(
-    `[Coldcalling] Start campagne ontvangen: ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
+    `[Coldcalling] Start campagne ontvangen via ${provider}: ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
   );
 
   let results = [];
@@ -4684,6 +5322,7 @@ app.post('/api/coldcalling/start', async (req, res) => {
         attempted: leadsToProcess.length,
         started: startedNow,
         failed: failedNow,
+        provider,
         dispatchMode: campaign.dispatchMode,
         dispatchDelaySeconds: 0,
         sequentialWaitForCallEnd: true,
@@ -4722,6 +5361,7 @@ app.post('/api/coldcalling/start', async (req, res) => {
       attempted: leadsToProcess.length,
       started,
       failed,
+      provider,
       dispatchMode: campaign.dispatchMode,
       dispatchDelaySeconds: campaign.dispatchMode === 'delay' ? campaign.dispatchDelaySeconds : 0,
     },
@@ -4734,54 +5374,7 @@ app.get('/api/coldcalling/call-status/:callId', async (req, res) => {
   if (!callId) {
     return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
   }
-
-  const cached = callUpdatesById.get(callId) || null;
-
-  if (!normalizeString(process.env.VAPI_API_KEY)) {
-    if (cached) {
-      return res.status(200).json({
-        ok: true,
-        source: 'cache',
-        callId: normalizeString(cached.callId || callId),
-        status: normalizeString(cached.status || ''),
-        endedReason: normalizeString(cached.endedReason || ''),
-        startedAt: normalizeString(cached.startedAt || ''),
-        endedAt: normalizeString(cached.endedAt || ''),
-        durationSeconds: parseNumberSafe(cached.durationSeconds, null),
-        recordingUrl: normalizeString(cached.recordingUrl || ''),
-      });
-    }
-    return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
-  }
-
-  try {
-    const { endpoint, data } = await fetchVapiCallStatusById(callId);
-    const update = extractCallUpdateFromVapiCallStatusResponse(callId, data);
-    if (update) {
-      upsertRecentCallUpdate(update);
-    }
-    const call = data?.call && typeof data.call === 'object' ? data.call : data;
-
-    return res.status(200).json({
-      ok: true,
-      endpoint,
-      source: 'vapi',
-      callId: normalizeString(update?.callId || call?.id || callId),
-      status: normalizeString(update?.status || call?.status || data?.status || ''),
-      endedReason: normalizeString(update?.endedReason || call?.endedReason || data?.endedReason || ''),
-      startedAt: normalizeString(update?.startedAt || ''),
-      endedAt: normalizeString(update?.endedAt || ''),
-      durationSeconds: parseNumberSafe(update?.durationSeconds, null),
-      recordingUrl: normalizeString(update?.recordingUrl || ''),
-    });
-  } catch (error) {
-    return res.status(Number(error?.status || 500)).json({
-      ok: false,
-      error: error?.message || 'Kon Vapi call status niet ophalen.',
-      endpoint: error?.endpoint || null,
-      details: error?.data || null,
-    });
-  }
+  return sendColdcallingStatusResponse(res, callId);
 });
 
 // Vercel route-fallback: sommige serverless route-combinaties geven NOT_FOUND op diepere paden.
@@ -4791,50 +5384,30 @@ app.get('/api/coldcalling/status', async (req, res) => {
   if (!callId) {
     return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
   }
+  return sendColdcallingStatusResponse(res, callId);
+});
 
-  const cached = callUpdatesById.get(callId) || null;
+app.get('/api/coldcalling/recording', async (req, res) => {
+  const callId = normalizeString(req.query?.callId);
+  if (!callId) {
+    return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
+  }
 
-  if (!normalizeString(process.env.VAPI_API_KEY)) {
-    if (cached) {
-      return res.status(200).json({
-        ok: true,
-        source: 'cache',
-        callId: normalizeString(cached.callId || callId),
-        status: normalizeString(cached.status || ''),
-        endedReason: normalizeString(cached.endedReason || ''),
-        startedAt: normalizeString(cached.startedAt || ''),
-        endedAt: normalizeString(cached.endedAt || ''),
-        durationSeconds: parseNumberSafe(cached.durationSeconds, null),
-        recordingUrl: normalizeString(cached.recordingUrl || ''),
-      });
-    }
-    return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
+  if (!normalizeString(process.env.ELEVENLABS_API_KEY)) {
+    return res.status(500).json({ ok: false, error: 'ELEVENLABS_API_KEY ontbreekt op server.' });
   }
 
   try {
-    const { endpoint, data } = await fetchVapiCallStatusById(callId);
-    const update = extractCallUpdateFromVapiCallStatusResponse(callId, data);
-    if (update) {
-      upsertRecentCallUpdate(update);
-    }
-    const call = data?.call && typeof data.call === 'object' ? data.call : data;
-
-    return res.status(200).json({
-      ok: true,
-      endpoint,
-      source: 'vapi',
-      callId: normalizeString(update?.callId || call?.id || callId),
-      status: normalizeString(update?.status || call?.status || data?.status || ''),
-      endedReason: normalizeString(update?.endedReason || call?.endedReason || data?.endedReason || ''),
-      startedAt: normalizeString(update?.startedAt || ''),
-      endedAt: normalizeString(update?.endedAt || ''),
-      durationSeconds: parseNumberSafe(update?.durationSeconds, null),
-      recordingUrl: normalizeString(update?.recordingUrl || ''),
-    });
+    const { response } = await fetchElevenLabsConversationAudioResponse(callId);
+    const contentType = normalizeString(response.headers.get('content-type') || 'audio/mpeg');
+    const arrayBuffer = await response.arrayBuffer();
+    res.setHeader('Content-Type', contentType || 'audio/mpeg');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).send(Buffer.from(arrayBuffer));
   } catch (error) {
     return res.status(Number(error?.status || 500)).json({
       ok: false,
-      error: error?.message || 'Kon Vapi call status niet ophalen.',
+      error: error?.message || 'Kon ElevenLabs audio niet ophalen.',
       endpoint: error?.endpoint || null,
       details: error?.data || null,
     });
@@ -4908,27 +5481,7 @@ app.post('/api/vapi/webhook', (req, res) => {
       )
     );
 
-    handleSequentialDispatchQueueWebhookProgress(callUpdate);
-
-    // Cruciale backoffice-functie (bevestigingstaak) synchroon doen zodat Vercel serverless
-    // background-cancellation dit niet kan verliezen. OpenAI-enrichment blijft asynchroon.
-    ensureRuleBasedInsightAndAppointment(callUpdate);
-
-    void maybeAnalyzeCallUpdateWithAi(callUpdate).catch((error) => {
-      console.error(
-        '[AI Call Insight Error]',
-        JSON.stringify(
-          {
-            callId: callUpdate.callId,
-            message: error?.message || 'Onbekende fout',
-            status: error?.status || null,
-            data: error?.data || null,
-          },
-          null,
-          2
-        )
-      );
-    });
+    triggerPostCallAutomation(callUpdate);
   }
 
   // Reageer na de snelle lokale verwerking. Dit blijft snel genoeg en voorkomt gemiste taken.
@@ -4946,6 +5499,24 @@ app.get('/api/vapi/call-updates', async (req, res) => {
   }
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 200)));
   const sinceMs = parseNumberSafe(req.query.sinceMs, null);
+
+  if (getColdcallingProvider() === 'elevenlabs' && normalizeString(process.env.ELEVENLABS_API_KEY)) {
+    try {
+      await refreshElevenLabsRecentCallUpdates(limit);
+    } catch (error) {
+      console.warn(
+        '[ElevenLabs Call Updates Refresh Failed]',
+        JSON.stringify(
+          {
+            message: error?.message || 'Onbekende fout',
+            status: error?.status || null,
+          },
+          null,
+          2
+        )
+      );
+    }
+  }
 
   const filtered = recentCallUpdates.filter((item) => {
     if (!Number.isFinite(sinceMs)) return true;
@@ -6596,11 +7167,12 @@ function startServer() {
   seedDemoConfirmationTaskForUiTesting();
   void ensureRuntimeStateHydratedFromSupabase();
   app.listen(PORT, () => {
-    console.log(`Softora Vapi backend draait op http://localhost:${PORT}`);
-    const missingEnv = getMissingEnvVars();
+    const provider = getColdcallingProvider();
+    console.log(`Softora coldcalling backend draait op http://localhost:${PORT} (provider: ${provider})`);
+    const missingEnv = getMissingEnvVars(provider);
     if (missingEnv.length > 0) {
       console.warn(
-        `[Startup] Let op: ontbrekende env vars voor Vapi (${missingEnv.join(', ')}). /api/coldcalling/start zal falen totdat deze zijn ingevuld.`
+        `[Startup] Let op: ontbrekende env vars voor ${provider} (${missingEnv.join(', ')}). /api/coldcalling/start zal falen totdat deze zijn ingevuld.`
       );
     }
     if (isSupabaseConfigured()) {

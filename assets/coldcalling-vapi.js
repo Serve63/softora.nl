@@ -2057,7 +2057,7 @@
       if (!listEl) return;
 
       if (!state.calls.length) {
-        listEl.innerHTML = `<div style="padding:18px; color:${theme.textMuted}; font-size:14px; line-height:1.6;">Nog geen gesprekken beschikbaar. Zodra Vapi calls terugschrijft verschijnen ze hier automatisch.</div>`;
+        listEl.innerHTML = `<div style="padding:18px; color:${theme.textMuted}; font-size:14px; line-height:1.6;">Nog geen gesprekken beschikbaar. Zodra outbound calls terugschrijven verschijnen ze hier automatisch.</div>`;
         renderConversationDetail();
         return;
       }
@@ -2589,7 +2589,7 @@
           setStatusMessage('success', buildCampaignStartedMessage(completedCount, run.campaign, run.failed));
         } else {
           setStatusPill('error', 'Fout');
-          setStatusMessage('error', 'Geen calls gestart. Controleer Vapi-configuratie en logs.');
+          setStatusMessage('error', 'Geen calls gestart. Controleer outbound-configuratie en logs.');
         }
         activeSequentialClientDispatch = null;
       }
@@ -2815,7 +2815,7 @@
       isSubmitting = true;
       setButtonLoading(true);
       setStatusPill('loading', 'Bezig met starten');
-      setStatusMessage('loading', 'Campagne wordt gestart via Vapi...');
+      setStatusMessage('loading', 'Campagne wordt gestart...');
       if (leadSelection.parsed.errors.length > 0) {
         addUiLog(
           'skip',
@@ -2932,7 +2932,7 @@
         const failCause = firstFailure?.cause ? ` Oorzaak: ${firstFailure.cause}.` : '';
         setStatusMessage(
           'error',
-          `Geen calls gestart. Controleer Vapi-configuratie en logs.${failMessage}${failCause}`
+          `Geen calls gestart. Controleer outbound-configuratie en logs.${failMessage}${failCause}`
         );
       }
     } catch (error) {
