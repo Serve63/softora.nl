@@ -28,30 +28,7 @@
   const CAMPAIGN_MIN_PRICE_STORAGE_KEY = 'softora_campaign_min_price';
   const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
   const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
-  const COLDCALLER_PROFILE_STORAGE_KEY = 'softora_coldcaller_profile';
   const REMOTE_UI_STATE_SCOPE = 'coldcalling';
-  const ELEVENLABS_COLDCALLER_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
-  const ELEVENLABS_COLDCALLER_AGENT_NAME = 'Ruben Nijhuis';
-  const COLDCALLER_PROFILES = {
-    default_softora: {
-      id: 'default_softora',
-      label: 'Standaard Softora caller',
-      provider: 'vapi',
-      hint: 'Huidige outbound coldcaller. Deze bestaande Vapi-flow blijft exact zoals hij nu is.',
-      promptPrefix: '',
-      showWidgetButton: false,
-    },
-    ruben_nijhuis: {
-      id: 'ruben_nijhuis',
-      label: 'Ruben Nijhuis',
-      provider: 'elevenlabs',
-      hint:
-        'Extra coldcaller-profiel naast de huidige caller. De bestaande outbound flow blijft actief; Ruben wordt als extra profielcontext meegestuurd en is hier ook als ElevenLabs widget te openen.',
-      promptPrefix:
-        'Gebruik coldcaller-profiel Ruben Nijhuis. Introduceer jezelf als Ruben Nijhuis van Softora. Spreek helder Nederlands, direct maar beleefd, en stuur op een korte intake of vervolggesprek.',
-      showWidgetButton: true,
-    },
-  };
   let remoteUiStateCache = Object.create(null);
   let remoteUiStateLoaded = false;
   let remoteUiStateLoadingPromise = null;
@@ -85,160 +62,6 @@
   function parseNumber(value, fallback) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
-  }
-
-  function normalizeColdcallerProfileId(value) {
-    const normalized = String(value || '').trim().toLowerCase();
-    return COLDCALLER_PROFILES[normalized] ? normalized : 'default_softora';
-  }
-
-  function getColdcallerProfile(profileId) {
-    return COLDCALLER_PROFILES[normalizeColdcallerProfileId(profileId)];
-  }
-
-  function getSavedColdcallerProfileId() {
-    return normalizeColdcallerProfileId(readStorage(COLDCALLER_PROFILE_STORAGE_KEY));
-  }
-
-  function buildCampaignExtraInstructions(baseInstructions, profileId) {
-    const profile = getColdcallerProfile(profileId);
-    const instructions = String(baseInstructions || '').trim();
-    const parts = [];
-
-    if (profile && profile.promptPrefix) {
-      parts.push(profile.promptPrefix);
-    }
-    if (instructions) {
-      parts.push(instructions);
-    }
-
-    return parts.join('\n\n').trim();
-  }
-
-  function ensureElevenLabsColdcallerWidget() {
-    if (!document.getElementById('softora-elevenlabs-coldcaller-style')) {
-      const style = document.createElement('style');
-      style.id = 'softora-elevenlabs-coldcaller-style';
-      style.textContent = [
-        'elevenlabs-convai[data-softora-coldcaller-widget="true"] {',
-        '  position: fixed;',
-        '  right: 24px;',
-        '  bottom: 24px;',
-        '  z-index: 10040;',
-        '}',
-        'body:has(elevenlabs-convai[data-softora-coldcaller-widget="true"]:hover) {',
-        '  cursor: auto !important;',
-        '}',
-        'body:has(elevenlabs-convai[data-softora-coldcaller-widget="true"]:hover) .cursor,',
-        'body:has(elevenlabs-convai[data-softora-coldcaller-widget="true"]:hover) .cursor-dot {',
-        '  opacity: 0;',
-        '}',
-      ].join('\n');
-      document.head.appendChild(style);
-    }
-
-    if (!document.querySelector('script[data-softora-elevenlabs-coldcaller="true"]')) {
-      const script = document.createElement('script');
-      script.src = 'https://elevenlabs.io/convai-widget/index.js';
-      script.async = true;
-      script.setAttribute('data-softora-elevenlabs-coldcaller', 'true');
-      document.head.appendChild(script);
-    }
-
-    let widget = document.querySelector('elevenlabs-convai[data-softora-coldcaller-widget="true"]');
-    if (!widget) {
-      widget = document.createElement('elevenlabs-convai');
-      widget.setAttribute('agent-id', ELEVENLABS_COLDCALLER_AGENT_ID);
-      widget.setAttribute('data-softora-coldcaller-widget', 'true');
-      widget.setAttribute('aria-label', `Praat met ${ELEVENLABS_COLDCALLER_AGENT_NAME}`);
-      document.body.appendChild(widget);
-    }
-
-    return widget;
-  }
-
-  function updateColdcallerPanelUi() {
-    const select = byId('coldcallerProfile');
-    const hint = byId('coldcallerProfileHint');
-    const widgetWrap = byId('coldcallerWidgetActionWrap');
-    const widgetBtn = byId('openColdcallerWidgetBtn');
-    if (!select) return;
-
-    const profile = getColdcallerProfile(select.value);
-    if (hint) {
-      hint.textContent = profile.hint;
-      hint.style.display = profile.hint ? 'block' : 'none';
-    }
-
-    if (widgetWrap) {
-      widgetWrap.style.display = profile.showWidgetButton ? 'block' : 'none';
-    }
-
-    if (widgetBtn) {
-      widgetBtn.textContent = `Open ${profile.label}`;
-    }
-
-    if (profile.provider === 'elevenlabs') {
-      ensureElevenLabsColdcallerWidget();
-    }
-  }
-
-  function ensureColdcallerPanel() {
-    let select = byId('coldcallerProfile');
-    if (select) {
-      updateColdcallerPanelUi();
-      return select;
-    }
-
-    const dispatchControl = byId('callDispatchControlWrap');
-    const leadControl = byId('leadListControlWrap');
-    const target = dispatchControl || leadControl;
-    if (!target) return null;
-
-    const wrap = document.createElement('div');
-    wrap.className = 'form-group';
-    wrap.id = 'coldcallerControlWrap';
-    wrap.style.marginTop = '12px';
-    wrap.innerHTML = [
-      '<label class="form-label" for="coldcallerProfile">Coldcaller</label>',
-      '<select class="form-select magnetic" id="coldcallerProfile">',
-      `  <option value="default_softora">${escapeHtml(COLDCALLER_PROFILES.default_softora.label)}</option>`,
-      `  <option value="ruben_nijhuis">${escapeHtml(COLDCALLER_PROFILES.ruben_nijhuis.label)} (extra)</option>`,
-      '</select>',
-      '<div id="coldcallerProfileHint" style="margin-top:8px; font-size:12px; line-height:1.45; opacity:0.85;"></div>',
-      '<div id="coldcallerWidgetActionWrap" style="margin-top:10px; display:none;">',
-      '  <button type="button" class="form-input magnetic" id="openColdcallerWidgetBtn" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">',
-      `    <span>Open ${escapeHtml(ELEVENLABS_COLDCALLER_AGENT_NAME)}</span>`,
-      '  </button>',
-      '  <div style="margin-top:8px; font-size:12px; line-height:1.45; opacity:0.72;">Widget opent rechtsonder op deze pagina.</div>',
-      '</div>',
-    ].join('');
-
-    target.insertAdjacentElement('afterend', wrap);
-
-    select = byId('coldcallerProfile');
-    if (select) {
-      select.value = getSavedColdcallerProfileId();
-      select.addEventListener('change', () => {
-        writeStorage(COLDCALLER_PROFILE_STORAGE_KEY, select.value);
-        updateColdcallerPanelUi();
-      });
-    }
-
-    byId('openColdcallerWidgetBtn')?.addEventListener('click', () => {
-      ensureElevenLabsColdcallerWidget();
-      setStatusMessage(
-        'loading',
-        `${ELEVENLABS_COLDCALLER_AGENT_NAME} staat klaar als ElevenLabs widget rechtsonder.`
-      );
-    });
-
-    if (typeof window.initCustomFormSelects === 'function') {
-      window.initCustomFormSelects();
-    }
-
-    updateColdcallerPanelUi();
-    return select;
   }
 
   function usesStandaloneCustomSliderValue() {
@@ -1442,7 +1265,6 @@
     leadSlider.addEventListener('input', updateLeadListHint);
     leadSlider.addEventListener('change', updateLeadListHint);
     updateLeadListHint();
-    ensureColdcallerPanel();
     ensureAiNotebookPanel();
     return button;
   }
@@ -2931,12 +2753,7 @@
     const amount = getLeadSliderAmount();
     const minProjectValue = parseNumber(byId('minPrice')?.value, 0);
     const maxDiscountPct = parseNumber(byId('maxDiscount')?.value, 0);
-    const profileId = normalizeColdcallerProfileId(byId('coldcallerProfile')?.value || getSavedColdcallerProfileId());
-    const profile = getColdcallerProfile(profileId);
-    const extraInstructions = buildCampaignExtraInstructions(
-      String(byId('instructions')?.value || '').trim(),
-      profileId
-    );
+    const extraInstructions = String(byId('instructions')?.value || '').trim();
     const dispatchMode = String(byId('callDispatchMode')?.value || 'sequential');
     const dispatchDelaySeconds = Math.max(0, parseNumber(byId('callDispatchDelaySeconds')?.value, 5));
 
@@ -2947,9 +2764,6 @@
       minProjectValue,
       maxDiscountPct,
       extraInstructions,
-      coldcallerProfileId: profile.id,
-      coldcallerProfileLabel: profile.label,
-      coldcallerProfileProvider: profile.provider,
       dispatchMode,
       dispatchDelaySeconds,
     };
@@ -3026,7 +2840,7 @@
             : campaign.dispatchMode === 'delay'
               ? `${campaign.dispatchDelaySeconds}s tussen calls`
               : '1 voor 1'
-        )}) via ${escapeHtml(campaign.coldcallerProfileLabel || 'Standaard Softora caller')}.`
+        )}).`
       );
 
       if (campaign.dispatchMode === 'sequential' && leads.length > 1) {
