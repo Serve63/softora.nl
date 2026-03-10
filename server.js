@@ -681,14 +681,14 @@ function getColdcallingHistoryVisibleAfterMs() {
 }
 
 function getCallUpdateRelevantMs(update) {
-  const updatedAtMs = Number(update?.updatedAtMs);
-  if (Number.isFinite(updatedAtMs) && updatedAtMs > 0) return Math.round(updatedAtMs);
-
-  const candidates = [update?.updatedAt, update?.endedAt, update?.startedAt];
+  const candidates = [update?.endedAt, update?.startedAt, update?.updatedAt];
   for (const candidate of candidates) {
     const parsed = Date.parse(normalizeString(candidate || ''));
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
+
+  const updatedAtMs = Number(update?.updatedAtMs);
+  if (Number.isFinite(updatedAtMs) && updatedAtMs > 0) return Math.round(updatedAtMs);
 
   return 0;
 }
