@@ -1475,6 +1475,94 @@ function normalizeNlPhoneToE164(input) {
   throw new Error(`Kan nummer niet omzetten naar NL E.164 formaat: ${raw}`);
 }
 
+function normalizePhoneComparisonKey(input) {
+  const raw = normalizeString(input);
+  if (!raw) return '';
+
+  try {
+    return normalizeNlPhoneToE164(raw).replace(/\D/g, '');
+  } catch {
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('0031') && digits.length === 13) {
+      return `31${digits.slice(4)}`;
+    }
+    if (digits.startsWith('31') && digits.length === 11) {
+      return digits;
+    }
+    if (digits.startsWith('0') && digits.length === 10) {
+      return `31${digits.slice(1)}`;
+    }
+    if (digits.length === 9 && digits.startsWith('6')) {
+      return `31${digits}`;
+    }
+    return digits;
+  }
+}
+
+function getConfiguredBlockedColdcallingTargetKeys() {
+  const rawValues = [
+    process.env.COLDCALLING_BLOCKED_TARGET_NUMBERS,
+    process.env.ELEVENLABS_OUTBOUND_CALLER_NUMBER,
+    process.env.TWILIO_OUTBOUND_CALLER_NUMBER,
+    process.env.COMPANY_PHONE_NUMBER,
+    process.env.SOFTORA_PHONE_NUMBER,
+  ];
+
+  const keys = new Set();
+  rawValues
+    .flatMap((value) => String(value || '').split(/[\n,;]+/))
+    .map((value) => normalizePhoneComparisonKey(value))
+    .filter(Boolean)
+    .forEach((value) => keys.add(value));
+
+  return keys;
+}
+
+function buildBlockedColdcallingLeadResult(lead, index) {
+  return {
+    index,
+    success: false,
+    lead: {
+      name: normalizeString(lead?.name),
+      company: normalizeString(lead?.company),
+      phone: normalizeString(lead?.phone),
+      region: normalizeString(lead?.region),
+    },
+    error: 'Doelnummer is geblokkeerd.',
+    cause: 'blocked target number',
+    causeExplanation:
+      'Dit nummer is geblokkeerd als doelnummer zodat je eigen lijn alleen uitbelt en nooit zelf door een campagne wordt gebeld.',
+    details: {
+      blockedPhone: normalizeString(lead?.phone),
+    },
+  };
+}
+
+function filterBlockedColdcallingLeads(leads) {
+  const blockedKeys = getConfiguredBlockedColdcallingTargetKeys();
+  if (blockedKeys.size === 0) {
+    return {
+      allowedLeads: Array.isArray(leads) ? leads.slice() : [],
+      blockedResults: [],
+    };
+  }
+
+  const allowedLeads = [];
+  const blockedResults = [];
+
+  (Array.isArray(leads) ? leads : []).forEach((lead, index) => {
+    const phoneKey = normalizePhoneComparisonKey(lead?.phone);
+    if (phoneKey && blockedKeys.has(phoneKey)) {
+      blockedResults.push(buildBlockedColdcallingLeadResult(lead, index));
+      return;
+    }
+    allowedLeads.push(lead);
+  });
+
+  return { allowedLeads, blockedResults };
+}
+
 function getRequiredVapiEnv() {
   return ['VAPI_API_KEY', 'VAPI_ASSISTANT_ID', 'VAPI_PHONE_NUMBER_ID'];
 }
@@ -5442,11 +5530,31 @@ app.post('/api/coldcalling/start', async (req, res) => {
     return res.status(400).json({ ok: false, error: validated.error });
   }
 
-  const { campaign, leads } = validated;
+  const campaign = validated.campaign;
+  const originalLeads = Array.isArray(validated.leads) ? validated.leads : [];
+  const { allowedLeads, blockedResults } = filterBlockedColdcallingLeads(originalLeads);
+
+  if (blockedResults.length > 0) {
+    console.warn(
+      `[Coldcalling] ${blockedResults.length} lead(s) geblokkeerd omdat het doelnummer op de blocklist staat.`
+    );
+  }
+
+  if (allowedLeads.length === 0) {
+    return res.status(400).json({
+      ok: false,
+      error:
+        'Alle geselecteerde leads zijn geblokkeerd als doelnummer. Je eigen lijn wordt daarom niet gebeld.',
+      provider,
+      results: blockedResults,
+    });
+  }
+
+  const leads = allowedLeads;
   const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
 
   console.log(
-    `[Coldcalling] Start campagne ontvangen via ${provider}: ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
+    `[Coldcalling] Start campagne ontvangen via ${provider}: ${leadsToProcess.length}/${originalLeads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
   );
 
   let results = [];
@@ -5460,9 +5568,10 @@ app.post('/api/coldcalling/start', async (req, res) => {
     await advanceSequentialDispatchQueue(queue.id, 'start-request');
     results = queue.results.slice();
 
-    const startedNow = results.filter((item) => item.success).length;
-    const failedNow = results.length - startedNow;
     const queuedRemaining = Math.max(0, queue.leads.length - queue.results.length);
+    const allResults = blockedResults.concat(results);
+    const totalStartedNow = allResults.filter((item) => item.success).length;
+    const totalFailedNow = allResults.length - totalStartedNow;
 
     console.log(
       `[Coldcalling][Sequential Queue] ${queue.id} gestart: direct ${results.length}/${queue.leads.length} verwerkt, ${queuedRemaining} wachtend`
@@ -5471,18 +5580,19 @@ app.post('/api/coldcalling/start', async (req, res) => {
     return res.status(200).json({
       ok: true,
       summary: {
-        requested: leads.length,
+        requested: originalLeads.length,
         attempted: leadsToProcess.length,
-        started: startedNow,
-        failed: failedNow,
+        started: totalStartedNow,
+        failed: totalFailedNow,
         provider,
         dispatchMode: campaign.dispatchMode,
         dispatchDelaySeconds: 0,
         sequentialWaitForCallEnd: true,
         queueId: queue.id,
         queuedRemaining,
+        blocked: blockedResults.length,
       },
-      results,
+      results: allResults,
     });
   } else {
     results = [];
@@ -5504,21 +5614,23 @@ app.post('/api/coldcalling/start', async (req, res) => {
     }
   }
 
-  const started = results.filter((item) => item.success).length;
-  const failed = results.length - started;
+  const allResults = blockedResults.concat(results);
+  const started = allResults.filter((item) => item.success).length;
+  const failed = allResults.length - started;
 
   return res.status(200).json({
     ok: true,
     summary: {
-      requested: leads.length,
+      requested: originalLeads.length,
       attempted: leadsToProcess.length,
       started,
       failed,
+      blocked: blockedResults.length,
       provider,
       dispatchMode: campaign.dispatchMode,
       dispatchDelaySeconds: campaign.dispatchMode === 'delay' ? campaign.dispatchDelaySeconds : 0,
     },
-    results,
+    results: allResults,
   });
 });
 
