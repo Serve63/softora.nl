@@ -1772,6 +1772,53 @@
     });
   }
 
+  function getConversationDisplayDate(record) {
+    const candidates = [
+      String(record?.updatedAt || '').trim(),
+      String(record?.endedAt || '').trim(),
+      String(record?.startedAt || '').trim(),
+    ];
+
+    for (const value of candidates) {
+      if (!value) continue;
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) return date;
+    }
+
+    const updatedAtMs = Number(record?.updatedAtMs);
+    if (Number.isFinite(updatedAtMs) && updatedAtMs > 0) {
+      const date = new Date(updatedAtMs);
+      if (!Number.isNaN(date.getTime())) return date;
+    }
+
+    return null;
+  }
+
+  function getConversationDateGroupKey(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'unknown';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function formatConversationDateGroupLabel(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'Onbekend';
+
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.round((todayStart.getTime() - dateStart.getTime()) / 86400000);
+
+    if (diffDays === 0) return 'Vandaag';
+    if (diffDays === 1) return 'Gisteren';
+
+    const sameYear = date.getFullYear() === today.getFullYear();
+    return date.toLocaleDateString('nl-NL', sameYear
+      ? { day: 'numeric', month: 'long' }
+      : { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
   function getConversationConclusion(record) {
     const source = String(record?.summary || record?.transcriptSnippet || '').replace(/\s+/g, ' ').trim();
     if (!source) return 'Nog geen conclusie beschikbaar.';
@@ -2062,8 +2109,23 @@
         return;
       }
 
-      listEl.innerHTML = state.calls
-        .map((record) => {
+      const rows = [];
+      let previousGroupKey = '';
+
+      state.calls.forEach((record, index) => {
+        const displayDate = getConversationDisplayDate(record);
+        const groupKey = getConversationDateGroupKey(displayDate);
+        if (groupKey !== previousGroupKey) {
+          rows.push([
+            `<div style="padding:${index === 0 ? '14px 16px 10px' : '18px 16px 10px'}; border-bottom:1px solid ${theme.border}; background:${theme.chromeAltBg};">`,
+            `  <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted};">${escapeHtml(formatConversationDateGroupLabel(displayDate))}</div>`,
+            '</div>',
+          ].join(''));
+          previousGroupKey = groupKey;
+        }
+
+        rows.push(
+          (() => {
           const isActive = record.callId === state.selectedCallId;
           const label = escapeHtml(getConversationListLabel(record));
           const answered = escapeHtml(formatConversationAnsweredLabel(record));
@@ -2082,8 +2144,11 @@
             '  </div>',
             '</button>',
           ].join('');
-        })
-        .join('');
+          })()
+        );
+      });
+
+      listEl.innerHTML = rows.join('');
 
       listEl.querySelectorAll('[data-conversation-id]').forEach((button) => {
         button.addEventListener('click', () => {
