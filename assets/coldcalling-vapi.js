@@ -19,6 +19,7 @@
   const TEST_LEAD_STORAGE_KEY = 'softora_vapi_test_lead_phone';
   const LEAD_ROWS_STORAGE_KEY = 'softora_vapi_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
+  const CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS = 1773150071879;
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY = 'softora_campaign_amount_slider_index';
@@ -1691,6 +1692,29 @@
     return Number.isFinite(updatedAt) ? updatedAt : 0;
   }
 
+  function getConversationRecordTimelineMs(record) {
+    const candidates = [
+      String(record?.endedAt || '').trim(),
+      String(record?.startedAt || '').trim(),
+      String(record?.updatedAt || '').trim(),
+    ];
+
+    for (const value of candidates) {
+      if (!value) continue;
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+
+    return getConversationRecordUpdatedMs(record);
+  }
+
+  function isConversationRecordVisible(record) {
+    if (!Number.isFinite(CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS) || CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS <= 0) {
+      return true;
+    }
+    return getConversationRecordTimelineMs(record) >= CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS;
+  }
+
   function buildConversationRecordsFromUpdates(updates) {
     const byId = new Map();
 
@@ -1727,7 +1751,9 @@
       });
     });
 
-    return Array.from(byId.values()).sort((a, b) => getConversationRecordUpdatedMs(b) - getConversationRecordUpdatedMs(a));
+    return Array.from(byId.values())
+      .filter((record) => isConversationRecordVisible(record))
+      .sort((a, b) => getConversationRecordUpdatedMs(b) - getConversationRecordUpdatedMs(a));
   }
 
   function inferConversationAnswered(record) {
