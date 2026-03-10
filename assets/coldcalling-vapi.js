@@ -2126,24 +2126,24 @@
 
         rows.push(
           (() => {
-          const isActive = record.callId === state.selectedCallId;
-          const label = escapeHtml(getConversationListLabel(record));
-          const answered = escapeHtml(formatConversationAnsweredLabel(record));
-          const answeredColor =
-            inferConversationAnswered(record) === true
-              ? theme.positive
-              : inferConversationAnswered(record) === false
-                ? theme.warning
-                : theme.textMuted;
-          return [
-            `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:11px 16px; border:none; border-bottom:1px solid ${theme.border}; border-left:3px solid ${isActive ? theme.accent : 'transparent'}; background:${isActive ? theme.accentSoftBgActive : 'transparent'}; color:${theme.text}; cursor:pointer; transition:background 0.2s ease, border-color 0.2s ease;">`,
-            '  <div style="display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px;">',
-            `    <div style="min-width:0; font-family:Oswald,sans-serif; font-size:15px; line-height:1; text-transform:uppercase; letter-spacing:0.04em; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</div>`,
-            `    <div style="font-size:12px; color:${theme.textMuted}; white-space:nowrap;">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div>`,
-            `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:${answeredColor}; white-space:nowrap;">${answered}</div>`,
-            '  </div>',
-            '</button>',
-          ].join('');
+            const isActive = record.callId === state.selectedCallId;
+            const label = escapeHtml(getConversationListLabel(record));
+            const answered = escapeHtml(formatConversationAnsweredLabel(record));
+            const answeredColor =
+              inferConversationAnswered(record) === true
+                ? theme.positive
+                : inferConversationAnswered(record) === false
+                  ? theme.warning
+                  : theme.textMuted;
+            return [
+              `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:11px 16px; border:none; border-bottom:1px solid ${theme.border}; border-left:3px solid ${isActive ? theme.accent : 'transparent'}; background:${isActive ? theme.accentSoftBgActive : 'transparent'}; color:${theme.text}; cursor:pointer; transition:background 0.2s ease, border-color 0.2s ease;">`,
+              '  <div style="display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px;">',
+              `    <div style="min-width:0; font-family:Oswald,sans-serif; font-size:15px; line-height:1; text-transform:uppercase; letter-spacing:0.04em; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</div>`,
+              `    <div style="font-size:12px; color:${theme.textMuted}; white-space:nowrap;">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div>`,
+              `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:${answeredColor}; white-space:nowrap;">${answered}</div>`,
+              '  </div>',
+              '</button>',
+            ].join('');
           })()
         );
       });
