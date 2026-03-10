@@ -730,6 +730,48 @@ function clearColdcallingHistoryRuntime(options = {}) {
   };
 }
 
+function parseHttpByteRange(rangeHeader, totalLength) {
+  const total = Number(totalLength);
+  if (!Number.isFinite(total) || total <= 0) return null;
+
+  const raw = normalizeString(rangeHeader || '');
+  const match = raw.match(/^bytes=(\d*)-(\d*)$/i);
+  if (!match) return null;
+
+  const startRaw = match[1];
+  const endRaw = match[2];
+
+  let start = startRaw === '' ? null : Number(startRaw);
+  let end = endRaw === '' ? null : Number(endRaw);
+
+  if (startRaw === '' && endRaw === '') return null;
+
+  if (startRaw === '') {
+    const suffixLength = Number(end);
+    if (!Number.isFinite(suffixLength) || suffixLength <= 0) return null;
+    start = Math.max(0, total - suffixLength);
+    end = total - 1;
+  } else {
+    if (!Number.isFinite(start) || start < 0) return null;
+    if (endRaw === '') {
+      end = total - 1;
+    } else if (!Number.isFinite(end) || end < start) {
+      return null;
+    }
+  }
+
+  if (start >= total) return { unsatisfiable: true, total };
+
+  end = Math.min(Number(end), total - 1);
+  return {
+    start,
+    end,
+    length: end - start + 1,
+    total,
+    unsatisfiable: false,
+  };
+}
+
 function createDashboardActivityEntry(input) {
   const nowIso = new Date().toISOString();
   const entryId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -5511,10 +5553,28 @@ app.get('/api/coldcalling/recording', async (req, res) => {
   try {
     const { response } = await fetchElevenLabsConversationAudioResponse(callId);
     const contentType = normalizeString(response.headers.get('content-type') || 'audio/mpeg');
-    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    const range = parseHttpByteRange(req.headers.range, audioBuffer.length);
+
     res.setHeader('Content-Type', contentType || 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).send(Buffer.from(arrayBuffer));
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Disposition', 'inline');
+
+    if (range && range.unsatisfiable) {
+      res.setHeader('Content-Range', `bytes */${range.total}`);
+      return res.status(416).end();
+    }
+
+    if (range) {
+      res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${range.total}`);
+      res.setHeader('Content-Length', String(range.length));
+      return res.status(206).send(audioBuffer.subarray(range.start, range.end + 1));
+    }
+
+    res.setHeader('Content-Length', String(audioBuffer.length));
+    res.setHeader('Content-Type', contentType || 'audio/mpeg');
+    return res.status(200).send(audioBuffer);
   } catch (error) {
     return res.status(Number(error?.status || 500)).json({
       ok: false,
