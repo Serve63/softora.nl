@@ -524,7 +524,7 @@ function applyRuntimeStateSnapshotPayload(payload) {
 async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
   const force = Boolean(options && options.force);
   if (!isSupabaseConfigured()) return false;
-  if (supabaseStateHydrated) return true;
+  if (supabaseStateHydrated && !force) return true;
   if (supabaseStateHydrationPromise) return supabaseStateHydrationPromise;
   if (!force && Date.now() < supabaseHydrateRetryNotBeforeMs) return false;
 
@@ -5641,8 +5641,8 @@ app.post('/api/vapi/webhook', (req, res) => {
 });
 
 app.get('/api/vapi/call-updates', async (req, res) => {
-  if (isSupabaseConfigured() && !supabaseStateHydrated) {
-    await forceHydrateRuntimeStateWithRetries(3);
+  if (isSupabaseConfigured()) {
+    await ensureRuntimeStateHydratedFromSupabase({ force: true });
   }
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 200)));
   const sinceMs = parseNumberSafe(req.query.sinceMs, null);
