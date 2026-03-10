@@ -19,7 +19,7 @@
   const TEST_LEAD_STORAGE_KEY = 'softora_vapi_test_lead_phone';
   const LEAD_ROWS_STORAGE_KEY = 'softora_vapi_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
-  const CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS = 1773150071879;
+  const CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS = 1773151035909;
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY = 'softora_campaign_amount_slider_index';
