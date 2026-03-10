@@ -5525,7 +5525,7 @@ app.get('/api/coldcalling/recording', async (req, res) => {
   }
 });
 
-app.post('/api/coldcalling/history/reset', async (req, res) => {
+async function sendColdcallingHistoryResetResponse(req, res) {
   if (!isAdminMutationAuthorized(req)) {
     return res.status(401).json({ ok: false, error: 'Niet geautoriseerd.' });
   }
@@ -5551,6 +5551,14 @@ app.post('/api/coldcalling/history/reset', async (req, res) => {
     before,
     after: reset,
   });
+}
+
+app.post('/api/coldcalling/history/reset', async (req, res) => {
+  return sendColdcallingHistoryResetResponse(req, res);
+});
+
+app.post('/api/coldcalling-history-reset', async (req, res) => {
+  return sendColdcallingHistoryResetResponse(req, res);
 });
 
 app.post('/api/vapi/webhook', (req, res) => {
