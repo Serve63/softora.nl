@@ -116,6 +116,7 @@ let elevenLabsConversationListCache = {
   agentId: '',
   conversations: [],
 };
+let coldcallingHistoryVisibleAfterMs = 0;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
 const inMemoryUiStateByScope = new Map();
@@ -439,8 +440,9 @@ function buildRuntimeStateSnapshotPayload() {
   }));
 
   return {
-    version: 2,
+    version: 3,
     savedAt: new Date().toISOString(),
+    coldcallingHistoryVisibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
     recentWebhookEvents: compactWebhookEvents,
     recentCallUpdates: recentCallUpdates.slice(0, 500),
     recentAiCallInsights: recentAiCallInsights.slice(0, 500),
@@ -453,9 +455,25 @@ function buildRuntimeStateSnapshotPayload() {
 function applyRuntimeStateSnapshotPayload(payload) {
   if (!payload || typeof payload !== 'object') return false;
 
+  coldcallingHistoryVisibleAfterMs = Math.max(
+    0,
+    Number(payload.coldcallingHistoryVisibleAfterMs || 0) || 0
+  );
+
   const nextWebhookEvents = Array.isArray(payload.recentWebhookEvents) ? payload.recentWebhookEvents.slice(0, 200) : [];
-  const nextCallUpdates = Array.isArray(payload.recentCallUpdates) ? payload.recentCallUpdates.slice(0, 500) : [];
-  const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights) ? payload.recentAiCallInsights.slice(0, 500) : [];
+  const nextCallUpdates = Array.isArray(payload.recentCallUpdates)
+    ? payload.recentCallUpdates.slice(0, 500).filter((item) => isCallUpdateVisibleForHistory(item))
+    : [];
+  const visibleCallIds = new Set(
+    nextCallUpdates
+      .map((item) => normalizeString(item?.callId || ''))
+      .filter(Boolean)
+  );
+  const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights)
+    ? payload.recentAiCallInsights
+        .slice(0, 500)
+        .filter((item) => visibleCallIds.has(normalizeString(item?.callId || '')))
+    : [];
   const nextDashboardActivities = Array.isArray(payload.recentDashboardActivities)
     ? payload.recentDashboardActivities.slice(0, 500)
     : [];
@@ -655,6 +673,61 @@ function queueRuntimeStatePersist(reason = 'unknown') {
       console.error('[Supabase][PersistQueueError]', error?.message || error);
       return false;
     });
+}
+
+function getColdcallingHistoryVisibleAfterMs() {
+  const value = Number(coldcallingHistoryVisibleAfterMs || 0);
+  return Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+}
+
+function getCallUpdateRelevantMs(update) {
+  const updatedAtMs = Number(update?.updatedAtMs);
+  if (Number.isFinite(updatedAtMs) && updatedAtMs > 0) return Math.round(updatedAtMs);
+
+  const candidates = [update?.updatedAt, update?.endedAt, update?.startedAt];
+  for (const candidate of candidates) {
+    const parsed = Date.parse(normalizeString(candidate || ''));
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  return 0;
+}
+
+function isCallUpdateVisibleForHistory(update) {
+  const cutoffMs = getColdcallingHistoryVisibleAfterMs();
+  if (!cutoffMs) return true;
+  const updateMs = getCallUpdateRelevantMs(update);
+  return Number.isFinite(updateMs) && updateMs >= cutoffMs;
+}
+
+function clearColdcallingHistoryRuntime(options = {}) {
+  const nowMs = Date.now();
+  const requestedCutoffMs = Number(options.visibleAfterMs || nowMs) || nowMs;
+  coldcallingHistoryVisibleAfterMs = Math.max(nowMs, requestedCutoffMs);
+
+  recentWebhookEvents.splice(0, recentWebhookEvents.length);
+  recentCallUpdates.splice(0, recentCallUpdates.length);
+  callUpdatesById.clear();
+  recentAiCallInsights.splice(0, recentAiCallInsights.length);
+  aiCallInsightsByCallId.clear();
+  aiAnalysisFingerprintByCallId.clear();
+  aiAnalysisInFlightCallIds.clear();
+  elevenLabsConversationListCache = {
+    fetchedAtMs: 0,
+    agentId: '',
+    conversations: [],
+  };
+
+  return {
+    visibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
+    visibleAfter: new Date(getColdcallingHistoryVisibleAfterMs()).toISOString(),
+    counts: {
+      webhookEvents: recentWebhookEvents.length,
+      callUpdates: recentCallUpdates.length,
+      aiCallInsights: recentAiCallInsights.length,
+      appointments: generatedAgendaAppointments.length,
+    },
+  };
 }
 
 function createDashboardActivityEntry(input) {
@@ -1276,6 +1349,15 @@ function upsertRecentCallUpdate(update) {
         updatedAtMs: update.updatedAtMs,
       }
     : update;
+
+  if (!isCallUpdateVisibleForHistory(merged)) {
+    const existingIndex = recentCallUpdates.findIndex((item) => item.callId === merged.callId);
+    if (existingIndex >= 0) {
+      recentCallUpdates.splice(existingIndex, 1);
+    }
+    callUpdatesById.delete(merged.callId);
+    return null;
+  }
 
   callUpdatesById.set(merged.callId, merged);
 
@@ -5156,6 +5238,35 @@ function isWebhookAuthorized(req) {
   return false;
 }
 
+function isAdminMutationAuthorized(req) {
+  const sharedSecrets = [
+    normalizeString(process.env.WEBHOOK_SECRET || ''),
+    normalizeString(process.env.ELEVENLABS_API_KEY || ''),
+    normalizeString(process.env.VAPI_API_KEY || ''),
+  ].filter(Boolean);
+
+  if (!sharedSecrets.length) return false;
+
+  const headerCandidates = [
+    req.get('x-admin-secret'),
+    req.get('authorization'),
+  ].filter(Boolean);
+
+  for (const candidate of headerCandidates) {
+    const normalizedCandidate = normalizeString(candidate);
+    if (!normalizedCandidate) continue;
+    if (sharedSecrets.includes(normalizedCandidate)) return true;
+    if (
+      normalizedCandidate.toLowerCase().startsWith('bearer ') &&
+      sharedSecrets.includes(normalizedCandidate.slice(7).trim())
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 async function fetchElevenLabsCallStatusPayload(callId) {
   const cached = callUpdatesById.get(callId) || null;
   const { endpoint, data } = await fetchElevenLabsConversationById(callId);
@@ -5414,6 +5525,34 @@ app.get('/api/coldcalling/recording', async (req, res) => {
   }
 });
 
+app.post('/api/coldcalling/history/reset', async (req, res) => {
+  if (!isAdminMutationAuthorized(req)) {
+    return res.status(401).json({ ok: false, error: 'Niet geautoriseerd.' });
+  }
+
+  if (isSupabaseConfigured() && !supabaseStateHydrated) {
+    await forceHydrateRuntimeStateWithRetries(3);
+  }
+
+  const before = {
+    webhookEvents: recentWebhookEvents.length,
+    callUpdates: recentCallUpdates.length,
+    aiCallInsights: recentAiCallInsights.length,
+    appointments: generatedAgendaAppointments.length,
+    visibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
+  };
+
+  const reset = clearColdcallingHistoryRuntime({ visibleAfterMs: Date.now() });
+  const persisted = await persistRuntimeStateToSupabase('coldcalling_history_reset');
+
+  return res.status(200).json({
+    ok: true,
+    persisted,
+    before,
+    after: reset,
+  });
+});
+
 app.post('/api/vapi/webhook', (req, res) => {
   if (!isWebhookAuthorized(req)) {
     return res.status(401).json({ ok: false, error: 'Webhook secret ongeldig.' });
@@ -5519,6 +5658,7 @@ app.get('/api/vapi/call-updates', async (req, res) => {
   }
 
   const filtered = recentCallUpdates.filter((item) => {
+    if (!isCallUpdateVisibleForHistory(item)) return false;
     if (!Number.isFinite(sinceMs)) return true;
     return Number(item.updatedAtMs || 0) > Number(sinceMs);
   });
@@ -6835,6 +6975,11 @@ function sendRuntimeHealthDebug(_req, res) {
       callUpdates: recentCallUpdates.length,
       aiCallInsights: recentAiCallInsights.length,
       appointments: generatedAgendaAppointments.length,
+      callHistoryVisibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
+      callHistoryVisibleAfter:
+        getColdcallingHistoryVisibleAfterMs() > 0
+          ? new Date(getColdcallingHistoryVisibleAfterMs()).toISOString()
+          : null,
       realCallUpdates: recentCallUpdates.filter((item) => {
         const callId = normalizeString(item?.callId || '');
         return callId && !callId.startsWith('demo-');
