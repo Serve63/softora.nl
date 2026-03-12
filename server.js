@@ -4936,6 +4936,56 @@ function normalizeVapiCompatibleElevenLabsLlm(value) {
   return raw;
 }
 
+function isSupportedVapiModelOverride(provider, model) {
+  const normalizedProvider = normalizeString(provider).toLowerCase();
+  const normalizedModel = normalizeString(model).toLowerCase();
+  if (!normalizedProvider || !normalizedModel) return false;
+
+  if (normalizedProvider === 'openai') {
+    return /^(gpt-5(?:\.2(?:-chat-latest)?|\.1(?:-chat-latest)?|-chat-latest|-mini|-nano)?|gpt-4\.1(?:-mini|-nano)?(?:-2025-04-14)?(?:[:][a-z0-9]+)?|chatgpt-4o-latest|o3(?:-mini)?|o4-mini|o1-mini(?:-2024-09-12)?|gpt-4o-realtime-preview-2024-(10-01|12-17)|gpt-4o-mini-realtime-preview-2024-12-17|gpt-realtime-(?:2025-08-28|mini-2025-12-15)|gpt-4o-mini(?:-2024-07-18)?(?:[:][a-z0-9]+)?|gpt-4o(?:-2024-(05-13|08-06|11-20))?(?:[:][a-z0-9]+)?|gpt-4-turbo(?:-2024-04-09)?(?:[:][a-z0-9]+)?|gpt-4-turbo-preview|gpt-4-0125-preview(?:[:][a-z0-9]+)?|gpt-4-1106-preview(?:[:][a-z0-9]+)?|gpt-4(?:-0613(?:[:][a-z0-9]+)?)?|gpt-3\.5-turbo(?:-(?:0125|1106|16k|0613))?(?:[:][a-z0-9]+)?)$/.test(
+      normalizedModel
+    );
+  }
+
+  if (normalizedProvider === 'anthropic') {
+    return new Set([
+      'claude-3-opus-20240229',
+      'claude-3-sonnet-20240229',
+      'claude-3-haiku-20240307',
+      'claude-3-5-sonnet-20240620',
+      'claude-3-5-sonnet-20241022',
+      'claude-3-5-haiku-20241022',
+      'claude-3-7-sonnet-20250219',
+      'claude-opus-4-20250514',
+      'claude-opus-4-5-20251101',
+      'claude-sonnet-4-20250514',
+      'claude-sonnet-4-5-20250929',
+      'claude-haiku-4-5-20251001',
+    ]).has(normalizedModel);
+  }
+
+  if (normalizedProvider === 'google') {
+    return new Set([
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash-thinking-exp',
+      'gemini-2.0-pro-exp-02-05',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+      'gemini-2.0-flash-exp',
+      'gemini-2.0-flash-realtime-exp',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-002',
+      'gemini-1.5-pro',
+      'gemini-1.5-pro-002',
+      'gemini-1.0-pro',
+    ]).has(normalizedModel);
+  }
+
+  return false;
+}
+
 function mapElevenLabsLlmToVapiModel(value) {
   const llm = normalizeVapiCompatibleElevenLabsLlm(value);
   if (!llm) return null;
@@ -4971,7 +5021,12 @@ function mapElevenLabsLlmToVapiModel(value) {
 
 function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = null) {
   const settings = getElevenLabsAgentRuntimeSettings(agentData);
-  const mappedModel = mapElevenLabsLlmToVapiModel(settings.llm);
+  const mappedModelCandidate = mapElevenLabsLlmToVapiModel(settings.llm);
+  const mappedModel =
+    mappedModelCandidate &&
+    isSupportedVapiModelOverride(mappedModelCandidate.provider, mappedModelCandidate.model)
+      ? mappedModelCandidate
+      : null;
   const nextModel =
     fallbackModel && typeof fallbackModel === 'object' ? cloneJsonSafe(fallbackModel, {}) : {};
 
@@ -4984,6 +5039,8 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
       JSON.stringify(
         {
           llm: settings.llm,
+          normalizedCandidateProvider: normalizeString(mappedModelCandidate?.provider),
+          normalizedCandidateModel: normalizeString(mappedModelCandidate?.model),
           fallbackProvider: normalizeString(nextModel.provider),
           fallbackModel: normalizeString(nextModel.model),
         },
