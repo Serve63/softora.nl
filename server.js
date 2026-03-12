@@ -4968,51 +4968,7 @@ function isUndesiredColdcallingFirstMessage(value) {
     /\b(?:how can i help you today|waarmee kan ik (?:je|u) helpen|hoe kan ik (?:je|u) helpen)\b/i.test(normalized);
 }
 
-function extractLikelyColdcallerNameFromPrompt(promptText) {
-  const prompt = normalizeString(promptText);
-  if (!prompt) return '';
-
-  const patterns = [
-    /\b(?:je|jij)\s+bent\s+([A-ZÀ-ÖØ-Ý][\p{L}'-]*(?:\s+[A-ZÀ-ÖØ-Ý][\p{L}'-]*){0,2})/u,
-    /\b(?:you are)\s+([A-Z][A-Za-z'-]*(?:\s+[A-Z][A-Za-z'-]*){0,2})\b/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = prompt.match(pattern);
-    if (match && normalizeString(match[1])) {
-      return normalizeString(match[1]);
-    }
-  }
-
-  return '';
-}
-
-function extractLikelyAgencyNameFromPrompt(promptText) {
-  const prompt = normalizeString(promptText);
-  if (!prompt) return 'Softora.nl';
-
-  const patterns = [
-    /\b(?:werk\s+je\s+bij|werk\s+jij\s+bij|bij|van)\s+([A-Z0-9][A-Za-z0-9.&/'-]*(?:\s+[A-Z0-9][A-Za-z0-9.&/'-]*){0,4})/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = prompt.match(pattern);
-    if (match && normalizeString(match[1])) {
-      return normalizeString(match[1]).replace(/[.,;:]+$/g, '');
-    }
-  }
-
-  return 'Softora.nl';
-}
-
-function buildPromptGuardedFirstMessage(promptText) {
-  const callerName = extractLikelyColdcallerNameFromPrompt(promptText);
-  const agencyName = extractLikelyAgencyNameFromPrompt(promptText) || 'Softora.nl';
-  const intro = callerName ? `${callerName} van ${agencyName}` : `een collega van ${agencyName}`;
-  return `Hallo, met ${intro}. Ik bel je even kort omdat ik jullie website of online presentatie bekeek en wilde aftasten hoe jullie daar nu naar kijken. Komt dat gelegen?`;
-}
-
-function resolveColdcallingFirstMessage(settings, fallbackAssistant = null) {
+function resolveColdcallingFirstMessage(settings) {
   const explicitFirstMessage = normalizeString(settings?.firstMessage);
   if (explicitFirstMessage && !isUndesiredColdcallingFirstMessage(explicitFirstMessage)) {
     return {
@@ -5021,26 +4977,16 @@ function resolveColdcallingFirstMessage(settings, fallbackAssistant = null) {
     };
   }
 
-  const fallbackFirstMessage = normalizeString(fallbackAssistant?.firstMessage);
-  if (fallbackFirstMessage && !isUndesiredColdcallingFirstMessage(fallbackFirstMessage)) {
+  if (explicitFirstMessage) {
     return {
-      text: fallbackFirstMessage,
-      source: 'vapi-assistant-fallback',
-    };
-  }
-
-  const derivedFromPrompt = buildPromptGuardedFirstMessage(settings?.promptText);
-  if (derivedFromPrompt && !isUndesiredColdcallingFirstMessage(derivedFromPrompt)) {
-    return {
-      text: derivedFromPrompt,
-      source: 'derived-from-elevenlabs-prompt',
+      text: '',
+      source: 'blocked-invalid-elevenlabs-first-message',
     };
   }
 
   return {
-    text:
-      'Hallo, met een collega van Softora.nl. Ik bel je even kort omdat ik jullie online presentatie bekeek en wilde aftasten hoe jullie daar nu naar kijken. Komt dat gelegen?',
-    source: 'hardcoded-fallback',
+    text: '',
+    source: 'wait-for-user',
   };
 }
 
@@ -5226,11 +5172,13 @@ function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssi
 function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssistant = null) {
   const settings = getElevenLabsAgentRuntimeSettings(agentData);
   const overrides = {};
-  const resolvedFirstMessage = resolveColdcallingFirstMessage(settings, fallbackAssistant);
+  const resolvedFirstMessage = resolveColdcallingFirstMessage(settings);
 
   if (normalizeString(resolvedFirstMessage.text)) {
     overrides.firstMessage = resolvedFirstMessage.text;
     overrides.firstMessageMode = 'assistant-speaks-first';
+  } else {
+    overrides.firstMessageMode = 'assistant-waits-for-user';
   }
 
   if (typeof settings.disableFirstMessageInterruptions === 'boolean') {
