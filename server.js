@@ -4794,6 +4794,21 @@ function getElevenLabsPromptConfig(agentData) {
   return null;
 }
 
+function getElevenLabsAsrConfig(agentData) {
+  const conversationConfig = getElevenLabsConversationConfigRoot(agentData);
+  if (!conversationConfig || typeof conversationConfig !== 'object') return null;
+
+  if (conversationConfig.asr && typeof conversationConfig.asr === 'object') {
+    return conversationConfig.asr;
+  }
+
+  if (conversationConfig.asr_config && typeof conversationConfig.asr_config === 'object') {
+    return conversationConfig.asr_config;
+  }
+
+  return null;
+}
+
 function getElevenLabsTtsConfig(agentData) {
   const conversationConfig = getElevenLabsConversationConfigRoot(agentData);
   if (!conversationConfig || typeof conversationConfig !== 'object') return null;
@@ -4827,6 +4842,7 @@ function getElevenLabsConversationLimitsConfig(agentData) {
 function getElevenLabsAgentRuntimeSettings(agentData) {
   const agentConfig = getElevenLabsAgentConfig(agentData);
   const promptConfig = getElevenLabsPromptConfig(agentData);
+  const asrConfig = getElevenLabsAsrConfig(agentData);
   const limitsConfig = getElevenLabsConversationLimitsConfig(agentData);
 
   return {
@@ -4840,6 +4856,8 @@ function getElevenLabsAgentRuntimeSettings(agentData) {
     llm: normalizeString(promptConfig?.llm),
     temperature: parseNumberSafe(promptConfig?.temperature, null),
     maxTokens: parseNumberSafe(promptConfig?.maxTokens ?? promptConfig?.max_tokens, null),
+    asrProvider: normalizeString(asrConfig?.provider),
+    asrQuality: normalizeString(asrConfig?.quality),
     maxDurationSeconds: parseNumberSafe(
       limitsConfig?.maxDurationSeconds ?? limitsConfig?.max_duration_seconds,
       null
@@ -4945,6 +4963,26 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
   return nextModel;
 }
 
+function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssistant = null) {
+  const settings = getElevenLabsAgentRuntimeSettings(agentData);
+  const fallbackTranscriber =
+    fallbackAssistant?.transcriber && typeof fallbackAssistant.transcriber === 'object'
+      ? cloneJsonSafe(fallbackAssistant.transcriber, {})
+      : {};
+  const nextTranscriber = {
+    ...fallbackTranscriber,
+    provider: '11labs',
+    model: 'scribe_v1',
+  };
+  const language = normalizeString(settings.language).toLowerCase();
+
+  if (/^[a-z]{2,3}$/.test(language)) {
+    nextTranscriber.language = language;
+  }
+
+  return nextTranscriber;
+}
+
 function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssistant = null) {
   const settings = getElevenLabsAgentRuntimeSettings(agentData);
   const overrides = {};
@@ -4969,6 +5007,14 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
     overrides.model = modelOverride;
   }
 
+  const transcriberOverride = buildVapiTranscriberOverrideFromElevenLabsAgent(
+    agentData,
+    fallbackAssistant
+  );
+  if (transcriberOverride) {
+    overrides.transcriber = transcriberOverride;
+  }
+
   if (Number.isFinite(settings.maxDurationSeconds) && Number(settings.maxDurationSeconds) > 0) {
     overrides.maxDurationSeconds = Math.round(Number(settings.maxDurationSeconds));
   }
@@ -4979,8 +5025,11 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
       syncedFirstMessage: Boolean(settings.firstMessage),
       syncedPrompt: Boolean(settings.promptText),
       syncedModel: Boolean(modelOverride),
+      syncedTranscriber: Boolean(transcriberOverride),
       syncedMaxDuration: Boolean(overrides.maxDurationSeconds),
       llm: settings.llm || '',
+      asrProvider: settings.asrProvider || '',
+      asrQuality: settings.asrQuality || '',
     },
   };
 }
@@ -5926,8 +5975,11 @@ async function buildVapiPayload(lead, campaign) {
             syncedFirstMessage: syncedAgentConfig.summary.syncedFirstMessage,
             syncedPrompt: syncedAgentConfig.summary.syncedPrompt,
             syncedModel: syncedAgentConfig.summary.syncedModel,
+            syncedTranscriber: syncedAgentConfig.summary.syncedTranscriber,
             syncedMaxDuration: syncedAgentConfig.summary.syncedMaxDuration,
             llm: syncedAgentConfig.summary.llm,
+            asrProvider: syncedAgentConfig.summary.asrProvider,
+            asrQuality: syncedAgentConfig.summary.asrQuality,
           },
           null,
           2
