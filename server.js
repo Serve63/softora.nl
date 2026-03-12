@@ -156,6 +156,7 @@ let elevenLabsAgentConfigCache = {
   error: '',
   promise: null,
 };
+let latestVapiPayloadDebug = null;
 let coldcallingHistoryVisibleAfterMs = 0;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
@@ -1028,6 +1029,8 @@ function formatTranscriptPartsFromEntries(entries, options = {}) {
           entry.channel ||
           entry.actor
       );
+      const normalizedSpeaker = speaker.toLowerCase();
+      if (normalizedSpeaker === 'system') return '';
 
       const nestedMessage =
         (entry.message && typeof entry.message === 'object' ? entry.message : null) ||
@@ -1052,6 +1055,20 @@ function formatTranscriptPartsFromEntries(entries, options = {}) {
   if (parts.length === 0) return '';
   const joined = preferFull ? parts.join('\n') : parts.slice(-6).join(' | ');
   return truncateText(joined, maxLength);
+}
+
+function removeSystemOnlyTranscriptText(value) {
+  const normalized = normalizeString(value);
+  if (!normalized) return '';
+
+  const lowered = normalized.toLowerCase();
+  const hasSystem = /\bsystem\s*:/.test(lowered);
+  const hasSpokenTurn = /\b(?:user|assistant|bot|ai|customer|caller|human)\s*:/.test(lowered);
+  if (hasSystem && !hasSpokenTurn) {
+    return '';
+  }
+
+  return normalized;
 }
 
 function extractTranscriptText(payload, options = {}) {
@@ -1083,7 +1100,11 @@ function extractTranscriptText(payload, options = {}) {
     if (!candidate) continue;
 
     if (typeof candidate === 'string') {
-      return truncateText(candidate, maxLength);
+      const cleaned = removeSystemOnlyTranscriptText(candidate);
+      if (cleaned) {
+        return truncateText(cleaned, maxLength);
+      }
+      continue;
     }
 
     if (Array.isArray(candidate)) {
@@ -1112,7 +1133,7 @@ function extractTranscriptText(payload, options = {}) {
   const utteranceCandidates = collectStringValuesByKey(payload, /utterance|transcript/i, {
     maxItems: preferFull ? 40 : 8,
     minLength: 8,
-  });
+  }).map((candidate) => removeSystemOnlyTranscriptText(candidate)).filter(Boolean);
   if (utteranceCandidates.length > 0) {
     return truncateText(
       preferFull ? utteranceCandidates.join('\n') : utteranceCandidates.slice(-4).join(' | '),
@@ -4936,6 +4957,107 @@ function normalizeVapiCompatibleElevenLabsLlm(value) {
   return raw;
 }
 
+function isUndesiredColdcallingFirstMessage(value) {
+  const normalized = normalizeString(value);
+  if (!normalized) return true;
+
+  return (
+    /\b(?:ik|i)\s+(?:begrijp|understand|snap|volg|follow|received|gelezen)\b/i.test(normalized) &&
+    /\b(?:instructies?|instructions?|prompt|rol|role|systeem|system)\b/i.test(normalized)
+  ) || /\b(?:als een ai|as an ai)\b/i.test(normalized) ||
+    /\b(?:how can i help you today|waarmee kan ik (?:je|u) helpen|hoe kan ik (?:je|u) helpen)\b/i.test(normalized);
+}
+
+function extractLikelyColdcallerNameFromPrompt(promptText) {
+  const prompt = normalizeString(promptText);
+  if (!prompt) return '';
+
+  const patterns = [
+    /\b(?:je|jij)\s+bent\s+([A-ZÀ-ÖØ-Ý][\p{L}'-]*(?:\s+[A-ZÀ-ÖØ-Ý][\p{L}'-]*){0,2})/u,
+    /\b(?:you are)\s+([A-Z][A-Za-z'-]*(?:\s+[A-Z][A-Za-z'-]*){0,2})\b/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = prompt.match(pattern);
+    if (match && normalizeString(match[1])) {
+      return normalizeString(match[1]);
+    }
+  }
+
+  return '';
+}
+
+function extractLikelyAgencyNameFromPrompt(promptText) {
+  const prompt = normalizeString(promptText);
+  if (!prompt) return 'Softora.nl';
+
+  const patterns = [
+    /\b(?:werk\s+je\s+bij|werk\s+jij\s+bij|bij|van)\s+([A-Z0-9][A-Za-z0-9.&/'-]*(?:\s+[A-Z0-9][A-Za-z0-9.&/'-]*){0,4})/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = prompt.match(pattern);
+    if (match && normalizeString(match[1])) {
+      return normalizeString(match[1]).replace(/[.,;:]+$/g, '');
+    }
+  }
+
+  return 'Softora.nl';
+}
+
+function buildPromptGuardedFirstMessage(promptText) {
+  const callerName = extractLikelyColdcallerNameFromPrompt(promptText);
+  const agencyName = extractLikelyAgencyNameFromPrompt(promptText) || 'Softora.nl';
+  const intro = callerName ? `${callerName} van ${agencyName}` : `een collega van ${agencyName}`;
+  return `Hallo, met ${intro}. Ik bel je even kort omdat ik jullie website of online presentatie bekeek en wilde aftasten hoe jullie daar nu naar kijken. Komt dat gelegen?`;
+}
+
+function resolveColdcallingFirstMessage(settings, fallbackAssistant = null) {
+  const explicitFirstMessage = normalizeString(settings?.firstMessage);
+  if (explicitFirstMessage && !isUndesiredColdcallingFirstMessage(explicitFirstMessage)) {
+    return {
+      text: explicitFirstMessage,
+      source: 'elevenlabs-agent',
+    };
+  }
+
+  const fallbackFirstMessage = normalizeString(fallbackAssistant?.firstMessage);
+  if (fallbackFirstMessage && !isUndesiredColdcallingFirstMessage(fallbackFirstMessage)) {
+    return {
+      text: fallbackFirstMessage,
+      source: 'vapi-assistant-fallback',
+    };
+  }
+
+  const derivedFromPrompt = buildPromptGuardedFirstMessage(settings?.promptText);
+  if (derivedFromPrompt && !isUndesiredColdcallingFirstMessage(derivedFromPrompt)) {
+    return {
+      text: derivedFromPrompt,
+      source: 'derived-from-elevenlabs-prompt',
+    };
+  }
+
+  return {
+    text:
+      'Hallo, met een collega van Softora.nl. Ik bel je even kort omdat ik jullie online presentatie bekeek en wilde aftasten hoe jullie daar nu naar kijken. Komt dat gelegen?',
+    source: 'hardcoded-fallback',
+  };
+}
+
+function buildVapiSafeSystemPrompt(promptText) {
+  const normalizedPrompt = normalizeString(promptText);
+  if (!normalizedPrompt) return '';
+
+  const guardrail =
+    'Kritieke spreekregel: benoem nooit dat je instructies, een prompt, een rol, regels of systeemtekst hebt ontvangen of begrijpt. Zeg nooit dat je de instructies begrijpt. Open altijd direct natuurlijk in karakter en in rol.';
+
+  if (/zeg nooit dat je de instructies begrijpt|benoem nooit dat je instructies/i.test(normalizedPrompt)) {
+    return normalizedPrompt;
+  }
+
+  return `${normalizedPrompt}\n\n${guardrail}`;
+}
+
 function isSupportedVapiModelOverride(provider, model) {
   const normalizedProvider = normalizeString(provider).toLowerCase();
   const normalizedModel = normalizeString(model).toLowerCase();
@@ -5056,8 +5178,9 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
     nextModel.model = mappedModel.model;
   }
 
-  if (settings.promptText) {
-    nextModel.messages = [{ role: 'system', content: settings.promptText }];
+  const safePromptText = buildVapiSafeSystemPrompt(settings.promptText);
+  if (safePromptText) {
+    nextModel.messages = [{ role: 'system', content: safePromptText }];
   }
 
   if (Number.isFinite(settings.temperature)) {
@@ -5069,7 +5192,7 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
   }
 
   if (
-    !settings.promptText &&
+    !safePromptText &&
     !mappedModel &&
     !Number.isFinite(settings.temperature) &&
     !Number.isFinite(settings.maxTokens)
@@ -5103,13 +5226,11 @@ function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssi
 function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssistant = null) {
   const settings = getElevenLabsAgentRuntimeSettings(agentData);
   const overrides = {};
-  const fallbackFirstMessage = normalizeString(fallbackAssistant?.firstMessage);
+  const resolvedFirstMessage = resolveColdcallingFirstMessage(settings, fallbackAssistant);
 
-  if (settings.firstMessage) {
-    overrides.firstMessage = settings.firstMessage;
+  if (normalizeString(resolvedFirstMessage.text)) {
+    overrides.firstMessage = resolvedFirstMessage.text;
     overrides.firstMessageMode = 'assistant-speaks-first';
-  } else if (!fallbackFirstMessage) {
-    overrides.firstMessageMode = 'assistant-speaks-first-with-model-generated-message';
   }
 
   if (typeof settings.disableFirstMessageInterruptions === 'boolean') {
@@ -5141,6 +5262,8 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
     overrides,
     summary: {
       syncedFirstMessage: Boolean(settings.firstMessage),
+      effectiveFirstMessage: truncateText(normalizeString(overrides.firstMessage), 220),
+      firstMessageSource: normalizeString(resolvedFirstMessage.source),
       firstMessageMode: normalizeString(overrides.firstMessageMode),
       syncedPrompt: Boolean(settings.promptText),
       syncedModel: Boolean(modelOverride),
@@ -6067,6 +6190,7 @@ async function buildVapiPayload(lead, campaign) {
   const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
   const elevenLabsCredentials = buildVapiElevenLabsCredentialsOverride();
+  const configuredBackgroundSound = getConfiguredColdcallingBackgroundSound();
   const assistantOverrides = {
     variableValues: buildVariableValues(
       {
@@ -6075,7 +6199,7 @@ async function buildVapiPayload(lead, campaign) {
       },
       campaign
     ),
-    backgroundSound: getConfiguredColdcallingBackgroundSound(),
+    backgroundSound: configuredBackgroundSound,
   };
   if (elevenLabsCredentials) {
     assistantOverrides.credentials = elevenLabsCredentials;
@@ -6098,6 +6222,7 @@ async function buildVapiPayload(lead, campaign) {
         vapiAssistant
       );
       Object.assign(assistantOverrides, syncedAgentConfig.overrides);
+      assistantOverrides.backgroundSound = configuredBackgroundSound;
 
       console.log(
         '[Coldcalling][ElevenLabs -> Vapi Sync]',
@@ -6115,6 +6240,8 @@ async function buildVapiPayload(lead, campaign) {
                   .filter(Boolean)
               : [],
             syncedFirstMessage: syncedAgentConfig.summary.syncedFirstMessage,
+            firstMessageSource: syncedAgentConfig.summary.firstMessageSource,
+            effectiveFirstMessage: syncedAgentConfig.summary.effectiveFirstMessage,
             firstMessageMode: syncedAgentConfig.summary.firstMessageMode,
             syncedPrompt: syncedAgentConfig.summary.syncedPrompt,
             syncedModel: syncedAgentConfig.summary.syncedModel,
@@ -6162,6 +6289,42 @@ async function buildVapiPayload(lead, campaign) {
       )
     );
   }
+
+  latestVapiPayloadDebug = {
+    builtAt: new Date().toISOString(),
+    leadCompany: normalizeString(lead.company),
+    leadName: normalizeString(lead.name),
+    leadPhoneE164: normalizedPhone,
+    backgroundSound: normalizeString(assistantOverrides.backgroundSound),
+    firstMessage: truncateText(normalizeString(assistantOverrides.firstMessage), 240),
+    firstMessageMode: normalizeString(assistantOverrides.firstMessageMode),
+    credentialProviders: Array.isArray(assistantOverrides.credentials)
+      ? assistantOverrides.credentials.map((credential) => normalizeString(credential?.provider)).filter(Boolean)
+      : [],
+    voice:
+      assistantOverrides.voice && typeof assistantOverrides.voice === 'object'
+        ? {
+            provider: normalizeString(assistantOverrides.voice.provider),
+            voiceId: normalizeString(assistantOverrides.voice.voiceId),
+            model: normalizeString(assistantOverrides.voice.model),
+          }
+        : null,
+    transcriber:
+      assistantOverrides.transcriber && typeof assistantOverrides.transcriber === 'object'
+        ? {
+            provider: normalizeString(assistantOverrides.transcriber.provider),
+            model: normalizeString(assistantOverrides.transcriber.model),
+            language: normalizeString(assistantOverrides.transcriber.language),
+          }
+        : null,
+    model:
+      assistantOverrides.model && typeof assistantOverrides.model === 'object'
+        ? {
+            provider: normalizeString(assistantOverrides.model.provider),
+            model: normalizeString(assistantOverrides.model.model),
+          }
+        : null,
+  };
 
   return {
     assistantId: process.env.VAPI_ASSISTANT_ID,
@@ -8450,6 +8613,7 @@ function sendRuntimeHealthDebug(_req, res) {
         const callId = normalizeString(item?.callId || '');
         return callId && !callId.startsWith('demo-');
       }).length,
+      latestVapiPayloadDebug,
     },
     supabase: {
       enabled: isSupabaseConfigured(),
