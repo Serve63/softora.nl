@@ -4889,8 +4889,55 @@ function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, numeric));
 }
 
+function normalizeVapiCompatibleElevenLabsLlm(value) {
+  const raw = normalizeString(value).toLowerCase();
+  if (!raw) return '';
+
+  const aliases = {
+    'claude-sonnet-4': 'claude-sonnet-4-20250514',
+    'claude-sonnet-4-5': 'claude-sonnet-4-5-20250929',
+    'claude-haiku-4-5': 'claude-haiku-4-5-20251001',
+    'claude-3-7-sonnet': 'claude-3-7-sonnet-20250219',
+    'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
+    'claude-3-5-sonnet-v1': 'claude-3-5-sonnet-20240620',
+    'claude-3-5-sonnet-v2': 'claude-3-5-sonnet-20241022',
+    'claude-3-haiku': 'claude-3-haiku-20240307',
+    'claude-sonnet-4@20250514': 'claude-sonnet-4-20250514',
+    'claude-sonnet-4-5@20250929': 'claude-sonnet-4-5-20250929',
+    'claude-haiku-4-5@20251001': 'claude-haiku-4-5-20251001',
+    'claude-3-7-sonnet@20250219': 'claude-3-7-sonnet-20250219',
+    'claude-3-5-sonnet@20240620': 'claude-3-5-sonnet-20240620',
+    'claude-3-5-sonnet-v2@20241022': 'claude-3-5-sonnet-20241022',
+    'claude-3-haiku@20240307': 'claude-3-haiku-20240307',
+    'gemini-3-pro-preview': 'gemini-2.5-pro',
+    'gemini-3-flash-preview': 'gemini-2.5-flash',
+    'gemini-3.1-flash-lite-preview': 'gemini-2.5-flash-lite',
+    'gemini-2.5-flash-preview-09-2025': 'gemini-2.5-flash',
+    'gemini-2.5-flash-lite-preview-09-2025': 'gemini-2.5-flash-lite',
+    'gemini-2.5-flash-preview-05-20': 'gemini-2.5-flash',
+    'gemini-2.5-flash-preview-04-17': 'gemini-2.5-flash',
+    'gemini-2.5-flash-lite-preview-06-17': 'gemini-2.5-flash-lite',
+    'gemini-2.0-flash-lite-001': 'gemini-2.0-flash-lite',
+    'gemini-2.0-flash-001': 'gemini-2.0-flash',
+    'gemini-1.5-flash-001': 'gemini-1.5-flash',
+    'gemini-1.5-pro-001': 'gemini-1.5-pro',
+    'gpt-5-2025-08-07': 'gpt-5',
+    'gpt-5.1-2025-11-13': 'gpt-5.1',
+    'gpt-5.2-2025-12-11': 'gpt-5.2',
+    'gpt-5-mini-2025-08-07': 'gpt-5-mini',
+    'gpt-5-nano-2025-08-07': 'gpt-5-nano',
+    'gpt-4-0314': 'gpt-4',
+  };
+
+  if (aliases[raw]) {
+    return aliases[raw];
+  }
+
+  return raw;
+}
+
 function mapElevenLabsLlmToVapiModel(value) {
-  const llm = normalizeString(value).toLowerCase();
+  const llm = normalizeVapiCompatibleElevenLabsLlm(value);
   if (!llm) return null;
 
   if (
@@ -4931,6 +4978,19 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
   if (mappedModel) {
     nextModel.provider = mappedModel.provider;
     nextModel.model = mappedModel.model;
+  } else if (settings.llm) {
+    console.warn(
+      '[Coldcalling][Unsupported ElevenLabs LLM]',
+      JSON.stringify(
+        {
+          llm: settings.llm,
+          fallbackProvider: normalizeString(nextModel.provider),
+          fallbackModel: normalizeString(nextModel.model),
+        },
+        null,
+        2
+      )
+    );
   }
 
   if (!normalizeString(nextModel.provider) || !normalizeString(nextModel.model)) {
