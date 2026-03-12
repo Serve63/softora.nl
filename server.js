@@ -111,10 +111,36 @@ const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
 const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
+const ELEVENLABS_TOOL_CALL_SOUND_SYNC_CACHE_TTL_MS = Math.max(
+  60_000,
+  Math.min(
+    86_400_000,
+    Number(process.env.ELEVENLABS_TOOL_CALL_SOUND_SYNC_CACHE_TTL_MS || 900_000) || 900_000
+  )
+);
 let elevenLabsConversationListCache = {
   fetchedAtMs: 0,
   agentId: '',
   conversations: [],
+};
+let elevenLabsToolCallSoundSyncState = {
+  agentId: '',
+  sound: '',
+  behavior: '',
+  result: 'idle',
+  syncedAtMs: 0,
+  touchedToolCount: 0,
+  changedToolCount: 0,
+  error: '',
+  promise: null,
+};
+let elevenLabsAgentVoiceOverrideCache = {
+  agentId: '',
+  fetchedAtMs: 0,
+  voiceOverride: null,
+  source: '',
+  error: '',
+  promise: null,
 };
 let coldcallingHistoryVisibleAfterMs = 0;
 const recentAiCallInsights = [];
@@ -1567,6 +1593,10 @@ function getRequiredVapiEnv() {
   return ['VAPI_API_KEY', 'VAPI_ASSISTANT_ID', 'VAPI_PHONE_NUMBER_ID'];
 }
 
+function isVapiColdcallingConfigured() {
+  return getRequiredVapiEnv().every((key) => normalizeString(process.env[key]));
+}
+
 function getRequiredElevenLabsEnv() {
   return ['ELEVENLABS_API_KEY', 'ELEVENLABS_PHONE_NUMBER_ID'];
 }
@@ -1575,12 +1605,103 @@ function getConfiguredElevenLabsAgentId() {
   return normalizeString(process.env.ELEVENLABS_AGENT_ID || DEFAULT_ELEVENLABS_AGENT_ID);
 }
 
+function normalizeColdcallingBackgroundSound(value) {
+  const raw = normalizeString(value);
+  if (!raw) return 'office';
+  if (/^(0|false|no|nee|off|disabled|none)$/i.test(raw)) return 'off';
+  if (/^(office|kantoor)$/i.test(raw)) return 'office';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return 'office';
+}
+
+function getConfiguredColdcallingBackgroundSound() {
+  return normalizeColdcallingBackgroundSound(
+    process.env.COLDCALLING_BACKGROUND_SOUND || process.env.VAPI_BACKGROUND_SOUND || 'office'
+  );
+}
+
+function isContinuousColdcallingBackgroundSoundEnabled() {
+  return getConfiguredColdcallingBackgroundSound() !== 'off';
+}
+
+function normalizeElevenLabsToolCallSound(value) {
+  const normalized = normalizeString(value)
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  if (!normalized || /^(0|false|off|disabled|none)$/.test(normalized)) {
+    return '';
+  }
+
+  if (normalized === 'typing' || normalized === 'office' || normalized === 'office_typing') {
+    return 'typing';
+  }
+
+  const elevatorMatch = normalized.match(/^elevator(?:_music)?_?([1-4])$/);
+  if (elevatorMatch) {
+    return `elevator_music_${elevatorMatch[1]}`;
+  }
+
+  return 'typing';
+}
+
+function normalizeElevenLabsToolCallSoundBehavior(value) {
+  const normalized = normalizeString(value)
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  if (!normalized) return 'always';
+  if (normalized === 'always' || normalized === 'always_play' || normalized === 'alwaysplay') {
+    return 'always';
+  }
+  if (
+    normalized === 'auto' ||
+    normalized === 'with_pre_speech' ||
+    normalized === 'with_prespeech' ||
+    normalized === 'prespeech' ||
+    normalized === 'pre_speech'
+  ) {
+    return 'auto';
+  }
+
+  return 'always';
+}
+
+function getConfiguredElevenLabsToolCallSound() {
+  return normalizeElevenLabsToolCallSound(
+    process.env.ELEVENLABS_TOOL_CALL_SOUND ||
+      process.env.ELEVENLABS_AGENT_TOOL_CALL_SOUND ||
+      'typing'
+  );
+}
+
+function getConfiguredElevenLabsToolCallSoundBehavior() {
+  return normalizeElevenLabsToolCallSoundBehavior(
+    process.env.ELEVENLABS_TOOL_CALL_SOUND_BEHAVIOR ||
+      process.env.ELEVENLABS_AGENT_TOOL_CALL_SOUND_BEHAVIOR ||
+      'always'
+  );
+}
+
+function isElevenLabsToolCallSoundSyncEnabled() {
+  return !/^(0|false|no|nee|off|disabled)$/i.test(
+    normalizeString(
+      process.env.ELEVENLABS_TOOL_CALL_SOUND_SYNC ||
+        process.env.ELEVENLABS_AGENT_TOOL_CALL_SOUND_SYNC ||
+        'true'
+    )
+  );
+}
+
 function isElevenLabsColdcallingConfigured() {
   return getRequiredElevenLabsEnv().every((key) => normalizeString(process.env[key]));
 }
 
 function getColdcallingProvider() {
   const configured = normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase();
+  if (isContinuousColdcallingBackgroundSoundEnabled() && isVapiColdcallingConfigured()) {
+    return 'vapi';
+  }
   if (configured === 'elevenlabs') return 'elevenlabs';
   if (configured === 'vapi') return 'vapi';
   return isElevenLabsColdcallingConfigured() ? 'elevenlabs' : 'vapi';
@@ -4506,6 +4627,205 @@ function buildVariableValues(lead, campaign) {
   };
 }
 
+function normalizeVapiElevenLabsVoiceModel(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  if (!normalized) return '';
+
+  const aliases = {
+    eleven_flash_v2: 'eleven_flash_v2',
+    eleven_flash_v2_5: 'eleven_flash_v2_5',
+    eleven_flash_v25: 'eleven_flash_v2_5',
+    eleven_monolingual_v1: 'eleven_monolingual_v1',
+    eleven_multilingual_v2: 'eleven_multilingual_v2',
+    eleven_turbo_v2: 'eleven_turbo_v2',
+    eleven_turbo_v2_5: 'eleven_turbo_v2_5',
+    eleven_turbo_v25: 'eleven_turbo_v2_5',
+  };
+
+  return aliases[normalized] || '';
+}
+
+function clampNumber(value, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function buildVapiElevenLabsVoiceOverrideFromSource(source) {
+  if (!source || typeof source !== 'object') return null;
+
+  const voiceId = normalizeString(source.voiceId || source.voice_id);
+  if (!voiceId) return null;
+
+  const voiceOverride = {
+    provider: '11labs',
+    voiceId,
+  };
+  const stability = clampNumber(source.stability, 0, 1);
+  const similarityBoost = clampNumber(
+    source.similarityBoost ?? source.similarity_boost,
+    0,
+    1
+  );
+  const style = clampNumber(source.style, 0, 1);
+  const speed = clampNumber(source.speed, 0.7, 1.2);
+  const optimizeStreamingLatency = clampNumber(
+    source.optimizeStreamingLatency ?? source.optimize_streaming_latency,
+    0,
+    4
+  );
+  const model = normalizeVapiElevenLabsVoiceModel(source.model || source.model_id);
+  const language = normalizeString(source.language);
+
+  if (stability !== null) voiceOverride.stability = stability;
+  if (similarityBoost !== null) voiceOverride.similarityBoost = similarityBoost;
+  if (style !== null) voiceOverride.style = style;
+  if (speed !== null) voiceOverride.speed = speed;
+  if (optimizeStreamingLatency !== null) {
+    voiceOverride.optimizeStreamingLatency = Math.round(optimizeStreamingLatency);
+  }
+  if (model) voiceOverride.model = model;
+  if (language) voiceOverride.language = language;
+
+  const hasUseSpeakerBoost =
+    Object.prototype.hasOwnProperty.call(source, 'useSpeakerBoost') ||
+    Object.prototype.hasOwnProperty.call(source, 'use_speaker_boost');
+  if (hasUseSpeakerBoost) {
+    voiceOverride.useSpeakerBoost = toBooleanSafe(
+      source.useSpeakerBoost ?? source.use_speaker_boost,
+      false
+    );
+  }
+
+  return voiceOverride;
+}
+
+function buildConfiguredVapiElevenLabsVoiceOverrideFromEnv() {
+  return buildVapiElevenLabsVoiceOverrideFromSource({
+    voiceId:
+      process.env.VAPI_ELEVENLABS_VOICE_ID ||
+      process.env.COLDCALLING_ELEVENLABS_VOICE_ID ||
+      process.env.ELEVENLABS_VOICE_ID,
+    model: process.env.VAPI_ELEVENLABS_VOICE_MODEL,
+    stability: process.env.VAPI_ELEVENLABS_STABILITY,
+    similarityBoost: process.env.VAPI_ELEVENLABS_SIMILARITY_BOOST,
+    style: process.env.VAPI_ELEVENLABS_STYLE,
+    speed: process.env.VAPI_ELEVENLABS_SPEED,
+    optimizeStreamingLatency: process.env.VAPI_ELEVENLABS_OPTIMIZE_STREAMING_LATENCY,
+    useSpeakerBoost: process.env.VAPI_ELEVENLABS_USE_SPEAKER_BOOST,
+    language: process.env.VAPI_ELEVENLABS_LANGUAGE,
+  });
+}
+
+function findLikelyElevenLabsTtsConfig(value, visited = new WeakSet()) {
+  if (!value || typeof value !== 'object') return null;
+  if (visited.has(value)) return null;
+  visited.add(value);
+
+  if (!Array.isArray(value)) {
+    if (normalizeString(value.voice_id || value.voiceId)) {
+      return value;
+    }
+
+    for (const nestedValue of Object.values(value)) {
+      const match = findLikelyElevenLabsTtsConfig(nestedValue, visited);
+      if (match) return match;
+    }
+  } else {
+    for (const item of value) {
+      const match = findLikelyElevenLabsTtsConfig(item, visited);
+      if (match) return match;
+    }
+  }
+
+  return null;
+}
+
+function buildVapiElevenLabsVoiceOverrideFromAgent(agent) {
+  const conversationConfig =
+    agent?.conversation_config && typeof agent.conversation_config === 'object'
+      ? agent.conversation_config
+      : null;
+  if (!conversationConfig) return null;
+  return buildVapiElevenLabsVoiceOverrideFromSource(
+    findLikelyElevenLabsTtsConfig(conversationConfig)
+  );
+}
+
+async function getConfiguredVapiElevenLabsVoiceOverride() {
+  const envOverride = buildConfiguredVapiElevenLabsVoiceOverrideFromEnv();
+  if (envOverride) {
+    return {
+      voiceOverride: envOverride,
+      source: 'env',
+    };
+  }
+
+  const agentId = getConfiguredElevenLabsAgentId();
+  if (!normalizeString(process.env.ELEVENLABS_API_KEY) || !agentId) {
+    return {
+      voiceOverride: null,
+      source: 'none',
+    };
+  }
+
+  if (
+    elevenLabsAgentVoiceOverrideCache.agentId === agentId &&
+    elevenLabsAgentVoiceOverrideCache.voiceOverride &&
+    Date.now() - Number(elevenLabsAgentVoiceOverrideCache.fetchedAtMs || 0) <
+      ELEVENLABS_TOOL_CALL_SOUND_SYNC_CACHE_TTL_MS
+  ) {
+    return {
+      voiceOverride: cloneJsonSafe(elevenLabsAgentVoiceOverrideCache.voiceOverride, null),
+      source: elevenLabsAgentVoiceOverrideCache.source || 'agent-cache',
+    };
+  }
+
+  if (
+    elevenLabsAgentVoiceOverrideCache.agentId === agentId &&
+    elevenLabsAgentVoiceOverrideCache.promise
+  ) {
+    return elevenLabsAgentVoiceOverrideCache.promise;
+  }
+
+  const syncPromise = (async () => {
+    const { data } = await fetchElevenLabsAgent(agentId);
+    const voiceOverride = buildVapiElevenLabsVoiceOverrideFromAgent(data);
+
+    elevenLabsAgentVoiceOverrideCache = {
+      agentId,
+      fetchedAtMs: Date.now(),
+      voiceOverride: cloneJsonSafe(voiceOverride, null),
+      source: voiceOverride ? 'agent' : 'agent-missing-voice',
+      error: '',
+      promise: null,
+    };
+
+    return {
+      voiceOverride,
+      source: elevenLabsAgentVoiceOverrideCache.source,
+    };
+  })().catch((error) => {
+    elevenLabsAgentVoiceOverrideCache = {
+      agentId,
+      fetchedAtMs: Date.now(),
+      voiceOverride: null,
+      source: 'error',
+      error: normalizeString(error?.message || error),
+      promise: null,
+    };
+    throw error;
+  });
+
+  elevenLabsAgentVoiceOverrideCache = {
+    ...elevenLabsAgentVoiceOverrideCache,
+    agentId,
+    promise: syncPromise,
+  };
+
+  return syncPromise;
+}
+
 function buildElevenLabsApiUrl(relativePath, searchParams = null) {
   const normalizedBase = `${normalizeString(ELEVENLABS_API_BASE_URL).replace(/\/+$/, '')}/`;
   const url = new URL(String(relativePath || '').replace(/^\/+/, ''), normalizedBase);
@@ -4519,6 +4839,318 @@ function buildElevenLabsApiUrl(relativePath, searchParams = null) {
   }
 
   return url;
+}
+
+function cloneJsonSafe(value, fallback) {
+  try {
+    return JSON.parse(JSON.stringify(value ?? fallback));
+  } catch {
+    return fallback;
+  }
+}
+
+function isLikelyElevenLabsToolDefinition(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+  return (
+    Object.prototype.hasOwnProperty.call(value, 'tool_call_sound') ||
+    Object.prototype.hasOwnProperty.call(value, 'tool_call_sound_behavior') ||
+    Object.prototype.hasOwnProperty.call(value, 'type') ||
+    Object.prototype.hasOwnProperty.call(value, 'name') ||
+    Object.prototype.hasOwnProperty.call(value, 'description') ||
+    Object.prototype.hasOwnProperty.call(value, 'url') ||
+    Object.prototype.hasOwnProperty.call(value, 'tool_id') ||
+    Object.prototype.hasOwnProperty.call(value, 'tool_type') ||
+    Object.prototype.hasOwnProperty.call(value, 'system_tool_type')
+  );
+}
+
+function applyElevenLabsToolCallSoundToConversationConfig(conversationConfig, sound, behavior) {
+  const clonedConfig = cloneJsonSafe(conversationConfig, {});
+  let touchedToolCount = 0;
+  let changedToolCount = 0;
+  const visited = new WeakSet();
+
+  function visit(node) {
+    if (!node || typeof node !== 'object') return;
+    if (visited.has(node)) return;
+    visited.add(node);
+
+    if (Array.isArray(node)) {
+      node.forEach((item) => visit(item));
+      return;
+    }
+
+    Object.entries(node).forEach(([key, value]) => {
+      if (key === 'tools' && Array.isArray(value) && value.some((item) => isLikelyElevenLabsToolDefinition(item))) {
+        value.forEach((tool) => {
+          if (!tool || typeof tool !== 'object' || Array.isArray(tool)) return;
+          touchedToolCount += 1;
+
+          if (normalizeString(tool.tool_call_sound) !== sound) {
+            tool.tool_call_sound = sound;
+            changedToolCount += 1;
+          }
+
+          if (normalizeString(tool.tool_call_sound_behavior) !== behavior) {
+            tool.tool_call_sound_behavior = behavior;
+            changedToolCount += 1;
+          }
+        });
+      }
+
+      visit(value);
+    });
+  }
+
+  visit(clonedConfig);
+
+  return {
+    conversationConfig: clonedConfig,
+    touchedToolCount,
+    changedToolCount,
+    changed: changedToolCount > 0,
+  };
+}
+
+async function fetchElevenLabsAgent(agentId) {
+  const normalizedAgentId = normalizeString(agentId);
+  const endpoint = `/convai/agents/${encodeURIComponent(normalizedAgentId)}`;
+  const response = await fetch(buildElevenLabsApiUrl(endpoint), {
+    method: 'GET',
+    headers: {
+      'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+    },
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs agent ophalen mislukt (${response.status})`
+    );
+    error.status = response.status;
+    error.data = data;
+    error.endpoint = endpoint;
+    throw error;
+  }
+
+  return { endpoint, data };
+}
+
+async function updateElevenLabsAgent(agentId, payload) {
+  const normalizedAgentId = normalizeString(agentId);
+  const endpoint = `/convai/agents/${encodeURIComponent(normalizedAgentId)}`;
+  const response = await fetch(buildElevenLabsApiUrl(endpoint), {
+    method: 'PATCH',
+    headers: {
+      'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs agent updaten mislukt (${response.status})`
+    );
+    error.status = response.status;
+    error.data = data;
+    error.endpoint = endpoint;
+    throw error;
+  }
+
+  return { endpoint, data };
+}
+
+async function ensureElevenLabsToolCallSoundConfigured({ force = false } = {}) {
+  if (!isElevenLabsToolCallSoundSyncEnabled()) {
+    return {
+      ok: false,
+      skipped: true,
+      result: 'disabled',
+    };
+  }
+
+  const agentId = getConfiguredElevenLabsAgentId();
+  const sound = getConfiguredElevenLabsToolCallSound();
+  const behavior = getConfiguredElevenLabsToolCallSoundBehavior();
+
+  if (!normalizeString(process.env.ELEVENLABS_API_KEY) || !agentId || !sound) {
+    return {
+      ok: false,
+      skipped: true,
+      result: 'missing_config',
+    };
+  }
+
+  const cacheMatchesRequestedConfig =
+    elevenLabsToolCallSoundSyncState.agentId === agentId &&
+    elevenLabsToolCallSoundSyncState.sound === sound &&
+    elevenLabsToolCallSoundSyncState.behavior === behavior;
+
+  if (!force && cacheMatchesRequestedConfig && elevenLabsToolCallSoundSyncState.promise) {
+    return elevenLabsToolCallSoundSyncState.promise;
+  }
+
+  if (
+    !force &&
+    cacheMatchesRequestedConfig &&
+    Date.now() - Number(elevenLabsToolCallSoundSyncState.syncedAtMs || 0) <
+      ELEVENLABS_TOOL_CALL_SOUND_SYNC_CACHE_TTL_MS &&
+    elevenLabsToolCallSoundSyncState.result !== 'idle' &&
+    elevenLabsToolCallSoundSyncState.result !== 'error'
+  ) {
+    return {
+      ok: elevenLabsToolCallSoundSyncState.result === 'synced' ||
+        elevenLabsToolCallSoundSyncState.result === 'already_synced',
+      skipped: true,
+      cached: true,
+      result: elevenLabsToolCallSoundSyncState.result,
+      touchedToolCount: elevenLabsToolCallSoundSyncState.touchedToolCount,
+      changedToolCount: elevenLabsToolCallSoundSyncState.changedToolCount,
+    };
+  }
+
+  const syncPromise = (async () => {
+    const { data } = await fetchElevenLabsAgent(agentId);
+    const conversationConfig =
+      data?.conversation_config && typeof data.conversation_config === 'object'
+        ? data.conversation_config
+        : null;
+
+    if (!conversationConfig) {
+      elevenLabsToolCallSoundSyncState = {
+        ...elevenLabsToolCallSoundSyncState,
+        agentId,
+        sound,
+        behavior,
+        result: 'no_conversation_config',
+        syncedAtMs: Date.now(),
+        touchedToolCount: 0,
+        changedToolCount: 0,
+        error: '',
+        promise: null,
+      };
+
+      return {
+        ok: false,
+        skipped: true,
+        result: 'no_conversation_config',
+      };
+    }
+
+    const nextConfig = applyElevenLabsToolCallSoundToConversationConfig(conversationConfig, sound, behavior);
+
+    if (nextConfig.touchedToolCount === 0) {
+      elevenLabsToolCallSoundSyncState = {
+        ...elevenLabsToolCallSoundSyncState,
+        agentId,
+        sound,
+        behavior,
+        result: 'no_tools',
+        syncedAtMs: Date.now(),
+        touchedToolCount: 0,
+        changedToolCount: 0,
+        error: '',
+        promise: null,
+      };
+
+      return {
+        ok: false,
+        skipped: true,
+        result: 'no_tools',
+      };
+    }
+
+    if (!nextConfig.changed) {
+      elevenLabsToolCallSoundSyncState = {
+        ...elevenLabsToolCallSoundSyncState,
+        agentId,
+        sound,
+        behavior,
+        result: 'already_synced',
+        syncedAtMs: Date.now(),
+        touchedToolCount: nextConfig.touchedToolCount,
+        changedToolCount: 0,
+        error: '',
+        promise: null,
+      };
+
+      return {
+        ok: true,
+        skipped: true,
+        result: 'already_synced',
+        touchedToolCount: nextConfig.touchedToolCount,
+        changedToolCount: 0,
+      };
+    }
+
+    await updateElevenLabsAgent(agentId, {
+      conversation_config: nextConfig.conversationConfig,
+    });
+
+    elevenLabsToolCallSoundSyncState = {
+      ...elevenLabsToolCallSoundSyncState,
+      agentId,
+      sound,
+      behavior,
+      result: 'synced',
+      syncedAtMs: Date.now(),
+      touchedToolCount: nextConfig.touchedToolCount,
+      changedToolCount: nextConfig.changedToolCount,
+      error: '',
+      promise: null,
+    };
+
+    console.log(
+      '[ElevenLabs Tool Sound Sync]',
+      JSON.stringify(
+        {
+          agentId,
+          sound,
+          behavior,
+          touchedToolCount: nextConfig.touchedToolCount,
+          changedToolCount: nextConfig.changedToolCount,
+        },
+        null,
+        2
+      )
+    );
+
+    return {
+      ok: true,
+      result: 'synced',
+      touchedToolCount: nextConfig.touchedToolCount,
+      changedToolCount: nextConfig.changedToolCount,
+    };
+  })().catch((error) => {
+    elevenLabsToolCallSoundSyncState = {
+      ...elevenLabsToolCallSoundSyncState,
+      agentId,
+      sound,
+      behavior,
+      result: 'error',
+      syncedAtMs: Date.now(),
+      touchedToolCount: 0,
+      changedToolCount: 0,
+      error: normalizeString(error?.message || error),
+      promise: null,
+    };
+    throw error;
+  });
+
+  elevenLabsToolCallSoundSyncState = {
+    ...elevenLabsToolCallSoundSyncState,
+    agentId,
+    sound,
+    behavior,
+    promise: syncPromise,
+  };
+
+  return syncPromise;
 }
 
 function toIsoFromUnixSeconds(value) {
@@ -4637,6 +5269,23 @@ function buildElevenLabsConversationUpdate(callId, details, fallback = {}) {
 }
 
 async function createElevenLabsOutboundCall(lead, campaign) {
+  try {
+    await ensureElevenLabsToolCallSoundConfigured();
+  } catch (error) {
+    console.warn(
+      '[ElevenLabs Tool Sound Sync Failed]',
+      JSON.stringify(
+        {
+          message: error?.message || 'Onbekende fout',
+          status: error?.status || null,
+          endpoint: error?.endpoint || null,
+        },
+        null,
+        2
+      )
+    );
+  }
+
   const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
   const payload = {
     agent_id: getConfiguredElevenLabsAgentId(),
@@ -4876,9 +5525,52 @@ function classifyElevenLabsFailure(error) {
   };
 }
 
-function buildVapiPayload(lead, campaign) {
+async function buildVapiPayload(lead, campaign) {
   const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
+  const assistantOverrides = {
+    variableValues: buildVariableValues(
+      {
+        ...lead,
+        phone: normalizedPhone,
+      },
+      campaign
+    ),
+    backgroundSound: getConfiguredColdcallingBackgroundSound(),
+  };
+
+  try {
+    const { voiceOverride, source } = await getConfiguredVapiElevenLabsVoiceOverride();
+    if (voiceOverride) {
+      assistantOverrides.voice = voiceOverride;
+      console.log(
+        '[Coldcalling][Vapi Voice Override]',
+        JSON.stringify(
+          {
+            source,
+            provider: voiceOverride.provider,
+            voiceId: voiceOverride.voiceId,
+            backgroundSound: assistantOverrides.backgroundSound,
+          },
+          null,
+          2
+        )
+      );
+    }
+  } catch (error) {
+    console.warn(
+      '[Coldcalling][Vapi Voice Override Failed]',
+      JSON.stringify(
+        {
+          message: error?.message || 'Onbekende fout',
+          status: error?.status || null,
+          endpoint: error?.endpoint || null,
+        },
+        null,
+        2
+      )
+    );
+  }
 
   return {
     assistantId: process.env.VAPI_ASSISTANT_ID,
@@ -4887,15 +5579,7 @@ function buildVapiPayload(lead, campaign) {
       name: normalizeString(lead.name) || normalizeString(lead.company) || 'Onbekende lead',
       number: normalizedPhone,
     },
-    assistantOverrides: {
-      variableValues: buildVariableValues(
-        {
-          ...lead,
-          phone: normalizedPhone,
-        },
-        campaign
-      ),
-    },
+    assistantOverrides,
     metadata: {
       source: 'softora-coldcalling-dashboard',
       leadCompany: normalizeString(lead.company),
@@ -4909,7 +5593,7 @@ function buildVapiPayload(lead, campaign) {
 
 async function processVapiColdcallingLead(lead, campaign, index) {
   try {
-    const payload = buildVapiPayload(lead, campaign);
+    const payload = await buildVapiPayload(lead, campaign);
     const normalizedPhone = payload.customer.number;
     const { endpoint, data } = await createVapiOutboundCall(payload);
     const callId = data?.id || data?.call?.id || null;
@@ -5511,6 +6195,7 @@ async function sendColdcallingStatusResponse(res, callId) {
 
 app.post('/api/coldcalling/start', async (req, res) => {
   const provider = getColdcallingProvider();
+  const configuredProvider = normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase();
   const missingEnv = getMissingEnvVars(provider);
 
   if (missingEnv.length > 0) {
@@ -5552,6 +6237,16 @@ app.post('/api/coldcalling/start', async (req, res) => {
 
   const leads = allowedLeads;
   const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
+
+  if (
+    provider === 'vapi' &&
+    configuredProvider === 'elevenlabs' &&
+    isContinuousColdcallingBackgroundSoundEnabled()
+  ) {
+    console.log(
+      `[Coldcalling] COLDCALLING_PROVIDER=elevenlabs automatisch omgezet naar Vapi omdat continue background sound "${getConfiguredColdcallingBackgroundSound()}" via Vapi transport moet lopen.`
+    );
+  }
 
   console.log(
     `[Coldcalling] Start campagne ontvangen via ${provider}: ${leadsToProcess.length}/${originalLeads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
@@ -7494,6 +8189,15 @@ function startServer() {
   app.listen(PORT, () => {
     const provider = getColdcallingProvider();
     console.log(`Softora coldcalling backend draait op http://localhost:${PORT} (provider: ${provider})`);
+    if (
+      provider === 'vapi' &&
+      isContinuousColdcallingBackgroundSoundEnabled() &&
+      normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase() === 'elevenlabs'
+    ) {
+      console.log(
+        `[Startup] Vapi transport geforceerd voor continue background sound "${getConfiguredColdcallingBackgroundSound()}".`
+      );
+    }
     const missingEnv = getMissingEnvVars(provider);
     if (missingEnv.length > 0) {
       console.warn(
