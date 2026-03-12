@@ -5103,12 +5103,13 @@ function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssi
 function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssistant = null) {
   const settings = getElevenLabsAgentRuntimeSettings(agentData);
   const overrides = {};
+  const fallbackFirstMessage = normalizeString(fallbackAssistant?.firstMessage);
 
   if (settings.firstMessage) {
     overrides.firstMessage = settings.firstMessage;
     overrides.firstMessageMode = 'assistant-speaks-first';
-  } else {
-    overrides.firstMessageMode = 'assistant-waits-for-user';
+  } else if (!fallbackFirstMessage) {
+    overrides.firstMessageMode = 'assistant-speaks-first-with-model-generated-message';
   }
 
   if (typeof settings.disableFirstMessageInterruptions === 'boolean') {
@@ -5140,6 +5141,7 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
     overrides,
     summary: {
       syncedFirstMessage: Boolean(settings.firstMessage),
+      firstMessageMode: normalizeString(overrides.firstMessageMode),
       syncedPrompt: Boolean(settings.promptText),
       syncedModel: Boolean(modelOverride),
       syncedTranscriber: Boolean(transcriberOverride),
@@ -5176,6 +5178,7 @@ function buildVapiElevenLabsVoiceOverrideFromSource(source) {
   );
   const model = normalizeVapiElevenLabsVoiceModel(source.model || source.model_id);
   const language = normalizeString(source.language);
+  const supportsLanguageEnforcement = model === 'eleven_turbo_v2_5';
 
   if (stability !== null) voiceOverride.stability = stability;
   if (similarityBoost !== null) voiceOverride.similarityBoost = similarityBoost;
@@ -5185,7 +5188,7 @@ function buildVapiElevenLabsVoiceOverrideFromSource(source) {
     voiceOverride.optimizeStreamingLatency = Math.round(optimizeStreamingLatency);
   }
   if (model) voiceOverride.model = model;
-  if (language) voiceOverride.language = language;
+  if (language && supportsLanguageEnforcement) voiceOverride.language = language;
 
   const hasUseSpeakerBoost =
     Object.prototype.hasOwnProperty.call(source, 'useSpeakerBoost') ||
@@ -5198,6 +5201,19 @@ function buildVapiElevenLabsVoiceOverrideFromSource(source) {
   }
 
   return voiceOverride;
+}
+
+function buildVapiElevenLabsCredentialsOverride() {
+  const apiKey = normalizeString(process.env.ELEVENLABS_API_KEY);
+  if (!apiKey) return null;
+
+  return [
+    {
+      provider: '11labs',
+      apiKey,
+      name: 'runtime-elevenlabs',
+    },
+  ];
 }
 
 function buildConfiguredVapiElevenLabsVoiceOverrideFromEnv() {
@@ -6050,6 +6066,7 @@ function classifyElevenLabsFailure(error) {
 async function buildVapiPayload(lead, campaign) {
   const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
+  const elevenLabsCredentials = buildVapiElevenLabsCredentialsOverride();
   const assistantOverrides = {
     variableValues: buildVariableValues(
       {
@@ -6060,6 +6077,9 @@ async function buildVapiPayload(lead, campaign) {
     ),
     backgroundSound: getConfiguredColdcallingBackgroundSound(),
   };
+  if (elevenLabsCredentials) {
+    assistantOverrides.credentials = elevenLabsCredentials;
+  }
 
   try {
     const [{ assistant: vapiAssistant, source: vapiAssistantSource }, { data: elevenLabsAgentData, source: elevenLabsAgentSource }] =
@@ -6089,7 +6109,13 @@ async function buildVapiPayload(lead, campaign) {
             voiceSource: source,
             voiceProvider: voiceOverride?.provider || '',
             voiceId: voiceOverride?.voiceId || '',
+            credentialProviders: Array.isArray(assistantOverrides.credentials)
+              ? assistantOverrides.credentials
+                  .map((credential) => normalizeString(credential?.provider))
+                  .filter(Boolean)
+              : [],
             syncedFirstMessage: syncedAgentConfig.summary.syncedFirstMessage,
+            firstMessageMode: syncedAgentConfig.summary.firstMessageMode,
             syncedPrompt: syncedAgentConfig.summary.syncedPrompt,
             syncedModel: syncedAgentConfig.summary.syncedModel,
             syncedTranscriber: syncedAgentConfig.summary.syncedTranscriber,
@@ -6111,6 +6137,11 @@ async function buildVapiPayload(lead, campaign) {
             provider: voiceOverride.provider,
             voiceId: voiceOverride.voiceId,
             backgroundSound: assistantOverrides.backgroundSound,
+            credentialProviders: Array.isArray(assistantOverrides.credentials)
+              ? assistantOverrides.credentials
+                  .map((credential) => normalizeString(credential?.provider))
+                  .filter(Boolean)
+              : [],
           },
           null,
           2
