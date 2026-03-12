@@ -123,6 +123,13 @@ let elevenLabsConversationListCache = {
   agentId: '',
   conversations: [],
 };
+let vapiAssistantConfigCache = {
+  assistantId: '',
+  fetchedAtMs: 0,
+  assistant: null,
+  error: '',
+  promise: null,
+};
 let elevenLabsToolCallSoundSyncState = {
   agentId: '',
   sound: '',
@@ -139,6 +146,13 @@ let elevenLabsAgentVoiceOverrideCache = {
   fetchedAtMs: 0,
   voiceOverride: null,
   source: '',
+  error: '',
+  promise: null,
+};
+let elevenLabsAgentConfigCache = {
+  agentId: '',
+  fetchedAtMs: 0,
+  data: null,
   error: '',
   promise: null,
 };
@@ -4480,6 +4494,119 @@ async function createVapiOutboundCall(payload) {
   throw lastError || new Error('Onbekende fout bij starten Vapi call');
 }
 
+async function fetchVapiAssistant(assistantId) {
+  const normalizedAssistantId = normalizeString(assistantId);
+  if (!normalizedAssistantId) {
+    throw new Error('Vapi assistantId ontbreekt');
+  }
+
+  const endpoints = [`/assistant/${encodeURIComponent(normalizedAssistantId)}`, `/assistants/${encodeURIComponent(normalizedAssistantId)}`];
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const { response, data } = await fetchJsonWithTimeout(
+        `${VAPI_BASE_URL}${endpoint}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${process.env.VAPI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        return { endpoint, data };
+      }
+
+      const statusError = new Error(
+        data?.message || data?.error || data?.raw || `Vapi assistant fout (${response.status})`
+      );
+      statusError.status = response.status;
+      statusError.endpoint = endpoint;
+      statusError.data = data;
+      lastError = statusError;
+
+      if (response.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
+        continue;
+      }
+
+      throw statusError;
+    } catch (error) {
+      lastError = error;
+      if (error?.name === 'AbortError') {
+        throw new Error('Timeout bij ophalen Vapi assistant');
+      }
+      if (error?.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError || new Error('Kon Vapi assistant niet ophalen');
+}
+
+async function getConfiguredVapiAssistant() {
+  const assistantId = normalizeString(process.env.VAPI_ASSISTANT_ID);
+  if (!normalizeString(process.env.VAPI_API_KEY) || !assistantId) {
+    return {
+      assistant: null,
+      source: 'none',
+    };
+  }
+
+  if (
+    vapiAssistantConfigCache.assistantId === assistantId &&
+    vapiAssistantConfigCache.assistant &&
+    Date.now() - Number(vapiAssistantConfigCache.fetchedAtMs || 0) <
+      ELEVENLABS_TOOL_CALL_SOUND_SYNC_CACHE_TTL_MS
+  ) {
+    return {
+      assistant: cloneJsonSafe(vapiAssistantConfigCache.assistant, null),
+      source: 'cache',
+    };
+  }
+
+  if (vapiAssistantConfigCache.assistantId === assistantId && vapiAssistantConfigCache.promise) {
+    return vapiAssistantConfigCache.promise;
+  }
+
+  const syncPromise = (async () => {
+    const { data } = await fetchVapiAssistant(assistantId);
+    vapiAssistantConfigCache = {
+      assistantId,
+      fetchedAtMs: Date.now(),
+      assistant: cloneJsonSafe(data, null),
+      error: '',
+      promise: null,
+    };
+
+    return {
+      assistant: cloneJsonSafe(data, null),
+      source: 'api',
+    };
+  })().catch((error) => {
+    vapiAssistantConfigCache = {
+      assistantId,
+      fetchedAtMs: Date.now(),
+      assistant: null,
+      error: normalizeString(error?.message || error),
+      promise: null,
+    };
+    throw error;
+  });
+
+  vapiAssistantConfigCache = {
+    ...vapiAssistantConfigCache,
+    assistantId,
+    promise: syncPromise,
+  };
+
+  return syncPromise;
+}
+
 async function fetchVapiCallStatusById(callId) {
   const normalizedCallId = normalizeString(callId);
   if (!normalizedCallId) {
@@ -4627,6 +4754,99 @@ function buildVariableValues(lead, campaign) {
   };
 }
 
+function getElevenLabsConversationConfigRoot(agentData) {
+  const conversationConfig =
+    agentData?.conversation_config && typeof agentData.conversation_config === 'object'
+      ? agentData.conversation_config
+      : agentData?.conversationConfig && typeof agentData.conversationConfig === 'object'
+        ? agentData.conversationConfig
+        : null;
+  return conversationConfig;
+}
+
+function getElevenLabsAgentConfig(agentData) {
+  const conversationConfig = getElevenLabsConversationConfigRoot(agentData);
+  if (!conversationConfig || typeof conversationConfig !== 'object') return null;
+
+  if (conversationConfig.agent && typeof conversationConfig.agent === 'object') {
+    return conversationConfig.agent;
+  }
+
+  if (conversationConfig.agent_config && typeof conversationConfig.agent_config === 'object') {
+    return conversationConfig.agent_config;
+  }
+
+  return null;
+}
+
+function getElevenLabsPromptConfig(agentData) {
+  const agentConfig = getElevenLabsAgentConfig(agentData);
+  if (!agentConfig || typeof agentConfig !== 'object') return null;
+
+  if (agentConfig.prompt && typeof agentConfig.prompt === 'object') {
+    return agentConfig.prompt;
+  }
+
+  if (agentConfig.prompt_config && typeof agentConfig.prompt_config === 'object') {
+    return agentConfig.prompt_config;
+  }
+
+  return null;
+}
+
+function getElevenLabsTtsConfig(agentData) {
+  const conversationConfig = getElevenLabsConversationConfigRoot(agentData);
+  if (!conversationConfig || typeof conversationConfig !== 'object') return null;
+
+  if (conversationConfig.tts && typeof conversationConfig.tts === 'object') {
+    return conversationConfig.tts;
+  }
+
+  if (conversationConfig.tts_config && typeof conversationConfig.tts_config === 'object') {
+    return conversationConfig.tts_config;
+  }
+
+  return null;
+}
+
+function getElevenLabsConversationLimitsConfig(agentData) {
+  const conversationConfig = getElevenLabsConversationConfigRoot(agentData);
+  if (!conversationConfig || typeof conversationConfig !== 'object') return null;
+
+  if (conversationConfig.conversation && typeof conversationConfig.conversation === 'object') {
+    return conversationConfig.conversation;
+  }
+
+  if (conversationConfig.conversation_config && typeof conversationConfig.conversation_config === 'object') {
+    return conversationConfig.conversation_config;
+  }
+
+  return null;
+}
+
+function getElevenLabsAgentRuntimeSettings(agentData) {
+  const agentConfig = getElevenLabsAgentConfig(agentData);
+  const promptConfig = getElevenLabsPromptConfig(agentData);
+  const limitsConfig = getElevenLabsConversationLimitsConfig(agentData);
+
+  return {
+    firstMessage: normalizeString(agentConfig?.firstMessage || agentConfig?.first_message),
+    language: normalizeString(agentConfig?.language),
+    disableFirstMessageInterruptions:
+      typeof (agentConfig?.disableFirstMessageInterruptions ?? agentConfig?.disable_first_message_interruptions) === 'boolean'
+        ? Boolean(agentConfig?.disableFirstMessageInterruptions ?? agentConfig?.disable_first_message_interruptions)
+        : null,
+    promptText: normalizeString(promptConfig?.prompt),
+    llm: normalizeString(promptConfig?.llm),
+    temperature: parseNumberSafe(promptConfig?.temperature, null),
+    maxTokens: parseNumberSafe(promptConfig?.maxTokens ?? promptConfig?.max_tokens, null),
+    maxDurationSeconds: parseNumberSafe(
+      limitsConfig?.maxDurationSeconds ?? limitsConfig?.max_duration_seconds,
+      null
+    ),
+  };
+}
+
 function normalizeVapiElevenLabsVoiceModel(value) {
   const normalized = normalizeString(value).toLowerCase();
   if (!normalized) return '';
@@ -4649,6 +4869,120 @@ function clampNumber(value, min, max) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
   return Math.min(max, Math.max(min, numeric));
+}
+
+function mapElevenLabsLlmToVapiModel(value) {
+  const llm = normalizeString(value).toLowerCase();
+  if (!llm) return null;
+
+  if (
+    llm.startsWith('gpt-') ||
+    llm.startsWith('chatgpt-') ||
+    /^o[134](?:-|$)/.test(llm) ||
+    llm.startsWith('gpt-realtime-')
+  ) {
+    return {
+      provider: 'openai',
+      model: llm,
+    };
+  }
+
+  if (llm.startsWith('claude-')) {
+    return {
+      provider: 'anthropic',
+      model: llm,
+    };
+  }
+
+  if (llm.startsWith('gemini-')) {
+    return {
+      provider: 'google',
+      model: llm,
+    };
+  }
+
+  return null;
+}
+
+function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = null) {
+  const settings = getElevenLabsAgentRuntimeSettings(agentData);
+  const mappedModel = mapElevenLabsLlmToVapiModel(settings.llm);
+  const nextModel =
+    fallbackModel && typeof fallbackModel === 'object' ? cloneJsonSafe(fallbackModel, {}) : {};
+
+  if (mappedModel) {
+    nextModel.provider = mappedModel.provider;
+    nextModel.model = mappedModel.model;
+  }
+
+  if (!normalizeString(nextModel.provider) || !normalizeString(nextModel.model)) {
+    if (!mappedModel) return null;
+    nextModel.provider = mappedModel.provider;
+    nextModel.model = mappedModel.model;
+  }
+
+  if (settings.promptText) {
+    nextModel.messages = [{ role: 'system', content: settings.promptText }];
+  }
+
+  if (Number.isFinite(settings.temperature)) {
+    nextModel.temperature = Math.max(0, Math.min(2, Number(settings.temperature)));
+  }
+
+  if (Number.isFinite(settings.maxTokens) && Number(settings.maxTokens) > 0) {
+    nextModel.maxTokens = Math.round(Number(settings.maxTokens));
+  }
+
+  if (
+    !settings.promptText &&
+    !mappedModel &&
+    !Number.isFinite(settings.temperature) &&
+    !Number.isFinite(settings.maxTokens)
+  ) {
+    return null;
+  }
+
+  return nextModel;
+}
+
+function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssistant = null) {
+  const settings = getElevenLabsAgentRuntimeSettings(agentData);
+  const overrides = {};
+
+  if (settings.firstMessage) {
+    overrides.firstMessage = settings.firstMessage;
+    overrides.firstMessageMode = 'assistant-speaks-first';
+  } else {
+    overrides.firstMessageMode = 'assistant-waits-for-user';
+  }
+
+  if (typeof settings.disableFirstMessageInterruptions === 'boolean') {
+    overrides.firstMessageInterruptionsEnabled = !settings.disableFirstMessageInterruptions;
+  }
+
+  const fallbackModel =
+    fallbackAssistant?.model && typeof fallbackAssistant.model === 'object'
+      ? fallbackAssistant.model
+      : null;
+  const modelOverride = buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel);
+  if (modelOverride) {
+    overrides.model = modelOverride;
+  }
+
+  if (Number.isFinite(settings.maxDurationSeconds) && Number(settings.maxDurationSeconds) > 0) {
+    overrides.maxDurationSeconds = Math.round(Number(settings.maxDurationSeconds));
+  }
+
+  return {
+    overrides,
+    summary: {
+      syncedFirstMessage: Boolean(settings.firstMessage),
+      syncedPrompt: Boolean(settings.promptText),
+      syncedModel: Boolean(modelOverride),
+      syncedMaxDuration: Boolean(overrides.maxDurationSeconds),
+      llm: settings.llm || '',
+    },
+  };
 }
 
 function buildVapiElevenLabsVoiceOverrideFromSource(source) {
@@ -4752,7 +5086,7 @@ function buildVapiElevenLabsVoiceOverrideFromAgent(agent) {
   );
 }
 
-async function getConfiguredVapiElevenLabsVoiceOverride() {
+async function getConfiguredVapiElevenLabsVoiceOverride(agentData = null) {
   const envOverride = buildConfiguredVapiElevenLabsVoiceOverrideFromEnv();
   if (envOverride) {
     return {
@@ -4762,68 +5096,28 @@ async function getConfiguredVapiElevenLabsVoiceOverride() {
   }
 
   const agentId = getConfiguredElevenLabsAgentId();
-  if (!normalizeString(process.env.ELEVENLABS_API_KEY) || !agentId) {
+  const resolvedAgentData = agentData || (await getConfiguredElevenLabsAgentData()).data;
+  if (!resolvedAgentData || !agentId) {
     return {
       voiceOverride: null,
       source: 'none',
     };
   }
 
-  if (
-    elevenLabsAgentVoiceOverrideCache.agentId === agentId &&
-    elevenLabsAgentVoiceOverrideCache.voiceOverride &&
-    Date.now() - Number(elevenLabsAgentVoiceOverrideCache.fetchedAtMs || 0) <
-      ELEVENLABS_TOOL_CALL_SOUND_SYNC_CACHE_TTL_MS
-  ) {
-    return {
-      voiceOverride: cloneJsonSafe(elevenLabsAgentVoiceOverrideCache.voiceOverride, null),
-      source: elevenLabsAgentVoiceOverrideCache.source || 'agent-cache',
-    };
-  }
-
-  if (
-    elevenLabsAgentVoiceOverrideCache.agentId === agentId &&
-    elevenLabsAgentVoiceOverrideCache.promise
-  ) {
-    return elevenLabsAgentVoiceOverrideCache.promise;
-  }
-
-  const syncPromise = (async () => {
-    const { data } = await fetchElevenLabsAgent(agentId);
-    const voiceOverride = buildVapiElevenLabsVoiceOverrideFromAgent(data);
-
-    elevenLabsAgentVoiceOverrideCache = {
-      agentId,
-      fetchedAtMs: Date.now(),
-      voiceOverride: cloneJsonSafe(voiceOverride, null),
-      source: voiceOverride ? 'agent' : 'agent-missing-voice',
-      error: '',
-      promise: null,
-    };
-
-    return {
-      voiceOverride,
-      source: elevenLabsAgentVoiceOverrideCache.source,
-    };
-  })().catch((error) => {
-    elevenLabsAgentVoiceOverrideCache = {
-      agentId,
-      fetchedAtMs: Date.now(),
-      voiceOverride: null,
-      source: 'error',
-      error: normalizeString(error?.message || error),
-      promise: null,
-    };
-    throw error;
-  });
-
+  const voiceOverride = buildVapiElevenLabsVoiceOverrideFromAgent(resolvedAgentData);
   elevenLabsAgentVoiceOverrideCache = {
-    ...elevenLabsAgentVoiceOverrideCache,
     agentId,
-    promise: syncPromise,
+    fetchedAtMs: Date.now(),
+    voiceOverride: cloneJsonSafe(voiceOverride, null),
+    source: voiceOverride ? 'agent' : 'agent-missing-voice',
+    error: '',
+    promise: null,
   };
 
-  return syncPromise;
+  return {
+    voiceOverride: cloneJsonSafe(voiceOverride, null),
+    source: elevenLabsAgentVoiceOverrideCache.source,
+  };
 }
 
 function buildElevenLabsApiUrl(relativePath, searchParams = null) {
@@ -4963,6 +5257,68 @@ async function updateElevenLabsAgent(agentId, payload) {
   }
 
   return { endpoint, data };
+}
+
+async function getConfiguredElevenLabsAgentData() {
+  const agentId = getConfiguredElevenLabsAgentId();
+  if (!normalizeString(process.env.ELEVENLABS_API_KEY) || !agentId) {
+    return {
+      data: null,
+      source: 'none',
+    };
+  }
+
+  if (
+    elevenLabsAgentConfigCache.agentId === agentId &&
+    elevenLabsAgentConfigCache.data &&
+    Date.now() - Number(elevenLabsAgentConfigCache.fetchedAtMs || 0) <
+      ELEVENLABS_TOOL_CALL_SOUND_SYNC_CACHE_TTL_MS
+  ) {
+    return {
+      data: cloneJsonSafe(elevenLabsAgentConfigCache.data, null),
+      source: 'cache',
+    };
+  }
+
+  if (
+    elevenLabsAgentConfigCache.agentId === agentId &&
+    elevenLabsAgentConfigCache.promise
+  ) {
+    return elevenLabsAgentConfigCache.promise;
+  }
+
+  const syncPromise = (async () => {
+    const { data } = await fetchElevenLabsAgent(agentId);
+    elevenLabsAgentConfigCache = {
+      agentId,
+      fetchedAtMs: Date.now(),
+      data: cloneJsonSafe(data, null),
+      error: '',
+      promise: null,
+    };
+
+    return {
+      data: cloneJsonSafe(data, null),
+      source: 'api',
+    };
+  })().catch((error) => {
+    elevenLabsAgentConfigCache = {
+      agentId,
+      fetchedAtMs: Date.now(),
+      data: null,
+      error: normalizeString(error?.message || error),
+      promise: null,
+    };
+    throw error;
+  });
+
+  elevenLabsAgentConfigCache = {
+    ...elevenLabsAgentConfigCache,
+    agentId,
+    promise: syncPromise,
+  };
+
+  return syncPromise;
 }
 
 async function ensureElevenLabsToolCallSoundConfigured({ force = false } = {}) {
@@ -5540,9 +5896,44 @@ async function buildVapiPayload(lead, campaign) {
   };
 
   try {
-    const { voiceOverride, source } = await getConfiguredVapiElevenLabsVoiceOverride();
+    const [{ assistant: vapiAssistant, source: vapiAssistantSource }, { data: elevenLabsAgentData, source: elevenLabsAgentSource }] =
+      await Promise.all([getConfiguredVapiAssistant(), getConfiguredElevenLabsAgentData()]);
+
+    const { voiceOverride, source } = await getConfiguredVapiElevenLabsVoiceOverride(
+      elevenLabsAgentData
+    );
     if (voiceOverride) {
       assistantOverrides.voice = voiceOverride;
+    }
+
+    if (elevenLabsAgentData) {
+      const syncedAgentConfig = buildVapiAssistantOverridesFromElevenLabsAgent(
+        elevenLabsAgentData,
+        vapiAssistant
+      );
+      Object.assign(assistantOverrides, syncedAgentConfig.overrides);
+
+      console.log(
+        '[Coldcalling][ElevenLabs -> Vapi Sync]',
+        JSON.stringify(
+          {
+            backgroundSound: assistantOverrides.backgroundSound,
+            vapiAssistantSource,
+            elevenLabsAgentSource,
+            voiceSource: source,
+            voiceProvider: voiceOverride?.provider || '',
+            voiceId: voiceOverride?.voiceId || '',
+            syncedFirstMessage: syncedAgentConfig.summary.syncedFirstMessage,
+            syncedPrompt: syncedAgentConfig.summary.syncedPrompt,
+            syncedModel: syncedAgentConfig.summary.syncedModel,
+            syncedMaxDuration: syncedAgentConfig.summary.syncedMaxDuration,
+            llm: syncedAgentConfig.summary.llm,
+          },
+          null,
+          2
+        )
+      );
+    } else if (voiceOverride) {
       console.log(
         '[Coldcalling][Vapi Voice Override]',
         JSON.stringify(
@@ -5559,7 +5950,7 @@ async function buildVapiPayload(lead, campaign) {
     }
   } catch (error) {
     console.warn(
-      '[Coldcalling][Vapi Voice Override Failed]',
+      '[Coldcalling][ElevenLabs Sync Failed]',
       JSON.stringify(
         {
           message: error?.message || 'Onbekende fout',
