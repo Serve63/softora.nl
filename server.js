@@ -9,6 +9,13 @@ require('dotenv').config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const APP_BUILD_ID = String(
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.RENDER_GIT_COMMIT ||
+    process.env.GIT_COMMIT ||
+    process.env.COMMIT_SHA ||
+    ''
+).trim();
 const VAPI_BASE_URL = process.env.VAPI_BASE_URL || 'https://api.vapi.ai';
 const ELEVENLABS_API_BASE_URL = process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io/v1';
 const OPENAI_API_BASE_URL = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
@@ -1644,9 +1651,58 @@ function normalizeColdcallingBackgroundSound(value) {
   const raw = normalizeString(value);
   if (!raw) return 'office';
   if (/^(0|false|no|nee|off|disabled|none)$/i.test(raw)) return 'off';
-  if (/^(office|kantoor)$/i.test(raw)) return 'office';
+  if (/^(office|kantoor)$/i.test(raw)) {
+    return buildHostedColdcallingOfficeBackgroundSoundUrl() || 'office';
+  }
   if (/^https?:\/\//i.test(raw)) return raw;
-  return 'office';
+  return buildHostedColdcallingOfficeBackgroundSoundUrl() || 'office';
+}
+
+function normalizePublicBaseUrl(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const url = new URL(withProtocol);
+    if (!/^https?:$/i.test(url.protocol)) return '';
+    url.hash = '';
+    url.search = '';
+    url.pathname = '/';
+    return url.toString().replace(/\/$/, '');
+  } catch (_error) {
+    return '';
+  }
+}
+
+function getConfiguredPublicBaseUrl() {
+  const candidates = [
+    process.env.COLDCALLING_PUBLIC_BASE_URL,
+    process.env.PUBLIC_BASE_URL,
+    process.env.APP_BASE_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    process.env.VERCEL_BRANCH_URL,
+    process.env.VERCEL_URL,
+    'https://www.softora.nl',
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizePublicBaseUrl(candidate);
+    if (normalized) return normalized;
+  }
+
+  return '';
+}
+
+function buildHostedColdcallingOfficeBackgroundSoundUrl() {
+  const baseUrl = getConfiguredPublicBaseUrl();
+  if (!baseUrl) return '';
+
+  try {
+    return new URL('/assets/office-ambient-loud.mp3', `${baseUrl}/`).toString();
+  } catch (_error) {
+    return '';
+  }
 }
 
 function getConfiguredColdcallingBackgroundSound() {
@@ -5178,6 +5234,7 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
     overrides.firstMessage = resolvedFirstMessage.text;
     overrides.firstMessageMode = 'assistant-speaks-first';
   } else {
+    overrides.firstMessage = '';
     overrides.firstMessageMode = 'assistant-waits-for-user';
   }
 
@@ -8518,6 +8575,7 @@ app.get('/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
+    build: APP_BUILD_ID || null,
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
@@ -8533,6 +8591,7 @@ app.get('/api/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
+    build: APP_BUILD_ID || null,
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
@@ -8546,6 +8605,7 @@ app.get('/api/healthz', (_req, res) => {
 function sendRuntimeHealthDebug(_req, res) {
   return res.status(200).json({
     ok: true,
+    build: APP_BUILD_ID || null,
     timestamp: new Date().toISOString(),
     runtime: {
       webhookEvents: recentWebhookEvents.length,
