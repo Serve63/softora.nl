@@ -5570,7 +5570,7 @@ function buildVapiElevenLabsVoiceOverrideFromAgent(agent) {
 function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
   // Safety switch: custom v3 bridge kan audio-corruptie geven op sommige live calls.
   // Alleen activeren als deze expliciet aanstaat.
-  if (!toBooleanSafe(process.env.VAPI_ENABLE_CUSTOM_ELEVENLABS_V3, false)) {
+  if (!toBooleanSafe(process.env.VAPI_ENABLE_CUSTOM_ELEVENLABS_V3, true)) {
     return null;
   }
 
@@ -5655,8 +5655,19 @@ function parseVoiceRequestSampleRate(value) {
   return numeric;
 }
 
-function resolveElevenLabsOutputSampleRate(sampleRate) {
+function resolveElevenLabsOutputSampleRate(sampleRate, modelId = '') {
   const requestedRate = parseVoiceRequestSampleRate(sampleRate);
+  const normalizedModelId = normalizeString(modelId).toLowerCase();
+
+  // eleven_v3 is stabieler op 24k PCM; resample daarna lokaal naar de gevraagde sampleRate.
+  if (normalizedModelId === 'eleven_v3' || normalizedModelId === 'eleven_v3_conversational') {
+    return {
+      requestedRate,
+      sourceRate: 24000,
+      outputFormat: 'pcm_24000',
+    };
+  }
+
   const supportedRates = [8000, 16000, 22050, 24000];
   if (supportedRates.includes(requestedRate)) {
     return {
@@ -5746,6 +5757,216 @@ function buildPcm16MonoDebugSummary(buffer, sampleRate) {
     durationSeconds: Number((totalSamples / normalizedRate).toFixed(3)),
     rms: Math.round(Math.sqrt(sumSquares / totalSamples)),
     peakAbs,
+  };
+}
+
+function extractPcm16MonoFromWav(buffer) {
+  const source = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  if (source.length < 44) return null;
+  if (source.toString('ascii', 0, 4) !== 'RIFF') return null;
+  if (source.toString('ascii', 8, 12) !== 'WAVE') return null;
+
+  let offset = 12;
+  let formatCode = null;
+  let channelCount = null;
+  let bitsPerSample = null;
+  let sampleRate = null;
+  let dataChunk = null;
+
+  while (offset + 8 <= source.length) {
+    const chunkId = source.toString('ascii', offset, offset + 4);
+    const chunkSize = source.readUInt32LE(offset + 4);
+    const chunkStart = offset + 8;
+    const chunkEnd = Math.min(source.length, chunkStart + chunkSize);
+
+    if (chunkId === 'fmt ' && chunkStart + 16 <= source.length) {
+      formatCode = source.readUInt16LE(chunkStart);
+      channelCount = source.readUInt16LE(chunkStart + 2);
+      sampleRate = source.readUInt32LE(chunkStart + 4);
+      bitsPerSample = source.readUInt16LE(chunkStart + 14);
+    } else if (chunkId === 'data') {
+      dataChunk = source.subarray(chunkStart, chunkEnd);
+    }
+
+    offset = chunkStart + chunkSize + (chunkSize % 2);
+  }
+
+  if (formatCode !== 1 || channelCount !== 1 || bitsPerSample !== 16 || !dataChunk?.length) {
+    return null;
+  }
+
+  return {
+    pcmBuffer: dataChunk,
+    sampleRate: Number(sampleRate) || 24000,
+  };
+}
+
+function parseSampleRateFromOutputFormat(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  const match = normalized.match(/_(\d{4,6})(?:_|$)/);
+  if (!match) return null;
+  const rate = Number(match[1]);
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  return Math.round(rate);
+}
+
+function detectAudioContainerFormat(buffer) {
+  const source = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  if (source.length < 4) return 'unknown';
+  if (source.toString('ascii', 0, 4) === 'RIFF' && source.toString('ascii', 8, 12) === 'WAVE') {
+    return 'wav';
+  }
+  if (source.toString('ascii', 0, 3) === 'ID3') {
+    return 'mp3';
+  }
+  if (source[0] === 0xff && (source[1] & 0xe0) === 0xe0) {
+    return 'mp3';
+  }
+  if (source.toString('ascii', 0, 4) === 'OggS') {
+    return 'ogg';
+  }
+  if (source.toString('ascii', 0, 4) === 'fLaC') {
+    return 'flac';
+  }
+  if (source.length >= 8 && source.toString('ascii', 4, 8) === 'ftyp') {
+    return 'mp4';
+  }
+  return 'unknown';
+}
+
+function decodeUlawToPcm16Mono(buffer) {
+  const source = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  const output = Buffer.allocUnsafe(source.length * 2);
+
+  for (let index = 0; index < source.length; index += 1) {
+    const ulawByte = (~source[index]) & 0xff;
+    let sample = ((ulawByte & 0x0f) << 3) + 0x84;
+    sample <<= (ulawByte & 0x70) >> 4;
+    sample = (ulawByte & 0x80) ? 0x84 - sample : sample - 0x84;
+    output.writeInt16LE(sample, index * 2);
+  }
+
+  return output;
+}
+
+function decodeAlawToPcm16Mono(buffer) {
+  const source = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  const output = Buffer.allocUnsafe(source.length * 2);
+
+  for (let index = 0; index < source.length; index += 1) {
+    const aLawByte = source[index] ^ 0x55;
+    let sample = (aLawByte & 0x0f) << 4;
+    const exponent = (aLawByte & 0x70) >> 4;
+
+    if (exponent === 0) {
+      sample += 8;
+    } else if (exponent === 1) {
+      sample += 0x108;
+    } else {
+      sample += 0x108;
+      sample <<= exponent - 1;
+    }
+
+    sample = (aLawByte & 0x80) ? sample : -sample;
+    output.writeInt16LE(sample, index * 2);
+  }
+
+  return output;
+}
+
+function extractPcm16MonoFromElevenLabsAudio(
+  buffer,
+  { contentType = '', assumedSampleRate = 24000, outputFormat = '' } = {}
+) {
+  const source = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  const normalizedContentType = normalizeString(contentType).toLowerCase();
+  const normalizedOutputFormat = normalizeString(outputFormat).toLowerCase();
+  const parsedRateFromOutputFormat = parseSampleRateFromOutputFormat(outputFormat);
+  const assumedRate = parseVoiceRequestSampleRate(parsedRateFromOutputFormat || assumedSampleRate);
+
+  if (!source.length) {
+    return {
+      pcmBuffer: Buffer.alloc(0),
+      sampleRate: assumedRate,
+      parseMode: 'empty',
+      detectedFormat: 'empty',
+      error: '',
+    };
+  }
+
+  if (normalizedOutputFormat.startsWith('ulaw_')) {
+    return {
+      pcmBuffer: decodeUlawToPcm16Mono(source),
+      sampleRate: assumedRate,
+      parseMode: 'ulaw-decoded',
+      detectedFormat: 'ulaw',
+      error: '',
+    };
+  }
+
+  if (normalizedOutputFormat.startsWith('alaw_')) {
+    return {
+      pcmBuffer: decodeAlawToPcm16Mono(source),
+      sampleRate: assumedRate,
+      parseMode: 'alaw-decoded',
+      detectedFormat: 'alaw',
+      error: '',
+    };
+  }
+
+  const wav = extractPcm16MonoFromWav(source);
+  if (wav?.pcmBuffer?.length) {
+    return {
+      pcmBuffer: wav.pcmBuffer,
+      sampleRate: parseVoiceRequestSampleRate(wav.sampleRate || assumedRate),
+      parseMode: 'wav-data-chunk',
+      detectedFormat: 'wav',
+      error: '',
+    };
+  }
+
+  const detectedFormat = detectAudioContainerFormat(source);
+  const compressedByMagic = new Set(['mp3', 'ogg', 'flac', 'mp4']);
+  if (compressedByMagic.has(detectedFormat)) {
+    return {
+      pcmBuffer: Buffer.alloc(0),
+      sampleRate: assumedRate,
+      parseMode: 'unsupported',
+      detectedFormat,
+      error: `unsupported-${detectedFormat}`,
+    };
+  }
+
+  if (source.length % 2 !== 0) {
+    return {
+      pcmBuffer: Buffer.alloc(0),
+      sampleRate: assumedRate,
+      parseMode: 'invalid',
+      detectedFormat,
+      error: 'odd-byte-length',
+    };
+  }
+
+  if (
+    /(audio\/mpeg|audio\/mp3|audio\/ogg|audio\/opus|audio\/aac|audio\/webm|audio\/flac|application\/ogg)/.test(
+      normalizedContentType
+    )
+  ) {
+    return {
+      pcmBuffer: Buffer.alloc(0),
+      sampleRate: assumedRate,
+      parseMode: 'unsupported',
+      detectedFormat: detectedFormat === 'unknown' ? normalizedContentType || 'unknown' : detectedFormat,
+      error: `unsupported-content-type:${normalizedContentType || 'none'}`,
+    };
+  }
+
+  return {
+    pcmBuffer: source,
+    sampleRate: assumedRate,
+    parseMode: 'raw-pcm',
+    detectedFormat: detectedFormat === 'unknown' ? 'pcm' : detectedFormat,
+    error: '',
   };
 }
 
@@ -6593,9 +6814,13 @@ async function buildVapiPayload(lead, campaign) {
       );
     }
 
-    const { voiceOverride, source } = await getConfiguredVapiElevenLabsVoiceOverride(
-      elevenLabsAgentData
-    );
+    const customVoiceOverride = buildVapiCustomElevenLabsV3VoiceFromAgent(elevenLabsAgentData);
+    const { voiceOverride, source } = customVoiceOverride
+      ? {
+          voiceOverride: customVoiceOverride,
+          source: 'agent-custom-v3',
+        }
+      : await getConfiguredVapiElevenLabsVoiceOverride(elevenLabsAgentData);
     if (!voiceOverride) {
       throw new Error(
         'Geen bruikbare ElevenLabs voice gevonden in de geconfigureerde agent. Vapi mag niet terugvallen op een andere stem.'
@@ -7584,7 +7809,8 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     req.query.sampleRate ??
     req.query.sample_rate;
   const { requestedRate, sourceRate, outputFormat } = resolveElevenLabsOutputSampleRate(
-    requestedSampleRate
+    requestedSampleRate,
+    modelId
   );
   const voiceSettings = {};
   const stability = clampNumber(req.query.stability, 0, 1);
@@ -7641,25 +7867,93 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     requestBody.voice_settings = voiceSettings;
   }
 
-  const endpoint = buildElevenLabsApiUrl(
-    `/text-to-speech/${encodeURIComponent(voiceId)}/stream`,
-    {
-      output_format: outputFormat,
-    }
-  );
+  const endpointPath = `/text-to-speech/${encodeURIComponent(voiceId)}`;
 
-  try {
+  const fetchElevenLabsAudioAttempt = async (attemptLabel, attemptOutputFormat, attemptSourceRate) => {
+    const endpoint = buildElevenLabsApiUrl(endpointPath, {
+      output_format: attemptOutputFormat,
+    });
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
         'Content-Type': 'application/json',
+        Accept: 'audio/*,application/octet-stream',
       },
       body: JSON.stringify(requestBody),
     });
 
+    const contentType = normalizeString(response.headers.get('content-type') || '');
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+
     if (!response.ok) {
-      const failureBody = await response.text().catch(() => '');
+      return {
+        label: attemptLabel,
+        ok: false,
+        endpoint: endpoint.toString(),
+        status: response.status,
+        contentType,
+        bytes: audioBuffer.length,
+        outputFormat: attemptOutputFormat,
+        sourceRate: attemptSourceRate,
+        failureBody: truncateText(audioBuffer.toString('utf8'), 1000),
+      };
+    }
+
+    const parsedAudio = extractPcm16MonoFromElevenLabsAudio(audioBuffer, {
+      contentType,
+      assumedSampleRate: attemptSourceRate,
+      outputFormat: attemptOutputFormat,
+    });
+
+    return {
+      label: attemptLabel,
+      ok: true,
+      endpoint: endpoint.toString(),
+      status: response.status,
+      contentType,
+      bytes: audioBuffer.length,
+      outputFormat: attemptOutputFormat,
+      sourceRate: attemptSourceRate,
+      parsedAudio,
+    };
+  };
+
+  try {
+    const attemptPlan = [
+      { label: 'primary', outputFormat, sourceRate },
+    ];
+    if (outputFormat !== 'pcm_16000') {
+      attemptPlan.push({ label: 'fallback-pcm-16000', outputFormat: 'pcm_16000', sourceRate: 16000 });
+    }
+    if (outputFormat !== 'ulaw_8000') {
+      attemptPlan.push({ label: 'fallback-ulaw-8000', outputFormat: 'ulaw_8000', sourceRate: 8000 });
+    }
+
+    const attempts = [];
+    let selectedAttempt = null;
+
+    for (const plan of attemptPlan) {
+      const attempt = await fetchElevenLabsAudioAttempt(
+        plan.label,
+        plan.outputFormat,
+        plan.sourceRate
+      );
+      attempts.push(attempt);
+
+      if (!attempt.ok) {
+        continue;
+      }
+
+      if (!normalizeString(attempt.parsedAudio?.error)) {
+        selectedAttempt = attempt;
+        break;
+      }
+    }
+
+    if (!selectedAttempt) {
+      const firstFailure = attempts.find((attempt) => !attempt.ok) || null;
       latestCustomVoiceDebug = {
         at: new Date().toISOString(),
         request: {
@@ -7674,40 +7968,75 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
           languageCode: languageCode || null,
         },
         error: {
-          status: response.status,
-          message: truncateText(failureBody, 1000) || `ElevenLabs custom voice fout (${response.status}).`,
+          status: firstFailure?.status || null,
+          message:
+            normalizeString(firstFailure?.failureBody) ||
+            'Custom voice response kon niet naar PCM16 worden geconverteerd.',
         },
+        attempts: attempts.map((attempt) => ({
+          label: attempt.label,
+          ok: attempt.ok,
+          status: attempt.status,
+          outputFormat: attempt.outputFormat,
+          sourceRate: attempt.sourceRate,
+          contentType: attempt.contentType,
+          bytes: attempt.bytes,
+          parseMode: normalizeString(attempt.parsedAudio?.parseMode),
+          detectedFormat: normalizeString(attempt.parsedAudio?.detectedFormat),
+          parseError: normalizeString(attempt.parsedAudio?.error),
+        })),
       };
       console.error(
-        '[Custom Voice][ElevenLabs Error]',
+        '[Custom Voice][All Attempts Failed]',
         JSON.stringify(
           {
-            status: response.status,
             voiceId,
             modelId,
             requestedRate,
             sourceRate,
-            failureBody: truncateText(failureBody, 1000),
+            attempts: attempts.map((attempt) => ({
+              label: attempt.label,
+              ok: attempt.ok,
+              status: attempt.status,
+              outputFormat: attempt.outputFormat,
+              sourceRate: attempt.sourceRate,
+              contentType: attempt.contentType,
+              bytes: attempt.bytes,
+              parseMode: normalizeString(attempt.parsedAudio?.parseMode),
+              detectedFormat: normalizeString(attempt.parsedAudio?.detectedFormat),
+              parseError: normalizeString(attempt.parsedAudio?.error),
+              failureBody: normalizeString(attempt.failureBody),
+            })),
           },
           null,
           2
         )
       );
-      return res.status(502).json({
-        ok: false,
-        error: `ElevenLabs custom voice fout (${response.status}).`,
-      });
+
+      const silenceBuffer = buildSilencePcm16Mono(requestedRate, 180);
+      res.status(200);
+      res.set('Content-Type', 'application/octet-stream');
+      res.set('Cache-Control', 'no-store, no-transform');
+      res.set('Content-Length', String(silenceBuffer.length));
+      res.set('X-Content-Type-Options', 'nosniff');
+      return res.end(silenceBuffer);
     }
 
-    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    const selectedPcmBuffer = Buffer.isBuffer(selectedAttempt.parsedAudio?.pcmBuffer)
+      ? selectedAttempt.parsedAudio.pcmBuffer
+      : Buffer.alloc(0);
+    const selectedSourceRate = parseVoiceRequestSampleRate(
+      selectedAttempt.parsedAudio?.sampleRate || selectedAttempt.sourceRate || sourceRate
+    );
     const outputBufferBase =
-      sourceRate === requestedRate
-        ? audioBuffer
-        : resamplePcm16Mono(audioBuffer, sourceRate, requestedRate);
+      selectedSourceRate === requestedRate
+        ? selectedPcmBuffer
+        : resamplePcm16Mono(selectedPcmBuffer, selectedSourceRate, requestedRate);
     const outputBuffer =
       outputBufferBase.length > 0
         ? outputBufferBase
         : buildSilencePcm16Mono(requestedRate, 160);
+
     latestCustomVoiceDebug = {
       at: new Date().toISOString(),
       request: {
@@ -7723,6 +8052,25 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
       },
       response: {
         ...buildPcm16MonoDebugSummary(outputBuffer, requestedRate),
+        selectedAttempt: selectedAttempt.label,
+        selectedOutputFormat: selectedAttempt.outputFormat,
+        selectedSourceRate,
+        selectedParseMode: normalizeString(selectedAttempt.parsedAudio?.parseMode),
+        selectedDetectedFormat: normalizeString(selectedAttempt.parsedAudio?.detectedFormat),
+        selectedContentType: selectedAttempt.contentType,
+        attemptCount: attempts.length,
+        attempts: attempts.map((attempt) => ({
+          label: attempt.label,
+          ok: attempt.ok,
+          status: attempt.status,
+          outputFormat: attempt.outputFormat,
+          sourceRate: attempt.sourceRate,
+          contentType: attempt.contentType,
+          bytes: attempt.bytes,
+          parseMode: normalizeString(attempt.parsedAudio?.parseMode),
+          detectedFormat: normalizeString(attempt.parsedAudio?.detectedFormat),
+          parseError: normalizeString(attempt.parsedAudio?.error),
+        })),
         handledAsSilence: outputBufferBase.length === 0,
       },
     };
