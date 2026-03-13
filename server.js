@@ -726,7 +726,18 @@ function queueRuntimeStatePersist(reason = 'unknown') {
     });
 }
 
+function isColdcallingHistoryCutoffEnabled() {
+  return /^(1|true|yes|ja|on|enabled)$/i.test(
+    normalizeString(
+      process.env.COLDCALLING_HISTORY_CUTOFF_ENABLED ||
+        process.env.VAPI_CALL_HISTORY_CUTOFF_ENABLED ||
+        'false'
+    )
+  );
+}
+
 function getColdcallingHistoryVisibleAfterMs() {
+  if (!isColdcallingHistoryCutoffEnabled()) return 0;
   const value = Number(coldcallingHistoryVisibleAfterMs || 0);
   return Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
 }
@@ -9085,6 +9096,8 @@ app.get('/api/vapi/call-updates', async (req, res) => {
   return res.status(200).json({
     ok: true,
     count: Math.min(limit, filtered.length),
+    visibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
+    cutoffEnabled: isColdcallingHistoryCutoffEnabled(),
     updates: filtered.slice(0, limit),
   });
 });
