@@ -5298,12 +5298,22 @@ function getConfiguredColdcallingPreferredModel() {
   };
 }
 
+function shouldForceConfiguredPreferredModel() {
+  return /^(1|true|yes|ja|on|enabled)$/i.test(
+    normalizeString(
+      process.env.COLDCALLING_FORCE_PREFERRED_MODEL ||
+        process.env.VAPI_COLDCALLING_FORCE_PREFERRED_MODEL ||
+        'false'
+    )
+  );
+}
+
 function shouldForceElevenLabsTranscriberForColdcalling() {
-  return !/^(0|false|no|nee|off|disabled)$/i.test(
+  return /^(1|true|yes|ja|on|enabled)$/i.test(
     normalizeString(
       process.env.COLDCALLING_FORCE_ELEVENLABS_TRANSCRIBER ||
         process.env.VAPI_COLDCALLING_FORCE_ELEVENLABS_TRANSCRIBER ||
-        'true'
+        'false'
     )
   );
 }
@@ -5362,9 +5372,18 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
     if (mappedModel) {
       nextModel.provider = mappedModel.provider;
       nextModel.model = mappedModel.model;
-    } else {
+    } else if (shouldForceConfiguredPreferredModel()) {
       nextModel.provider = preferredModel.provider;
       nextModel.model = preferredModel.model;
+    } else if (fallbackModel && typeof fallbackModel === 'object') {
+      const fallbackProvider = normalizeString(fallbackModel.provider);
+      const fallbackResolvedModel = normalizeString(fallbackModel.model);
+      if (fallbackProvider && fallbackResolvedModel) {
+        nextModel.provider = fallbackProvider;
+        nextModel.model = fallbackResolvedModel;
+      }
+    } else {
+      return null;
     }
   }
 
@@ -7507,6 +7526,18 @@ async function processVapiColdcallingLead(lead, campaign, index) {
             payload.assistant?.voice?.server?.url || payload.assistantOverrides?.voice?.server?.url
           ),
           220
+        ),
+        transcriberProvider: normalizeString(
+          payload.assistant?.transcriber?.provider || payload.assistantOverrides?.transcriber?.provider
+        ),
+        transcriberModel: normalizeString(
+          payload.assistant?.transcriber?.model || payload.assistantOverrides?.transcriber?.model
+        ),
+        modelProvider: normalizeString(
+          payload.assistant?.model?.provider || payload.assistantOverrides?.model?.provider
+        ),
+        modelName: normalizeString(
+          payload.assistant?.model?.model || payload.assistantOverrides?.model?.model
         ),
       },
     };
