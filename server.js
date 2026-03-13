@@ -118,6 +118,25 @@ let elevenLabsConversationListCache = {
   agentId: '',
   conversations: [],
 };
+let elevenLabsTelephonyStatus = {
+  checkedAt: '',
+  checkedAtMs: 0,
+  ok: false,
+  issue: 'not_checked',
+  reason: 'Telephony check nog niet uitgevoerd.',
+  provider: 'elevenlabs',
+  phoneNumberId: '',
+  phoneNumberMasked: '',
+  supportsInbound: null,
+  supportsOutbound: null,
+  assignedAgentId: '',
+  configuredAgentId: '',
+  patchAttempted: false,
+  patched: false,
+  endpoint: '',
+  statusCode: null,
+};
+let elevenLabsTelephonyStatusPromise = null;
 let coldcallingHistoryVisibleAfterMs = 0;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
@@ -4556,6 +4575,252 @@ function buildElevenLabsApiUrl(relativePath, searchParams = null) {
   return url;
 }
 
+function toBooleanNullable(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'ja'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'nee'].includes(normalized)) return false;
+  }
+  if (typeof value === 'number') {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  return null;
+}
+
+function maskPhoneNumber(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length <= 4) return `***${digits}`;
+  const suffix = digits.slice(-4);
+  return `***${suffix}`;
+}
+
+function extractElevenLabsAssignedAgentId(payload) {
+  return normalizeString(
+    payload?.assigned_agent?.agent_id ||
+      payload?.assigned_agent?.id ||
+      payload?.assignedAgent?.agentId ||
+      payload?.assignedAgent?.id ||
+      payload?.assigned_agent_id ||
+      payload?.assignedAgentId ||
+      payload?.agent_id ||
+      payload?.agentId ||
+      ''
+  );
+}
+
+function normalizeElevenLabsPhonePayload(payload) {
+  if (payload && typeof payload.phone_number === 'object') return payload.phone_number;
+  if (payload && typeof payload.phoneNumber === 'object') return payload.phoneNumber;
+  return payload && typeof payload === 'object' ? payload : {};
+}
+
+function buildElevenLabsTelephonyStatusPatch(patch = {}) {
+  elevenLabsTelephonyStatus = {
+    ...elevenLabsTelephonyStatus,
+    ...patch,
+  };
+  return { ...elevenLabsTelephonyStatus };
+}
+
+function getElevenLabsTelephonyStatusSnapshot() {
+  return { ...elevenLabsTelephonyStatus };
+}
+
+function summarizeElevenLabsPhoneRuntime(phonePayload = {}, defaults = {}) {
+  const phone = normalizeElevenLabsPhonePayload(phonePayload);
+  const phoneNumberId = normalizeString(
+    phone?.phone_number_id || phone?.phoneNumberId || phone?.agent_phone_number_id || phone?.id || defaults.phoneNumberId || ''
+  );
+  const phoneNumberMasked = maskPhoneNumber(phone?.phone_number || phone?.phoneNumber || phone?.number || '');
+  const supportsInbound = toBooleanNullable(
+    phone?.supports_inbound ?? phone?.supportsInbound ?? phone?.inbound_enabled ?? phone?.inboundEnabled
+  );
+  const supportsOutbound = toBooleanNullable(
+    phone?.supports_outbound ?? phone?.supportsOutbound ?? phone?.outbound_enabled ?? phone?.outboundEnabled
+  );
+  const assignedAgentId = extractElevenLabsAssignedAgentId(phone);
+
+  return {
+    phoneNumberId,
+    phoneNumberMasked,
+    supportsInbound,
+    supportsOutbound,
+    assignedAgentId,
+  };
+}
+
+async function fetchElevenLabsPhoneNumberById(phoneNumberId) {
+  const endpoint = `/convai/phone-numbers/${encodeURIComponent(phoneNumberId)}`;
+  const { response, data } = await fetchJsonWithTimeout(
+    buildElevenLabsApiUrl(endpoint),
+    {
+      method: 'GET',
+      headers: {
+        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+      },
+    },
+    12000
+  );
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs phone ophalen mislukt (${response.status})`
+    );
+    error.status = response.status;
+    error.endpoint = endpoint;
+    error.data = data;
+    throw error;
+  }
+
+  return { endpoint, data };
+}
+
+async function patchElevenLabsPhoneAssignedAgent(phoneNumberId, agentId) {
+  const endpoint = `/convai/phone-numbers/${encodeURIComponent(phoneNumberId)}`;
+  const payload = { agent_id: agentId };
+  const { response, data } = await fetchJsonWithTimeout(
+    buildElevenLabsApiUrl(endpoint),
+    {
+      method: 'PATCH',
+      headers: {
+        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+    12000
+  );
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs phone update mislukt (${response.status})`
+    );
+    error.status = response.status;
+    error.endpoint = endpoint;
+    error.data = data;
+    throw error;
+  }
+
+  return { endpoint, data, statusCode: response.status };
+}
+
+async function ensureElevenLabsInboundRouting(options = {}) {
+  const force = Boolean(options?.force);
+  const reasonLabel = normalizeString(options?.reason || 'runtime-check');
+  const now = Date.now();
+
+  if (!force && elevenLabsTelephonyStatusPromise) {
+    return elevenLabsTelephonyStatusPromise;
+  }
+
+  if (!force && now - Number(elevenLabsTelephonyStatus.checkedAtMs || 0) < 60_000) {
+    return getElevenLabsTelephonyStatusSnapshot();
+  }
+
+  elevenLabsTelephonyStatusPromise = (async () => {
+    const checkedAt = new Date().toISOString();
+    const phoneNumberId = normalizeString(process.env.ELEVENLABS_PHONE_NUMBER_ID);
+    const configuredAgentId = getConfiguredElevenLabsAgentId();
+    const apiKeyPresent = Boolean(normalizeString(process.env.ELEVENLABS_API_KEY));
+
+    if (!apiKeyPresent || !phoneNumberId || !configuredAgentId) {
+      return buildElevenLabsTelephonyStatusPatch({
+        checkedAt,
+        checkedAtMs: now,
+        ok: false,
+        issue: 'missing_env',
+        reason:
+          'Telephony check kon niet draaien: ELEVENLABS_API_KEY, ELEVENLABS_PHONE_NUMBER_ID of ELEVENLABS_AGENT_ID ontbreekt.',
+        phoneNumberId,
+        configuredAgentId,
+        endpoint: '',
+        statusCode: null,
+        patchAttempted: false,
+        patched: false,
+      });
+    }
+
+    try {
+      const readResult = await fetchElevenLabsPhoneNumberById(phoneNumberId);
+      let runtime = summarizeElevenLabsPhoneRuntime(readResult.data, { phoneNumberId });
+      let patchAttempted = false;
+      let patched = false;
+      let patchStatusCode = null;
+      let issue = 'ok';
+      let issueReason = `Telephony check gelukt (${reasonLabel}).`;
+
+      if (runtime.supportsInbound === false) {
+        issue = 'inbound_disabled';
+        issueReason =
+          'Dit ElevenLabs nummer ondersteunt geen inbound calls (supports_inbound=false).';
+      } else if (!runtime.assignedAgentId || runtime.assignedAgentId !== configuredAgentId) {
+        patchAttempted = true;
+        const patchResult = await patchElevenLabsPhoneAssignedAgent(phoneNumberId, configuredAgentId);
+        patchStatusCode = Number(patchResult.statusCode || 0) || null;
+
+        const verifyRead = await fetchElevenLabsPhoneNumberById(phoneNumberId);
+        runtime = summarizeElevenLabsPhoneRuntime(verifyRead.data, { phoneNumberId });
+        patched = runtime.assignedAgentId === configuredAgentId;
+
+        if (patched) {
+          issueReason = 'Assigned agent op telefoonnummer hersteld naar geconfigureerde ElevenLabs-agent.';
+        } else {
+          issue = 'agent_mismatch';
+          issueReason =
+            'Telefoonnummer-agent koppeling kon niet bevestigd worden na patch.';
+        }
+      }
+
+      const ok = issue === 'ok' && runtime.supportsInbound !== false && runtime.assignedAgentId === configuredAgentId;
+      if (!ok && issue === 'ok') {
+        issue = runtime.supportsInbound === false ? 'inbound_disabled' : 'agent_mismatch';
+      }
+
+      return buildElevenLabsTelephonyStatusPatch({
+        checkedAt,
+        checkedAtMs: Date.now(),
+        ok,
+        issue,
+        reason: issueReason,
+        phoneNumberId: runtime.phoneNumberId || phoneNumberId,
+        phoneNumberMasked: runtime.phoneNumberMasked,
+        supportsInbound: runtime.supportsInbound,
+        supportsOutbound: runtime.supportsOutbound,
+        assignedAgentId: runtime.assignedAgentId,
+        configuredAgentId,
+        endpoint: readResult.endpoint,
+        statusCode: patchStatusCode,
+        patchAttempted,
+        patched,
+      });
+    } catch (error) {
+      return buildElevenLabsTelephonyStatusPatch({
+        checkedAt,
+        checkedAtMs: Date.now(),
+        ok: false,
+        issue: 'api_error',
+        reason: normalizeString(error?.message || 'Onbekende ElevenLabs telephony fout'),
+        phoneNumberId,
+        configuredAgentId,
+        endpoint: normalizeString(error?.endpoint || ''),
+        statusCode: Number(error?.status || 0) || null,
+        patchAttempted: false,
+        patched: false,
+      });
+    } finally {
+      elevenLabsTelephonyStatusPromise = null;
+    }
+  })();
+
+  return elevenLabsTelephonyStatusPromise;
+}
+
 function toIsoFromUnixSeconds(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) return '';
@@ -5543,6 +5808,9 @@ async function sendColdcallingStatusResponse(res, callId) {
 
 app.post('/api/coldcalling/start', async (req, res) => {
   const provider = getColdcallingProvider();
+  if (provider === 'elevenlabs') {
+    void ensureElevenLabsInboundRouting({ reason: 'coldcalling-start' });
+  }
   const missingEnv = getMissingEnvVars(provider);
 
   if (missingEnv.length > 0) {
@@ -7157,9 +7425,14 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 });
 
 // Simpele healthcheck voor hosting platforms (Render/Railway).
-app.get('/healthz', (_req, res) => {
+app.get('/healthz', async (req, res) => {
   const provider = getColdcallingProvider();
   const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
+  const refreshTelephony = toBooleanSafe(req.query?.refresh, false);
+  const telephony =
+    provider === 'elevenlabs'
+      ? await ensureElevenLabsInboundRouting({ reason: 'healthz', force: refreshTelephony })
+      : null;
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
@@ -7171,6 +7444,7 @@ app.get('/healthz', (_req, res) => {
       targetBlocklistEnabled: isColdcallingTargetBlocklistEnabled(),
       autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
       explicitBlockedTargetsCount,
+      telephony,
       missingEnv: getMissingEnvVars(provider),
     },
     supabase: {
@@ -7184,9 +7458,14 @@ app.get('/healthz', (_req, res) => {
 });
 
 // Alias voor serverless setups waar de backend onder /api/* hangt (zoals Vercel).
-app.get('/api/healthz', (_req, res) => {
+app.get('/api/healthz', async (req, res) => {
   const provider = getColdcallingProvider();
   const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
+  const refreshTelephony = toBooleanSafe(req.query?.refresh, false);
+  const telephony =
+    provider === 'elevenlabs'
+      ? await ensureElevenLabsInboundRouting({ reason: 'api-healthz', force: refreshTelephony })
+      : null;
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
@@ -7198,6 +7477,7 @@ app.get('/api/healthz', (_req, res) => {
       targetBlocklistEnabled: isColdcallingTargetBlocklistEnabled(),
       autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
       explicitBlockedTargetsCount,
+      telephony,
       missingEnv: getMissingEnvVars(provider),
     },
     supabase: {
@@ -7551,10 +7831,16 @@ function seedDemoConfirmationTaskForUiTesting() {
 // demo-taak ook bij module-load. De functie is idempotent op basis van callId.
 seedDemoConfirmationTaskForUiTesting();
 void ensureRuntimeStateHydratedFromSupabase();
+void ensureElevenLabsInboundRouting({ reason: 'module-load', force: true }).catch((error) => {
+  console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
+});
 
 function startServer() {
   seedDemoConfirmationTaskForUiTesting();
   void ensureRuntimeStateHydratedFromSupabase();
+  void ensureElevenLabsInboundRouting({ reason: 'startup', force: true }).catch((error) => {
+    console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
+  });
   app.listen(PORT, () => {
     const provider = getColdcallingProvider();
     console.log(`Softora coldcalling backend draait op http://localhost:${PORT} (provider: ${provider})`);
