@@ -5157,11 +5157,16 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
 }
 
 function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssistant = null) {
-  const settings = getElevenLabsAgentRuntimeSettings(agentData);
   const fallbackTranscriber =
     fallbackAssistant?.transcriber && typeof fallbackAssistant.transcriber === 'object'
       ? cloneJsonSafe(fallbackAssistant.transcriber, {})
       : {};
+  const fallbackProvider = normalizeString(fallbackTranscriber.provider).toLowerCase();
+  if (fallbackProvider) {
+    return fallbackTranscriber;
+  }
+
+  const settings = getElevenLabsAgentRuntimeSettings(agentData);
   const nextTranscriber = {
     provider: '11labs',
     model: 'scribe_v1',
@@ -5172,24 +5177,11 @@ function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssi
     nextTranscriber.language = language;
   }
 
-  const fallbackProvider = normalizeString(fallbackTranscriber.provider).toLowerCase();
-  const fallbackModel = normalizeString(fallbackTranscriber.model).toLowerCase();
-  const canUseFallbackPlan =
-    fallbackProvider &&
-    !(fallbackProvider === '11labs' && fallbackModel === 'scribe_v1');
-
-  if (canUseFallbackPlan) {
-    const fallbackPlanTranscriber = cloneJsonSafe(fallbackTranscriber, {});
-    delete fallbackPlanTranscriber.fallbackPlan;
-    nextTranscriber.fallbackPlan = {
-      transcribers: [fallbackPlanTranscriber],
-    };
-  }
-
   return nextTranscriber;
 }
 
 const VAPI_TRANSIENT_ASSISTANT_ALLOWED_KEYS = new Set([
+  'credentials',
   'transcriber',
   'model',
   'voice',
@@ -5380,9 +5372,7 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
       syncedPrompt: Boolean(settings.promptText),
       syncedModel: Boolean(modelOverride),
       syncedTranscriber: Boolean(transcriberOverride),
-      fallbackTranscriberProvider: normalizeString(
-        transcriberOverride?.fallbackPlan?.transcribers?.[0]?.provider
-      ),
+      fallbackTranscriberProvider: normalizeString(transcriberOverride?.provider),
       syncedMaxDuration: Boolean(overrides.maxDurationSeconds),
       llm: settings.llm || '',
       asrProvider: settings.asrProvider || '',
