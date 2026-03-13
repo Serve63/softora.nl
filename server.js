@@ -4921,6 +4921,15 @@ function normalizeVapiElevenLabsVoiceModel(value) {
   return aliases[normalized] || '';
 }
 
+function normalizeElevenLabsCustomSpeechModel(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  if (!normalized) return '';
+  if (normalized === 'eleven_v3' || normalized === 'eleven_v3_conversational') {
+    return 'eleven_v3';
+  }
+  return '';
+}
+
 function clampNumber(value, min, max) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
@@ -5483,6 +5492,17 @@ function buildConfiguredVapiElevenLabsVoiceOverrideFromEnv() {
   });
 }
 
+function getPublicAppBaseUrl() {
+  const configured = normalizeString(
+    process.env.PUBLIC_BASE_URL ||
+      process.env.APP_BASE_URL ||
+      process.env.RENDER_EXTERNAL_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
+      'https://www.softora.nl'
+  );
+  return configured.replace(/\/+$/, '');
+}
+
 function findLikelyElevenLabsTtsConfig(value, visited = new WeakSet()) {
   if (!value || typeof value !== 'object') return null;
   if (visited.has(value)) return null;
@@ -5543,6 +5563,148 @@ function buildVapiElevenLabsVoiceOverrideFromAgent(agent) {
         '',
     }
   );
+}
+
+function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
+  const explicitTtsConfig = getElevenLabsTtsConfig(agent);
+  const conversationConfig = getElevenLabsConversationConfigRoot(agent);
+  const runtimeSettings = getElevenLabsAgentRuntimeSettings(agent);
+  const sourceConfig = explicitTtsConfig || findLikelyElevenLabsTtsConfig(conversationConfig);
+  const voiceId = normalizeString(
+    sourceConfig?.voiceId ||
+      sourceConfig?.voice_id ||
+      sourceConfig?.voiceID ||
+      sourceConfig?.voice?.voiceId ||
+      sourceConfig?.voice?.voice_id ||
+      sourceConfig?.voice?.id
+  );
+  const requestedModel = normalizeString(
+    sourceConfig?.model ||
+      sourceConfig?.model_id ||
+      sourceConfig?.voice?.model ||
+      sourceConfig?.voice?.model_id
+  );
+  const customModel = normalizeElevenLabsCustomSpeechModel(requestedModel);
+
+  if (!voiceId || !customModel) return null;
+
+  const params = new URLSearchParams();
+  params.set('voice_id', voiceId);
+  params.set('model_id', customModel);
+
+  const languageCode =
+    normalizeString(sourceConfig?.language) || normalizeString(runtimeSettings.language);
+  if (languageCode) {
+    params.set('language_code', languageCode);
+  }
+
+  const stability = clampNumber(sourceConfig?.stability, 0, 1);
+  const similarityBoost = clampNumber(
+    sourceConfig?.similarityBoost ?? sourceConfig?.similarity_boost,
+    0,
+    1
+  );
+  const style = clampNumber(sourceConfig?.style, 0, 1);
+  const speed = clampNumber(sourceConfig?.speed, 0.7, 1.2);
+  const useSpeakerBoost = toBooleanSafe(
+    sourceConfig?.useSpeakerBoost ?? sourceConfig?.use_speaker_boost,
+    false
+  );
+
+  if (stability !== null) params.set('stability', String(stability));
+  if (similarityBoost !== null) params.set('similarity_boost', String(similarityBoost));
+  if (style !== null) params.set('style', String(style));
+  if (speed !== null) params.set('speed', String(speed));
+  if (
+    Object.prototype.hasOwnProperty.call(sourceConfig || {}, 'useSpeakerBoost') ||
+    Object.prototype.hasOwnProperty.call(sourceConfig || {}, 'use_speaker_boost')
+  ) {
+    params.set('use_speaker_boost', String(useSpeakerBoost));
+  }
+
+  const server = {
+    url: `${getPublicAppBaseUrl()}/api/vapi/custom-voice/elevenlabs?${params.toString()}`,
+    timeoutSeconds: 20,
+  };
+
+  const webhookSecret = normalizeString(process.env.WEBHOOK_SECRET);
+  if (webhookSecret) {
+    server.headers = {
+      'x-vapi-secret': webhookSecret,
+    };
+  }
+
+  return {
+    provider: 'custom-voice',
+    cachingEnabled: false,
+    server,
+  };
+}
+
+function parseVoiceRequestSampleRate(value) {
+  const numeric = Math.round(Number(value));
+  if (!Number.isFinite(numeric) || numeric <= 0) return 24000;
+  return numeric;
+}
+
+function resolveElevenLabsOutputSampleRate(sampleRate) {
+  const requestedRate = parseVoiceRequestSampleRate(sampleRate);
+  const supportedRates = [16000, 22050, 24000, 44100];
+  if (supportedRates.includes(requestedRate)) {
+    return {
+      requestedRate,
+      sourceRate: requestedRate,
+      outputFormat: `pcm_${requestedRate}`,
+    };
+  }
+
+  if (requestedRate < 16000) {
+    return {
+      requestedRate,
+      sourceRate: 16000,
+      outputFormat: 'pcm_16000',
+    };
+  }
+
+  const nearestRate = supportedRates.reduce((best, current) => {
+    if (Math.abs(current - requestedRate) < Math.abs(best - requestedRate)) {
+      return current;
+    }
+    return best;
+  }, 24000);
+
+  return {
+    requestedRate,
+    sourceRate: nearestRate,
+    outputFormat: `pcm_${nearestRate}`,
+  };
+}
+
+function resamplePcm16Mono(buffer, inputRate, outputRate) {
+  const source = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  if (!source.length || inputRate === outputRate) return source;
+
+  const inputSamples = Math.floor(source.length / 2);
+  if (inputSamples <= 1) return source;
+
+  const outputSamples = Math.max(1, Math.floor((inputSamples * outputRate) / inputRate));
+  const output = Buffer.allocUnsafe(outputSamples * 2);
+
+  for (let index = 0; index < outputSamples; index += 1) {
+    const sourcePosition = (index * inputRate) / outputRate;
+    const lowerIndex = Math.floor(sourcePosition);
+    const upperIndex = Math.min(inputSamples - 1, lowerIndex + 1);
+    const mix = sourcePosition - lowerIndex;
+    const lowerSample = source.readInt16LE(lowerIndex * 2);
+    const upperSample = source.readInt16LE(upperIndex * 2);
+    const sample = Math.max(
+      -32768,
+      Math.min(32767, Math.round(lowerSample + (upperSample - lowerSample) * mix))
+    );
+    output.writeInt16LE(sample, index * 2);
+  }
+
+  return output;
 }
 
 async function getConfiguredVapiElevenLabsVoiceOverride(agentData = null) {
@@ -6366,9 +6528,13 @@ async function buildVapiPayload(lead, campaign) {
       );
     }
 
-    const { voiceOverride, source } = await getConfiguredVapiElevenLabsVoiceOverride(
-      elevenLabsAgentData
-    );
+    const customVoiceOverride = buildVapiCustomElevenLabsV3VoiceFromAgent(elevenLabsAgentData);
+    const { voiceOverride, source } = customVoiceOverride
+      ? {
+          voiceOverride: customVoiceOverride,
+          source: 'agent-custom-v3',
+        }
+      : await getConfiguredVapiElevenLabsVoiceOverride(elevenLabsAgentData);
     if (!voiceOverride) {
       throw new Error(
         'Geen bruikbare ElevenLabs voice gevonden in de geconfigureerde agent. Vapi mag niet terugvallen op een andere stem.'
@@ -7329,6 +7495,135 @@ app.get('/api/coldcalling/status', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
   }
   return sendColdcallingStatusResponse(res, callId);
+});
+
+app.post('/api/vapi/custom-voice/elevenlabs', async (req, res) => {
+  if (!isWebhookAuthorized(req)) {
+    return res.status(401).json({ ok: false, error: 'Ongeldige Vapi custom voice secret.' });
+  }
+
+  const message = req.body?.message && typeof req.body.message === 'object' ? req.body.message : null;
+  const text = normalizeString(message?.text);
+  const voiceId = normalizeString(req.query.voice_id || req.query.voiceId);
+  const modelId =
+    normalizeElevenLabsCustomSpeechModel(req.query.model_id || req.query.modelId || 'eleven_v3') ||
+    'eleven_v3';
+  const languageCode = normalizeString(req.query.language_code || req.query.languageCode);
+
+  if (!voiceId) {
+    return res.status(400).json({ ok: false, error: 'voice_id ontbreekt voor custom ElevenLabs voice.' });
+  }
+
+  if (!text) {
+    return res.status(400).json({ ok: false, error: 'voice-request bevat geen tekst.' });
+  }
+
+  const { requestedRate, sourceRate, outputFormat } = resolveElevenLabsOutputSampleRate(
+    message?.sampleRate
+  );
+  const voiceSettings = {};
+  const stability = clampNumber(req.query.stability, 0, 1);
+  const similarityBoost = clampNumber(req.query.similarity_boost, 0, 1);
+  const style = clampNumber(req.query.style, 0, 1);
+  const speed = clampNumber(req.query.speed, 0.7, 1.2);
+  const hasUseSpeakerBoost = normalizeString(req.query.use_speaker_boost) !== '';
+
+  if (stability !== null) voiceSettings.stability = stability;
+  if (similarityBoost !== null) voiceSettings.similarity_boost = similarityBoost;
+  if (style !== null) voiceSettings.style = style;
+  if (speed !== null) voiceSettings.speed = speed;
+  if (hasUseSpeakerBoost) {
+    voiceSettings.use_speaker_boost = toBooleanSafe(req.query.use_speaker_boost, false);
+  }
+
+  const requestBody = {
+    text,
+    model_id: modelId,
+  };
+  if (languageCode) {
+    requestBody.language_code = languageCode;
+  }
+  if (Object.keys(voiceSettings).length > 0) {
+    requestBody.voice_settings = voiceSettings;
+  }
+
+  const endpoint = buildElevenLabsApiUrl(
+    `/text-to-speech/${encodeURIComponent(voiceId)}/stream`,
+    {
+      output_format: outputFormat,
+    }
+  );
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const failureBody = await response.text().catch(() => '');
+      console.error(
+        '[Custom Voice][ElevenLabs Error]',
+        JSON.stringify(
+          {
+            status: response.status,
+            voiceId,
+            modelId,
+            requestedRate,
+            sourceRate,
+            failureBody: truncateText(failureBody, 1000),
+          },
+          null,
+          2
+        )
+      );
+      return res.status(502).json({
+        ok: false,
+        error: `ElevenLabs custom voice fout (${response.status}).`,
+      });
+    }
+
+    res.status(200);
+    res.set('Content-Type', 'application/octet-stream');
+    res.set('Cache-Control', 'no-store');
+
+    if (sourceRate === requestedRate && response.body) {
+      for await (const chunk of response.body) {
+        res.write(Buffer.from(chunk));
+      }
+      return res.end();
+    }
+
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    const outputBuffer =
+      sourceRate === requestedRate
+        ? audioBuffer
+        : resamplePcm16Mono(audioBuffer, sourceRate, requestedRate);
+    return res.end(outputBuffer);
+  } catch (error) {
+    console.error(
+      '[Custom Voice][Unhandled Error]',
+      JSON.stringify(
+        {
+          message: error?.message || 'Onbekende fout',
+          voiceId,
+          modelId,
+          requestedRate,
+          sourceRate,
+        },
+        null,
+        2
+      )
+    );
+    return res.status(502).json({
+      ok: false,
+      error: 'Custom ElevenLabs voice kon niet worden opgehaald.',
+    });
+  }
 });
 
 app.get('/api/coldcalling/recording', async (req, res) => {
