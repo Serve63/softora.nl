@@ -5930,6 +5930,18 @@ function parseVoiceRequestSampleRate(value) {
   return numeric;
 }
 
+function getConfiguredElevenLabsCustomVoiceTimeoutMs() {
+  const parsed = Math.round(
+    Number(
+      process.env.ELEVENLABS_CUSTOM_VOICE_TIMEOUT_MS ||
+        process.env.VAPI_CUSTOM_VOICE_TIMEOUT_MS ||
+        12000
+    )
+  );
+  if (!Number.isFinite(parsed) || parsed <= 0) return 12000;
+  return Math.max(3000, Math.min(60000, parsed));
+}
+
 function resolveElevenLabsOutputSampleRate(sampleRate, modelId = '') {
   const requestedRate = parseVoiceRequestSampleRate(sampleRate);
   const normalizedModelId = normalizeString(modelId).toLowerCase();
@@ -8278,6 +8290,7 @@ app.get('/api/coldcalling/status', async (req, res) => {
 });
 
 app.post('/api/custom-voice-elevenlabs', async (req, res) => {
+  const routeStartedAtMs = Date.now();
   const message = req.body?.message && typeof req.body.message === 'object' ? req.body.message : null;
   const voiceId = normalizeString(req.query.voice_id || req.query.voiceId);
   const modelId =
@@ -8491,6 +8504,7 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
   ) => {
     const useMinimalV3 = Boolean(options.useMinimalV3);
     const isV3Attempt = isElevenLabsV3CustomSpeechModel(synthesisModelId);
+    const timeoutMs = getConfiguredElevenLabsCustomVoiceTimeoutMs();
     const endpointQuery = {
       output_format: attemptOutputFormat,
     };
@@ -8505,18 +8519,49 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     const requestBody = buildSynthesisRequestBody(synthesisModelId, {
       useMinimalV3,
     });
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
-        'Content-Type': 'application/json',
-        Accept: 'audio/*,application/octet-stream',
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const startedAtMs = Date.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let response = null;
+    let audioBuffer = Buffer.alloc(0);
+    let contentType = '';
 
-    const contentType = normalizeString(response.headers.get('content-type') || '');
-    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+          'Content-Type': 'application/json',
+          Accept: 'audio/*,application/octet-stream',
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+      contentType = normalizeString(response.headers.get('content-type') || '');
+      audioBuffer = Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      clearTimeout(timeout);
+      const requestDurationMs = Date.now() - startedAtMs;
+      const timedOut = error?.name === 'AbortError';
+      return {
+        label: attemptLabel,
+        ok: false,
+        endpoint: endpoint.toString(),
+        status: timedOut ? 408 : null,
+        contentType: '',
+        bytes: 0,
+        synthesisModelId,
+        outputFormat: attemptOutputFormat,
+        sourceRate: attemptSourceRate,
+        requestDurationMs,
+        timeoutMs,
+        failureBody: timedOut ? `request-timeout-${timeoutMs}ms` : normalizeString(error?.message),
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const requestDurationMs = Date.now() - startedAtMs;
 
     if (!response.ok) {
       return {
@@ -8529,6 +8574,8 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
         synthesisModelId,
         outputFormat: attemptOutputFormat,
         sourceRate: attemptSourceRate,
+        requestDurationMs,
+        timeoutMs,
         failureBody: truncateText(audioBuffer.toString('utf8'), 1000),
       };
     }
@@ -8549,6 +8596,8 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
       synthesisModelId,
       outputFormat: attemptOutputFormat,
       sourceRate: attemptSourceRate,
+      requestDurationMs,
+      timeoutMs,
       parsedAudio,
     };
   };
@@ -8664,6 +8713,7 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
         },
         response: {
           ...buildPcm16MonoDebugSummary(silenceBuffer, requestedRate),
+          routeDurationMs: Date.now() - routeStartedAtMs,
           handledAsSilence: true,
           attemptCount: attempts.length,
           attempts: attempts.map((attempt) => ({
@@ -8676,6 +8726,8 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
             selectedSourceRate: attempt.selectedSourceRate,
             contentType: attempt.contentType,
             bytes: attempt.bytes,
+            requestDurationMs: Number(attempt.requestDurationMs || 0),
+            timeoutMs: Number(attempt.timeoutMs || 0),
             parseMode: normalizeString(attempt.parsedAudio?.parseMode),
             detectedFormat: normalizeString(attempt.parsedAudio?.detectedFormat),
             parseError: normalizeString(attempt.parseError),
@@ -8753,10 +8805,12 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
       },
       response: {
         ...buildPcm16MonoDebugSummary(outputBuffer, requestedRate),
+        routeDurationMs: Date.now() - routeStartedAtMs,
         selectedAttempt: selectedAttempt.label,
         selectedSynthesisModelId: selectedAttempt.synthesisModelId,
         selectedOutputFormat: selectedAttempt.outputFormat,
         selectedSourceRate: selectedAttempt.selectedSourceRate,
+        selectedRequestDurationMs: Number(selectedAttempt.requestDurationMs || 0),
         selectedParseMode: normalizeString(selectedAttempt.parsedAudio?.parseMode),
         selectedDetectedFormat: normalizeString(selectedAttempt.parsedAudio?.detectedFormat),
         selectedContentType: selectedAttempt.contentType,
@@ -8771,6 +8825,8 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
           selectedSourceRate: attempt.selectedSourceRate,
           contentType: attempt.contentType,
           bytes: attempt.bytes,
+          requestDurationMs: Number(attempt.requestDurationMs || 0),
+          timeoutMs: Number(attempt.timeoutMs || 0),
           parseMode: normalizeString(attempt.parsedAudio?.parseMode),
           detectedFormat: normalizeString(attempt.parsedAudio?.detectedFormat),
           parseError: normalizeString(attempt.parseError),
@@ -8808,6 +8864,7 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
       },
       response: {
         ...buildPcm16MonoDebugSummary(silenceBuffer, requestedRate),
+        routeDurationMs: Date.now() - routeStartedAtMs,
         handledAsSilence: true,
       },
     };
