@@ -164,6 +164,9 @@ let elevenLabsAgentConfigCache = {
 };
 let latestVapiPayloadDebug = null;
 let latestCustomVoiceDebug = null;
+const customVoiceRequestStateByCallId = new Map();
+const CUSTOM_VOICE_REQUEST_STATE_TTL_MS = 10 * 60 * 1000;
+const CUSTOM_VOICE_REQUEST_STATE_MAX_ENTRIES = 400;
 let coldcallingHistoryVisibleAfterMs = 0;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
@@ -4877,11 +4880,145 @@ function getElevenLabsConversationLimitsConfig(agentData) {
   return null;
 }
 
+function collectLikelyPromptTextCandidates(value, candidates, visited = new WeakSet(), depth = 0) {
+  if (depth > 8) return;
+  if (typeof value === 'string') {
+    const normalized = normalizeString(value);
+    if (!normalized) return;
+    candidates.push(normalized);
+    return;
+  }
+
+  if (!value || typeof value !== 'object') return;
+  if (visited.has(value)) return;
+  visited.add(value);
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectLikelyPromptTextCandidates(item, candidates, visited, depth + 1));
+    return;
+  }
+
+  const preferredKeys = [
+    'prompt',
+    'system_prompt',
+    'systemPrompt',
+    'instructions',
+    'instruction',
+    'script',
+    'assistant_prompt',
+    'assistantPrompt',
+    'content',
+    'text',
+    'message',
+  ];
+
+  preferredKeys.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) return;
+    collectLikelyPromptTextCandidates(value[key], candidates, visited, depth + 1);
+  });
+
+  Object.entries(value).forEach(([key, nested]) => {
+    if (preferredKeys.includes(key)) return;
+    if (typeof nested === 'string' && /(prompt|instruction|system|script|assistant|role)/i.test(key)) {
+      const normalized = normalizeString(nested);
+      if (normalized) candidates.push(normalized);
+      return;
+    }
+    if (nested && typeof nested === 'object') {
+      collectLikelyPromptTextCandidates(nested, candidates, visited, depth + 1);
+    }
+  });
+}
+
+function dedupePromptCandidates(candidates) {
+  const seen = new Set();
+  const next = [];
+  candidates.forEach((candidate) => {
+    const normalized = normalizeString(candidate);
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    next.push(normalized);
+  });
+  return next;
+}
+
+function resolveBestElevenLabsPromptText(agentData, promptConfig, agentConfig) {
+  const candidates = [];
+
+  collectLikelyPromptTextCandidates(promptConfig, candidates);
+  collectLikelyPromptTextCandidates(agentConfig?.prompt_config, candidates);
+  collectLikelyPromptTextCandidates(agentConfig?.prompt, candidates);
+  collectLikelyPromptTextCandidates(getElevenLabsConversationConfigRoot(agentData), candidates);
+
+  const deduped = dedupePromptCandidates(candidates);
+  if (!deduped.length) return '';
+
+  const sorted = deduped.sort((a, b) => {
+    const aScore =
+      a.length +
+      (/(doel|objective|target|pitch|website|lead|bedrijf|prospect|afspraak|appointment|objection|bezwaar)/i.test(a)
+        ? 120
+        : 0);
+    const bScore =
+      b.length +
+      (/(doel|objective|target|pitch|website|lead|bedrijf|prospect|afspraak|appointment|objection|bezwaar)/i.test(b)
+        ? 120
+        : 0);
+    return bScore - aScore;
+  });
+
+  return normalizeString(sorted[0]);
+}
+
+function firstNormalizedString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const normalized = normalizeString(value);
+      if (normalized) return normalized;
+      continue;
+    }
+
+    if (value && typeof value === 'object') {
+      const nested = normalizeString(
+        value.model ||
+          value.model_id ||
+          value.modelId ||
+          value.llm ||
+          value.name ||
+          value.value
+      );
+      if (nested) return nested;
+    }
+  }
+  return '';
+}
+
+function firstFiniteNumber(...values) {
+  for (const value of values) {
+    const parsed = parseNumberSafe(value, null);
+    if (Number.isFinite(parsed)) return parsed;
+    if (value && typeof value === 'object') {
+      const nested = parseNumberSafe(
+        value.value ??
+          value.temperature ??
+          value.maxTokens ??
+          value.max_tokens,
+        null
+      );
+      if (Number.isFinite(nested)) return nested;
+    }
+  }
+  return null;
+}
+
 function getElevenLabsAgentRuntimeSettings(agentData) {
   const agentConfig = getElevenLabsAgentConfig(agentData);
   const promptConfig = getElevenLabsPromptConfig(agentData);
   const asrConfig = getElevenLabsAsrConfig(agentData);
   const limitsConfig = getElevenLabsConversationLimitsConfig(agentData);
+  const promptText = resolveBestElevenLabsPromptText(agentData, promptConfig, agentConfig);
 
   return {
     firstMessage: normalizeString(agentConfig?.firstMessage || agentConfig?.first_message),
@@ -4890,10 +5027,34 @@ function getElevenLabsAgentRuntimeSettings(agentData) {
       typeof (agentConfig?.disableFirstMessageInterruptions ?? agentConfig?.disable_first_message_interruptions) === 'boolean'
         ? Boolean(agentConfig?.disableFirstMessageInterruptions ?? agentConfig?.disable_first_message_interruptions)
         : null,
-    promptText: normalizeString(promptConfig?.prompt),
-    llm: normalizeString(promptConfig?.llm),
-    temperature: parseNumberSafe(promptConfig?.temperature, null),
-    maxTokens: parseNumberSafe(promptConfig?.maxTokens ?? promptConfig?.max_tokens, null),
+    promptText,
+    llm: firstNormalizedString(
+      promptConfig?.llm,
+      promptConfig?.model,
+      promptConfig?.model_id,
+      promptConfig?.modelId,
+      promptConfig?.llm_model,
+      promptConfig?.llmModel,
+      promptConfig?.model_config,
+      agentConfig?.llm,
+      agentConfig?.model,
+      agentConfig?.model_id,
+      agentConfig?.modelId
+    ),
+    temperature: firstFiniteNumber(
+      promptConfig?.temperature,
+      promptConfig?.temp,
+      promptConfig?.model_config?.temperature,
+      promptConfig?.llm_config?.temperature
+    ),
+    maxTokens: firstFiniteNumber(
+      promptConfig?.maxTokens,
+      promptConfig?.max_tokens,
+      promptConfig?.model_config?.maxTokens,
+      promptConfig?.model_config?.max_tokens,
+      promptConfig?.llm_config?.maxTokens,
+      promptConfig?.llm_config?.max_tokens
+    ),
     asrProvider: normalizeString(asrConfig?.provider),
     asrQuality: normalizeString(asrConfig?.quality),
     maxDurationSeconds: parseNumberSafe(
@@ -5115,6 +5276,56 @@ function mapElevenLabsLlmToVapiModel(value) {
   return null;
 }
 
+function getConfiguredColdcallingPreferredModel() {
+  const preferredOpenAiModel = normalizeString(
+    process.env.COLDCALLING_PREFERRED_OPENAI_MODEL ||
+      process.env.VAPI_COLDCALLING_PREFERRED_OPENAI_MODEL ||
+      'gpt-5-mini'
+  );
+  if (
+    preferredOpenAiModel &&
+    isSupportedVapiModelOverride('openai', preferredOpenAiModel)
+  ) {
+    return {
+      provider: 'openai',
+      model: preferredOpenAiModel,
+    };
+  }
+
+  return {
+    provider: 'openai',
+    model: 'gpt-4.1',
+  };
+}
+
+function shouldForceElevenLabsTranscriberForColdcalling() {
+  return !/^(0|false|no|nee|off|disabled)$/i.test(
+    normalizeString(
+      process.env.COLDCALLING_FORCE_ELEVENLABS_TRANSCRIBER ||
+        process.env.VAPI_COLDCALLING_FORCE_ELEVENLABS_TRANSCRIBER ||
+        'true'
+    )
+  );
+}
+
+function getConfiguredColdcallingDefaultTemperature() {
+  const parsed = parseNumberSafe(
+    process.env.COLDCALLING_MODEL_TEMPERATURE || process.env.VAPI_COLDCALLING_MODEL_TEMPERATURE,
+    null
+  );
+  if (!Number.isFinite(parsed)) return 0.35;
+  return Math.max(0, Math.min(2, Number(parsed)));
+}
+
+function getConfiguredColdcallingDefaultMaxTokens() {
+  const parsed = parseNumberSafe(
+    process.env.COLDCALLING_MODEL_MAX_TOKENS || process.env.VAPI_COLDCALLING_MODEL_MAX_TOKENS,
+    null
+  );
+  if (!Number.isFinite(parsed) || parsed <= 0) return 650;
+  return Math.round(Math.max(50, Math.min(4000, parsed)));
+}
+
 function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = null) {
   const settings = getElevenLabsAgentRuntimeSettings(agentData);
   const mappedModelCandidate = mapElevenLabsLlmToVapiModel(settings.llm);
@@ -5146,10 +5357,15 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
     );
   }
 
+  const preferredModel = getConfiguredColdcallingPreferredModel();
   if (!normalizeString(nextModel.provider) || !normalizeString(nextModel.model)) {
-    if (!mappedModel) return null;
-    nextModel.provider = mappedModel.provider;
-    nextModel.model = mappedModel.model;
+    if (mappedModel) {
+      nextModel.provider = mappedModel.provider;
+      nextModel.model = mappedModel.model;
+    } else {
+      nextModel.provider = preferredModel.provider;
+      nextModel.model = preferredModel.model;
+    }
   }
 
   const safePromptText = buildVapiSafeSystemPrompt(settings.promptText);
@@ -5159,18 +5375,22 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
 
   if (Number.isFinite(settings.temperature)) {
     nextModel.temperature = Math.max(0, Math.min(2, Number(settings.temperature)));
+  } else if (!Number.isFinite(parseNumberSafe(nextModel.temperature, null))) {
+    nextModel.temperature = getConfiguredColdcallingDefaultTemperature();
   }
 
   if (Number.isFinite(settings.maxTokens) && Number(settings.maxTokens) > 0) {
     nextModel.maxTokens = Math.round(Number(settings.maxTokens));
+  } else if (!Number.isFinite(parseNumberSafe(nextModel.maxTokens, null))) {
+    nextModel.maxTokens = getConfiguredColdcallingDefaultMaxTokens();
   }
 
-  if (
-    !safePromptText &&
-    !mappedModel &&
-    !Number.isFinite(settings.temperature) &&
-    !Number.isFinite(settings.maxTokens)
-  ) {
+  const hasResolvedModel =
+    Boolean(normalizeString(nextModel.provider)) && Boolean(normalizeString(nextModel.model));
+  const hasResolvedTemperature = Number.isFinite(parseNumberSafe(nextModel.temperature, null));
+  const hasResolvedMaxTokens = Number.isFinite(parseNumberSafe(nextModel.maxTokens, null));
+
+  if (!safePromptText && !hasResolvedModel && !hasResolvedTemperature && !hasResolvedMaxTokens) {
     return null;
   }
 
@@ -5183,7 +5403,7 @@ function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssi
       ? cloneJsonSafe(fallbackAssistant.transcriber, {})
       : {};
   const fallbackProvider = normalizeString(fallbackTranscriber.provider).toLowerCase();
-  if (fallbackProvider) {
+  if (fallbackProvider && !shouldForceElevenLabsTranscriberForColdcalling()) {
     return fallbackTranscriber;
   }
 
@@ -5192,7 +5412,9 @@ function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssi
     provider: '11labs',
     model: 'scribe_v1',
   };
-  const language = normalizeString(settings.language).toLowerCase();
+  const language = normalizeString(
+    settings.language || fallbackTranscriber.language || fallbackTranscriber.locale
+  ).toLowerCase();
 
   if (/^[a-z]{2,3}$/.test(language)) {
     nextTranscriber.language = language;
@@ -5396,6 +5618,9 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
       fallbackTranscriberProvider: normalizeString(transcriberOverride?.provider),
       syncedMaxDuration: Boolean(overrides.maxDurationSeconds),
       llm: settings.llm || '',
+      effectiveModelProvider: normalizeString(modelOverride?.provider),
+      effectiveModel: normalizeString(modelOverride?.model),
+      promptPreview: truncateText(settings.promptText, 220),
       asrProvider: settings.asrProvider || '',
       asrQuality: settings.asrQuality || '',
     },
@@ -5613,6 +5838,11 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
   );
   const style = clampNumber(sourceConfig?.style, 0, 1);
   const speed = clampNumber(sourceConfig?.speed, 0.7, 1.2);
+  const optimizeStreamingLatency = clampNumber(
+    sourceConfig?.optimizeStreamingLatency ?? sourceConfig?.optimize_streaming_latency,
+    0,
+    4
+  );
   const useSpeakerBoost = toBooleanSafe(
     sourceConfig?.useSpeakerBoost ?? sourceConfig?.use_speaker_boost,
     false
@@ -5622,6 +5852,9 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
   if (similarityBoost !== null) params.set('similarity_boost', String(similarityBoost));
   if (style !== null) params.set('style', String(style));
   if (speed !== null) params.set('speed', String(speed));
+  if (optimizeStreamingLatency !== null) {
+    params.set('optimize_streaming_latency', String(Math.round(optimizeStreamingLatency)));
+  }
   if (
     Object.prototype.hasOwnProperty.call(sourceConfig || {}, 'useSpeakerBoost') ||
     Object.prototype.hasOwnProperty.call(sourceConfig || {}, 'use_speaker_boost')
@@ -6141,6 +6374,48 @@ function isLikelyCorruptPcm16Mono(buffer, sampleRate) {
     suspicious,
     summary,
   };
+}
+
+function cleanupCustomVoiceRequestState(nowMs = Date.now()) {
+  const entries = Array.from(customVoiceRequestStateByCallId.entries());
+  entries.forEach(([callId, state]) => {
+    const updatedAtMs = Number(state?.updatedAtMs || 0);
+    if (!updatedAtMs || nowMs - updatedAtMs > CUSTOM_VOICE_REQUEST_STATE_TTL_MS) {
+      customVoiceRequestStateByCallId.delete(callId);
+    }
+  });
+
+  if (customVoiceRequestStateByCallId.size <= CUSTOM_VOICE_REQUEST_STATE_MAX_ENTRIES) {
+    return;
+  }
+
+  const sortedEntries = Array.from(customVoiceRequestStateByCallId.entries()).sort(
+    (a, b) => Number(a[1]?.updatedAtMs || 0) - Number(b[1]?.updatedAtMs || 0)
+  );
+
+  const removeCount = customVoiceRequestStateByCallId.size - CUSTOM_VOICE_REQUEST_STATE_MAX_ENTRIES;
+  for (let index = 0; index < removeCount; index += 1) {
+    customVoiceRequestStateByCallId.delete(sortedEntries[index][0]);
+  }
+}
+
+function resolveCustomVoiceRequestCallId(req, message) {
+  const candidates = [
+    req.query.call_id,
+    req.query.callId,
+    req.body?.call?.id,
+    req.body?.message?.call?.id,
+    message?.call?.id,
+    req.get('x-vapi-call-id'),
+    req.get('x-call-id'),
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeString(candidate);
+    if (normalized) return normalized;
+  }
+
+  return '';
 }
 
 async function getConfiguredVapiElevenLabsVoiceOverride(agentData = null) {
@@ -7962,6 +8237,10 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     req.query.sampleRate ??
     req.query.sample_rate;
   const requestedRatePreAuth = parseVoiceRequestSampleRate(requestedSampleRate);
+  const callId = resolveCustomVoiceRequestCallId(req, message);
+  cleanupCustomVoiceRequestState(Date.now());
+  const previousRequestState = callId ? customVoiceRequestStateByCallId.get(callId) : null;
+  const previousTextForContinuity = normalizeString(previousRequestState?.lastSanitizedText);
 
   if (!isWebhookAuthorized(req)) {
     const silenceBuffer = buildSilencePcm16Mono(requestedRatePreAuth, 200);
@@ -7995,11 +8274,57 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
   const text = preprocessCustomVoiceText(rawText);
 
   if (!voiceId) {
-    return res.status(400).json({ ok: false, error: 'voice_id ontbreekt voor custom ElevenLabs voice.' });
+    const silenceBuffer = buildSilencePcm16Mono(requestedRatePreAuth, 200);
+    latestCustomVoiceDebug = {
+      at: new Date().toISOString(),
+      request: {
+        type: normalizeString(message?.type),
+        callId: callId || null,
+        voiceId: '',
+        modelId,
+        requestedRate: requestedRatePreAuth,
+      },
+      error: {
+        message: 'voice_id ontbreekt; fail-safe silence returned.',
+      },
+      response: {
+        ...buildPcm16MonoDebugSummary(silenceBuffer, requestedRatePreAuth),
+        handledAsSilence: true,
+      },
+    };
+    res.status(200);
+    res.set('Content-Type', 'application/octet-stream');
+    res.set('Cache-Control', 'no-store, no-transform');
+    res.set('Content-Length', String(silenceBuffer.length));
+    res.set('X-Content-Type-Options', 'nosniff');
+    return res.end(silenceBuffer);
   }
 
   if (!rawText) {
-    return res.status(400).json({ ok: false, error: 'voice-request bevat geen tekst.' });
+    const silenceBuffer = buildSilencePcm16Mono(requestedRatePreAuth, 200);
+    latestCustomVoiceDebug = {
+      at: new Date().toISOString(),
+      request: {
+        type: normalizeString(message?.type),
+        callId: callId || null,
+        voiceId,
+        modelId,
+        requestedRate: requestedRatePreAuth,
+      },
+      error: {
+        message: 'voice-request bevat geen tekst; fail-safe silence returned.',
+      },
+      response: {
+        ...buildPcm16MonoDebugSummary(silenceBuffer, requestedRatePreAuth),
+        handledAsSilence: true,
+      },
+    };
+    res.status(200);
+    res.set('Content-Type', 'application/octet-stream');
+    res.set('Cache-Control', 'no-store, no-transform');
+    res.set('Content-Length', String(silenceBuffer.length));
+    res.set('X-Content-Type-Options', 'nosniff');
+    return res.end(silenceBuffer);
   }
 
   const { requestedRate, sourceRate, outputFormat } = resolveElevenLabsOutputSampleRate(
@@ -8011,6 +8336,11 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
   const similarityBoost = clampNumber(req.query.similarity_boost, 0, 1);
   const style = clampNumber(req.query.style, 0, 1);
   const speed = clampNumber(req.query.speed, 0.7, 1.2);
+  const optimizeStreamingLatency = clampNumber(
+    req.query.optimize_streaming_latency ?? req.query.optimizeStreamingLatency,
+    0,
+    4
+  );
   const hasUseSpeakerBoost = normalizeString(req.query.use_speaker_boost) !== '';
 
   if (stability !== null) voiceSettings.stability = stability;
@@ -8063,6 +8393,9 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     if (Object.keys(voiceSettings).length > 0) {
       nextBody.voice_settings = voiceSettings;
     }
+    if (previousTextForContinuity && previousTextForContinuity !== text) {
+      nextBody.previous_text = truncateText(previousTextForContinuity, 900);
+    }
     return nextBody;
   };
 
@@ -8072,9 +8405,13 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     attemptOutputFormat,
     attemptSourceRate
   ) => {
-    const endpoint = buildElevenLabsApiUrl(endpointPath, {
+    const endpointQuery = {
       output_format: attemptOutputFormat,
-    });
+    };
+    if (optimizeStreamingLatency !== null) {
+      endpointQuery.optimize_streaming_latency = String(Math.round(optimizeStreamingLatency));
+    }
+    const endpoint = buildElevenLabsApiUrl(endpointPath, endpointQuery);
 
     const requestBody = buildSynthesisRequestBody(synthesisModelId);
     const response = await fetch(endpoint, {
@@ -8208,14 +8545,18 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
         at: new Date().toISOString(),
         request: {
           type: normalizeString(message?.type),
+          callId: callId || null,
           voiceId,
           modelId,
           textPreview: truncateText(rawText, 180),
           sanitizedTextPreview: truncateText(text, 180),
+          previousTextPreview: truncateText(previousTextForContinuity, 180),
           requestedRate,
           sourceRate,
           outputFormat,
           languageCode: languageCode || null,
+          optimizeStreamingLatency:
+            optimizeStreamingLatency !== null ? Math.round(optimizeStreamingLatency) : null,
         },
         error: {
           message: 'Alle custom voice attempts afgewezen; fail-safe silence teruggegeven.',
@@ -8284,19 +8625,30 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     }
 
     const outputBuffer = selectedAttempt.outputBuffer;
+    if (callId) {
+      customVoiceRequestStateByCallId.set(callId, {
+        updatedAtMs: Date.now(),
+        lastSanitizedText: text,
+      });
+      cleanupCustomVoiceRequestState(Date.now());
+    }
 
     latestCustomVoiceDebug = {
       at: new Date().toISOString(),
       request: {
         type: normalizeString(message?.type),
+        callId: callId || null,
         voiceId,
         modelId,
         textPreview: truncateText(rawText, 180),
         sanitizedTextPreview: truncateText(text, 180),
+        previousTextPreview: truncateText(previousTextForContinuity, 180),
         requestedRate,
         sourceRate,
         outputFormat,
         languageCode: languageCode || null,
+        optimizeStreamingLatency:
+          optimizeStreamingLatency !== null ? Math.round(optimizeStreamingLatency) : null,
       },
       response: {
         ...buildPcm16MonoDebugSummary(outputBuffer, requestedRate),
