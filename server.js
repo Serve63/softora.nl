@@ -5623,7 +5623,7 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
   }
 
   const server = {
-    url: `${getPublicAppBaseUrl()}/api/vapi/custom-voice/elevenlabs?${params.toString()}`,
+    url: `${getPublicAppBaseUrl()}/api/custom-voice-elevenlabs?${params.toString()}`,
     timeoutSeconds: 20,
   };
 
@@ -7497,7 +7497,7 @@ app.get('/api/coldcalling/status', async (req, res) => {
   return sendColdcallingStatusResponse(res, callId);
 });
 
-app.post('/api/vapi/custom-voice/elevenlabs', async (req, res) => {
+app.post('/api/custom-voice-elevenlabs', async (req, res) => {
   if (!isWebhookAuthorized(req)) {
     return res.status(401).json({ ok: false, error: 'Ongeldige Vapi custom voice secret.' });
   }
