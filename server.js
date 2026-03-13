@@ -117,7 +117,6 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
-const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
 const ELEVENLABS_TOOL_CALL_SOUND_SYNC_CACHE_TTL_MS = Math.max(
   60_000,
   Math.min(
@@ -1640,11 +1639,11 @@ function isVapiColdcallingConfigured() {
 }
 
 function getRequiredElevenLabsEnv() {
-  return ['ELEVENLABS_API_KEY', 'ELEVENLABS_PHONE_NUMBER_ID'];
+  return ['ELEVENLABS_API_KEY', 'ELEVENLABS_PHONE_NUMBER_ID', 'ELEVENLABS_AGENT_ID'];
 }
 
 function getConfiguredElevenLabsAgentId() {
-  return normalizeString(process.env.ELEVENLABS_AGENT_ID || DEFAULT_ELEVENLABS_AGENT_ID);
+  return normalizeString(process.env.ELEVENLABS_AGENT_ID);
 }
 
 function normalizeColdcallingBackgroundSound(value) {
@@ -5507,36 +5506,38 @@ function buildVapiElevenLabsVoiceOverrideFromAgent(agent) {
 }
 
 async function getConfiguredVapiElevenLabsVoiceOverride(agentData = null) {
+  const agentId = getConfiguredElevenLabsAgentId();
+  const resolvedAgentData = agentData || (await getConfiguredElevenLabsAgentData()).data;
+  if (resolvedAgentData && agentId) {
+    const voiceOverride = buildVapiElevenLabsVoiceOverrideFromAgent(resolvedAgentData);
+    elevenLabsAgentVoiceOverrideCache = {
+      agentId,
+      fetchedAtMs: Date.now(),
+      voiceOverride: cloneJsonSafe(voiceOverride, null),
+      source: voiceOverride ? 'agent' : 'agent-missing-voice',
+      error: '',
+      promise: null,
+    };
+
+    if (voiceOverride) {
+      return {
+        voiceOverride: cloneJsonSafe(voiceOverride, null),
+        source: elevenLabsAgentVoiceOverrideCache.source,
+      };
+    }
+  }
+
   const envOverride = buildConfiguredVapiElevenLabsVoiceOverrideFromEnv();
   if (envOverride) {
     return {
       voiceOverride: envOverride,
-      source: 'env',
+      source: 'env-fallback',
     };
   }
-
-  const agentId = getConfiguredElevenLabsAgentId();
-  const resolvedAgentData = agentData || (await getConfiguredElevenLabsAgentData()).data;
-  if (!resolvedAgentData || !agentId) {
-    return {
-      voiceOverride: null,
-      source: 'none',
-    };
-  }
-
-  const voiceOverride = buildVapiElevenLabsVoiceOverrideFromAgent(resolvedAgentData);
-  elevenLabsAgentVoiceOverrideCache = {
-    agentId,
-    fetchedAtMs: Date.now(),
-    voiceOverride: cloneJsonSafe(voiceOverride, null),
-    source: voiceOverride ? 'agent' : 'agent-missing-voice',
-    error: '',
-    promise: null,
-  };
 
   return {
-    voiceOverride: cloneJsonSafe(voiceOverride, null),
-    source: elevenLabsAgentVoiceOverrideCache.source,
+    voiceOverride: null,
+    source: agentId ? 'agent-missing-voice' : 'none',
   };
 }
 
