@@ -4712,6 +4712,7 @@ async function patchElevenLabsPhoneAssignedAgent(phoneNumberId, agentId) {
 
 async function ensureElevenLabsInboundRouting(options = {}) {
   const force = Boolean(options?.force);
+  const forceRelink = Boolean(options?.forceRelink);
   const reasonLabel = normalizeString(options?.reason || 'runtime-check');
   const now = Date.now();
 
@@ -4759,7 +4760,7 @@ async function ensureElevenLabsInboundRouting(options = {}) {
         issue = 'inbound_disabled';
         issueReason =
           'Dit ElevenLabs nummer ondersteunt geen inbound calls (supports_inbound=false).';
-      } else if (!runtime.assignedAgentId || runtime.assignedAgentId !== configuredAgentId) {
+      } else if (forceRelink || !runtime.assignedAgentId || runtime.assignedAgentId !== configuredAgentId) {
         patchAttempted = true;
         const patchResult = await patchElevenLabsPhoneAssignedAgent(phoneNumberId, configuredAgentId);
         patchStatusCode = Number(patchResult.statusCode || 0) || null;
@@ -4769,7 +4770,9 @@ async function ensureElevenLabsInboundRouting(options = {}) {
         patched = runtime.assignedAgentId === configuredAgentId;
 
         if (patched) {
-          issueReason = 'Assigned agent op telefoonnummer hersteld naar geconfigureerde ElevenLabs-agent.';
+          issueReason = forceRelink
+            ? 'Assigned agent op telefoonnummer is geforceerd opnieuw gekoppeld.'
+            : 'Assigned agent op telefoonnummer hersteld naar geconfigureerde ElevenLabs-agent.';
         } else {
           issue = 'agent_mismatch';
           issueReason =
@@ -7429,9 +7432,14 @@ app.get('/healthz', async (req, res) => {
   const provider = getColdcallingProvider();
   const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
   const refreshTelephony = toBooleanSafe(req.query?.refresh, false);
+  const repairTelephony = toBooleanSafe(req.query?.repair, false);
   const telephony =
     provider === 'elevenlabs'
-      ? await ensureElevenLabsInboundRouting({ reason: 'healthz', force: refreshTelephony })
+      ? await ensureElevenLabsInboundRouting({
+          reason: 'healthz',
+          force: refreshTelephony || repairTelephony,
+          forceRelink: repairTelephony,
+        })
       : null;
   res.status(200).json({
     ok: true,
@@ -7462,9 +7470,14 @@ app.get('/api/healthz', async (req, res) => {
   const provider = getColdcallingProvider();
   const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
   const refreshTelephony = toBooleanSafe(req.query?.refresh, false);
+  const repairTelephony = toBooleanSafe(req.query?.repair, false);
   const telephony =
     provider === 'elevenlabs'
-      ? await ensureElevenLabsInboundRouting({ reason: 'api-healthz', force: refreshTelephony })
+      ? await ensureElevenLabsInboundRouting({
+          reason: 'api-healthz',
+          force: refreshTelephony || repairTelephony,
+          forceRelink: repairTelephony,
+        })
       : null;
   res.status(200).json({
     ok: true,
