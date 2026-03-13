@@ -110,6 +110,7 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
+const COLDCALLING_PROVIDER_LOCK = 'elevenlabs';
 const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
 let elevenLabsConversationListCache = {
   fetchedAtMs: 0,
@@ -1580,10 +1581,9 @@ function isElevenLabsColdcallingConfigured() {
 }
 
 function getColdcallingProvider() {
-  const configured = normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase();
-  if (configured === 'elevenlabs') return 'elevenlabs';
-  if (configured === 'vapi') return 'vapi';
-  return isElevenLabsColdcallingConfigured() ? 'elevenlabs' : 'vapi';
+  // Coldcalling runtime is intentionally locked to ElevenLabs to keep voice, LLM,
+  // and transcriber on one provider and avoid legacy Vapi regressions.
+  return COLDCALLING_PROVIDER_LOCK;
 }
 
 function getMissingEnvVars(provider = getColdcallingProvider()) {
@@ -5079,10 +5079,7 @@ async function processElevenLabsColdcallingLead(lead, campaign, index) {
 }
 
 async function processColdcallingLead(lead, campaign, index) {
-  if (getColdcallingProvider() === 'elevenlabs') {
-    return processElevenLabsColdcallingLead(lead, campaign, index);
-  }
-  return processVapiColdcallingLead(lead, campaign, index);
+  return processElevenLabsColdcallingLead(lead, campaign, index);
 }
 
 function validateStartPayload(body) {
@@ -5414,7 +5411,7 @@ async function fetchElevenLabsCallStatusPayload(callId) {
 
 async function sendColdcallingStatusResponse(res, callId) {
   const cached = callUpdatesById.get(callId) || null;
-  const provider = normalizeString(cached?.provider || getColdcallingProvider());
+  const provider = getColdcallingProvider();
 
   if (provider === 'elevenlabs') {
     if (!normalizeString(process.env.ELEVENLABS_API_KEY)) {
@@ -5734,6 +5731,14 @@ app.post('/api/coldcalling-history-reset', async (req, res) => {
 });
 
 app.post('/api/vapi/webhook', (req, res) => {
+  if (getColdcallingProvider() === 'elevenlabs') {
+    return res.status(200).json({
+      ok: true,
+      ignored: true,
+      reason: 'Legacy Vapi webhook uitgeschakeld: coldcalling draait volledig via ElevenLabs.',
+    });
+  }
+
   if (!isWebhookAuthorized(req)) {
     return res.status(401).json({ ok: false, error: 'Webhook secret ongeldig.' });
   }
@@ -7118,9 +7123,15 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 
 // Simpele healthcheck voor hosting platforms (Render/Railway).
 app.get('/healthz', (_req, res) => {
+  const provider = getColdcallingProvider();
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
+    coldcalling: {
+      provider,
+      providerLocked: true,
+      missingEnv: getMissingEnvVars(provider),
+    },
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
@@ -7133,9 +7144,15 @@ app.get('/healthz', (_req, res) => {
 
 // Alias voor serverless setups waar de backend onder /api/* hangt (zoals Vercel).
 app.get('/api/healthz', (_req, res) => {
+  const provider = getColdcallingProvider();
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
+    coldcalling: {
+      provider,
+      providerLocked: true,
+      missingEnv: getMissingEnvVars(provider),
+    },
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
