@@ -1651,58 +1651,9 @@ function normalizeColdcallingBackgroundSound(value) {
   const raw = normalizeString(value);
   if (!raw) return 'office';
   if (/^(0|false|no|nee|off|disabled|none)$/i.test(raw)) return 'off';
-  if (/^(office|kantoor)$/i.test(raw)) {
-    return buildHostedColdcallingOfficeBackgroundSoundUrl() || 'office';
-  }
+  if (/^(office|kantoor)$/i.test(raw)) return 'office';
   if (/^https?:\/\//i.test(raw)) return raw;
-  return buildHostedColdcallingOfficeBackgroundSoundUrl() || 'office';
-}
-
-function normalizePublicBaseUrl(value) {
-  const raw = normalizeString(value);
-  if (!raw) return '';
-
-  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-  try {
-    const url = new URL(withProtocol);
-    if (!/^https?:$/i.test(url.protocol)) return '';
-    url.hash = '';
-    url.search = '';
-    url.pathname = '/';
-    return url.toString().replace(/\/$/, '');
-  } catch (_error) {
-    return '';
-  }
-}
-
-function getConfiguredPublicBaseUrl() {
-  const candidates = [
-    process.env.COLDCALLING_PUBLIC_BASE_URL,
-    process.env.PUBLIC_BASE_URL,
-    process.env.APP_BASE_URL,
-    process.env.VERCEL_PROJECT_PRODUCTION_URL,
-    process.env.VERCEL_BRANCH_URL,
-    process.env.VERCEL_URL,
-    'https://www.softora.nl',
-  ];
-
-  for (const candidate of candidates) {
-    const normalized = normalizePublicBaseUrl(candidate);
-    if (normalized) return normalized;
-  }
-
-  return '';
-}
-
-function buildHostedColdcallingOfficeBackgroundSoundUrl() {
-  const baseUrl = getConfiguredPublicBaseUrl();
-  if (!baseUrl) return '';
-
-  try {
-    return new URL('/assets/office-ambient-loud.mp3', `${baseUrl}/`).toString();
-  } catch (_error) {
-    return '';
-  }
+  return 'office';
 }
 
 function getConfiguredColdcallingBackgroundSound() {
@@ -5234,7 +5185,6 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
     overrides.firstMessage = resolvedFirstMessage.text;
     overrides.firstMessageMode = 'assistant-speaks-first';
   } else {
-    overrides.firstMessage = '';
     overrides.firstMessageMode = 'assistant-waits-for-user';
   }
 
