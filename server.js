@@ -5642,11 +5642,24 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
     };
   }
 
-  return {
+  const fallbackVoice = buildVapiElevenLabsVoiceOverrideFromSource({
+    ...(sourceConfig || {}),
+    language: languageCode || normalizeString(sourceConfig?.language),
+  });
+
+  const customVoice = {
     provider: 'custom-voice',
     cachingEnabled: false,
     server,
   };
+
+  if (fallbackVoice) {
+    customVoice.fallbackPlan = {
+      voices: [fallbackVoice],
+    };
+  }
+
+  return customVoice;
 }
 
 function parseVoiceRequestSampleRate(value) {
@@ -5883,6 +5896,12 @@ function extractPcm16MonoFromElevenLabsAudio(
   const normalizedOutputFormat = normalizeString(outputFormat).toLowerCase();
   const parsedRateFromOutputFormat = parseSampleRateFromOutputFormat(outputFormat);
   const assumedRate = parseVoiceRequestSampleRate(parsedRateFromOutputFormat || assumedSampleRate);
+  const detectedFormat = detectAudioContainerFormat(source);
+  const isCompressedByMagic = new Set(['mp3', 'ogg', 'flac', 'mp4']).has(detectedFormat);
+  const isCompressedByContentType =
+    /(audio\/mpeg|audio\/mp3|audio\/ogg|audio\/opus|audio\/aac|audio\/webm|audio\/flac|application\/ogg)/.test(
+      normalizedContentType
+    );
 
   if (!source.length) {
     return {
@@ -5894,7 +5913,47 @@ function extractPcm16MonoFromElevenLabsAudio(
     };
   }
 
+  if (
+    /(application\/json|text\/plain|text\/html|text\/xml|application\/xml)/.test(
+      normalizedContentType
+    )
+  ) {
+    return {
+      pcmBuffer: Buffer.alloc(0),
+      sampleRate: assumedRate,
+      parseMode: 'unsupported',
+      detectedFormat: detectedFormat === 'unknown' ? normalizedContentType || 'unknown' : detectedFormat,
+      error: `unsupported-content-type:${normalizedContentType || 'none'}`,
+    };
+  }
+
+  if (isCompressedByMagic || isCompressedByContentType) {
+    return {
+      pcmBuffer: Buffer.alloc(0),
+      sampleRate: assumedRate,
+      parseMode: 'unsupported',
+      detectedFormat: detectedFormat === 'unknown' ? normalizedContentType || 'unknown' : detectedFormat,
+      error: isCompressedByMagic
+        ? `unsupported-${detectedFormat}`
+        : `unsupported-content-type:${normalizedContentType || 'none'}`,
+    };
+  }
+
   if (normalizedOutputFormat.startsWith('ulaw_')) {
+    if (
+      normalizedContentType &&
+      !/(application\/octet-stream|audio\/basic|audio\/ulaw|audio\/x-mulaw|audio\/x-ulaw)/.test(
+        normalizedContentType
+      )
+    ) {
+      return {
+        pcmBuffer: Buffer.alloc(0),
+        sampleRate: assumedRate,
+        parseMode: 'unsupported',
+        detectedFormat: detectedFormat === 'unknown' ? normalizedContentType || 'unknown' : detectedFormat,
+        error: `unsupported-ulaw-content-type:${normalizedContentType}`,
+      };
+    }
     return {
       pcmBuffer: decodeUlawToPcm16Mono(source),
       sampleRate: assumedRate,
@@ -5905,6 +5964,20 @@ function extractPcm16MonoFromElevenLabsAudio(
   }
 
   if (normalizedOutputFormat.startsWith('alaw_')) {
+    if (
+      normalizedContentType &&
+      !/(application\/octet-stream|audio\/basic|audio\/alaw|audio\/x-alaw)/.test(
+        normalizedContentType
+      )
+    ) {
+      return {
+        pcmBuffer: Buffer.alloc(0),
+        sampleRate: assumedRate,
+        parseMode: 'unsupported',
+        detectedFormat: detectedFormat === 'unknown' ? normalizedContentType || 'unknown' : detectedFormat,
+        error: `unsupported-alaw-content-type:${normalizedContentType}`,
+      };
+    }
     return {
       pcmBuffer: decodeAlawToPcm16Mono(source),
       sampleRate: assumedRate,
@@ -5925,18 +5998,6 @@ function extractPcm16MonoFromElevenLabsAudio(
     };
   }
 
-  const detectedFormat = detectAudioContainerFormat(source);
-  const compressedByMagic = new Set(['mp3', 'ogg', 'flac', 'mp4']);
-  if (compressedByMagic.has(detectedFormat)) {
-    return {
-      pcmBuffer: Buffer.alloc(0),
-      sampleRate: assumedRate,
-      parseMode: 'unsupported',
-      detectedFormat,
-      error: `unsupported-${detectedFormat}`,
-    };
-  }
-
   if (source.length % 2 !== 0) {
     return {
       pcmBuffer: Buffer.alloc(0),
@@ -5944,20 +6005,6 @@ function extractPcm16MonoFromElevenLabsAudio(
       parseMode: 'invalid',
       detectedFormat,
       error: 'odd-byte-length',
-    };
-  }
-
-  if (
-    /(audio\/mpeg|audio\/mp3|audio\/ogg|audio\/opus|audio\/aac|audio\/webm|audio\/flac|application\/ogg)/.test(
-      normalizedContentType
-    )
-  ) {
-    return {
-      pcmBuffer: Buffer.alloc(0),
-      sampleRate: assumedRate,
-      parseMode: 'unsupported',
-      detectedFormat: detectedFormat === 'unknown' ? normalizedContentType || 'unknown' : detectedFormat,
-      error: `unsupported-content-type:${normalizedContentType || 'none'}`,
     };
   }
 
@@ -5991,6 +6038,19 @@ function buildSilencePcm16Mono(sampleRate, durationMs = 120) {
   const duration = Math.max(40, Math.min(1000, Math.round(Number(durationMs) || 120)));
   const sampleCount = Math.max(1, Math.round((normalizedRate * duration) / 1000));
   return Buffer.alloc(sampleCount * 2);
+}
+
+function isLikelyCorruptPcm16Mono(buffer, sampleRate) {
+  const summary = buildPcm16MonoDebugSummary(buffer, sampleRate);
+  const suspicious =
+    summary.bytes <= 0 ||
+    summary.rms >= 14000 ||
+    (summary.peakAbs >= 32760 && summary.rms >= 9000);
+
+  return {
+    suspicious,
+    summary,
+  };
 }
 
 async function getConfiguredVapiElevenLabsVoiceOverride(agentData = null) {
@@ -7927,9 +7987,6 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     if (outputFormat !== 'pcm_16000') {
       attemptPlan.push({ label: 'fallback-pcm-16000', outputFormat: 'pcm_16000', sourceRate: 16000 });
     }
-    if (outputFormat !== 'ulaw_8000') {
-      attemptPlan.push({ label: 'fallback-ulaw-8000', outputFormat: 'ulaw_8000', sourceRate: 8000 });
-    }
 
     const attempts = [];
     let selectedAttempt = null;
@@ -8012,14 +8069,10 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
           2
         )
       );
-
-      const silenceBuffer = buildSilencePcm16Mono(requestedRate, 180);
-      res.status(200);
-      res.set('Content-Type', 'application/octet-stream');
-      res.set('Cache-Control', 'no-store, no-transform');
-      res.set('Content-Length', String(silenceBuffer.length));
-      res.set('X-Content-Type-Options', 'nosniff');
-      return res.end(silenceBuffer);
+      return res.status(502).json({
+        ok: false,
+        error: 'Custom ElevenLabs voice kon niet worden omgezet naar valide PCM audio.',
+      });
     }
 
     const selectedPcmBuffer = Buffer.isBuffer(selectedAttempt.parsedAudio?.pcmBuffer)
@@ -8036,6 +8089,63 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
       outputBufferBase.length > 0
         ? outputBufferBase
         : buildSilencePcm16Mono(requestedRate, 160);
+    const audioQualityCheck = isLikelyCorruptPcm16Mono(outputBuffer, requestedRate);
+
+    if (audioQualityCheck.suspicious) {
+      latestCustomVoiceDebug = {
+        at: new Date().toISOString(),
+        request: {
+          type: normalizeString(message?.type),
+          voiceId,
+          modelId,
+          textPreview: truncateText(rawText, 180),
+          sanitizedTextPreview: truncateText(text, 180),
+          requestedRate,
+          sourceRate,
+          outputFormat,
+          languageCode: languageCode || null,
+        },
+        error: {
+          message: 'Corrupt/suspicious PCM gedetecteerd, custom audio afgewezen voor fallback.',
+        },
+        response: {
+          ...audioQualityCheck.summary,
+          selectedAttempt: selectedAttempt.label,
+          selectedOutputFormat: selectedAttempt.outputFormat,
+          selectedSourceRate,
+          selectedParseMode: normalizeString(selectedAttempt.parsedAudio?.parseMode),
+          selectedDetectedFormat: normalizeString(selectedAttempt.parsedAudio?.detectedFormat),
+          selectedContentType: selectedAttempt.contentType,
+          attemptCount: attempts.length,
+        },
+      };
+
+      console.error(
+        '[Custom Voice][Suspicious PCM Rejected]',
+        JSON.stringify(
+          {
+            voiceId,
+            modelId,
+            requestedRate,
+            sourceRate,
+            selectedAttempt: selectedAttempt.label,
+            selectedOutputFormat: selectedAttempt.outputFormat,
+            selectedSourceRate,
+            selectedParseMode: normalizeString(selectedAttempt.parsedAudio?.parseMode),
+            selectedDetectedFormat: normalizeString(selectedAttempt.parsedAudio?.detectedFormat),
+            selectedContentType: selectedAttempt.contentType,
+            summary: audioQualityCheck.summary,
+          },
+          null,
+          2
+        )
+      );
+
+      return res.status(502).json({
+        ok: false,
+        error: 'Custom ElevenLabs audio was verdacht/corrupt en is afgewezen.',
+      });
+    }
 
     latestCustomVoiceDebug = {
       at: new Date().toISOString(),
