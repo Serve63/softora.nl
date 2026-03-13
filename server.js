@@ -1745,12 +1745,13 @@ function isElevenLabsColdcallingConfigured() {
 
 function getColdcallingProvider() {
   const configured = normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase();
+  if (configured === 'elevenlabs') return 'elevenlabs';
+  if (configured === 'vapi') return 'vapi';
+  if (isElevenLabsColdcallingConfigured()) return 'elevenlabs';
   if (isContinuousColdcallingBackgroundSoundEnabled() && isVapiColdcallingConfigured()) {
     return 'vapi';
   }
-  if (configured === 'elevenlabs') return 'elevenlabs';
-  if (configured === 'vapi') return 'vapi';
-  return isElevenLabsColdcallingConfigured() ? 'elevenlabs' : 'vapi';
+  return 'vapi';
 }
 
 function getMissingEnvVars(provider = getColdcallingProvider()) {
@@ -7448,13 +7449,9 @@ app.post('/api/coldcalling/start', async (req, res) => {
   const leads = allowedLeads;
   const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
 
-  if (
-    provider === 'vapi' &&
-    configuredProvider === 'elevenlabs' &&
-    isContinuousColdcallingBackgroundSoundEnabled()
-  ) {
+  if (provider !== configuredProvider && configuredProvider) {
     console.log(
-      `[Coldcalling] COLDCALLING_PROVIDER=elevenlabs automatisch omgezet naar Vapi omdat continue background sound "${getConfiguredColdcallingBackgroundSound()}" via Vapi transport moet lopen.`
+      `[Coldcalling] Provider-resolutie: configured="${configuredProvider}" -> active="${provider}".`
     );
   }
 
