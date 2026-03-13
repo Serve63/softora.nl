@@ -1642,6 +1642,10 @@ function getRequiredElevenLabsEnv() {
   return ['ELEVENLABS_API_KEY', 'ELEVENLABS_PHONE_NUMBER_ID', 'ELEVENLABS_AGENT_ID'];
 }
 
+function getRequiredVapiColdcallingElevenLabsEnv() {
+  return ['ELEVENLABS_API_KEY', 'ELEVENLABS_AGENT_ID'];
+}
+
 function getConfiguredElevenLabsAgentId() {
   return normalizeString(process.env.ELEVENLABS_AGENT_ID);
 }
@@ -1751,6 +1755,11 @@ function getColdcallingProvider() {
 function getMissingEnvVars(provider = getColdcallingProvider()) {
   if (provider === 'elevenlabs') {
     return getRequiredElevenLabsEnv().filter((key) => !process.env[key]);
+  }
+  if (provider === 'vapi') {
+    return [...getRequiredVapiEnv(), ...getRequiredVapiColdcallingElevenLabsEnv()].filter(
+      (key, index, list) => !process.env[key] && list.indexOf(key) === index
+    );
   }
   return getRequiredVapiEnv().filter((key) => !process.env[key]);
 }
@@ -5527,14 +5536,6 @@ async function getConfiguredVapiElevenLabsVoiceOverride(agentData = null) {
     }
   }
 
-  const envOverride = buildConfiguredVapiElevenLabsVoiceOverrideFromEnv();
-  if (envOverride) {
-    return {
-      voiceOverride: envOverride,
-      source: 'env-fallback',
-    };
-  }
-
   return {
     voiceOverride: null,
     source: agentId ? 'agent-missing-voice' : 'none',
@@ -6328,9 +6329,20 @@ async function buildVapiPayload(lead, campaign) {
     const [{ assistant: vapiAssistant, source: vapiAssistantSource }, { data: elevenLabsAgentData, source: elevenLabsAgentSource }] =
       await Promise.all([getConfiguredVapiAssistant(), getConfiguredElevenLabsAgentData()]);
 
+    if (!elevenLabsAgentData) {
+      throw new Error(
+        'ELEVENLABS_AGENT_ID ontbreekt of de ElevenLabs agent kon niet worden geladen voor Vapi coldcalling.'
+      );
+    }
+
     const { voiceOverride, source } = await getConfiguredVapiElevenLabsVoiceOverride(
       elevenLabsAgentData
     );
+    if (!voiceOverride) {
+      throw new Error(
+        'Geen bruikbare ElevenLabs voice gevonden in de geconfigureerde agent. Vapi mag niet terugvallen op een andere stem.'
+      );
+    }
     if (voiceOverride) {
       assistantOverrides.voice = voiceOverride;
     }
@@ -8827,8 +8839,85 @@ function sendRuntimeHealthDebug(_req, res) {
   });
 }
 
+async function buildColdcallingVoiceDebugSnapshot() {
+  const configuredProvider = getColdcallingProvider();
+  const agentId = getConfiguredElevenLabsAgentId();
+  const envVoiceOverride = buildConfiguredVapiElevenLabsVoiceOverrideFromEnv();
+  let agentData = null;
+  let agentSource = 'none';
+  let agentError = null;
+
+  try {
+    const agentResult = await getConfiguredElevenLabsAgentData();
+    agentData = agentResult?.data || null;
+    agentSource = normalizeString(agentResult?.source || 'none');
+  } catch (error) {
+    agentError = error?.message || 'Onbekende fout';
+  }
+
+  const agentVoiceOverride = agentData
+    ? buildVapiElevenLabsVoiceOverrideFromAgent(agentData)
+    : null;
+
+  let resolvedVoiceOverride = null;
+  let resolvedVoiceSource = 'none';
+  let resolvedVoiceError = null;
+
+  try {
+    const resolved = await getConfiguredVapiElevenLabsVoiceOverride(agentData);
+    resolvedVoiceOverride = resolved?.voiceOverride || null;
+    resolvedVoiceSource = normalizeString(resolved?.source || 'none');
+  } catch (error) {
+    resolvedVoiceError = error?.message || 'Onbekende fout';
+  }
+
+  return {
+    provider: configuredProvider,
+    backgroundSound: getConfiguredColdcallingBackgroundSound(),
+    missingEnvForVapiColdcalling: getMissingEnvVars('vapi'),
+    elevenLabs: {
+      agentId,
+      agentSource,
+      agentError,
+      agentName: normalizeString(agentData?.name || agentData?.agent?.name || ''),
+      envVoiceOverride:
+        envVoiceOverride && typeof envVoiceOverride === 'object'
+          ? {
+              voiceId: normalizeString(envVoiceOverride.voiceId),
+              model: normalizeString(envVoiceOverride.model),
+            }
+          : null,
+      agentVoiceOverride:
+        agentVoiceOverride && typeof agentVoiceOverride === 'object'
+          ? {
+              voiceId: normalizeString(agentVoiceOverride.voiceId),
+              model: normalizeString(agentVoiceOverride.model),
+            }
+          : null,
+      resolvedVoiceSource,
+      resolvedVoiceError,
+      resolvedVoiceOverride:
+        resolvedVoiceOverride && typeof resolvedVoiceOverride === 'object'
+          ? {
+              voiceId: normalizeString(resolvedVoiceOverride.voiceId),
+              model: normalizeString(resolvedVoiceOverride.model),
+            }
+          : null,
+    },
+  };
+}
+
 app.get('/api/debug/runtime-health', sendRuntimeHealthDebug);
 app.get('/api/runtime-health', sendRuntimeHealthDebug);
+app.get('/api/debug/coldcalling-voice', async (_req, res) => {
+  const snapshot = await buildColdcallingVoiceDebugSnapshot();
+  return res.status(200).json({
+    ok: true,
+    build: APP_BUILD_ID || null,
+    timestamp: new Date().toISOString(),
+    snapshot,
+  });
+});
 
 /* app.get('/api/debug/runtime-health', (_req, res) => {
   res.status(200).json({
