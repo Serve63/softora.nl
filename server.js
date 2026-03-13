@@ -5299,11 +5299,11 @@ function getConfiguredColdcallingPreferredModel() {
 }
 
 function shouldForceConfiguredPreferredModel() {
-  return /^(1|true|yes|ja|on|enabled)$/i.test(
+  return !/^(0|false|no|nee|off|disabled)$/i.test(
     normalizeString(
       process.env.COLDCALLING_FORCE_PREFERRED_MODEL ||
         process.env.VAPI_COLDCALLING_FORCE_PREFERRED_MODEL ||
-        'false'
+        'true'
     )
   );
 }
@@ -5346,6 +5346,10 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
       : null;
   const nextModel =
     fallbackModel && typeof fallbackModel === 'object' ? cloneJsonSafe(fallbackModel, {}) : {};
+  const hasRuntimeOpenAiKey = Boolean(getOpenAiApiKey());
+  const preferredModel = getConfiguredColdcallingPreferredModel();
+  const shouldForcePreferredModel =
+    shouldForceConfiguredPreferredModel() && hasRuntimeOpenAiKey;
 
   if (mappedModel) {
     nextModel.provider = mappedModel.provider;
@@ -5367,12 +5371,11 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
     );
   }
 
-  const preferredModel = getConfiguredColdcallingPreferredModel();
   if (!normalizeString(nextModel.provider) || !normalizeString(nextModel.model)) {
     if (mappedModel) {
       nextModel.provider = mappedModel.provider;
       nextModel.model = mappedModel.model;
-    } else if (shouldForceConfiguredPreferredModel()) {
+    } else if (shouldForcePreferredModel) {
       nextModel.provider = preferredModel.provider;
       nextModel.model = preferredModel.model;
     } else if (fallbackModel && typeof fallbackModel === 'object') {
@@ -5384,6 +5387,24 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
       }
     } else {
       return null;
+    }
+  }
+
+  const resolvedProvider = normalizeString(nextModel.provider);
+  const resolvedModel = normalizeString(nextModel.model);
+  if (!isSupportedVapiModelOverride(resolvedProvider, resolvedModel)) {
+    if (shouldForcePreferredModel) {
+      nextModel.provider = preferredModel.provider;
+      nextModel.model = preferredModel.model;
+    } else {
+      const fallbackProvider = normalizeString(fallbackModel?.provider);
+      const fallbackResolvedModel = normalizeString(fallbackModel?.model);
+      if (isSupportedVapiModelOverride(fallbackProvider, fallbackResolvedModel)) {
+        nextModel.provider = fallbackProvider;
+        nextModel.model = fallbackResolvedModel;
+      } else {
+        return null;
+      }
     }
   }
 
@@ -5406,10 +5427,7 @@ function buildVapiModelOverrideFromElevenLabsAgent(agentData, fallbackModel = nu
 
   const hasResolvedModel =
     Boolean(normalizeString(nextModel.provider)) && Boolean(normalizeString(nextModel.model));
-  const hasResolvedTemperature = Number.isFinite(parseNumberSafe(nextModel.temperature, null));
-  const hasResolvedMaxTokens = Number.isFinite(parseNumberSafe(nextModel.maxTokens, null));
-
-  if (!safePromptText && !hasResolvedModel && !hasResolvedTemperature && !hasResolvedMaxTokens) {
+  if (!hasResolvedModel) {
     return null;
   }
 
@@ -5719,6 +5737,66 @@ function buildVapiElevenLabsCredentialsOverride() {
       name: 'runtime-elevenlabs',
     },
   ];
+}
+
+function buildVapiOpenAiCredentialsOverride() {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) return null;
+
+  return [
+    {
+      provider: 'openai',
+      apiKey,
+      name: 'runtime-openai',
+    },
+  ];
+}
+
+function buildVapiAnthropicCredentialsOverride() {
+  const apiKey = getAnthropicApiKey();
+  if (!apiKey) return null;
+
+  return [
+    {
+      provider: 'anthropic',
+      apiKey,
+      name: 'runtime-anthropic',
+    },
+  ];
+}
+
+function mergeVapiCredentials(...credentialSets) {
+  const merged = [];
+  const seen = new Set();
+
+  credentialSets.forEach((credentialSet) => {
+    if (!Array.isArray(credentialSet)) return;
+
+    credentialSet.forEach((credential) => {
+      if (!credential || typeof credential !== 'object') return;
+      const provider = normalizeString(credential.provider).toLowerCase();
+      if (!provider) return;
+
+      const apiKey = normalizeString(credential.apiKey || credential.api_key);
+      const credentialId = normalizeString(
+        credential.credentialId || credential.credential_id || credential.id
+      );
+      const name = normalizeString(credential.name);
+      const dedupeKey = `${provider}::${credentialId || ''}::${name || ''}::${apiKey || ''}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+
+      const normalizedCredential = cloneJsonSafe(credential, {});
+      normalizedCredential.provider = provider;
+      if (apiKey) {
+        normalizedCredential.apiKey = apiKey;
+        delete normalizedCredential.api_key;
+      }
+      merged.push(normalizedCredential);
+    });
+  });
+
+  return merged.length > 0 ? merged : null;
 }
 
 function buildConfiguredVapiElevenLabsVoiceOverrideFromEnv() {
@@ -7229,7 +7307,11 @@ function classifyElevenLabsFailure(error) {
 async function buildVapiPayload(lead, campaign) {
   const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
-  const elevenLabsCredentials = buildVapiElevenLabsCredentialsOverride();
+  const runtimeCredentials = mergeVapiCredentials(
+    buildVapiElevenLabsCredentialsOverride(),
+    buildVapiOpenAiCredentialsOverride(),
+    buildVapiAnthropicCredentialsOverride()
+  );
   const configuredBackgroundSound = getConfiguredColdcallingBackgroundSound();
   let transientAssistant = null;
   let transientAssistantSource = 'saved-assistant';
@@ -7244,13 +7326,23 @@ async function buildVapiPayload(lead, campaign) {
     ),
     backgroundSound: configuredBackgroundSound,
   };
-  if (elevenLabsCredentials) {
-    assistantOverrides.credentials = elevenLabsCredentials;
+  if (runtimeCredentials) {
+    assistantOverrides.credentials = runtimeCredentials;
   }
 
   try {
     const [{ assistant: vapiAssistant, source: vapiAssistantSource }, { data: elevenLabsAgentData, source: elevenLabsAgentSource }] =
       await Promise.all([getConfiguredVapiAssistant(), getConfiguredElevenLabsAgentData()]);
+
+    const mergedCredentials = mergeVapiCredentials(
+      Array.isArray(vapiAssistant?.credentials) ? vapiAssistant.credentials : null,
+      assistantOverrides.credentials
+    );
+    if (mergedCredentials) {
+      assistantOverrides.credentials = mergedCredentials;
+    } else {
+      delete assistantOverrides.credentials;
+    }
 
     if (!elevenLabsAgentData) {
       throw new Error(
