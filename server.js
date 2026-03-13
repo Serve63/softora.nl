@@ -5638,12 +5638,6 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
   return {
     provider: 'custom-voice',
     cachingEnabled: false,
-    chunkPlan: {
-      enabled: false,
-    },
-    formatPlan: {
-      enabled: false,
-    },
     server,
   };
 }
