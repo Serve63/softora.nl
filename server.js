@@ -5093,6 +5093,10 @@ function normalizeElevenLabsCustomSpeechModel(value) {
   return '';
 }
 
+function isElevenLabsV3CustomSpeechModel(value) {
+  return normalizeElevenLabsCustomSpeechModel(value) === 'eleven_v3';
+}
+
 function clampNumber(value, min, max) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
@@ -5920,10 +5924,24 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
   const params = new URLSearchParams();
   params.set('voice_id', voiceId);
   params.set('model_id', customModel);
+  const isV3Model = isElevenLabsV3CustomSpeechModel(customModel);
+  const allowV3LanguageCode = toBooleanSafe(
+    process.env.ELEVENLABS_CUSTOM_V3_SEND_LANGUAGE_CODE,
+    false
+  );
+  const allowV3VoiceSettings = toBooleanSafe(
+    process.env.ELEVENLABS_CUSTOM_V3_USE_VOICE_SETTINGS,
+    false
+  );
+  const allowV3LatencyHint = toBooleanSafe(
+    process.env.ELEVENLABS_CUSTOM_V3_USE_OPTIMIZE_STREAMING_LATENCY,
+    false
+  );
 
-  const languageCode =
-    normalizeString(sourceConfig?.language) || normalizeString(runtimeSettings.language);
-  if (languageCode) {
+  const languageCode = normalizeString(
+    normalizeString(sourceConfig?.language) || normalizeString(runtimeSettings.language)
+  ).toLowerCase();
+  if (/^[a-z]{2}$/.test(languageCode) && (!isV3Model || allowV3LanguageCode)) {
     params.set('language_code', languageCode);
   }
 
@@ -5945,16 +5963,27 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
     false
   );
 
-  if (stability !== null) params.set('stability', String(stability));
-  if (similarityBoost !== null) params.set('similarity_boost', String(similarityBoost));
-  if (style !== null) params.set('style', String(style));
-  if (speed !== null) params.set('speed', String(speed));
-  if (optimizeStreamingLatency !== null) {
+  if (stability !== null && (!isV3Model || allowV3VoiceSettings)) {
+    params.set('stability', String(stability));
+  }
+  if (similarityBoost !== null && (!isV3Model || allowV3VoiceSettings)) {
+    params.set('similarity_boost', String(similarityBoost));
+  }
+  if (style !== null && (!isV3Model || allowV3VoiceSettings)) {
+    params.set('style', String(style));
+  }
+  if (speed !== null && (!isV3Model || allowV3VoiceSettings)) {
+    params.set('speed', String(speed));
+  }
+  if (optimizeStreamingLatency !== null && (!isV3Model || allowV3LatencyHint)) {
     params.set('optimize_streaming_latency', String(Math.round(optimizeStreamingLatency)));
   }
   if (
-    Object.prototype.hasOwnProperty.call(sourceConfig || {}, 'useSpeakerBoost') ||
-    Object.prototype.hasOwnProperty.call(sourceConfig || {}, 'use_speaker_boost')
+    (!isV3Model || allowV3VoiceSettings) &&
+    (
+      Object.prototype.hasOwnProperty.call(sourceConfig || {}, 'useSpeakerBoost') ||
+      Object.prototype.hasOwnProperty.call(sourceConfig || {}, 'use_speaker_boost')
+    )
   ) {
     params.set('use_speaker_boost', String(useSpeakerBoost));
   }
@@ -8454,6 +8483,25 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     requestedSampleRate,
     modelId
   );
+  const isV3Model = isElevenLabsV3CustomSpeechModel(modelId);
+  const allowV3LanguageCode = toBooleanSafe(
+    process.env.ELEVENLABS_CUSTOM_V3_SEND_LANGUAGE_CODE,
+    false
+  );
+  const allowV3VoiceSettings = toBooleanSafe(
+    process.env.ELEVENLABS_CUSTOM_V3_USE_VOICE_SETTINGS,
+    false
+  );
+  const allowV3PreviousText = toBooleanSafe(
+    process.env.ELEVENLABS_CUSTOM_V3_USE_PREVIOUS_TEXT,
+    false
+  );
+  const allowV3LatencyHint = toBooleanSafe(
+    process.env.ELEVENLABS_CUSTOM_V3_USE_OPTIMIZE_STREAMING_LATENCY,
+    false
+  );
+  const normalizedLanguageCode = normalizeString(languageCode).toLowerCase();
+  const safeLanguageCode = /^[a-z]{2}$/.test(normalizedLanguageCode) ? normalizedLanguageCode : '';
   const voiceSettings = {};
   const stability = clampNumber(req.query.stability, 0, 1);
   const similarityBoost = clampNumber(req.query.similarity_boost, 0, 1);
@@ -8466,11 +8514,14 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
   );
   const hasUseSpeakerBoost = normalizeString(req.query.use_speaker_boost) !== '';
 
-  if (stability !== null) voiceSettings.stability = stability;
-  if (similarityBoost !== null) voiceSettings.similarity_boost = similarityBoost;
-  if (style !== null) voiceSettings.style = style;
-  if (speed !== null) voiceSettings.speed = speed;
-  if (hasUseSpeakerBoost) {
+  const shouldApplyVoiceSettings = !isV3Model || allowV3VoiceSettings;
+  if (stability !== null && shouldApplyVoiceSettings) voiceSettings.stability = stability;
+  if (similarityBoost !== null && shouldApplyVoiceSettings) {
+    voiceSettings.similarity_boost = similarityBoost;
+  }
+  if (style !== null && shouldApplyVoiceSettings) voiceSettings.style = style;
+  if (speed !== null && shouldApplyVoiceSettings) voiceSettings.speed = speed;
+  if (hasUseSpeakerBoost && shouldApplyVoiceSettings) {
     voiceSettings.use_speaker_boost = toBooleanSafe(req.query.use_speaker_boost, false);
   }
 
@@ -8505,18 +8556,24 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
 
   const endpointPath = `/text-to-speech/${encodeURIComponent(voiceId)}`;
 
-  const buildSynthesisRequestBody = (synthesisModelId) => {
+  const buildSynthesisRequestBody = (synthesisModelId, options = {}) => {
+    const useMinimalV3 = Boolean(options.useMinimalV3);
+    const isV3Attempt = isElevenLabsV3CustomSpeechModel(synthesisModelId);
     const nextBody = {
       text,
       model_id: synthesisModelId,
     };
-    if (languageCode) {
-      nextBody.language_code = languageCode;
+    if (safeLanguageCode && (!isV3Attempt || !useMinimalV3 || allowV3LanguageCode)) {
+      nextBody.language_code = safeLanguageCode;
     }
-    if (Object.keys(voiceSettings).length > 0) {
+    if (Object.keys(voiceSettings).length > 0 && (!isV3Attempt || !useMinimalV3)) {
       nextBody.voice_settings = voiceSettings;
     }
-    if (previousTextForContinuity && previousTextForContinuity !== text) {
+    if (
+      previousTextForContinuity &&
+      previousTextForContinuity !== text &&
+      (!isV3Attempt || !useMinimalV3 || allowV3PreviousText)
+    ) {
       nextBody.previous_text = truncateText(previousTextForContinuity, 900);
     }
     return nextBody;
@@ -8526,17 +8583,25 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     attemptLabel,
     synthesisModelId,
     attemptOutputFormat,
-    attemptSourceRate
+    attemptSourceRate,
+    options = {}
   ) => {
+    const useMinimalV3 = Boolean(options.useMinimalV3);
+    const isV3Attempt = isElevenLabsV3CustomSpeechModel(synthesisModelId);
     const endpointQuery = {
       output_format: attemptOutputFormat,
     };
-    if (optimizeStreamingLatency !== null) {
+    if (
+      optimizeStreamingLatency !== null &&
+      (!isV3Attempt || !useMinimalV3 || allowV3LatencyHint)
+    ) {
       endpointQuery.optimize_streaming_latency = String(Math.round(optimizeStreamingLatency));
     }
     const endpoint = buildElevenLabsApiUrl(endpointPath, endpointQuery);
 
-    const requestBody = buildSynthesisRequestBody(synthesisModelId);
+    const requestBody = buildSynthesisRequestBody(synthesisModelId, {
+      useMinimalV3,
+    });
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -8593,6 +8658,9 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
         synthesisModelId: modelId,
         outputFormat,
         sourceRate,
+        options: {
+          useMinimalV3: isElevenLabsV3CustomSpeechModel(modelId),
+        },
       },
     ];
     if (outputFormat !== 'pcm_16000') {
@@ -8601,6 +8669,9 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
         synthesisModelId: modelId,
         outputFormat: 'pcm_16000',
         sourceRate: 16000,
+        options: {
+          useMinimalV3: isElevenLabsV3CustomSpeechModel(modelId),
+        },
       });
     }
     if (modelId !== fallbackSynthesisModelId) {
@@ -8609,6 +8680,9 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
         synthesisModelId: fallbackSynthesisModelId,
         outputFormat: 'pcm_16000',
         sourceRate: 16000,
+        options: {
+          useMinimalV3: false,
+        },
       });
     }
 
@@ -8620,7 +8694,8 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
         plan.label,
         plan.synthesisModelId,
         plan.outputFormat,
-        plan.sourceRate
+        plan.sourceRate,
+        plan.options || {}
       );
 
       const parseError = normalizeString(attempt.parsedAudio?.error);
