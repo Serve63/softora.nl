@@ -8796,7 +8796,8 @@ app.get('/api/healthz', (_req, res) => {
   });
 });
 
-function sendRuntimeHealthDebug(_req, res) {
+async function sendRuntimeHealthDebug(_req, res) {
+  const coldcallingVoice = await buildColdcallingVoiceDebugSnapshot();
   return res.status(200).json({
     ok: true,
     build: APP_BUILD_ID || null,
@@ -8816,6 +8817,7 @@ function sendRuntimeHealthDebug(_req, res) {
         return callId && !callId.startsWith('demo-');
       }).length,
       latestVapiPayloadDebug,
+      coldcallingVoice,
     },
     supabase: {
       enabled: isSupabaseConfigured(),
@@ -8909,6 +8911,15 @@ async function buildColdcallingVoiceDebugSnapshot() {
 
 app.get('/api/debug/runtime-health', sendRuntimeHealthDebug);
 app.get('/api/runtime-health', sendRuntimeHealthDebug);
+app.get('/api/coldcalling/voice-debug', async (_req, res) => {
+  const snapshot = await buildColdcallingVoiceDebugSnapshot();
+  return res.status(200).json({
+    ok: true,
+    build: APP_BUILD_ID || null,
+    timestamp: new Date().toISOString(),
+    snapshot,
+  });
+});
 app.get('/api/debug/coldcalling-voice', async (_req, res) => {
   const snapshot = await buildColdcallingVoiceDebugSnapshot();
   return res.status(200).json({
