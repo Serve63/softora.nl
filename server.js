@@ -5505,6 +5505,28 @@ function findLikelyElevenLabsTtsConfig(value, visited = new WeakSet()) {
   return null;
 }
 
+function collectLikelyElevenLabsTtsConfigs(value, visited = new WeakSet(), results = []) {
+  if (!value || typeof value !== 'object') return results;
+  if (visited.has(value)) return results;
+  visited.add(value);
+
+  if (!Array.isArray(value)) {
+    if (normalizeString(value.voice_id || value.voiceId || value.voiceID)) {
+      results.push(value);
+    }
+
+    Object.values(value).forEach((nestedValue) => {
+      collectLikelyElevenLabsTtsConfigs(nestedValue, visited, results);
+    });
+  } else {
+    value.forEach((item) => {
+      collectLikelyElevenLabsTtsConfigs(item, visited, results);
+    });
+  }
+
+  return results;
+}
+
 function buildVapiElevenLabsVoiceOverrideFromAgent(agent) {
   const conversationConfig = getElevenLabsConversationConfigRoot(agent);
   if (!conversationConfig) return null;
@@ -8860,6 +8882,27 @@ async function buildColdcallingVoiceDebugSnapshot() {
   const agentVoiceOverride = agentData
     ? buildVapiElevenLabsVoiceOverrideFromAgent(agentData)
     : null;
+  const explicitTtsConfig = agentData ? getElevenLabsTtsConfig(agentData) : null;
+  const voiceCandidates = agentData
+    ? collectLikelyElevenLabsTtsConfigs(getElevenLabsConversationConfigRoot(agentData))
+        .map((candidate) => ({
+          voiceId: normalizeString(
+            candidate?.voiceId ||
+              candidate?.voice_id ||
+              candidate?.voiceID ||
+              candidate?.voice?.voiceId ||
+              candidate?.voice?.voice_id ||
+              candidate?.voice?.id
+          ),
+          model: normalizeString(
+            candidate?.model ||
+              candidate?.model_id ||
+              candidate?.voice?.model ||
+              candidate?.voice?.model_id
+          ),
+        }))
+        .filter((candidate) => candidate.voiceId)
+    : [];
 
   let resolvedVoiceOverride = null;
   let resolvedVoiceSource = 'none';
@@ -8896,6 +8939,25 @@ async function buildColdcallingVoiceDebugSnapshot() {
               model: normalizeString(agentVoiceOverride.model),
             }
           : null,
+      explicitTtsConfig:
+        explicitTtsConfig && typeof explicitTtsConfig === 'object'
+          ? {
+              voiceId: normalizeString(
+                explicitTtsConfig.voiceId ||
+                  explicitTtsConfig.voice_id ||
+                  explicitTtsConfig.voice?.voiceId ||
+                  explicitTtsConfig.voice?.voice_id ||
+                  explicitTtsConfig.voice?.id
+              ),
+              model: normalizeString(
+                explicitTtsConfig.model ||
+                  explicitTtsConfig.model_id ||
+                  explicitTtsConfig.voice?.model ||
+                  explicitTtsConfig.voice?.model_id
+              ),
+            }
+          : null,
+      voiceCandidates: voiceCandidates.slice(0, 20),
       resolvedVoiceSource,
       resolvedVoiceError,
       resolvedVoiceOverride:
