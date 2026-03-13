@@ -1745,12 +1745,12 @@ function isElevenLabsColdcallingConfigured() {
 
 function getColdcallingProvider() {
   const configured = normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase();
-  if (configured === 'elevenlabs') return 'elevenlabs';
-  if (configured === 'vapi') return 'vapi';
-  if (isElevenLabsColdcallingConfigured()) return 'elevenlabs';
   if (isContinuousColdcallingBackgroundSoundEnabled() && isVapiColdcallingConfigured()) {
     return 'vapi';
   }
+  if (configured === 'elevenlabs') return 'elevenlabs';
+  if (configured === 'vapi') return 'vapi';
+  if (isElevenLabsColdcallingConfigured()) return 'elevenlabs';
   return 'vapi';
 }
 
