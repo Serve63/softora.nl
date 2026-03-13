@@ -5163,7 +5163,6 @@ function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssi
       ? cloneJsonSafe(fallbackAssistant.transcriber, {})
       : {};
   const nextTranscriber = {
-    ...fallbackTranscriber,
     provider: '11labs',
     model: 'scribe_v1',
   };
@@ -5171,6 +5170,20 @@ function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssi
 
   if (/^[a-z]{2,3}$/.test(language)) {
     nextTranscriber.language = language;
+  }
+
+  const fallbackProvider = normalizeString(fallbackTranscriber.provider).toLowerCase();
+  const fallbackModel = normalizeString(fallbackTranscriber.model).toLowerCase();
+  const canUseFallbackPlan =
+    fallbackProvider &&
+    !(fallbackProvider === '11labs' && fallbackModel === 'scribe_v1');
+
+  if (canUseFallbackPlan) {
+    const fallbackPlanTranscriber = cloneJsonSafe(fallbackTranscriber, {});
+    delete fallbackPlanTranscriber.fallbackPlan;
+    nextTranscriber.fallbackPlan = {
+      transcribers: [fallbackPlanTranscriber],
+    };
   }
 
   return nextTranscriber;
@@ -5221,6 +5234,9 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
       syncedPrompt: Boolean(settings.promptText),
       syncedModel: Boolean(modelOverride),
       syncedTranscriber: Boolean(transcriberOverride),
+      fallbackTranscriberProvider: normalizeString(
+        transcriberOverride?.fallbackPlan?.transcribers?.[0]?.provider
+      ),
       syncedMaxDuration: Boolean(overrides.maxDurationSeconds),
       llm: settings.llm || '',
       asrProvider: settings.asrProvider || '',
@@ -6199,6 +6215,7 @@ async function buildVapiPayload(lead, campaign) {
             syncedPrompt: syncedAgentConfig.summary.syncedPrompt,
             syncedModel: syncedAgentConfig.summary.syncedModel,
             syncedTranscriber: syncedAgentConfig.summary.syncedTranscriber,
+            fallbackTranscriberProvider: syncedAgentConfig.summary.fallbackTranscriberProvider,
             syncedMaxDuration: syncedAgentConfig.summary.syncedMaxDuration,
             llm: syncedAgentConfig.summary.llm,
             asrProvider: syncedAgentConfig.summary.asrProvider,
