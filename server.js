@@ -111,6 +111,7 @@ const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
 const COLDCALLING_PROVIDER_LOCK = 'elevenlabs';
+const DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED = false;
 const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
 let elevenLabsConversationListCache = {
   fetchedAtMs: 0,
@@ -4502,7 +4503,11 @@ function buildVariableValues(lead, campaign) {
     region: effectiveRegion,
     minProjectValue: campaign.minProjectValue,
     maxDiscountPct: campaign.maxDiscountPct,
-    extraInstructions: normalizeString(campaign.extraInstructions),
+    // Voorkomt verborgen prompt-injectie vanuit dashboardtekst;
+    // alleen instructies in ElevenLabs Agent blijven leidend.
+    extraInstructions: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED
+      ? normalizeString(campaign.extraInstructions)
+      : '',
   };
 }
 
@@ -7130,6 +7135,8 @@ app.get('/healthz', (_req, res) => {
     coldcalling: {
       provider,
       providerLocked: true,
+      agentId: getConfiguredElevenLabsAgentId(),
+      dashboardExtraInstructionsEnabled: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED,
       missingEnv: getMissingEnvVars(provider),
     },
     supabase: {
@@ -7151,6 +7158,8 @@ app.get('/api/healthz', (_req, res) => {
     coldcalling: {
       provider,
       providerLocked: true,
+      agentId: getConfiguredElevenLabsAgentId(),
+      dashboardExtraInstructionsEnabled: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED,
       missingEnv: getMissingEnvVars(provider),
     },
     supabase: {
