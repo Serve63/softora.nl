@@ -163,6 +163,7 @@ let elevenLabsAgentConfigCache = {
   promise: null,
 };
 let latestVapiPayloadDebug = null;
+let latestCustomVoiceDebug = null;
 let coldcallingHistoryVisibleAfterMs = 0;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
@@ -5624,7 +5625,7 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
 
   const server = {
     url: `${getPublicAppBaseUrl()}/api/custom-voice-elevenlabs?${params.toString()}`,
-    timeoutSeconds: 20,
+    timeoutSeconds: 40,
   };
 
   const webhookSecret = normalizeString(process.env.WEBHOOK_SECRET);
@@ -5643,13 +5644,13 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
 
 function parseVoiceRequestSampleRate(value) {
   const numeric = Math.round(Number(value));
-  if (!Number.isFinite(numeric) || numeric <= 0) return 24000;
+  if (!Number.isFinite(numeric) || numeric <= 0) return 16000;
   return numeric;
 }
 
 function resolveElevenLabsOutputSampleRate(sampleRate) {
   const requestedRate = parseVoiceRequestSampleRate(sampleRate);
-  const supportedRates = [16000, 22050, 24000, 44100];
+  const supportedRates = [8000, 16000, 22050, 24000];
   if (supportedRates.includes(requestedRate)) {
     return {
       requestedRate,
@@ -5705,6 +5706,40 @@ function resamplePcm16Mono(buffer, inputRate, outputRate) {
   }
 
   return output;
+}
+
+function buildPcm16MonoDebugSummary(buffer, sampleRate) {
+  const audio = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  const normalizedRate = parseVoiceRequestSampleRate(sampleRate);
+  const totalSamples = Math.floor(audio.length / 2);
+
+  if (!audio.length || totalSamples <= 0) {
+    return {
+      bytes: audio.length,
+      sampleRate: normalizedRate,
+      durationSeconds: 0,
+      rms: 0,
+      peakAbs: 0,
+    };
+  }
+
+  let sumSquares = 0;
+  let peakAbs = 0;
+
+  for (let offset = 0; offset + 1 < audio.length; offset += 2) {
+    const sample = audio.readInt16LE(offset);
+    const abs = Math.abs(sample);
+    if (abs > peakAbs) peakAbs = abs;
+    sumSquares += sample * sample;
+  }
+
+  return {
+    bytes: audio.length,
+    sampleRate: normalizedRate,
+    durationSeconds: Number((totalSamples / normalizedRate).toFixed(3)),
+    rms: Math.round(Math.sqrt(sumSquares / totalSamples)),
+    peakAbs,
+  };
 }
 
 async function getConfiguredVapiElevenLabsVoiceOverride(agentData = null) {
@@ -7518,8 +7553,15 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'voice-request bevat geen tekst.' });
   }
 
+  const requestedSampleRate =
+    message?.sampleRate ??
+    message?.sample_rate ??
+    req.body?.sampleRate ??
+    req.body?.sample_rate ??
+    req.query.sampleRate ??
+    req.query.sample_rate;
   const { requestedRate, sourceRate, outputFormat } = resolveElevenLabsOutputSampleRate(
-    message?.sampleRate
+    requestedSampleRate
   );
   const voiceSettings = {};
   const stability = clampNumber(req.query.stability, 0, 1);
@@ -7566,6 +7608,23 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
 
     if (!response.ok) {
       const failureBody = await response.text().catch(() => '');
+      latestCustomVoiceDebug = {
+        at: new Date().toISOString(),
+        request: {
+          type: normalizeString(message?.type),
+          voiceId,
+          modelId,
+          textPreview: truncateText(text, 180),
+          requestedRate,
+          sourceRate,
+          outputFormat,
+          languageCode: languageCode || null,
+        },
+        error: {
+          status: response.status,
+          message: truncateText(failureBody, 1000) || `ElevenLabs custom voice fout (${response.status}).`,
+        },
+      };
       console.error(
         '[Custom Voice][ElevenLabs Error]',
         JSON.stringify(
@@ -7587,24 +7646,50 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
       });
     }
 
-    res.status(200);
-    res.set('Content-Type', 'application/octet-stream');
-    res.set('Cache-Control', 'no-store');
-
-    if (sourceRate === requestedRate && response.body) {
-      for await (const chunk of response.body) {
-        res.write(Buffer.from(chunk));
-      }
-      return res.end();
-    }
-
     const audioBuffer = Buffer.from(await response.arrayBuffer());
     const outputBuffer =
       sourceRate === requestedRate
         ? audioBuffer
         : resamplePcm16Mono(audioBuffer, sourceRate, requestedRate);
+    latestCustomVoiceDebug = {
+      at: new Date().toISOString(),
+      request: {
+        type: normalizeString(message?.type),
+        voiceId,
+        modelId,
+        textPreview: truncateText(text, 180),
+        requestedRate,
+        sourceRate,
+        outputFormat,
+        languageCode: languageCode || null,
+      },
+      response: buildPcm16MonoDebugSummary(outputBuffer, requestedRate),
+    };
+
+    res.status(200);
+    res.set('Content-Type', 'application/octet-stream');
+    res.set('Cache-Control', 'no-store, no-transform');
+    res.set('Content-Length', String(outputBuffer.length));
+    res.set('X-Content-Type-Options', 'nosniff');
+
     return res.end(outputBuffer);
   } catch (error) {
+    latestCustomVoiceDebug = {
+      at: new Date().toISOString(),
+      request: {
+        type: normalizeString(message?.type),
+        voiceId,
+        modelId,
+        textPreview: truncateText(text, 180),
+        requestedRate,
+        sourceRate,
+        outputFormat,
+        languageCode: languageCode || null,
+      },
+      error: {
+        message: error?.message || 'Onbekende fout',
+      },
+    };
     console.error(
       '[Custom Voice][Unhandled Error]',
       JSON.stringify(
@@ -9143,6 +9228,7 @@ async function sendRuntimeHealthDebug(_req, res) {
         return callId && !callId.startsWith('demo-');
       }).length,
       latestVapiPayloadDebug,
+      latestCustomVoiceDebug,
       coldcallingVoice,
     },
     supabase: {
@@ -9284,6 +9370,14 @@ app.get('/api/coldcalling/voice-debug', async (_req, res) => {
     build: APP_BUILD_ID || null,
     timestamp: new Date().toISOString(),
     snapshot,
+  });
+});
+app.get('/api/coldcalling/custom-voice-debug', (_req, res) => {
+  return res.status(200).json({
+    ok: true,
+    build: APP_BUILD_ID || null,
+    timestamp: new Date().toISOString(),
+    snapshot: latestCustomVoiceDebug,
   });
 });
 app.get('/api/debug/coldcalling-voice', async (_req, res) => {
