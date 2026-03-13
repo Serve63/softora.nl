@@ -5638,6 +5638,12 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
   return {
     provider: 'custom-voice',
     cachingEnabled: false,
+    chunkPlan: {
+      enabled: false,
+    },
+    formatPlan: {
+      enabled: false,
+    },
     server,
   };
 }
@@ -5740,6 +5746,29 @@ function buildPcm16MonoDebugSummary(buffer, sampleRate) {
     rms: Math.round(Math.sqrt(sumSquares / totalSamples)),
     peakAbs,
   };
+}
+
+function preprocessCustomVoiceText(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+
+  return raw
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\[[^\]]+\]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s.,!?;:'"()%&+\-\/]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasReadableCustomVoiceText(value) {
+  return /[\p{L}\p{N}]/u.test(normalizeString(value));
+}
+
+function buildSilencePcm16Mono(sampleRate, durationMs = 120) {
+  const normalizedRate = parseVoiceRequestSampleRate(sampleRate);
+  const duration = Math.max(40, Math.min(1000, Math.round(Number(durationMs) || 120)));
+  const sampleCount = Math.max(1, Math.round((normalizedRate * duration) / 1000));
+  return Buffer.alloc(sampleCount * 2);
 }
 
 async function getConfiguredVapiElevenLabsVoiceOverride(agentData = null) {
@@ -7538,7 +7567,8 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
   }
 
   const message = req.body?.message && typeof req.body.message === 'object' ? req.body.message : null;
-  const text = normalizeString(message?.text);
+  const rawText = normalizeString(message?.text);
+  const text = preprocessCustomVoiceText(rawText);
   const voiceId = normalizeString(req.query.voice_id || req.query.voiceId);
   const modelId =
     normalizeElevenLabsCustomSpeechModel(req.query.model_id || req.query.modelId || 'eleven_v3') ||
@@ -7549,7 +7579,7 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'voice_id ontbreekt voor custom ElevenLabs voice.' });
   }
 
-  if (!text) {
+  if (!rawText) {
     return res.status(400).json({ ok: false, error: 'voice-request bevat geen tekst.' });
   }
 
@@ -7576,6 +7606,35 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
   if (speed !== null) voiceSettings.speed = speed;
   if (hasUseSpeakerBoost) {
     voiceSettings.use_speaker_boost = toBooleanSafe(req.query.use_speaker_boost, false);
+  }
+
+  if (!hasReadableCustomVoiceText(text)) {
+    const silenceBuffer = buildSilencePcm16Mono(requestedRate, 160);
+    latestCustomVoiceDebug = {
+      at: new Date().toISOString(),
+      request: {
+        type: normalizeString(message?.type),
+        voiceId,
+        modelId,
+        textPreview: truncateText(rawText, 180),
+        sanitizedTextPreview: truncateText(text, 180),
+        requestedRate,
+        sourceRate: requestedRate,
+        outputFormat: `pcm_${requestedRate}`,
+        languageCode: languageCode || null,
+      },
+      response: {
+        ...buildPcm16MonoDebugSummary(silenceBuffer, requestedRate),
+        handledAsSilence: true,
+      },
+    };
+
+    res.status(200);
+    res.set('Content-Type', 'application/octet-stream');
+    res.set('Cache-Control', 'no-store, no-transform');
+    res.set('Content-Length', String(silenceBuffer.length));
+    res.set('X-Content-Type-Options', 'nosniff');
+    return res.end(silenceBuffer);
   }
 
   const requestBody = {
@@ -7614,7 +7673,8 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
           type: normalizeString(message?.type),
           voiceId,
           modelId,
-          textPreview: truncateText(text, 180),
+          textPreview: truncateText(rawText, 180),
+          sanitizedTextPreview: truncateText(text, 180),
           requestedRate,
           sourceRate,
           outputFormat,
@@ -7647,23 +7707,31 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     }
 
     const audioBuffer = Buffer.from(await response.arrayBuffer());
-    const outputBuffer =
+    const outputBufferBase =
       sourceRate === requestedRate
         ? audioBuffer
         : resamplePcm16Mono(audioBuffer, sourceRate, requestedRate);
+    const outputBuffer =
+      outputBufferBase.length > 0
+        ? outputBufferBase
+        : buildSilencePcm16Mono(requestedRate, 160);
     latestCustomVoiceDebug = {
       at: new Date().toISOString(),
       request: {
         type: normalizeString(message?.type),
         voiceId,
         modelId,
-        textPreview: truncateText(text, 180),
+        textPreview: truncateText(rawText, 180),
+        sanitizedTextPreview: truncateText(text, 180),
         requestedRate,
         sourceRate,
         outputFormat,
         languageCode: languageCode || null,
       },
-      response: buildPcm16MonoDebugSummary(outputBuffer, requestedRate),
+      response: {
+        ...buildPcm16MonoDebugSummary(outputBuffer, requestedRate),
+        handledAsSilence: outputBufferBase.length === 0,
+      },
     };
 
     res.status(200);
@@ -7680,7 +7748,8 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
         type: normalizeString(message?.type),
         voiceId,
         modelId,
-        textPreview: truncateText(text, 180),
+        textPreview: truncateText(rawText, 180),
+        sanitizedTextPreview: truncateText(text, 180),
         requestedRate,
         sourceRate,
         outputFormat,
