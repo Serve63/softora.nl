@@ -1506,6 +1506,10 @@ function isColdcallingAutoBlockOwnNumbersEnabled() {
   return /^(1|true|yes|ja)$/i.test(String(process.env.COLDCALLING_AUTO_BLOCK_OWN_NUMBERS || '').trim());
 }
 
+function isColdcallingTargetBlocklistEnabled() {
+  return /^(1|true|yes|ja)$/i.test(String(process.env.COLDCALLING_ENABLE_TARGET_BLOCKLIST || '').trim());
+}
+
 function getExplicitBlockedColdcallingTargetValues() {
   return String(process.env.COLDCALLING_BLOCKED_TARGET_NUMBERS || '')
     .split(/[\n,;]+/)
@@ -1561,6 +1565,13 @@ function buildBlockedColdcallingLeadResult(lead, index) {
 }
 
 function filterBlockedColdcallingLeads(leads) {
+  if (!isColdcallingTargetBlocklistEnabled()) {
+    return {
+      allowedLeads: Array.isArray(leads) ? leads.slice() : [],
+      blockedResults: [],
+    };
+  }
+
   const blockedKeys = getConfiguredBlockedColdcallingTargetKeys();
   if (blockedKeys.size === 0) {
     return {
@@ -7157,6 +7168,7 @@ app.get('/healthz', (_req, res) => {
       providerLocked: true,
       agentId: getConfiguredElevenLabsAgentId(),
       dashboardExtraInstructionsEnabled: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED,
+      targetBlocklistEnabled: isColdcallingTargetBlocklistEnabled(),
       autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
       explicitBlockedTargetsCount,
       missingEnv: getMissingEnvVars(provider),
@@ -7183,6 +7195,7 @@ app.get('/api/healthz', (_req, res) => {
       providerLocked: true,
       agentId: getConfiguredElevenLabsAgentId(),
       dashboardExtraInstructionsEnabled: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED,
+      targetBlocklistEnabled: isColdcallingTargetBlocklistEnabled(),
       autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
       explicitBlockedTargetsCount,
       missingEnv: getMissingEnvVars(provider),
