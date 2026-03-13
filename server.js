@@ -7216,6 +7216,24 @@ async function processVapiColdcallingLead(lead, campaign, index) {
         callId,
         status: callStatus,
       },
+      voiceDebug: {
+        transportMode: payload.assistant ? 'transient-assistant' : 'assistant-id-overrides',
+        provider: normalizeString(
+          payload.assistant?.voice?.provider || payload.assistantOverrides?.voice?.provider
+        ),
+        voiceId: normalizeString(
+          payload.assistant?.voice?.voiceId || payload.assistantOverrides?.voice?.voiceId
+        ),
+        model: normalizeString(
+          payload.assistant?.voice?.model || payload.assistantOverrides?.voice?.model
+        ),
+        customVoiceServerUrl: truncateText(
+          normalizeString(
+            payload.assistant?.voice?.server?.url || payload.assistantOverrides?.voice?.server?.url
+          ),
+          220
+        ),
+      },
     };
   } catch (error) {
     const failure = classifyVapiFailure(error);
