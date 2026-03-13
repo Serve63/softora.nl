@@ -5384,7 +5384,19 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
 function buildVapiElevenLabsVoiceOverrideFromSource(source) {
   if (!source || typeof source !== 'object') return null;
 
-  const voiceId = normalizeString(source.voiceId || source.voice_id);
+  const nestedVoice =
+    source.voice && typeof source.voice === 'object' && !Array.isArray(source.voice)
+      ? source.voice
+      : null;
+  const voiceId = normalizeString(
+    source.voiceId ||
+      source.voice_id ||
+      source.voiceID ||
+      nestedVoice?.voiceId ||
+      nestedVoice?.voice_id ||
+      nestedVoice?.voiceID ||
+      nestedVoice?.id
+  );
   if (!voiceId) return null;
 
   const voiceOverride = {
@@ -5486,13 +5498,11 @@ function findLikelyElevenLabsTtsConfig(value, visited = new WeakSet()) {
 }
 
 function buildVapiElevenLabsVoiceOverrideFromAgent(agent) {
-  const conversationConfig =
-    agent?.conversation_config && typeof agent.conversation_config === 'object'
-      ? agent.conversation_config
-      : null;
+  const conversationConfig = getElevenLabsConversationConfigRoot(agent);
   if (!conversationConfig) return null;
+  const explicitTtsConfig = getElevenLabsTtsConfig(agent);
   return buildVapiElevenLabsVoiceOverrideFromSource(
-    findLikelyElevenLabsTtsConfig(conversationConfig)
+    explicitTtsConfig || findLikelyElevenLabsTtsConfig(conversationConfig)
   );
 }
 
