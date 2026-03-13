@@ -5499,7 +5499,6 @@ function getPublicAppBaseUrl() {
     process.env.PUBLIC_BASE_URL ||
       process.env.APP_BASE_URL ||
       process.env.RENDER_EXTERNAL_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
       'https://www.softora.nl'
   );
   return configured.replace(/\/+$/, '');
@@ -5639,6 +5638,7 @@ function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
   if (webhookSecret) {
     server.headers = {
       'x-vapi-secret': webhookSecret,
+      authorization: `Bearer ${webhookSecret}`,
     };
   }
 
@@ -7948,18 +7948,51 @@ app.get('/api/coldcalling/status', async (req, res) => {
 });
 
 app.post('/api/custom-voice-elevenlabs', async (req, res) => {
-  if (!isWebhookAuthorized(req)) {
-    return res.status(401).json({ ok: false, error: 'Ongeldige Vapi custom voice secret.' });
-  }
-
   const message = req.body?.message && typeof req.body.message === 'object' ? req.body.message : null;
-  const rawText = normalizeString(message?.text);
-  const text = preprocessCustomVoiceText(rawText);
   const voiceId = normalizeString(req.query.voice_id || req.query.voiceId);
   const modelId =
     normalizeElevenLabsCustomSpeechModel(req.query.model_id || req.query.modelId || 'eleven_v3') ||
     'eleven_v3';
   const languageCode = normalizeString(req.query.language_code || req.query.languageCode);
+  const requestedSampleRate =
+    message?.sampleRate ??
+    message?.sample_rate ??
+    req.body?.sampleRate ??
+    req.body?.sample_rate ??
+    req.query.sampleRate ??
+    req.query.sample_rate;
+  const requestedRatePreAuth = parseVoiceRequestSampleRate(requestedSampleRate);
+
+  if (!isWebhookAuthorized(req)) {
+    const silenceBuffer = buildSilencePcm16Mono(requestedRatePreAuth, 200);
+    latestCustomVoiceDebug = {
+      at: new Date().toISOString(),
+      request: {
+        type: normalizeString(message?.type),
+        voiceId,
+        modelId,
+        requestedRate: requestedRatePreAuth,
+        languageCode: languageCode || null,
+      },
+      error: {
+        message: 'Unauthorized custom voice request; fail-safe silence returned.',
+      },
+      response: {
+        ...buildPcm16MonoDebugSummary(silenceBuffer, requestedRatePreAuth),
+        handledAsSilence: true,
+      },
+    };
+
+    res.status(200);
+    res.set('Content-Type', 'application/octet-stream');
+    res.set('Cache-Control', 'no-store, no-transform');
+    res.set('Content-Length', String(silenceBuffer.length));
+    res.set('X-Content-Type-Options', 'nosniff');
+    return res.end(silenceBuffer);
+  }
+
+  const rawText = normalizeString(message?.text);
+  const text = preprocessCustomVoiceText(rawText);
 
   if (!voiceId) {
     return res.status(400).json({ ok: false, error: 'voice_id ontbreekt voor custom ElevenLabs voice.' });
@@ -7969,13 +8002,6 @@ app.post('/api/custom-voice-elevenlabs', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'voice-request bevat geen tekst.' });
   }
 
-  const requestedSampleRate =
-    message?.sampleRate ??
-    message?.sample_rate ??
-    req.body?.sampleRate ??
-    req.body?.sample_rate ??
-    req.query.sampleRate ??
-    req.query.sample_rate;
   const { requestedRate, sourceRate, outputFormat } = resolveElevenLabsOutputSampleRate(
     requestedSampleRate,
     modelId
