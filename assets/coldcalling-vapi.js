@@ -19,7 +19,7 @@
   const TEST_LEAD_STORAGE_KEY = 'softora_vapi_test_lead_phone';
   const LEAD_ROWS_STORAGE_KEY = 'softora_vapi_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
-  let callHistoryClientVisibleAfterMs = 0;
+  const CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS = 1773151035909;
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY = 'softora_campaign_amount_slider_index';
@@ -1709,10 +1709,10 @@
   }
 
   function isConversationRecordVisible(record) {
-    if (!Number.isFinite(callHistoryClientVisibleAfterMs) || callHistoryClientVisibleAfterMs <= 0) {
+    if (!Number.isFinite(CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS) || CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS <= 0) {
       return true;
     }
-    return getConversationRecordTimelineMs(record) >= callHistoryClientVisibleAfterMs;
+    return getConversationRecordTimelineMs(record) >= CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS;
   }
 
   function buildConversationRecordsFromUpdates(updates) {
@@ -1773,21 +1773,6 @@
     if (answered === true) return 'Ja';
     if (answered === false) return 'Nee';
     return 'Onbekend';
-  }
-
-  function inferConversationRecording(record) {
-    const recordingUrl = String(record?.recordingUrl || '').trim();
-    if (recordingUrl) return true;
-    const answered = inferConversationAnswered(record);
-    if (answered === false) return false;
-    return null;
-  }
-
-  function formatConversationRecordingLabel(record) {
-    const recording = inferConversationRecording(record);
-    if (recording === true) return 'Opname: Ja';
-    if (recording === false) return 'Opname: Nee';
-    return 'Opname: ?';
   }
 
   function formatConversationDuration(seconds) {
@@ -2096,20 +2081,6 @@
       const recordingUrl = String(record.recordingUrl || '').trim();
       const detailLoading = state.detailLoadingId === record.callId;
       const detailError = state.detailErrorById[record.callId] || '';
-      const recordingState = inferConversationRecording(record);
-      const recordingLabel = formatConversationRecordingLabel(record);
-      const recordingPillColor =
-        recordingState === true
-          ? theme.positive
-          : recordingState === false
-            ? '#d66f8b'
-            : theme.textMuted;
-      const recordingPillBg =
-        recordingState === true
-          ? 'rgba(45, 138, 94, 0.12)'
-          : recordingState === false
-            ? 'rgba(214, 111, 139, 0.12)'
-            : theme.blockBg;
 
       detailEl.innerHTML = [
         '<div style="max-width:100%;">',
@@ -2118,7 +2089,7 @@
         `  <div style="margin-top:12px; color:${theme.textMuted}; font-size:14px;">${escapeHtml(record.phone || 'Geen telefoonnummer beschikbaar')}</div>`,
         `  <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:14px 28px; margin-top:28px; margin-bottom:28px;">`,
         `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Gebelde lead</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div></div>`,
-        `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Opgenomen</div><div style="display:inline-flex; align-items:center; gap:8px; height:30px; padding:0 10px; border-radius:999px; border:1px solid ${recordingPillColor}; background:${recordingPillBg}; color:${recordingPillColor}; font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase;">${escapeHtml(recordingLabel)}</div></div>`,
+        `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Opgenomen</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(formatConversationAnsweredLabel(record))}</div></div>`,
         `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Gespreksduur</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div></div>`,
         `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Call ID</div><div style="font-size:15px; line-height:1.5; color:${theme.text}; word-break:break-all;">${callId}</div></div>`,
         `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Status</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(String(record.status || 'Onbekend'))}</div></div>`,
@@ -2190,27 +2161,12 @@
                 : inferConversationAnswered(record) === false
                   ? theme.warning
                   : theme.textMuted;
-            const recordingState = inferConversationRecording(record);
-            const recordingColor =
-              recordingState === true
-                ? theme.positive
-                : recordingState === false
-                  ? '#d66f8b'
-                  : theme.textMuted;
-            const recordingBarColor =
-              recordingState === true
-                ? theme.positive
-                : recordingState === false
-                  ? '#d66f8b'
-                  : theme.border;
             return [
-              `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:0; border:none; border-bottom:1px solid ${theme.border}; border-left:3px solid ${isActive ? theme.accent : 'transparent'}; background:${isActive ? theme.accentSoftBgActive : 'transparent'}; color:${theme.text}; cursor:pointer; transition:background 0.2s ease, border-color 0.2s ease;">`,
-              '  <div style="display:grid; grid-template-columns:4px minmax(0,1fr) auto auto auto; align-items:center; gap:12px; min-height:44px;">',
-              `    <div style="height:100%; background:${recordingBarColor};"></div>`,
+              `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:11px 16px; border:none; border-bottom:1px solid ${theme.border}; border-left:3px solid ${isActive ? theme.accent : 'transparent'}; background:${isActive ? theme.accentSoftBgActive : 'transparent'}; color:${theme.text}; cursor:pointer; transition:background 0.2s ease, border-color 0.2s ease;">`,
+              '  <div style="display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px;">',
               `    <div style="min-width:0; font-family:Oswald,sans-serif; font-size:15px; line-height:1; text-transform:uppercase; letter-spacing:0.04em; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</div>`,
               `    <div style="font-size:12px; color:${theme.textMuted}; white-space:nowrap;">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div>`,
               `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:${answeredColor}; white-space:nowrap;">${answered}</div>`,
-              `    <div style="font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:${recordingColor}; white-space:nowrap; padding-right:12px;">${escapeHtml(formatConversationRecordingLabel(record))}</div>`,
               '  </div>',
               '</button>',
             ].join('');
@@ -2283,7 +2239,7 @@
       renderConversationList();
 
       try {
-        const response = await fetchWithTimeout('/api/vapi/call-updates?limit=500', {
+        const response = await fetchWithTimeout('/api/vapi/call-updates?limit=200', {
           method: 'GET',
           cache: 'no-store',
         }, 12000);
@@ -2291,11 +2247,6 @@
         if (!response.ok || !data?.ok || !Array.isArray(data?.updates)) {
           throw new Error(String(data?.error || `Telefoongesprekken laden mislukt (${response.status})`));
         }
-
-        callHistoryClientVisibleAfterMs = Math.max(
-          0,
-          Number(data?.visibleAfterMs || 0) || 0
-        );
 
         state.calls = buildConversationRecordsFromUpdates(data.updates);
         if (!state.selectedCallId || !state.calls.some((item) => item.callId === state.selectedCallId)) {
