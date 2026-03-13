@@ -53,24 +53,33 @@
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
 
+        :root {
+            --sidebar-width: 280px;
+            --pdf-page-width: 595px;
+            --pdf-page-height: 842px;
+            --pdf-preview-scale: 1;
+        }
+
         .dashboard-layout {
             display: flex;
-            min-height: 100vh;
+            min-height: 100dvh;
         }
 
         .sidebar {
-            width: 280px;
+            width: var(--sidebar-width);
             background: var(--bg-secondary);
             border-right: 1px solid var(--border);
             padding: 2.5rem 0;
             display: flex;
             flex-direction: column;
             font-family: 'Inter', sans-serif;
+            line-height: 1.6;
             position: fixed;
             top: 0;
             left: 0;
-            height: 100vh;
+            height: 100dvh;
             z-index: 100;
+            overflow: hidden;
         }
 
         .sidebar-logo {
@@ -88,7 +97,9 @@
         }
 
         .sidebar-nav {
-            flex: 1;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
         }
 
         .sidebar-section {
@@ -169,6 +180,9 @@
         .sidebar-footer {
             padding: 2rem;
             border-top: 1px solid var(--border);
+            margin-top: auto;
+            flex-shrink: 0;
+            background: var(--bg-secondary);
         }
 
         .sidebar-user {
@@ -201,6 +215,9 @@
             font-size: 0.85rem;
             font-weight: 500;
             color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .sidebar-user-role {
@@ -226,11 +243,11 @@
         }
 
         .main {
-            margin-left: 280px;
+            margin-left: var(--sidebar-width);
             flex: 1;
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
+            min-height: 100dvh;
             overflow: hidden;
             background: var(--bg-primary);
         }
@@ -238,6 +255,29 @@
         .topbar {
             padding: 34px 40px 0;
             flex-shrink: 0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        .topbar-copy {
+            min-width: 0;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+            padding-top: 6px;
+            flex-shrink: 0;
+        }
+
+        .topbar-actions .btn-download {
+            width: auto;
+            min-width: 184px;
+            padding-inline: 18px;
+            box-shadow: 0 10px 24px rgba(139, 34, 82, 0.16);
         }
 
         .page-title {
@@ -300,15 +340,17 @@
         }
 
         .split {
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             flex: 1;
+            min-height: 0;
             overflow: hidden;
             gap: 0;
         }
 
         .form-panel {
-            width: 380px;
-            flex-shrink: 0;
+            width: auto;
+            min-width: 0;
             overflow-y: auto;
             border-right: 1px solid var(--border);
             background: var(--bg-secondary);
@@ -466,13 +508,6 @@
             background: rgba(155, 35, 85, .04);
         }
 
-        .form-footer {
-            padding: 14px 22px;
-            border-top: 1px solid var(--border);
-            background: var(--bg-tertiary);
-            flex-shrink: 0;
-        }
-
         .btn-download {
             width: 100%;
             padding: 11px;
@@ -499,42 +534,48 @@
 
         .preview-panel {
             flex: 1;
-            overflow-y: auto;
+            min-width: 0;
+            overflow: hidden;
             background: var(--bg-primary);
+            position: relative;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 24px 20px;
-            gap: 0;
+            align-items: flex-end;
+            padding: 0 0 24px 24px;
         }
 
-        .preview-label {
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 0.65rem;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: var(--text-tertiary);
-            margin-bottom: 12px;
-            align-self: flex-start;
-            padding-left: 4px;
+        .preview-canvas {
+            width: calc(var(--pdf-page-width) * var(--pdf-preview-scale));
+            min-height: calc(var(--pdf-page-height) * var(--pdf-preview-scale));
+            max-width: 100%;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: flex-end;
+            margin-top: -8px;
         }
 
         .pdf-page {
-            width: 595px;
-            min-height: 842px;
+            width: var(--pdf-page-width);
+            height: var(--pdf-page-height);
             background: #fff;
             box-shadow: 0 4px 40px rgba(0,0,0,.25);
             font-family: 'Barlow', sans-serif;
             position: relative;
             flex-shrink: 0;
             color: #1a1a2e;
+            max-width: none;
+            transform: scale(var(--pdf-preview-scale));
+            transform-origin: top right;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         .pdf-header { background: #9b2355; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
         .pdf-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; color: #fff; letter-spacing: 1px; }
         .pdf-doctype { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 2px; color: rgba(255,200,220,.9); text-transform: uppercase; }
-        .pdf-body { padding: 20px 28px 60px; }
+        .pdf-body { padding: 20px 28px 0; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+        .pdf-body-content { flex: 1 1 auto; }
         .pdf-addresses { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
         .pdf-addr-box { background: #f7f4f0; padding: 12px 14px; border-radius: 2px; }
         .pdf-addr-label { font-size: 8px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #999; margin-bottom: 6px; }
@@ -561,7 +602,15 @@
         .pdf-notes { margin-top: 18px; }
         .pdf-notes-label { font-size: 8px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #999; margin-bottom: 6px; }
         .pdf-notes-text { font-size: 9.5px; color: #666; line-height: 1.6; background: #f7f4f0; padding: 10px 12px; border-radius: 2px; }
-        .pdf-footer-bar { position: absolute; bottom: 0; left: 0; right: 0; background: #f7f4f0; padding: 8px 28px; text-align: center; font-size: 8px; color: #aaa; border-top: 1px solid #eee; }
+        .pdf-footer-bar {
+            margin: auto 0 16px;
+            padding-top: 10px;
+            text-align: center;
+            font-size: 8px;
+            color: #aaa;
+            border-top: 1px solid #eee;
+            background: transparent;
+        }
         .pdf-herinnering-banner { padding: 8px 14px; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 14px; }
         .pdf-body-text { font-size: 10px; color: #444; line-height: 1.7; margin-bottom: 16px; }
         .pdf-invoice-ref { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; background: #f7f4f0; margin-bottom: 14px; }
@@ -595,18 +644,32 @@
             transform: translateY(0);
         }
 
-        @media (max-width: 1280px) {
-            .form-panel { width: 350px; }
-            .pdf-page { transform: scale(0.9); transform-origin: top center; }
-        }
-
         @media (max-width: 1100px) {
             body { overflow: auto; }
             .main { overflow: visible; }
-            .tab-panel.active, .split { flex-direction: column; }
+            .topbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .topbar-actions {
+                width: 100%;
+                padding-top: 0;
+            }
+            .split { display: flex; flex-direction: column; }
             .form-panel { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
-            .preview-panel { align-items: flex-start; }
-            .pdf-page { transform: scale(0.78); transform-origin: top left; }
+            .preview-panel {
+                overflow: auto;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 24px;
+                position: static;
+            }
+            .preview-canvas {
+                justify-content: flex-start;
+                margin-top: 0;
+            }
+            .pdf-page { transform-origin: top left; }
         }
     </style>
 </head>
@@ -678,8 +741,16 @@
 
         <div class="main">
             <div class="topbar">
-                <div class="page-title">PDF'S</div>
-                <div class="page-subtitle">Vul links in — de preview wordt realtime bijgewerkt</div>
+                <div class="topbar-copy">
+                    <div class="page-title">PDF'S</div>
+                    <div class="page-subtitle">Vul links in — de preview wordt realtime bijgewerkt</div>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn-download" id="topbar-download-btn" type="button" onclick="downloadPDF(activeTab)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        PDF Downloaden
+                    </button>
+                </div>
             </div>
 
             <div class="tabs">
@@ -725,17 +796,12 @@
                             <div class="section-label">Opmerkingen</div>
                             <div class="form-group"><textarea id="o-notities" oninput="updatePreview()" placeholder="Bijv. betalingstermijn, voorwaarden…"></textarea></div>
                         </div>
-                        <div class="form-footer">
-                            <button class="btn-download" type="button" onclick="downloadPDF('offerte')">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                PDF Downloaden
-                            </button>
-                        </div>
                     </div>
 
                     <div class="preview-panel">
-                        <div class="preview-label">Live Preview</div>
-                        <div class="pdf-page" id="preview-offerte"></div>
+                        <div class="preview-canvas">
+                            <div class="pdf-page" id="preview-offerte"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -778,17 +844,12 @@
                             <div class="section-label">Opmerkingen</div>
                             <div class="form-group"><textarea id="f-notities" oninput="updatePreview()" placeholder="Bijv. betaalverzoek, referentienummer…"></textarea></div>
                         </div>
-                        <div class="form-footer">
-                            <button class="btn-download" type="button" onclick="downloadPDF('factuur')">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                PDF Downloaden
-                            </button>
-                        </div>
                     </div>
 
                     <div class="preview-panel">
-                        <div class="preview-label">Live Preview</div>
-                        <div class="pdf-page" id="preview-factuur"></div>
+                        <div class="preview-canvas">
+                            <div class="pdf-page" id="preview-factuur"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -832,17 +893,12 @@
                             <div class="section-label">Extra toelichting</div>
                             <div class="form-group"><textarea id="h-notities" oninput="updatePreview()" placeholder="Persoonlijke boodschap (optioneel)…"></textarea></div>
                         </div>
-                        <div class="form-footer">
-                            <button class="btn-download" type="button" onclick="downloadPDF('herinnering')">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                PDF Downloaden
-                            </button>
-                        </div>
                     </div>
 
                     <div class="preview-panel">
-                        <div class="preview-label">Live Preview</div>
-                        <div class="pdf-page" id="preview-herinnering"></div>
+                        <div class="preview-canvas">
+                            <div class="pdf-page" id="preview-herinnering"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -853,6 +909,30 @@
 
     <script>
         let activeTab = 'offerte';
+        let previewScaleFrame = 0;
+
+        function queuePreviewScale() {
+            cancelAnimationFrame(previewScaleFrame);
+            previewScaleFrame = requestAnimationFrame(updatePreviewScale);
+        }
+
+        function updatePreviewScale() {
+            const root = document.documentElement;
+            const panel = document.querySelector(`#tab-${activeTab} .preview-panel`);
+            if (!panel) return;
+
+            const isStacked = window.innerWidth <= 1100;
+            const horizontalPadding = isStacked ? 48 : 24;
+            const verticalPadding = isStacked ? 48 : 24;
+            const availableWidth = Math.max(panel.clientWidth - horizontalPadding, 320);
+            const availableHeight = Math.max(panel.clientHeight - verticalPadding, 320);
+            const widthScale = availableWidth / 595;
+            const heightScale = availableHeight / 842;
+            const maxScale = isStacked ? 0.9 : 1.18;
+            const nextScale = Math.max(0.55, Math.min(widthScale, heightScale, maxScale));
+
+            root.style.setProperty('--pdf-preview-scale', nextScale.toFixed(4));
+        }
 
         function switchTab(name, el) {
             document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -861,6 +941,7 @@
             el.classList.add('active');
             activeTab = name;
             updatePreview();
+            queuePreviewScale();
         }
 
         function v(id) { const el = document.getElementById(id); return el ? (el.value || '') : ''; }
@@ -947,36 +1028,40 @@
             return `
                 <div class="pdf-header"><div class="pdf-logo">SOFTORA.NL</div><div class="pdf-doctype">Offerte</div></div>
                 <div class="pdf-body">
-                    ${buildAdresses(['Softora.nl', 'info@softora.nl', 'www.softora.nl', 'KvK: 12345678'], [v('o-bedrijf') || '—', v('o-contact'), v('o-adres'), v('o-email'), v('o-kvk') ? 'KvK: ' + v('o-kvk') : ''])}
-                    <div class="pdf-meta-strip">
-                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Offertenummer</div><div class="pdf-meta-val">${v('o-nummer') || '—'}</div></div>
-                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Datum</div><div class="pdf-meta-val">${fmtDate(v('o-datum'))}</div></div>
-                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Geldig tot</div><div class="pdf-meta-val">${fmtDate(v('o-geldig'))}</div></div>
-                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Onderwerp</div><div class="pdf-meta-val">${v('o-onderwerp') || '—'}</div></div>
+                    <div class="pdf-body-content">
+                        ${buildAdresses(['Softora.nl', 'info@softora.nl', 'www.softora.nl', 'KvK: 12345678'], [v('o-bedrijf') || '—', v('o-contact'), v('o-adres'), v('o-email'), v('o-kvk') ? 'KvK: ' + v('o-kvk') : ''])}
+                        <div class="pdf-meta-strip">
+                            <div class="pdf-meta-cell"><div class="pdf-meta-key">Offertenummer</div><div class="pdf-meta-val">${v('o-nummer') || '—'}</div></div>
+                            <div class="pdf-meta-cell"><div class="pdf-meta-key">Datum</div><div class="pdf-meta-val">${fmtDate(v('o-datum'))}</div></div>
+                            <div class="pdf-meta-cell"><div class="pdf-meta-key">Geldig tot</div><div class="pdf-meta-val">${fmtDate(v('o-geldig'))}</div></div>
+                            <div class="pdf-meta-cell"><div class="pdf-meta-key">Onderwerp</div><div class="pdf-meta-val">${v('o-onderwerp') || '—'}</div></div>
+                        </div>
+                        ${buildRegelsTable(regelData.o)}
+                        ${buildTotals('o')}
+                        ${buildNotes(v('o-notities'))}
                     </div>
-                    ${buildRegelsTable(regelData.o)}
-                    ${buildTotals('o')}
-                    ${buildNotes(v('o-notities'))}
-                </div>
-                <div class="pdf-footer-bar">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
+                    <div class="pdf-footer-bar">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>
+                </div>`;
         }
 
         function buildFactuur() {
             return `
                 <div class="pdf-header"><div class="pdf-logo">SOFTORA.NL</div><div class="pdf-doctype">Factuur</div></div>
                 <div class="pdf-body">
-                    ${buildAdresses(['Softora.nl', 'info@softora.nl', v('f-iban') ? 'IBAN: ' + v('f-iban') : '', 'KvK: 12345678'], [v('f-bedrijf') || '—', v('f-contact'), v('f-adres'), v('f-email'), v('f-kvk') ? 'KvK: ' + v('f-kvk') : '', v('f-btwnum') ? 'BTW: ' + v('f-btwnum') : ''])}
-                    <div class="pdf-meta-strip">
-                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurnummer</div><div class="pdf-meta-val">${v('f-nummer') || '—'}</div></div>
-                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurdatum</div><div class="pdf-meta-val">${fmtDate(v('f-datum'))}</div></div>
-                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Vervaldatum</div><div class="pdf-meta-val">${fmtDate(v('f-verval'))}</div></div>
-                        <div class="pdf-meta-cell"><div class="pdf-meta-key">Referentie</div><div class="pdf-meta-val">${v('f-ref') || '—'}</div></div>
+                    <div class="pdf-body-content">
+                        ${buildAdresses(['Softora.nl', 'info@softora.nl', v('f-iban') ? 'IBAN: ' + v('f-iban') : '', 'KvK: 12345678'], [v('f-bedrijf') || '—', v('f-contact'), v('f-adres'), v('f-email'), v('f-kvk') ? 'KvK: ' + v('f-kvk') : '', v('f-btwnum') ? 'BTW: ' + v('f-btwnum') : ''])}
+                        <div class="pdf-meta-strip">
+                            <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurnummer</div><div class="pdf-meta-val">${v('f-nummer') || '—'}</div></div>
+                            <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurdatum</div><div class="pdf-meta-val">${fmtDate(v('f-datum'))}</div></div>
+                            <div class="pdf-meta-cell"><div class="pdf-meta-key">Vervaldatum</div><div class="pdf-meta-val">${fmtDate(v('f-verval'))}</div></div>
+                            <div class="pdf-meta-cell"><div class="pdf-meta-key">Referentie</div><div class="pdf-meta-val">${v('f-ref') || '—'}</div></div>
+                        </div>
+                        ${buildRegelsTable(regelData.f)}
+                        ${buildTotals('f')}
+                        ${buildNotes(v('f-notities'))}
                     </div>
-                    ${buildRegelsTable(regelData.f)}
-                    ${buildTotals('f')}
-                    ${buildNotes(v('f-notities'))}
-                </div>
-                <div class="pdf-footer-bar">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
+                    <div class="pdf-footer-bar">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>
+                </div>`;
         }
 
         function buildHerinnering() {
@@ -994,28 +1079,31 @@
             return `
                 <div class="pdf-header"><div class="pdf-logo">SOFTORA.NL</div><div class="pdf-doctype" style="color:rgba(255,220,200,.9)">${labels[htype]}</div></div>
                 <div class="pdf-body">
-                    ${buildAdresses(['Softora.nl', 'info@softora.nl', 'www.softora.nl'], [v('h-bedrijf') || '—', v('h-contact'), v('h-adres'), v('h-email')])}
-                    <div class="pdf-herinnering-banner" style="background:${col}">${labels[htype]}</div>
-                    <div class="pdf-body-text">${msgs[htype].replace(/\n/g, '<br>')}</div>
-                    <div class="pdf-invoice-ref">
-                        <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Factuurnummer</div><div class="pdf-invoice-ref-val">${v('h-factnr') || '—'}</div></div>
-                        <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Factuurdatum</div><div class="pdf-invoice-ref-val">${fmtDate(v('h-factdatum'))}</div></div>
-                        <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Vervallen op</div><div class="pdf-invoice-ref-val">${fmtDate(v('h-verval'))}</div></div>
-                        <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Openstaand</div><div class="pdf-invoice-ref-val" style="color:${col}">${v('h-bedrag') || '—'}</div></div>
+                    <div class="pdf-body-content">
+                        ${buildAdresses(['Softora.nl', 'info@softora.nl', 'www.softora.nl'], [v('h-bedrijf') || '—', v('h-contact'), v('h-adres'), v('h-email')])}
+                        <div class="pdf-herinnering-banner" style="background:${col}">${labels[htype]}</div>
+                        <div class="pdf-body-text">${msgs[htype].replace(/\n/g, '<br>')}</div>
+                        <div class="pdf-invoice-ref">
+                            <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Factuurnummer</div><div class="pdf-invoice-ref-val">${v('h-factnr') || '—'}</div></div>
+                            <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Factuurdatum</div><div class="pdf-invoice-ref-val">${fmtDate(v('h-factdatum'))}</div></div>
+                            <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Vervallen op</div><div class="pdf-invoice-ref-val">${fmtDate(v('h-verval'))}</div></div>
+                            <div class="pdf-invoice-ref-cell"><div class="pdf-invoice-ref-label">Openstaand</div><div class="pdf-invoice-ref-val" style="color:${col}">${v('h-bedrag') || '—'}</div></div>
+                        </div>
+                        <div class="pdf-betaal-strip" style="background:${col}">
+                            <div class="pdf-betaal-strip-left"><strong>Betaal uiterlijk: ${fmtDate(v('h-nieuwdatum'))}</strong>IBAN: ${v('h-iban') || '—'} · t.n.v. Softora.nl</div>
+                            <div class="pdf-betaal-strip-right">${v('h-bedrag') || '—'}</div>
+                        </div>
+                        ${notities ? `<div class="pdf-notes"><div class="pdf-notes-label">Toelichting</div><div class="pdf-notes-text">${notities.replace(/\n/g, '<br>')}</div></div>` : ''}
                     </div>
-                    <div class="pdf-betaal-strip" style="background:${col}">
-                        <div class="pdf-betaal-strip-left"><strong>Betaal uiterlijk: ${fmtDate(v('h-nieuwdatum'))}</strong>IBAN: ${v('h-iban') || '—'} · t.n.v. Softora.nl</div>
-                        <div class="pdf-betaal-strip-right">${v('h-bedrag') || '—'}</div>
-                    </div>
-                    ${notities ? `<div class="pdf-notes"><div class="pdf-notes-label">Toelichting</div><div class="pdf-notes-text">${notities.replace(/\n/g, '<br>')}</div></div>` : ''}
-                </div>
-                <div class="pdf-footer-bar">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
+                    <div class="pdf-footer-bar">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>
+                </div>`;
         }
 
         function updatePreview() {
             const builders = { offerte: buildOfferte, factuur: buildFactuur, herinnering: buildHerinnering };
             const previewEl = document.getElementById('preview-' + activeTab);
             if (previewEl && builders[activeTab]) previewEl.innerHTML = builders[activeTab]();
+            queuePreviewScale();
         }
 
         function downloadPDF(type) {
@@ -1157,6 +1245,8 @@
         addRegel('o');
         addRegel('f');
         updatePreview();
+        window.addEventListener('resize', queuePreviewScale);
+        window.addEventListener('load', queuePreviewScale);
     </script>
 </body>
 </html>

@@ -53,6 +53,21 @@
         }, { once: true });
     }
 
+    function placeSidebarLogoutNextToRole() {
+        document.querySelectorAll(".sidebar-footer .sidebar-user").forEach(function (user) {
+            const info = user.querySelector(".sidebar-user-info");
+            const role = info && info.querySelector(".sidebar-user-role");
+            const logout = user.querySelector(".logout-btn");
+
+            if (!role || !logout) return;
+            if (logout.parentElement === role) return;
+
+            role.appendChild(logout);
+        });
+    }
+
+    placeSidebarLogoutNextToRole();
+
     function normalizeThemeMode(mode) {
         if (mode === "dark" || mode === "light") return mode;
         return null;

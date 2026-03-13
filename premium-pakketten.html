@@ -1226,15 +1226,11 @@ body {
       <div class="page-title">Pakketten</div>
       <div class="page-subtitle">Overzicht van beschikbare diensten en prijzen</div>
     </div>
-    <div class="header-controls">
-      <button class="btn-outline" type="button">Pakket Aanvragen</button>
-    </div>
   </div>
 
   <div class="tabs">
     <button class="tab active" type="button" onclick="switchTab('bouwen', this)">Website Bouwen</button>
     <button class="tab" type="button" onclick="switchTab('onderhoud', this)">Website Onderhoud</button>
-    <button class="tab" type="button" onclick="switchTab('vergelijking', this)">Vergelijking</button>
   </div>
 
   <div id="tab-bouwen" class="tab-panel active">
@@ -1384,71 +1380,6 @@ body {
     </div>
   </div>
 
-  <div id="tab-vergelijking" class="tab-panel">
-    <div class="section-title">Pakketvergelijking – Website Bouwen</div>
-    <div class="compare-wrap" style="margin-bottom:32px">
-      <table class="compare-table">
-        <thead>
-          <tr>
-            <th>Functie</th>
-            <th>Starter</th>
-            <th>Business</th>
-            <th>Premium</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="category-row"><td colspan="4">Omvang</td></tr>
-          <tr><td class="row-label">Aantal pagina's</td><td class="dot-text">Tot 5</td><td class="dot-text">Tot 10</td><td class="dot-text">Onbeperkt</td></tr>
-          <tr><td class="row-label">Oplevering</td><td class="dot-text">2 weken</td><td class="dot-text">3 weken</td><td class="dot-text">Op aanvraag</td></tr>
-          <tr class="category-row"><td colspan="4">Design &amp; Techniek</td></tr>
-          <tr><td class="row-label">Responsief design</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr><td class="row-label">Maatwerk design</td><td class="dot-no">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr><td class="row-label">Animaties &amp; effecten</td><td class="dot-no">●</td><td class="dot-no">●</td><td class="dot-yes">●</td></tr>
-          <tr><td class="row-label">Meertalig</td><td class="dot-no">●</td><td class="dot-no">●</td><td class="dot-yes">●</td></tr>
-          <tr class="category-row"><td colspan="4">Marketing &amp; Groei</td></tr>
-          <tr><td class="row-label">Basis SEO</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr><td class="row-label">Geavanceerde SEO</td><td class="dot-no">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr><td class="row-label">Blog / nieuws module</td><td class="dot-no">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr><td class="row-label">Webshop / reserveringen</td><td class="dot-no">●</td><td class="dot-no">●</td><td class="dot-yes">●</td></tr>
-          <tr class="category-row"><td colspan="4">Support</td></tr>
-          <tr><td class="row-label">Gratis support na oplevering</td><td class="dot-no">●</td><td class="dot-text">1 maand</td><td class="dot-text">3 maanden</td></tr>
-          <tr><td class="row-label">Prioriteit SLA</td><td class="dot-no">●</td><td class="dot-no">●</td><td class="dot-yes">●</td></tr>
-          <tr class="category-row"><td colspan="4">Investering</td></tr>
-          <tr><td class="row-label">Prijs (excl. BTW)</td><td class="dot-text">€799</td><td class="dot-text">€1.499</td><td class="dot-text">€2.999</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="section-title">Pakketvergelijking – Onderhoud Abonnementen</div>
-    <div class="compare-wrap">
-      <table class="compare-table">
-        <thead>
-          <tr>
-            <th>Functie</th>
-            <th>Basis</th>
-            <th>Plus</th>
-            <th>Pro</th>
-            <th>Enterprise</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="category-row"><td colspan="5">Beveiliging &amp; Beheer</td></tr>
-          <tr><td class="row-label">Plugin-updates</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr><td class="row-label">Dagelijkse backups</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr><td class="row-label">Uptime monitoring</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr class="category-row"><td colspan="5">Aanpassingen</td></tr>
-          <tr><td class="row-label">Uur aanpassingen/mnd</td><td class="dot-no">●</td><td class="dot-text">1 uur</td><td class="dot-text">3 uur</td><td class="dot-text">Onbeperkt</td></tr>
-          <tr><td class="row-label">Maandelijkse rapportage</td><td class="dot-no">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr class="category-row"><td colspan="5">Support</td></tr>
-          <tr><td class="row-label">E-mail support</td><td class="dot-no">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td><td class="dot-yes">●</td></tr>
-          <tr><td class="row-label">Prioriteit reactietijd</td><td class="dot-no">●</td><td class="dot-no">●</td><td class="dot-text">&lt;4 uur</td><td class="dot-text">SLA</td></tr>
-          <tr><td class="row-label">Dedicated contactpersoon</td><td class="dot-no">●</td><td class="dot-no">●</td><td class="dot-no">●</td><td class="dot-yes">●</td></tr>
-          <tr class="category-row"><td colspan="5">Prijs</td></tr>
-          <tr><td class="row-label">Maandprijs (excl. BTW)</td><td class="dot-text">€29</td><td class="dot-text">€59</td><td class="dot-text">€99</td><td class="dot-text">Op aanvraag</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
 </main>
 
 <script>

@@ -1,4 +1,9 @@
 :root {
+    --accent: #8b2252;
+    --accent-dark: #6b1a3f;
+    --accent-light: #a62d65;
+    --accent-soft: rgba(139, 34, 82, 0.12);
+    --accent-glow: rgba(139, 34, 82, 0.4);
     --theme-control-bg: rgba(0, 0, 0, 0.03);
     --theme-control-bg-hover: rgba(0, 0, 0, 0.06);
     --theme-control-bg-active: rgba(0, 0, 0, 0.1);
@@ -109,11 +114,19 @@
     line-height: 1 !important;
 }
 
+.sidebar-footer .sidebar-user .sidebar-user-role {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
 .sidebar-footer .sidebar-user .logout-btn {
-    order: -1;
+    order: 0;
+    margin-left: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    vertical-align: middle;
 }
 
 .sidebar-footer .sidebar-user .logout-btn svg {
