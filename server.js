@@ -5189,6 +5189,152 @@ function buildVapiTranscriberOverrideFromElevenLabsAgent(agentData, fallbackAssi
   return nextTranscriber;
 }
 
+const VAPI_TRANSIENT_ASSISTANT_ALLOWED_KEYS = new Set([
+  'transcriber',
+  'model',
+  'voice',
+  'firstMessage',
+  'firstMessageInterruptionsEnabled',
+  'firstMessageMode',
+  'voicemailDetection',
+  'clientMessages',
+  'serverMessages',
+  'maxDurationSeconds',
+  'backgroundSound',
+  'modelOutputInMessagesEnabled',
+  'transportConfigurations',
+  'observabilityPlan',
+  'hooks',
+  'name',
+  'voicemailMessage',
+  'endCallMessage',
+  'endCallPhrases',
+  'compliancePlan',
+  'metadata',
+  'backgroundSpeechDenoisingPlan',
+  'analysisPlan',
+  'artifactPlan',
+  'startSpeakingPlan',
+  'stopSpeakingPlan',
+  'monitorPlan',
+  'credentialIds',
+  'server',
+  'keypadInputPlan',
+]);
+
+function sanitizeVapiAssistantForTransientCall(assistant) {
+  const source = assistant && typeof assistant === 'object' ? cloneJsonSafe(assistant, {}) : {};
+  const nextAssistant = {};
+
+  VAPI_TRANSIENT_ASSISTANT_ALLOWED_KEYS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) return;
+    nextAssistant[key] = cloneJsonSafe(source[key], source[key]);
+  });
+
+  return nextAssistant;
+}
+
+function buildColdcallingVapiServerMessages(existingMessages) {
+  const nextMessages = [];
+  const seen = new Set();
+
+  function append(value) {
+    const normalized = normalizeString(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    nextMessages.push(normalized);
+  }
+
+  [
+    'assistant.started',
+    'conversation-update',
+    'end-of-call-report',
+    'function-call',
+    'hang',
+    'model-output',
+    'speech-update',
+    'status-update',
+    'tool-calls',
+    'transfer-destination-request',
+    'handoff-destination-request',
+    'user-interrupted',
+    'voice-input',
+    'transcript',
+    'transcript[transcriptType="final"]',
+  ].forEach(append);
+
+  if (Array.isArray(existingMessages)) {
+    existingMessages.forEach(append);
+  }
+
+  return nextMessages;
+}
+
+function buildVapiTransientAssistantForColdcalling(
+  fallbackAssistant,
+  runtimeAssistantConfig = {},
+  syncSummary = {}
+) {
+  const nextAssistant = sanitizeVapiAssistantForTransientCall(fallbackAssistant);
+  const runtimeConfig =
+    runtimeAssistantConfig && typeof runtimeAssistantConfig === 'object'
+      ? runtimeAssistantConfig
+      : {};
+  const normalizedFirstMessage = normalizeString(runtimeConfig.firstMessage);
+  const normalizedFirstMessageMode = normalizeString(runtimeConfig.firstMessageMode);
+  const firstMessageSource = normalizeString(syncSummary.firstMessageSource);
+
+  if (runtimeConfig.model && typeof runtimeConfig.model === 'object') {
+    nextAssistant.model = cloneJsonSafe(runtimeConfig.model, {});
+  }
+
+  if (runtimeConfig.transcriber && typeof runtimeConfig.transcriber === 'object') {
+    nextAssistant.transcriber = cloneJsonSafe(runtimeConfig.transcriber, {});
+  }
+
+  if (runtimeConfig.voice && typeof runtimeConfig.voice === 'object') {
+    nextAssistant.voice = cloneJsonSafe(runtimeConfig.voice, {});
+  }
+
+  if (Array.isArray(runtimeConfig.credentials) && runtimeConfig.credentials.length > 0) {
+    nextAssistant.credentials = cloneJsonSafe(runtimeConfig.credentials, []);
+  }
+
+  if (typeof runtimeConfig.firstMessageInterruptionsEnabled === 'boolean') {
+    nextAssistant.firstMessageInterruptionsEnabled =
+      runtimeConfig.firstMessageInterruptionsEnabled;
+  }
+
+  if (
+    Number.isFinite(Number(runtimeConfig.maxDurationSeconds)) &&
+    Number(runtimeConfig.maxDurationSeconds) > 0
+  ) {
+    nextAssistant.maxDurationSeconds = Math.round(Number(runtimeConfig.maxDurationSeconds));
+  }
+
+  if (normalizeString(runtimeConfig.backgroundSound)) {
+    nextAssistant.backgroundSound = normalizeString(runtimeConfig.backgroundSound);
+  }
+
+  if (normalizedFirstMessage) {
+    nextAssistant.firstMessage = normalizedFirstMessage;
+    nextAssistant.firstMessageMode =
+      normalizedFirstMessageMode || 'assistant-speaks-first';
+  } else if (
+    firstMessageSource === 'wait-for-user' ||
+    firstMessageSource === 'blocked-invalid-elevenlabs-first-message'
+  ) {
+    delete nextAssistant.firstMessage;
+    delete nextAssistant.firstMessageMode;
+  }
+
+  nextAssistant.serverMessages = buildColdcallingVapiServerMessages(
+    nextAssistant.serverMessages
+  );
+
+  return nextAssistant;
+}
+
 function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssistant = null) {
   const settings = getElevenLabsAgentRuntimeSettings(agentData);
   const overrides = {};
@@ -6160,6 +6306,9 @@ async function buildVapiPayload(lead, campaign) {
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
   const elevenLabsCredentials = buildVapiElevenLabsCredentialsOverride();
   const configuredBackgroundSound = getConfiguredColdcallingBackgroundSound();
+  let transientAssistant = null;
+  let transientAssistantSource = 'saved-assistant';
+  let syncedAgentSummary = null;
   const assistantOverrides = {
     variableValues: buildVariableValues(
       {
@@ -6190,6 +6339,7 @@ async function buildVapiPayload(lead, campaign) {
         elevenLabsAgentData,
         vapiAssistant
       );
+      syncedAgentSummary = syncedAgentConfig.summary;
       Object.assign(assistantOverrides, syncedAgentConfig.overrides);
       assistantOverrides.backgroundSound = configuredBackgroundSound;
 
@@ -6225,6 +6375,15 @@ async function buildVapiPayload(lead, campaign) {
           2
         )
       );
+
+      if (vapiAssistant && typeof vapiAssistant === 'object') {
+        transientAssistant = buildVapiTransientAssistantForColdcalling(
+          vapiAssistant,
+          assistantOverrides,
+          syncedAgentConfig.summary
+        );
+        transientAssistantSource = 'transient-synced-assistant';
+      }
     } else if (voiceOverride) {
       console.log(
         '[Coldcalling][Vapi Voice Override]',
@@ -6244,6 +6403,14 @@ async function buildVapiPayload(lead, campaign) {
           2
         )
       );
+
+      if (vapiAssistant && typeof vapiAssistant === 'object') {
+        transientAssistant = buildVapiTransientAssistantForColdcalling(vapiAssistant, assistantOverrides);
+        transientAssistantSource = 'transient-voice-assistant';
+      }
+    } else if (vapiAssistant && typeof vapiAssistant === 'object') {
+      transientAssistant = buildVapiTransientAssistantForColdcalling(vapiAssistant, assistantOverrides);
+      transientAssistantSource = 'transient-base-assistant';
     }
   } catch (error) {
     console.warn(
@@ -6265,9 +6432,12 @@ async function buildVapiPayload(lead, campaign) {
     leadCompany: normalizeString(lead.company),
     leadName: normalizeString(lead.name),
     leadPhoneE164: normalizedPhone,
+    transportMode: transientAssistant ? 'transient-assistant' : 'assistant-id-overrides',
+    transientAssistantSource,
     backgroundSound: normalizeString(assistantOverrides.backgroundSound),
     firstMessage: truncateText(normalizeString(assistantOverrides.firstMessage), 240),
     firstMessageMode: normalizeString(assistantOverrides.firstMessageMode),
+    firstMessageSource: normalizeString(syncedAgentSummary?.firstMessageSource),
     credentialProviders: Array.isArray(assistantOverrides.credentials)
       ? assistantOverrides.credentials.map((credential) => normalizeString(credential?.provider)).filter(Boolean)
       : [],
@@ -6294,16 +6464,54 @@ async function buildVapiPayload(lead, campaign) {
             model: normalizeString(assistantOverrides.model.model),
           }
         : null,
+    transientAssistant:
+      transientAssistant && typeof transientAssistant === 'object'
+        ? {
+            name: normalizeString(transientAssistant.name),
+            backgroundSound: normalizeString(transientAssistant.backgroundSound),
+            firstMessage: truncateText(normalizeString(transientAssistant.firstMessage), 240),
+            firstMessageMode: normalizeString(transientAssistant.firstMessageMode),
+            voice:
+              transientAssistant.voice && typeof transientAssistant.voice === 'object'
+                ? {
+                    provider: normalizeString(transientAssistant.voice.provider),
+                    voiceId: normalizeString(transientAssistant.voice.voiceId),
+                    model: normalizeString(transientAssistant.voice.model),
+                  }
+                : null,
+            transcriber:
+              transientAssistant.transcriber && typeof transientAssistant.transcriber === 'object'
+                ? {
+                    provider: normalizeString(transientAssistant.transcriber.provider),
+                    model: normalizeString(transientAssistant.transcriber.model),
+                    language: normalizeString(transientAssistant.transcriber.language),
+                  }
+                : null,
+            model:
+              transientAssistant.model && typeof transientAssistant.model === 'object'
+                ? {
+                    provider: normalizeString(transientAssistant.model.provider),
+                    model: normalizeString(transientAssistant.model.model),
+                  }
+                : null,
+            serverMessages: Array.isArray(transientAssistant.serverMessages)
+              ? transientAssistant.serverMessages.slice(0, 20)
+              : [],
+          }
+        : null,
   };
 
-  return {
-    assistantId: process.env.VAPI_ASSISTANT_ID,
+  const payload = {
     phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID,
     customer: {
       name: normalizeString(lead.name) || normalizeString(lead.company) || 'Onbekende lead',
       number: normalizedPhone,
     },
-    assistantOverrides,
+    assistantOverrides: transientAssistant
+      ? {
+          variableValues: assistantOverrides.variableValues,
+        }
+      : assistantOverrides,
     metadata: {
       source: 'softora-coldcalling-dashboard',
       leadCompany: normalizeString(lead.company),
@@ -6313,6 +6521,14 @@ async function buildVapiPayload(lead, campaign) {
       region: effectiveRegion,
     },
   };
+
+  if (transientAssistant) {
+    payload.assistant = transientAssistant;
+  } else {
+    payload.assistantId = process.env.VAPI_ASSISTANT_ID;
+  }
+
+  return payload;
 }
 
 async function processVapiColdcallingLead(lead, campaign, index) {
