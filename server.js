@@ -6592,13 +6592,9 @@ async function buildVapiPayload(lead, campaign) {
       );
     }
 
-    const customVoiceOverride = buildVapiCustomElevenLabsV3VoiceFromAgent(elevenLabsAgentData);
-    const { voiceOverride, source } = customVoiceOverride
-      ? {
-          voiceOverride: customVoiceOverride,
-          source: 'agent-custom-v3',
-        }
-      : await getConfiguredVapiElevenLabsVoiceOverride(elevenLabsAgentData);
+    const { voiceOverride, source } = await getConfiguredVapiElevenLabsVoiceOverride(
+      elevenLabsAgentData
+    );
     if (!voiceOverride) {
       throw new Error(
         'Geen bruikbare ElevenLabs voice gevonden in de geconfigureerde agent. Vapi mag niet terugvallen op een andere stem.'
