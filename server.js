@@ -4906,6 +4906,8 @@ function normalizeVapiElevenLabsVoiceModel(value) {
   if (!normalized) return '';
 
   const aliases = {
+    eleven_v3: 'eleven_turbo_v2_5',
+    eleven_v3_conversational: 'eleven_turbo_v2_5',
     eleven_flash_v2: 'eleven_flash_v2',
     eleven_flash_v2_5: 'eleven_flash_v2_5',
     eleven_flash_v25: 'eleven_flash_v2_5',
@@ -5531,8 +5533,15 @@ function buildVapiElevenLabsVoiceOverrideFromAgent(agent) {
   const conversationConfig = getElevenLabsConversationConfigRoot(agent);
   if (!conversationConfig) return null;
   const explicitTtsConfig = getElevenLabsTtsConfig(agent);
+  const runtimeSettings = getElevenLabsAgentRuntimeSettings(agent);
   return buildVapiElevenLabsVoiceOverrideFromSource(
-    explicitTtsConfig || findLikelyElevenLabsTtsConfig(conversationConfig)
+    {
+      ...(explicitTtsConfig || findLikelyElevenLabsTtsConfig(conversationConfig) || {}),
+      language:
+        normalizeString(explicitTtsConfig?.language) ||
+        normalizeString(runtimeSettings.language) ||
+        '',
+    }
   );
 }
 
