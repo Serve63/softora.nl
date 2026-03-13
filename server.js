@@ -4880,96 +4880,30 @@ function getElevenLabsConversationLimitsConfig(agentData) {
   return null;
 }
 
-function collectLikelyPromptTextCandidates(value, candidates, visited = new WeakSet(), depth = 0) {
-  if (depth > 8) return;
-  if (typeof value === 'string') {
-    const normalized = normalizeString(value);
-    if (!normalized) return;
-    candidates.push(normalized);
-    return;
-  }
-
-  if (!value || typeof value !== 'object') return;
-  if (visited.has(value)) return;
-  visited.add(value);
-
-  if (Array.isArray(value)) {
-    value.forEach((item) => collectLikelyPromptTextCandidates(item, candidates, visited, depth + 1));
-    return;
-  }
-
-  const preferredKeys = [
-    'prompt',
-    'system_prompt',
-    'systemPrompt',
-    'instructions',
-    'instruction',
-    'script',
-    'assistant_prompt',
-    'assistantPrompt',
-    'content',
-    'text',
-    'message',
+function resolveBestElevenLabsPromptText(_agentData, promptConfig, agentConfig) {
+  const promptFields = [
+    promptConfig?.prompt,
+    promptConfig?.system_prompt,
+    promptConfig?.systemPrompt,
+    promptConfig?.instructions,
+    promptConfig?.instruction,
+    promptConfig?.content,
+    promptConfig?.text,
+    promptConfig?.message,
+    agentConfig?.prompt?.prompt,
+    agentConfig?.prompt?.system_prompt,
+    agentConfig?.prompt?.systemPrompt,
+    agentConfig?.prompt_config?.prompt,
+    agentConfig?.prompt_config?.system_prompt,
+    agentConfig?.prompt_config?.systemPrompt,
   ];
 
-  preferredKeys.forEach((key) => {
-    if (!Object.prototype.hasOwnProperty.call(value, key)) return;
-    collectLikelyPromptTextCandidates(value[key], candidates, visited, depth + 1);
-  });
-
-  Object.entries(value).forEach(([key, nested]) => {
-    if (preferredKeys.includes(key)) return;
-    if (typeof nested === 'string' && /(prompt|instruction|system|script|assistant|role)/i.test(key)) {
-      const normalized = normalizeString(nested);
-      if (normalized) candidates.push(normalized);
-      return;
-    }
-    if (nested && typeof nested === 'object') {
-      collectLikelyPromptTextCandidates(nested, candidates, visited, depth + 1);
-    }
-  });
-}
-
-function dedupePromptCandidates(candidates) {
-  const seen = new Set();
-  const next = [];
-  candidates.forEach((candidate) => {
+  for (const candidate of promptFields) {
     const normalized = normalizeString(candidate);
-    if (!normalized) return;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    next.push(normalized);
-  });
-  return next;
-}
+    if (normalized) return normalized;
+  }
 
-function resolveBestElevenLabsPromptText(agentData, promptConfig, agentConfig) {
-  const candidates = [];
-
-  collectLikelyPromptTextCandidates(promptConfig, candidates);
-  collectLikelyPromptTextCandidates(agentConfig?.prompt_config, candidates);
-  collectLikelyPromptTextCandidates(agentConfig?.prompt, candidates);
-  collectLikelyPromptTextCandidates(getElevenLabsConversationConfigRoot(agentData), candidates);
-
-  const deduped = dedupePromptCandidates(candidates);
-  if (!deduped.length) return '';
-
-  const sorted = deduped.sort((a, b) => {
-    const aScore =
-      a.length +
-      (/(doel|objective|target|pitch|website|lead|bedrijf|prospect|afspraak|appointment|objection|bezwaar)/i.test(a)
-        ? 120
-        : 0);
-    const bScore =
-      b.length +
-      (/(doel|objective|target|pitch|website|lead|bedrijf|prospect|afspraak|appointment|objection|bezwaar)/i.test(b)
-        ? 120
-        : 0);
-    return bScore - aScore;
-  });
-
-  return normalizeString(sorted[0]);
+  return '';
 }
 
 function firstNormalizedString(...values) {
@@ -5150,30 +5084,12 @@ function normalizeVapiCompatibleElevenLabsLlm(value) {
   return raw;
 }
 
-function isUndesiredColdcallingFirstMessage(value) {
-  const normalized = normalizeString(value);
-  if (!normalized) return true;
-
-  return (
-    /\b(?:ik|i)\s+(?:begrijp|understand|snap|volg|follow|received|gelezen)\b/i.test(normalized) &&
-    /\b(?:instructies?|instructions?|prompt|rol|role|systeem|system)\b/i.test(normalized)
-  ) || /\b(?:als een ai|as an ai)\b/i.test(normalized) ||
-    /\b(?:how can i help you today|waarmee kan ik (?:je|u) helpen|hoe kan ik (?:je|u) helpen)\b/i.test(normalized);
-}
-
 function resolveColdcallingFirstMessage(settings) {
   const explicitFirstMessage = normalizeString(settings?.firstMessage);
-  if (explicitFirstMessage && !isUndesiredColdcallingFirstMessage(explicitFirstMessage)) {
+  if (explicitFirstMessage) {
     return {
       text: explicitFirstMessage,
       source: 'elevenlabs-agent',
-    };
-  }
-
-  if (explicitFirstMessage) {
-    return {
-      text: '',
-      source: 'blocked-invalid-elevenlabs-first-message',
     };
   }
 
@@ -5184,17 +5100,7 @@ function resolveColdcallingFirstMessage(settings) {
 }
 
 function buildVapiSafeSystemPrompt(promptText) {
-  const normalizedPrompt = normalizeString(promptText);
-  if (!normalizedPrompt) return '';
-
-  const guardrail =
-    'Kritieke spreekregel: benoem nooit dat je instructies, een prompt, een rol, regels of systeemtekst hebt ontvangen of begrijpt. Zeg nooit dat je de instructies begrijpt. Open altijd direct natuurlijk in karakter en in rol.';
-
-  if (/zeg nooit dat je de instructies begrijpt|benoem nooit dat je instructies/i.test(normalizedPrompt)) {
-    return normalizedPrompt;
-  }
-
-  return `${normalizedPrompt}\n\n${guardrail}`;
+  return normalizeString(promptText);
 }
 
 function isSupportedVapiModelOverride(provider, model) {
@@ -5596,10 +5502,7 @@ function buildVapiTransientAssistantForColdcalling(
     nextAssistant.firstMessage = normalizedFirstMessage;
     nextAssistant.firstMessageMode =
       normalizedFirstMessageMode || 'assistant-speaks-first';
-  } else if (
-    firstMessageSource === 'wait-for-user' ||
-    firstMessageSource === 'blocked-invalid-elevenlabs-first-message'
-  ) {
+  } else if (firstMessageSource === 'wait-for-user') {
     delete nextAssistant.firstMessage;
     delete nextAssistant.firstMessageMode;
   }
