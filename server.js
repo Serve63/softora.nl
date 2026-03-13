@@ -1502,18 +1502,37 @@ function normalizePhoneComparisonKey(input) {
   }
 }
 
-function getConfiguredBlockedColdcallingTargetKeys() {
-  const rawValues = [
-    process.env.COLDCALLING_BLOCKED_TARGET_NUMBERS,
-    process.env.ELEVENLABS_OUTBOUND_CALLER_NUMBER,
-    process.env.TWILIO_OUTBOUND_CALLER_NUMBER,
-    process.env.COMPANY_PHONE_NUMBER,
-    process.env.SOFTORA_PHONE_NUMBER,
-  ];
+function isColdcallingAutoBlockOwnNumbersEnabled() {
+  return /^(1|true|yes|ja)$/i.test(String(process.env.COLDCALLING_AUTO_BLOCK_OWN_NUMBERS || '').trim());
+}
 
+function getExplicitBlockedColdcallingTargetValues() {
+  return String(process.env.COLDCALLING_BLOCKED_TARGET_NUMBERS || '')
+    .split(/[\n,;]+/)
+    .map((value) => normalizeString(value))
+    .filter(Boolean);
+}
+
+function getConfiguredBlockedColdcallingTargetValues() {
+  const rawValues = getExplicitBlockedColdcallingTargetValues();
+
+  // Auto-block van eigen nummers staat standaard UIT zodat mensen het
+  // publieksnummer gewoon kunnen bellen en testcalls niet onbedoeld falen.
+  if (isColdcallingAutoBlockOwnNumbersEnabled()) {
+    rawValues.push(
+      process.env.ELEVENLABS_OUTBOUND_CALLER_NUMBER,
+      process.env.TWILIO_OUTBOUND_CALLER_NUMBER,
+      process.env.COMPANY_PHONE_NUMBER,
+      process.env.SOFTORA_PHONE_NUMBER
+    );
+  }
+
+  return rawValues;
+}
+
+function getConfiguredBlockedColdcallingTargetKeys() {
   const keys = new Set();
-  rawValues
-    .flatMap((value) => String(value || '').split(/[\n,;]+/))
+  getConfiguredBlockedColdcallingTargetValues()
     .map((value) => normalizePhoneComparisonKey(value))
     .filter(Boolean)
     .forEach((value) => keys.add(value));
@@ -1534,7 +1553,7 @@ function buildBlockedColdcallingLeadResult(lead, index) {
     error: 'Doelnummer is geblokkeerd.',
     cause: 'blocked target number',
     causeExplanation:
-      'Dit nummer is geblokkeerd als doelnummer zodat je eigen lijn alleen uitbelt en nooit zelf door een campagne wordt gebeld.',
+      'Dit doelnummer staat op de outbound blocklist. Haal het nummer uit COLDCALLING_BLOCKED_TARGET_NUMBERS of zet COLDCALLING_AUTO_BLOCK_OWN_NUMBERS uit.',
     details: {
       blockedPhone: normalizeString(lead?.phone),
     },
@@ -7129,6 +7148,7 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 // Simpele healthcheck voor hosting platforms (Render/Railway).
 app.get('/healthz', (_req, res) => {
   const provider = getColdcallingProvider();
+  const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
@@ -7137,6 +7157,8 @@ app.get('/healthz', (_req, res) => {
       providerLocked: true,
       agentId: getConfiguredElevenLabsAgentId(),
       dashboardExtraInstructionsEnabled: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED,
+      autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
+      explicitBlockedTargetsCount,
       missingEnv: getMissingEnvVars(provider),
     },
     supabase: {
@@ -7152,6 +7174,7 @@ app.get('/healthz', (_req, res) => {
 // Alias voor serverless setups waar de backend onder /api/* hangt (zoals Vercel).
 app.get('/api/healthz', (_req, res) => {
   const provider = getColdcallingProvider();
+  const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
@@ -7160,6 +7183,8 @@ app.get('/api/healthz', (_req, res) => {
       providerLocked: true,
       agentId: getConfiguredElevenLabsAgentId(),
       dashboardExtraInstructionsEnabled: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED,
+      autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
+      explicitBlockedTargetsCount,
       missingEnv: getMissingEnvVars(provider),
     },
     supabase: {
