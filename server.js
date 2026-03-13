@@ -5567,6 +5567,12 @@ function buildVapiElevenLabsVoiceOverrideFromAgent(agent) {
 }
 
 function buildVapiCustomElevenLabsV3VoiceFromAgent(agent) {
+  // Safety switch: custom v3 bridge kan audio-corruptie geven op sommige live calls.
+  // Alleen activeren als deze expliciet aanstaat.
+  if (!toBooleanSafe(process.env.VAPI_ENABLE_CUSTOM_ELEVENLABS_V3, false)) {
+    return null;
+  }
+
   const explicitTtsConfig = getElevenLabsTtsConfig(agent);
   const conversationConfig = getElevenLabsConversationConfigRoot(agent);
   const runtimeSettings = getElevenLabsAgentRuntimeSettings(agent);
