@@ -5184,8 +5184,6 @@ function buildVapiAssistantOverridesFromElevenLabsAgent(agentData, fallbackAssis
   if (normalizeString(resolvedFirstMessage.text)) {
     overrides.firstMessage = resolvedFirstMessage.text;
     overrides.firstMessageMode = 'assistant-speaks-first';
-  } else {
-    overrides.firstMessageMode = 'assistant-waits-for-user';
   }
 
   if (typeof settings.disableFirstMessageInterruptions === 'boolean') {
