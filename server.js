@@ -146,7 +146,7 @@ const ELEVENLABS_AMBIENCE_MIXER_TTS_OUTPUT_AUDIO_FORMAT = normalizeString(
   process.env.ELEVENLABS_AMBIENCE_MIXER_TTS_OUTPUT_AUDIO_FORMAT || 'ulaw_8000'
 );
 const ELEVENLABS_AMBIENCE_MIXER_TTS_OPTIMIZE_STREAMING_LATENCY = (() => {
-  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_TTS_OPTIMIZE_STREAMING_LATENCY || '');
+  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_TTS_OPTIMIZE_STREAMING_LATENCY || '1');
   if (!raw) return null;
   const numeric = Number(raw);
   if (!Number.isFinite(numeric)) return null;
