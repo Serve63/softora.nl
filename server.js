@@ -4895,6 +4895,8 @@ function buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, currentAgentPa
   );
 
   const nextTurn = { ...currentTurn };
+  delete nextTurn.soft_timeout_config;
+  delete nextTurn.softTimeoutConfig;
   if (desiredProfile.enforceTurnSettings) {
     if (desiredProfile.turnMode) nextTurn.mode = desiredProfile.turnMode;
     if (desiredProfile.turnModel) nextTurn.turn_model = desiredProfile.turnModel;
@@ -4910,22 +4912,35 @@ function buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, currentAgentPa
   const shouldSetSoftTimeoutConfig =
     Number.isFinite(Number(desiredProfile.softTimeoutSeconds)) ||
     desiredProfile.softTimeoutUseLlmGeneratedMessage !== null;
+  const nextSoftTimeoutConfig = {
+    ...currentSoftTimeout,
+  };
+  delete nextSoftTimeoutConfig.timeout_seconds;
+  delete nextSoftTimeoutConfig.timeoutSeconds;
+  const existingSoftTimeoutSeconds = parseNumberSafe(
+    currentSoftTimeout?.timeout_seconds ?? currentSoftTimeout?.timeoutSeconds,
+    null
+  );
+  if (Number.isFinite(existingSoftTimeoutSeconds)) {
+    nextSoftTimeoutConfig.timeout_seconds =
+      existingSoftTimeoutSeconds === -1 || existingSoftTimeoutSeconds >= 0.5
+        ? Number(existingSoftTimeoutSeconds)
+        : -1;
+  }
   if (shouldSetSoftTimeoutConfig) {
-    nextTurn.soft_timeout_config = {
-      ...currentSoftTimeout,
-    };
-    delete nextTurn.soft_timeout_config.timeout_seconds;
-    delete nextTurn.soft_timeout_config.timeoutSeconds;
     if (Number.isFinite(Number(desiredProfile.softTimeoutSeconds))) {
-      nextTurn.soft_timeout_config.timeout_seconds = Number(desiredProfile.softTimeoutSeconds);
+      nextSoftTimeoutConfig.timeout_seconds = Number(desiredProfile.softTimeoutSeconds);
     }
     if (desiredProfile.softTimeoutMessage) {
-      nextTurn.soft_timeout_config.message = desiredProfile.softTimeoutMessage;
+      nextSoftTimeoutConfig.message = desiredProfile.softTimeoutMessage;
     }
     if (desiredProfile.softTimeoutUseLlmGeneratedMessage !== null) {
-      nextTurn.soft_timeout_config.use_llm_generated_message =
+      nextSoftTimeoutConfig.use_llm_generated_message =
         desiredProfile.softTimeoutUseLlmGeneratedMessage;
     }
+  }
+  if (Object.keys(nextSoftTimeoutConfig).length > 0) {
+    nextTurn.soft_timeout_config = nextSoftTimeoutConfig;
   }
 
   const nextVad = { ...currentVad };
