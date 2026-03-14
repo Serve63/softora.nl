@@ -142,8 +142,7 @@ const ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_SECONDS = (() => {
   if (!raw) return null;
   const numeric = Number(raw);
   if (!Number.isFinite(numeric)) return null;
-  if (numeric <= 0) return -1;
-  return Math.max(0.5, Math.min(8, numeric));
+  return Math.max(-1, Math.min(7, numeric));
 })();
 const ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_MESSAGE = normalizeString(
   process.env.ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_MESSAGE || ''
