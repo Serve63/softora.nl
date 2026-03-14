@@ -224,6 +224,9 @@ let elevenLabsAmbienceMixerStatus = {
   softTimeoutSeconds: null,
   softTimeoutMessage: '',
   softTimeoutUseLlmGeneratedMessage: null,
+  desiredSoftTimeoutSeconds: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_SECONDS,
+  desiredSoftTimeoutMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_MESSAGE,
+  desiredSoftTimeoutUseLlmGeneratedMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_USE_LLM_MESSAGE,
   suggestedAudioTags: [],
 };
 let elevenLabsAmbienceMixerStatusPromise = null;
@@ -5117,6 +5120,9 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
       configuredAgentId: getConfiguredElevenLabsAgentId(),
       profileVersion: desiredProfile.profileVersion,
       enforceTurnSettings: desiredProfile.enforceTurnSettings,
+      desiredSoftTimeoutSeconds: desiredProfile.softTimeoutSeconds,
+      desiredSoftTimeoutMessage: desiredProfile.softTimeoutMessage,
+      desiredSoftTimeoutUseLlmGeneratedMessage: desiredProfile.softTimeoutUseLlmGeneratedMessage,
       patchAttempted: false,
       patched: false,
     });
@@ -5134,6 +5140,8 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
     const checkedAt = new Date().toISOString();
     const configuredAgentId = getConfiguredElevenLabsAgentId();
     const apiKeyPresent = Boolean(normalizeString(process.env.ELEVENLABS_API_KEY));
+    let patchAttempted = false;
+    let patchStatusCode = null;
 
     if (!apiKeyPresent || !configuredAgentId) {
       return buildElevenLabsAmbienceMixerStatusPatch({
@@ -5146,6 +5154,9 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
         configuredAgentId,
         profileVersion: desiredProfile.profileVersion,
         enforceTurnSettings: desiredProfile.enforceTurnSettings,
+        desiredSoftTimeoutSeconds: desiredProfile.softTimeoutSeconds,
+        desiredSoftTimeoutMessage: desiredProfile.softTimeoutMessage,
+        desiredSoftTimeoutUseLlmGeneratedMessage: desiredProfile.softTimeoutUseLlmGeneratedMessage,
         endpoint: '',
         statusCode: null,
         patchAttempted: false,
@@ -5156,9 +5167,7 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
     try {
       const readResult = await fetchElevenLabsAgentById(configuredAgentId);
       let runtime = summarizeElevenLabsAgentMixerRuntime(readResult.data, { configuredAgentId });
-      let patchAttempted = false;
       let patched = false;
-      let patchStatusCode = null;
       let issue = 'ok';
       let issueReason = `Ambience mixer check gelukt (${reasonLabel}).`;
 
@@ -5211,6 +5220,9 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
         softTimeoutSeconds: runtime.softTimeoutSeconds,
         softTimeoutMessage: runtime.softTimeoutMessage,
         softTimeoutUseLlmGeneratedMessage: runtime.softTimeoutUseLlmGeneratedMessage,
+        desiredSoftTimeoutSeconds: desiredProfile.softTimeoutSeconds,
+        desiredSoftTimeoutMessage: desiredProfile.softTimeoutMessage,
+        desiredSoftTimeoutUseLlmGeneratedMessage: desiredProfile.softTimeoutUseLlmGeneratedMessage,
         suggestedAudioTags: runtime.suggestedAudioTags,
       });
     } catch (error) {
@@ -5224,9 +5236,12 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
         configuredAgentId,
         profileVersion: desiredProfile.profileVersion,
         enforceTurnSettings: desiredProfile.enforceTurnSettings,
+        desiredSoftTimeoutSeconds: desiredProfile.softTimeoutSeconds,
+        desiredSoftTimeoutMessage: desiredProfile.softTimeoutMessage,
+        desiredSoftTimeoutUseLlmGeneratedMessage: desiredProfile.softTimeoutUseLlmGeneratedMessage,
         endpoint: normalizeString(error?.endpoint || ''),
-        statusCode: Number(error?.status || 0) || null,
-        patchAttempted: false,
+        statusCode: patchStatusCode || Number(error?.status || 0) || null,
+        patchAttempted,
         patched: false,
       });
     } finally {
