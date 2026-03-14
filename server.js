@@ -227,7 +227,6 @@ let elevenLabsAmbienceMixerStatus = {
   desiredSoftTimeoutSeconds: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_SECONDS,
   desiredSoftTimeoutMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_MESSAGE,
   desiredSoftTimeoutUseLlmGeneratedMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_USE_LLM_MESSAGE,
-  patchSoftTimeoutPayload: null,
   suggestedAudioTags: [],
 };
 let elevenLabsAmbienceMixerStatusPromise = null;
@@ -5143,7 +5142,6 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
     const apiKeyPresent = Boolean(normalizeString(process.env.ELEVENLABS_API_KEY));
     let patchAttempted = false;
     let patchStatusCode = null;
-    let patchSoftTimeoutPayload = null;
 
     if (!apiKeyPresent || !configuredAgentId) {
       return buildElevenLabsAmbienceMixerStatusPatch({
@@ -5176,11 +5174,6 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
       if (forcePatch || !isElevenLabsAmbienceMixerProfileCompliant(runtime, desiredProfile)) {
         patchAttempted = true;
         const patchPayload = buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, readResult.data);
-        patchSoftTimeoutPayload =
-          patchPayload?.conversation_config?.turn?.soft_timeout_config &&
-          typeof patchPayload.conversation_config.turn.soft_timeout_config === 'object'
-            ? { ...patchPayload.conversation_config.turn.soft_timeout_config }
-            : null;
         const patchResult = await patchElevenLabsAgentSettings(configuredAgentId, patchPayload);
         patchStatusCode = Number(patchResult.statusCode || 0) || null;
 
@@ -5246,7 +5239,6 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
         desiredSoftTimeoutSeconds: desiredProfile.softTimeoutSeconds,
         desiredSoftTimeoutMessage: desiredProfile.softTimeoutMessage,
         desiredSoftTimeoutUseLlmGeneratedMessage: desiredProfile.softTimeoutUseLlmGeneratedMessage,
-        patchSoftTimeoutPayload,
         endpoint: normalizeString(error?.endpoint || ''),
         statusCode: patchStatusCode || Number(error?.status || 0) || null,
         patchAttempted,
