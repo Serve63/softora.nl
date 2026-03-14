@@ -110,47 +110,25 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
 const ELEVENLABS_AMBIENCE_MIXER_ENABLED = !/^(0|false|no)$/i.test(
   String(process.env.ELEVENLABS_AMBIENCE_MIXER_ENABLED || 'true')
 );
-const ELEVENLABS_AMBIENCE_MIXER_PROFILE_VERSION = '2026-03-14-open-line-v2';
+const ELEVENLABS_AMBIENCE_MIXER_PROFILE_VERSION = '2026-03-14-open-line-v1';
 const ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS = /^(1|true|yes)$/i.test(
-  String(process.env.ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS || 'true')
+  String(process.env.ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS || '')
 );
 const ELEVENLABS_AMBIENCE_MIXER_TURN_MODE = normalizeString(
-  process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_MODE || 'turn'
+  process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_MODE || ''
 );
 const ELEVENLABS_AMBIENCE_MIXER_TURN_MODEL = normalizeString(
-  process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_MODEL || 'turn_v3'
+  process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_MODEL || ''
 );
 const ELEVENLABS_AMBIENCE_MIXER_TURN_EAGERNESS = normalizeString(
-  process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_EAGERNESS || 'normal'
+  process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_EAGERNESS || ''
 );
 const ELEVENLABS_AMBIENCE_MIXER_TURN_TIMEOUT = (() => {
-  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_TIMEOUT || '2');
+  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_TIMEOUT || '');
   if (!raw) return null;
   const numeric = Number(raw);
   if (!Number.isFinite(numeric)) return null;
   return Math.max(0.3, Math.min(7, numeric));
-})();
-const ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TTS_SETTINGS = /^(1|true|yes)$/i.test(
-  String(process.env.ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TTS_SETTINGS || 'true')
-);
-const ELEVENLABS_AMBIENCE_MIXER_TTS_MODEL = normalizeString(
-  process.env.ELEVENLABS_AMBIENCE_MIXER_TTS_MODEL || 'eleven_v3_conversational'
-);
-const ELEVENLABS_AMBIENCE_MIXER_TTS_EXPRESSIVE_MODE = (() => {
-  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_TTS_EXPRESSIVE_MODE || 'true');
-  if (/^(1|true|yes|ja)$/i.test(raw)) return true;
-  if (/^(0|false|no|nee)$/i.test(raw)) return false;
-  return true;
-})();
-const ELEVENLABS_AMBIENCE_MIXER_TTS_OUTPUT_AUDIO_FORMAT = normalizeString(
-  process.env.ELEVENLABS_AMBIENCE_MIXER_TTS_OUTPUT_AUDIO_FORMAT || 'ulaw_8000'
-);
-const ELEVENLABS_AMBIENCE_MIXER_TTS_OPTIMIZE_STREAMING_LATENCY = (() => {
-  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_TTS_OPTIMIZE_STREAMING_LATENCY || '');
-  if (!raw) return null;
-  const numeric = Number(raw);
-  if (!Number.isFinite(numeric)) return null;
-  return Math.max(0, Math.min(4, Math.round(numeric)));
 })();
 const ELEVENLABS_AMBIENCE_MIXER_BACKGROUND_VOICE_DETECTION = (() => {
   const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_BACKGROUND_VOICE_DETECTION || '');
@@ -233,7 +211,6 @@ let elevenLabsAmbienceMixerStatus = {
   configuredAgentId: '',
   profileVersion: ELEVENLABS_AMBIENCE_MIXER_PROFILE_VERSION,
   enforceTurnSettings: ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS,
-  enforceTtsSettings: ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TTS_SETTINGS,
   endpoint: '',
   statusCode: null,
   patchAttempted: false,
@@ -247,17 +224,9 @@ let elevenLabsAmbienceMixerStatus = {
   softTimeoutSeconds: null,
   softTimeoutMessage: '',
   softTimeoutUseLlmGeneratedMessage: null,
-  ttsModel: '',
-  ttsExpressiveMode: null,
-  ttsOutputAudioFormat: '',
-  ttsOptimizeStreamingLatency: null,
   desiredSoftTimeoutSeconds: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_SECONDS,
   desiredSoftTimeoutMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_MESSAGE,
   desiredSoftTimeoutUseLlmGeneratedMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_USE_LLM_MESSAGE,
-  desiredTtsModel: ELEVENLABS_AMBIENCE_MIXER_TTS_MODEL,
-  desiredTtsExpressiveMode: ELEVENLABS_AMBIENCE_MIXER_TTS_EXPRESSIVE_MODE,
-  desiredTtsOutputAudioFormat: ELEVENLABS_AMBIENCE_MIXER_TTS_OUTPUT_AUDIO_FORMAT,
-  desiredTtsOptimizeStreamingLatency: ELEVENLABS_AMBIENCE_MIXER_TTS_OPTIMIZE_STREAMING_LATENCY,
   patchSoftTimeoutPayload: null,
   suggestedAudioTags: [],
 };
@@ -4788,7 +4757,6 @@ function getElevenLabsAmbienceMixerDesiredProfile() {
     enabled: ELEVENLABS_AMBIENCE_MIXER_ENABLED,
     profileVersion: ELEVENLABS_AMBIENCE_MIXER_PROFILE_VERSION,
     enforceTurnSettings: ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS,
-    enforceTtsSettings: ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TTS_SETTINGS,
     turnMode: ELEVENLABS_AMBIENCE_MIXER_TURN_MODE,
     turnModel: ELEVENLABS_AMBIENCE_MIXER_TURN_MODEL,
     turnEagerness: ELEVENLABS_AMBIENCE_MIXER_TURN_EAGERNESS,
@@ -4798,10 +4766,6 @@ function getElevenLabsAmbienceMixerDesiredProfile() {
     softTimeoutSeconds: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_SECONDS,
     softTimeoutMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_MESSAGE,
     softTimeoutUseLlmGeneratedMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_USE_LLM_MESSAGE,
-    ttsModel: ELEVENLABS_AMBIENCE_MIXER_TTS_MODEL,
-    ttsExpressiveMode: ELEVENLABS_AMBIENCE_MIXER_TTS_EXPRESSIVE_MODE,
-    ttsOutputAudioFormat: ELEVENLABS_AMBIENCE_MIXER_TTS_OUTPUT_AUDIO_FORMAT,
-    ttsOptimizeStreamingLatency: ELEVENLABS_AMBIENCE_MIXER_TTS_OPTIMIZE_STREAMING_LATENCY,
     suggestedAudioTags: ELEVENLABS_AMBIENCE_MIXER_TAGS.map((item) => ({
       tag: normalizeString(item?.tag),
       description: normalizeString(item?.description || ''),
@@ -4837,15 +4801,6 @@ function summarizeElevenLabsAgentMixerRuntime(agentPayload = {}, defaults = {}) 
     softTimeoutMessage: normalizeString(softTimeout?.message || ''),
     softTimeoutUseLlmGeneratedMessage: toBooleanNullable(
       softTimeout?.use_llm_generated_message ?? softTimeout?.useLlmGeneratedMessage
-    ),
-    ttsModel: normalizeString(tts?.model_id || tts?.model || ''),
-    ttsExpressiveMode: toBooleanNullable(tts?.expressive_mode ?? tts?.expressiveMode),
-    ttsOutputAudioFormat: normalizeString(
-      tts?.agent_output_audio_format || tts?.agentOutputAudioFormat || ''
-    ),
-    ttsOptimizeStreamingLatency: parseNumberSafe(
-      tts?.optimize_streaming_latency ?? tts?.optimizeStreamingLatency,
-      null
     ),
     suggestedAudioTags,
     suggestedAudioTagNames: suggestedAudioTags.map((item) => item.tag.toLowerCase()),
@@ -4886,25 +4841,6 @@ function isElevenLabsAmbienceMixerProfileCompliant(runtime, desiredProfile) {
   const softTimeoutUseLlmMessageOk =
     desiredProfile.softTimeoutUseLlmGeneratedMessage === null ||
     runtime.softTimeoutUseLlmGeneratedMessage === desiredProfile.softTimeoutUseLlmGeneratedMessage;
-  const ttsModelOk =
-    !desiredProfile.enforceTtsSettings ||
-    !desiredProfile.ttsModel ||
-    runtime.ttsModel === desiredProfile.ttsModel;
-  const ttsExpressiveModeOk =
-    !desiredProfile.enforceTtsSettings ||
-    desiredProfile.ttsExpressiveMode === null ||
-    runtime.ttsExpressiveMode === desiredProfile.ttsExpressiveMode;
-  const ttsOutputAudioFormatOk =
-    !desiredProfile.enforceTtsSettings ||
-    !desiredProfile.ttsOutputAudioFormat ||
-    runtime.ttsOutputAudioFormat === desiredProfile.ttsOutputAudioFormat;
-  const ttsOptimizeStreamingLatencyOk =
-    !desiredProfile.enforceTtsSettings ||
-    !hasFiniteNumericValue(desiredProfile.ttsOptimizeStreamingLatency) ||
-    (Number.isFinite(Number(runtime.ttsOptimizeStreamingLatency)) &&
-      Math.abs(
-        Number(runtime.ttsOptimizeStreamingLatency) - Number(desiredProfile.ttsOptimizeStreamingLatency)
-      ) < 0.01);
   const requiredTagNames = desiredProfile.suggestedAudioTags.map((item) => item.tag.toLowerCase());
   const hasAllTags =
     requiredTagNames.length === 0 ||
@@ -4920,10 +4856,6 @@ function isElevenLabsAmbienceMixerProfileCompliant(runtime, desiredProfile) {
     softTimeoutOk &&
     softTimeoutMessageOk &&
     softTimeoutUseLlmMessageOk &&
-    ttsModelOk &&
-    ttsExpressiveModeOk &&
-    ttsOutputAudioFormatOk &&
-    ttsOptimizeStreamingLatencyOk &&
     hasAllTags
   );
 }
@@ -5026,20 +4958,6 @@ function buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, currentAgentPa
   }
 
   const nextTts = { ...currentTts };
-  if (desiredProfile.enforceTtsSettings) {
-    if (desiredProfile.ttsModel) {
-      nextTts.model_id = desiredProfile.ttsModel;
-    }
-    if (desiredProfile.ttsExpressiveMode !== null) {
-      nextTts.expressive_mode = desiredProfile.ttsExpressiveMode;
-    }
-    if (desiredProfile.ttsOutputAudioFormat) {
-      nextTts.agent_output_audio_format = desiredProfile.ttsOutputAudioFormat;
-    }
-    if (hasFiniteNumericValue(desiredProfile.ttsOptimizeStreamingLatency)) {
-      nextTts.optimize_streaming_latency = Number(desiredProfile.ttsOptimizeStreamingLatency);
-    }
-  }
   if (mergedTags.length > 0) {
     nextTts.suggested_audio_tags = mergedTags;
   }
@@ -5208,14 +5126,9 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
       configuredAgentId: getConfiguredElevenLabsAgentId(),
       profileVersion: desiredProfile.profileVersion,
       enforceTurnSettings: desiredProfile.enforceTurnSettings,
-      enforceTtsSettings: desiredProfile.enforceTtsSettings,
       desiredSoftTimeoutSeconds: desiredProfile.softTimeoutSeconds,
       desiredSoftTimeoutMessage: desiredProfile.softTimeoutMessage,
       desiredSoftTimeoutUseLlmGeneratedMessage: desiredProfile.softTimeoutUseLlmGeneratedMessage,
-      desiredTtsModel: desiredProfile.ttsModel,
-      desiredTtsExpressiveMode: desiredProfile.ttsExpressiveMode,
-      desiredTtsOutputAudioFormat: desiredProfile.ttsOutputAudioFormat,
-      desiredTtsOptimizeStreamingLatency: desiredProfile.ttsOptimizeStreamingLatency,
       patchAttempted: false,
       patched: false,
     });
@@ -5248,14 +5161,9 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
         configuredAgentId,
         profileVersion: desiredProfile.profileVersion,
         enforceTurnSettings: desiredProfile.enforceTurnSettings,
-        enforceTtsSettings: desiredProfile.enforceTtsSettings,
         desiredSoftTimeoutSeconds: desiredProfile.softTimeoutSeconds,
         desiredSoftTimeoutMessage: desiredProfile.softTimeoutMessage,
         desiredSoftTimeoutUseLlmGeneratedMessage: desiredProfile.softTimeoutUseLlmGeneratedMessage,
-        desiredTtsModel: desiredProfile.ttsModel,
-        desiredTtsExpressiveMode: desiredProfile.ttsExpressiveMode,
-        desiredTtsOutputAudioFormat: desiredProfile.ttsOutputAudioFormat,
-        desiredTtsOptimizeStreamingLatency: desiredProfile.ttsOptimizeStreamingLatency,
         endpoint: '',
         statusCode: null,
         patchAttempted: false,
@@ -5311,7 +5219,6 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
         configuredAgentId,
         profileVersion: desiredProfile.profileVersion,
         enforceTurnSettings: desiredProfile.enforceTurnSettings,
-        enforceTtsSettings: desiredProfile.enforceTtsSettings,
         endpoint: readResult.endpoint,
         statusCode: patchStatusCode,
         patchAttempted,
@@ -5325,17 +5232,9 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
         softTimeoutSeconds: runtime.softTimeoutSeconds,
         softTimeoutMessage: runtime.softTimeoutMessage,
         softTimeoutUseLlmGeneratedMessage: runtime.softTimeoutUseLlmGeneratedMessage,
-        ttsModel: runtime.ttsModel,
-        ttsExpressiveMode: runtime.ttsExpressiveMode,
-        ttsOutputAudioFormat: runtime.ttsOutputAudioFormat,
-        ttsOptimizeStreamingLatency: runtime.ttsOptimizeStreamingLatency,
         desiredSoftTimeoutSeconds: desiredProfile.softTimeoutSeconds,
         desiredSoftTimeoutMessage: desiredProfile.softTimeoutMessage,
         desiredSoftTimeoutUseLlmGeneratedMessage: desiredProfile.softTimeoutUseLlmGeneratedMessage,
-        desiredTtsModel: desiredProfile.ttsModel,
-        desiredTtsExpressiveMode: desiredProfile.ttsExpressiveMode,
-        desiredTtsOutputAudioFormat: desiredProfile.ttsOutputAudioFormat,
-        desiredTtsOptimizeStreamingLatency: desiredProfile.ttsOptimizeStreamingLatency,
         suggestedAudioTags: runtime.suggestedAudioTags,
       });
     } catch (error) {
@@ -5349,14 +5248,9 @@ async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
         configuredAgentId,
         profileVersion: desiredProfile.profileVersion,
         enforceTurnSettings: desiredProfile.enforceTurnSettings,
-        enforceTtsSettings: desiredProfile.enforceTtsSettings,
         desiredSoftTimeoutSeconds: desiredProfile.softTimeoutSeconds,
         desiredSoftTimeoutMessage: desiredProfile.softTimeoutMessage,
         desiredSoftTimeoutUseLlmGeneratedMessage: desiredProfile.softTimeoutUseLlmGeneratedMessage,
-        desiredTtsModel: desiredProfile.ttsModel,
-        desiredTtsExpressiveMode: desiredProfile.ttsExpressiveMode,
-        desiredTtsOutputAudioFormat: desiredProfile.ttsOutputAudioFormat,
-        desiredTtsOptimizeStreamingLatency: desiredProfile.ttsOptimizeStreamingLatency,
         patchSoftTimeoutPayload,
         endpoint: normalizeString(error?.endpoint || ''),
         statusCode: patchStatusCode || Number(error?.status || 0) || null,
