@@ -327,6 +327,11 @@ function parseNumberSafe(value, fallback = null) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function hasFiniteNumericValue(value) {
+  if (value === '' || value === null || value === undefined) return false;
+  return Number.isFinite(Number(value));
+}
+
 function normalizeString(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
   return String(value).trim();
@@ -4818,7 +4823,7 @@ function isElevenLabsAmbienceMixerProfileCompliant(runtime, desiredProfile) {
     runtime.turnEagerness === desiredProfile.turnEagerness;
   const turnTimeoutOk =
     !desiredProfile.enforceTurnSettings ||
-    !Number.isFinite(Number(desiredProfile.turnTimeout)) ||
+    !hasFiniteNumericValue(desiredProfile.turnTimeout) ||
     (Number.isFinite(Number(runtime.turnTimeout)) &&
       Math.abs(Number(runtime.turnTimeout) - Number(desiredProfile.turnTimeout)) < 0.01);
   const speculativeTurnOk =
@@ -4828,7 +4833,7 @@ function isElevenLabsAmbienceMixerProfileCompliant(runtime, desiredProfile) {
     desiredProfile.backgroundVoiceDetection === null ||
     runtime.backgroundVoiceDetection === desiredProfile.backgroundVoiceDetection;
   const softTimeoutOk =
-    !Number.isFinite(Number(desiredProfile.softTimeoutSeconds)) ||
+    !hasFiniteNumericValue(desiredProfile.softTimeoutSeconds) ||
     (Number.isFinite(Number(runtime.softTimeoutSeconds)) &&
       Math.abs(Number(runtime.softTimeoutSeconds) - Number(desiredProfile.softTimeoutSeconds)) < 0.01);
   const softTimeoutMessageOk =
@@ -4905,7 +4910,7 @@ function buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, currentAgentPa
     if (desiredProfile.turnMode) nextTurn.mode = desiredProfile.turnMode;
     if (desiredProfile.turnModel) nextTurn.turn_model = desiredProfile.turnModel;
     if (desiredProfile.turnEagerness) nextTurn.turn_eagerness = desiredProfile.turnEagerness;
-    if (Number.isFinite(Number(desiredProfile.turnTimeout))) {
+    if (hasFiniteNumericValue(desiredProfile.turnTimeout)) {
       nextTurn.turn_timeout = Number(desiredProfile.turnTimeout);
     }
     if (desiredProfile.speculativeTurn !== null) {
@@ -4914,7 +4919,7 @@ function buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, currentAgentPa
   }
 
   const shouldSetSoftTimeoutConfig =
-    Number.isFinite(Number(desiredProfile.softTimeoutSeconds)) ||
+    hasFiniteNumericValue(desiredProfile.softTimeoutSeconds) ||
     desiredProfile.softTimeoutUseLlmGeneratedMessage !== null;
   const nextSoftTimeoutConfig = {
     ...currentSoftTimeout,
@@ -4932,7 +4937,7 @@ function buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, currentAgentPa
         : -1;
   }
   if (shouldSetSoftTimeoutConfig) {
-    if (Number.isFinite(Number(desiredProfile.softTimeoutSeconds))) {
+    if (hasFiniteNumericValue(desiredProfile.softTimeoutSeconds)) {
       nextSoftTimeoutConfig.timeout_seconds = Number(desiredProfile.softTimeoutSeconds);
     }
     if (desiredProfile.softTimeoutMessage) {
