@@ -4909,7 +4909,6 @@ function buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, currentAgentPa
 
   const shouldSetSoftTimeoutConfig =
     Number.isFinite(Number(desiredProfile.softTimeoutSeconds)) ||
-    Boolean(desiredProfile.softTimeoutMessage) ||
     desiredProfile.softTimeoutUseLlmGeneratedMessage !== null;
   if (shouldSetSoftTimeoutConfig) {
     nextTurn.soft_timeout_config = {
@@ -4917,6 +4916,9 @@ function buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, currentAgentPa
     };
     if (Number.isFinite(Number(desiredProfile.softTimeoutSeconds))) {
       nextTurn.soft_timeout_config.timeout_seconds = Number(desiredProfile.softTimeoutSeconds);
+    } else {
+      delete nextTurn.soft_timeout_config.timeout_seconds;
+      delete nextTurn.soft_timeout_config.timeoutSeconds;
     }
     if (desiredProfile.softTimeoutMessage) {
       nextTurn.soft_timeout_config.message = desiredProfile.softTimeoutMessage;
