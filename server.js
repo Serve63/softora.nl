@@ -107,6 +107,67 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
   5_000,
   Math.min(300_000, Number(process.env.MAIL_IMAP_POLL_COOLDOWN_MS || 20_000) || 20_000)
 );
+const ELEVENLABS_AMBIENCE_MIXER_ENABLED = !/^(0|false|no)$/i.test(
+  String(process.env.ELEVENLABS_AMBIENCE_MIXER_ENABLED || 'true')
+);
+const ELEVENLABS_AMBIENCE_MIXER_PROFILE_VERSION = '2026-03-14-open-line-v1';
+const ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS = /^(1|true|yes)$/i.test(
+  String(process.env.ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS || '')
+);
+const ELEVENLABS_AMBIENCE_MIXER_TURN_MODE = normalizeString(
+  process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_MODE || ''
+);
+const ELEVENLABS_AMBIENCE_MIXER_TURN_MODEL = normalizeString(
+  process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_MODEL || ''
+);
+const ELEVENLABS_AMBIENCE_MIXER_TURN_EAGERNESS = normalizeString(
+  process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_EAGERNESS || ''
+);
+const ELEVENLABS_AMBIENCE_MIXER_TURN_TIMEOUT = (() => {
+  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_TURN_TIMEOUT || '');
+  if (!raw) return null;
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(0.3, Math.min(7, numeric));
+})();
+const ELEVENLABS_AMBIENCE_MIXER_BACKGROUND_VOICE_DETECTION = (() => {
+  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_BACKGROUND_VOICE_DETECTION || '');
+  if (!raw) return true;
+  if (/^(1|true|yes|ja)$/i.test(raw)) return true;
+  if (/^(0|false|no|nee)$/i.test(raw)) return false;
+  return true;
+})();
+const ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_SECONDS = (() => {
+  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_SECONDS || '');
+  if (!raw) return null;
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(-1, Math.min(7, numeric));
+})();
+const ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_MESSAGE = normalizeString(
+  process.env.ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_MESSAGE || ''
+);
+const ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_USE_LLM_MESSAGE = (() => {
+  const raw = normalizeString(process.env.ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_USE_LLM_MESSAGE || '');
+  if (!raw) return null;
+  if (/^(1|true|yes|ja)$/i.test(raw)) return true;
+  if (/^(0|false|no|nee)$/i.test(raw)) return false;
+  return null;
+})();
+const ELEVENLABS_AMBIENCE_MIXER_TAGS = [
+  {
+    tag: 'office ambience',
+    description: 'Gebruik subtiele kantoorachtergrond tijdens uitingen waar dit natuurlijk klinkt.',
+  },
+  {
+    tag: 'distant chatter',
+    description: 'Zachte, verre stemmen op de achtergrond om doodse stilte te voorkomen.',
+  },
+  {
+    tag: 'phone call',
+    description: 'Behoud natuurlijke telefoonlijn-klank zonder hard effect.',
+  },
+];
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
@@ -137,6 +198,34 @@ let elevenLabsTelephonyStatus = {
   statusCode: null,
 };
 let elevenLabsTelephonyStatusPromise = null;
+let elevenLabsAmbienceMixerStatus = {
+  checkedAt: '',
+  checkedAtMs: 0,
+  ok: false,
+  enabled: ELEVENLABS_AMBIENCE_MIXER_ENABLED,
+  issue: ELEVENLABS_AMBIENCE_MIXER_ENABLED ? 'not_checked' : 'disabled',
+  reason: ELEVENLABS_AMBIENCE_MIXER_ENABLED
+    ? 'Ambience mixer check nog niet uitgevoerd.'
+    : 'Ambience mixer staat uit via ELEVENLABS_AMBIENCE_MIXER_ENABLED.',
+  configuredAgentId: '',
+  profileVersion: ELEVENLABS_AMBIENCE_MIXER_PROFILE_VERSION,
+  enforceTurnSettings: ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS,
+  endpoint: '',
+  statusCode: null,
+  patchAttempted: false,
+  patched: false,
+  turnMode: '',
+  turnModel: '',
+  turnEagerness: '',
+  turnTimeout: null,
+  speculativeTurn: null,
+  backgroundVoiceDetection: null,
+  softTimeoutSeconds: null,
+  softTimeoutMessage: '',
+  softTimeoutUseLlmGeneratedMessage: null,
+  suggestedAudioTags: [],
+};
+let elevenLabsAmbienceMixerStatusPromise = null;
 let coldcallingHistoryVisibleAfterMs = 0;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
@@ -4630,6 +4719,233 @@ function getElevenLabsTelephonyStatusSnapshot() {
   return { ...elevenLabsTelephonyStatus };
 }
 
+function buildElevenLabsAmbienceMixerStatusPatch(patch = {}) {
+  elevenLabsAmbienceMixerStatus = {
+    ...elevenLabsAmbienceMixerStatus,
+    ...patch,
+  };
+  return { ...elevenLabsAmbienceMixerStatus };
+}
+
+function getElevenLabsAmbienceMixerStatusSnapshot() {
+  return { ...elevenLabsAmbienceMixerStatus };
+}
+
+function normalizeSuggestedAudioTagList(tags) {
+  if (!Array.isArray(tags)) return [];
+  return tags
+    .map((item) => {
+      const tag = normalizeString(item?.tag ?? item);
+      const description = normalizeString(item?.description || '');
+      return tag ? { tag, description } : null;
+    })
+    .filter(Boolean);
+}
+
+function getElevenLabsAmbienceMixerDesiredProfile() {
+  return {
+    enabled: ELEVENLABS_AMBIENCE_MIXER_ENABLED,
+    profileVersion: ELEVENLABS_AMBIENCE_MIXER_PROFILE_VERSION,
+    enforceTurnSettings: ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS,
+    turnMode: ELEVENLABS_AMBIENCE_MIXER_TURN_MODE,
+    turnModel: ELEVENLABS_AMBIENCE_MIXER_TURN_MODEL,
+    turnEagerness: ELEVENLABS_AMBIENCE_MIXER_TURN_EAGERNESS,
+    turnTimeout: ELEVENLABS_AMBIENCE_MIXER_TURN_TIMEOUT,
+    speculativeTurn: ELEVENLABS_AMBIENCE_MIXER_ENFORCE_TURN_SETTINGS ? true : null,
+    backgroundVoiceDetection: ELEVENLABS_AMBIENCE_MIXER_BACKGROUND_VOICE_DETECTION,
+    softTimeoutSeconds: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_SECONDS,
+    softTimeoutMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_MESSAGE,
+    softTimeoutUseLlmGeneratedMessage: ELEVENLABS_AMBIENCE_MIXER_SOFT_TIMEOUT_USE_LLM_MESSAGE,
+    suggestedAudioTags: ELEVENLABS_AMBIENCE_MIXER_TAGS.map((item) => ({
+      tag: normalizeString(item?.tag),
+      description: normalizeString(item?.description || ''),
+    })).filter((item) => item.tag),
+  };
+}
+
+function summarizeElevenLabsAgentMixerRuntime(agentPayload = {}, defaults = {}) {
+  const conversationConfig =
+    agentPayload?.conversation_config && typeof agentPayload.conversation_config === 'object'
+      ? agentPayload.conversation_config
+      : {};
+  const turn = conversationConfig?.turn && typeof conversationConfig.turn === 'object' ? conversationConfig.turn : {};
+  const vad = conversationConfig?.vad && typeof conversationConfig.vad === 'object' ? conversationConfig.vad : {};
+  const tts = conversationConfig?.tts && typeof conversationConfig.tts === 'object' ? conversationConfig.tts : {};
+  const softTimeout =
+    turn?.soft_timeout_config && typeof turn.soft_timeout_config === 'object'
+      ? turn.soft_timeout_config
+      : {};
+  const suggestedAudioTags = normalizeSuggestedAudioTagList(tts?.suggested_audio_tags);
+
+  return {
+    configuredAgentId: normalizeString(agentPayload?.agent_id || defaults.configuredAgentId || ''),
+    turnMode: normalizeString(turn?.mode || ''),
+    turnModel: normalizeString(turn?.turn_model || turn?.turnModel || ''),
+    turnEagerness: normalizeString(turn?.turn_eagerness || turn?.turnEagerness || ''),
+    turnTimeout: parseNumberSafe(turn?.turn_timeout ?? turn?.turnTimeout, null),
+    speculativeTurn: toBooleanNullable(turn?.speculative_turn ?? turn?.speculativeTurn),
+    backgroundVoiceDetection: toBooleanNullable(
+      vad?.background_voice_detection ?? vad?.backgroundVoiceDetection
+    ),
+    softTimeoutSeconds: parseNumberSafe(softTimeout?.timeout_seconds ?? softTimeout?.timeoutSeconds, null),
+    softTimeoutMessage: normalizeString(softTimeout?.message || ''),
+    softTimeoutUseLlmGeneratedMessage: toBooleanNullable(
+      softTimeout?.use_llm_generated_message ?? softTimeout?.useLlmGeneratedMessage
+    ),
+    suggestedAudioTags,
+    suggestedAudioTagNames: suggestedAudioTags.map((item) => item.tag.toLowerCase()),
+  };
+}
+
+function isElevenLabsAmbienceMixerProfileCompliant(runtime, desiredProfile) {
+  if (!runtime || !desiredProfile) return false;
+  const turnModeOk =
+    !desiredProfile.enforceTurnSettings ||
+    !desiredProfile.turnMode ||
+    runtime.turnMode === desiredProfile.turnMode;
+  const turnModelOk =
+    !desiredProfile.enforceTurnSettings ||
+    !desiredProfile.turnModel ||
+    runtime.turnModel === desiredProfile.turnModel;
+  const turnEagernessOk =
+    !desiredProfile.enforceTurnSettings ||
+    !desiredProfile.turnEagerness ||
+    runtime.turnEagerness === desiredProfile.turnEagerness;
+  const turnTimeoutOk =
+    !desiredProfile.enforceTurnSettings ||
+    !Number.isFinite(Number(desiredProfile.turnTimeout)) ||
+    (Number.isFinite(Number(runtime.turnTimeout)) &&
+      Math.abs(Number(runtime.turnTimeout) - Number(desiredProfile.turnTimeout)) < 0.01);
+  const speculativeTurnOk =
+    desiredProfile.speculativeTurn === null ||
+    runtime.speculativeTurn === desiredProfile.speculativeTurn;
+  const backgroundVoiceDetectionOk =
+    desiredProfile.backgroundVoiceDetection === null ||
+    runtime.backgroundVoiceDetection === desiredProfile.backgroundVoiceDetection;
+  const softTimeoutOk =
+    !Number.isFinite(Number(desiredProfile.softTimeoutSeconds)) ||
+    (Number.isFinite(Number(runtime.softTimeoutSeconds)) &&
+      Math.abs(Number(runtime.softTimeoutSeconds) - Number(desiredProfile.softTimeoutSeconds)) < 0.01);
+  const softTimeoutMessageOk =
+    !desiredProfile.softTimeoutMessage || runtime.softTimeoutMessage === desiredProfile.softTimeoutMessage;
+  const softTimeoutUseLlmMessageOk =
+    desiredProfile.softTimeoutUseLlmGeneratedMessage === null ||
+    runtime.softTimeoutUseLlmGeneratedMessage === desiredProfile.softTimeoutUseLlmGeneratedMessage;
+  const requiredTagNames = desiredProfile.suggestedAudioTags.map((item) => item.tag.toLowerCase());
+  const hasAllTags =
+    requiredTagNames.length === 0 ||
+    requiredTagNames.every((tag) => runtime.suggestedAudioTagNames.includes(tag));
+
+  return (
+    turnModeOk &&
+    turnModelOk &&
+    turnEagernessOk &&
+    turnTimeoutOk &&
+    speculativeTurnOk &&
+    backgroundVoiceDetectionOk &&
+    softTimeoutOk &&
+    softTimeoutMessageOk &&
+    softTimeoutUseLlmMessageOk &&
+    hasAllTags
+  );
+}
+
+function mergeSuggestedAudioTags(existingTags = [], desiredTags = []) {
+  const out = [];
+  const seen = new Set();
+  [...desiredTags, ...existingTags].forEach((item) => {
+    const tag = normalizeString(item?.tag ?? item);
+    if (!tag) return;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      tag,
+      description: normalizeString(item?.description || ''),
+    });
+  });
+  return out;
+}
+
+function buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, currentAgentPayload = {}) {
+  const currentConversationConfig =
+    currentAgentPayload?.conversation_config && typeof currentAgentPayload.conversation_config === 'object'
+      ? currentAgentPayload.conversation_config
+      : {};
+  const currentTurn =
+    currentConversationConfig?.turn && typeof currentConversationConfig.turn === 'object'
+      ? currentConversationConfig.turn
+      : {};
+  const currentVad =
+    currentConversationConfig?.vad && typeof currentConversationConfig.vad === 'object'
+      ? currentConversationConfig.vad
+      : {};
+  const currentTts =
+    currentConversationConfig?.tts && typeof currentConversationConfig.tts === 'object'
+      ? currentConversationConfig.tts
+      : {};
+  const currentSoftTimeout =
+    currentTurn?.soft_timeout_config && typeof currentTurn.soft_timeout_config === 'object'
+      ? currentTurn.soft_timeout_config
+      : {};
+  const mergedTags = mergeSuggestedAudioTags(
+    normalizeSuggestedAudioTagList(currentTts?.suggested_audio_tags),
+    desiredProfile.suggestedAudioTags
+  );
+
+  const nextTurn = { ...currentTurn };
+  if (desiredProfile.enforceTurnSettings) {
+    if (desiredProfile.turnMode) nextTurn.mode = desiredProfile.turnMode;
+    if (desiredProfile.turnModel) nextTurn.turn_model = desiredProfile.turnModel;
+    if (desiredProfile.turnEagerness) nextTurn.turn_eagerness = desiredProfile.turnEagerness;
+    if (Number.isFinite(Number(desiredProfile.turnTimeout))) {
+      nextTurn.turn_timeout = Number(desiredProfile.turnTimeout);
+    }
+    if (desiredProfile.speculativeTurn !== null) {
+      nextTurn.speculative_turn = desiredProfile.speculativeTurn;
+    }
+  }
+
+  const shouldSetSoftTimeoutConfig =
+    Number.isFinite(Number(desiredProfile.softTimeoutSeconds)) ||
+    Boolean(desiredProfile.softTimeoutMessage) ||
+    desiredProfile.softTimeoutUseLlmGeneratedMessage !== null;
+  if (shouldSetSoftTimeoutConfig) {
+    nextTurn.soft_timeout_config = {
+      ...currentSoftTimeout,
+    };
+    if (Number.isFinite(Number(desiredProfile.softTimeoutSeconds))) {
+      nextTurn.soft_timeout_config.timeout_seconds = Number(desiredProfile.softTimeoutSeconds);
+    }
+    if (desiredProfile.softTimeoutMessage) {
+      nextTurn.soft_timeout_config.message = desiredProfile.softTimeoutMessage;
+    }
+    if (desiredProfile.softTimeoutUseLlmGeneratedMessage !== null) {
+      nextTurn.soft_timeout_config.use_llm_generated_message =
+        desiredProfile.softTimeoutUseLlmGeneratedMessage;
+    }
+  }
+
+  const nextVad = { ...currentVad };
+  if (desiredProfile.backgroundVoiceDetection !== null) {
+    nextVad.background_voice_detection = desiredProfile.backgroundVoiceDetection;
+  }
+
+  const nextTts = { ...currentTts };
+  if (mergedTags.length > 0) {
+    nextTts.suggested_audio_tags = mergedTags;
+  }
+
+  return {
+    conversation_config: {
+      ...currentConversationConfig,
+      turn: nextTurn,
+      vad: nextVad,
+      tts: nextTts,
+    },
+  };
+}
+
 function summarizeElevenLabsPhoneRuntime(phonePayload = {}, defaults = {}) {
   const phone = normalizeElevenLabsPhonePayload(phonePayload);
   const phoneNumberId = normalizeString(
@@ -4708,6 +5024,200 @@ async function patchElevenLabsPhoneAssignedAgent(phoneNumberId, agentId) {
   }
 
   return { endpoint, data, statusCode: response.status };
+}
+
+async function fetchElevenLabsAgentById(agentId) {
+  const endpoint = `/convai/agents/${encodeURIComponent(agentId)}`;
+  const { response, data } = await fetchJsonWithTimeout(
+    buildElevenLabsApiUrl(endpoint),
+    {
+      method: 'GET',
+      headers: {
+        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+      },
+    },
+    12000
+  );
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs agent ophalen mislukt (${response.status})`
+    );
+    error.status = response.status;
+    error.endpoint = endpoint;
+    error.data = data;
+    throw error;
+  }
+
+  return { endpoint, data };
+}
+
+async function patchElevenLabsAgentSettings(agentId, payload) {
+  const endpoint = `/convai/agents/${encodeURIComponent(agentId)}`;
+  const { response, data } = await fetchJsonWithTimeout(
+    buildElevenLabsApiUrl(endpoint),
+    {
+      method: 'PATCH',
+      headers: {
+        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    },
+    12000
+  );
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
+        `ElevenLabs agent patch mislukt (${response.status})`
+    );
+    error.status = response.status;
+    error.endpoint = endpoint;
+    error.data = data;
+    throw error;
+  }
+
+  return { endpoint, data, statusCode: response.status };
+}
+
+async function ensureElevenLabsAmbienceMixerProfile(options = {}) {
+  const desiredProfile = getElevenLabsAmbienceMixerDesiredProfile();
+  const force = Boolean(options?.force);
+  const forcePatch = Boolean(options?.forcePatch);
+  const reasonLabel = normalizeString(options?.reason || 'runtime-check');
+  const now = Date.now();
+
+  if (!desiredProfile.enabled) {
+    return buildElevenLabsAmbienceMixerStatusPatch({
+      checkedAt: new Date().toISOString(),
+      checkedAtMs: now,
+      enabled: false,
+      ok: true,
+      issue: 'disabled',
+      reason: 'Ambience mixer staat uit via ELEVENLABS_AMBIENCE_MIXER_ENABLED.',
+      configuredAgentId: getConfiguredElevenLabsAgentId(),
+      profileVersion: desiredProfile.profileVersion,
+      enforceTurnSettings: desiredProfile.enforceTurnSettings,
+      patchAttempted: false,
+      patched: false,
+    });
+  }
+
+  if (!force && elevenLabsAmbienceMixerStatusPromise) {
+    return elevenLabsAmbienceMixerStatusPromise;
+  }
+
+  if (!force && now - Number(elevenLabsAmbienceMixerStatus.checkedAtMs || 0) < 60_000) {
+    return getElevenLabsAmbienceMixerStatusSnapshot();
+  }
+
+  elevenLabsAmbienceMixerStatusPromise = (async () => {
+    const checkedAt = new Date().toISOString();
+    const configuredAgentId = getConfiguredElevenLabsAgentId();
+    const apiKeyPresent = Boolean(normalizeString(process.env.ELEVENLABS_API_KEY));
+
+    if (!apiKeyPresent || !configuredAgentId) {
+      return buildElevenLabsAmbienceMixerStatusPatch({
+        checkedAt,
+        checkedAtMs: now,
+        enabled: true,
+        ok: false,
+        issue: 'missing_env',
+        reason: 'Ambience mixer check kon niet draaien: ELEVENLABS_API_KEY of ELEVENLABS_AGENT_ID ontbreekt.',
+        configuredAgentId,
+        profileVersion: desiredProfile.profileVersion,
+        enforceTurnSettings: desiredProfile.enforceTurnSettings,
+        endpoint: '',
+        statusCode: null,
+        patchAttempted: false,
+        patched: false,
+      });
+    }
+
+    try {
+      const readResult = await fetchElevenLabsAgentById(configuredAgentId);
+      let runtime = summarizeElevenLabsAgentMixerRuntime(readResult.data, { configuredAgentId });
+      let patchAttempted = false;
+      let patched = false;
+      let patchStatusCode = null;
+      let issue = 'ok';
+      let issueReason = `Ambience mixer check gelukt (${reasonLabel}).`;
+
+      if (forcePatch || !isElevenLabsAmbienceMixerProfileCompliant(runtime, desiredProfile)) {
+        patchAttempted = true;
+        const patchPayload = buildElevenLabsAmbienceMixerPatchPayload(desiredProfile, readResult.data);
+        const patchResult = await patchElevenLabsAgentSettings(configuredAgentId, patchPayload);
+        patchStatusCode = Number(patchResult.statusCode || 0) || null;
+
+        const verifyRead = await fetchElevenLabsAgentById(configuredAgentId);
+        runtime = summarizeElevenLabsAgentMixerRuntime(verifyRead.data, { configuredAgentId });
+        patched = isElevenLabsAmbienceMixerProfileCompliant(runtime, desiredProfile);
+
+        if (patched) {
+          issueReason = forcePatch
+            ? 'Ambience mixer profiel geforceerd opnieuw toegepast op ElevenLabs-agent.'
+            : 'Ambience mixer profiel toegepast op ElevenLabs-agent.';
+        } else {
+          issue = 'profile_mismatch';
+          issueReason = 'Ambience mixer profiel kon niet volledig bevestigd worden na patch.';
+        }
+      }
+
+      const compliant = isElevenLabsAmbienceMixerProfileCompliant(runtime, desiredProfile);
+      const ok = issue === 'ok' && compliant;
+      if (!ok && issue === 'ok') {
+        issue = 'profile_mismatch';
+      }
+
+      return buildElevenLabsAmbienceMixerStatusPatch({
+        checkedAt,
+        checkedAtMs: Date.now(),
+        enabled: true,
+        ok,
+        issue,
+        reason: issueReason,
+        configuredAgentId,
+        profileVersion: desiredProfile.profileVersion,
+        enforceTurnSettings: desiredProfile.enforceTurnSettings,
+        endpoint: readResult.endpoint,
+        statusCode: patchStatusCode,
+        patchAttempted,
+        patched,
+        turnMode: runtime.turnMode,
+        turnModel: runtime.turnModel,
+        turnEagerness: runtime.turnEagerness,
+        turnTimeout: runtime.turnTimeout,
+        speculativeTurn: runtime.speculativeTurn,
+        backgroundVoiceDetection: runtime.backgroundVoiceDetection,
+        softTimeoutSeconds: runtime.softTimeoutSeconds,
+        softTimeoutMessage: runtime.softTimeoutMessage,
+        softTimeoutUseLlmGeneratedMessage: runtime.softTimeoutUseLlmGeneratedMessage,
+        suggestedAudioTags: runtime.suggestedAudioTags,
+      });
+    } catch (error) {
+      return buildElevenLabsAmbienceMixerStatusPatch({
+        checkedAt,
+        checkedAtMs: Date.now(),
+        enabled: true,
+        ok: false,
+        issue: 'api_error',
+        reason: normalizeString(error?.message || 'Onbekende ElevenLabs ambience mixer fout'),
+        configuredAgentId,
+        profileVersion: desiredProfile.profileVersion,
+        enforceTurnSettings: desiredProfile.enforceTurnSettings,
+        endpoint: normalizeString(error?.endpoint || ''),
+        statusCode: Number(error?.status || 0) || null,
+        patchAttempted: false,
+        patched: false,
+      });
+    } finally {
+      elevenLabsAmbienceMixerStatusPromise = null;
+    }
+  })();
+
+  return elevenLabsAmbienceMixerStatusPromise;
 }
 
 async function ensureElevenLabsInboundRouting(options = {}) {
@@ -5811,9 +6321,6 @@ async function sendColdcallingStatusResponse(res, callId) {
 
 app.post('/api/coldcalling/start', async (req, res) => {
   const provider = getColdcallingProvider();
-  if (provider === 'elevenlabs') {
-    void ensureElevenLabsInboundRouting({ reason: 'coldcalling-start' });
-  }
   const missingEnv = getMissingEnvVars(provider);
 
   if (missingEnv.length > 0) {
@@ -5826,6 +6333,26 @@ app.post('/api/coldcalling/start', async (req, res) => {
       missingEnv,
       provider,
     });
+  }
+
+  if (provider === 'elevenlabs') {
+    const preflightResults = await Promise.allSettled([
+      ensureElevenLabsInboundRouting({ reason: 'coldcalling-start' }),
+      ensureElevenLabsAmbienceMixerProfile({ reason: 'coldcalling-start' }),
+    ]);
+
+    if (preflightResults[0]?.status === 'rejected') {
+      console.warn(
+        '[Coldcalling][Preflight][Telephony]',
+        preflightResults[0]?.reason?.message || preflightResults[0]?.reason || 'Onbekende fout'
+      );
+    }
+    if (preflightResults[1]?.status === 'rejected') {
+      console.warn(
+        '[Coldcalling][Preflight][Mixer]',
+        preflightResults[1]?.reason?.message || preflightResults[1]?.reason || 'Onbekende fout'
+      );
+    }
   }
 
   const validated = validateStartPayload(req.body);
@@ -7433,14 +7960,33 @@ app.get('/healthz', async (req, res) => {
   const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
   const refreshTelephony = toBooleanSafe(req.query?.refresh, false);
   const repairTelephony = toBooleanSafe(req.query?.repair, false);
-  const telephony =
+  const refreshMixer = toBooleanSafe(req.query?.refreshMixer, refreshTelephony || repairTelephony);
+  const repairMixer = toBooleanSafe(req.query?.repairMixer, false);
+  const [telephony, mixer] =
     provider === 'elevenlabs'
-      ? await ensureElevenLabsInboundRouting({
-          reason: 'healthz',
-          force: refreshTelephony || repairTelephony,
-          forceRelink: repairTelephony,
-        })
-      : null;
+      ? await Promise.all([
+          ensureElevenLabsInboundRouting({
+            reason: 'healthz',
+            force: refreshTelephony || repairTelephony,
+            forceRelink: repairTelephony,
+          }).catch((error) => ({
+            ...getElevenLabsTelephonyStatusSnapshot(),
+            ok: false,
+            issue: 'api_error',
+            reason: normalizeString(error?.message || 'Telephony check fout op /healthz'),
+          })),
+          ensureElevenLabsAmbienceMixerProfile({
+            reason: 'healthz',
+            force: refreshMixer || repairMixer,
+            forcePatch: repairMixer,
+          }).catch((error) => ({
+            ...getElevenLabsAmbienceMixerStatusSnapshot(),
+            ok: false,
+            issue: 'api_error',
+            reason: normalizeString(error?.message || 'Mixer check fout op /healthz'),
+          })),
+        ])
+      : [null, null];
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
@@ -7453,6 +7999,7 @@ app.get('/healthz', async (req, res) => {
       autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
       explicitBlockedTargetsCount,
       telephony,
+      mixer,
       missingEnv: getMissingEnvVars(provider),
     },
     supabase: {
@@ -7471,14 +8018,33 @@ app.get('/api/healthz', async (req, res) => {
   const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
   const refreshTelephony = toBooleanSafe(req.query?.refresh, false);
   const repairTelephony = toBooleanSafe(req.query?.repair, false);
-  const telephony =
+  const refreshMixer = toBooleanSafe(req.query?.refreshMixer, refreshTelephony || repairTelephony);
+  const repairMixer = toBooleanSafe(req.query?.repairMixer, false);
+  const [telephony, mixer] =
     provider === 'elevenlabs'
-      ? await ensureElevenLabsInboundRouting({
-          reason: 'api-healthz',
-          force: refreshTelephony || repairTelephony,
-          forceRelink: repairTelephony,
-        })
-      : null;
+      ? await Promise.all([
+          ensureElevenLabsInboundRouting({
+            reason: 'api-healthz',
+            force: refreshTelephony || repairTelephony,
+            forceRelink: repairTelephony,
+          }).catch((error) => ({
+            ...getElevenLabsTelephonyStatusSnapshot(),
+            ok: false,
+            issue: 'api_error',
+            reason: normalizeString(error?.message || 'Telephony check fout op /api/healthz'),
+          })),
+          ensureElevenLabsAmbienceMixerProfile({
+            reason: 'api-healthz',
+            force: refreshMixer || repairMixer,
+            forcePatch: repairMixer,
+          }).catch((error) => ({
+            ...getElevenLabsAmbienceMixerStatusSnapshot(),
+            ok: false,
+            issue: 'api_error',
+            reason: normalizeString(error?.message || 'Mixer check fout op /api/healthz'),
+          })),
+        ])
+      : [null, null];
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
@@ -7491,6 +8057,7 @@ app.get('/api/healthz', async (req, res) => {
       autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
       explicitBlockedTargetsCount,
       telephony,
+      mixer,
       missingEnv: getMissingEnvVars(provider),
     },
     supabase: {
@@ -7847,12 +8414,18 @@ void ensureRuntimeStateHydratedFromSupabase();
 void ensureElevenLabsInboundRouting({ reason: 'module-load', force: true }).catch((error) => {
   console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
 });
+void ensureElevenLabsAmbienceMixerProfile({ reason: 'module-load', force: true }).catch((error) => {
+  console.warn('[ElevenLabs Mixer Check Failed]', error?.message || error);
+});
 
 function startServer() {
   seedDemoConfirmationTaskForUiTesting();
   void ensureRuntimeStateHydratedFromSupabase();
   void ensureElevenLabsInboundRouting({ reason: 'startup', force: true }).catch((error) => {
     console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
+  });
+  void ensureElevenLabsAmbienceMixerProfile({ reason: 'startup', force: true }).catch((error) => {
+    console.warn('[ElevenLabs Mixer Check Failed]', error?.message || error);
   });
   app.listen(PORT, () => {
     const provider = getColdcallingProvider();
