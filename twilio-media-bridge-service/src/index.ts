@@ -40,12 +40,15 @@ type BridgeSession = {
   droppedAmbienceToTwilioAudio: number;
   droppedAmbienceSuppressionAudio: number;
   droppedEchoGuardAudio: number;
+  droppedTurnGateAudio: number;
   mediaStatsLastLoggedAtMs: number;
   bufferedUserAudioChunks: string[];
   suppressedInboundAudioPrebuffer: string[];
   inboundNoiseFloorRms: number;
   consecutiveLikelySpeechFrames: number;
   callerSpeechPassthroughUntilMs: number;
+  turnGatePassthroughUntilMs: number;
+  consecutiveBargeInFrames: number;
   echoGuardBypassUntilMs: number;
   lastCallerSpeechForwardedAtMs: number;
   stopping: boolean;
@@ -87,6 +90,15 @@ const AGENT_ECHO_GUARD_BYPASS_WINDOW_MS = Math.max(
 );
 const AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_RMS_THRESHOLD = Math.max(1200, AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD);
 const AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_PEAK_THRESHOLD = Math.max(4200, AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD);
+const TURN_INPUT_GATE_ENABLED = parseBooleanEnv(process.env.TURN_INPUT_GATE_ENABLED, true);
+const TURN_INPUT_GATE_BLOCK_MS = Math.max(0, Math.floor(parseNumberEnv(process.env.TURN_INPUT_GATE_BLOCK_MS, 900, 0)));
+const TURN_INPUT_GATE_BARGE_IN_ENABLED = parseBooleanEnv(process.env.TURN_INPUT_GATE_BARGE_IN_ENABLED, false);
+const TURN_INPUT_GATE_BARGE_IN_RMS_THRESHOLD = parseNumberEnv(process.env.TURN_INPUT_GATE_BARGE_IN_RMS_THRESHOLD, 1700, 100);
+const TURN_INPUT_GATE_BARGE_IN_PEAK_THRESHOLD = parseNumberEnv(process.env.TURN_INPUT_GATE_BARGE_IN_PEAK_THRESHOLD, 6200, 500);
+const TURN_INPUT_GATE_BARGE_IN_MIN_CONSECUTIVE_FRAMES = Math.max(
+  1,
+  Math.floor(parseNumberEnv(process.env.TURN_INPUT_GATE_BARGE_IN_MIN_CONSECUTIVE_FRAMES, 3, 1))
+);
 const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
 const TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS = Math.max(
   10,
@@ -799,6 +811,8 @@ function cleanupSessionState(session: BridgeSession, reason: string): void {
   session.pendingElevenAudioRemainder = Buffer.alloc(0);
   session.twilioAgentWarmupActive = false;
   session.twilioAgentWarmupUntilMs = 0;
+  session.turnGatePassthroughUntilMs = 0;
+  session.consecutiveBargeInFrames = 0;
   session.lastCallerSpeechForwardedAtMs = 0;
 }
 
@@ -814,6 +828,7 @@ function resetMediaStatsCounters(session: BridgeSession): void {
   session.droppedAmbienceToTwilioAudio = 0;
   session.droppedAmbienceSuppressionAudio = 0;
   session.droppedEchoGuardAudio = 0;
+  session.droppedTurnGateAudio = 0;
   session.twilioOutboundQueueHighWater = session.twilioOutboundAudioQueue.length;
 }
 
@@ -834,7 +849,8 @@ function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
     session.droppedElevenToTwilioLatencyAudio > 0 ||
     session.droppedAmbienceToTwilioAudio > 0 ||
     session.droppedAmbienceSuppressionAudio > 0 ||
-    session.droppedEchoGuardAudio > 0;
+    session.droppedEchoGuardAudio > 0 ||
+    session.droppedTurnGateAudio > 0;
 
   if (hasAnyStat) {
     log('INFO', 'media flow stats', {
@@ -851,6 +867,7 @@ function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
       droppedAmbienceToTwilio: session.droppedAmbienceToTwilioAudio,
       droppedAmbienceSuppression: session.droppedAmbienceSuppressionAudio,
       droppedEchoGuardAudio: session.droppedEchoGuardAudio,
+      droppedTurnGateAudio: session.droppedTurnGateAudio,
       twilioOutboundQueueDepth: session.twilioOutboundAudioQueue.length,
       twilioOutboundQueueHighWater: session.twilioOutboundQueueHighWater,
       intervalMs: now - session.mediaStatsLastLoggedAtMs,
@@ -1239,10 +1256,44 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
 
   if (session.hasReceivedAgentAudio) {
     const now = Date.now();
-    if (now < session.echoGuardBypassUntilMs) {
-      // Temporary bypass window after confirmed caller speech to prevent clipped turn-taking.
-    } else {
-      const elapsedSinceAgentAudioMs = now - session.lastAgentAudioAtMs;
+    const elapsedSinceAgentAudioMs = now - session.lastAgentAudioAtMs;
+    const inTurnGateWindow = elapsedSinceAgentAudioMs >= 0 && elapsedSinceAgentAudioMs < TURN_INPUT_GATE_BLOCK_MS;
+    const inTurnGatePassthroughWindow = now < session.turnGatePassthroughUntilMs;
+    if (TURN_INPUT_GATE_ENABLED && !inTurnGateWindow) {
+      session.consecutiveBargeInFrames = 0;
+    }
+
+    if (TURN_INPUT_GATE_ENABLED && inTurnGateWindow && !inTurnGatePassthroughWindow) {
+      if (!TURN_INPUT_GATE_BARGE_IN_ENABLED) {
+        session.consecutiveBargeInFrames = 0;
+        session.droppedTurnGateAudio += 1;
+        flushMediaStatsIfDue(session);
+        return;
+      }
+
+      const isStrongBargeInFrame = levelsPassAbsoluteSpeechThreshold(
+        getAnalyzedLevels(),
+        TURN_INPUT_GATE_BARGE_IN_RMS_THRESHOLD,
+        TURN_INPUT_GATE_BARGE_IN_PEAK_THRESHOLD
+      );
+      if (!isStrongBargeInFrame) {
+        session.consecutiveBargeInFrames = 0;
+        session.droppedTurnGateAudio += 1;
+        flushMediaStatsIfDue(session);
+        return;
+      }
+
+      session.consecutiveBargeInFrames += 1;
+      if (session.consecutiveBargeInFrames < TURN_INPUT_GATE_BARGE_IN_MIN_CONSECUTIVE_FRAMES) {
+        session.droppedTurnGateAudio += 1;
+        flushMediaStatsIfDue(session);
+        return;
+      }
+
+      session.consecutiveBargeInFrames = 0;
+      session.turnGatePassthroughUntilMs = now + Math.max(1200, AMBIENCE_INBOUND_SPEECH_PASSTHROUGH_MS);
+      sendClearToTwilio(session, 'caller_barge_in', true);
+    } else if (!TURN_INPUT_GATE_ENABLED && now >= session.echoGuardBypassUntilMs) {
       if (elapsedSinceAgentAudioMs >= 0 && elapsedSinceAgentAudioMs < AGENT_ECHO_GUARD_MS) {
         const canBypassEchoGuard =
           AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED &&
@@ -1603,12 +1654,15 @@ wss.on('connection', (ws, req) => {
     droppedAmbienceToTwilioAudio: 0,
     droppedAmbienceSuppressionAudio: 0,
     droppedEchoGuardAudio: 0,
+    droppedTurnGateAudio: 0,
     mediaStatsLastLoggedAtMs: Date.now(),
     bufferedUserAudioChunks: [],
     suppressedInboundAudioPrebuffer: [],
     inboundNoiseFloorRms: AMBIENCE_NOISE_FLOOR_RMS_INITIAL,
     consecutiveLikelySpeechFrames: 0,
     callerSpeechPassthroughUntilMs: 0,
+    turnGatePassthroughUntilMs: 0,
+    consecutiveBargeInFrames: 0,
     echoGuardBypassUntilMs: 0,
     lastCallerSpeechForwardedAtMs: 0,
     stopping: false,
@@ -1819,6 +1873,12 @@ server.listen(PORT, () => {
     AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_RMS_THRESHOLD,
     AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_PEAK_THRESHOLD,
     AGENT_ECHO_GUARD_BYPASS_WINDOW_MS,
+    TURN_INPUT_GATE_ENABLED,
+    TURN_INPUT_GATE_BLOCK_MS,
+    TURN_INPUT_GATE_BARGE_IN_ENABLED,
+    TURN_INPUT_GATE_BARGE_IN_RMS_THRESHOLD,
+    TURN_INPUT_GATE_BARGE_IN_PEAK_THRESHOLD,
+    TURN_INPUT_GATE_BARGE_IN_MIN_CONSECUTIVE_FRAMES,
     TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS,
     TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS,
     TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE,
