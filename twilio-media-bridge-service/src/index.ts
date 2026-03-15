@@ -21,6 +21,12 @@ type BridgeSession = {
   ambienceOffsetBytes: number;
   ambienceInterval: NodeJS.Timeout | null;
   agentSilenceTimer: NodeJS.Timeout | null;
+  twilioMediaReceived: number;
+  twilioMediaOutboundIgnored: number;
+  twilioToElevenAudioSent: number;
+  elevenToTwilioAudioSent: number;
+  ambienceToTwilioAudioSent: number;
+  mediaStatsLastLoggedAtMs: number;
   bufferedUserAudioChunks: string[];
   stopping: boolean;
 };
@@ -31,6 +37,7 @@ const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 200;
 const TWILIO_MEDIA_CHUNK_MS = 20;
 const TWILIO_ULAW_8K_CHUNK_BYTES = 160;
 const AGENT_SILENCE_TO_AMBIENCE_MS = 900;
+const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
 const ELEVENLABS_AGENT_ID = normalizeString(process.env.ELEVENLABS_AGENT_ID);
 const ELEVENLABS_API_KEY = normalizeString(process.env.ELEVENLABS_API_KEY);
 const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io');
@@ -250,7 +257,10 @@ function startAmbience(session: BridgeSession, reason: string): void {
 
     if (!ok) {
       stopAmbience(session, 'twilio_send_failed');
+      return;
     }
+    session.ambienceToTwilioAudioSent += 1;
+    flushMediaStatsIfDue(session);
   }, TWILIO_MEDIA_CHUNK_MS);
 }
 
@@ -267,6 +277,44 @@ function scheduleAmbienceStartOnSilence(session: BridgeSession, reason: string):
 function cleanupSessionState(session: BridgeSession, reason: string): void {
   clearAgentSilenceTimer(session);
   stopAmbience(session, reason);
+}
+
+function resetMediaStatsCounters(session: BridgeSession): void {
+  session.twilioMediaReceived = 0;
+  session.twilioMediaOutboundIgnored = 0;
+  session.twilioToElevenAudioSent = 0;
+  session.elevenToTwilioAudioSent = 0;
+  session.ambienceToTwilioAudioSent = 0;
+}
+
+function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
+  const now = Date.now();
+  if (!force && now - session.mediaStatsLastLoggedAtMs < MEDIA_STATS_LOG_INTERVAL_MS) {
+    return;
+  }
+
+  const hasAnyStat =
+    session.twilioMediaReceived > 0 ||
+    session.twilioMediaOutboundIgnored > 0 ||
+    session.twilioToElevenAudioSent > 0 ||
+    session.elevenToTwilioAudioSent > 0 ||
+    session.ambienceToTwilioAudioSent > 0;
+
+  if (hasAnyStat) {
+    log('INFO', 'media flow stats', {
+      connectionId: session.connectionId,
+      streamSid: session.streamSid,
+      mediaReceived: session.twilioMediaReceived,
+      outboundIgnored: session.twilioMediaOutboundIgnored,
+      twilioToElevenSent: session.twilioToElevenAudioSent,
+      elevenToTwilioSent: session.elevenToTwilioAudioSent,
+      ambienceToTwilioSent: session.ambienceToTwilioAudioSent,
+      intervalMs: now - session.mediaStatsLastLoggedAtMs,
+    });
+    resetMediaStatsCounters(session);
+  }
+
+  session.mediaStatsLastLoggedAtMs = now;
 }
 
 function asObject(value: unknown): JsonObject | null {
@@ -443,12 +491,8 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
     });
     return;
   }
-
-  log('INFO', 'audio returned to twilio', {
-    connectionId: session.connectionId,
-    streamSid: session.streamSid,
-    payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
-  });
+  session.elevenToTwilioAudioSent += 1;
+  flushMediaStatsIfDue(session);
 }
 
 function sendClearToTwilio(session: BridgeSession, reason: string): void {
@@ -506,11 +550,8 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
   if (elevenWs && elevenWs.readyState === WebSocket.OPEN) {
     const ok = safeSendWsJson(elevenWs, { user_audio_chunk: audioBase64 });
     if (ok) {
-      log('INFO', 'audio forwarded twilio -> elevenlabs', {
-        connectionId: session.connectionId,
-        streamSid: session.streamSid,
-        payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
-      });
+      session.twilioToElevenAudioSent += 1;
+      flushMediaStatsIfDue(session);
     } else {
       log('WARN', 'audio forward failed twilio -> elevenlabs (socket not open)', {
         connectionId: session.connectionId,
@@ -521,12 +562,13 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
   }
 
   session.bufferedUserAudioChunks.push(audioBase64);
-  log('INFO', 'audio buffered twilio -> elevenlabs (awaiting elevenlabs websocket)', {
-    connectionId: session.connectionId,
-    streamSid: session.streamSid,
-    bufferedChunks: session.bufferedUserAudioChunks.length,
-    payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
-  });
+  if (session.bufferedUserAudioChunks.length % 25 === 0 || session.bufferedUserAudioChunks.length === 1) {
+    log('INFO', 'audio buffered twilio -> elevenlabs (awaiting elevenlabs websocket)', {
+      connectionId: session.connectionId,
+      streamSid: session.streamSid,
+      bufferedChunks: session.bufferedUserAudioChunks.length,
+    });
+  }
   if (session.bufferedUserAudioChunks.length > MAX_BUFFERED_TWILIO_AUDIO_CHUNKS) {
     session.bufferedUserAudioChunks.shift();
     log('WARN', 'twilio audio buffer full, dropping oldest chunk', {
@@ -596,7 +638,9 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
     if (!audioBase64) return;
 
     if (!session.agentSpeaking) {
-      sendClearToTwilio(session, 'agent_audio_resumed');
+      if (session.ambienceActive) {
+        sendClearToTwilio(session, 'agent_audio_resumed');
+      }
       stopAmbience(session, 'agent_audio_resumed');
       log('INFO', 'agent audio resumed', {
         connectionId: session.connectionId,
@@ -801,6 +845,12 @@ wss.on('connection', (ws, req) => {
     ambienceOffsetBytes: 0,
     ambienceInterval: null,
     agentSilenceTimer: null,
+    twilioMediaReceived: 0,
+    twilioMediaOutboundIgnored: 0,
+    twilioToElevenAudioSent: 0,
+    elevenToTwilioAudioSent: 0,
+    ambienceToTwilioAudioSent: 0,
+    mediaStatsLastLoggedAtMs: Date.now(),
     bufferedUserAudioChunks: [],
     stopping: false,
   };
@@ -889,24 +939,13 @@ wss.on('connection', (ws, req) => {
       const media = asObject(payload.media) || {};
       const mediaPayload = asString(media.payload);
       const mediaTrack = asString(media.track);
-
-      log('INFO', 'twilio event: media', {
-        connectionId: session.connectionId,
-        streamSid: session.streamSid,
-        track: mediaTrack || 'unknown',
-        chunk: asString(media.chunk),
-        timestamp: asString(media.timestamp),
-        payloadBytes: mediaPayload ? Buffer.byteLength(mediaPayload, 'utf8') : 0,
-      });
+      session.twilioMediaReceived += 1;
 
       if (shouldForwardTwilioMediaToElevenLabs(mediaTrack)) {
         sendTwilioAudioToElevenLabs(session, mediaPayload);
       } else {
-        log('INFO', 'twilio outbound media ignored for elevenlabs', {
-          connectionId: session.connectionId,
-          streamSid: session.streamSid,
-          track: mediaTrack,
-        });
+        session.twilioMediaOutboundIgnored += 1;
+        flushMediaStatsIfDue(session);
       }
       if (!session.elevenWs && !session.elevenConnecting) {
         void connectElevenLabsForSession(session);
@@ -927,6 +966,7 @@ wss.on('connection', (ws, req) => {
       });
 
       cleanupSessionState(session, 'twilio_stop');
+      flushMediaStatsIfDue(session, true);
       closeElevenLabsForSession(session, 'twilio_stop');
       return;
     }
@@ -937,6 +977,7 @@ wss.on('connection', (ws, req) => {
   ws.on('close', (code, reason) => {
     session.stopping = true;
     cleanupSessionState(session, 'twilio_close');
+    flushMediaStatsIfDue(session, true);
     closeElevenLabsForSession(session, 'twilio_close');
     log('INFO', 'twilio websocket close', {
       connectionId: session.connectionId,
