@@ -44,34 +44,17 @@ type BridgeSession = {
 const PORT = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3000;
 const WS_PATH = '/twilio-media';
 const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 80;
-const MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS = Math.max(
-  4,
-  Math.floor(parseNumberEnv(process.env.MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS, 8, 4))
-);
+const MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS = 8;
 const TWILIO_MEDIA_CHUNK_MS = 20;
 const TWILIO_ULAW_8K_CHUNK_BYTES = 160;
 const AGENT_SILENCE_TO_AMBIENCE_MS = 900;
 const INITIAL_AMBIENCE_DELAY_MS = 3500;
-const AGENT_ECHO_GUARD_MS = Math.max(0, Math.floor(parseNumberEnv(process.env.AGENT_ECHO_GUARD_MS, 80, 0)));
-const INBOUND_SILENCE_GATE_ENABLED = parseBooleanEnv(process.env.INBOUND_SILENCE_GATE_ENABLED, true);
-const INBOUND_SILENCE_RMS_THRESHOLD = Math.max(
-  0,
-  Math.floor(
-    parseNumberEnv(
-      process.env.INBOUND_SILENCE_RMS_THRESHOLD,
-      parseNumberEnv(process.env.AMBIENCE_NOISE_FLOOR_RMS_INITIAL, 260, 0),
-      0
-    )
-  )
-);
-const INBOUND_SILENCE_HANGOVER_MS = Math.max(
-  0,
-  Math.floor(parseNumberEnv(process.env.INBOUND_SILENCE_HANGOVER_MS, 240, 0))
-);
-const INBOUND_SILENCE_GATE_WARMUP_MS = Math.max(
-  0,
-  Math.floor(parseNumberEnv(process.env.INBOUND_SILENCE_GATE_WARMUP_MS, 1200, 0))
-);
+// Hard-pinned low-latency profile. These values are intentionally code-fixed and do not read env vars.
+const AGENT_ECHO_GUARD_MS = 80;
+const INBOUND_SILENCE_GATE_ENABLED = true;
+const INBOUND_SILENCE_RMS_THRESHOLD = 260;
+const INBOUND_SILENCE_HANGOVER_MS = 240;
+const INBOUND_SILENCE_GATE_WARMUP_MS = 1200;
 const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
 const MAX_ELEVEN_WS_BUFFERED_BYTES = 128 * 1024;
 const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
@@ -105,15 +88,6 @@ function parseBooleanEnv(value: unknown, fallback: boolean): boolean {
   if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
   if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
   return fallback;
-}
-
-function parseNumberEnv(value: unknown, fallback: number, minValue = Number.NEGATIVE_INFINITY): number {
-  const normalized = normalizeString(value);
-  if (!normalized) return fallback;
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed)) return fallback;
-  if (parsed < minValue) return fallback;
-  return parsed;
 }
 
 function resolveAmbiencePath(filePath: string): string {
