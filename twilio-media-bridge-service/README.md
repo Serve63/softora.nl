@@ -29,6 +29,7 @@ Environment:
 - Voor non-stop subtiele ambience: `AMBIENCE_ALWAYS_ON=true`, met `AMBIENCE_BASE_GAIN` en `AMBIENCE_UNDER_AGENT_GAIN`
 - Ambience-inbound suppressie staat standaard uit bij `AMBIENCE_ALWAYS_ON=true` (en aan bij `AMBIENCE_ALWAYS_ON=false`) zodat caller speech niet wordt weggefilterd bij non-stop ambience
 - Voor soepeler speech start met ambience: gebruik `AMBIENCE_INBOUND_SUPPRESSION_PREROLL_MAX_CHUNKS` en `AMBIENCE_INBOUND_SPEECH_PASSTHROUGH_MS`
+- Stable telephony mode staat code-side aan (hard), inclusief loopback-hash guard; hierdoor is handmatig env-tunen voor echo/turn meestal niet meer nodig
 - Echo-guard draait nu in veilige telephony-stand (bypass standaard uit, effectieve minimale bypass-thresholds) om self-trigger loops te voorkomen
 - Turn-based input gate staat standaard aan (`TURN_INPUT_GATE_*`) voor stabiele half-duplex callflow; barge-in is optioneel en standaard uit
 - Outbound playout gebruikt nu centrale queue+pacing; finetune met `TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS` en `TWILIO_OUTBOUND_AGENT_JITTER_*`
