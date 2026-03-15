@@ -26,6 +26,9 @@ type BridgeSession = {
   twilioToElevenAudioSent: number;
   elevenToTwilioAudioSent: number;
   ambienceToTwilioAudioSent: number;
+  droppedTwilioToElevenAudio: number;
+  droppedElevenToTwilioAudio: number;
+  droppedAmbienceToTwilioAudio: number;
   mediaStatsLastLoggedAtMs: number;
   bufferedUserAudioChunks: string[];
   stopping: boolean;
@@ -33,11 +36,14 @@ type BridgeSession = {
 
 const PORT = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3000;
 const WS_PATH = '/twilio-media';
-const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 200;
+const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 80;
+const MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS = 20;
 const TWILIO_MEDIA_CHUNK_MS = 20;
 const TWILIO_ULAW_8K_CHUNK_BYTES = 160;
 const AGENT_SILENCE_TO_AMBIENCE_MS = 900;
 const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
+const MAX_ELEVEN_WS_BUFFERED_BYTES = 128 * 1024;
+const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
 const ELEVENLABS_AGENT_ID = normalizeString(process.env.ELEVENLABS_AGENT_ID);
 const ELEVENLABS_API_KEY = normalizeString(process.env.ELEVENLABS_API_KEY);
 const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io');
@@ -72,6 +78,17 @@ function parseBooleanEnv(value: unknown, fallback: boolean): boolean {
 function resolveAmbiencePath(filePath: string): string {
   if (!filePath) return '';
   return path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+}
+
+function setNoDelay(socket: unknown): void {
+  try {
+    const candidate = socket as { setNoDelay?: (noDelay?: boolean) => void } | null;
+    if (candidate && typeof candidate.setNoDelay === 'function') {
+      candidate.setNoDelay(true);
+    }
+  } catch {
+    // Ignore socket tuning failures; not critical for call flow.
+  }
 }
 
 function getLoopingChunk(source: Buffer, offset: number, size: number): { chunk: Buffer; nextOffset: number } {
@@ -249,6 +266,12 @@ function startAmbience(session: BridgeSession, reason: string): void {
     );
     session.ambienceOffsetBytes = nextOffset;
 
+    if (session.twilioWs.bufferedAmount > MAX_TWILIO_WS_BUFFERED_BYTES) {
+      session.droppedAmbienceToTwilioAudio += 1;
+      flushMediaStatsIfDue(session);
+      return;
+    }
+
     const ok = safeSendWsJson(session.twilioWs, {
       event: 'media',
       streamSid: session.streamSid,
@@ -285,6 +308,9 @@ function resetMediaStatsCounters(session: BridgeSession): void {
   session.twilioToElevenAudioSent = 0;
   session.elevenToTwilioAudioSent = 0;
   session.ambienceToTwilioAudioSent = 0;
+  session.droppedTwilioToElevenAudio = 0;
+  session.droppedElevenToTwilioAudio = 0;
+  session.droppedAmbienceToTwilioAudio = 0;
 }
 
 function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
@@ -309,6 +335,9 @@ function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
       twilioToElevenSent: session.twilioToElevenAudioSent,
       elevenToTwilioSent: session.elevenToTwilioAudioSent,
       ambienceToTwilioSent: session.ambienceToTwilioAudioSent,
+      droppedTwilioToEleven: session.droppedTwilioToElevenAudio,
+      droppedElevenToTwilio: session.droppedElevenToTwilioAudio,
+      droppedAmbienceToTwilio: session.droppedAmbienceToTwilioAudio,
       intervalMs: now - session.mediaStatsLastLoggedAtMs,
     });
     resetMediaStatsCounters(session);
@@ -478,6 +507,12 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
     return;
   }
 
+  if (session.twilioWs.bufferedAmount > MAX_TWILIO_WS_BUFFERED_BYTES) {
+    session.droppedElevenToTwilioAudio += 1;
+    flushMediaStatsIfDue(session);
+    return;
+  }
+
   const ok = safeSendWsJson(session.twilioWs, {
     event: 'media',
     streamSid: session.streamSid,
@@ -515,8 +550,23 @@ function flushBufferedAudioToElevenLabs(session: BridgeSession): void {
   const elevenWs = session.elevenWs;
   if (!elevenWs || elevenWs.readyState !== WebSocket.OPEN) return;
 
+  if (session.bufferedUserAudioChunks.length > MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS) {
+    const dropped = session.bufferedUserAudioChunks.length - MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS;
+    session.bufferedUserAudioChunks.splice(0, dropped);
+    session.droppedTwilioToElevenAudio += dropped;
+    log('WARN', 'dropping stale buffered twilio audio before flush', {
+      connectionId: session.connectionId,
+      streamSid: session.streamSid,
+      droppedChunks: dropped,
+      keptChunks: session.bufferedUserAudioChunks.length,
+    });
+  }
+
   let flushed = 0;
   while (session.bufferedUserAudioChunks.length > 0) {
+    if (elevenWs.bufferedAmount > MAX_ELEVEN_WS_BUFFERED_BYTES) {
+      break;
+    }
     const chunk = session.bufferedUserAudioChunks.shift();
     if (!chunk) continue;
     const ok = safeSendWsJson(elevenWs, { user_audio_chunk: chunk });
@@ -548,6 +598,11 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
 
   const elevenWs = session.elevenWs;
   if (elevenWs && elevenWs.readyState === WebSocket.OPEN) {
+    if (elevenWs.bufferedAmount > MAX_ELEVEN_WS_BUFFERED_BYTES) {
+      session.droppedTwilioToElevenAudio += 1;
+      flushMediaStatsIfDue(session);
+      return;
+    }
     const ok = safeSendWsJson(elevenWs, { user_audio_chunk: audioBase64 });
     if (ok) {
       session.twilioToElevenAudioSent += 1;
@@ -571,6 +626,7 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
   }
   if (session.bufferedUserAudioChunks.length > MAX_BUFFERED_TWILIO_AUDIO_CHUNKS) {
     session.bufferedUserAudioChunks.shift();
+    session.droppedTwilioToElevenAudio += 1;
     log('WARN', 'twilio audio buffer full, dropping oldest chunk', {
       connectionId: session.connectionId,
       maxBufferedChunks: MAX_BUFFERED_TWILIO_AUDIO_CHUNKS,
@@ -747,10 +803,11 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
     return;
   }
 
-  const elevenWs = new WebSocket(signedUrl);
+  const elevenWs = new WebSocket(signedUrl, { perMessageDeflate: false });
   session.elevenWs = elevenWs;
 
   elevenWs.on('open', () => {
+    setNoDelay((elevenWs as unknown as { _socket?: unknown })._socket);
     session.elevenConnecting = false;
     log('INFO', 'elevenlabs websocket open', {
       connectionId: session.connectionId,
@@ -812,9 +869,10 @@ const server = http.createServer((req, res) => {
   sendText(res, 404, 'not found');
 });
 
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
 
 server.on('upgrade', (req, socket, head) => {
+  setNoDelay(socket);
   const path = getPathFromRequest(req);
 
   if (path !== WS_PATH) {
@@ -829,6 +887,8 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', (ws, req) => {
+  setNoDelay(req.socket);
+  setNoDelay((ws as unknown as { _socket?: unknown })._socket);
   const connectionId = ++connectionCounter;
   const remoteAddress = asString(req.headers['x-forwarded-for']) || req.socket.remoteAddress || 'unknown';
   const session: BridgeSession = {
@@ -850,6 +910,9 @@ wss.on('connection', (ws, req) => {
     twilioToElevenAudioSent: 0,
     elevenToTwilioAudioSent: 0,
     ambienceToTwilioAudioSent: 0,
+    droppedTwilioToElevenAudio: 0,
+    droppedElevenToTwilioAudio: 0,
+    droppedAmbienceToTwilioAudio: 0,
     mediaStatsLastLoggedAtMs: Date.now(),
     bufferedUserAudioChunks: [],
     stopping: false,
