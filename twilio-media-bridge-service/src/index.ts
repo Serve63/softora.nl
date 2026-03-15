@@ -1,7 +1,4 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
-import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import path from 'node:path';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 
 type JsonObject = Record<string, unknown>;
@@ -9,7 +6,6 @@ type LogLevel = 'INFO' | 'WARN' | 'ERROR';
 
 type BridgeSession = {
   connectionId: number;
-  createdAtMs: number;
   twilioWs: WebSocket;
   streamSid: string;
   callSid: string;
@@ -17,74 +13,18 @@ type BridgeSession = {
   elevenConnecting: boolean;
   elevenConnectAttempts: number;
   elevenUnavailable: boolean;
-  hasReceivedAgentAudio: boolean;
-  lastAgentAudioAtMs: number;
-  agentSpeaking: boolean;
-  ambienceActive: boolean;
-  ambienceFrameIndex: number;
-  ambienceInterval: NodeJS.Timeout | null;
-  agentSilenceTimer: NodeJS.Timeout | null;
-  twilioMediaReceived: number;
-  twilioMediaOutboundIgnored: number;
-  twilioToElevenAudioSent: number;
-  elevenToTwilioAudioSent: number;
-  ambienceToTwilioAudioSent: number;
-  droppedTwilioToElevenAudio: number;
-  droppedElevenToTwilioAudio: number;
-  droppedAmbienceToTwilioAudio: number;
-  droppedEchoGuardAudio: number;
-  droppedInboundSilenceAudio: number;
-  mediaStatsLastLoggedAtMs: number;
   bufferedUserAudioChunks: string[];
-  lastInboundSpeechAtMs: number;
-  lastForwardedUserAudioAtMs: number;
   stopping: boolean;
 };
 
 const PORT = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3000;
 const WS_PATH = '/twilio-media';
-const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 80;
-const MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS = Math.max(
-  4,
-  Math.floor(parseNumberEnv(process.env.MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS, 8, 4))
-);
-const TWILIO_MEDIA_CHUNK_MS = 20;
-const TWILIO_ULAW_8K_CHUNK_BYTES = 160;
-const AGENT_SILENCE_TO_AMBIENCE_MS = 900;
-const INITIAL_AMBIENCE_DELAY_MS = 3500;
-const AGENT_ECHO_GUARD_MS = Math.max(0, Math.floor(parseNumberEnv(process.env.AGENT_ECHO_GUARD_MS, 80, 0)));
-const INBOUND_SILENCE_GATE_ENABLED = parseBooleanEnv(process.env.INBOUND_SILENCE_GATE_ENABLED, true);
-const INBOUND_SILENCE_RMS_THRESHOLD = Math.max(
-  0,
-  Math.floor(
-    parseNumberEnv(
-      process.env.INBOUND_SILENCE_RMS_THRESHOLD,
-      parseNumberEnv(process.env.AMBIENCE_NOISE_FLOOR_RMS_INITIAL, 260, 0),
-      0
-    )
-  )
-);
-const INBOUND_SILENCE_HANGOVER_MS = Math.max(
-  0,
-  Math.floor(parseNumberEnv(process.env.INBOUND_SILENCE_HANGOVER_MS, 240, 0))
-);
-const INBOUND_SILENCE_GATE_WARMUP_MS = Math.max(
-  0,
-  Math.floor(parseNumberEnv(process.env.INBOUND_SILENCE_GATE_WARMUP_MS, 1200, 0))
-);
-const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
-const MAX_ELEVEN_WS_BUFFERED_BYTES = 128 * 1024;
-const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
+const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 200;
 const ELEVENLABS_AGENT_ID = normalizeString(process.env.ELEVENLABS_AGENT_ID);
 const ELEVENLABS_API_KEY = normalizeString(process.env.ELEVENLABS_API_KEY);
 const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io');
-const AMBIENCE_ENABLED = parseBooleanEnv(process.env.AMBIENCE_ENABLED, false);
-const AMBIENCE_FILE_PATH = normalizeString(process.env.AMBIENCE_FILE_PATH);
 
 let connectionCounter = 0;
-let ambienceMuLawAudio: Buffer | null = null;
-let ambienceMuLawFramesBase64: string[] = [];
-let ambienceDisabledReason = '';
 
 function log(level: LogLevel, message: string, meta?: JsonObject): void {
   const ts = new Date().toISOString();
@@ -99,376 +39,6 @@ function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function parseBooleanEnv(value: unknown, fallback: boolean): boolean {
-  const normalized = normalizeString(value).toLowerCase();
-  if (!normalized) return fallback;
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
-  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
-  return fallback;
-}
-
-function parseNumberEnv(value: unknown, fallback: number, minValue = Number.NEGATIVE_INFINITY): number {
-  const normalized = normalizeString(value);
-  if (!normalized) return fallback;
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed)) return fallback;
-  if (parsed < minValue) return fallback;
-  return parsed;
-}
-
-function resolveAmbiencePath(filePath: string): string {
-  if (!filePath) return '';
-  return path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
-}
-
-function setNoDelay(socket: unknown): void {
-  try {
-    const candidate = socket as { setNoDelay?: (noDelay?: boolean) => void } | null;
-    if (candidate && typeof candidate.setNoDelay === 'function') {
-      candidate.setNoDelay(true);
-    }
-  } catch {
-    // Ignore socket tuning failures; not critical for call flow.
-  }
-}
-
-function getLoopingChunk(source: Buffer, offset: number, size: number): { chunk: Buffer; nextOffset: number } {
-  if (source.length === 0) {
-    return { chunk: Buffer.alloc(0), nextOffset: 0 };
-  }
-
-  const chunk = Buffer.alloc(size);
-  let writeOffset = 0;
-  let readOffset = offset % source.length;
-  while (writeOffset < size) {
-    const remainingSource = source.length - readOffset;
-    const remainingChunk = size - writeOffset;
-    const copySize = Math.min(remainingSource, remainingChunk);
-    source.copy(chunk, writeOffset, readOffset, readOffset + copySize);
-    writeOffset += copySize;
-    readOffset = (readOffset + copySize) % source.length;
-  }
-
-  return { chunk, nextOffset: readOffset };
-}
-
-function buildLoopingMuLawFramesBase64(source: Buffer, frameBytes: number): string[] {
-  if (!source.length || frameBytes <= 0) return [];
-  const frameCount = Math.max(1, Math.ceil(source.length / frameBytes));
-  const frames: string[] = [];
-  for (let i = 0; i < frameCount; i += 1) {
-    const offset = (i * frameBytes) % source.length;
-    const { chunk } = getLoopingChunk(source, offset, frameBytes);
-    frames.push(chunk.toString('base64'));
-  }
-  return frames;
-}
-
-function muLawByteToPcm16(sample: number): number {
-  const mu = (~sample) & 0xff;
-  const sign = mu & 0x80;
-  const exponent = (mu >> 4) & 0x07;
-  const mantissa = mu & 0x0f;
-  const magnitude = ((mantissa << 3) + 0x84) << exponent;
-  const pcm = magnitude - 0x84;
-  return sign ? -pcm : pcm;
-}
-
-const MU_LAW_TO_PCM16 = Int16Array.from({ length: 256 }, (_, index) => muLawByteToPcm16(index));
-
-function computeMuLawRms(chunk: Buffer): number {
-  if (!chunk.length) return 0;
-  let sumSquares = 0;
-  for (let i = 0; i < chunk.length; i += 1) {
-    const pcm = MU_LAW_TO_PCM16[chunk[i] as number];
-    sumSquares += pcm * pcm;
-  }
-  return Math.sqrt(sumSquares / chunk.length);
-}
-
-function shouldSuppressInboundSilence(session: BridgeSession, audioBase64: string): boolean {
-  if (!INBOUND_SILENCE_GATE_ENABLED) return false;
-  if (!audioBase64) return false;
-
-  const now = Date.now();
-  if (now - session.createdAtMs < INBOUND_SILENCE_GATE_WARMUP_MS) {
-    return false;
-  }
-
-  const chunk = Buffer.from(audioBase64, 'base64');
-  if (!chunk.length) {
-    return false;
-  }
-
-  const rms = computeMuLawRms(chunk);
-  if (rms >= INBOUND_SILENCE_RMS_THRESHOLD) {
-    session.lastInboundSpeechAtMs = now;
-    return false;
-  }
-
-  if (now - session.lastInboundSpeechAtMs <= INBOUND_SILENCE_HANGOVER_MS) {
-    return false;
-  }
-
-  return true;
-}
-
-function loadAmbienceMuLawAudioBuffer(): void {
-  ambienceMuLawAudio = null;
-  ambienceMuLawFramesBase64 = [];
-  ambienceDisabledReason = '';
-
-  if (!AMBIENCE_ENABLED) {
-    ambienceDisabledReason = 'AMBIENCE_ENABLED=false';
-    log('INFO', 'ambience disabled', { reason: ambienceDisabledReason });
-    return;
-  }
-
-  if (!AMBIENCE_FILE_PATH) {
-    ambienceDisabledReason = 'AMBIENCE_FILE_PATH ontbreekt';
-    log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
-    return;
-  }
-
-  const resolvedPath = resolveAmbiencePath(AMBIENCE_FILE_PATH);
-  if (!existsSync(resolvedPath)) {
-    ambienceDisabledReason = `ambience file niet gevonden: ${resolvedPath}`;
-    log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
-    return;
-  }
-
-  const extension = path.extname(resolvedPath).toLowerCase();
-  if (extension === '.mulaw' || extension === '.ulaw' || extension === '.g711u') {
-    try {
-      const directBuffer = readFileSync(resolvedPath);
-      if (!directBuffer.length) {
-        ambienceDisabledReason = 'ambience file is leeg';
-        log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
-        return;
-      }
-      ambienceMuLawAudio = directBuffer;
-      ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(directBuffer, TWILIO_ULAW_8K_CHUNK_BYTES);
-      if (!ambienceMuLawFramesBase64.length) {
-        ambienceDisabledReason = 'raw ambience kon niet naar frames worden opgebouwd';
-        ambienceMuLawAudio = null;
-        log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
-        return;
-      }
-      log('INFO', 'ambience loaded (raw mulaw)', {
-        bytes: directBuffer.length,
-        frames: ambienceMuLawFramesBase64.length,
-        filePath: resolvedPath,
-      });
-      return;
-    } catch (error) {
-      ambienceDisabledReason = `raw ambience read mislukt: ${
-        error instanceof Error ? error.message : String(error)
-      }`;
-      log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
-      return;
-    }
-  }
-
-  const converted = spawnSync(
-    'ffmpeg',
-    [
-      '-hide_banner',
-      '-loglevel',
-      'error',
-      '-i',
-      resolvedPath,
-      '-ac',
-      '1',
-      '-ar',
-      '8000',
-      '-f',
-      'mulaw',
-      'pipe:1',
-    ],
-    {
-      encoding: 'buffer',
-      maxBuffer: 50 * 1024 * 1024,
-    }
-  );
-
-  if (converted.error) {
-    ambienceDisabledReason = `ffmpeg start mislukt: ${converted.error.message}`;
-    log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
-    return;
-  }
-
-  if (converted.status !== 0) {
-    const stderrText = Buffer.isBuffer(converted.stderr) ? converted.stderr.toString('utf8').slice(0, 400) : '';
-    ambienceDisabledReason = `ffmpeg convert failed (exit ${converted.status}): ${stderrText || 'unknown error'}`;
-    log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
-    return;
-  }
-
-  const output = Buffer.isBuffer(converted.stdout) ? converted.stdout : Buffer.alloc(0);
-  if (!output.length) {
-    ambienceDisabledReason = 'ffmpeg gaf geen audio output';
-    log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
-    return;
-  }
-
-  ambienceMuLawAudio = output;
-  ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(output, TWILIO_ULAW_8K_CHUNK_BYTES);
-  if (!ambienceMuLawFramesBase64.length) {
-    ambienceDisabledReason = 'converted ambience kon niet naar frames worden opgebouwd';
-    ambienceMuLawAudio = null;
-    log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
-    return;
-  }
-  log('INFO', 'ambience loaded (converted to mulaw/8000/mono)', {
-    bytes: output.length,
-    frames: ambienceMuLawFramesBase64.length,
-    sourceFilePath: resolvedPath,
-  });
-}
-
-function clearAgentSilenceTimer(session: BridgeSession): void {
-  if (!session.agentSilenceTimer) return;
-  clearTimeout(session.agentSilenceTimer);
-  session.agentSilenceTimer = null;
-}
-
-function stopAmbience(session: BridgeSession, reason: string): void {
-  if (session.ambienceInterval) {
-    clearInterval(session.ambienceInterval);
-    session.ambienceInterval = null;
-  }
-  if (!session.ambienceActive) return;
-  session.ambienceActive = false;
-  log('INFO', 'ambience stopped', {
-    connectionId: session.connectionId,
-    streamSid: session.streamSid,
-    callSid: session.callSid,
-    reason,
-  });
-}
-
-function startAmbience(session: BridgeSession, reason: string): void {
-  if (session.stopping || session.ambienceActive) return;
-  if (!AMBIENCE_ENABLED || !ambienceMuLawAudio || ambienceMuLawAudio.length === 0 || ambienceMuLawFramesBase64.length === 0) {
-    return;
-  }
-  if (!session.streamSid || session.twilioWs.readyState !== WebSocket.OPEN) {
-    return;
-  }
-
-  session.ambienceActive = true;
-  if (session.ambienceFrameIndex < 0 || session.ambienceFrameIndex >= ambienceMuLawFramesBase64.length) {
-    session.ambienceFrameIndex = 0;
-  }
-
-  log('INFO', 'ambience started', {
-    connectionId: session.connectionId,
-    streamSid: session.streamSid,
-    callSid: session.callSid,
-    reason,
-  });
-
-  session.ambienceInterval = setInterval(() => {
-    if (session.stopping || session.twilioWs.readyState !== WebSocket.OPEN || !session.streamSid) {
-      stopAmbience(session, 'call_inactive');
-      return;
-    }
-    if (!ambienceMuLawAudio || ambienceMuLawAudio.length === 0 || ambienceMuLawFramesBase64.length === 0) {
-      stopAmbience(session, 'ambience_unavailable');
-      return;
-    }
-    const payloadBase64 = ambienceMuLawFramesBase64[session.ambienceFrameIndex] || '';
-    session.ambienceFrameIndex = (session.ambienceFrameIndex + 1) % ambienceMuLawFramesBase64.length;
-
-    if (session.twilioWs.bufferedAmount > MAX_TWILIO_WS_BUFFERED_BYTES) {
-      session.droppedAmbienceToTwilioAudio += 1;
-      flushMediaStatsIfDue(session);
-      return;
-    }
-
-    const ok = sendTwilioMediaToSocket(session, payloadBase64);
-
-    if (!ok) {
-      stopAmbience(session, 'twilio_send_failed');
-      return;
-    }
-    session.ambienceToTwilioAudioSent += 1;
-    flushMediaStatsIfDue(session);
-  }, TWILIO_MEDIA_CHUNK_MS);
-}
-
-function scheduleAmbienceStartOnSilence(
-  session: BridgeSession,
-  reason: string,
-  delayMs = AGENT_SILENCE_TO_AMBIENCE_MS
-): void {
-  clearAgentSilenceTimer(session);
-  if (session.stopping) return;
-  session.agentSilenceTimer = setTimeout(() => {
-    session.agentSilenceTimer = null;
-    session.agentSpeaking = false;
-    startAmbience(session, reason);
-  }, delayMs);
-}
-
-function cleanupSessionState(session: BridgeSession, reason: string): void {
-  clearAgentSilenceTimer(session);
-  stopAmbience(session, reason);
-}
-
-function resetMediaStatsCounters(session: BridgeSession): void {
-  session.twilioMediaReceived = 0;
-  session.twilioMediaOutboundIgnored = 0;
-  session.twilioToElevenAudioSent = 0;
-  session.elevenToTwilioAudioSent = 0;
-  session.ambienceToTwilioAudioSent = 0;
-  session.droppedTwilioToElevenAudio = 0;
-  session.droppedElevenToTwilioAudio = 0;
-  session.droppedAmbienceToTwilioAudio = 0;
-  session.droppedEchoGuardAudio = 0;
-  session.droppedInboundSilenceAudio = 0;
-}
-
-function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
-  const now = Date.now();
-  if (!force && now - session.mediaStatsLastLoggedAtMs < MEDIA_STATS_LOG_INTERVAL_MS) {
-    return;
-  }
-
-  const hasAnyStat =
-    session.twilioMediaReceived > 0 ||
-    session.twilioMediaOutboundIgnored > 0 ||
-    session.twilioToElevenAudioSent > 0 ||
-    session.elevenToTwilioAudioSent > 0 ||
-    session.ambienceToTwilioAudioSent > 0 ||
-    session.droppedTwilioToElevenAudio > 0 ||
-    session.droppedElevenToTwilioAudio > 0 ||
-    session.droppedAmbienceToTwilioAudio > 0 ||
-    session.droppedEchoGuardAudio > 0 ||
-    session.droppedInboundSilenceAudio > 0;
-
-  if (hasAnyStat) {
-    log('INFO', 'media flow stats', {
-      connectionId: session.connectionId,
-      streamSid: session.streamSid,
-      mediaReceived: session.twilioMediaReceived,
-      outboundIgnored: session.twilioMediaOutboundIgnored,
-      twilioToElevenSent: session.twilioToElevenAudioSent,
-      elevenToTwilioSent: session.elevenToTwilioAudioSent,
-      ambienceToTwilioSent: session.ambienceToTwilioAudioSent,
-      droppedTwilioToEleven: session.droppedTwilioToElevenAudio,
-      droppedElevenToTwilio: session.droppedElevenToTwilioAudio,
-      droppedAmbienceToTwilio: session.droppedAmbienceToTwilioAudio,
-      droppedEchoGuardAudio: session.droppedEchoGuardAudio,
-      droppedInboundSilenceAudio: session.droppedInboundSilenceAudio,
-      intervalMs: now - session.mediaStatsLastLoggedAtMs,
-    });
-    resetMediaStatsCounters(session);
-  }
-
-  session.mediaStatsLastLoggedAtMs = now;
-}
-
 function asObject(value: unknown): JsonObject | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as JsonObject;
@@ -476,15 +46,6 @@ function asObject(value: unknown): JsonObject | null {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
-}
-
-function shouldForwardTwilioMediaToElevenLabs(track: string): boolean {
-  const normalized = normalizeString(track).toLowerCase();
-  if (!normalized) return true;
-  if (normalized === 'inbound' || normalized === 'inbound_track' || normalized.includes('inbound')) return true;
-  if (normalized === 'outbound' || normalized === 'outbound_track' || normalized.includes('outbound')) return false;
-  if (normalized.includes('both')) return false;
-  return true;
 }
 
 function errorDetails(error: unknown): JsonObject {
@@ -590,7 +151,7 @@ async function fetchElevenLabsSignedUrl(): Promise<string> {
 
   const parsed = safeParseJson(bodyText);
   if (!parsed.ok) {
-    throw new Error(`signed-url response invalid JSON: ${'reason' in parsed ? parsed.reason : 'invalid_json'}`);
+    throw new Error(`signed-url response invalid JSON: ${parsed.reason}`);
   }
 
   const signedUrl = asString(parsed.value.signed_url);
@@ -605,18 +166,6 @@ function safeSendWsJson(ws: WebSocket, payload: JsonObject): boolean {
   if (ws.readyState !== WebSocket.OPEN) return false;
   ws.send(JSON.stringify(payload));
   return true;
-}
-
-function safeSendWsText(ws: WebSocket, payload: string): boolean {
-  if (ws.readyState !== WebSocket.OPEN) return false;
-  ws.send(payload);
-  return true;
-}
-
-function sendTwilioMediaToSocket(session: BridgeSession, payloadBase64: string): boolean {
-  if (!session.streamSid || !payloadBase64) return false;
-  const message = `{"event":"media","streamSid":"${session.streamSid}","media":{"payload":"${payloadBase64}"}}`;
-  return safeSendWsText(session.twilioWs, message);
 }
 
 function closeElevenLabsForSession(session: BridgeSession, reason: string): void {
@@ -643,13 +192,11 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
     return;
   }
 
-  if (session.twilioWs.bufferedAmount > MAX_TWILIO_WS_BUFFERED_BYTES) {
-    session.droppedElevenToTwilioAudio += 1;
-    flushMediaStatsIfDue(session);
-    return;
-  }
-
-  const ok = sendTwilioMediaToSocket(session, audioBase64);
+  const ok = safeSendWsJson(session.twilioWs, {
+    event: 'media',
+    streamSid: session.streamSid,
+    media: { payload: audioBase64 },
+  });
 
   if (!ok) {
     log('WARN', 'failed to send audio to twilio (socket not open)', {
@@ -658,8 +205,12 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
     });
     return;
   }
-  session.elevenToTwilioAudioSent += 1;
-  flushMediaStatsIfDue(session);
+
+  log('INFO', 'audio returned to twilio', {
+    connectionId: session.connectionId,
+    streamSid: session.streamSid,
+    payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
+  });
 }
 
 function sendClearToTwilio(session: BridgeSession, reason: string): void {
@@ -671,7 +222,7 @@ function sendClearToTwilio(session: BridgeSession, reason: string): void {
   });
 
   if (!ok) return;
-  log('INFO', 'clear sent to twilio', {
+  log('INFO', 'sent clear to twilio', {
     connectionId: session.connectionId,
     streamSid: session.streamSid,
     reason,
@@ -682,23 +233,8 @@ function flushBufferedAudioToElevenLabs(session: BridgeSession): void {
   const elevenWs = session.elevenWs;
   if (!elevenWs || elevenWs.readyState !== WebSocket.OPEN) return;
 
-  if (session.bufferedUserAudioChunks.length > MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS) {
-    const dropped = session.bufferedUserAudioChunks.length - MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS;
-    session.bufferedUserAudioChunks.splice(0, dropped);
-    session.droppedTwilioToElevenAudio += dropped;
-    log('WARN', 'dropping stale buffered twilio audio before flush', {
-      connectionId: session.connectionId,
-      streamSid: session.streamSid,
-      droppedChunks: dropped,
-      keptChunks: session.bufferedUserAudioChunks.length,
-    });
-  }
-
   let flushed = 0;
   while (session.bufferedUserAudioChunks.length > 0) {
-    if (elevenWs.bufferedAmount > MAX_ELEVEN_WS_BUFFERED_BYTES) {
-      break;
-    }
     const chunk = session.bufferedUserAudioChunks.shift();
     if (!chunk) continue;
     const ok = safeSendWsJson(elevenWs, { user_audio_chunk: chunk });
@@ -706,7 +242,6 @@ function flushBufferedAudioToElevenLabs(session: BridgeSession): void {
       session.bufferedUserAudioChunks.unshift(chunk);
       break;
     }
-    session.lastForwardedUserAudioAtMs = Date.now();
     flushed += 1;
   }
 
@@ -729,33 +264,15 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
     return;
   }
 
-  if (session.hasReceivedAgentAudio) {
-    const elapsedSinceAgentAudioMs = Date.now() - session.lastAgentAudioAtMs;
-    if (elapsedSinceAgentAudioMs >= 0 && elapsedSinceAgentAudioMs < AGENT_ECHO_GUARD_MS) {
-      session.droppedEchoGuardAudio += 1;
-      flushMediaStatsIfDue(session);
-      return;
-    }
-  }
-
-  if (shouldSuppressInboundSilence(session, audioBase64)) {
-    session.droppedInboundSilenceAudio += 1;
-    flushMediaStatsIfDue(session);
-    return;
-  }
-
   const elevenWs = session.elevenWs;
   if (elevenWs && elevenWs.readyState === WebSocket.OPEN) {
-    if (elevenWs.bufferedAmount > MAX_ELEVEN_WS_BUFFERED_BYTES) {
-      session.droppedTwilioToElevenAudio += 1;
-      flushMediaStatsIfDue(session);
-      return;
-    }
     const ok = safeSendWsJson(elevenWs, { user_audio_chunk: audioBase64 });
     if (ok) {
-      session.lastForwardedUserAudioAtMs = Date.now();
-      session.twilioToElevenAudioSent += 1;
-      flushMediaStatsIfDue(session);
+      log('INFO', 'audio forwarded twilio -> elevenlabs', {
+        connectionId: session.connectionId,
+        streamSid: session.streamSid,
+        payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
+      });
     } else {
       log('WARN', 'audio forward failed twilio -> elevenlabs (socket not open)', {
         connectionId: session.connectionId,
@@ -766,16 +283,14 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
   }
 
   session.bufferedUserAudioChunks.push(audioBase64);
-  if (session.bufferedUserAudioChunks.length % 25 === 0 || session.bufferedUserAudioChunks.length === 1) {
-    log('INFO', 'audio buffered twilio -> elevenlabs (awaiting elevenlabs websocket)', {
-      connectionId: session.connectionId,
-      streamSid: session.streamSid,
-      bufferedChunks: session.bufferedUserAudioChunks.length,
-    });
-  }
+  log('INFO', 'audio buffered twilio -> elevenlabs (awaiting elevenlabs websocket)', {
+    connectionId: session.connectionId,
+    streamSid: session.streamSid,
+    bufferedChunks: session.bufferedUserAudioChunks.length,
+    payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
+  });
   if (session.bufferedUserAudioChunks.length > MAX_BUFFERED_TWILIO_AUDIO_CHUNKS) {
     session.bufferedUserAudioChunks.shift();
-    session.droppedTwilioToElevenAudio += 1;
     log('WARN', 'twilio audio buffer full, dropping oldest chunk', {
       connectionId: session.connectionId,
       maxBufferedChunks: MAX_BUFFERED_TWILIO_AUDIO_CHUNKS,
@@ -788,7 +303,7 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
   if (!parsed.ok) {
     log('WARN', 'invalid elevenlabs message ignored', {
       connectionId: session.connectionId,
-      reason: 'reason' in parsed ? parsed.reason : 'invalid_json',
+      reason: parsed.reason,
     });
     return;
   }
@@ -840,29 +355,6 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
   if (type === 'audio') {
     const audioEvent = asObject(payload.audio_event) || {};
     const audioBase64 = asString(audioEvent.audio_base_64);
-    if (!audioBase64) return;
-
-    const now = Date.now();
-    session.hasReceivedAgentAudio = true;
-    session.lastAgentAudioAtMs = now;
-
-    if (!session.agentSpeaking) {
-      if (session.ambienceActive) {
-        sendClearToTwilio(session, 'agent_audio_resumed');
-      }
-      stopAmbience(session, 'agent_audio_resumed');
-      const resumedMeta: JsonObject = {
-        connectionId: session.connectionId,
-        streamSid: session.streamSid,
-        callSid: session.callSid,
-      };
-      if (session.lastForwardedUserAudioAtMs > 0) {
-        resumedMeta.latencySinceLastUserAudioMs = now - session.lastForwardedUserAudioAtMs;
-      }
-      log('INFO', 'agent audio resumed', resumedMeta);
-    }
-    session.agentSpeaking = true;
-    scheduleAmbienceStartOnSilence(session, 'agent_silence');
     sendAudioToTwilio(session, audioBase64);
     return;
   }
@@ -874,8 +366,6 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
       reason: asString(interruption.reason),
     });
     sendClearToTwilio(session, 'elevenlabs_interruption');
-    session.agentSpeaking = false;
-    scheduleAmbienceStartOnSilence(session, 'elevenlabs_interruption');
     return;
   }
 
@@ -960,11 +450,10 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
     return;
   }
 
-  const elevenWs = new WebSocket(signedUrl, { perMessageDeflate: false });
+  const elevenWs = new WebSocket(signedUrl);
   session.elevenWs = elevenWs;
 
   elevenWs.on('open', () => {
-    setNoDelay((elevenWs as unknown as { _socket?: unknown })._socket);
     session.elevenConnecting = false;
     log('INFO', 'elevenlabs websocket open', {
       connectionId: session.connectionId,
@@ -972,9 +461,6 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
       callSid: session.callSid,
     });
     flushBufferedAudioToElevenLabs(session);
-    if (!session.hasReceivedAgentAudio) {
-      scheduleAmbienceStartOnSilence(session, 'waiting_for_agent_audio', INITIAL_AMBIENCE_DELAY_MS);
-    }
   });
 
   elevenWs.on('message', (data, isBinary) => {
@@ -995,16 +481,12 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
   elevenWs.on('close', (code, reason) => {
     session.elevenConnecting = false;
     session.elevenWs = null;
-    session.agentSpeaking = false;
     log('WARN', 'elevenlabs websocket close', {
       connectionId: session.connectionId,
       streamSid: session.streamSid,
       code,
       reason: Buffer.isBuffer(reason) ? reason.toString('utf8') : String(reason || ''),
     });
-    if (!session.stopping) {
-      startAmbience(session, 'elevenlabs_ws_closed');
-    }
   });
 
   elevenWs.on('error', (error) => {
@@ -1017,8 +499,6 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
   });
 }
 
-loadAmbienceMuLawAudioBuffer();
-
 const server = http.createServer((req, res) => {
   const path = getPathFromRequest(req);
   if (path === '/' || path === '/healthz') {
@@ -1028,10 +508,9 @@ const server = http.createServer((req, res) => {
   sendText(res, 404, 'not found');
 });
 
-const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
+const wss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (req, socket, head) => {
-  setNoDelay(socket);
   const path = getPathFromRequest(req);
 
   if (path !== WS_PATH) {
@@ -1046,14 +525,10 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', (ws, req) => {
-  setNoDelay(req.socket);
-  setNoDelay((ws as unknown as { _socket?: unknown })._socket);
   const connectionId = ++connectionCounter;
   const remoteAddress = asString(req.headers['x-forwarded-for']) || req.socket.remoteAddress || 'unknown';
-  const now = Date.now();
   const session: BridgeSession = {
     connectionId,
-    createdAtMs: now,
     twilioWs: ws,
     streamSid: '',
     callSid: '',
@@ -1061,27 +536,7 @@ wss.on('connection', (ws, req) => {
     elevenConnecting: false,
     elevenConnectAttempts: 0,
     elevenUnavailable: false,
-    hasReceivedAgentAudio: false,
-    lastAgentAudioAtMs: 0,
-    agentSpeaking: false,
-    ambienceActive: false,
-    ambienceFrameIndex: 0,
-    ambienceInterval: null,
-    agentSilenceTimer: null,
-    twilioMediaReceived: 0,
-    twilioMediaOutboundIgnored: 0,
-    twilioToElevenAudioSent: 0,
-    elevenToTwilioAudioSent: 0,
-    ambienceToTwilioAudioSent: 0,
-    droppedTwilioToElevenAudio: 0,
-    droppedElevenToTwilioAudio: 0,
-    droppedAmbienceToTwilioAudio: 0,
-    droppedEchoGuardAudio: 0,
-    droppedInboundSilenceAudio: 0,
-    mediaStatsLastLoggedAtMs: now,
     bufferedUserAudioChunks: [],
-    lastInboundSpeechAtMs: now,
-    lastForwardedUserAudioAtMs: 0,
     stopping: false,
   };
 
@@ -1107,7 +562,7 @@ wss.on('connection', (ws, req) => {
     if (!parsed.ok) {
       log('WARN', 'invalid twilio message ignored', {
         connectionId: session.connectionId,
-        reason: 'reason' in parsed ? parsed.reason : 'invalid_json',
+        reason: parsed.reason,
       });
       return;
     }
@@ -1119,9 +574,6 @@ wss.on('connection', (ws, req) => {
 
     if (event === 'connected') {
       log('INFO', 'twilio event: connected', { connectionId: session.connectionId });
-      if (!session.elevenWs && !session.elevenConnecting) {
-        void connectElevenLabsForSession(session);
-      }
       return;
     }
 
@@ -1144,14 +596,6 @@ wss.on('connection', (ws, req) => {
         elevenLabsSignedUrlEndpoint: sanitizeUrlForLogs(buildElevenLabsSignedUrlRequestUrl().toString()),
         elevenLabsWebSocketUrl: 'dynamic signed URL (resolved during connect)',
       });
-      if (AMBIENCE_ENABLED && !ambienceMuLawAudio) {
-        log('WARN', 'ambience disabled for call', {
-          connectionId: session.connectionId,
-          streamSid: session.streamSid,
-          callSid: session.callSid,
-          reason: ambienceDisabledReason || 'ambience audio not available',
-        });
-      }
       if (!ELEVENLABS_API_KEY || !ELEVENLABS_AGENT_ID) {
         session.elevenUnavailable = true;
         log('ERROR', 'call has missing ElevenLabs configuration; realtime bridge will not start', {
@@ -1170,15 +614,16 @@ wss.on('connection', (ws, req) => {
     if (event === 'media') {
       const media = asObject(payload.media) || {};
       const mediaPayload = asString(media.payload);
-      const mediaTrack = asString(media.track);
-      session.twilioMediaReceived += 1;
 
-      if (shouldForwardTwilioMediaToElevenLabs(mediaTrack)) {
-        sendTwilioAudioToElevenLabs(session, mediaPayload);
-      } else {
-        session.twilioMediaOutboundIgnored += 1;
-        flushMediaStatsIfDue(session);
-      }
+      log('INFO', 'twilio event: media', {
+        connectionId: session.connectionId,
+        streamSid: session.streamSid,
+        chunk: asString(media.chunk),
+        timestamp: asString(media.timestamp),
+        payloadBytes: mediaPayload ? Buffer.byteLength(mediaPayload, 'utf8') : 0,
+      });
+
+      sendTwilioAudioToElevenLabs(session, mediaPayload);
       if (!session.elevenWs && !session.elevenConnecting) {
         void connectElevenLabsForSession(session);
       }
@@ -1197,8 +642,6 @@ wss.on('connection', (ws, req) => {
         callSid: session.callSid,
       });
 
-      cleanupSessionState(session, 'twilio_stop');
-      flushMediaStatsIfDue(session, true);
       closeElevenLabsForSession(session, 'twilio_stop');
       return;
     }
@@ -1208,8 +651,6 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', (code, reason) => {
     session.stopping = true;
-    cleanupSessionState(session, 'twilio_close');
-    flushMediaStatsIfDue(session, true);
     closeElevenLabsForSession(session, 'twilio_close');
     log('INFO', 'twilio websocket close', {
       connectionId: session.connectionId,
@@ -1244,18 +685,6 @@ process.on('uncaughtException', (error) => {
 });
 
 server.listen(PORT, () => {
-  log('INFO', 'ambience startup config', {
-    AMBIENCE_ENABLED,
-    AMBIENCE_FILE_PATH: AMBIENCE_FILE_PATH || '(empty)',
-    AGENT_ECHO_GUARD_MS,
-    INBOUND_SILENCE_GATE_ENABLED,
-    INBOUND_SILENCE_RMS_THRESHOLD,
-    INBOUND_SILENCE_HANGOVER_MS,
-    INBOUND_SILENCE_GATE_WARMUP_MS,
-    MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS,
-    ffmpeg: 'used for non-mulaw ambience conversion',
-  });
-
   if (!ELEVENLABS_AGENT_ID || !ELEVENLABS_API_KEY) {
     log('WARN', 'missing ElevenLabs env vars; audio bridge to ElevenLabs will fail', {
       hasElevenLabsAgentId: Boolean(ELEVENLABS_AGENT_ID),
