@@ -16,6 +16,7 @@ type BridgeSession = {
   elevenConnecting: boolean;
   elevenConnectAttempts: number;
   elevenUnavailable: boolean;
+  hasReceivedAgentAudio: boolean;
   agentSpeaking: boolean;
   ambienceActive: boolean;
   ambienceFrameIndex: number;
@@ -41,6 +42,7 @@ const MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS = 20;
 const TWILIO_MEDIA_CHUNK_MS = 20;
 const TWILIO_ULAW_8K_CHUNK_BYTES = 160;
 const AGENT_SILENCE_TO_AMBIENCE_MS = 900;
+const INITIAL_AMBIENCE_DELAY_MS = 3500;
 const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
 const MAX_ELEVEN_WS_BUFFERED_BYTES = 128 * 1024;
 const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
@@ -308,14 +310,18 @@ function startAmbience(session: BridgeSession, reason: string): void {
   }, TWILIO_MEDIA_CHUNK_MS);
 }
 
-function scheduleAmbienceStartOnSilence(session: BridgeSession, reason: string): void {
+function scheduleAmbienceStartOnSilence(
+  session: BridgeSession,
+  reason: string,
+  delayMs = AGENT_SILENCE_TO_AMBIENCE_MS
+): void {
   clearAgentSilenceTimer(session);
   if (session.stopping) return;
   session.agentSilenceTimer = setTimeout(() => {
     session.agentSilenceTimer = null;
     session.agentSpeaking = false;
     startAmbience(session, reason);
-  }, AGENT_SILENCE_TO_AMBIENCE_MS);
+  }, delayMs);
 }
 
 function cleanupSessionState(session: BridgeSession, reason: string): void {
@@ -725,6 +731,8 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
     const audioBase64 = asString(audioEvent.audio_base_64);
     if (!audioBase64) return;
 
+    session.hasReceivedAgentAudio = true;
+
     if (!session.agentSpeaking) {
       if (session.ambienceActive) {
         sendClearToTwilio(session, 'agent_audio_resumed');
@@ -847,7 +855,9 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
       callSid: session.callSid,
     });
     flushBufferedAudioToElevenLabs(session);
-    scheduleAmbienceStartOnSilence(session, 'waiting_for_agent_audio');
+    if (!session.hasReceivedAgentAudio) {
+      scheduleAmbienceStartOnSilence(session, 'waiting_for_agent_audio', INITIAL_AMBIENCE_DELAY_MS);
+    }
   });
 
   elevenWs.on('message', (data, isBinary) => {
@@ -932,6 +942,7 @@ wss.on('connection', (ws, req) => {
     elevenConnecting: false,
     elevenConnectAttempts: 0,
     elevenUnavailable: false,
+    hasReceivedAgentAudio: false,
     agentSpeaking: false,
     ambienceActive: false,
     ambienceFrameIndex: 0,
@@ -984,6 +995,9 @@ wss.on('connection', (ws, req) => {
 
     if (event === 'connected') {
       log('INFO', 'twilio event: connected', { connectionId: session.connectionId });
+      if (!session.elevenWs && !session.elevenConnecting) {
+        void connectElevenLabsForSession(session);
+      }
       return;
     }
 
@@ -1025,7 +1039,6 @@ wss.on('connection', (ws, req) => {
         });
       }
 
-      scheduleAmbienceStartOnSilence(session, 'call_started_waiting_for_agent');
       void connectElevenLabsForSession(session);
       return;
     }
