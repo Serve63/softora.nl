@@ -38,10 +38,7 @@ const ELEVENLABS_API_KEY = normalizeString(process.env.ELEVENLABS_API_KEY);
 const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io');
 const AMBIENCE_ENABLED = parseBooleanEnv(process.env.AMBIENCE_ENABLED, true);
 const AMBIENCE_FILE_PATH = normalizeString(process.env.AMBIENCE_FILE_PATH || 'assets/office-ambience.wav');
-const AMBIENCE_GAIN = Math.min(1, Math.max(0, parseNumberEnv(process.env.AMBIENCE_GAIN, 0.06)));
-const AMBIENCE_UNDER_AGENT_GAIN = Math.min(1, Math.max(0, parseNumberEnv(process.env.AMBIENCE_UNDER_AGENT_GAIN, 0.5)));
-const OUTBOUND_AGENT_PRIORITY_QUEUE_THRESHOLD = 6;
-const OUTBOUND_AMBIENCE_BACKPRESSURE_BYTES = 64 * 1024;
+const AMBIENCE_GAIN = Math.min(1, Math.max(0, parseNumberEnv(process.env.AMBIENCE_GAIN, 0.14)));
 
 let connectionCounter = 0;
 let ambienceMuLawAudio: Buffer | null = null;
@@ -291,21 +288,12 @@ function pcm16ToMuLaw(sample: number): number {
   return (~(sign | (exponent << 4) | mantissa)) & 0xff;
 }
 
-function applyMuLawGain(frame: Buffer, gain: number): Buffer {
-  const out = Buffer.allocUnsafe(TWILIO_ULAW_8K_CHUNK_BYTES);
-  for (let i = 0; i < TWILIO_ULAW_8K_CHUNK_BYTES; i += 1) {
-    const pcm = MU_LAW_TO_PCM16[frame[i] as number];
-    out[i] = pcm16ToMuLaw(pcm * gain);
-  }
-  return out;
-}
-
-function mixMuLawFrames(agentFrame: Buffer, ambienceFrame: Buffer, ambienceGain: number): Buffer {
+function mixMuLawFrames(agentFrame: Buffer, ambienceFrame: Buffer): Buffer {
   const out = Buffer.allocUnsafe(TWILIO_ULAW_8K_CHUNK_BYTES);
   for (let i = 0; i < TWILIO_ULAW_8K_CHUNK_BYTES; i += 1) {
     const agentPcm = MU_LAW_TO_PCM16[agentFrame[i] as number];
     const ambiencePcm = MU_LAW_TO_PCM16[ambienceFrame[i] as number];
-    const mixed = agentPcm + ambiencePcm * ambienceGain;
+    const mixed = agentPcm + ambiencePcm * AMBIENCE_GAIN;
     out[i] = pcm16ToMuLaw(mixed);
   }
   return out;
@@ -448,16 +436,8 @@ function startOutboundLoop(session: BridgeSession): void {
     }
 
     const agentFrame = session.agentAudioQueue.shift() || null;
-    const ambienceAllowed =
-      session.twilioWs.bufferedAmount <= OUTBOUND_AMBIENCE_BACKPRESSURE_BYTES &&
-      session.agentAudioQueue.length <= OUTBOUND_AGENT_PRIORITY_QUEUE_THRESHOLD;
-
     if (agentFrame && ambienceFrame) {
-      if (ambienceAllowed && AMBIENCE_GAIN > 0 && AMBIENCE_UNDER_AGENT_GAIN > 0) {
-        sendAudioFrameToTwilio(session, mixMuLawFrames(agentFrame, ambienceFrame, AMBIENCE_GAIN * AMBIENCE_UNDER_AGENT_GAIN));
-      } else {
-        sendAudioFrameToTwilio(session, agentFrame);
-      }
+      sendAudioFrameToTwilio(session, mixMuLawFrames(agentFrame, ambienceFrame));
       return;
     }
     if (agentFrame) {
@@ -465,9 +445,7 @@ function startOutboundLoop(session: BridgeSession): void {
       return;
     }
     if (ambienceFrame) {
-      if (ambienceAllowed && AMBIENCE_GAIN > 0) {
-        sendAudioFrameToTwilio(session, applyMuLawGain(ambienceFrame, AMBIENCE_GAIN));
-      }
+      sendAudioFrameToTwilio(session, ambienceFrame);
     }
   }, TWILIO_MEDIA_CHUNK_MS);
 }
@@ -973,9 +951,6 @@ server.listen(PORT, () => {
     AMBIENCE_ENABLED,
     AMBIENCE_FILE_PATH: AMBIENCE_FILE_PATH || '(empty)',
     AMBIENCE_GAIN,
-    AMBIENCE_UNDER_AGENT_GAIN,
-    OUTBOUND_AMBIENCE_BACKPRESSURE_BYTES,
-    OUTBOUND_AGENT_PRIORITY_QUEUE_THRESHOLD,
     ambienceLoaded: Boolean(ambienceMuLawAudio && ambienceMuLawAudio.length > 0),
     ambienceDisabledReason: ambienceDisabledReason || '(none)',
   });
