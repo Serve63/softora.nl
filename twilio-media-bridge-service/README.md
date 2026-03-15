@@ -27,13 +27,6 @@ Environment:
 - `ELEVENLABS_API_KEY`
 - `ELEVENLABS_AGENT_ID`
 - (optioneel) `ELEVENLABS_API_BASE_URL`
-- (optioneel) `AMBIENCE_ENABLED=true`
-- (optioneel) `AMBIENCE_FILE_PATH=assets/office-ambience.wav`
-- (optioneel) `AMBIENCE_GAIN=0.14`
-
-Audio gedrag:
-- Office-ambience speelt doorlopend op de outbound lijn.
-- Tijdens agent-speech wordt de agent-audio met ambience gemixt (dus geen hoorbare on/off van de lijn).
 
 ## Start command
 `npm run start`
