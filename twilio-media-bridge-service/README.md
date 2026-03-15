@@ -26,12 +26,11 @@ Environment:
 - `PORT` wordt door Render gezet
 - `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID`
 - Optioneel ambience: `AMBIENCE_ENABLED=true` + `AMBIENCE_FILE_PATH=...`
-- Low-latency profiel is code-fixed (geen Render env tuning nodig):
-  - `AGENT_ECHO_GUARD_MS=80`
-  - `MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS=8`
-  - `INBOUND_SILENCE_GATE_ENABLED=true`
-  - `INBOUND_SILENCE_RMS_THRESHOLD=260`
-  - `INBOUND_SILENCE_HANGOVER_MS=240`
+- Latency-tuning: `AGENT_ECHO_GUARD_MS` (default `80`)
+- Startup flush tuning: `MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS` (default `8`)
+- Inbound stiltefilter (aanbevolen): `INBOUND_SILENCE_GATE_ENABLED=true`
+- Stiltefilter drempel: `INBOUND_SILENCE_RMS_THRESHOLD` (default `260`)
+- Stiltefilter hangover: `INBOUND_SILENCE_HANGOVER_MS` (default `240`)
 
 ## Start command
 `npm run start`
