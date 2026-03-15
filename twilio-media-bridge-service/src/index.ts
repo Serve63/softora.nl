@@ -105,7 +105,7 @@ const TURN_INPUT_GATE_BARGE_IN_MIN_CONSECUTIVE_FRAMES = Math.max(
   Math.floor(parseNumberEnv(process.env.TURN_INPUT_GATE_BARGE_IN_MIN_CONSECUTIVE_FRAMES, 3, 1))
 );
 const EFFECTIVE_TURN_INPUT_GATE_ENABLED = STABLE_TELEPHONY_MODE ? true : TURN_INPUT_GATE_ENABLED;
-const EFFECTIVE_TURN_INPUT_GATE_BLOCK_MS = STABLE_TELEPHONY_MODE ? 1000 : TURN_INPUT_GATE_BLOCK_MS;
+const EFFECTIVE_TURN_INPUT_GATE_BLOCK_MS = STABLE_TELEPHONY_MODE ? 1800 : TURN_INPUT_GATE_BLOCK_MS;
 const EFFECTIVE_TURN_INPUT_GATE_BARGE_IN_ENABLED = STABLE_TELEPHONY_MODE ? false : TURN_INPUT_GATE_BARGE_IN_ENABLED;
 const EFFECTIVE_AGENT_ECHO_GUARD_MS = STABLE_TELEPHONY_MODE ? 0 : AGENT_ECHO_GUARD_MS;
 const EFFECTIVE_AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED = STABLE_TELEPHONY_MODE
@@ -145,12 +145,14 @@ const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_
 const AMBIENCE_ENABLED = parseBooleanEnv(process.env.AMBIENCE_ENABLED, false);
 const AMBIENCE_FILE_PATH = normalizeString(process.env.AMBIENCE_FILE_PATH);
 const AMBIENCE_ALWAYS_ON = parseBooleanEnv(process.env.AMBIENCE_ALWAYS_ON, true);
-const AMBIENCE_BASE_GAIN = clampNumber(parseNumberEnv(process.env.AMBIENCE_BASE_GAIN, 0.22, 0), 0, 2);
-const AMBIENCE_UNDER_AGENT_GAIN = clampNumber(
-  parseNumberEnv(process.env.AMBIENCE_UNDER_AGENT_GAIN, 1, 0),
-  0,
-  2
-);
+const REQUESTED_AMBIENCE_BASE_GAIN = clampNumber(parseNumberEnv(process.env.AMBIENCE_BASE_GAIN, 0.22, 0), 0, 2);
+const REQUESTED_AMBIENCE_UNDER_AGENT_GAIN = clampNumber(parseNumberEnv(process.env.AMBIENCE_UNDER_AGENT_GAIN, 1, 0), 0, 2);
+const AMBIENCE_BASE_GAIN = STABLE_TELEPHONY_MODE
+  ? clampNumber(Math.min(REQUESTED_AMBIENCE_BASE_GAIN, 0.14), 0, 2)
+  : REQUESTED_AMBIENCE_BASE_GAIN;
+const AMBIENCE_UNDER_AGENT_GAIN = STABLE_TELEPHONY_MODE
+  ? clampNumber(Math.min(REQUESTED_AMBIENCE_UNDER_AGENT_GAIN, 0.04), 0, 2)
+  : REQUESTED_AMBIENCE_UNDER_AGENT_GAIN;
 const AMBIENCE_INBOUND_SUPPRESSION_ENABLED = parseBooleanEnv(
   process.env.AMBIENCE_INBOUND_SUPPRESSION_ENABLED,
   !AMBIENCE_ALWAYS_ON
@@ -1502,6 +1504,13 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
 
   if (type === 'interruption') {
     const interruption = asObject(payload.interruption_event) || {};
+    if (STABLE_TELEPHONY_MODE && !EFFECTIVE_TURN_INPUT_GATE_BARGE_IN_ENABLED) {
+      log('INFO', 'elevenlabs interruption ignored (stable telephony mode)', {
+        connectionId: session.connectionId,
+        reason: asString(interruption.reason),
+      });
+      return;
+    }
     log('INFO', 'elevenlabs event: interruption', {
       connectionId: session.connectionId,
       reason: asString(interruption.reason),
@@ -1923,6 +1932,8 @@ server.listen(PORT, () => {
     AMBIENCE_ENABLED,
     AMBIENCE_FILE_PATH: AMBIENCE_FILE_PATH || '(empty)',
     AMBIENCE_ALWAYS_ON,
+    REQUESTED_AMBIENCE_BASE_GAIN,
+    REQUESTED_AMBIENCE_UNDER_AGENT_GAIN,
     AMBIENCE_BASE_GAIN,
     AMBIENCE_UNDER_AGENT_GAIN,
     AMBIENCE_INBOUND_SUPPRESSION_ENABLED,
