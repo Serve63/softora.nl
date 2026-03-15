@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
@@ -110,9 +111,33 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
-const COLDCALLING_PROVIDER_LOCK = 'elevenlabs';
+const ALLOWED_COLDCALLING_PROVIDERS = new Set(['elevenlabs', 'twilio_conference']);
+const COLDCALLING_PROVIDER_LOCK = ALLOWED_COLDCALLING_PROVIDERS.has(
+  String(process.env.COLDCALLING_PROVIDER || 'elevenlabs').trim().toLowerCase()
+)
+  ? String(process.env.COLDCALLING_PROVIDER || 'elevenlabs').trim().toLowerCase()
+  : 'elevenlabs';
 const DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED = false;
 const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
+const DEFAULT_TWILIO_MEDIA_WS_URL = 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media';
+const TWILIO_ACCOUNT_SID = String(process.env.TWILIO_ACCOUNT_SID || '').trim();
+const TWILIO_AUTH_TOKEN = String(process.env.TWILIO_AUTH_TOKEN || '').trim();
+const TWILIO_OUTBOUND_CALLER_NUMBER = String(
+  process.env.TWILIO_OUTBOUND_CALLER_NUMBER || process.env.TWILIO_PHONE_NUMBER || ''
+).trim();
+const TWILIO_MEDIA_WS_URL = String(process.env.TWILIO_MEDIA_WS_URL || DEFAULT_TWILIO_MEDIA_WS_URL).trim();
+const TWILIO_CONFERENCE_TWIML_APP_SID = String(process.env.TWILIO_CONFERENCE_TWIML_APP_SID || '').trim();
+const TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME = String(
+  process.env.TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME || 'softora-conference-participant'
+).trim();
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || '').trim();
+const TWILIO_AMBIENCE_AUDIO_URL = String(process.env.TWILIO_AMBIENCE_AUDIO_URL || '').trim();
+const TWILIO_AMBIENCE_AUDIO_FILE_PATH = path.join(
+  __dirname,
+  'twilio-media-bridge-service',
+  'assets',
+  'office-ambience.wav'
+);
 let elevenLabsConversationListCache = {
   fetchedAtMs: 0,
   agentId: '',
@@ -149,6 +174,14 @@ const agendaAppointmentIdByCallId = new Map();
 let nextGeneratedAgendaAppointmentId = 100000;
 const sequentialDispatchQueues = new Map();
 const sequentialDispatchQueueIdByCallId = new Map();
+const twilioConferenceSessionsById = new Map();
+const twilioConferenceSessionIdByCallSid = new Map();
+let lastKnownPublicBaseUrl = PUBLIC_BASE_URL;
+let twilioConferenceParticipantAppCache = {
+  sid: TWILIO_CONFERENCE_TWIML_APP_SID,
+  voiceUrl: '',
+  fetchedAtMs: 0,
+};
 let nextSequentialDispatchQueueId = 1;
 let supabaseClient = null;
 let smtpTransporter = null;
@@ -208,6 +241,7 @@ app.use(
     },
   })
 );
+app.use(express.urlencoded({ extended: false }));
 
 app.use((req, _res, next) => {
   const requestPath = String(req.path || '');
@@ -259,6 +293,215 @@ function clipText(value, maxLength = 500) {
   if (!Number.isFinite(Number(maxLength)) || Number(maxLength) <= 0) return '';
   const limit = Math.floor(Number(maxLength));
   return text.length > limit ? text.slice(0, limit) : text;
+}
+
+function xmlEscape(value) {
+  return escapeHtml(value);
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function createShortId(prefix = '') {
+  const suffix = crypto.randomUUID().replace(/-/g, '');
+  return prefix ? `${prefix}${suffix}` : suffix;
+}
+
+function inferPublicBaseUrlFromReq(req) {
+  const explicit = normalizeString(PUBLIC_BASE_URL);
+  if (explicit) return explicit.replace(/\/+$/, '');
+
+  const host = normalizeString(req?.get?.('x-forwarded-host') || req?.get?.('host') || req?.headers?.host || '');
+  if (!host) return '';
+  const proto =
+    normalizeString(req?.get?.('x-forwarded-proto') || req?.protocol || '').toLowerCase() ||
+    (host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  return `${proto}://${host}`.replace(/\/+$/, '');
+}
+
+function rememberPublicBaseUrl(value) {
+  const normalized = normalizeString(value);
+  if (!normalized) return '';
+  lastKnownPublicBaseUrl = normalized.replace(/\/+$/, '');
+  return lastKnownPublicBaseUrl;
+}
+
+function getResolvedPublicBaseUrl(options = {}) {
+  const explicit = normalizeString(options.publicBaseUrl || '');
+  if (explicit) return explicit.replace(/\/+$/, '');
+  if (PUBLIC_BASE_URL) return PUBLIC_BASE_URL.replace(/\/+$/, '');
+  if (lastKnownPublicBaseUrl) return lastKnownPublicBaseUrl.replace(/\/+$/, '');
+  return '';
+}
+
+function normalizeColdcallingProvider(value) {
+  const normalized = normalizeString(value || '').toLowerCase();
+  return ALLOWED_COLDCALLING_PROVIDERS.has(normalized) ? normalized : 'elevenlabs';
+}
+
+function buildTwilioBasicAuthHeader() {
+  const token = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+  return `Basic ${token}`;
+}
+
+function buildTwilioApiUrl(relativePath) {
+  const pathValue = String(relativePath || '').replace(/^\/+/, '');
+  return `https://api.twilio.com/2010-04-01/${pathValue}`;
+}
+
+async function twilioApiRequest(relativePath, options = {}) {
+  const method = normalizeString(options.method || 'GET').toUpperCase() || 'GET';
+  const headers = {
+    Authorization: buildTwilioBasicAuthHeader(),
+    ...(options.headers && typeof options.headers === 'object' ? options.headers : {}),
+  };
+  let body = options.body;
+
+  if (options.form && typeof options.form === 'object') {
+    const formBody = new URLSearchParams();
+    Object.entries(options.form).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      formBody.append(key, String(value));
+    });
+    body = formBody.toString();
+    headers['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
+  }
+
+  const response = await fetch(buildTwilioApiUrl(relativePath), {
+    method,
+    headers,
+    body,
+  });
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+
+  if (!response.ok) {
+    const err = new Error(
+      normalizeString(data?.message || data?.detail || data?.error || '') ||
+        `Twilio API fout (${response.status})`
+    );
+    err.status = response.status;
+    err.data = data;
+    err.endpoint = buildTwilioApiUrl(relativePath);
+    throw err;
+  }
+
+  return { response, data };
+}
+
+function buildTwilioConferenceSession(lead, campaign, normalizedPhone, publicBaseUrl) {
+  const sessionId = createShortId('twconf_');
+  const conferenceName = `softora-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    sessionId,
+    conferenceName,
+    publicBaseUrl: normalizeString(publicBaseUrl || ''),
+    lead: {
+      name: normalizeString(lead?.name),
+      company: normalizeString(lead?.company),
+      phone: normalizeString(lead?.phone),
+      region: normalizeString(lead?.region),
+      phoneE164: normalizedPhone,
+    },
+    campaign: {
+      sector: normalizeString(campaign?.sector),
+      region: normalizeString(campaign?.region),
+      minProjectValue: parseNumberSafe(campaign?.minProjectValue, null),
+      maxDiscountPct: parseNumberSafe(campaign?.maxDiscountPct, null),
+      extraInstructions: normalizeString(campaign?.extraInstructions),
+      dispatchMode: normalizeString(campaign?.dispatchMode),
+      dispatchDelaySeconds: parseNumberSafe(campaign?.dispatchDelaySeconds, 0),
+    },
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    status: 'queued',
+    startedAt: '',
+    endedAt: '',
+    durationSeconds: null,
+    recordingUrl: '',
+    endedReason: '',
+    prospectCallSid: '',
+    aiCallSid: '',
+    ambienceCallSid: '',
+    auxParticipantsStarted: false,
+    auxParticipantsStarting: false,
+    auxParticipantsStartFailed: false,
+    ambienceStartWarning: '',
+  };
+}
+
+function getTwilioConferenceSession(sessionId) {
+  const normalizedId = normalizeString(sessionId);
+  if (!normalizedId) return null;
+  return twilioConferenceSessionsById.get(normalizedId) || null;
+}
+
+function setTwilioConferenceSession(session) {
+  if (!session || !normalizeString(session.sessionId)) return null;
+  session.updatedAt = nowIso();
+  twilioConferenceSessionsById.set(session.sessionId, session);
+  return session;
+}
+
+function trackTwilioConferenceCallSid(sessionId, callSid) {
+  const normalizedSessionId = normalizeString(sessionId);
+  const normalizedCallSid = normalizeString(callSid);
+  if (!normalizedSessionId || !normalizedCallSid) return;
+  twilioConferenceSessionIdByCallSid.set(normalizedCallSid, normalizedSessionId);
+}
+
+function getTwilioConferenceSessionByCallSid(callSid) {
+  const normalizedCallSid = normalizeString(callSid);
+  if (!normalizedCallSid) return null;
+  const sessionId = twilioConferenceSessionIdByCallSid.get(normalizedCallSid);
+  return sessionId ? getTwilioConferenceSession(sessionId) : null;
+}
+
+function buildTwilioConferenceCallUpdate(session, patch = {}) {
+  if (!session) return null;
+  const terminal = Boolean(
+    normalizeString(patch.endedReason || session.endedReason) ||
+      /(completed|busy|failed|no-answer|no answer|canceled|cancelled|disconnected)/i.test(
+        normalizeString(patch.status || session.status)
+      )
+  );
+  const endedAt = terminal
+    ? normalizeString(patch.endedAt || session.endedAt || nowIso())
+    : normalizeString(patch.endedAt || session.endedAt || '');
+
+  return {
+    callId: normalizeString(session.sessionId),
+    phone: normalizeString(session.lead?.phoneE164 || session.lead?.phone),
+    company: normalizeString(session.lead?.company),
+    name: normalizeString(session.lead?.name),
+    status: normalizeString(patch.status || session.status),
+    messageType: normalizeString(patch.messageType || 'twilio.conference'),
+    summary: normalizeString(patch.summary || ''),
+    transcriptSnippet: normalizeString(patch.transcriptSnippet || ''),
+    transcriptFull: normalizeString(patch.transcriptFull || ''),
+    endedReason: normalizeString(patch.endedReason || session.endedReason),
+    startedAt: normalizeString(patch.startedAt || session.startedAt || session.createdAt),
+    endedAt,
+    durationSeconds: Number.isFinite(Number(patch.durationSeconds))
+      ? Math.max(0, Math.round(Number(patch.durationSeconds)))
+      : Number.isFinite(Number(session.durationSeconds))
+        ? Math.max(0, Math.round(Number(session.durationSeconds)))
+        : null,
+    recordingUrl: normalizeString(patch.recordingUrl || session.recordingUrl || ''),
+    updatedAt: nowIso(),
+    updatedAtMs: Date.now(),
+    provider: 'twilio_conference',
+  };
+}
+
+function hasBundledTwilioAmbienceAudio() {
+  return fs.existsSync(TWILIO_AMBIENCE_AUDIO_FILE_PATH);
 }
 
 function isSupabaseConfigured() {
@@ -1622,6 +1865,10 @@ function getRequiredElevenLabsEnv() {
   return ['ELEVENLABS_API_KEY', 'ELEVENLABS_PHONE_NUMBER_ID'];
 }
 
+function getRequiredTwilioConferenceEnv() {
+  return ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_OUTBOUND_CALLER_NUMBER', 'TWILIO_MEDIA_WS_URL'];
+}
+
 function getConfiguredElevenLabsAgentId() {
   return normalizeString(process.env.ELEVENLABS_AGENT_ID || DEFAULT_ELEVENLABS_AGENT_ID);
 }
@@ -1631,14 +1878,21 @@ function isElevenLabsColdcallingConfigured() {
 }
 
 function getColdcallingProvider() {
-  // Coldcalling runtime is intentionally locked to ElevenLabs to keep voice, LLM,
-  // and transcriber on one provider and avoid legacy Vapi regressions.
-  return COLDCALLING_PROVIDER_LOCK;
+  return normalizeColdcallingProvider(COLDCALLING_PROVIDER_LOCK);
 }
 
 function getMissingEnvVars(provider = getColdcallingProvider()) {
   if (provider === 'elevenlabs') {
     return getRequiredElevenLabsEnv().filter((key) => !process.env[key]);
+  }
+  if (provider === 'twilio_conference') {
+    return getRequiredTwilioConferenceEnv().filter((key) => {
+      if (key === 'TWILIO_MEDIA_WS_URL') return !normalizeString(TWILIO_MEDIA_WS_URL);
+      if (key === 'TWILIO_OUTBOUND_CALLER_NUMBER') return !normalizeString(TWILIO_OUTBOUND_CALLER_NUMBER);
+      if (key === 'TWILIO_ACCOUNT_SID') return !normalizeString(TWILIO_ACCOUNT_SID);
+      if (key === 'TWILIO_AUTH_TOKEN') return !normalizeString(TWILIO_AUTH_TOKEN);
+      return !normalizeString(process.env[key]);
+    });
   }
   return getRequiredVapiEnv().filter((key) => !process.env[key]);
 }
@@ -4883,6 +5137,331 @@ function buildElevenLabsConversationInitiationData(lead, campaign, normalizedPho
   };
 }
 
+function buildTwilioConferenceParticipantVoiceUrl(baseUrl) {
+  return `${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/participant`;
+}
+
+function buildTwilioConferenceAmbienceAudioUrl(baseUrl) {
+  return normalizeString(TWILIO_AMBIENCE_AUDIO_URL) || `${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/ambience-audio`;
+}
+
+function buildTwilioConferenceCalleeUrl(baseUrl, sessionId) {
+  const url = new URL(`${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/callee`);
+  url.searchParams.set('sessionId', normalizeString(sessionId));
+  return url.toString();
+}
+
+function buildTwilioConferenceCallStatusUrl(baseUrl, sessionId, role) {
+  const url = new URL(`${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/call-status`);
+  url.searchParams.set('sessionId', normalizeString(sessionId));
+  url.searchParams.set('role', normalizeString(role));
+  return url.toString();
+}
+
+function buildTwilioConferenceEventUrl(baseUrl, sessionId) {
+  const url = new URL(`${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/event`);
+  url.searchParams.set('sessionId', normalizeString(sessionId));
+  return url.toString();
+}
+
+async function ensureTwilioConferenceParticipantApp(baseUrl) {
+  const normalizedBaseUrl = normalizeString(baseUrl).replace(/\/+$/, '');
+  if (!normalizedBaseUrl) {
+    throw new Error('PUBLIC_BASE_URL ontbreekt; Twilio conference participant app kan niet worden geconfigureerd.');
+  }
+
+  const desiredVoiceUrl = buildTwilioConferenceParticipantVoiceUrl(normalizedBaseUrl);
+  if (
+    normalizeString(twilioConferenceParticipantAppCache.sid) &&
+    normalizeString(twilioConferenceParticipantAppCache.voiceUrl) === desiredVoiceUrl
+  ) {
+    return twilioConferenceParticipantAppCache.sid;
+  }
+
+  let appSid = normalizeString(TWILIO_CONFERENCE_TWIML_APP_SID || twilioConferenceParticipantAppCache.sid);
+  if (appSid) {
+    await twilioApiRequest(`Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Applications/${encodeURIComponent(appSid)}.json`, {
+      method: 'POST',
+      form: {
+        FriendlyName: TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME,
+        VoiceUrl: desiredVoiceUrl,
+        VoiceMethod: 'POST',
+      },
+    });
+    twilioConferenceParticipantAppCache = {
+      sid: appSid,
+      voiceUrl: desiredVoiceUrl,
+      fetchedAtMs: Date.now(),
+    };
+    return appSid;
+  }
+
+  const { data: listData } = await twilioApiRequest(
+    `Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Applications.json?PageSize=50`,
+    { method: 'GET' }
+  );
+  const existingApps = Array.isArray(listData?.applications) ? listData.applications : [];
+  const existingApp = existingApps.find(
+    (item) => normalizeString(item?.friendly_name) === TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME
+  );
+
+  if (existingApp?.sid) {
+    appSid = normalizeString(existingApp.sid);
+    await twilioApiRequest(`Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Applications/${encodeURIComponent(appSid)}.json`, {
+      method: 'POST',
+      form: {
+        FriendlyName: TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME,
+        VoiceUrl: desiredVoiceUrl,
+        VoiceMethod: 'POST',
+      },
+    });
+    twilioConferenceParticipantAppCache = {
+      sid: appSid,
+      voiceUrl: desiredVoiceUrl,
+      fetchedAtMs: Date.now(),
+    };
+    return appSid;
+  }
+
+  const { data: createData } = await twilioApiRequest(
+    `Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Applications.json`,
+    {
+      method: 'POST',
+      form: {
+        FriendlyName: TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME,
+        VoiceUrl: desiredVoiceUrl,
+        VoiceMethod: 'POST',
+      },
+    }
+  );
+  appSid = normalizeString(createData?.sid);
+  if (!appSid) {
+    throw new Error('Twilio conference participant app kon niet worden aangemaakt.');
+  }
+  twilioConferenceParticipantAppCache = {
+    sid: appSid,
+    voiceUrl: desiredVoiceUrl,
+    fetchedAtMs: Date.now(),
+  };
+  return appSid;
+}
+
+async function createTwilioOutboundCall(options = {}) {
+  const {
+    to,
+    from = TWILIO_OUTBOUND_CALLER_NUMBER,
+    url,
+    statusCallback,
+    statusCallbackEvent = ['initiated', 'ringing', 'answered', 'completed'],
+    machineDetection = '',
+  } = options;
+
+  const form = {
+    To: normalizeString(to),
+    From: normalizeString(from),
+    Url: normalizeString(url),
+    Method: normalizeString(options.method || 'POST'),
+    StatusCallback: normalizeString(statusCallback),
+    StatusCallbackMethod: normalizeString(options.statusCallbackMethod || 'POST'),
+  };
+  if (Array.isArray(statusCallbackEvent) && statusCallbackEvent.length > 0) {
+    form.StatusCallbackEvent = statusCallbackEvent.join(' ');
+  }
+  if (normalizeString(machineDetection)) {
+    form.MachineDetection = normalizeString(machineDetection);
+  }
+
+  const { data } = await twilioApiRequest(`Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Calls.json`, {
+    method: 'POST',
+    form,
+  });
+  return data;
+}
+
+async function createTwilioConferenceParticipant(conferenceName, options = {}) {
+  const form = {
+    From: normalizeString(options.from || TWILIO_OUTBOUND_CALLER_NUMBER),
+    To: normalizeString(options.to),
+    Label: normalizeString(options.label),
+    Beep: normalizeString(options.beep || 'false'),
+    StartConferenceOnEnter: options.startConferenceOnEnter === false ? 'false' : 'true',
+    EndConferenceOnExit: options.endConferenceOnExit ? 'true' : 'false',
+    JitterBufferSize: normalizeString(options.jitterBufferSize || 'off'),
+    StatusCallback: normalizeString(options.statusCallback),
+    StatusCallbackMethod: normalizeString(options.statusCallbackMethod || 'POST'),
+  };
+
+  if (options.coaching) {
+    form.Coaching = 'true';
+  }
+  if (normalizeString(options.callSidToCoach)) {
+    form.CallSidToCoach = normalizeString(options.callSidToCoach);
+  }
+  if (Array.isArray(options.statusCallbackEvent) && options.statusCallbackEvent.length > 0) {
+    form.StatusCallbackEvent = options.statusCallbackEvent.join(' ');
+  }
+  if (options.earlyMedia === true) {
+    form.EarlyMedia = 'true';
+  }
+
+  const { data } = await twilioApiRequest(
+    `Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Conferences/${encodeURIComponent(conferenceName)}/Participants.json`,
+    {
+      method: 'POST',
+      form,
+    }
+  );
+  return data;
+}
+
+function buildTwilioConferenceAiAppTarget(appSid, sessionId) {
+  return `app:${encodeURIComponent(appSid)}?mode=ai&sessionId=${encodeURIComponent(sessionId)}`;
+}
+
+function buildTwilioConferenceAmbienceAppTarget(appSid, sessionId) {
+  return `app:${encodeURIComponent(appSid)}?mode=ambience&sessionId=${encodeURIComponent(sessionId)}`;
+}
+
+async function ensureTwilioConferenceAuxParticipantsStarted(sessionId) {
+  const session = getTwilioConferenceSession(sessionId);
+  if (!session) return null;
+  if (session.auxParticipantsStarted) return session;
+  if (session.auxParticipantsStarting) return session;
+  if (!normalizeString(session.publicBaseUrl)) {
+    throw new Error(`Twilio conference session ${sessionId} mist publicBaseUrl.`);
+  }
+  if (!normalizeString(session.prospectCallSid)) {
+    throw new Error(`Twilio conference session ${sessionId} mist prospectCallSid.`);
+  }
+
+  session.auxParticipantsStarting = true;
+  setTwilioConferenceSession(session);
+
+  try {
+    const participantAppSid = await ensureTwilioConferenceParticipantApp(session.publicBaseUrl);
+
+    const aiData = await createTwilioConferenceParticipant(session.conferenceName, {
+      to: buildTwilioConferenceAiAppTarget(participantAppSid, session.sessionId),
+      label: 'ai',
+      endConferenceOnExit: true,
+      jitterBufferSize: 'off',
+      earlyMedia: true,
+      statusCallback: buildTwilioConferenceCallStatusUrl(session.publicBaseUrl, session.sessionId, 'ai'),
+      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+    });
+    session.aiCallSid = normalizeString(aiData?.call_sid || aiData?.callSid || aiData?.sid);
+    trackTwilioConferenceCallSid(session.sessionId, session.aiCallSid);
+
+    try {
+      const ambienceData = await createTwilioConferenceParticipant(session.conferenceName, {
+        to: buildTwilioConferenceAmbienceAppTarget(participantAppSid, session.sessionId),
+        label: 'ambience',
+        endConferenceOnExit: false,
+        jitterBufferSize: 'off',
+        coaching: true,
+        earlyMedia: true,
+        callSidToCoach: session.prospectCallSid,
+        statusCallback: buildTwilioConferenceCallStatusUrl(session.publicBaseUrl, session.sessionId, 'ambience'),
+        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+      });
+      session.ambienceCallSid = normalizeString(
+        ambienceData?.call_sid || ambienceData?.callSid || ambienceData?.sid
+      );
+      trackTwilioConferenceCallSid(session.sessionId, session.ambienceCallSid);
+    } catch (error) {
+      session.ambienceStartWarning = normalizeString(error?.message || 'ambience participant start failed');
+      console.warn(
+        '[Twilio Conference][AmbienceParticipantWarning]',
+        JSON.stringify(
+          {
+            sessionId: session.sessionId,
+            message: error?.message || 'Onbekende fout',
+            status: error?.status || null,
+          },
+          null,
+          2
+        )
+      );
+    }
+
+    session.auxParticipantsStarted = true;
+    session.auxParticipantsStartFailed = false;
+    setTwilioConferenceSession(session);
+    return session;
+  } catch (error) {
+    session.auxParticipantsStartFailed = true;
+    session.endedReason = normalizeString(error?.message || 'conference participant start failed');
+    setTwilioConferenceSession(session);
+
+    if (normalizeString(session.prospectCallSid)) {
+      try {
+        await twilioApiRequest(`Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Calls/${encodeURIComponent(session.prospectCallSid)}.json`, {
+          method: 'POST',
+          form: { Status: 'completed' },
+        });
+      } catch (hangupError) {
+        console.error(
+          '[Twilio Conference][ProspectHangupAfterAuxFailure]',
+          JSON.stringify(
+            {
+              sessionId: session.sessionId,
+              message: hangupError?.message || 'Onbekende fout',
+            },
+            null,
+            2
+          )
+        );
+      }
+    }
+    throw error;
+  } finally {
+    session.auxParticipantsStarting = false;
+    setTwilioConferenceSession(session);
+  }
+}
+
+async function createTwilioConferenceColdcallingLead(lead, campaign) {
+  const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
+  const publicBaseUrl = getResolvedPublicBaseUrl();
+  if (!publicBaseUrl) {
+    throw new Error('PUBLIC_BASE_URL ontbreekt; kan Twilio callbacks/TwiML niet betrouwbaar configureren.');
+  }
+
+  await ensureTwilioConferenceParticipantApp(publicBaseUrl);
+
+  const session = buildTwilioConferenceSession(lead, campaign, normalizedPhone, publicBaseUrl);
+  setTwilioConferenceSession(session);
+
+  const prospectCallData = await createTwilioOutboundCall({
+    to: normalizedPhone,
+    url: buildTwilioConferenceCalleeUrl(publicBaseUrl, session.sessionId),
+    statusCallback: buildTwilioConferenceCallStatusUrl(publicBaseUrl, session.sessionId, 'prospect'),
+    statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+  });
+
+  session.prospectCallSid = normalizeString(
+    prospectCallData?.sid || prospectCallData?.call_sid || prospectCallData?.callSid
+  );
+  session.status = normalizeString(prospectCallData?.status || 'queued') || 'queued';
+  session.startedAt = nowIso();
+  setTwilioConferenceSession(session);
+  trackTwilioConferenceCallSid(session.sessionId, session.prospectCallSid);
+
+  upsertRecentCallUpdate(
+    buildTwilioConferenceCallUpdate(session, {
+      messageType: 'twilio.conference.start',
+      status: session.status,
+      startedAt: session.startedAt,
+    })
+  );
+
+  return {
+    session,
+    normalizedPhone,
+    data: prospectCallData,
+  };
+}
+
 function buildElevenLabsConversationUpdate(callId, details, fallback = {}) {
   const metadata = details?.metadata && typeof details.metadata === 'object' ? details.metadata : {};
   const transcriptFull = extractElevenLabsTranscriptText(details?.transcript);
@@ -5381,7 +5960,74 @@ async function processElevenLabsColdcallingLead(lead, campaign, index) {
   }
 }
 
+async function processTwilioConferenceColdcallingLead(lead, campaign, index) {
+  try {
+    const { session, normalizedPhone, data } = await createTwilioConferenceColdcallingLead(lead, campaign);
+    return {
+      index,
+      success: true,
+      lead: {
+        name: normalizeString(lead.name),
+        company: normalizeString(lead.company),
+        phone: normalizeString(lead.phone),
+        region: normalizeString(lead.region),
+        phoneE164: normalizedPhone,
+      },
+      vapi: {
+        endpoint: '/twilio/conference/outbound',
+        callId: normalizeString(session.sessionId),
+        status: normalizeString(data?.status || session.status || 'queued'),
+      },
+      twilio: {
+        provider: 'twilio_conference',
+        sessionId: normalizeString(session.sessionId),
+        conferenceName: normalizeString(session.conferenceName),
+        prospectCallSid: normalizeString(session.prospectCallSid),
+        status: normalizeString(data?.status || session.status || 'queued'),
+      },
+    };
+  } catch (error) {
+    console.error(
+      '[Coldcalling][Lead Error]',
+      JSON.stringify(
+        {
+          provider: 'twilio_conference',
+          lead: {
+            name: normalizeString(lead?.name),
+            company: normalizeString(lead?.company),
+            phone: normalizeString(lead?.phone),
+          },
+          error: error?.message || 'Onbekende fout',
+          statusCode: error?.status || null,
+          responseBody: error?.data || null,
+        },
+        null,
+        2
+      )
+    );
+
+    return {
+      index,
+      success: false,
+      lead: {
+        name: normalizeString(lead?.name),
+        company: normalizeString(lead?.company),
+        phone: normalizeString(lead?.phone),
+        region: normalizeString(lead?.region),
+      },
+      error: error?.message || 'Onbekende fout',
+      statusCode: error?.status || null,
+      cause: 'twilio conference error',
+      causeExplanation: 'Twilio conference call kon niet worden gestart.',
+      details: error?.data || null,
+    };
+  }
+}
+
 async function processColdcallingLead(lead, campaign, index) {
+  if (getColdcallingProvider() === 'twilio_conference') {
+    return processTwilioConferenceColdcallingLead(lead, campaign, index);
+  }
   return processElevenLabsColdcallingLead(lead, campaign, index);
 }
 
@@ -5716,6 +6362,33 @@ async function sendColdcallingStatusResponse(res, callId) {
   const cached = callUpdatesById.get(callId) || null;
   const provider = getColdcallingProvider();
 
+  if (provider === 'twilio_conference') {
+    const session = getTwilioConferenceSession(callId) || getTwilioConferenceSessionByCallSid(callId);
+    const update =
+      cached ||
+      (session
+        ? buildTwilioConferenceCallUpdate(session, {
+            status: normalizeString(session.status || ''),
+            endedReason: normalizeString(session.endedReason || ''),
+          })
+        : null);
+    if (!update) {
+      return res.status(404).json({ ok: false, error: 'Twilio conference call niet gevonden.' });
+    }
+    return res.status(200).json({
+      ok: true,
+      source: 'cache',
+      provider: 'twilio_conference',
+      callId: normalizeString(update.callId || callId),
+      status: normalizeString(update.status || ''),
+      endedReason: normalizeString(update.endedReason || ''),
+      startedAt: normalizeString(update.startedAt || ''),
+      endedAt: normalizeString(update.endedAt || ''),
+      durationSeconds: parseNumberSafe(update.durationSeconds, null),
+      recordingUrl: normalizeString(update.recordingUrl || ''),
+    });
+  }
+
   if (provider === 'elevenlabs') {
     if (!normalizeString(process.env.ELEVENLABS_API_KEY)) {
       if (cached) {
@@ -5809,8 +6482,282 @@ async function sendColdcallingStatusResponse(res, callId) {
   }
 }
 
+function sendTwimlResponse(res, xml) {
+  res.status(200).set('Content-Type', 'text/xml; charset=utf-8').send(xml);
+}
+
+function buildTwilioConferenceAiParticipantTwiml(session) {
+  const dynamicValues = {
+    ...buildVariableValues(
+      {
+        ...session.lead,
+        phone: session.lead.phoneE164,
+      },
+      session.campaign
+    ),
+    phone: session.lead.phoneE164,
+    callId: session.sessionId,
+  };
+
+  const parameterXml = Object.entries(dynamicValues)
+    .filter(([, value]) => value !== undefined && value !== null && normalizeString(value) !== '')
+    .map(
+      ([key, value]) =>
+        `      <Parameter name="${xmlEscape(key)}" value="${xmlEscape(String(value))}" />`
+    )
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Connect>
+    <Stream url="${xmlEscape(TWILIO_MEDIA_WS_URL)}">
+${parameterXml}
+    </Stream>
+  </Connect>
+</Response>`;
+}
+
+function buildTwilioConferenceAmbienceTwiml(session) {
+  const audioUrl = buildTwilioConferenceAmbienceAudioUrl(session.publicBaseUrl);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Play loop="0">${xmlEscape(audioUrl)}</Play>
+</Response>`;
+}
+
+function buildTwilioConferenceCalleeTwiml(session) {
+  const conferenceStatusUrl = buildTwilioConferenceEventUrl(session.publicBaseUrl, session.sessionId);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial>
+    <Conference
+      beep="false"
+      endConferenceOnExit="true"
+      jitterBufferSize="off"
+      startConferenceOnEnter="true"
+      statusCallback="${xmlEscape(conferenceStatusUrl)}"
+      statusCallbackEvent="start end join leave"
+    >${xmlEscape(session.conferenceName)}</Conference>
+  </Dial>
+</Response>`;
+}
+
+function parseTwilioConferenceCallStatus(req) {
+  const callSid = normalizeString(req.body?.CallSid || req.query?.CallSid);
+  const callStatus = normalizeString(req.body?.CallStatus || req.query?.CallStatus).toLowerCase();
+  const callDuration = parseNumberSafe(req.body?.CallDuration || req.query?.CallDuration, null);
+  const answeredBy = normalizeString(req.body?.AnsweredBy || req.query?.AnsweredBy);
+  const role = normalizeString(req.query?.role || req.body?.role).toLowerCase();
+  const sessionId =
+    normalizeString(req.query?.sessionId || req.body?.sessionId) ||
+    normalizeString(twilioConferenceSessionIdByCallSid.get(callSid) || '');
+
+  return {
+    callSid,
+    callStatus,
+    callDuration,
+    answeredBy,
+    role,
+    sessionId,
+  };
+}
+
+app.all('/api/twilio/conference/callee', (req, res) => {
+  const publicBaseUrl = rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
+  const sessionId = normalizeString(req.query?.sessionId || req.body?.sessionId);
+  const session = getTwilioConferenceSession(sessionId);
+  if (!session) {
+    return sendTwimlResponse(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Hangup />
+</Response>`
+    );
+  }
+  if (publicBaseUrl && !session.publicBaseUrl) {
+    session.publicBaseUrl = publicBaseUrl;
+    setTwilioConferenceSession(session);
+  }
+  return sendTwimlResponse(res, buildTwilioConferenceCalleeTwiml(session));
+});
+
+app.all('/api/twilio/conference/participant', (req, res) => {
+  const publicBaseUrl = rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
+  const mode = normalizeString(req.query?.mode || req.body?.mode).toLowerCase();
+  const sessionId = normalizeString(req.query?.sessionId || req.body?.sessionId);
+  const session = getTwilioConferenceSession(sessionId);
+  if (!session) {
+    return sendTwimlResponse(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Hangup />
+</Response>`
+    );
+  }
+  if (publicBaseUrl && !session.publicBaseUrl) {
+    session.publicBaseUrl = publicBaseUrl;
+    setTwilioConferenceSession(session);
+  }
+  if (mode === 'ai') {
+    return sendTwimlResponse(res, buildTwilioConferenceAiParticipantTwiml(session));
+  }
+  if (mode === 'ambience') {
+    return sendTwimlResponse(res, buildTwilioConferenceAmbienceTwiml(session));
+  }
+  return sendTwimlResponse(
+    res,
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Hangup />
+</Response>`
+  );
+});
+
+app.get('/api/twilio/conference/ambience-audio', (req, res) => {
+  rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
+  if (!fs.existsSync(TWILIO_AMBIENCE_AUDIO_FILE_PATH)) {
+    return res.status(404).send('not found');
+  }
+  res.set('Content-Type', 'audio/mpeg');
+  res.set('Cache-Control', 'public, max-age=3600');
+  return res.sendFile(TWILIO_AMBIENCE_AUDIO_FILE_PATH);
+});
+
+app.post('/api/twilio/conference/call-status', (req, res) => {
+  rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
+  const { callSid, callStatus, callDuration, answeredBy, role, sessionId } =
+    parseTwilioConferenceCallStatus(req);
+  const session = getTwilioConferenceSession(sessionId) || getTwilioConferenceSessionByCallSid(callSid);
+
+  if (!session) {
+    return res.status(200).send('ok');
+  }
+
+  if (callSid) {
+    trackTwilioConferenceCallSid(session.sessionId, callSid);
+  }
+  if (role === 'prospect' && callSid && !session.prospectCallSid) {
+    session.prospectCallSid = callSid;
+  }
+  if (role === 'ai' && callSid && !session.aiCallSid) {
+    session.aiCallSid = callSid;
+  }
+  if (role === 'ambience' && callSid && !session.ambienceCallSid) {
+    session.ambienceCallSid = callSid;
+  }
+
+  if (role === 'prospect' && callStatus) {
+    session.status = callStatus;
+    if ((callStatus === 'in-progress' || callStatus === 'answered') && !normalizeString(session.startedAt)) {
+      session.startedAt = nowIso();
+    }
+    if (callStatus === 'completed' || callStatus === 'busy' || callStatus === 'failed' || callStatus === 'no-answer' || callStatus === 'canceled' || callStatus === 'cancelled') {
+      session.endedReason = callStatus;
+      session.endedAt = session.endedAt || nowIso();
+    }
+  }
+  if (Number.isFinite(callDuration) && callDuration >= 0) {
+    session.durationSeconds = Math.max(0, Math.round(callDuration));
+  }
+  setTwilioConferenceSession(session);
+
+  const update = buildTwilioConferenceCallUpdate(session, {
+    status: role === 'prospect' ? callStatus || session.status : session.status,
+    endedReason:
+      role === 'prospect' && /^(completed|busy|failed|no-answer|canceled|cancelled)$/i.test(callStatus)
+        ? callStatus
+        : '',
+    durationSeconds: Number.isFinite(callDuration) ? callDuration : null,
+    messageType: `twilio.conference.${role || 'participant'}.status`,
+  });
+  const upserted = upsertRecentCallUpdate(update);
+  if (upserted && role === 'prospect' && normalizeString(upserted.endedReason || '')) {
+    triggerPostCallAutomation(upserted);
+  }
+
+  res.status(200).send('ok');
+
+  if (role === 'prospect' && (callStatus === 'in-progress' || callStatus === 'answered')) {
+    void ensureTwilioConferenceAuxParticipantsStarted(session.sessionId).catch((error) => {
+      console.error(
+        '[Twilio Conference][AuxStartError]',
+        JSON.stringify(
+          {
+            sessionId: session.sessionId,
+            callSid: session.prospectCallSid,
+            answeredBy,
+            message: error?.message || 'Onbekende fout',
+            status: error?.status || null,
+          },
+          null,
+          2
+        )
+      );
+    });
+  }
+});
+
+app.post('/api/twilio/conference/event', (req, res) => {
+  rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
+  const sessionId = normalizeString(req.query?.sessionId || req.body?.sessionId);
+  const statusCallbackEvent = normalizeString(req.body?.StatusCallbackEvent || req.body?.statusCallbackEvent).toLowerCase();
+  const conferenceSid = normalizeString(req.body?.ConferenceSid || '');
+  const callSid = normalizeString(req.body?.CallSid || '');
+  const session = getTwilioConferenceSession(sessionId) || getTwilioConferenceSessionByCallSid(callSid);
+  if (!session) {
+    return res.status(200).send('ok');
+  }
+
+  if (statusCallbackEvent === 'conference-end') {
+    session.status = 'completed';
+    session.endedReason = session.endedReason || 'conference-end';
+    session.endedAt = session.endedAt || nowIso();
+    if (!Number.isFinite(Number(session.durationSeconds)) && normalizeString(session.startedAt) && normalizeString(session.endedAt)) {
+      const durationSeconds = Math.round(
+        Math.max(0, Date.parse(session.endedAt) - Date.parse(session.startedAt)) / 1000
+      );
+      session.durationSeconds = Number.isFinite(durationSeconds) ? durationSeconds : null;
+    }
+    setTwilioConferenceSession(session);
+    const update = upsertRecentCallUpdate(
+      buildTwilioConferenceCallUpdate(session, {
+        status: 'completed',
+        endedReason: session.endedReason,
+        endedAt: session.endedAt,
+        durationSeconds: session.durationSeconds,
+        messageType: 'twilio.conference.event',
+      })
+    );
+    if (update) {
+      triggerPostCallAutomation(update);
+    }
+  }
+
+  console.log(
+    '[Twilio Conference][Event]',
+    JSON.stringify(
+      {
+        sessionId: session.sessionId,
+        conferenceSid,
+        callSid,
+        statusCallbackEvent,
+      },
+      null,
+      2
+    )
+  );
+
+  return res.status(200).send('ok');
+});
+
 app.post('/api/coldcalling/start', async (req, res) => {
   const provider = getColdcallingProvider();
+  const inferredPublicBaseUrl = inferPublicBaseUrlFromReq(req);
+  if (inferredPublicBaseUrl) {
+    rememberPublicBaseUrl(inferredPublicBaseUrl);
+  }
   if (provider === 'elevenlabs') {
     void ensureElevenLabsInboundRouting({ reason: 'coldcalling-start' });
   }
@@ -5822,7 +6769,9 @@ app.post('/api/coldcalling/start', async (req, res) => {
       error:
         provider === 'elevenlabs'
           ? 'Server mist vereiste environment variables voor ElevenLabs outbound calling.'
-          : 'Server mist vereiste environment variables voor Vapi.',
+          : provider === 'twilio_conference'
+            ? 'Server mist vereiste environment variables voor Twilio conference coldcalling.'
+            : 'Server mist vereiste environment variables voor Vapi.',
       missingEnv,
       provider,
     });
@@ -7441,9 +8390,13 @@ app.get('/healthz', async (req, res) => {
           forceRelink: repairTelephony,
         })
       : null;
+  const ambienceSource =
+    provider === 'twilio_conference'
+      ? normalizeString(TWILIO_AMBIENCE_AUDIO_URL) || (hasBundledTwilioAmbienceAudio() ? '/api/twilio/conference/ambience-audio' : '')
+      : '';
   res.status(200).json({
     ok: true,
-    service: 'softora-vapi-coldcalling-backend',
+    service: 'softora-coldcalling-backend',
     coldcalling: {
       provider,
       providerLocked: true,
@@ -7454,6 +8407,7 @@ app.get('/healthz', async (req, res) => {
       explicitBlockedTargetsCount,
       telephony,
       missingEnv: getMissingEnvVars(provider),
+      ambienceSource: ambienceSource || null,
     },
     supabase: {
       enabled: isSupabaseConfigured(),
@@ -7479,9 +8433,13 @@ app.get('/api/healthz', async (req, res) => {
           forceRelink: repairTelephony,
         })
       : null;
+  const ambienceSource =
+    provider === 'twilio_conference'
+      ? normalizeString(TWILIO_AMBIENCE_AUDIO_URL) || (hasBundledTwilioAmbienceAudio() ? '/api/twilio/conference/ambience-audio' : '')
+      : '';
   res.status(200).json({
     ok: true,
-    service: 'softora-vapi-coldcalling-backend',
+    service: 'softora-coldcalling-backend',
     coldcalling: {
       provider,
       providerLocked: true,
@@ -7492,6 +8450,7 @@ app.get('/api/healthz', async (req, res) => {
       explicitBlockedTargetsCount,
       telephony,
       missingEnv: getMissingEnvVars(provider),
+      ambienceSource: ambienceSource || null,
     },
     supabase: {
       enabled: isSupabaseConfigured(),
@@ -7844,16 +8803,20 @@ function seedDemoConfirmationTaskForUiTesting() {
 // demo-taak ook bij module-load. De functie is idempotent op basis van callId.
 seedDemoConfirmationTaskForUiTesting();
 void ensureRuntimeStateHydratedFromSupabase();
-void ensureElevenLabsInboundRouting({ reason: 'module-load', force: true }).catch((error) => {
-  console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
-});
+if (getColdcallingProvider() === 'elevenlabs') {
+  void ensureElevenLabsInboundRouting({ reason: 'module-load', force: true }).catch((error) => {
+    console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
+  });
+}
 
 function startServer() {
   seedDemoConfirmationTaskForUiTesting();
   void ensureRuntimeStateHydratedFromSupabase();
-  void ensureElevenLabsInboundRouting({ reason: 'startup', force: true }).catch((error) => {
-    console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
-  });
+  if (getColdcallingProvider() === 'elevenlabs') {
+    void ensureElevenLabsInboundRouting({ reason: 'startup', force: true }).catch((error) => {
+      console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
+    });
+  }
   app.listen(PORT, () => {
     const provider = getColdcallingProvider();
     console.log(`Softora coldcalling backend draait op http://localhost:${PORT} (provider: ${provider})`);
@@ -7869,6 +8832,9 @@ function startServer() {
       );
     } else {
       console.log('[Startup] Supabase state persistence uit (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY ontbreken).');
+    }
+    if (provider === 'twilio_conference' && !normalizeString(TWILIO_AMBIENCE_AUDIO_URL) && !hasBundledTwilioAmbienceAudio()) {
+      console.warn('[Startup] Geen ambience audio bron gevonden voor twilio_conference. Zet TWILIO_AMBIENCE_AUDIO_URL of voeg het bundled bestand toe.');
     }
   });
 }

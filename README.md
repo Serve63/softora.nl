@@ -1,4 +1,51 @@
-# Softora AI Coldcalling Dashboard + Vapi (Outbound Calls)
+# Softora AI Coldcalling Dashboard
+
+Huidige coldcalling-architecturen in deze repo:
+
+- `elevenlabs`:
+  native ElevenLabs outbound telephony vanuit `server.js`
+- `twilio_conference`:
+  Twilio outbound prospect call -> Twilio Conference -> AI participant via Twilio Media Stream bridge -> ElevenLabs WebSocket
+  plus een aparte coached ambience participant alleen voor de prospect
+
+De actieve runtime-provider wordt bepaald door `COLDCALLING_PROVIDER`.
+
+## Twilio Conference + Ambience flow
+
+Als je `COLDCALLING_PROVIDER=twilio_conference` gebruikt, is dit de vereiste setup:
+
+```env
+COLDCALLING_PROVIDER=twilio_conference
+PUBLIC_BASE_URL=https://jouw-backend.onrender.com
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_OUTBOUND_CALLER_NUMBER=+31xxxxxxxxx
+TWILIO_MEDIA_WS_URL=wss://twilio-media-bridge.onrender.com/twilio-media
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
+ELEVENLABS_AGENT_ID=your_elevenlabs_agent_id
+```
+
+Optioneel:
+
+```env
+# Alleen nodig als je een vaste bestaande TwiML App wilt forceren
+TWILIO_CONFERENCE_TWIML_APP_SID=APxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Alleen nodig als je niet het bundled office audio bestand wilt gebruiken
+TWILIO_AMBIENCE_AUDIO_URL=https://jouw-backend.onrender.com/api/twilio/conference/ambience-audio
+```
+
+De backend:
+
+- maakt/update automatisch de TwiML App voor AI- en ambience-participants
+- start de prospect call
+- laat de prospect in een conference joinen
+- voegt daarna de AI participant toe via de bestaande Twilio media bridge
+- voegt daarna een coached ambience participant toe zodat alleen de prospect het kantoorgeluid hoort
+
+## Legacy achtergrond
+
+De oudere Vapi-teksten hieronder beschrijven de oorspronkelijke setup. De code ondersteunt die legacy stukken nog, maar de actieve coldcalling-flow wordt nu gekozen via `COLDCALLING_PROVIDER`.
 
 Deze setup voegt een kleine `Node.js + Express` backend toe aan je bestaande statische dashboard, zodat je frontend veilig via een backend Vapi outbound calls kan starten.
 

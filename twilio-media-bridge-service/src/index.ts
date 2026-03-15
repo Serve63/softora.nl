@@ -9,6 +9,8 @@ type BridgeSession = {
   twilioWs: WebSocket;
   streamSid: string;
   callSid: string;
+  customParameters: JsonObject;
+  conversationInitiationPayload: JsonObject | null;
   elevenWs: WebSocket | null;
   elevenConnecting: boolean;
   elevenConnectAttempts: number;
@@ -23,6 +25,7 @@ const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 200;
 const ELEVENLABS_AGENT_ID = normalizeString(process.env.ELEVENLABS_AGENT_ID);
 const ELEVENLABS_API_KEY = normalizeString(process.env.ELEVENLABS_API_KEY);
 const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io');
+const VERBOSE_MEDIA_LOGS = /^(1|true|yes)$/i.test(normalizeString(process.env.VERBOSE_MEDIA_LOGS || ''));
 
 let connectionCounter = 0;
 
@@ -33,6 +36,11 @@ function log(level: LogLevel, message: string, meta?: JsonObject): void {
     return;
   }
   console.log(`[${ts}] [${level}] ${message}`);
+}
+
+function logVerbose(message: string, meta?: JsonObject): void {
+  if (!VERBOSE_MEDIA_LOGS) return;
+  log('INFO', message, meta);
 }
 
 function normalizeString(value: unknown): string {
@@ -84,6 +92,46 @@ function getPathFromRequest(req: IncomingMessage): string {
   } catch {
     return '/';
   }
+}
+
+function buildDynamicVariablesFromTwilioCustomParameters(parameters: JsonObject): JsonObject {
+  const dynamicVariables: JsonObject = {};
+  for (const [key, value] of Object.entries(parameters || {})) {
+    const normalizedKey = normalizeString(key);
+    const normalizedValue = normalizeString(value);
+    if (!normalizedKey || !normalizedValue) continue;
+    dynamicVariables[normalizedKey] = normalizedValue;
+  }
+  return dynamicVariables;
+}
+
+function buildConversationInitiationPayload(parameters: JsonObject): JsonObject | null {
+  const dynamicVariables = buildDynamicVariablesFromTwilioCustomParameters(parameters);
+  if (Object.keys(dynamicVariables).length === 0) return null;
+  return {
+    type: 'conversation_initiation_client_data',
+    dynamic_variables: dynamicVariables,
+  };
+}
+
+function extractTwilioCustomParameters(value: unknown): JsonObject {
+  const raw = asObject(value);
+  if (!raw) return {};
+
+  const customParametersCandidate = asObject(raw.customParameters) || raw;
+  const out: JsonObject = {};
+  for (const [key, nestedValue] of Object.entries(customParametersCandidate)) {
+    const normalizedKey = normalizeString(key);
+    if (!normalizedKey) continue;
+    const objectValue = asObject(nestedValue);
+    const normalizedValue =
+      normalizeString(objectValue?.value) ||
+      normalizeString(objectValue?.Value) ||
+      normalizeString(nestedValue);
+    if (!normalizedValue) continue;
+    out[normalizedKey] = normalizedValue;
+  }
+  return out;
 }
 
 function safeParseJson(raw: string): { ok: true; value: JsonObject } | { ok: false; reason: string } {
@@ -206,7 +254,7 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
     return;
   }
 
-  log('INFO', 'audio returned to twilio', {
+  logVerbose('audio returned to twilio', {
     connectionId: session.connectionId,
     streamSid: session.streamSid,
     payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
@@ -268,7 +316,7 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
   if (elevenWs && elevenWs.readyState === WebSocket.OPEN) {
     const ok = safeSendWsJson(elevenWs, { user_audio_chunk: audioBase64 });
     if (ok) {
-      log('INFO', 'audio forwarded twilio -> elevenlabs', {
+      logVerbose('audio forwarded twilio -> elevenlabs', {
         connectionId: session.connectionId,
         streamSid: session.streamSid,
         payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
@@ -283,7 +331,7 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
   }
 
   session.bufferedUserAudioChunks.push(audioBase64);
-  log('INFO', 'audio buffered twilio -> elevenlabs (awaiting elevenlabs websocket)', {
+  logVerbose('audio buffered twilio -> elevenlabs (awaiting elevenlabs websocket)', {
     connectionId: session.connectionId,
     streamSid: session.streamSid,
     bufferedChunks: session.bufferedUserAudioChunks.length,
@@ -460,6 +508,17 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
       streamSid: session.streamSid,
       callSid: session.callSid,
     });
+    if (session.conversationInitiationPayload) {
+      const ok = safeSendWsJson(elevenWs, session.conversationInitiationPayload);
+      log(ok ? 'INFO' : 'WARN', 'elevenlabs conversation initiation payload sent', {
+        connectionId: session.connectionId,
+        streamSid: session.streamSid,
+        callSid: session.callSid,
+        dynamicVariableKeys: Object.keys(
+          asObject(session.conversationInitiationPayload.dynamic_variables) || {}
+        ),
+      });
+    }
     flushBufferedAudioToElevenLabs(session);
   });
 
@@ -532,6 +591,8 @@ wss.on('connection', (ws, req) => {
     twilioWs: ws,
     streamSid: '',
     callSid: '',
+    customParameters: {},
+    conversationInitiationPayload: null,
     elevenWs: null,
     elevenConnecting: false,
     elevenConnectAttempts: 0,
@@ -581,11 +642,14 @@ wss.on('connection', (ws, req) => {
       const start = asObject(payload.start) || {};
       session.streamSid = asString(start.streamSid) || session.streamSid;
       session.callSid = asString(start.callSid) || session.callSid;
+      session.customParameters = extractTwilioCustomParameters(start.customParameters);
+      session.conversationInitiationPayload = buildConversationInitiationPayload(session.customParameters);
 
       log('INFO', 'twilio event: start', {
         connectionId: session.connectionId,
         streamSid: session.streamSid,
         callSid: session.callSid,
+        customParameterKeys: Object.keys(session.customParameters),
       });
       log('INFO', 'elevenlabs call-start config', {
         connectionId: session.connectionId,
@@ -615,7 +679,7 @@ wss.on('connection', (ws, req) => {
       const media = asObject(payload.media) || {};
       const mediaPayload = asString(media.payload);
 
-      log('INFO', 'twilio event: media', {
+      logVerbose('twilio event: media', {
         connectionId: session.connectionId,
         streamSid: session.streamSid,
         chunk: asString(media.chunk),
