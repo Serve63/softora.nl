@@ -198,7 +198,7 @@ async function fetchElevenLabsSignedUrl(): Promise<string> {
   }
 
   const parsed = safeParseJson(bodyText);
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     throw new Error(`signed-url response invalid JSON: ${parsed.reason}`);
   }
 
@@ -348,7 +348,7 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
 
 function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
   const parsed = safeParseJson(raw);
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     log('WARN', 'invalid elevenlabs message ignored', {
       connectionId: session.connectionId,
       reason: parsed.reason,
@@ -620,7 +620,7 @@ wss.on('connection', (ws, req) => {
     }
 
     const parsed = safeParseJson(raw);
-    if (!parsed.ok) {
+    if (parsed.ok === false) {
       log('WARN', 'invalid twilio message ignored', {
         connectionId: session.connectionId,
         reason: parsed.reason,
