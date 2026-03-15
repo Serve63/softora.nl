@@ -27,13 +27,6 @@ Environment:
 - `ELEVENLABS_API_KEY`
 - `ELEVENLABS_AGENT_ID`
 - (optioneel) `ELEVENLABS_API_BASE_URL`
-- (optioneel) `COMFORT_NOISE_ENABLED=true`
-- (optioneel) `COMFORT_NOISE_MIN_GAP_MS=120`
-- (optioneel) `COMFORT_NOISE_PCM_PEAK=120`
-
-Gedrag:
-- Tijdens stiltes stuurt de bridge subtiele comfort-noise naar Twilio voor een natuurlijke "open lijn".
-- Alleen inbound media wordt naar ElevenLabs doorgestuurd; outbound wordt genegeerd om self-talk loops te voorkomen.
 
 ## Start command
 `npm run start`

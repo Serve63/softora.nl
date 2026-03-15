@@ -13,11 +13,6 @@ type BridgeSession = {
   elevenConnecting: boolean;
   elevenConnectAttempts: number;
   elevenUnavailable: boolean;
-  lastAgentAudioAtMs: number;
-  comfortNoiseInterval: NodeJS.Timeout | null;
-  comfortNoiseSent: number;
-  comfortNoiseDropped: number;
-  outboundMediaIgnored: number;
   bufferedUserAudioChunks: string[];
   stopping: boolean;
 };
@@ -25,15 +20,9 @@ type BridgeSession = {
 const PORT = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3000;
 const WS_PATH = '/twilio-media';
 const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 200;
-const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
-const TWILIO_MEDIA_CHUNK_MS = 20;
-const TWILIO_ULAW_8K_CHUNK_BYTES = 160;
 const ELEVENLABS_AGENT_ID = normalizeString(process.env.ELEVENLABS_AGENT_ID);
 const ELEVENLABS_API_KEY = normalizeString(process.env.ELEVENLABS_API_KEY);
 const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io');
-const COMFORT_NOISE_ENABLED = parseBooleanEnv(process.env.COMFORT_NOISE_ENABLED, true);
-const COMFORT_NOISE_MIN_GAP_MS = parseIntegerEnv(process.env.COMFORT_NOISE_MIN_GAP_MS, 120, 0);
-const COMFORT_NOISE_PCM_PEAK = parseIntegerEnv(process.env.COMFORT_NOISE_PCM_PEAK, 120, 1);
 
 let connectionCounter = 0;
 
@@ -48,23 +37,6 @@ function log(level: LogLevel, message: string, meta?: JsonObject): void {
 
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function parseBooleanEnv(value: unknown, fallback: boolean): boolean {
-  const normalized = normalizeString(value).toLowerCase();
-  if (!normalized) return fallback;
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
-  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
-  return fallback;
-}
-
-function parseIntegerEnv(value: unknown, fallback: number, minValue: number): number {
-  const normalized = normalizeString(value);
-  if (!normalized) return fallback;
-  const parsed = Number.parseInt(normalized, 10);
-  if (!Number.isFinite(parsed) || Number.isNaN(parsed)) return fallback;
-  if (parsed < minValue) return fallback;
-  return parsed;
 }
 
 function asObject(value: unknown): JsonObject | null {
@@ -131,42 +103,6 @@ function rawDataToUtf8(data: RawData): string {
   if (data instanceof ArrayBuffer) return Buffer.from(data).toString('utf8');
   if (Array.isArray(data)) return Buffer.concat(data).toString('utf8');
   return '';
-}
-
-function shouldForwardTwilioMediaToElevenLabs(track: string): boolean {
-  const normalized = normalizeString(track).toLowerCase();
-  if (!normalized) return true;
-  if (normalized === 'inbound' || normalized === 'inbound_track' || normalized.includes('inbound')) return true;
-  if (normalized === 'outbound' || normalized === 'outbound_track' || normalized.includes('outbound')) return false;
-  if (normalized.includes('both')) return false;
-  return true;
-}
-
-function pcm16ToMuLaw(sample: number): number {
-  const BIAS = 0x84;
-  const CLIP = 32635;
-
-  let pcm = Math.max(-32768, Math.min(32767, Math.trunc(sample)));
-  const sign = pcm < 0 ? 0x80 : 0;
-  if (sign) pcm = -pcm;
-  if (pcm > CLIP) pcm = CLIP;
-  pcm += BIAS;
-
-  let exponent = 7;
-  for (let expMask = 0x4000; (pcm & expMask) === 0 && exponent > 0; expMask >>= 1) {
-    exponent -= 1;
-  }
-  const mantissa = (pcm >> (exponent + 3)) & 0x0f;
-  return (~(sign | (exponent << 4) | mantissa)) & 0xff;
-}
-
-function buildComfortNoiseFrameBase64(): string {
-  const frame = Buffer.allocUnsafe(TWILIO_ULAW_8K_CHUNK_BYTES);
-  for (let i = 0; i < frame.length; i += 1) {
-    const sample = Math.round((Math.random() * 2 - 1) * COMFORT_NOISE_PCM_PEAK);
-    frame[i] = pcm16ToMuLaw(sample);
-  }
-  return frame.toString('base64');
 }
 
 function sendText(res: ServerResponse, statusCode: number, body: string): void {
@@ -247,26 +183,11 @@ function closeElevenLabsForSession(session: BridgeSession, reason: string): void
   }
 }
 
-function sendAudioToTwilio(session: BridgeSession, audioBase64: string, source: 'agent' | 'comfort' = 'agent'): void {
+function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
   if (!audioBase64) return;
   if (!session.streamSid) {
-    if (source === 'agent') {
-      log('WARN', 'dropping elevenlabs audio because streamSid is missing', {
-        connectionId: session.connectionId,
-      });
-    }
-    return;
-  }
-
-  if (session.twilioWs.bufferedAmount > MAX_TWILIO_WS_BUFFERED_BYTES) {
-    if (source === 'comfort') {
-      session.comfortNoiseDropped += 1;
-      return;
-    }
-    log('WARN', 'dropping agent audio because twilio websocket buffer is high', {
+    log('WARN', 'dropping elevenlabs audio because streamSid is missing', {
       connectionId: session.connectionId,
-      streamSid: session.streamSid,
-      bufferedAmount: session.twilioWs.bufferedAmount,
     });
     return;
   }
@@ -278,22 +199,18 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string, source: 
   });
 
   if (!ok) {
-    if (source === 'comfort') {
-      session.comfortNoiseDropped += 1;
-    } else {
-      log('WARN', 'failed to send audio to twilio (socket not open)', {
-        connectionId: session.connectionId,
-        streamSid: session.streamSid,
-      });
-    }
+    log('WARN', 'failed to send audio to twilio (socket not open)', {
+      connectionId: session.connectionId,
+      streamSid: session.streamSid,
+    });
     return;
   }
 
-  if (source === 'agent') {
-    session.lastAgentAudioAtMs = Date.now();
-    return;
-  }
-  session.comfortNoiseSent += 1;
+  log('INFO', 'audio returned to twilio', {
+    connectionId: session.connectionId,
+    streamSid: session.streamSid,
+    payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
+  });
 }
 
 function sendClearToTwilio(session: BridgeSession, reason: string): void {
@@ -310,26 +227,6 @@ function sendClearToTwilio(session: BridgeSession, reason: string): void {
     streamSid: session.streamSid,
     reason,
   });
-}
-
-function startComfortNoiseLoop(session: BridgeSession): void {
-  if (!COMFORT_NOISE_ENABLED) return;
-  if (session.comfortNoiseInterval) return;
-  session.comfortNoiseInterval = setInterval(() => {
-    if (session.stopping || session.twilioWs.readyState !== WebSocket.OPEN || !session.streamSid) {
-      return;
-    }
-    if (Date.now() - session.lastAgentAudioAtMs < COMFORT_NOISE_MIN_GAP_MS) {
-      return;
-    }
-    sendAudioToTwilio(session, buildComfortNoiseFrameBase64(), 'comfort');
-  }, TWILIO_MEDIA_CHUNK_MS);
-}
-
-function stopComfortNoiseLoop(session: BridgeSession): void {
-  if (!session.comfortNoiseInterval) return;
-  clearInterval(session.comfortNoiseInterval);
-  session.comfortNoiseInterval = null;
 }
 
 function flushBufferedAudioToElevenLabs(session: BridgeSession): void {
@@ -370,7 +267,13 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
   const elevenWs = session.elevenWs;
   if (elevenWs && elevenWs.readyState === WebSocket.OPEN) {
     const ok = safeSendWsJson(elevenWs, { user_audio_chunk: audioBase64 });
-    if (!ok) {
+    if (ok) {
+      log('INFO', 'audio forwarded twilio -> elevenlabs', {
+        connectionId: session.connectionId,
+        streamSid: session.streamSid,
+        payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
+      });
+    } else {
       log('WARN', 'audio forward failed twilio -> elevenlabs (socket not open)', {
         connectionId: session.connectionId,
         streamSid: session.streamSid,
@@ -380,13 +283,12 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
   }
 
   session.bufferedUserAudioChunks.push(audioBase64);
-  if (session.bufferedUserAudioChunks.length === 1 || session.bufferedUserAudioChunks.length % 25 === 0) {
-    log('INFO', 'audio buffered twilio -> elevenlabs (awaiting elevenlabs websocket)', {
-      connectionId: session.connectionId,
-      streamSid: session.streamSid,
-      bufferedChunks: session.bufferedUserAudioChunks.length,
-    });
-  }
+  log('INFO', 'audio buffered twilio -> elevenlabs (awaiting elevenlabs websocket)', {
+    connectionId: session.connectionId,
+    streamSid: session.streamSid,
+    bufferedChunks: session.bufferedUserAudioChunks.length,
+    payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
+  });
   if (session.bufferedUserAudioChunks.length > MAX_BUFFERED_TWILIO_AUDIO_CHUNKS) {
     session.bufferedUserAudioChunks.shift();
     log('WARN', 'twilio audio buffer full, dropping oldest chunk', {
@@ -634,11 +536,6 @@ wss.on('connection', (ws, req) => {
     elevenConnecting: false,
     elevenConnectAttempts: 0,
     elevenUnavailable: false,
-    lastAgentAudioAtMs: 0,
-    comfortNoiseInterval: null,
-    comfortNoiseSent: 0,
-    comfortNoiseDropped: 0,
-    outboundMediaIgnored: 0,
     bufferedUserAudioChunks: [],
     stopping: false,
   };
@@ -710,7 +607,6 @@ wss.on('connection', (ws, req) => {
         });
       }
 
-      startComfortNoiseLoop(session);
       void connectElevenLabsForSession(session);
       return;
     }
@@ -718,13 +614,16 @@ wss.on('connection', (ws, req) => {
     if (event === 'media') {
       const media = asObject(payload.media) || {};
       const mediaPayload = asString(media.payload);
-      const mediaTrack = asString(media.track);
 
-      if (shouldForwardTwilioMediaToElevenLabs(mediaTrack)) {
-        sendTwilioAudioToElevenLabs(session, mediaPayload);
-      } else {
-        session.outboundMediaIgnored += 1;
-      }
+      log('INFO', 'twilio event: media', {
+        connectionId: session.connectionId,
+        streamSid: session.streamSid,
+        chunk: asString(media.chunk),
+        timestamp: asString(media.timestamp),
+        payloadBytes: mediaPayload ? Buffer.byteLength(mediaPayload, 'utf8') : 0,
+      });
+
+      sendTwilioAudioToElevenLabs(session, mediaPayload);
       if (!session.elevenWs && !session.elevenConnecting) {
         void connectElevenLabsForSession(session);
       }
@@ -743,14 +642,6 @@ wss.on('connection', (ws, req) => {
         callSid: session.callSid,
       });
 
-      stopComfortNoiseLoop(session);
-      log('INFO', 'comfort noise stats', {
-        connectionId: session.connectionId,
-        streamSid: session.streamSid,
-        comfortNoiseSent: session.comfortNoiseSent,
-        comfortNoiseDropped: session.comfortNoiseDropped,
-        outboundMediaIgnored: session.outboundMediaIgnored,
-      });
       closeElevenLabsForSession(session, 'twilio_stop');
       return;
     }
@@ -760,7 +651,6 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', (code, reason) => {
     session.stopping = true;
-    stopComfortNoiseLoop(session);
     closeElevenLabsForSession(session, 'twilio_close');
     log('INFO', 'twilio websocket close', {
       connectionId: session.connectionId,
@@ -768,9 +658,6 @@ wss.on('connection', (ws, req) => {
       callSid: session.callSid,
       code,
       reason: Buffer.isBuffer(reason) ? reason.toString('utf8') : String(reason || ''),
-      comfortNoiseSent: session.comfortNoiseSent,
-      comfortNoiseDropped: session.comfortNoiseDropped,
-      outboundMediaIgnored: session.outboundMediaIgnored,
     });
   });
 
@@ -804,12 +691,6 @@ server.listen(PORT, () => {
       hasElevenLabsApiKey: Boolean(ELEVENLABS_API_KEY),
     });
   }
-
-  log('INFO', 'comfort noise config', {
-    COMFORT_NOISE_ENABLED,
-    COMFORT_NOISE_MIN_GAP_MS,
-    COMFORT_NOISE_PCM_PEAK,
-  });
 
   log('INFO', 'twilio media bridge listening', {
     port: PORT,
