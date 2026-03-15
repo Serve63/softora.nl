@@ -84,23 +84,23 @@ const AGENT_ECHO_GUARD_BYPASS_WINDOW_MS = Math.max(
 const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
 const TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS = Math.max(
   10,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS, 140, 10))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS, 180, 10))
 );
 const TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS = Math.max(
   4,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS, 18, 4))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS, 40, 4))
 );
 const TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS = Math.max(
   1,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS, 3, 1))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS, 1, 1))
 );
 const TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS = Math.max(
   0,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS, 120, 0))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS, 0, 0))
 );
 const TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK = Math.max(
   1,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK, 2, 1))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK, 1, 1))
 );
 const MAX_ELEVEN_WS_BUFFERED_BYTES = 128 * 1024;
 const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
@@ -148,9 +148,11 @@ const AMBIENCE_NOISE_FLOOR_RMS_INITIAL = parseNumberEnv(process.env.AMBIENCE_NOI
 
 let connectionCounter = 0;
 let ambienceMuLawAudio: Buffer | null = null;
+let ambienceMuLawFrames: Buffer[] = [];
 let ambienceMuLawFramesBase64: string[] = [];
 let ambienceDisabledReason = '';
 const ULAW_DECODE_TABLE = buildMuLawDecodeTable();
+const ULAW_ENCODE_TABLE = buildMuLawEncodeTable();
 
 function log(level: LogLevel, message: string, meta?: JsonObject): void {
   const ts = new Date().toISOString();
@@ -221,6 +223,19 @@ function buildMuLawDecodeTable(): Int16Array {
   return table;
 }
 
+function buildMuLawEncodeTable(): Uint8Array {
+  const table = new Uint8Array(65_536);
+  for (let i = 0; i < table.length; i += 1) {
+    table[i] = encodeMuLawSample(i - 32_768);
+  }
+  return table;
+}
+
+function encodeMuLawSampleFast(sample: number): number {
+  const clamped = Math.max(-32_768, Math.min(32_767, Math.round(sample)));
+  return ULAW_ENCODE_TABLE[clamped + 32_768];
+}
+
 function applyGainToMuLawBuffer(source: Buffer, gain: number): Buffer {
   if (!source.length) return Buffer.alloc(0);
   const safeGain = clampNumber(gain, 0, 2);
@@ -229,26 +244,25 @@ function applyGainToMuLawBuffer(source: Buffer, gain: number): Buffer {
   const output = Buffer.allocUnsafe(source.length);
   for (let i = 0; i < source.length; i += 1) {
     const pcm = ULAW_DECODE_TABLE[source[i]];
-    output[i] = encodeMuLawSample(pcm * safeGain);
+    output[i] = encodeMuLawSampleFast(pcm * safeGain);
   }
   return output;
 }
 
-function mixMuLawBase64(primaryBase64: string, ambienceBase64: string, ambienceGain: number): string {
-  if (!primaryBase64 || !ambienceBase64) return primaryBase64;
+function mixMuLawWithAmbience(primaryBase64: string, ambienceFrame: Buffer, ambienceGain: number): string {
+  if (!primaryBase64 || !ambienceFrame.length) return primaryBase64;
   const safeGain = clampNumber(ambienceGain, 0, 2);
   if (safeGain <= 0) return primaryBase64;
 
   const primary = Buffer.from(primaryBase64, 'base64');
-  const ambience = Buffer.from(ambienceBase64, 'base64');
-  if (!primary.length || !ambience.length) return primaryBase64;
+  if (!primary.length) return primaryBase64;
 
   const output = Buffer.allocUnsafe(primary.length);
-  const mixLength = Math.min(primary.length, ambience.length);
+  const mixLength = Math.min(primary.length, ambienceFrame.length);
   for (let i = 0; i < mixLength; i += 1) {
     const basePcm = ULAW_DECODE_TABLE[primary[i]];
-    const ambiencePcm = ULAW_DECODE_TABLE[ambience[i]];
-    output[i] = encodeMuLawSample(basePcm + ambiencePcm * safeGain);
+    const ambiencePcm = ULAW_DECODE_TABLE[ambienceFrame[i]];
+    output[i] = encodeMuLawSampleFast(basePcm + ambiencePcm * safeGain);
   }
   for (let i = mixLength; i < primary.length; i += 1) {
     output[i] = primary[i];
@@ -365,8 +379,21 @@ function buildLoopingMuLawFramesBase64(source: Buffer, frameBytes: number): stri
   return frames;
 }
 
+function buildLoopingMuLawFrames(source: Buffer, frameBytes: number): Buffer[] {
+  if (!source.length || frameBytes <= 0) return [];
+  const frameCount = Math.max(1, Math.ceil(source.length / frameBytes));
+  const frames: Buffer[] = [];
+  for (let i = 0; i < frameCount; i += 1) {
+    const offset = (i * frameBytes) % source.length;
+    const { chunk } = getLoopingChunk(source, offset, frameBytes);
+    frames.push(chunk);
+  }
+  return frames;
+}
+
 function loadAmbienceMuLawAudioBuffer(): void {
   ambienceMuLawAudio = null;
+  ambienceMuLawFrames = [];
   ambienceMuLawFramesBase64 = [];
   ambienceDisabledReason = '';
 
@@ -400,10 +427,12 @@ function loadAmbienceMuLawAudioBuffer(): void {
       }
       const normalizedAmbienceBuffer = applyGainToMuLawBuffer(directBuffer, AMBIENCE_BASE_GAIN);
       ambienceMuLawAudio = normalizedAmbienceBuffer;
-      ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(normalizedAmbienceBuffer, TWILIO_ULAW_8K_CHUNK_BYTES);
-      if (!ambienceMuLawFramesBase64.length) {
+      ambienceMuLawFrames = buildLoopingMuLawFrames(normalizedAmbienceBuffer, TWILIO_ULAW_8K_CHUNK_BYTES);
+      ambienceMuLawFramesBase64 = ambienceMuLawFrames.map((frame) => frame.toString('base64'));
+      if (!ambienceMuLawFrames.length || !ambienceMuLawFramesBase64.length) {
         ambienceDisabledReason = 'raw ambience kon niet naar frames worden opgebouwd';
         ambienceMuLawAudio = null;
+        ambienceMuLawFrames = [];
         log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
         return;
       }
@@ -467,10 +496,12 @@ function loadAmbienceMuLawAudioBuffer(): void {
 
   const normalizedAmbienceBuffer = applyGainToMuLawBuffer(output, AMBIENCE_BASE_GAIN);
   ambienceMuLawAudio = normalizedAmbienceBuffer;
-  ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(normalizedAmbienceBuffer, TWILIO_ULAW_8K_CHUNK_BYTES);
-  if (!ambienceMuLawFramesBase64.length) {
+  ambienceMuLawFrames = buildLoopingMuLawFrames(normalizedAmbienceBuffer, TWILIO_ULAW_8K_CHUNK_BYTES);
+  ambienceMuLawFramesBase64 = ambienceMuLawFrames.map((frame) => frame.toString('base64'));
+  if (!ambienceMuLawFrames.length || !ambienceMuLawFramesBase64.length) {
     ambienceDisabledReason = 'converted ambience kon niet naar frames worden opgebouwd';
     ambienceMuLawAudio = null;
+    ambienceMuLawFrames = [];
     log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
     return;
   }
@@ -494,18 +525,27 @@ function clearTwilioOutboundPlayoutTimer(session: BridgeSession): void {
   session.twilioOutboundPlayoutTimer = null;
 }
 
-function pullNextAmbienceFrameBase64(session: BridgeSession): string {
-  if (!session.ambienceActive) return '';
-  if (!ambienceMuLawAudio || ambienceMuLawAudio.length === 0 || ambienceMuLawFramesBase64.length === 0) {
+function pullNextAmbienceFrame(
+  session: BridgeSession
+): { frameBytes: Buffer; frameBase64: string } | null {
+  if (!session.ambienceActive) return null;
+  if (
+    !ambienceMuLawAudio ||
+    ambienceMuLawAudio.length === 0 ||
+    ambienceMuLawFrames.length === 0 ||
+    ambienceMuLawFramesBase64.length === 0
+  ) {
     stopAmbience(session, 'ambience_unavailable');
-    return '';
+    return null;
   }
-  if (session.ambienceFrameIndex < 0 || session.ambienceFrameIndex >= ambienceMuLawFramesBase64.length) {
+  if (session.ambienceFrameIndex < 0 || session.ambienceFrameIndex >= ambienceMuLawFrames.length) {
     session.ambienceFrameIndex = 0;
   }
-  const payloadBase64 = ambienceMuLawFramesBase64[session.ambienceFrameIndex] || '';
-  session.ambienceFrameIndex = (session.ambienceFrameIndex + 1) % ambienceMuLawFramesBase64.length;
-  return payloadBase64;
+  const frameBytes = ambienceMuLawFrames[session.ambienceFrameIndex] || Buffer.alloc(0);
+  const frameBase64 = ambienceMuLawFramesBase64[session.ambienceFrameIndex] || '';
+  session.ambienceFrameIndex = (session.ambienceFrameIndex + 1) % ambienceMuLawFrames.length;
+  if (!frameBytes.length || !frameBase64) return null;
+  return { frameBytes, frameBase64 };
 }
 
 function getNextTwilioOutboundFrame(
@@ -526,9 +566,13 @@ function getNextTwilioOutboundFrame(
     const agentPayloadBase64 = session.twilioOutboundAudioQueue.shift() || '';
     if (!agentPayloadBase64) return null;
     if (AMBIENCE_ALWAYS_ON && session.ambienceActive) {
-      const ambiencePayloadBase64 = pullNextAmbienceFrameBase64(session);
-      if (ambiencePayloadBase64) {
-        const mixedPayloadBase64 = mixMuLawBase64(agentPayloadBase64, ambiencePayloadBase64, AMBIENCE_UNDER_AGENT_GAIN);
+      const ambienceFrame = pullNextAmbienceFrame(session);
+      if (ambienceFrame) {
+        const mixedPayloadBase64 = mixMuLawWithAmbience(
+          agentPayloadBase64,
+          ambienceFrame.frameBytes,
+          AMBIENCE_UNDER_AGENT_GAIN
+        );
         return {
           payloadBase64: mixedPayloadBase64 || agentPayloadBase64,
           source: 'agent',
@@ -543,9 +587,9 @@ function getNextTwilioOutboundFrame(
     session.twilioAgentWarmupUntilMs = 0;
   }
 
-  const payloadBase64 = pullNextAmbienceFrameBase64(session);
-  if (!payloadBase64) return null;
-  return { payloadBase64, source: 'ambience' };
+  const ambienceFrame = pullNextAmbienceFrame(session);
+  if (!ambienceFrame) return null;
+  return { payloadBase64: ambienceFrame.frameBase64, source: 'ambience' };
 }
 
 function scheduleTwilioOutboundPlayoutTick(session: BridgeSession, delayMs: number): void {
@@ -649,7 +693,13 @@ function stopAmbience(session: BridgeSession, reason: string): void {
 
 function startAmbience(session: BridgeSession, reason: string): void {
   if (session.stopping || session.ambienceActive) return;
-  if (!AMBIENCE_ENABLED || !ambienceMuLawAudio || ambienceMuLawAudio.length === 0 || ambienceMuLawFramesBase64.length === 0) {
+  if (
+    !AMBIENCE_ENABLED ||
+    !ambienceMuLawAudio ||
+    ambienceMuLawAudio.length === 0 ||
+    ambienceMuLawFrames.length === 0 ||
+    ambienceMuLawFramesBase64.length === 0
+  ) {
     return;
   }
   if (!session.streamSid || session.twilioWs.readyState !== WebSocket.OPEN) {
@@ -657,7 +707,7 @@ function startAmbience(session: BridgeSession, reason: string): void {
   }
 
   session.ambienceActive = true;
-  if (session.ambienceFrameIndex < 0 || session.ambienceFrameIndex >= ambienceMuLawFramesBase64.length) {
+  if (session.ambienceFrameIndex < 0 || session.ambienceFrameIndex >= ambienceMuLawFrames.length) {
     session.ambienceFrameIndex = 0;
   }
 
