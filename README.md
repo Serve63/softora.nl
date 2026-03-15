@@ -21,8 +21,6 @@ TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_OUTBOUND_CALLER_NUMBER=+31xxxxxxxxx
 TWILIO_MEDIA_WS_URL=wss://twilio-media-bridge.onrender.com/twilio-media
-ELEVENLABS_API_KEY=your_elevenlabs_api_key
-ELEVENLABS_AGENT_ID=your_elevenlabs_agent_id
 ```
 
 Optioneel:
@@ -42,6 +40,13 @@ De backend:
 - laat de prospect in een conference joinen
 - voegt daarna de AI participant toe via de bestaande Twilio media bridge
 - voegt daarna een coached ambience participant toe zodat alleen de prospect het kantoorgeluid hoort
+
+De aparte `twilio-media-bridge-service` heeft zelf wel deze envs nodig:
+
+```env
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
+ELEVENLABS_AGENT_ID=your_elevenlabs_agent_id
+```
 
 ## Legacy achtergrond
 
