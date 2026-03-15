@@ -137,6 +137,13 @@ const TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK = Math.max(
   1,
   Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK, 2, 1))
 );
+const EFFECTIVE_TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK = STABLE_TELEPHONY_MODE ? 1 : TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK;
+const EFFECTIVE_TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS = STABLE_TELEPHONY_MODE
+  ? TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS
+  : TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS;
+const EFFECTIVE_TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE = STABLE_TELEPHONY_MODE
+  ? 0
+  : TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE;
 const MAX_ELEVEN_WS_BUFFERED_BYTES = 128 * 1024;
 const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
 const ELEVENLABS_AGENT_ID = normalizeString(process.env.ELEVENLABS_AGENT_ID);
@@ -148,10 +155,10 @@ const AMBIENCE_ALWAYS_ON = parseBooleanEnv(process.env.AMBIENCE_ALWAYS_ON, true)
 const REQUESTED_AMBIENCE_BASE_GAIN = clampNumber(parseNumberEnv(process.env.AMBIENCE_BASE_GAIN, 0.22, 0), 0, 2);
 const REQUESTED_AMBIENCE_UNDER_AGENT_GAIN = clampNumber(parseNumberEnv(process.env.AMBIENCE_UNDER_AGENT_GAIN, 1, 0), 0, 2);
 const AMBIENCE_BASE_GAIN = STABLE_TELEPHONY_MODE
-  ? clampNumber(Math.min(REQUESTED_AMBIENCE_BASE_GAIN, 0.14), 0, 2)
+  ? clampNumber(Math.min(REQUESTED_AMBIENCE_BASE_GAIN, 0.09), 0, 2)
   : REQUESTED_AMBIENCE_BASE_GAIN;
 const AMBIENCE_UNDER_AGENT_GAIN = STABLE_TELEPHONY_MODE
-  ? clampNumber(Math.min(REQUESTED_AMBIENCE_UNDER_AGENT_GAIN, 0.04), 0, 2)
+  ? clampNumber(Math.min(REQUESTED_AMBIENCE_UNDER_AGENT_GAIN, 0.015), 0, 2)
   : REQUESTED_AMBIENCE_UNDER_AGENT_GAIN;
 const AMBIENCE_INBOUND_SUPPRESSION_ENABLED = parseBooleanEnv(
   process.env.AMBIENCE_INBOUND_SUPPRESSION_ENABLED,
@@ -726,12 +733,12 @@ function runTwilioOutboundPlayoutTick(session: BridgeSession): void {
 
   let framesToProcess = 1;
   if (
-    TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK > 1 &&
+    EFFECTIVE_TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK > 1 &&
     session.twilioOutboundAudioQueue.length > TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS
   ) {
     const behindFrames = Math.floor((nowMs - session.twilioOutboundPlayoutNextAtMs) / TWILIO_MEDIA_CHUNK_MS);
     if (behindFrames > 0) {
-      framesToProcess = Math.min(TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK, 1 + behindFrames);
+      framesToProcess = Math.min(EFFECTIVE_TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK, 1 + behindFrames);
     }
   }
 
@@ -1156,9 +1163,12 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
     session.twilioOutboundQueueHighWater = session.twilioOutboundAudioQueue.length;
   }
 
-  if (session.twilioOutboundAudioQueue.length > TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS) {
-    const overflow = session.twilioOutboundAudioQueue.length - TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS;
-    const droppedForLag = Math.min(overflow, TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE);
+  if (
+    EFFECTIVE_TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE > 0 &&
+    session.twilioOutboundAudioQueue.length > EFFECTIVE_TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS
+  ) {
+    const overflow = session.twilioOutboundAudioQueue.length - EFFECTIVE_TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS;
+    const droppedForLag = Math.min(overflow, EFFECTIVE_TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE);
     session.twilioOutboundAudioQueue.splice(0, droppedForLag);
     session.droppedElevenToTwilioAudio += droppedForLag;
     session.droppedElevenToTwilioLatencyAudio += droppedForLag;
@@ -1326,12 +1336,14 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
     const now = Date.now();
     const elapsedSinceAgentAudioMs = now - session.lastAgentAudioAtMs;
     const inTurnGateWindow = elapsedSinceAgentAudioMs >= 0 && elapsedSinceAgentAudioMs < EFFECTIVE_TURN_INPUT_GATE_BLOCK_MS;
+    const agentDominant =
+      session.agentSpeaking || session.twilioOutboundAudioQueue.length > 0 || inTurnGateWindow;
     const inTurnGatePassthroughWindow = now < session.turnGatePassthroughUntilMs;
-    if (EFFECTIVE_TURN_INPUT_GATE_ENABLED && !inTurnGateWindow) {
+    if (EFFECTIVE_TURN_INPUT_GATE_ENABLED && !agentDominant) {
       session.consecutiveBargeInFrames = 0;
     }
 
-    if (EFFECTIVE_TURN_INPUT_GATE_ENABLED && inTurnGateWindow && !inTurnGatePassthroughWindow) {
+    if (EFFECTIVE_TURN_INPUT_GATE_ENABLED && agentDominant && !inTurnGatePassthroughWindow) {
       if (!EFFECTIVE_TURN_INPUT_GATE_BARGE_IN_ENABLED) {
         session.consecutiveBargeInFrames = 0;
         session.droppedTurnGateAudio += 1;
@@ -1970,9 +1982,12 @@ server.listen(PORT, () => {
     TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS,
     TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS,
     TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE,
+    EFFECTIVE_TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS,
+    EFFECTIVE_TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE,
     TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS,
     TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS,
     TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK,
+    EFFECTIVE_TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK,
     ffmpeg: 'used for non-mulaw ambience conversion',
   });
 
