@@ -25,6 +25,7 @@ type BridgeSession = {
   twilioOutboundPlayoutTimer: NodeJS.Timeout | null;
   twilioOutboundPlayoutNextAtMs: number;
   twilioOutboundAudioQueue: string[];
+  pendingElevenAudioRemainder: Buffer;
   twilioOutboundQueueHighWater: number;
   twilioAgentWarmupActive: boolean;
   twilioAgentWarmupUntilMs: number;
@@ -790,6 +791,7 @@ function cleanupSessionState(session: BridgeSession, reason: string): void {
   stopAmbience(session, reason);
   clearTwilioOutboundPlayoutTimer(session);
   session.twilioOutboundAudioQueue.length = 0;
+  session.pendingElevenAudioRemainder = Buffer.alloc(0);
   session.twilioAgentWarmupActive = false;
   session.twilioAgentWarmupUntilMs = 0;
   session.lastCallerSpeechForwardedAtMs = 0;
@@ -1018,6 +1020,41 @@ function closeElevenLabsForSession(session: BridgeSession, reason: string): void
   }
 }
 
+function normalizeElevenAudioToTwilioFrames(session: BridgeSession, audioBase64: string): string[] {
+  if (!audioBase64) return [];
+
+  const raw = Buffer.from(audioBase64, 'base64');
+  if (!raw.length) return [];
+
+  let combined = raw;
+  if (session.pendingElevenAudioRemainder.length > 0) {
+    combined = Buffer.concat([session.pendingElevenAudioRemainder, raw]);
+    session.pendingElevenAudioRemainder = Buffer.alloc(0);
+  }
+
+  if (combined.length < TWILIO_ULAW_8K_CHUNK_BYTES) {
+    session.pendingElevenAudioRemainder = Buffer.from(combined);
+    return [];
+  }
+
+  const fullFrameCount = Math.floor(combined.length / TWILIO_ULAW_8K_CHUNK_BYTES);
+  const normalizedFrames: string[] = [];
+  for (let i = 0; i < fullFrameCount; i += 1) {
+    const start = i * TWILIO_ULAW_8K_CHUNK_BYTES;
+    const end = start + TWILIO_ULAW_8K_CHUNK_BYTES;
+    normalizedFrames.push(combined.subarray(start, end).toString('base64'));
+  }
+
+  const remainderStart = fullFrameCount * TWILIO_ULAW_8K_CHUNK_BYTES;
+  if (remainderStart < combined.length) {
+    session.pendingElevenAudioRemainder = Buffer.from(combined.subarray(remainderStart));
+  } else {
+    session.pendingElevenAudioRemainder = Buffer.alloc(0);
+  }
+
+  return normalizedFrames;
+}
+
 function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
   if (!audioBase64) return;
   if (!session.streamSid) {
@@ -1027,8 +1064,11 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
     return;
   }
 
+  const normalizedFrames = normalizeElevenAudioToTwilioFrames(session, audioBase64);
+  if (!normalizedFrames.length) return;
+
   const queueWasEmpty = session.twilioOutboundAudioQueue.length === 0;
-  session.twilioOutboundAudioQueue.push(audioBase64);
+  session.twilioOutboundAudioQueue.push(...normalizedFrames);
   if (session.twilioOutboundAudioQueue.length > session.twilioOutboundQueueHighWater) {
     session.twilioOutboundQueueHighWater = session.twilioOutboundAudioQueue.length;
   }
@@ -1057,11 +1097,12 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
 }
 
 function clearQueuedAgentAudioForTwilio(session: BridgeSession, reason: string): void {
-  if (!session.twilioOutboundAudioQueue.length) return;
   const dropped = session.twilioOutboundAudioQueue.length;
   session.twilioOutboundAudioQueue.length = 0;
+  session.pendingElevenAudioRemainder = Buffer.alloc(0);
   session.twilioAgentWarmupActive = false;
   session.twilioAgentWarmupUntilMs = 0;
+  if (!dropped) return;
   session.droppedElevenToTwilioAudio += dropped;
   log('INFO', 'queued agent audio cleared before twilio playout', {
     connectionId: session.connectionId,
@@ -1541,6 +1582,7 @@ wss.on('connection', (ws, req) => {
     twilioOutboundPlayoutTimer: null,
     twilioOutboundPlayoutNextAtMs: 0,
     twilioOutboundAudioQueue: [],
+    pendingElevenAudioRemainder: Buffer.alloc(0),
     twilioOutboundQueueHighWater: 0,
     twilioAgentWarmupActive: false,
     twilioAgentWarmupUntilMs: 0,
