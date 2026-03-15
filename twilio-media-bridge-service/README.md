@@ -26,16 +26,11 @@ Environment:
 - `PORT` wordt door Render gezet
 - `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID`
 - Optioneel ambience: `AMBIENCE_ENABLED=true` + `AMBIENCE_FILE_PATH=...`
-- Voor non-stop subtiele ambience: `AMBIENCE_ALWAYS_ON=true`, met `AMBIENCE_BASE_GAIN` en `AMBIENCE_UNDER_AGENT_GAIN`
-- Ambience-inbound suppressie staat standaard uit bij `AMBIENCE_ALWAYS_ON=true` (en aan bij `AMBIENCE_ALWAYS_ON=false`) zodat caller speech niet wordt weggefilterd bij non-stop ambience
-- Voor soepeler speech start met ambience: gebruik `AMBIENCE_INBOUND_SUPPRESSION_PREROLL_MAX_CHUNKS` en `AMBIENCE_INBOUND_SPEECH_PASSTHROUGH_MS`
-- Stable telephony mode staat code-side aan (hard), inclusief loopback-hash guard, bredere turn-gate en agressieve ambience-ducking onder agent; hierdoor is handmatig env-tunen voor echo/turn meestal niet meer nodig
-- Echo-guard draait nu in veilige telephony-stand (bypass standaard uit, effectieve minimale bypass-thresholds) om self-trigger loops te voorkomen
-- Turn-based input gate staat standaard aan (`TURN_INPUT_GATE_*`) voor stabiele half-duplex callflow; barge-in is optioneel en standaard uit
-- Outbound playout gebruikt nu centrale queue+pacing; finetune met `TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS` en `TWILIO_OUTBOUND_AGENT_JITTER_*`
-- Voor minimale latency-spikes: tune `TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS`, `TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK`, `AGENT_SILENCE_TO_AMBIENCE_MS` en `AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS`
-- Bij extreem lage latency-eis kun je terug naar `TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS=1` en `TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK=1`, maar standaardwaarden zijn gericht op minder hapering
-- Voor vloeiender lag-recovery zonder harde sprongen: gebruik `TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE`
+- Latency-tuning: `AGENT_ECHO_GUARD_MS` (default `80`)
+- Startup flush tuning: `MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS` (default `8`)
+- Inbound stiltefilter (aanbevolen): `INBOUND_SILENCE_GATE_ENABLED=true`
+- Stiltefilter drempel: `INBOUND_SILENCE_RMS_THRESHOLD` (default `260`)
+- Stiltefilter hangover: `INBOUND_SILENCE_HANGOVER_MS` (default `240`)
 
 ## Start command
 `npm run start`
