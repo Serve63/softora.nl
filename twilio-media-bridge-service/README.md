@@ -29,11 +29,13 @@ Environment:
 - (optioneel) `ELEVENLABS_API_BASE_URL`
 - (optioneel) `AMBIENCE_ENABLED=true`
 - (optioneel) `AMBIENCE_FILE_PATH=assets/office-ambience.wav`
-- (optioneel) `AMBIENCE_GAIN=0.14`
+- (optioneel) `AMBIENCE_GAIN=0.06`
+- (optioneel) `AMBIENCE_UNDER_AGENT_GAIN=0.5`
 
 Audio gedrag:
 - Office-ambience speelt doorlopend op de outbound lijn.
-- Tijdens agent-speech wordt de agent-audio met ambience gemixt (dus geen hoorbare on/off van de lijn).
+- Tijdens agent-speech wordt ambience extra zachter gemixt voor verstaanbaarheid.
+- Bij backpressure krijgt agent-audio voorrang en wordt ambience tijdelijk onderdrukt om haperingen te beperken.
 
 ## Start command
 `npm run start`
