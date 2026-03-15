@@ -112,11 +112,11 @@ const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
 const ALLOWED_COLDCALLING_PROVIDERS = new Set(['elevenlabs', 'twilio_conference']);
-const COLDCALLING_PROVIDER_LOCK = ALLOWED_COLDCALLING_PROVIDERS.has(
-  String(process.env.COLDCALLING_PROVIDER || 'elevenlabs').trim().toLowerCase()
+const EXPLICIT_COLDCALLING_PROVIDER = ALLOWED_COLDCALLING_PROVIDERS.has(
+  String(process.env.COLDCALLING_PROVIDER || '').trim().toLowerCase()
 )
-  ? String(process.env.COLDCALLING_PROVIDER || 'elevenlabs').trim().toLowerCase()
-  : 'elevenlabs';
+  ? String(process.env.COLDCALLING_PROVIDER || '').trim().toLowerCase()
+  : '';
 const DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED = false;
 const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
 const DEFAULT_TWILIO_MEDIA_WS_URL = 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media';
@@ -1869,6 +1869,15 @@ function getRequiredTwilioConferenceEnv() {
   return ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_OUTBOUND_CALLER_NUMBER', 'TWILIO_MEDIA_WS_URL'];
 }
 
+function hasTwilioConferenceRuntimeConfig() {
+  return Boolean(
+    normalizeString(TWILIO_ACCOUNT_SID) &&
+      normalizeString(TWILIO_AUTH_TOKEN) &&
+      normalizeString(TWILIO_OUTBOUND_CALLER_NUMBER) &&
+      normalizeString(TWILIO_MEDIA_WS_URL)
+  );
+}
+
 function getConfiguredElevenLabsAgentId() {
   return normalizeString(process.env.ELEVENLABS_AGENT_ID || DEFAULT_ELEVENLABS_AGENT_ID);
 }
@@ -1878,7 +1887,13 @@ function isElevenLabsColdcallingConfigured() {
 }
 
 function getColdcallingProvider() {
-  return normalizeColdcallingProvider(COLDCALLING_PROVIDER_LOCK);
+  if (EXPLICIT_COLDCALLING_PROVIDER) {
+    return normalizeColdcallingProvider(EXPLICIT_COLDCALLING_PROVIDER);
+  }
+  if (hasTwilioConferenceRuntimeConfig()) {
+    return 'twilio_conference';
+  }
+  return 'elevenlabs';
 }
 
 function getMissingEnvVars(provider = getColdcallingProvider()) {

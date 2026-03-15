@@ -8,7 +8,11 @@ Huidige coldcalling-architecturen in deze repo:
   Twilio outbound prospect call -> Twilio Conference -> AI participant via Twilio Media Stream bridge -> ElevenLabs WebSocket
   plus een aparte coached ambience participant alleen voor de prospect
 
-De actieve runtime-provider wordt bepaald door `COLDCALLING_PROVIDER`.
+De actieve runtime-provider wordt als volgt gekozen:
+
+- als `COLDCALLING_PROVIDER` expliciet is gezet, volgt de backend die waarde
+- anders schakelt de backend automatisch naar `twilio_conference` zodra de vereiste Twilio envs aanwezig zijn
+- anders blijft hij op `elevenlabs`
 
 ## Twilio Conference + Ambience flow
 
