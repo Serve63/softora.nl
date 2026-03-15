@@ -17,6 +17,7 @@ type BridgeSession = {
   elevenConnectAttempts: number;
   elevenUnavailable: boolean;
   hasReceivedAgentAudio: boolean;
+  lastAgentAudioAtMs: number;
   agentSpeaking: boolean;
   ambienceActive: boolean;
   ambienceFrameIndex: number;
@@ -30,6 +31,7 @@ type BridgeSession = {
   droppedTwilioToElevenAudio: number;
   droppedElevenToTwilioAudio: number;
   droppedAmbienceToTwilioAudio: number;
+  droppedEchoGuardAudio: number;
   mediaStatsLastLoggedAtMs: number;
   bufferedUserAudioChunks: string[];
   stopping: boolean;
@@ -43,6 +45,7 @@ const TWILIO_MEDIA_CHUNK_MS = 20;
 const TWILIO_ULAW_8K_CHUNK_BYTES = 160;
 const AGENT_SILENCE_TO_AMBIENCE_MS = 900;
 const INITIAL_AMBIENCE_DELAY_MS = 3500;
+const AGENT_ECHO_GUARD_MS = 650;
 const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
 const MAX_ELEVEN_WS_BUFFERED_BYTES = 128 * 1024;
 const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
@@ -338,6 +341,7 @@ function resetMediaStatsCounters(session: BridgeSession): void {
   session.droppedTwilioToElevenAudio = 0;
   session.droppedElevenToTwilioAudio = 0;
   session.droppedAmbienceToTwilioAudio = 0;
+  session.droppedEchoGuardAudio = 0;
 }
 
 function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
@@ -354,7 +358,8 @@ function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
     session.ambienceToTwilioAudioSent > 0 ||
     session.droppedTwilioToElevenAudio > 0 ||
     session.droppedElevenToTwilioAudio > 0 ||
-    session.droppedAmbienceToTwilioAudio > 0;
+    session.droppedAmbienceToTwilioAudio > 0 ||
+    session.droppedEchoGuardAudio > 0;
 
   if (hasAnyStat) {
     log('INFO', 'media flow stats', {
@@ -368,6 +373,7 @@ function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
       droppedTwilioToEleven: session.droppedTwilioToElevenAudio,
       droppedElevenToTwilio: session.droppedElevenToTwilioAudio,
       droppedAmbienceToTwilio: session.droppedAmbienceToTwilioAudio,
+      droppedEchoGuardAudio: session.droppedEchoGuardAudio,
       intervalMs: now - session.mediaStatsLastLoggedAtMs,
     });
     resetMediaStatsCounters(session);
@@ -634,6 +640,15 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
     return;
   }
 
+  if (session.hasReceivedAgentAudio) {
+    const elapsedSinceAgentAudioMs = Date.now() - session.lastAgentAudioAtMs;
+    if (elapsedSinceAgentAudioMs >= 0 && elapsedSinceAgentAudioMs < AGENT_ECHO_GUARD_MS) {
+      session.droppedEchoGuardAudio += 1;
+      flushMediaStatsIfDue(session);
+      return;
+    }
+  }
+
   const elevenWs = session.elevenWs;
   if (elevenWs && elevenWs.readyState === WebSocket.OPEN) {
     if (elevenWs.bufferedAmount > MAX_ELEVEN_WS_BUFFERED_BYTES) {
@@ -732,6 +747,7 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
     if (!audioBase64) return;
 
     session.hasReceivedAgentAudio = true;
+    session.lastAgentAudioAtMs = Date.now();
 
     if (!session.agentSpeaking) {
       if (session.ambienceActive) {
@@ -943,6 +959,7 @@ wss.on('connection', (ws, req) => {
     elevenConnectAttempts: 0,
     elevenUnavailable: false,
     hasReceivedAgentAudio: false,
+    lastAgentAudioAtMs: 0,
     agentSpeaking: false,
     ambienceActive: false,
     ambienceFrameIndex: 0,
@@ -956,6 +973,7 @@ wss.on('connection', (ws, req) => {
     droppedTwilioToElevenAudio: 0,
     droppedElevenToTwilioAudio: 0,
     droppedAmbienceToTwilioAudio: 0,
+    droppedEchoGuardAudio: 0,
     mediaStatsLastLoggedAtMs: Date.now(),
     bufferedUserAudioChunks: [],
     stopping: false,
