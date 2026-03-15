@@ -29,7 +29,7 @@ Environment:
 - Voor non-stop subtiele ambience: `AMBIENCE_ALWAYS_ON=true`, met `AMBIENCE_BASE_GAIN` en `AMBIENCE_UNDER_AGENT_GAIN`
 - Ambience-inbound suppressie staat standaard uit bij `AMBIENCE_ALWAYS_ON=true` (en aan bij `AMBIENCE_ALWAYS_ON=false`) zodat caller speech niet wordt weggefilterd bij non-stop ambience
 - Voor soepeler speech start met ambience: gebruik `AMBIENCE_INBOUND_SUPPRESSION_PREROLL_MAX_CHUNKS` en `AMBIENCE_INBOUND_SPEECH_PASSTHROUGH_MS`
-- Echo-guard is verlaagd voor snellere beurtwisseling, met speech-bypass tunables (`AGENT_ECHO_GUARD_*`)
+- Echo-guard draait nu in veilige telephony-stand (bypass standaard uit, effectieve minimale bypass-thresholds) om self-trigger loops te voorkomen
 - Outbound playout gebruikt nu centrale queue+pacing; finetune met `TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS` en `TWILIO_OUTBOUND_AGENT_JITTER_*`
 - Voor minimale latency-spikes: tune `TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS`, `TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK`, `AGENT_SILENCE_TO_AMBIENCE_MS` en `AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS`
 - Bij extreem lage latency-eis kun je terug naar `TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS=1` en `TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK=1`, maar standaardwaarden zijn gericht op minder hapering

@@ -67,7 +67,10 @@ const AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS = Math.max(
   Math.floor(parseNumberEnv(process.env.AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS, 1200, 0))
 );
 const AGENT_ECHO_GUARD_MS = parseNumberEnv(process.env.AGENT_ECHO_GUARD_MS, 220, 0);
-const AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED = parseBooleanEnv(process.env.AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED, true);
+const AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED = parseBooleanEnv(
+  process.env.AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED,
+  false
+);
 const AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD = parseNumberEnv(
   process.env.AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD,
   900,
@@ -80,8 +83,10 @@ const AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD = parseNumberEnv(
 );
 const AGENT_ECHO_GUARD_BYPASS_WINDOW_MS = Math.max(
   0,
-  Math.floor(parseNumberEnv(process.env.AGENT_ECHO_GUARD_BYPASS_WINDOW_MS, 900, 0))
+  Math.floor(parseNumberEnv(process.env.AGENT_ECHO_GUARD_BYPASS_WINDOW_MS, 0, 0))
 );
+const AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_RMS_THRESHOLD = Math.max(1200, AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD);
+const AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_PEAK_THRESHOLD = Math.max(4200, AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD);
 const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
 const TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS = Math.max(
   10,
@@ -868,8 +873,9 @@ function asString(value: unknown): string {
 function shouldForwardTwilioMediaToElevenLabs(track: string): boolean {
   const normalized = normalizeString(track).toLowerCase();
   if (!normalized) return true;
-  if (normalized === 'inbound' || normalized === 'inbound_track') return true;
-  if (normalized === 'outbound' || normalized === 'outbound_track') return false;
+  if (normalized === 'inbound' || normalized === 'inbound_track' || normalized.includes('inbound')) return true;
+  if (normalized === 'outbound' || normalized === 'outbound_track' || normalized.includes('outbound')) return false;
+  if (normalized.includes('both')) return false;
   return true;
 }
 
@@ -1242,8 +1248,8 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
           AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED &&
           levelsPassAbsoluteSpeechThreshold(
             getAnalyzedLevels(),
-            AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD,
-            AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD
+            AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_RMS_THRESHOLD,
+            AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_PEAK_THRESHOLD
           );
         if (!canBypassEchoGuard) {
           session.droppedEchoGuardAudio += 1;
@@ -1810,6 +1816,8 @@ server.listen(PORT, () => {
     AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED,
     AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD,
     AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD,
+    AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_RMS_THRESHOLD,
+    AGENT_ECHO_GUARD_EFFECTIVE_BYPASS_PEAK_THRESHOLD,
     AGENT_ECHO_GUARD_BYPASS_WINDOW_MS,
     TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS,
     TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS,
