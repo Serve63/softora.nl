@@ -90,6 +90,10 @@ const TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS = Math.max(
   4,
   Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS, 40, 4))
 );
+const TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE = Math.max(
+  1,
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE, 4, 1))
+);
 const TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS = Math.max(
   1,
   Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS, 1, 1))
@@ -153,6 +157,9 @@ let ambienceMuLawFramesBase64: string[] = [];
 let ambienceDisabledReason = '';
 const ULAW_DECODE_TABLE = buildMuLawDecodeTable();
 const ULAW_ENCODE_TABLE = buildMuLawEncodeTable();
+const ULAW_ABS_TABLE = buildMuLawAbsTable();
+const ULAW_SQUARE_TABLE = buildMuLawSquareTable();
+const ULAW_MIX_TABLE_UNDER_AGENT = buildMuLawMixTable(AMBIENCE_UNDER_AGENT_GAIN);
 
 function log(level: LogLevel, message: string, meta?: JsonObject): void {
   const ts = new Date().toISOString();
@@ -231,6 +238,38 @@ function buildMuLawEncodeTable(): Uint8Array {
   return table;
 }
 
+function buildMuLawAbsTable(): Uint16Array {
+  const table = new Uint16Array(256);
+  for (let i = 0; i < table.length; i += 1) {
+    const sample = ULAW_DECODE_TABLE[i];
+    table[i] = sample < 0 ? -sample : sample;
+  }
+  return table;
+}
+
+function buildMuLawSquareTable(): Float64Array {
+  const table = new Float64Array(256);
+  for (let i = 0; i < table.length; i += 1) {
+    const sample = ULAW_DECODE_TABLE[i];
+    table[i] = sample * sample;
+  }
+  return table;
+}
+
+function buildMuLawMixTable(ambienceGain: number): Uint8Array {
+  const table = new Uint8Array(256 * 256);
+  const safeGain = clampNumber(ambienceGain, 0, 2);
+  for (let primaryByte = 0; primaryByte < 256; primaryByte += 1) {
+    const primaryPcm = ULAW_DECODE_TABLE[primaryByte];
+    for (let ambienceByte = 0; ambienceByte < 256; ambienceByte += 1) {
+      const ambiencePcm = ULAW_DECODE_TABLE[ambienceByte];
+      const mixed = primaryPcm + ambiencePcm * safeGain;
+      table[(primaryByte << 8) | ambienceByte] = encodeMuLawSampleFast(mixed);
+    }
+  }
+  return table;
+}
+
 function encodeMuLawSampleFast(sample: number): number {
   const clamped = Math.max(-32_768, Math.min(32_767, Math.round(sample)));
   return ULAW_ENCODE_TABLE[clamped + 32_768];
@@ -260,9 +299,7 @@ function mixMuLawWithAmbience(primaryBase64: string, ambienceFrame: Buffer, ambi
   const output = Buffer.allocUnsafe(primary.length);
   const mixLength = Math.min(primary.length, ambienceFrame.length);
   for (let i = 0; i < mixLength; i += 1) {
-    const basePcm = ULAW_DECODE_TABLE[primary[i]];
-    const ambiencePcm = ULAW_DECODE_TABLE[ambienceFrame[i]];
-    output[i] = encodeMuLawSampleFast(basePcm + ambiencePcm * safeGain);
+    output[i] = ULAW_MIX_TABLE_UNDER_AGENT[(primary[i] << 8) | ambienceFrame[i]];
   }
   for (let i = mixLength; i < primary.length; i += 1) {
     output[i] = primary[i];
@@ -279,10 +316,9 @@ function analyzeMuLawAudioLevels(audioBase64: string): { rms: number; peak: numb
   let sumSquares = 0;
   let peak = 0;
   for (let i = 0; i < audio.length; i += 1) {
-    const sample = ULAW_DECODE_TABLE[audio[i]];
-    const abs = sample < 0 ? -sample : sample;
-    sumSquares += sample * sample;
-    if (abs > peak) peak = abs;
+    const value = audio[i];
+    sumSquares += ULAW_SQUARE_TABLE[value];
+    if (ULAW_ABS_TABLE[value] > peak) peak = ULAW_ABS_TABLE[value];
   }
 
   return {
@@ -995,7 +1031,8 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
   }
 
   if (session.twilioOutboundAudioQueue.length > TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS) {
-    const droppedForLag = session.twilioOutboundAudioQueue.length - TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS;
+    const overflow = session.twilioOutboundAudioQueue.length - TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS;
+    const droppedForLag = Math.min(overflow, TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE);
     session.twilioOutboundAudioQueue.splice(0, droppedForLag);
     session.droppedElevenToTwilioAudio += droppedForLag;
     session.droppedElevenToTwilioLatencyAudio += droppedForLag;
@@ -1730,6 +1767,7 @@ server.listen(PORT, () => {
     AGENT_ECHO_GUARD_BYPASS_WINDOW_MS,
     TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS,
     TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS,
+    TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE,
     TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS,
     TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS,
     TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK,
