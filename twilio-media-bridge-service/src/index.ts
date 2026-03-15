@@ -18,7 +18,7 @@ type BridgeSession = {
   elevenUnavailable: boolean;
   agentSpeaking: boolean;
   ambienceActive: boolean;
-  ambienceOffsetBytes: number;
+  ambienceFrameIndex: number;
   ambienceInterval: NodeJS.Timeout | null;
   agentSilenceTimer: NodeJS.Timeout | null;
   twilioMediaReceived: number;
@@ -52,6 +52,7 @@ const AMBIENCE_FILE_PATH = normalizeString(process.env.AMBIENCE_FILE_PATH);
 
 let connectionCounter = 0;
 let ambienceMuLawAudio: Buffer | null = null;
+let ambienceMuLawFramesBase64: string[] = [];
 let ambienceDisabledReason = '';
 
 function log(level: LogLevel, message: string, meta?: JsonObject): void {
@@ -111,8 +112,21 @@ function getLoopingChunk(source: Buffer, offset: number, size: number): { chunk:
   return { chunk, nextOffset: readOffset };
 }
 
+function buildLoopingMuLawFramesBase64(source: Buffer, frameBytes: number): string[] {
+  if (!source.length || frameBytes <= 0) return [];
+  const frameCount = Math.max(1, Math.ceil(source.length / frameBytes));
+  const frames: string[] = [];
+  for (let i = 0; i < frameCount; i += 1) {
+    const offset = (i * frameBytes) % source.length;
+    const { chunk } = getLoopingChunk(source, offset, frameBytes);
+    frames.push(chunk.toString('base64'));
+  }
+  return frames;
+}
+
 function loadAmbienceMuLawAudioBuffer(): void {
   ambienceMuLawAudio = null;
+  ambienceMuLawFramesBase64 = [];
   ambienceDisabledReason = '';
 
   if (!AMBIENCE_ENABLED) {
@@ -144,8 +158,16 @@ function loadAmbienceMuLawAudioBuffer(): void {
         return;
       }
       ambienceMuLawAudio = directBuffer;
+      ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(directBuffer, TWILIO_ULAW_8K_CHUNK_BYTES);
+      if (!ambienceMuLawFramesBase64.length) {
+        ambienceDisabledReason = 'raw ambience kon niet naar frames worden opgebouwd';
+        ambienceMuLawAudio = null;
+        log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
+        return;
+      }
       log('INFO', 'ambience loaded (raw mulaw)', {
         bytes: directBuffer.length,
+        frames: ambienceMuLawFramesBase64.length,
         filePath: resolvedPath,
       });
       return;
@@ -201,8 +223,16 @@ function loadAmbienceMuLawAudioBuffer(): void {
   }
 
   ambienceMuLawAudio = output;
+  ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(output, TWILIO_ULAW_8K_CHUNK_BYTES);
+  if (!ambienceMuLawFramesBase64.length) {
+    ambienceDisabledReason = 'converted ambience kon niet naar frames worden opgebouwd';
+    ambienceMuLawAudio = null;
+    log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
+    return;
+  }
   log('INFO', 'ambience loaded (converted to mulaw/8000/mono)', {
     bytes: output.length,
+    frames: ambienceMuLawFramesBase64.length,
     sourceFilePath: resolvedPath,
   });
 }
@@ -230,7 +260,7 @@ function stopAmbience(session: BridgeSession, reason: string): void {
 
 function startAmbience(session: BridgeSession, reason: string): void {
   if (session.stopping || session.ambienceActive) return;
-  if (!AMBIENCE_ENABLED || !ambienceMuLawAudio || ambienceMuLawAudio.length === 0) {
+  if (!AMBIENCE_ENABLED || !ambienceMuLawAudio || ambienceMuLawAudio.length === 0 || ambienceMuLawFramesBase64.length === 0) {
     return;
   }
   if (!session.streamSid || session.twilioWs.readyState !== WebSocket.OPEN) {
@@ -238,8 +268,8 @@ function startAmbience(session: BridgeSession, reason: string): void {
   }
 
   session.ambienceActive = true;
-  if (!session.ambienceOffsetBytes || session.ambienceOffsetBytes >= ambienceMuLawAudio.length) {
-    session.ambienceOffsetBytes = 0;
+  if (session.ambienceFrameIndex < 0 || session.ambienceFrameIndex >= ambienceMuLawFramesBase64.length) {
+    session.ambienceFrameIndex = 0;
   }
 
   log('INFO', 'ambience started', {
@@ -254,17 +284,12 @@ function startAmbience(session: BridgeSession, reason: string): void {
       stopAmbience(session, 'call_inactive');
       return;
     }
-    if (!ambienceMuLawAudio || ambienceMuLawAudio.length === 0) {
+    if (!ambienceMuLawAudio || ambienceMuLawAudio.length === 0 || ambienceMuLawFramesBase64.length === 0) {
       stopAmbience(session, 'ambience_unavailable');
       return;
     }
-
-    const { chunk, nextOffset } = getLoopingChunk(
-      ambienceMuLawAudio,
-      session.ambienceOffsetBytes,
-      TWILIO_ULAW_8K_CHUNK_BYTES
-    );
-    session.ambienceOffsetBytes = nextOffset;
+    const payloadBase64 = ambienceMuLawFramesBase64[session.ambienceFrameIndex] || '';
+    session.ambienceFrameIndex = (session.ambienceFrameIndex + 1) % ambienceMuLawFramesBase64.length;
 
     if (session.twilioWs.bufferedAmount > MAX_TWILIO_WS_BUFFERED_BYTES) {
       session.droppedAmbienceToTwilioAudio += 1;
@@ -272,11 +297,7 @@ function startAmbience(session: BridgeSession, reason: string): void {
       return;
     }
 
-    const ok = safeSendWsJson(session.twilioWs, {
-      event: 'media',
-      streamSid: session.streamSid,
-      media: { payload: chunk.toString('base64') },
-    });
+    const ok = sendTwilioMediaToSocket(session, payloadBase64);
 
     if (!ok) {
       stopAmbience(session, 'twilio_send_failed');
@@ -324,7 +345,10 @@ function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
     session.twilioMediaOutboundIgnored > 0 ||
     session.twilioToElevenAudioSent > 0 ||
     session.elevenToTwilioAudioSent > 0 ||
-    session.ambienceToTwilioAudioSent > 0;
+    session.ambienceToTwilioAudioSent > 0 ||
+    session.droppedTwilioToElevenAudio > 0 ||
+    session.droppedElevenToTwilioAudio > 0 ||
+    session.droppedAmbienceToTwilioAudio > 0;
 
   if (hasAnyStat) {
     log('INFO', 'media flow stats', {
@@ -483,6 +507,18 @@ function safeSendWsJson(ws: WebSocket, payload: JsonObject): boolean {
   return true;
 }
 
+function safeSendWsText(ws: WebSocket, payload: string): boolean {
+  if (ws.readyState !== WebSocket.OPEN) return false;
+  ws.send(payload);
+  return true;
+}
+
+function sendTwilioMediaToSocket(session: BridgeSession, payloadBase64: string): boolean {
+  if (!session.streamSid || !payloadBase64) return false;
+  const message = `{"event":"media","streamSid":"${session.streamSid}","media":{"payload":"${payloadBase64}"}}`;
+  return safeSendWsText(session.twilioWs, message);
+}
+
 function closeElevenLabsForSession(session: BridgeSession, reason: string): void {
   const elevenWs = session.elevenWs;
   if (!elevenWs) return;
@@ -513,11 +549,7 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
     return;
   }
 
-  const ok = safeSendWsJson(session.twilioWs, {
-    event: 'media',
-    streamSid: session.streamSid,
-    media: { payload: audioBase64 },
-  });
+  const ok = sendTwilioMediaToSocket(session, audioBase64);
 
   if (!ok) {
     log('WARN', 'failed to send audio to twilio (socket not open)', {
@@ -902,7 +934,7 @@ wss.on('connection', (ws, req) => {
     elevenUnavailable: false,
     agentSpeaking: false,
     ambienceActive: false,
-    ambienceOffsetBytes: 0,
+    ambienceFrameIndex: 0,
     ambienceInterval: null,
     agentSilenceTimer: null,
     twilioMediaReceived: 0,
