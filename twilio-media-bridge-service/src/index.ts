@@ -30,7 +30,7 @@ const WS_PATH = '/twilio-media';
 const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 200;
 const TWILIO_MEDIA_CHUNK_MS = 20;
 const TWILIO_ULAW_8K_CHUNK_BYTES = 160;
-const AGENT_SILENCE_TO_AMBIENCE_MS = 450;
+const AGENT_SILENCE_TO_AMBIENCE_MS = 900;
 const ELEVENLABS_AGENT_ID = normalizeString(process.env.ELEVENLABS_AGENT_ID);
 const ELEVENLABS_API_KEY = normalizeString(process.env.ELEVENLABS_API_KEY);
 const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io');
@@ -276,6 +276,14 @@ function asObject(value: unknown): JsonObject | null {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function shouldForwardTwilioMediaToElevenLabs(track: string): boolean {
+  const normalized = normalizeString(track).toLowerCase();
+  if (!normalized) return true;
+  if (normalized === 'inbound' || normalized === 'inbound_track') return true;
+  if (normalized === 'outbound' || normalized === 'outbound_track') return false;
+  return true;
 }
 
 function errorDetails(error: unknown): JsonObject {
@@ -880,16 +888,26 @@ wss.on('connection', (ws, req) => {
     if (event === 'media') {
       const media = asObject(payload.media) || {};
       const mediaPayload = asString(media.payload);
+      const mediaTrack = asString(media.track);
 
       log('INFO', 'twilio event: media', {
         connectionId: session.connectionId,
         streamSid: session.streamSid,
+        track: mediaTrack || 'unknown',
         chunk: asString(media.chunk),
         timestamp: asString(media.timestamp),
         payloadBytes: mediaPayload ? Buffer.byteLength(mediaPayload, 'utf8') : 0,
       });
 
-      sendTwilioAudioToElevenLabs(session, mediaPayload);
+      if (shouldForwardTwilioMediaToElevenLabs(mediaTrack)) {
+        sendTwilioAudioToElevenLabs(session, mediaPayload);
+      } else {
+        log('INFO', 'twilio outbound media ignored for elevenlabs', {
+          connectionId: session.connectionId,
+          streamSid: session.streamSid,
+          track: mediaTrack,
+        });
+      }
       if (!session.elevenWs && !session.elevenConnecting) {
         void connectElevenLabsForSession(session);
       }
