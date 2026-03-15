@@ -65,16 +65,16 @@ const AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS = Math.max(
   0,
   Math.floor(parseNumberEnv(process.env.AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS, 1200, 0))
 );
-const AGENT_ECHO_GUARD_MS = parseNumberEnv(process.env.AGENT_ECHO_GUARD_MS, 320, 0);
+const AGENT_ECHO_GUARD_MS = parseNumberEnv(process.env.AGENT_ECHO_GUARD_MS, 220, 0);
 const AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED = parseBooleanEnv(process.env.AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED, true);
 const AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD = parseNumberEnv(
   process.env.AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD,
-  1300,
+  900,
   100
 );
 const AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD = parseNumberEnv(
   process.env.AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD,
-  4600,
+  3200,
   500
 );
 const AGENT_ECHO_GUARD_BYPASS_WINDOW_MS = Math.max(
@@ -88,23 +88,23 @@ const TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS = Math.max(
 );
 const TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS = Math.max(
   4,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS, 40, 4))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS, 48, 4))
 );
 const TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE = Math.max(
   1,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE, 4, 1))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_MAX_DROP_PER_ENQUEUE, 2, 1))
 );
 const TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS = Math.max(
   1,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS, 1, 1))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS, 2, 1))
 );
 const TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS = Math.max(
   0,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS, 0, 0))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS, 40, 0))
 );
 const TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK = Math.max(
   1,
-  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK, 1, 1))
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK, 2, 1))
 );
 const MAX_ELEVEN_WS_BUFFERED_BYTES = 128 * 1024;
 const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
@@ -120,15 +120,18 @@ const AMBIENCE_UNDER_AGENT_GAIN = clampNumber(
   0,
   2
 );
-const AMBIENCE_INBOUND_SUPPRESSION_ENABLED = parseBooleanEnv(process.env.AMBIENCE_INBOUND_SUPPRESSION_ENABLED, true);
+const AMBIENCE_INBOUND_SUPPRESSION_ENABLED = parseBooleanEnv(
+  process.env.AMBIENCE_INBOUND_SUPPRESSION_ENABLED,
+  !AMBIENCE_ALWAYS_ON
+);
 const AMBIENCE_INBOUND_SPEECH_ABSOLUTE_RMS_THRESHOLD = parseNumberEnv(
   process.env.AMBIENCE_INBOUND_SPEECH_ABSOLUTE_RMS_THRESHOLD,
-  1150,
+  900,
   100
 );
 const AMBIENCE_INBOUND_SPEECH_PEAK_THRESHOLD = parseNumberEnv(
   process.env.AMBIENCE_INBOUND_SPEECH_PEAK_THRESHOLD,
-  4200,
+  3400,
   500
 );
 const AMBIENCE_INBOUND_SPEECH_NOISE_MULTIPLIER = parseNumberEnv(
@@ -138,7 +141,7 @@ const AMBIENCE_INBOUND_SPEECH_NOISE_MULTIPLIER = parseNumberEnv(
 );
 const AMBIENCE_INBOUND_SPEECH_MIN_CONSECUTIVE_FRAMES = Math.max(
   1,
-  Math.floor(parseNumberEnv(process.env.AMBIENCE_INBOUND_SPEECH_MIN_CONSECUTIVE_FRAMES, 2, 1))
+  Math.floor(parseNumberEnv(process.env.AMBIENCE_INBOUND_SPEECH_MIN_CONSECUTIVE_FRAMES, 1, 1))
 );
 const AMBIENCE_INBOUND_SUPPRESSION_PREROLL_MAX_CHUNKS = Math.max(
   0,
@@ -1213,7 +1216,9 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
     }
   }
 
-  if (AMBIENCE_INBOUND_SUPPRESSION_ENABLED && session.ambienceActive) {
+  const shouldApplyInboundAmbienceSuppression =
+    AMBIENCE_INBOUND_SUPPRESSION_ENABLED && session.ambienceActive && !AMBIENCE_ALWAYS_ON;
+  if (shouldApplyInboundAmbienceSuppression) {
     const now = Date.now();
     const inSpeechPassthroughWindow = now < session.callerSpeechPassthroughUntilMs;
     if (!inSpeechPassthroughWindow) {
@@ -1233,7 +1238,6 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
       if (!AMBIENCE_ALWAYS_ON) {
         stopAmbience(session, 'caller_speech_detected');
       }
-      sendClearToTwilio(session, 'caller_speech_detected', true);
       if (session.suppressedInboundAudioPrebuffer.length > 0) {
         const prebufferedChunks = session.suppressedInboundAudioPrebuffer.splice(0);
         for (const chunk of prebufferedChunks) {
