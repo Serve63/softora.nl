@@ -21,8 +21,13 @@ type BridgeSession = {
   agentSpeaking: boolean;
   ambienceActive: boolean;
   ambienceFrameIndex: number;
-  ambienceInterval: NodeJS.Timeout | null;
   agentSilenceTimer: NodeJS.Timeout | null;
+  twilioOutboundPlayoutTimer: NodeJS.Timeout | null;
+  twilioOutboundPlayoutNextAtMs: number;
+  twilioOutboundAudioQueue: string[];
+  twilioOutboundQueueHighWater: number;
+  twilioAgentWarmupActive: boolean;
+  twilioAgentWarmupUntilMs: number;
   twilioMediaReceived: number;
   twilioMediaOutboundIgnored: number;
   twilioToElevenAudioSent: number;
@@ -30,10 +35,18 @@ type BridgeSession = {
   ambienceToTwilioAudioSent: number;
   droppedTwilioToElevenAudio: number;
   droppedElevenToTwilioAudio: number;
+  droppedElevenToTwilioLatencyAudio: number;
   droppedAmbienceToTwilioAudio: number;
+  droppedAmbienceSuppressionAudio: number;
   droppedEchoGuardAudio: number;
   mediaStatsLastLoggedAtMs: number;
   bufferedUserAudioChunks: string[];
+  suppressedInboundAudioPrebuffer: string[];
+  inboundNoiseFloorRms: number;
+  consecutiveLikelySpeechFrames: number;
+  callerSpeechPassthroughUntilMs: number;
+  echoGuardBypassUntilMs: number;
+  lastCallerSpeechForwardedAtMs: number;
   stopping: boolean;
 };
 
@@ -43,10 +56,52 @@ const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 80;
 const MAX_PREFLUSH_TWILIO_AUDIO_CHUNKS = 20;
 const TWILIO_MEDIA_CHUNK_MS = 20;
 const TWILIO_ULAW_8K_CHUNK_BYTES = 160;
-const AGENT_SILENCE_TO_AMBIENCE_MS = 900;
+const AGENT_SILENCE_TO_AMBIENCE_MS = Math.max(
+  200,
+  Math.floor(parseNumberEnv(process.env.AGENT_SILENCE_TO_AMBIENCE_MS, 1400, 200))
+);
 const INITIAL_AMBIENCE_DELAY_MS = 3500;
-const AGENT_ECHO_GUARD_MS = 650;
+const AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS = Math.max(
+  0,
+  Math.floor(parseNumberEnv(process.env.AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS, 1200, 0))
+);
+const AGENT_ECHO_GUARD_MS = parseNumberEnv(process.env.AGENT_ECHO_GUARD_MS, 320, 0);
+const AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED = parseBooleanEnv(process.env.AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED, true);
+const AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD = parseNumberEnv(
+  process.env.AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD,
+  1300,
+  100
+);
+const AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD = parseNumberEnv(
+  process.env.AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD,
+  4600,
+  500
+);
+const AGENT_ECHO_GUARD_BYPASS_WINDOW_MS = Math.max(
+  0,
+  Math.floor(parseNumberEnv(process.env.AGENT_ECHO_GUARD_BYPASS_WINDOW_MS, 900, 0))
+);
 const MEDIA_STATS_LOG_INTERVAL_MS = 3000;
+const TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS = Math.max(
+  10,
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS, 140, 10))
+);
+const TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS = Math.max(
+  4,
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS, 18, 4))
+);
+const TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS = Math.max(
+  1,
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS, 3, 1))
+);
+const TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS = Math.max(
+  0,
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS, 120, 0))
+);
+const TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK = Math.max(
+  1,
+  Math.floor(parseNumberEnv(process.env.TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK, 2, 1))
+);
 const MAX_ELEVEN_WS_BUFFERED_BYTES = 128 * 1024;
 const MAX_TWILIO_WS_BUFFERED_BYTES = 128 * 1024;
 const ELEVENLABS_AGENT_ID = normalizeString(process.env.ELEVENLABS_AGENT_ID);
@@ -54,11 +109,48 @@ const ELEVENLABS_API_KEY = normalizeString(process.env.ELEVENLABS_API_KEY);
 const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io');
 const AMBIENCE_ENABLED = parseBooleanEnv(process.env.AMBIENCE_ENABLED, false);
 const AMBIENCE_FILE_PATH = normalizeString(process.env.AMBIENCE_FILE_PATH);
+const AMBIENCE_ALWAYS_ON = parseBooleanEnv(process.env.AMBIENCE_ALWAYS_ON, true);
+const AMBIENCE_BASE_GAIN = clampNumber(parseNumberEnv(process.env.AMBIENCE_BASE_GAIN, 0.22, 0), 0, 2);
+const AMBIENCE_UNDER_AGENT_GAIN = clampNumber(
+  parseNumberEnv(process.env.AMBIENCE_UNDER_AGENT_GAIN, 1, 0),
+  0,
+  2
+);
+const AMBIENCE_INBOUND_SUPPRESSION_ENABLED = parseBooleanEnv(process.env.AMBIENCE_INBOUND_SUPPRESSION_ENABLED, true);
+const AMBIENCE_INBOUND_SPEECH_ABSOLUTE_RMS_THRESHOLD = parseNumberEnv(
+  process.env.AMBIENCE_INBOUND_SPEECH_ABSOLUTE_RMS_THRESHOLD,
+  1150,
+  100
+);
+const AMBIENCE_INBOUND_SPEECH_PEAK_THRESHOLD = parseNumberEnv(
+  process.env.AMBIENCE_INBOUND_SPEECH_PEAK_THRESHOLD,
+  4200,
+  500
+);
+const AMBIENCE_INBOUND_SPEECH_NOISE_MULTIPLIER = parseNumberEnv(
+  process.env.AMBIENCE_INBOUND_SPEECH_NOISE_MULTIPLIER,
+  2.2,
+  1
+);
+const AMBIENCE_INBOUND_SPEECH_MIN_CONSECUTIVE_FRAMES = Math.max(
+  1,
+  Math.floor(parseNumberEnv(process.env.AMBIENCE_INBOUND_SPEECH_MIN_CONSECUTIVE_FRAMES, 2, 1))
+);
+const AMBIENCE_INBOUND_SUPPRESSION_PREROLL_MAX_CHUNKS = Math.max(
+  0,
+  Math.floor(parseNumberEnv(process.env.AMBIENCE_INBOUND_SUPPRESSION_PREROLL_MAX_CHUNKS, 12, 0))
+);
+const AMBIENCE_INBOUND_SPEECH_PASSTHROUGH_MS = Math.max(
+  0,
+  Math.floor(parseNumberEnv(process.env.AMBIENCE_INBOUND_SPEECH_PASSTHROUGH_MS, 1400, 0))
+);
+const AMBIENCE_NOISE_FLOOR_RMS_INITIAL = parseNumberEnv(process.env.AMBIENCE_NOISE_FLOOR_RMS_INITIAL, 250, 10);
 
 let connectionCounter = 0;
 let ambienceMuLawAudio: Buffer | null = null;
 let ambienceMuLawFramesBase64: string[] = [];
 let ambienceDisabledReason = '';
+const ULAW_DECODE_TABLE = buildMuLawDecodeTable();
 
 function log(level: LogLevel, message: string, meta?: JsonObject): void {
   const ts = new Date().toISOString();
@@ -79,6 +171,150 @@ function parseBooleanEnv(value: unknown, fallback: boolean): boolean {
   if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
   if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
   return fallback;
+}
+
+function parseNumberEnv(value: unknown, fallback: number, minValue = Number.NEGATIVE_INFINITY): number {
+  const normalized = normalizeString(value);
+  if (!normalized) return fallback;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return fallback;
+  if (parsed < minValue) return fallback;
+  return parsed;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function decodeMuLawSample(sample: number): number {
+  const muLaw = (~sample) & 0xff;
+  const sign = muLaw & 0x80;
+  const exponent = (muLaw >> 4) & 0x07;
+  const mantissa = muLaw & 0x0f;
+  let linear = ((mantissa << 3) + 0x84) << exponent;
+  linear -= 0x84;
+  return sign ? -linear : linear;
+}
+
+function encodeMuLawSample(sample: number): number {
+  const MU_LAW_BIAS = 0x84;
+  const MU_LAW_CLIP = 32635;
+  let pcm = Math.max(-32768, Math.min(32767, Math.round(sample)));
+  const sign = pcm < 0 ? 0x80 : 0x00;
+  if (pcm < 0) pcm = -pcm;
+  if (pcm > MU_LAW_CLIP) pcm = MU_LAW_CLIP;
+  pcm += MU_LAW_BIAS;
+
+  let exponent = 7;
+  for (let expMask = 0x4000; (pcm & expMask) === 0 && exponent > 0; expMask >>= 1) {
+    exponent -= 1;
+  }
+  const mantissa = (pcm >> (exponent + 3)) & 0x0f;
+  return (~(sign | (exponent << 4) | mantissa)) & 0xff;
+}
+
+function buildMuLawDecodeTable(): Int16Array {
+  const table = new Int16Array(256);
+  for (let i = 0; i < table.length; i += 1) {
+    table[i] = decodeMuLawSample(i);
+  }
+  return table;
+}
+
+function applyGainToMuLawBuffer(source: Buffer, gain: number): Buffer {
+  if (!source.length) return Buffer.alloc(0);
+  const safeGain = clampNumber(gain, 0, 2);
+  if (safeGain === 1) return Buffer.from(source);
+
+  const output = Buffer.allocUnsafe(source.length);
+  for (let i = 0; i < source.length; i += 1) {
+    const pcm = ULAW_DECODE_TABLE[source[i]];
+    output[i] = encodeMuLawSample(pcm * safeGain);
+  }
+  return output;
+}
+
+function mixMuLawBase64(primaryBase64: string, ambienceBase64: string, ambienceGain: number): string {
+  if (!primaryBase64 || !ambienceBase64) return primaryBase64;
+  const safeGain = clampNumber(ambienceGain, 0, 2);
+  if (safeGain <= 0) return primaryBase64;
+
+  const primary = Buffer.from(primaryBase64, 'base64');
+  const ambience = Buffer.from(ambienceBase64, 'base64');
+  if (!primary.length || !ambience.length) return primaryBase64;
+
+  const output = Buffer.allocUnsafe(primary.length);
+  const mixLength = Math.min(primary.length, ambience.length);
+  for (let i = 0; i < mixLength; i += 1) {
+    const basePcm = ULAW_DECODE_TABLE[primary[i]];
+    const ambiencePcm = ULAW_DECODE_TABLE[ambience[i]];
+    output[i] = encodeMuLawSample(basePcm + ambiencePcm * safeGain);
+  }
+  for (let i = mixLength; i < primary.length; i += 1) {
+    output[i] = primary[i];
+  }
+  return output.toString('base64');
+}
+
+function analyzeMuLawAudioLevels(audioBase64: string): { rms: number; peak: number } | null {
+  if (!audioBase64) return null;
+
+  const audio = Buffer.from(audioBase64, 'base64');
+  if (!audio.length) return null;
+
+  let sumSquares = 0;
+  let peak = 0;
+  for (let i = 0; i < audio.length; i += 1) {
+    const sample = ULAW_DECODE_TABLE[audio[i]];
+    const abs = sample < 0 ? -sample : sample;
+    sumSquares += sample * sample;
+    if (abs > peak) peak = abs;
+  }
+
+  return {
+    rms: Math.sqrt(sumSquares / audio.length),
+    peak,
+  };
+}
+
+function levelsPassAbsoluteSpeechThreshold(
+  levels: { rms: number; peak: number } | null,
+  rmsThreshold: number,
+  peakThreshold: number
+): boolean {
+  if (!levels) return false;
+  return levels.rms >= rmsThreshold && levels.peak >= peakThreshold;
+}
+
+function isLikelyCallerSpeechFrame(session: BridgeSession, audioBase64: string): boolean {
+  const levels = analyzeMuLawAudioLevels(audioBase64);
+  if (!levels) {
+    session.consecutiveLikelySpeechFrames = 0;
+    return true;
+  }
+
+  const dynamicRmsThreshold = Math.max(
+    AMBIENCE_INBOUND_SPEECH_ABSOLUTE_RMS_THRESHOLD,
+    session.inboundNoiseFloorRms * AMBIENCE_INBOUND_SPEECH_NOISE_MULTIPLIER
+  );
+  const isSpeechFrame = levelsPassAbsoluteSpeechThreshold(
+    levels,
+    dynamicRmsThreshold,
+    AMBIENCE_INBOUND_SPEECH_PEAK_THRESHOLD
+  );
+
+  if (isSpeechFrame) {
+    session.consecutiveLikelySpeechFrames += 1;
+    return session.consecutiveLikelySpeechFrames >= AMBIENCE_INBOUND_SPEECH_MIN_CONSECUTIVE_FRAMES;
+  }
+
+  session.consecutiveLikelySpeechFrames = 0;
+  session.inboundNoiseFloorRms = clampNumber(
+    session.inboundNoiseFloorRms * 0.9 + levels.rms * 0.1,
+    50,
+    10_000
+  );
+  return false;
 }
 
 function resolveAmbiencePath(filePath: string): string {
@@ -162,8 +398,9 @@ function loadAmbienceMuLawAudioBuffer(): void {
         log('WARN', 'ambience disabled', { reason: ambienceDisabledReason });
         return;
       }
-      ambienceMuLawAudio = directBuffer;
-      ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(directBuffer, TWILIO_ULAW_8K_CHUNK_BYTES);
+      const normalizedAmbienceBuffer = applyGainToMuLawBuffer(directBuffer, AMBIENCE_BASE_GAIN);
+      ambienceMuLawAudio = normalizedAmbienceBuffer;
+      ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(normalizedAmbienceBuffer, TWILIO_ULAW_8K_CHUNK_BYTES);
       if (!ambienceMuLawFramesBase64.length) {
         ambienceDisabledReason = 'raw ambience kon niet naar frames worden opgebouwd';
         ambienceMuLawAudio = null;
@@ -171,9 +408,10 @@ function loadAmbienceMuLawAudioBuffer(): void {
         return;
       }
       log('INFO', 'ambience loaded (raw mulaw)', {
-        bytes: directBuffer.length,
+        bytes: normalizedAmbienceBuffer.length,
         frames: ambienceMuLawFramesBase64.length,
         filePath: resolvedPath,
+        appliedGain: AMBIENCE_BASE_GAIN,
       });
       return;
     } catch (error) {
@@ -227,8 +465,9 @@ function loadAmbienceMuLawAudioBuffer(): void {
     return;
   }
 
-  ambienceMuLawAudio = output;
-  ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(output, TWILIO_ULAW_8K_CHUNK_BYTES);
+  const normalizedAmbienceBuffer = applyGainToMuLawBuffer(output, AMBIENCE_BASE_GAIN);
+  ambienceMuLawAudio = normalizedAmbienceBuffer;
+  ambienceMuLawFramesBase64 = buildLoopingMuLawFramesBase64(normalizedAmbienceBuffer, TWILIO_ULAW_8K_CHUNK_BYTES);
   if (!ambienceMuLawFramesBase64.length) {
     ambienceDisabledReason = 'converted ambience kon niet naar frames worden opgebouwd';
     ambienceMuLawAudio = null;
@@ -236,9 +475,10 @@ function loadAmbienceMuLawAudioBuffer(): void {
     return;
   }
   log('INFO', 'ambience loaded (converted to mulaw/8000/mono)', {
-    bytes: output.length,
+    bytes: normalizedAmbienceBuffer.length,
     frames: ambienceMuLawFramesBase64.length,
     sourceFilePath: resolvedPath,
+    appliedGain: AMBIENCE_BASE_GAIN,
   });
 }
 
@@ -248,11 +488,155 @@ function clearAgentSilenceTimer(session: BridgeSession): void {
   session.agentSilenceTimer = null;
 }
 
-function stopAmbience(session: BridgeSession, reason: string): void {
-  if (session.ambienceInterval) {
-    clearInterval(session.ambienceInterval);
-    session.ambienceInterval = null;
+function clearTwilioOutboundPlayoutTimer(session: BridgeSession): void {
+  if (!session.twilioOutboundPlayoutTimer) return;
+  clearTimeout(session.twilioOutboundPlayoutTimer);
+  session.twilioOutboundPlayoutTimer = null;
+}
+
+function pullNextAmbienceFrameBase64(session: BridgeSession): string {
+  if (!session.ambienceActive) return '';
+  if (!ambienceMuLawAudio || ambienceMuLawAudio.length === 0 || ambienceMuLawFramesBase64.length === 0) {
+    stopAmbience(session, 'ambience_unavailable');
+    return '';
   }
+  if (session.ambienceFrameIndex < 0 || session.ambienceFrameIndex >= ambienceMuLawFramesBase64.length) {
+    session.ambienceFrameIndex = 0;
+  }
+  const payloadBase64 = ambienceMuLawFramesBase64[session.ambienceFrameIndex] || '';
+  session.ambienceFrameIndex = (session.ambienceFrameIndex + 1) % ambienceMuLawFramesBase64.length;
+  return payloadBase64;
+}
+
+function getNextTwilioOutboundFrame(
+  session: BridgeSession,
+  nowMs: number
+): { payloadBase64: string; source: 'agent' | 'ambience' } | null {
+  if (session.twilioOutboundAudioQueue.length > 0) {
+    if (session.twilioAgentWarmupActive) {
+      const warmupSatisfied =
+        session.twilioOutboundAudioQueue.length >= TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS ||
+        nowMs >= session.twilioAgentWarmupUntilMs;
+      if (!warmupSatisfied) {
+        return null;
+      }
+      session.twilioAgentWarmupActive = false;
+      session.twilioAgentWarmupUntilMs = 0;
+    }
+    const agentPayloadBase64 = session.twilioOutboundAudioQueue.shift() || '';
+    if (!agentPayloadBase64) return null;
+    if (AMBIENCE_ALWAYS_ON && session.ambienceActive) {
+      const ambiencePayloadBase64 = pullNextAmbienceFrameBase64(session);
+      if (ambiencePayloadBase64) {
+        const mixedPayloadBase64 = mixMuLawBase64(agentPayloadBase64, ambiencePayloadBase64, AMBIENCE_UNDER_AGENT_GAIN);
+        return {
+          payloadBase64: mixedPayloadBase64 || agentPayloadBase64,
+          source: 'agent',
+        };
+      }
+    }
+    return { payloadBase64: agentPayloadBase64, source: 'agent' };
+  }
+
+  if (session.twilioAgentWarmupActive) {
+    session.twilioAgentWarmupActive = false;
+    session.twilioAgentWarmupUntilMs = 0;
+  }
+
+  const payloadBase64 = pullNextAmbienceFrameBase64(session);
+  if (!payloadBase64) return null;
+  return { payloadBase64, source: 'ambience' };
+}
+
+function scheduleTwilioOutboundPlayoutTick(session: BridgeSession, delayMs: number): void {
+  if (session.stopping) return;
+  clearTwilioOutboundPlayoutTimer(session);
+  session.twilioOutboundPlayoutTimer = setTimeout(() => {
+    session.twilioOutboundPlayoutTimer = null;
+    runTwilioOutboundPlayoutTick(session);
+  }, Math.max(0, delayMs));
+}
+
+function runTwilioOutboundPlayoutTick(session: BridgeSession): void {
+  if (session.stopping) return;
+  if (!session.streamSid || session.twilioWs.readyState !== WebSocket.OPEN) return;
+
+  const nowMs = Date.now();
+  if (session.twilioOutboundPlayoutNextAtMs <= 0) {
+    session.twilioOutboundPlayoutNextAtMs = nowMs;
+  }
+  if (session.twilioOutboundPlayoutNextAtMs < nowMs - TWILIO_MEDIA_CHUNK_MS * 6) {
+    session.twilioOutboundPlayoutNextAtMs = nowMs;
+  }
+
+  let framesToProcess = 1;
+  if (
+    TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK > 1 &&
+    session.twilioOutboundAudioQueue.length > TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS
+  ) {
+    const behindFrames = Math.floor((nowMs - session.twilioOutboundPlayoutNextAtMs) / TWILIO_MEDIA_CHUNK_MS);
+    if (behindFrames > 0) {
+      framesToProcess = Math.min(TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK, 1 + behindFrames);
+    }
+  }
+
+  let framesAdvanced = 0;
+  for (let i = 0; i < framesToProcess; i += 1) {
+    const frame = getNextTwilioOutboundFrame(session, nowMs);
+    if (!frame) break;
+    framesAdvanced += 1;
+    if (session.twilioWs.bufferedAmount > MAX_TWILIO_WS_BUFFERED_BYTES) {
+      if (frame.source === 'agent') {
+        session.droppedElevenToTwilioAudio += 1;
+      } else {
+        session.droppedAmbienceToTwilioAudio += 1;
+      }
+      flushMediaStatsIfDue(session);
+      continue;
+    }
+    const ok = sendTwilioMediaToSocket(session, frame.payloadBase64);
+    if (!ok) {
+      if (frame.source === 'ambience') {
+        stopAmbience(session, 'twilio_send_failed');
+      } else {
+        session.droppedElevenToTwilioAudio += 1;
+        flushMediaStatsIfDue(session);
+      }
+      continue;
+    }
+    if (frame.source === 'agent') {
+      session.elevenToTwilioAudioSent += 1;
+      flushMediaStatsIfDue(session);
+    } else {
+      session.ambienceToTwilioAudioSent += 1;
+      flushMediaStatsIfDue(session);
+    }
+  }
+
+  const shouldContinuePlayout = session.ambienceActive || session.twilioOutboundAudioQueue.length > 0;
+  if (!shouldContinuePlayout) {
+    session.twilioOutboundPlayoutNextAtMs = Date.now();
+    return;
+  }
+
+  session.twilioOutboundPlayoutNextAtMs += TWILIO_MEDIA_CHUNK_MS * Math.max(1, framesAdvanced);
+  if (session.twilioOutboundPlayoutNextAtMs < Date.now() - TWILIO_MEDIA_CHUNK_MS * 2) {
+    session.twilioOutboundPlayoutNextAtMs = Date.now() + TWILIO_MEDIA_CHUNK_MS;
+  }
+  const nextDelayMs = Math.max(0, session.twilioOutboundPlayoutNextAtMs - Date.now());
+  scheduleTwilioOutboundPlayoutTick(session, nextDelayMs);
+}
+
+function ensureTwilioOutboundPlayoutRunning(session: BridgeSession): void {
+  if (session.stopping || session.twilioWs.readyState !== WebSocket.OPEN || !session.streamSid) return;
+  if (session.twilioOutboundPlayoutTimer) return;
+  if (session.twilioOutboundPlayoutNextAtMs <= 0) {
+    session.twilioOutboundPlayoutNextAtMs = Date.now();
+  }
+  scheduleTwilioOutboundPlayoutTick(session, 0);
+}
+
+function stopAmbience(session: BridgeSession, reason: string): void {
   if (!session.ambienceActive) return;
   session.ambienceActive = false;
   log('INFO', 'ambience stopped', {
@@ -283,34 +667,7 @@ function startAmbience(session: BridgeSession, reason: string): void {
     callSid: session.callSid,
     reason,
   });
-
-  session.ambienceInterval = setInterval(() => {
-    if (session.stopping || session.twilioWs.readyState !== WebSocket.OPEN || !session.streamSid) {
-      stopAmbience(session, 'call_inactive');
-      return;
-    }
-    if (!ambienceMuLawAudio || ambienceMuLawAudio.length === 0 || ambienceMuLawFramesBase64.length === 0) {
-      stopAmbience(session, 'ambience_unavailable');
-      return;
-    }
-    const payloadBase64 = ambienceMuLawFramesBase64[session.ambienceFrameIndex] || '';
-    session.ambienceFrameIndex = (session.ambienceFrameIndex + 1) % ambienceMuLawFramesBase64.length;
-
-    if (session.twilioWs.bufferedAmount > MAX_TWILIO_WS_BUFFERED_BYTES) {
-      session.droppedAmbienceToTwilioAudio += 1;
-      flushMediaStatsIfDue(session);
-      return;
-    }
-
-    const ok = sendTwilioMediaToSocket(session, payloadBase64);
-
-    if (!ok) {
-      stopAmbience(session, 'twilio_send_failed');
-      return;
-    }
-    session.ambienceToTwilioAudioSent += 1;
-    flushMediaStatsIfDue(session);
-  }, TWILIO_MEDIA_CHUNK_MS);
+  ensureTwilioOutboundPlayoutRunning(session);
 }
 
 function scheduleAmbienceStartOnSilence(
@@ -318,10 +675,22 @@ function scheduleAmbienceStartOnSilence(
   reason: string,
   delayMs = AGENT_SILENCE_TO_AMBIENCE_MS
 ): void {
+  if (AMBIENCE_ALWAYS_ON) {
+    startAmbience(session, reason);
+    return;
+  }
   clearAgentSilenceTimer(session);
   if (session.stopping) return;
   session.agentSilenceTimer = setTimeout(() => {
     session.agentSilenceTimer = null;
+    if (AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS > 0 && session.lastCallerSpeechForwardedAtMs > 0) {
+      const elapsedSinceCallerSpeechMs = Date.now() - session.lastCallerSpeechForwardedAtMs;
+      if (elapsedSinceCallerSpeechMs < AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS) {
+        const remainingMs = AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS - elapsedSinceCallerSpeechMs;
+        scheduleAmbienceStartOnSilence(session, reason, Math.max(TWILIO_MEDIA_CHUNK_MS, remainingMs));
+        return;
+      }
+    }
     session.agentSpeaking = false;
     startAmbience(session, reason);
   }, delayMs);
@@ -330,6 +699,11 @@ function scheduleAmbienceStartOnSilence(
 function cleanupSessionState(session: BridgeSession, reason: string): void {
   clearAgentSilenceTimer(session);
   stopAmbience(session, reason);
+  clearTwilioOutboundPlayoutTimer(session);
+  session.twilioOutboundAudioQueue.length = 0;
+  session.twilioAgentWarmupActive = false;
+  session.twilioAgentWarmupUntilMs = 0;
+  session.lastCallerSpeechForwardedAtMs = 0;
 }
 
 function resetMediaStatsCounters(session: BridgeSession): void {
@@ -340,8 +714,11 @@ function resetMediaStatsCounters(session: BridgeSession): void {
   session.ambienceToTwilioAudioSent = 0;
   session.droppedTwilioToElevenAudio = 0;
   session.droppedElevenToTwilioAudio = 0;
+  session.droppedElevenToTwilioLatencyAudio = 0;
   session.droppedAmbienceToTwilioAudio = 0;
+  session.droppedAmbienceSuppressionAudio = 0;
   session.droppedEchoGuardAudio = 0;
+  session.twilioOutboundQueueHighWater = session.twilioOutboundAudioQueue.length;
 }
 
 function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
@@ -358,7 +735,9 @@ function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
     session.ambienceToTwilioAudioSent > 0 ||
     session.droppedTwilioToElevenAudio > 0 ||
     session.droppedElevenToTwilioAudio > 0 ||
+    session.droppedElevenToTwilioLatencyAudio > 0 ||
     session.droppedAmbienceToTwilioAudio > 0 ||
+    session.droppedAmbienceSuppressionAudio > 0 ||
     session.droppedEchoGuardAudio > 0;
 
   if (hasAnyStat) {
@@ -372,8 +751,12 @@ function flushMediaStatsIfDue(session: BridgeSession, force = false): void {
       ambienceToTwilioSent: session.ambienceToTwilioAudioSent,
       droppedTwilioToEleven: session.droppedTwilioToElevenAudio,
       droppedElevenToTwilio: session.droppedElevenToTwilioAudio,
+      droppedElevenToTwilioLatency: session.droppedElevenToTwilioLatencyAudio,
       droppedAmbienceToTwilio: session.droppedAmbienceToTwilioAudio,
+      droppedAmbienceSuppression: session.droppedAmbienceSuppressionAudio,
       droppedEchoGuardAudio: session.droppedEchoGuardAudio,
+      twilioOutboundQueueDepth: session.twilioOutboundAudioQueue.length,
+      twilioOutboundQueueHighWater: session.twilioOutboundQueueHighWater,
       intervalMs: now - session.mediaStatsLastLoggedAtMs,
     });
     resetMediaStatsCounters(session);
@@ -555,27 +938,55 @@ function sendAudioToTwilio(session: BridgeSession, audioBase64: string): void {
     return;
   }
 
-  if (session.twilioWs.bufferedAmount > MAX_TWILIO_WS_BUFFERED_BYTES) {
-    session.droppedElevenToTwilioAudio += 1;
+  const queueWasEmpty = session.twilioOutboundAudioQueue.length === 0;
+  session.twilioOutboundAudioQueue.push(audioBase64);
+  if (session.twilioOutboundAudioQueue.length > session.twilioOutboundQueueHighWater) {
+    session.twilioOutboundQueueHighWater = session.twilioOutboundAudioQueue.length;
+  }
+
+  if (session.twilioOutboundAudioQueue.length > TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS) {
+    const droppedForLag = session.twilioOutboundAudioQueue.length - TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS;
+    session.twilioOutboundAudioQueue.splice(0, droppedForLag);
+    session.droppedElevenToTwilioAudio += droppedForLag;
+    session.droppedElevenToTwilioLatencyAudio += droppedForLag;
     flushMediaStatsIfDue(session);
-    return;
   }
 
-  const ok = sendTwilioMediaToSocket(session, audioBase64);
-
-  if (!ok) {
-    log('WARN', 'failed to send audio to twilio (socket not open)', {
-      connectionId: session.connectionId,
-      streamSid: session.streamSid,
-    });
-    return;
+  if (session.twilioOutboundAudioQueue.length > TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS) {
+    const dropped = session.twilioOutboundAudioQueue.length - TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS;
+    session.twilioOutboundAudioQueue.splice(0, dropped);
+    session.droppedElevenToTwilioAudio += dropped;
+    flushMediaStatsIfDue(session);
   }
-  session.elevenToTwilioAudioSent += 1;
-  flushMediaStatsIfDue(session);
+
+  if (queueWasEmpty && TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS > 1) {
+    session.twilioAgentWarmupActive = true;
+    session.twilioAgentWarmupUntilMs = Date.now() + TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS;
+  }
+  ensureTwilioOutboundPlayoutRunning(session);
 }
 
-function sendClearToTwilio(session: BridgeSession, reason: string): void {
+function clearQueuedAgentAudioForTwilio(session: BridgeSession, reason: string): void {
+  if (!session.twilioOutboundAudioQueue.length) return;
+  const dropped = session.twilioOutboundAudioQueue.length;
+  session.twilioOutboundAudioQueue.length = 0;
+  session.twilioAgentWarmupActive = false;
+  session.twilioAgentWarmupUntilMs = 0;
+  session.droppedElevenToTwilioAudio += dropped;
+  log('INFO', 'queued agent audio cleared before twilio playout', {
+    connectionId: session.connectionId,
+    streamSid: session.streamSid,
+    droppedChunks: dropped,
+    reason,
+  });
+}
+
+function sendClearToTwilio(session: BridgeSession, reason: string, clearQueuedAgentAudio = false): void {
   if (!session.streamSid) return;
+
+  if (clearQueuedAgentAudio) {
+    clearQueuedAgentAudioForTwilio(session, reason);
+  }
 
   const ok = safeSendWsJson(session.twilioWs, {
     event: 'clear',
@@ -629,26 +1040,9 @@ function flushBufferedAudioToElevenLabs(session: BridgeSession): void {
   }
 }
 
-function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string): void {
+function forwardTwilioAudioChunkToElevenLabs(session: BridgeSession, audioBase64: string): void {
   if (!audioBase64) return;
-  if (session.elevenUnavailable) {
-    log('WARN', 'audio dropped: elevenlabs marked unavailable for this call', {
-      connectionId: session.connectionId,
-      streamSid: session.streamSid,
-      payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
-    });
-    return;
-  }
-
-  if (session.hasReceivedAgentAudio) {
-    const elapsedSinceAgentAudioMs = Date.now() - session.lastAgentAudioAtMs;
-    if (elapsedSinceAgentAudioMs >= 0 && elapsedSinceAgentAudioMs < AGENT_ECHO_GUARD_MS) {
-      session.droppedEchoGuardAudio += 1;
-      flushMediaStatsIfDue(session);
-      return;
-    }
-  }
-
+  session.lastCallerSpeechForwardedAtMs = Date.now();
   const elevenWs = session.elevenWs;
   if (elevenWs && elevenWs.readyState === WebSocket.OPEN) {
     if (elevenWs.bufferedAmount > MAX_ELEVEN_WS_BUFFERED_BYTES) {
@@ -685,6 +1079,88 @@ function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string
       maxBufferedChunks: MAX_BUFFERED_TWILIO_AUDIO_CHUNKS,
     });
   }
+}
+
+function sendTwilioAudioToElevenLabs(session: BridgeSession, audioBase64: string): void {
+  if (!audioBase64) return;
+  if (session.elevenUnavailable) {
+    log('WARN', 'audio dropped: elevenlabs marked unavailable for this call', {
+      connectionId: session.connectionId,
+      streamSid: session.streamSid,
+      payloadBytes: Buffer.byteLength(audioBase64, 'utf8'),
+    });
+    return;
+  }
+
+  let analyzedLevels: { rms: number; peak: number } | null | undefined;
+  const getAnalyzedLevels = (): { rms: number; peak: number } | null => {
+    if (analyzedLevels === undefined) {
+      analyzedLevels = analyzeMuLawAudioLevels(audioBase64);
+    }
+    return analyzedLevels;
+  };
+
+  if (session.hasReceivedAgentAudio) {
+    const now = Date.now();
+    if (now < session.echoGuardBypassUntilMs) {
+      // Temporary bypass window after confirmed caller speech to prevent clipped turn-taking.
+    } else {
+      const elapsedSinceAgentAudioMs = now - session.lastAgentAudioAtMs;
+      if (elapsedSinceAgentAudioMs >= 0 && elapsedSinceAgentAudioMs < AGENT_ECHO_GUARD_MS) {
+        const canBypassEchoGuard =
+          AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED &&
+          levelsPassAbsoluteSpeechThreshold(
+            getAnalyzedLevels(),
+            AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD,
+            AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD
+          );
+        if (!canBypassEchoGuard) {
+          session.droppedEchoGuardAudio += 1;
+          flushMediaStatsIfDue(session);
+          return;
+        }
+        if (AGENT_ECHO_GUARD_BYPASS_WINDOW_MS > 0) {
+          session.echoGuardBypassUntilMs = now + AGENT_ECHO_GUARD_BYPASS_WINDOW_MS;
+        }
+      }
+    }
+  }
+
+  if (AMBIENCE_INBOUND_SUPPRESSION_ENABLED && session.ambienceActive) {
+    const now = Date.now();
+    const inSpeechPassthroughWindow = now < session.callerSpeechPassthroughUntilMs;
+    if (!inSpeechPassthroughWindow) {
+      const likelyCallerSpeech = isLikelyCallerSpeechFrame(session, audioBase64);
+      if (!likelyCallerSpeech) {
+        if (AMBIENCE_INBOUND_SUPPRESSION_PREROLL_MAX_CHUNKS > 0) {
+          session.suppressedInboundAudioPrebuffer.push(audioBase64);
+          if (session.suppressedInboundAudioPrebuffer.length > AMBIENCE_INBOUND_SUPPRESSION_PREROLL_MAX_CHUNKS) {
+            session.suppressedInboundAudioPrebuffer.shift();
+          }
+        }
+        session.droppedAmbienceSuppressionAudio += 1;
+        flushMediaStatsIfDue(session);
+        return;
+      }
+      session.callerSpeechPassthroughUntilMs = now + AMBIENCE_INBOUND_SPEECH_PASSTHROUGH_MS;
+      if (!AMBIENCE_ALWAYS_ON) {
+        stopAmbience(session, 'caller_speech_detected');
+      }
+      sendClearToTwilio(session, 'caller_speech_detected', true);
+      if (session.suppressedInboundAudioPrebuffer.length > 0) {
+        const prebufferedChunks = session.suppressedInboundAudioPrebuffer.splice(0);
+        for (const chunk of prebufferedChunks) {
+          forwardTwilioAudioChunkToElevenLabs(session, chunk);
+        }
+      }
+    }
+  } else {
+    session.consecutiveLikelySpeechFrames = 0;
+    session.suppressedInboundAudioPrebuffer.length = 0;
+    session.callerSpeechPassthroughUntilMs = 0;
+  }
+
+  forwardTwilioAudioChunkToElevenLabs(session, audioBase64);
 }
 
 function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
@@ -748,12 +1224,15 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
 
     session.hasReceivedAgentAudio = true;
     session.lastAgentAudioAtMs = Date.now();
+    session.echoGuardBypassUntilMs = 0;
 
     if (!session.agentSpeaking) {
-      if (session.ambienceActive) {
-        sendClearToTwilio(session, 'agent_audio_resumed');
+      if (session.ambienceActive && !AMBIENCE_ALWAYS_ON) {
+        sendClearToTwilio(session, 'agent_audio_resumed', true);
       }
-      stopAmbience(session, 'agent_audio_resumed');
+      if (!AMBIENCE_ALWAYS_ON) {
+        stopAmbience(session, 'agent_audio_resumed');
+      }
       log('INFO', 'agent audio resumed', {
         connectionId: session.connectionId,
         streamSid: session.streamSid,
@@ -772,7 +1251,7 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
       connectionId: session.connectionId,
       reason: asString(interruption.reason),
     });
-    sendClearToTwilio(session, 'elevenlabs_interruption');
+    sendClearToTwilio(session, 'elevenlabs_interruption', true);
     session.agentSpeaking = false;
     scheduleAmbienceStartOnSilence(session, 'elevenlabs_interruption');
     return;
@@ -872,7 +1351,11 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
     });
     flushBufferedAudioToElevenLabs(session);
     if (!session.hasReceivedAgentAudio) {
-      scheduleAmbienceStartOnSilence(session, 'waiting_for_agent_audio', INITIAL_AMBIENCE_DELAY_MS);
+      if (AMBIENCE_ALWAYS_ON) {
+        startAmbience(session, 'waiting_for_agent_audio');
+      } else {
+        scheduleAmbienceStartOnSilence(session, 'waiting_for_agent_audio', INITIAL_AMBIENCE_DELAY_MS);
+      }
     }
   });
 
@@ -963,8 +1446,13 @@ wss.on('connection', (ws, req) => {
     agentSpeaking: false,
     ambienceActive: false,
     ambienceFrameIndex: 0,
-    ambienceInterval: null,
     agentSilenceTimer: null,
+    twilioOutboundPlayoutTimer: null,
+    twilioOutboundPlayoutNextAtMs: 0,
+    twilioOutboundAudioQueue: [],
+    twilioOutboundQueueHighWater: 0,
+    twilioAgentWarmupActive: false,
+    twilioAgentWarmupUntilMs: 0,
     twilioMediaReceived: 0,
     twilioMediaOutboundIgnored: 0,
     twilioToElevenAudioSent: 0,
@@ -972,10 +1460,18 @@ wss.on('connection', (ws, req) => {
     ambienceToTwilioAudioSent: 0,
     droppedTwilioToElevenAudio: 0,
     droppedElevenToTwilioAudio: 0,
+    droppedElevenToTwilioLatencyAudio: 0,
     droppedAmbienceToTwilioAudio: 0,
+    droppedAmbienceSuppressionAudio: 0,
     droppedEchoGuardAudio: 0,
     mediaStatsLastLoggedAtMs: Date.now(),
     bufferedUserAudioChunks: [],
+    suppressedInboundAudioPrebuffer: [],
+    inboundNoiseFloorRms: AMBIENCE_NOISE_FLOOR_RMS_INITIAL,
+    consecutiveLikelySpeechFrames: 0,
+    callerSpeechPassthroughUntilMs: 0,
+    echoGuardBypassUntilMs: 0,
+    lastCallerSpeechForwardedAtMs: 0,
     stopping: false,
   };
 
@@ -1023,12 +1519,31 @@ wss.on('connection', (ws, req) => {
       const start = asObject(payload.start) || {};
       session.streamSid = asString(start.streamSid) || session.streamSid;
       session.callSid = asString(start.callSid) || session.callSid;
+      const mediaFormat = asObject(start.mediaFormat) || {};
+      const mediaEncoding = asString(mediaFormat.encoding).toLowerCase();
+      const mediaSampleRate = asString(mediaFormat.sampleRate);
+      const mediaChannels = asString(mediaFormat.channels);
 
       log('INFO', 'twilio event: start', {
         connectionId: session.connectionId,
         streamSid: session.streamSid,
         callSid: session.callSid,
+        mediaEncoding: mediaEncoding || '(unknown)',
+        mediaSampleRate: mediaSampleRate || '(unknown)',
+        mediaChannels: mediaChannels || '(unknown)',
       });
+      if (
+        (mediaEncoding && !/mulaw|ulaw|g711/.test(mediaEncoding)) ||
+        (mediaSampleRate && mediaSampleRate !== '8000')
+      ) {
+        log('WARN', 'twilio media format may not be telephony-compatible', {
+          connectionId: session.connectionId,
+          streamSid: session.streamSid,
+          mediaEncoding: mediaEncoding || '(unknown)',
+          mediaSampleRate: mediaSampleRate || '(unknown)',
+          mediaChannels: mediaChannels || '(unknown)',
+        });
+      }
       log('INFO', 'elevenlabs call-start config', {
         connectionId: session.connectionId,
         streamSid: session.streamSid,
@@ -1055,6 +1570,10 @@ wss.on('connection', (ws, req) => {
           hasElevenLabsApiKey: Boolean(ELEVENLABS_API_KEY),
           hasElevenLabsAgentId: Boolean(ELEVENLABS_AGENT_ID),
         });
+      }
+
+      if (AMBIENCE_ALWAYS_ON) {
+        startAmbience(session, 'call_start');
       }
 
       void connectElevenLabsForSession(session);
@@ -1141,6 +1660,29 @@ server.listen(PORT, () => {
   log('INFO', 'ambience startup config', {
     AMBIENCE_ENABLED,
     AMBIENCE_FILE_PATH: AMBIENCE_FILE_PATH || '(empty)',
+    AMBIENCE_ALWAYS_ON,
+    AMBIENCE_BASE_GAIN,
+    AMBIENCE_UNDER_AGENT_GAIN,
+    AMBIENCE_INBOUND_SUPPRESSION_ENABLED,
+    AMBIENCE_INBOUND_SPEECH_ABSOLUTE_RMS_THRESHOLD,
+    AMBIENCE_INBOUND_SPEECH_PEAK_THRESHOLD,
+    AMBIENCE_INBOUND_SPEECH_NOISE_MULTIPLIER,
+    AMBIENCE_INBOUND_SPEECH_MIN_CONSECUTIVE_FRAMES,
+    AMBIENCE_INBOUND_SUPPRESSION_PREROLL_MAX_CHUNKS,
+    AMBIENCE_INBOUND_SPEECH_PASSTHROUGH_MS,
+    AGENT_SILENCE_TO_AMBIENCE_MS,
+    AMBIENCE_AFTER_CALLER_SPEECH_COOLDOWN_MS,
+    AMBIENCE_NOISE_FLOOR_RMS_INITIAL,
+    AGENT_ECHO_GUARD_MS,
+    AGENT_ECHO_GUARD_SPEECH_BYPASS_ENABLED,
+    AGENT_ECHO_GUARD_SPEECH_BYPASS_RMS_THRESHOLD,
+    AGENT_ECHO_GUARD_SPEECH_BYPASS_PEAK_THRESHOLD,
+    AGENT_ECHO_GUARD_BYPASS_WINDOW_MS,
+    TWILIO_OUTBOUND_AGENT_QUEUE_MAX_CHUNKS,
+    TWILIO_OUTBOUND_AGENT_MAX_LAG_CHUNKS,
+    TWILIO_OUTBOUND_AGENT_JITTER_TARGET_CHUNKS,
+    TWILIO_OUTBOUND_AGENT_JITTER_MAX_WAIT_MS,
+    TWILIO_OUTBOUND_MAX_FRAMES_PER_TICK,
     ffmpeg: 'used for non-mulaw ambience conversion',
   });
 
