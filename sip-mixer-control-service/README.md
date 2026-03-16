@@ -7,9 +7,10 @@ Aparte control plane service voor het `sip_media_mixer` providerpad in `server.j
 - Expose `POST /v1/outbound/start`
 - Expose `GET /v1/outbound/calls/:callId`
 - API-key auth via `Authorization: Bearer <SIP_MIXER_CONTROL_API_KEY>`
-- Nu met 2 engine-modes:
+- Nu met 3 engine-modes:
   - `mock` (default) voor end-to-end testen zonder telephony infra
   - `webhook` om door te schakelen naar een externe media engine
+  - `twilio_stream` voor echte outbound calls via Twilio Media Streams
 
 ## Quick start
 
@@ -25,8 +26,9 @@ Service draait standaard op `http://localhost:10001`.
 
 - `PORT` default `10001`
 - `SIP_MIXER_CONTROL_API_KEY` required
-- `SIP_MIXER_ENGINE_MODE` `mock` of `webhook` (default `mock`)
+- `SIP_MIXER_ENGINE_MODE` `mock`, `webhook` of `twilio_stream` (default `mock`)
 - `SIP_MIXER_REQUEST_TIMEOUT_MS` default `15000`
+- `SIP_MIXER_PUBLIC_BASE_URL` public https base URL van deze service (vereist voor `twilio_stream`, fallback: `RENDER_EXTERNAL_HOSTNAME`)
 
 ### Mock mode tuning
 
@@ -41,6 +43,16 @@ Service draait standaard op `http://localhost:10001`.
 - `SIP_MIXER_ENGINE_BEARER_TOKEN` optional
 - `SIP_MIXER_ENGINE_START_PATH` default `/v1/calls/start`
 - `SIP_MIXER_ENGINE_STATUS_PATH_TEMPLATE` default `/v1/calls/{callId}`
+
+### Twilio stream mode
+
+- `TWILIO_ACCOUNT_SID` required
+- `TWILIO_AUTH_TOKEN` required
+- `TWILIO_OUTBOUND_CALLER_NUMBER` required
+- `TWILIO_MEDIA_WS_URL` required (bijv. `wss://twilio-media-bridge-.../twilio-media`)
+- Service gebruikt:
+  - `POST /v1/twilio/call-status` als Twilio status callback
+  - `ALL /v1/twilio/outbound-twiml` als TwiML endpoint voor `<Connect><Stream>`
 
 ## Contract
 

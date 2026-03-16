@@ -17,6 +17,12 @@ const ENGINE_START_PATH = String(process.env.SIP_MIXER_ENGINE_START_PATH || '/v1
 const ENGINE_STATUS_PATH_TEMPLATE = String(
   process.env.SIP_MIXER_ENGINE_STATUS_PATH_TEMPLATE || '/v1/calls/{callId}'
 ).trim();
+const SIP_MIXER_PUBLIC_BASE_URL = String(process.env.SIP_MIXER_PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '');
+
+const TWILIO_ACCOUNT_SID = String(process.env.TWILIO_ACCOUNT_SID || '').trim();
+const TWILIO_AUTH_TOKEN = String(process.env.TWILIO_AUTH_TOKEN || '').trim();
+const TWILIO_OUTBOUND_CALLER_NUMBER = String(process.env.TWILIO_OUTBOUND_CALLER_NUMBER || '').trim();
+const TWILIO_MEDIA_WS_URL = String(process.env.TWILIO_MEDIA_WS_URL || '').trim();
 
 const MOCK_RING_DELAY_MS = Math.max(100, Number(process.env.SIP_MIXER_MOCK_RING_DELAY_MS || 900) || 900);
 const MOCK_CONNECT_DELAY_MS = Math.max(
@@ -32,6 +38,7 @@ app.use(express.urlencoded({ extended: false }));
 
 const callsById = new Map();
 const mockTimersByCallId = new Map();
+const twilioCallSidToCallId = new Map();
 
 function normalizeString(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
@@ -42,6 +49,117 @@ function parseNumberSafe(value, fallback = null) {
   if (value === '' || value === null || value === undefined) return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function escapeXml(value) {
+  return normalizeString(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function isTerminalStatus(status) {
+  const normalized = normalizeString(status).toLowerCase();
+  return (
+    normalized === 'completed' ||
+    normalized === 'busy' ||
+    normalized === 'failed' ||
+    normalized === 'no-answer' ||
+    normalized === 'canceled' ||
+    normalized === 'cancelled'
+  );
+}
+
+function mapTwilioStatus(status) {
+  const normalized = normalizeString(status).toLowerCase();
+  if (!normalized) return '';
+  if (normalized === 'answered') return 'in-progress';
+  if (normalized === 'initiated') return 'queued';
+  return normalized;
+}
+
+function resolvePublicBaseUrl() {
+  const configured = normalizeString(SIP_MIXER_PUBLIC_BASE_URL);
+  if (configured) return configured.replace(/\/+$/, '');
+  const renderHostname = normalizeString(process.env.RENDER_EXTERNAL_HOSTNAME);
+  if (renderHostname) return `https://${renderHostname}`;
+  return '';
+}
+
+function buildTwilioAuthHeader() {
+  const token = Buffer.from(`${normalizeString(TWILIO_ACCOUNT_SID)}:${normalizeString(TWILIO_AUTH_TOKEN)}`).toString(
+    'base64'
+  );
+  return `Basic ${token}`;
+}
+
+function buildFormEncodedBody(form = {}) {
+  const params = new URLSearchParams();
+  Object.entries(form).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    const normalized = Array.isArray(value) ? value.join(' ') : String(value);
+    if (!normalizeString(normalized)) return;
+    params.append(key, normalized);
+  });
+  return params;
+}
+
+async function twilioApiRequest(path, options = {}) {
+  if (!normalizeString(TWILIO_ACCOUNT_SID) || !normalizeString(TWILIO_AUTH_TOKEN)) {
+    const error = new Error('Twilio credentials ontbreken op SIP mixer service.');
+    error.status = 503;
+    throw error;
+  }
+  const normalizedPath = normalizeString(path).replace(/^\/+/, '');
+  const endpoint = `https://api.twilio.com/2010-04-01/${normalizedPath}`;
+  const method = normalizeString(options.method || 'GET').toUpperCase() || 'GET';
+  const headers = {
+    Authorization: buildTwilioAuthHeader(),
+    Accept: 'application/json',
+  };
+  let body;
+  if (options.form && typeof options.form === 'object') {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    body = buildFormEncodedBody(options.form).toString();
+  }
+
+  const { response, data } = await fetchJsonWithTimeout(endpoint, {
+    method,
+    headers,
+    body,
+  });
+
+  if (!response.ok) {
+    const error = new Error(
+      normalizeString(data?.message || data?.detail || data?.error) || `Twilio API request failed (${response.status})`
+    );
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return {
+    status: response.status,
+    data: data && typeof data === 'object' ? data : {},
+  };
+}
+
+function ensureTwilioStreamEngineConfig() {
+  const missing = [];
+  if (!normalizeString(TWILIO_ACCOUNT_SID)) missing.push('TWILIO_ACCOUNT_SID');
+  if (!normalizeString(TWILIO_AUTH_TOKEN)) missing.push('TWILIO_AUTH_TOKEN');
+  if (!normalizeString(TWILIO_OUTBOUND_CALLER_NUMBER)) missing.push('TWILIO_OUTBOUND_CALLER_NUMBER');
+  if (!normalizeString(TWILIO_MEDIA_WS_URL)) missing.push('TWILIO_MEDIA_WS_URL');
+  if (!normalizeString(resolvePublicBaseUrl())) missing.push('SIP_MIXER_PUBLIC_BASE_URL');
+
+  if (missing.length > 0) {
+    const error = new Error(`Twilio stream engine mist env vars: ${missing.join(', ')}`);
+    error.status = 503;
+    error.data = { missing };
+    throw error;
+  }
 }
 
 function nowIso() {
@@ -138,6 +256,61 @@ function patchCall(callId, patch = {}) {
   }
   callsById.set(callId, next);
   return next;
+}
+
+function trackTwilioCallSid(callId, callSid) {
+  const normalizedCallId = normalizeString(callId);
+  const normalizedCallSid = normalizeString(callSid);
+  if (!normalizedCallId || !normalizedCallSid) return;
+  twilioCallSidToCallId.set(normalizedCallSid, normalizedCallId);
+}
+
+function getCallIdByTwilioCallSid(callSid) {
+  const normalizedCallSid = normalizeString(callSid);
+  if (!normalizedCallSid) return '';
+  return normalizeString(twilioCallSidToCallId.get(normalizedCallSid) || '');
+}
+
+function buildTwilioStreamParameters(call) {
+  const base = {
+    callId: normalizeString(call?.callId),
+    profileId: normalizeString(call?.profileId),
+    lead_name: normalizeString(call?.lead?.name),
+    lead_company: normalizeString(call?.lead?.company),
+    lead_phone: normalizeString(call?.lead?.phone),
+    lead_region: normalizeString(call?.lead?.region),
+    campaign_sector: normalizeString(call?.campaign?.sector),
+    campaign_region: normalizeString(call?.campaign?.region),
+    campaign_extra_instructions: normalizeString(call?.campaign?.extraInstructions),
+  };
+
+  const dynamicVariables = call?.dynamicVariables && typeof call.dynamicVariables === 'object' ? call.dynamicVariables : {};
+  const dynamicParameters = {};
+  for (const [key, value] of Object.entries(dynamicVariables)) {
+    const normalizedKey = normalizeString(key);
+    const normalizedValue = normalizeString(value);
+    if (!normalizedKey || !normalizedValue) continue;
+    dynamicParameters[normalizedKey] = normalizedValue;
+  }
+
+  return { ...base, ...dynamicParameters };
+}
+
+function buildTwilioStreamTwiml(call) {
+  const parameters = buildTwilioStreamParameters(call);
+  const parameterXml = Object.entries(parameters)
+    .filter(([, value]) => normalizeString(value))
+    .map(([key, value]) => `      <Parameter name="${escapeXml(key)}" value="${escapeXml(value)}" />`)
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Connect>
+    <Stream url="${escapeXml(TWILIO_MEDIA_WS_URL)}">
+${parameterXml}
+    </Stream>
+  </Connect>
+</Response>`;
 }
 
 function clearMockTimers(callId) {
@@ -307,7 +480,103 @@ async function getCallWithWebhookEngine(callId) {
   return call;
 }
 
+async function startCallWithTwilioStreamEngine(payload) {
+  ensureTwilioStreamEngineConfig();
+
+  const call = buildCallStateFromStartPayload(payload, {
+    callId: createCallId(),
+    status: 'queued',
+    providerMetadata: {
+      engineMode: 'twilio_stream',
+    },
+  });
+  callsById.set(call.callId, call);
+
+  const publicBaseUrl = resolvePublicBaseUrl();
+  const twimlUrl = new URL(`${publicBaseUrl}/v1/twilio/outbound-twiml`);
+  twimlUrl.searchParams.set('callId', call.callId);
+
+  const statusCallbackUrl = new URL(`${publicBaseUrl}/v1/twilio/call-status`);
+  statusCallbackUrl.searchParams.set('callId', call.callId);
+
+  const { data } = await twilioApiRequest(`Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Calls.json`, {
+    method: 'POST',
+    form: {
+      To: normalizeString(call?.lead?.phone),
+      From: normalizeString(TWILIO_OUTBOUND_CALLER_NUMBER),
+      Url: twimlUrl.toString(),
+      Method: 'POST',
+      StatusCallback: statusCallbackUrl.toString(),
+      StatusCallbackMethod: 'POST',
+      StatusCallbackEvent: 'initiated ringing answered completed',
+    },
+  });
+
+  const twilioCallSid = normalizeString(data?.sid || data?.callSid || data?.call_sid);
+  const twilioStatus = mapTwilioStatus(data?.status);
+  trackTwilioCallSid(call.callId, twilioCallSid);
+
+  return (
+    patchCall(call.callId, {
+      status: twilioStatus || 'queued',
+      startedAt: call.startedAt || nowIso(),
+      providerMetadata: {
+        ...(call.providerMetadata && typeof call.providerMetadata === 'object' ? call.providerMetadata : {}),
+        engineMode: 'twilio_stream',
+        twilioCallSid,
+        twilioStatus: twilioStatus || 'queued',
+      },
+    }) || call
+  );
+}
+
+async function syncTwilioStatusForCall(call) {
+  if (!call || typeof call !== 'object') return call || null;
+  if (isTerminalStatus(call.status)) return call;
+
+  const twilioCallSid = normalizeString(call?.providerMetadata?.twilioCallSid);
+  if (!twilioCallSid || !normalizeString(TWILIO_ACCOUNT_SID) || !normalizeString(TWILIO_AUTH_TOKEN)) {
+    return call;
+  }
+
+  try {
+    const { data } = await twilioApiRequest(
+      `Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Calls/${encodeURIComponent(twilioCallSid)}.json`,
+      { method: 'GET' }
+    );
+    const status = mapTwilioStatus(data?.status);
+    if (!status) return call;
+
+    const patch = {
+      status,
+      endedReason: isTerminalStatus(status) ? status : normalizeString(call?.endedReason),
+      endedAt: isTerminalStatus(status) ? normalizeString(call?.endedAt || nowIso()) : normalizeString(call?.endedAt),
+      durationSeconds: parseNumberSafe(data?.duration, parseNumberSafe(call?.durationSeconds, null)),
+      providerMetadata: {
+        ...(call.providerMetadata && typeof call.providerMetadata === 'object' ? call.providerMetadata : {}),
+        engineMode: 'twilio_stream',
+        twilioCallSid,
+        twilioStatus: status,
+      },
+    };
+
+    return patchCall(call.callId, patch) || call;
+  } catch {
+    return call;
+  }
+}
+
+async function getCallWithTwilioStreamEngine(callId) {
+  const normalizedCallId = normalizeString(callId);
+  const cached = callsById.get(normalizedCallId) || null;
+  if (!cached) return null;
+  return syncTwilioStatusForCall(cached);
+}
+
 async function startCall(payload) {
+  if (ENGINE_MODE === 'twilio_stream') {
+    return startCallWithTwilioStreamEngine(payload);
+  }
   if (ENGINE_MODE === 'webhook') {
     return startCallWithWebhookEngine(payload);
   }
@@ -315,6 +584,9 @@ async function startCall(payload) {
 }
 
 async function getCall(callId) {
+  if (ENGINE_MODE === 'twilio_stream') {
+    return getCallWithTwilioStreamEngine(callId);
+  }
   if (ENGINE_MODE === 'webhook') {
     return getCallWithWebhookEngine(callId);
   }
@@ -359,9 +631,79 @@ app.get('/healthz', (_req, res) => {
     engineMode: ENGINE_MODE,
     authConfigured: Boolean(normalizeString(CONTROL_API_KEY)),
     engineBaseUrl: normalizeString(ENGINE_BASE_URL) || null,
+    twilioStreamConfigured:
+      Boolean(normalizeString(TWILIO_ACCOUNT_SID)) &&
+      Boolean(normalizeString(TWILIO_AUTH_TOKEN)) &&
+      Boolean(normalizeString(TWILIO_OUTBOUND_CALLER_NUMBER)) &&
+      Boolean(normalizeString(TWILIO_MEDIA_WS_URL)) &&
+      Boolean(normalizeString(resolvePublicBaseUrl())),
+    publicBaseUrl: normalizeString(resolvePublicBaseUrl()) || null,
     callsInMemory: callsById.size,
     timestamp: nowIso(),
   });
+});
+
+function sendTwimlResponse(res, xmlBody) {
+  return res.status(200).set('Content-Type', 'text/xml; charset=utf-8').send(xmlBody);
+}
+
+app.all('/v1/twilio/outbound-twiml', (req, res) => {
+  if (ENGINE_MODE !== 'twilio_stream') {
+    return sendTwimlResponse(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Hangup />
+</Response>`
+    );
+  }
+
+  const callId = normalizeString(req.query?.callId || req.body?.callId);
+  const call = callsById.get(callId);
+  if (!call) {
+    return sendTwimlResponse(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Hangup />
+</Response>`
+    );
+  }
+
+  return sendTwimlResponse(res, buildTwilioStreamTwiml(call));
+});
+
+app.post('/v1/twilio/call-status', (req, res) => {
+  const callSid = normalizeString(req.body?.CallSid || req.query?.CallSid);
+  const status = mapTwilioStatus(req.body?.CallStatus || req.query?.CallStatus);
+  const callDuration = parseNumberSafe(req.body?.CallDuration || req.query?.CallDuration, null);
+  const queryCallId = normalizeString(req.query?.callId || req.body?.callId);
+  const mappedCallId = getCallIdByTwilioCallSid(callSid);
+  const callId = queryCallId || mappedCallId;
+
+  if (!callId) return res.status(200).send('ok');
+  const existing = callsById.get(callId);
+  if (!existing) return res.status(200).send('ok');
+
+  if (callSid) {
+    trackTwilioCallSid(callId, callSid);
+  }
+
+  const terminal = isTerminalStatus(status);
+  patchCall(callId, {
+    status: status || normalizeString(existing.status),
+    endedReason: terminal ? status : normalizeString(existing.endedReason),
+    endedAt: terminal ? normalizeString(existing.endedAt || nowIso()) : normalizeString(existing.endedAt),
+    durationSeconds: parseNumberSafe(callDuration, parseNumberSafe(existing.durationSeconds, null)),
+    providerMetadata: {
+      ...(existing.providerMetadata && typeof existing.providerMetadata === 'object' ? existing.providerMetadata : {}),
+      engineMode: 'twilio_stream',
+      twilioCallSid: callSid || normalizeString(existing?.providerMetadata?.twilioCallSid),
+      twilioStatus: status || normalizeString(existing?.providerMetadata?.twilioStatus),
+    },
+  });
+
+  return res.status(200).send('ok');
 });
 
 app.post('/v1/outbound/start', requireApiAuth, async (req, res) => {

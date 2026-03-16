@@ -78,6 +78,12 @@ Contract (control API) dat deze backend verwacht:
 - `GET /v1/outbound/calls/:callId`
   - response: `{ callId, status, endedReason, startedAt, endedAt, durationSeconds, recordingUrl }`
 
+De meegeleverde `sip-mixer-control-service` ondersteunt nu ook `SIP_MIXER_ENGINE_MODE=twilio_stream`:
+
+- start echte Twilio outbound calls
+- gebruikt `ALL /v1/twilio/outbound-twiml` met `<Connect><Stream>` naar je media bridge
+- verwerkt Twilio statuscallbacks op `POST /v1/twilio/call-status`
+
 Er staat ook een Render blueprint klaar voor deze externe service:
 
 - [render.sip-mixer.yaml](/Users/servecreusen/softora.nl-7/render.sip-mixer.yaml)
