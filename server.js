@@ -1,5 +1,4 @@
 const express = require('express');
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
@@ -111,67 +110,13 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
-const ALLOWED_COLDCALLING_PROVIDERS = new Set(['elevenlabs', 'twilio_conference', 'sip_media_mixer']);
-const EXPLICIT_COLDCALLING_PROVIDER = ALLOWED_COLDCALLING_PROVIDERS.has(
-  String(process.env.COLDCALLING_PROVIDER || '').trim().toLowerCase()
-)
-  ? String(process.env.COLDCALLING_PROVIDER || '').trim().toLowerCase()
-  : '';
-const COLDCALLING_ALLOW_IMPLICIT_TWILIO_CONFERENCE = /^(1|true|yes|ja)$/i.test(
-  String(process.env.COLDCALLING_ALLOW_IMPLICIT_TWILIO_CONFERENCE || '').trim()
-);
-const DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED = false;
+const COLDCALLING_PROVIDER_LOCK = 'elevenlabs';
 const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
-const DEFAULT_TWILIO_MEDIA_WS_URL = 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media';
-const TWILIO_ACCOUNT_SID = String(process.env.TWILIO_ACCOUNT_SID || '').trim();
-const TWILIO_AUTH_TOKEN = String(process.env.TWILIO_AUTH_TOKEN || '').trim();
-const TWILIO_OUTBOUND_CALLER_NUMBER = String(
-  process.env.TWILIO_OUTBOUND_CALLER_NUMBER || process.env.TWILIO_PHONE_NUMBER || ''
-).trim();
-const TWILIO_MEDIA_WS_URL = String(process.env.TWILIO_MEDIA_WS_URL || DEFAULT_TWILIO_MEDIA_WS_URL).trim();
-const TWILIO_CONFERENCE_TWIML_APP_SID = String(process.env.TWILIO_CONFERENCE_TWIML_APP_SID || '').trim();
-const TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME = String(
-  process.env.TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME || 'softora-conference-participant'
-).trim();
-const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || '').trim();
-const TWILIO_AMBIENCE_AUDIO_URL = String(process.env.TWILIO_AMBIENCE_AUDIO_URL || '').trim();
-const SIP_MIXER_CONTROL_URL = String(process.env.SIP_MIXER_CONTROL_URL || '').trim().replace(/\/+$/, '');
-const SIP_MIXER_CONTROL_API_KEY = String(process.env.SIP_MIXER_CONTROL_API_KEY || '').trim();
-const SIP_MIXER_PROFILE_ID = String(process.env.SIP_MIXER_PROFILE_ID || '').trim();
-const SIP_MIXER_REQUEST_TIMEOUT_MS = Math.max(
-  3_000,
-  Math.min(60_000, Number(process.env.SIP_MIXER_REQUEST_TIMEOUT_MS || 15_000) || 15_000)
-);
-const TWILIO_AMBIENCE_AUDIO_FILE_PATH = path.join(
-  __dirname,
-  'twilio-media-bridge-service',
-  'assets',
-  'office-ambience.wav'
-);
 let elevenLabsConversationListCache = {
   fetchedAtMs: 0,
   agentId: '',
   conversations: [],
 };
-let elevenLabsTelephonyStatus = {
-  checkedAt: '',
-  checkedAtMs: 0,
-  ok: false,
-  issue: 'not_checked',
-  reason: 'Telephony check nog niet uitgevoerd.',
-  provider: 'elevenlabs',
-  phoneNumberId: '',
-  phoneNumberMasked: '',
-  supportsInbound: null,
-  supportsOutbound: null,
-  assignedAgentId: '',
-  configuredAgentId: '',
-  patchAttempted: false,
-  patched: false,
-  endpoint: '',
-  statusCode: null,
-};
-let elevenLabsTelephonyStatusPromise = null;
 let coldcallingHistoryVisibleAfterMs = 0;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
@@ -184,14 +129,6 @@ const agendaAppointmentIdByCallId = new Map();
 let nextGeneratedAgendaAppointmentId = 100000;
 const sequentialDispatchQueues = new Map();
 const sequentialDispatchQueueIdByCallId = new Map();
-const twilioConferenceSessionsById = new Map();
-const twilioConferenceSessionIdByCallSid = new Map();
-let lastKnownPublicBaseUrl = PUBLIC_BASE_URL;
-let twilioConferenceParticipantAppCache = {
-  sid: TWILIO_CONFERENCE_TWIML_APP_SID,
-  voiceUrl: '',
-  fetchedAtMs: 0,
-};
 let nextSequentialDispatchQueueId = 1;
 let supabaseClient = null;
 let smtpTransporter = null;
@@ -251,7 +188,6 @@ app.use(
     },
   })
 );
-app.use(express.urlencoded({ extended: false }));
 
 app.use((req, _res, next) => {
   const requestPath = String(req.path || '');
@@ -303,243 +239,6 @@ function clipText(value, maxLength = 500) {
   if (!Number.isFinite(Number(maxLength)) || Number(maxLength) <= 0) return '';
   const limit = Math.floor(Number(maxLength));
   return text.length > limit ? text.slice(0, limit) : text;
-}
-
-function xmlEscape(value) {
-  return escapeHtml(value);
-}
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function createShortId(prefix = '') {
-  const suffix = crypto.randomUUID().replace(/-/g, '');
-  return prefix ? `${prefix}${suffix}` : suffix;
-}
-
-function inferPublicBaseUrlFromReq(req) {
-  const explicit = normalizeString(PUBLIC_BASE_URL);
-  if (explicit) return explicit.replace(/\/+$/, '');
-
-  const host = normalizeString(req?.get?.('x-forwarded-host') || req?.get?.('host') || req?.headers?.host || '');
-  if (!host) return '';
-  const proto =
-    normalizeString(req?.get?.('x-forwarded-proto') || req?.protocol || '').toLowerCase() ||
-    (host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
-  return `${proto}://${host}`.replace(/\/+$/, '');
-}
-
-function rememberPublicBaseUrl(value) {
-  const normalized = normalizeString(value);
-  if (!normalized) return '';
-  lastKnownPublicBaseUrl = normalized.replace(/\/+$/, '');
-  return lastKnownPublicBaseUrl;
-}
-
-function getResolvedPublicBaseUrl(options = {}) {
-  const explicit = normalizeString(options.publicBaseUrl || '');
-  if (explicit) return explicit.replace(/\/+$/, '');
-  if (PUBLIC_BASE_URL) return PUBLIC_BASE_URL.replace(/\/+$/, '');
-  if (lastKnownPublicBaseUrl) return lastKnownPublicBaseUrl.replace(/\/+$/, '');
-  return '';
-}
-
-function normalizeColdcallingProvider(value) {
-  const normalized = normalizeString(value || '').toLowerCase();
-  return ALLOWED_COLDCALLING_PROVIDERS.has(normalized) ? normalized : 'elevenlabs';
-}
-
-function buildTwilioBasicAuthHeader() {
-  const token = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
-  return `Basic ${token}`;
-}
-
-function buildTwilioApiUrl(relativePath) {
-  const pathValue = String(relativePath || '').replace(/^\/+/, '');
-  return `https://api.twilio.com/2010-04-01/${pathValue}`;
-}
-
-function buildSipMixerControlUrl(relativePath) {
-  const base = normalizeString(SIP_MIXER_CONTROL_URL).replace(/\/+$/, '');
-  const pathValue = String(relativePath || '').replace(/^\/+/, '');
-  if (!base) {
-    throw new Error('SIP_MIXER_CONTROL_URL ontbreekt.');
-  }
-  return `${base}/${pathValue}`;
-}
-
-async function twilioApiRequest(relativePath, options = {}) {
-  const method = normalizeString(options.method || 'GET').toUpperCase() || 'GET';
-  const headers = {
-    Authorization: buildTwilioBasicAuthHeader(),
-    ...(options.headers && typeof options.headers === 'object' ? options.headers : {}),
-  };
-  let body = options.body;
-
-  if (options.form && typeof options.form === 'object') {
-    const formBody = new URLSearchParams();
-    Object.entries(options.form).forEach(([key, value]) => {
-      if (value === undefined || value === null) return;
-      formBody.append(key, String(value));
-    });
-    body = formBody.toString();
-    headers['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
-  }
-
-  const response = await fetch(buildTwilioApiUrl(relativePath), {
-    method,
-    headers,
-    body,
-  });
-  const text = await response.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text;
-  }
-
-  if (!response.ok) {
-    const err = new Error(
-      normalizeString(data?.message || data?.detail || data?.error || '') ||
-        `Twilio API fout (${response.status})`
-    );
-    err.status = response.status;
-    err.data = data;
-    err.endpoint = buildTwilioApiUrl(relativePath);
-    throw err;
-  }
-
-  return { response, data };
-}
-
-function buildTwilioConferenceSession(lead, campaign, normalizedPhone, publicBaseUrl) {
-  const sessionId = createShortId('twconf_');
-  const conferenceName = `softora-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return {
-    sessionId,
-    conferenceName,
-    publicBaseUrl: normalizeString(publicBaseUrl || ''),
-    lead: {
-      name: normalizeString(lead?.name),
-      company: normalizeString(lead?.company),
-      phone: normalizeString(lead?.phone),
-      region: normalizeString(lead?.region),
-      phoneE164: normalizedPhone,
-    },
-    campaign: {
-      sector: normalizeString(campaign?.sector),
-      region: normalizeString(campaign?.region),
-      minProjectValue: parseNumberSafe(campaign?.minProjectValue, null),
-      maxDiscountPct: parseNumberSafe(campaign?.maxDiscountPct, null),
-      extraInstructions: normalizeString(campaign?.extraInstructions),
-      dispatchMode: normalizeString(campaign?.dispatchMode),
-      dispatchDelaySeconds: parseNumberSafe(campaign?.dispatchDelaySeconds, 0),
-    },
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    status: 'queued',
-    startedAt: '',
-    endedAt: '',
-    durationSeconds: null,
-    recordingUrl: '',
-    endedReason: '',
-    prospectCallSid: '',
-    aiCallSid: '',
-    ambienceCallSid: '',
-    auxParticipantsStarted: false,
-    auxParticipantsStarting: false,
-    auxParticipantsStartFailed: false,
-    ambienceStartWarning: '',
-  };
-}
-
-function getTwilioConferenceSession(sessionId) {
-  const normalizedId = normalizeString(sessionId);
-  if (!normalizedId) return null;
-  return twilioConferenceSessionsById.get(normalizedId) || null;
-}
-
-function setTwilioConferenceSession(session, persistReason = 'twilio_conference_session') {
-  if (!session || !normalizeString(session.sessionId)) return null;
-  session.updatedAt = nowIso();
-  twilioConferenceSessionsById.set(session.sessionId, session);
-  queueRuntimeStatePersist(persistReason);
-  return session;
-}
-
-function trackTwilioConferenceCallSid(sessionId, callSid) {
-  const normalizedSessionId = normalizeString(sessionId);
-  const normalizedCallSid = normalizeString(callSid);
-  if (!normalizedSessionId || !normalizedCallSid) return;
-  twilioConferenceSessionIdByCallSid.set(normalizedCallSid, normalizedSessionId);
-}
-
-function getTwilioConferenceSessionByCallSid(callSid) {
-  const normalizedCallSid = normalizeString(callSid);
-  if (!normalizedCallSid) return null;
-  const sessionId = twilioConferenceSessionIdByCallSid.get(normalizedCallSid);
-  return sessionId ? getTwilioConferenceSession(sessionId) : null;
-}
-
-async function findTwilioConferenceSession(sessionId, callSid = '') {
-  const normalizedSessionId = normalizeString(sessionId);
-  const normalizedCallSid = normalizeString(callSid);
-
-  let session =
-    getTwilioConferenceSession(normalizedSessionId) ||
-    getTwilioConferenceSessionByCallSid(normalizedCallSid);
-  if (session) return session;
-
-  if (!isSupabaseConfigured()) return null;
-
-  await forceHydrateRuntimeStateWithRetries(2);
-  session =
-    getTwilioConferenceSession(normalizedSessionId) ||
-    getTwilioConferenceSessionByCallSid(normalizedCallSid);
-  return session || null;
-}
-
-function buildTwilioConferenceCallUpdate(session, patch = {}) {
-  if (!session) return null;
-  const terminal = Boolean(
-    normalizeString(patch.endedReason || session.endedReason) ||
-      /(completed|busy|failed|no-answer|no answer|canceled|cancelled|disconnected)/i.test(
-        normalizeString(patch.status || session.status)
-      )
-  );
-  const endedAt = terminal
-    ? normalizeString(patch.endedAt || session.endedAt || nowIso())
-    : normalizeString(patch.endedAt || session.endedAt || '');
-
-  return {
-    callId: normalizeString(session.sessionId),
-    phone: normalizeString(session.lead?.phoneE164 || session.lead?.phone),
-    company: normalizeString(session.lead?.company),
-    name: normalizeString(session.lead?.name),
-    status: normalizeString(patch.status || session.status),
-    messageType: normalizeString(patch.messageType || 'twilio.conference'),
-    summary: normalizeString(patch.summary || ''),
-    transcriptSnippet: normalizeString(patch.transcriptSnippet || ''),
-    transcriptFull: normalizeString(patch.transcriptFull || ''),
-    endedReason: normalizeString(patch.endedReason || session.endedReason),
-    startedAt: normalizeString(patch.startedAt || session.startedAt || session.createdAt),
-    endedAt,
-    durationSeconds: Number.isFinite(Number(patch.durationSeconds))
-      ? Math.max(0, Math.round(Number(patch.durationSeconds)))
-      : Number.isFinite(Number(session.durationSeconds))
-        ? Math.max(0, Math.round(Number(session.durationSeconds)))
-        : null,
-    recordingUrl: normalizeString(patch.recordingUrl || session.recordingUrl || ''),
-    updatedAt: nowIso(),
-    updatedAtMs: Date.now(),
-    provider: 'twilio_conference',
-  };
-}
-
-function hasBundledTwilioAmbienceAudio() {
-  return fs.existsSync(TWILIO_AMBIENCE_AUDIO_FILE_PATH);
 }
 
 function isSupabaseConfigured() {
@@ -742,7 +441,7 @@ function buildRuntimeStateSnapshotPayload() {
   }));
 
   return {
-    version: 4,
+    version: 3,
     savedAt: new Date().toISOString(),
     coldcallingHistoryVisibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
     recentWebhookEvents: compactWebhookEvents,
@@ -751,50 +450,6 @@ function buildRuntimeStateSnapshotPayload() {
     recentDashboardActivities: recentDashboardActivities.slice(0, 500),
     generatedAgendaAppointments: generatedAgendaAppointments.slice(),
     nextGeneratedAgendaAppointmentId,
-    twilioConferenceSessions: Array.from(twilioConferenceSessionsById.values())
-      .slice()
-      .sort((a, b) => {
-        const aTs = Date.parse(normalizeString(a?.updatedAt || a?.createdAt || '')) || 0;
-        const bTs = Date.parse(normalizeString(b?.updatedAt || b?.createdAt || '')) || 0;
-        return bTs - aTs;
-      })
-      .slice(0, 200)
-      .map((session) => ({
-        sessionId: normalizeString(session?.sessionId),
-        conferenceName: normalizeString(session?.conferenceName),
-        publicBaseUrl: normalizeString(session?.publicBaseUrl),
-        lead: {
-          name: normalizeString(session?.lead?.name),
-          company: normalizeString(session?.lead?.company),
-          phone: normalizeString(session?.lead?.phone),
-          region: normalizeString(session?.lead?.region),
-          phoneE164: normalizeString(session?.lead?.phoneE164),
-        },
-        campaign: {
-          sector: normalizeString(session?.campaign?.sector),
-          region: normalizeString(session?.campaign?.region),
-          minProjectValue: parseNumberSafe(session?.campaign?.minProjectValue, null),
-          maxDiscountPct: parseNumberSafe(session?.campaign?.maxDiscountPct, null),
-          extraInstructions: normalizeString(session?.campaign?.extraInstructions),
-          dispatchMode: normalizeString(session?.campaign?.dispatchMode),
-          dispatchDelaySeconds: parseNumberSafe(session?.campaign?.dispatchDelaySeconds, 0),
-        },
-        createdAt: normalizeString(session?.createdAt),
-        updatedAt: normalizeString(session?.updatedAt),
-        status: normalizeString(session?.status),
-        startedAt: normalizeString(session?.startedAt),
-        endedAt: normalizeString(session?.endedAt),
-        durationSeconds: parseNumberSafe(session?.durationSeconds, null),
-        recordingUrl: normalizeString(session?.recordingUrl),
-        endedReason: normalizeString(session?.endedReason),
-        prospectCallSid: normalizeString(session?.prospectCallSid),
-        aiCallSid: normalizeString(session?.aiCallSid),
-        ambienceCallSid: normalizeString(session?.ambienceCallSid),
-        auxParticipantsStarted: Boolean(session?.auxParticipantsStarted),
-        auxParticipantsStarting: Boolean(session?.auxParticipantsStarting),
-        auxParticipantsStartFailed: Boolean(session?.auxParticipantsStartFailed),
-        ambienceStartWarning: normalizeString(session?.ambienceStartWarning),
-      })),
   };
 }
 
@@ -863,63 +518,6 @@ function applyRuntimeStateSnapshotPayload(payload) {
   nextGeneratedAgendaAppointmentId = Number.isFinite(payloadNextId)
     ? Math.max(payloadNextId, maxAppointmentId + 1)
     : maxAppointmentId + 1;
-
-  twilioConferenceSessionsById.clear();
-  twilioConferenceSessionIdByCallSid.clear();
-  const nextTwilioConferenceSessions = Array.isArray(payload.twilioConferenceSessions)
-    ? payload.twilioConferenceSessions.slice(0, 200)
-    : [];
-  nextTwilioConferenceSessions.forEach((session) => {
-    const sessionId = normalizeString(session?.sessionId || '');
-    if (!sessionId) return;
-    const normalizedSession = {
-      sessionId,
-      conferenceName: normalizeString(session?.conferenceName),
-      publicBaseUrl: normalizeString(session?.publicBaseUrl),
-      lead: {
-        name: normalizeString(session?.lead?.name),
-        company: normalizeString(session?.lead?.company),
-        phone: normalizeString(session?.lead?.phone),
-        region: normalizeString(session?.lead?.region),
-        phoneE164: normalizeString(session?.lead?.phoneE164),
-      },
-      campaign: {
-        sector: normalizeString(session?.campaign?.sector),
-        region: normalizeString(session?.campaign?.region),
-        minProjectValue: parseNumberSafe(session?.campaign?.minProjectValue, null),
-        maxDiscountPct: parseNumberSafe(session?.campaign?.maxDiscountPct, null),
-        extraInstructions: normalizeString(session?.campaign?.extraInstructions),
-        dispatchMode: normalizeString(session?.campaign?.dispatchMode),
-        dispatchDelaySeconds: parseNumberSafe(session?.campaign?.dispatchDelaySeconds, 0),
-      },
-      createdAt: normalizeString(session?.createdAt),
-      updatedAt: normalizeString(session?.updatedAt),
-      status: normalizeString(session?.status),
-      startedAt: normalizeString(session?.startedAt),
-      endedAt: normalizeString(session?.endedAt),
-      durationSeconds: parseNumberSafe(session?.durationSeconds, null),
-      recordingUrl: normalizeString(session?.recordingUrl),
-      endedReason: normalizeString(session?.endedReason),
-      prospectCallSid: normalizeString(session?.prospectCallSid),
-      aiCallSid: normalizeString(session?.aiCallSid),
-      ambienceCallSid: normalizeString(session?.ambienceCallSid),
-      auxParticipantsStarted: Boolean(session?.auxParticipantsStarted),
-      auxParticipantsStarting: Boolean(session?.auxParticipantsStarting),
-      auxParticipantsStartFailed: Boolean(session?.auxParticipantsStartFailed),
-      ambienceStartWarning: normalizeString(session?.ambienceStartWarning),
-    };
-    twilioConferenceSessionsById.set(sessionId, normalizedSession);
-    [
-      normalizedSession.prospectCallSid,
-      normalizedSession.aiCallSid,
-      normalizedSession.ambienceCallSid,
-    ]
-      .map((value) => normalizeString(value))
-      .filter(Boolean)
-      .forEach((callSid) => {
-        twilioConferenceSessionIdByCallSid.set(callSid, sessionId);
-      });
-  });
 
   return true;
 }
@@ -1001,6 +599,7 @@ async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
 
 async function forceHydrateRuntimeStateWithRetries(maxAttempts = 3) {
   if (!isSupabaseConfigured()) return false;
+  if (supabaseStateHydrated) return true;
 
   const attempts = Math.max(1, Math.min(5, Number(maxAttempts) || 1));
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -1902,41 +1501,18 @@ function normalizePhoneComparisonKey(input) {
   }
 }
 
-function isColdcallingAutoBlockOwnNumbersEnabled() {
-  return /^(1|true|yes|ja)$/i.test(String(process.env.COLDCALLING_AUTO_BLOCK_OWN_NUMBERS || '').trim());
-}
-
-function isColdcallingTargetBlocklistEnabled() {
-  return /^(1|true|yes|ja)$/i.test(String(process.env.COLDCALLING_ENABLE_TARGET_BLOCKLIST || '').trim());
-}
-
-function getExplicitBlockedColdcallingTargetValues() {
-  return String(process.env.COLDCALLING_BLOCKED_TARGET_NUMBERS || '')
-    .split(/[\n,;]+/)
-    .map((value) => normalizeString(value))
-    .filter(Boolean);
-}
-
-function getConfiguredBlockedColdcallingTargetValues() {
-  const rawValues = getExplicitBlockedColdcallingTargetValues();
-
-  // Auto-block van eigen nummers staat standaard UIT zodat mensen het
-  // publieksnummer gewoon kunnen bellen en testcalls niet onbedoeld falen.
-  if (isColdcallingAutoBlockOwnNumbersEnabled()) {
-    rawValues.push(
-      process.env.ELEVENLABS_OUTBOUND_CALLER_NUMBER,
-      process.env.TWILIO_OUTBOUND_CALLER_NUMBER,
-      process.env.COMPANY_PHONE_NUMBER,
-      process.env.SOFTORA_PHONE_NUMBER
-    );
-  }
-
-  return rawValues;
-}
-
 function getConfiguredBlockedColdcallingTargetKeys() {
+  const rawValues = [
+    process.env.COLDCALLING_BLOCKED_TARGET_NUMBERS,
+    process.env.ELEVENLABS_OUTBOUND_CALLER_NUMBER,
+    process.env.TWILIO_OUTBOUND_CALLER_NUMBER,
+    process.env.COMPANY_PHONE_NUMBER,
+    process.env.SOFTORA_PHONE_NUMBER,
+  ];
+
   const keys = new Set();
-  getConfiguredBlockedColdcallingTargetValues()
+  rawValues
+    .flatMap((value) => String(value || '').split(/[\n,;]+/))
     .map((value) => normalizePhoneComparisonKey(value))
     .filter(Boolean)
     .forEach((value) => keys.add(value));
@@ -1957,7 +1533,7 @@ function buildBlockedColdcallingLeadResult(lead, index) {
     error: 'Doelnummer is geblokkeerd.',
     cause: 'blocked target number',
     causeExplanation:
-      'Dit doelnummer staat op de outbound blocklist. Haal het nummer uit COLDCALLING_BLOCKED_TARGET_NUMBERS of zet COLDCALLING_AUTO_BLOCK_OWN_NUMBERS uit.',
+      'Dit nummer is geblokkeerd als doelnummer zodat je eigen lijn alleen uitbelt en nooit zelf door een campagne wordt gebeld.',
     details: {
       blockedPhone: normalizeString(lead?.phone),
     },
@@ -1965,13 +1541,6 @@ function buildBlockedColdcallingLeadResult(lead, index) {
 }
 
 function filterBlockedColdcallingLeads(leads) {
-  if (!isColdcallingTargetBlocklistEnabled()) {
-    return {
-      allowedLeads: Array.isArray(leads) ? leads.slice() : [],
-      blockedResults: [],
-    };
-  }
-
   const blockedKeys = getConfiguredBlockedColdcallingTargetKeys();
   if (blockedKeys.size === 0) {
     return {
@@ -2003,27 +1572,6 @@ function getRequiredElevenLabsEnv() {
   return ['ELEVENLABS_API_KEY', 'ELEVENLABS_PHONE_NUMBER_ID'];
 }
 
-function getRequiredTwilioConferenceEnv() {
-  return ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_OUTBOUND_CALLER_NUMBER', 'TWILIO_MEDIA_WS_URL'];
-}
-
-function getRequiredSipMediaMixerEnv() {
-  return ['SIP_MIXER_CONTROL_URL', 'SIP_MIXER_CONTROL_API_KEY'];
-}
-
-function hasTwilioConferenceRuntimeConfig() {
-  return Boolean(
-    normalizeString(TWILIO_ACCOUNT_SID) &&
-      normalizeString(TWILIO_AUTH_TOKEN) &&
-      normalizeString(TWILIO_OUTBOUND_CALLER_NUMBER) &&
-      normalizeString(TWILIO_MEDIA_WS_URL)
-  );
-}
-
-function hasSipMediaMixerRuntimeConfig() {
-  return Boolean(normalizeString(SIP_MIXER_CONTROL_URL) && normalizeString(SIP_MIXER_CONTROL_API_KEY));
-}
-
 function getConfiguredElevenLabsAgentId() {
   return normalizeString(process.env.ELEVENLABS_AGENT_ID || DEFAULT_ELEVENLABS_AGENT_ID);
 }
@@ -2032,50 +1580,15 @@ function isElevenLabsColdcallingConfigured() {
   return getRequiredElevenLabsEnv().every((key) => normalizeString(process.env[key]));
 }
 
-function getColdcallingProviderSelectionMode() {
-  if (EXPLICIT_COLDCALLING_PROVIDER) {
-    return 'explicit';
-  }
-  if (COLDCALLING_ALLOW_IMPLICIT_TWILIO_CONFERENCE && hasTwilioConferenceRuntimeConfig()) {
-    return 'implicit_twilio_conference';
-  }
-  return 'default_elevenlabs';
-}
-
-function isColdcallingProviderLocked() {
-  return Boolean(EXPLICIT_COLDCALLING_PROVIDER) || !COLDCALLING_ALLOW_IMPLICIT_TWILIO_CONFERENCE;
-}
-
 function getColdcallingProvider() {
-  const selectionMode = getColdcallingProviderSelectionMode();
-  if (selectionMode === 'explicit') {
-    return normalizeColdcallingProvider(EXPLICIT_COLDCALLING_PROVIDER);
-  }
-  if (selectionMode === 'implicit_twilio_conference') {
-    return 'twilio_conference';
-  }
-  return 'elevenlabs';
+  // Coldcalling runtime is intentionally locked to ElevenLabs to keep voice, LLM,
+  // and transcriber on one provider and avoid legacy Vapi regressions.
+  return COLDCALLING_PROVIDER_LOCK;
 }
 
 function getMissingEnvVars(provider = getColdcallingProvider()) {
   if (provider === 'elevenlabs') {
     return getRequiredElevenLabsEnv().filter((key) => !process.env[key]);
-  }
-  if (provider === 'twilio_conference') {
-    return getRequiredTwilioConferenceEnv().filter((key) => {
-      if (key === 'TWILIO_MEDIA_WS_URL') return !normalizeString(TWILIO_MEDIA_WS_URL);
-      if (key === 'TWILIO_OUTBOUND_CALLER_NUMBER') return !normalizeString(TWILIO_OUTBOUND_CALLER_NUMBER);
-      if (key === 'TWILIO_ACCOUNT_SID') return !normalizeString(TWILIO_ACCOUNT_SID);
-      if (key === 'TWILIO_AUTH_TOKEN') return !normalizeString(TWILIO_AUTH_TOKEN);
-      return !normalizeString(process.env[key]);
-    });
-  }
-  if (provider === 'sip_media_mixer') {
-    return getRequiredSipMediaMixerEnv().filter((key) => {
-      if (key === 'SIP_MIXER_CONTROL_URL') return !normalizeString(SIP_MIXER_CONTROL_URL);
-      if (key === 'SIP_MIXER_CONTROL_API_KEY') return !normalizeString(SIP_MIXER_CONTROL_API_KEY);
-      return !normalizeString(process.env[key]);
-    });
   }
   return getRequiredVapiEnv().filter((key) => !process.env[key]);
 }
@@ -4989,11 +4502,7 @@ function buildVariableValues(lead, campaign) {
     region: effectiveRegion,
     minProjectValue: campaign.minProjectValue,
     maxDiscountPct: campaign.maxDiscountPct,
-    // Voorkomt verborgen prompt-injectie vanuit dashboardtekst;
-    // alleen instructies in ElevenLabs Agent blijven leidend.
-    extraInstructions: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED
-      ? normalizeString(campaign.extraInstructions)
-      : '',
+    extraInstructions: normalizeString(campaign.extraInstructions),
   };
 }
 
@@ -5010,255 +4519,6 @@ function buildElevenLabsApiUrl(relativePath, searchParams = null) {
   }
 
   return url;
-}
-
-function toBooleanNullable(value) {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (['true', '1', 'yes', 'ja'].includes(normalized)) return true;
-    if (['false', '0', 'no', 'nee'].includes(normalized)) return false;
-  }
-  if (typeof value === 'number') {
-    if (value === 1) return true;
-    if (value === 0) return false;
-  }
-  return null;
-}
-
-function maskPhoneNumber(value) {
-  const raw = normalizeString(value);
-  if (!raw) return '';
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length <= 4) return `***${digits}`;
-  const suffix = digits.slice(-4);
-  return `***${suffix}`;
-}
-
-function extractElevenLabsAssignedAgentId(payload) {
-  return normalizeString(
-    payload?.assigned_agent?.agent_id ||
-      payload?.assigned_agent?.id ||
-      payload?.assignedAgent?.agentId ||
-      payload?.assignedAgent?.id ||
-      payload?.assigned_agent_id ||
-      payload?.assignedAgentId ||
-      payload?.agent_id ||
-      payload?.agentId ||
-      ''
-  );
-}
-
-function normalizeElevenLabsPhonePayload(payload) {
-  if (payload && typeof payload.phone_number === 'object') return payload.phone_number;
-  if (payload && typeof payload.phoneNumber === 'object') return payload.phoneNumber;
-  return payload && typeof payload === 'object' ? payload : {};
-}
-
-function buildElevenLabsTelephonyStatusPatch(patch = {}) {
-  elevenLabsTelephonyStatus = {
-    ...elevenLabsTelephonyStatus,
-    ...patch,
-  };
-  return { ...elevenLabsTelephonyStatus };
-}
-
-function getElevenLabsTelephonyStatusSnapshot() {
-  return { ...elevenLabsTelephonyStatus };
-}
-
-function summarizeElevenLabsPhoneRuntime(phonePayload = {}, defaults = {}) {
-  const phone = normalizeElevenLabsPhonePayload(phonePayload);
-  const phoneNumberId = normalizeString(
-    phone?.phone_number_id || phone?.phoneNumberId || phone?.agent_phone_number_id || phone?.id || defaults.phoneNumberId || ''
-  );
-  const phoneNumberMasked = maskPhoneNumber(phone?.phone_number || phone?.phoneNumber || phone?.number || '');
-  const supportsInbound = toBooleanNullable(
-    phone?.supports_inbound ?? phone?.supportsInbound ?? phone?.inbound_enabled ?? phone?.inboundEnabled
-  );
-  const supportsOutbound = toBooleanNullable(
-    phone?.supports_outbound ?? phone?.supportsOutbound ?? phone?.outbound_enabled ?? phone?.outboundEnabled
-  );
-  const assignedAgentId = extractElevenLabsAssignedAgentId(phone);
-
-  return {
-    phoneNumberId,
-    phoneNumberMasked,
-    supportsInbound,
-    supportsOutbound,
-    assignedAgentId,
-  };
-}
-
-async function fetchElevenLabsPhoneNumberById(phoneNumberId) {
-  const endpoint = `/convai/phone-numbers/${encodeURIComponent(phoneNumberId)}`;
-  const { response, data } = await fetchJsonWithTimeout(
-    buildElevenLabsApiUrl(endpoint),
-    {
-      method: 'GET',
-      headers: {
-        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
-      },
-    },
-    12000
-  );
-
-  if (!response.ok) {
-    const error = new Error(
-      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
-        `ElevenLabs phone ophalen mislukt (${response.status})`
-    );
-    error.status = response.status;
-    error.endpoint = endpoint;
-    error.data = data;
-    throw error;
-  }
-
-  return { endpoint, data };
-}
-
-async function patchElevenLabsPhoneAssignedAgent(phoneNumberId, agentId) {
-  const endpoint = `/convai/phone-numbers/${encodeURIComponent(phoneNumberId)}`;
-  const payload = { agent_id: agentId };
-  const { response, data } = await fetchJsonWithTimeout(
-    buildElevenLabsApiUrl(endpoint),
-    {
-      method: 'PATCH',
-      headers: {
-        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    },
-    12000
-  );
-
-  if (!response.ok) {
-    const error = new Error(
-      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
-        `ElevenLabs phone update mislukt (${response.status})`
-    );
-    error.status = response.status;
-    error.endpoint = endpoint;
-    error.data = data;
-    throw error;
-  }
-
-  return { endpoint, data, statusCode: response.status };
-}
-
-async function ensureElevenLabsInboundRouting(options = {}) {
-  const force = Boolean(options?.force);
-  const forceRelink = Boolean(options?.forceRelink);
-  const reasonLabel = normalizeString(options?.reason || 'runtime-check');
-  const now = Date.now();
-
-  if (!force && elevenLabsTelephonyStatusPromise) {
-    return elevenLabsTelephonyStatusPromise;
-  }
-
-  if (!force && now - Number(elevenLabsTelephonyStatus.checkedAtMs || 0) < 60_000) {
-    return getElevenLabsTelephonyStatusSnapshot();
-  }
-
-  elevenLabsTelephonyStatusPromise = (async () => {
-    const checkedAt = new Date().toISOString();
-    const phoneNumberId = normalizeString(process.env.ELEVENLABS_PHONE_NUMBER_ID);
-    const configuredAgentId = getConfiguredElevenLabsAgentId();
-    const apiKeyPresent = Boolean(normalizeString(process.env.ELEVENLABS_API_KEY));
-
-    if (!apiKeyPresent || !phoneNumberId || !configuredAgentId) {
-      return buildElevenLabsTelephonyStatusPatch({
-        checkedAt,
-        checkedAtMs: now,
-        ok: false,
-        issue: 'missing_env',
-        reason:
-          'Telephony check kon niet draaien: ELEVENLABS_API_KEY, ELEVENLABS_PHONE_NUMBER_ID of ELEVENLABS_AGENT_ID ontbreekt.',
-        phoneNumberId,
-        configuredAgentId,
-        endpoint: '',
-        statusCode: null,
-        patchAttempted: false,
-        patched: false,
-      });
-    }
-
-    try {
-      const readResult = await fetchElevenLabsPhoneNumberById(phoneNumberId);
-      let runtime = summarizeElevenLabsPhoneRuntime(readResult.data, { phoneNumberId });
-      let patchAttempted = false;
-      let patched = false;
-      let patchStatusCode = null;
-      let issue = 'ok';
-      let issueReason = `Telephony check gelukt (${reasonLabel}).`;
-
-      if (runtime.supportsInbound === false) {
-        issue = 'inbound_disabled';
-        issueReason =
-          'Dit ElevenLabs nummer ondersteunt geen inbound calls (supports_inbound=false).';
-      } else if (forceRelink || !runtime.assignedAgentId || runtime.assignedAgentId !== configuredAgentId) {
-        patchAttempted = true;
-        const patchResult = await patchElevenLabsPhoneAssignedAgent(phoneNumberId, configuredAgentId);
-        patchStatusCode = Number(patchResult.statusCode || 0) || null;
-
-        const verifyRead = await fetchElevenLabsPhoneNumberById(phoneNumberId);
-        runtime = summarizeElevenLabsPhoneRuntime(verifyRead.data, { phoneNumberId });
-        patched = runtime.assignedAgentId === configuredAgentId;
-
-        if (patched) {
-          issueReason = forceRelink
-            ? 'Assigned agent op telefoonnummer is geforceerd opnieuw gekoppeld.'
-            : 'Assigned agent op telefoonnummer hersteld naar geconfigureerde ElevenLabs-agent.';
-        } else {
-          issue = 'agent_mismatch';
-          issueReason =
-            'Telefoonnummer-agent koppeling kon niet bevestigd worden na patch.';
-        }
-      }
-
-      const ok = issue === 'ok' && runtime.supportsInbound !== false && runtime.assignedAgentId === configuredAgentId;
-      if (!ok && issue === 'ok') {
-        issue = runtime.supportsInbound === false ? 'inbound_disabled' : 'agent_mismatch';
-      }
-
-      return buildElevenLabsTelephonyStatusPatch({
-        checkedAt,
-        checkedAtMs: Date.now(),
-        ok,
-        issue,
-        reason: issueReason,
-        phoneNumberId: runtime.phoneNumberId || phoneNumberId,
-        phoneNumberMasked: runtime.phoneNumberMasked,
-        supportsInbound: runtime.supportsInbound,
-        supportsOutbound: runtime.supportsOutbound,
-        assignedAgentId: runtime.assignedAgentId,
-        configuredAgentId,
-        endpoint: readResult.endpoint,
-        statusCode: patchStatusCode,
-        patchAttempted,
-        patched,
-      });
-    } catch (error) {
-      return buildElevenLabsTelephonyStatusPatch({
-        checkedAt,
-        checkedAtMs: Date.now(),
-        ok: false,
-        issue: 'api_error',
-        reason: normalizeString(error?.message || 'Onbekende ElevenLabs telephony fout'),
-        phoneNumberId,
-        configuredAgentId,
-        endpoint: normalizeString(error?.endpoint || ''),
-        statusCode: Number(error?.status || 0) || null,
-        patchAttempted: false,
-        patched: false,
-      });
-    } finally {
-      elevenLabsTelephonyStatusPromise = null;
-    }
-  })();
-
-  return elevenLabsTelephonyStatusPromise;
 }
 
 function toIsoFromUnixSeconds(value) {
@@ -5317,427 +4577,6 @@ function buildElevenLabsConversationInitiationData(lead, campaign, normalizedPho
       ),
       phone: normalizedPhone,
     },
-  };
-}
-
-function buildTwilioConferenceParticipantVoiceUrl(baseUrl) {
-  return `${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/participant`;
-}
-
-function buildTwilioConferenceAmbienceAudioUrl(baseUrl) {
-  return normalizeString(TWILIO_AMBIENCE_AUDIO_URL) || `${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/ambience-audio`;
-}
-
-function buildTwilioConferenceCalleeUrl(baseUrl, sessionId) {
-  const url = new URL(`${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/callee`);
-  url.searchParams.set('sessionId', normalizeString(sessionId));
-  return url.toString();
-}
-
-function buildTwilioConferenceCallStatusUrl(baseUrl, sessionId, role) {
-  const url = new URL(`${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/call-status`);
-  url.searchParams.set('sessionId', normalizeString(sessionId));
-  url.searchParams.set('role', normalizeString(role));
-  return url.toString();
-}
-
-function buildTwilioConferenceEventUrl(baseUrl, sessionId) {
-  const url = new URL(`${normalizeString(baseUrl).replace(/\/+$/, '')}/api/twilio/conference/event`);
-  url.searchParams.set('sessionId', normalizeString(sessionId));
-  return url.toString();
-}
-
-async function ensureTwilioConferenceParticipantApp(baseUrl) {
-  const normalizedBaseUrl = normalizeString(baseUrl).replace(/\/+$/, '');
-  if (!normalizedBaseUrl) {
-    throw new Error('PUBLIC_BASE_URL ontbreekt; Twilio conference participant app kan niet worden geconfigureerd.');
-  }
-
-  const desiredVoiceUrl = buildTwilioConferenceParticipantVoiceUrl(normalizedBaseUrl);
-  if (
-    normalizeString(twilioConferenceParticipantAppCache.sid) &&
-    normalizeString(twilioConferenceParticipantAppCache.voiceUrl) === desiredVoiceUrl
-  ) {
-    return twilioConferenceParticipantAppCache.sid;
-  }
-
-  let appSid = normalizeString(TWILIO_CONFERENCE_TWIML_APP_SID || twilioConferenceParticipantAppCache.sid);
-  if (appSid) {
-    await twilioApiRequest(`Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Applications/${encodeURIComponent(appSid)}.json`, {
-      method: 'POST',
-      form: {
-        FriendlyName: TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME,
-        VoiceUrl: desiredVoiceUrl,
-        VoiceMethod: 'POST',
-      },
-    });
-    twilioConferenceParticipantAppCache = {
-      sid: appSid,
-      voiceUrl: desiredVoiceUrl,
-      fetchedAtMs: Date.now(),
-    };
-    return appSid;
-  }
-
-  const { data: listData } = await twilioApiRequest(
-    `Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Applications.json?PageSize=50`,
-    { method: 'GET' }
-  );
-  const existingApps = Array.isArray(listData?.applications) ? listData.applications : [];
-  const existingApp = existingApps.find(
-    (item) => normalizeString(item?.friendly_name) === TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME
-  );
-
-  if (existingApp?.sid) {
-    appSid = normalizeString(existingApp.sid);
-    await twilioApiRequest(`Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Applications/${encodeURIComponent(appSid)}.json`, {
-      method: 'POST',
-      form: {
-        FriendlyName: TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME,
-        VoiceUrl: desiredVoiceUrl,
-        VoiceMethod: 'POST',
-      },
-    });
-    twilioConferenceParticipantAppCache = {
-      sid: appSid,
-      voiceUrl: desiredVoiceUrl,
-      fetchedAtMs: Date.now(),
-    };
-    return appSid;
-  }
-
-  const { data: createData } = await twilioApiRequest(
-    `Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Applications.json`,
-    {
-      method: 'POST',
-      form: {
-        FriendlyName: TWILIO_CONFERENCE_TWIML_APP_FRIENDLY_NAME,
-        VoiceUrl: desiredVoiceUrl,
-        VoiceMethod: 'POST',
-      },
-    }
-  );
-  appSid = normalizeString(createData?.sid);
-  if (!appSid) {
-    throw new Error('Twilio conference participant app kon niet worden aangemaakt.');
-  }
-  twilioConferenceParticipantAppCache = {
-    sid: appSid,
-    voiceUrl: desiredVoiceUrl,
-    fetchedAtMs: Date.now(),
-  };
-  return appSid;
-}
-
-async function createTwilioOutboundCall(options = {}) {
-  const {
-    to,
-    from = TWILIO_OUTBOUND_CALLER_NUMBER,
-    url,
-    statusCallback,
-    statusCallbackEvent = ['initiated', 'ringing', 'answered', 'completed'],
-    machineDetection = '',
-  } = options;
-
-  const form = {
-    To: normalizeString(to),
-    From: normalizeString(from),
-    Url: normalizeString(url),
-    Method: normalizeString(options.method || 'POST'),
-    StatusCallback: normalizeString(statusCallback),
-    StatusCallbackMethod: normalizeString(options.statusCallbackMethod || 'POST'),
-  };
-  if (Array.isArray(statusCallbackEvent) && statusCallbackEvent.length > 0) {
-    form.StatusCallbackEvent = statusCallbackEvent.join(' ');
-  }
-  if (normalizeString(machineDetection)) {
-    form.MachineDetection = normalizeString(machineDetection);
-  }
-
-  const { data } = await twilioApiRequest(`Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Calls.json`, {
-    method: 'POST',
-    form,
-  });
-  return data;
-}
-
-async function createTwilioConferenceParticipant(conferenceName, options = {}) {
-  const form = {
-    From: normalizeString(options.from || TWILIO_OUTBOUND_CALLER_NUMBER),
-    To: normalizeString(options.to),
-    Label: normalizeString(options.label),
-    Beep: normalizeString(options.beep || 'false'),
-    StartConferenceOnEnter: options.startConferenceOnEnter === false ? 'false' : 'true',
-    EndConferenceOnExit: options.endConferenceOnExit ? 'true' : 'false',
-    JitterBufferSize: normalizeString(options.jitterBufferSize || 'off'),
-    StatusCallback: normalizeString(options.statusCallback),
-    StatusCallbackMethod: normalizeString(options.statusCallbackMethod || 'POST'),
-  };
-
-  if (options.coaching) {
-    form.Coaching = 'true';
-  }
-  if (normalizeString(options.callSidToCoach)) {
-    form.CallSidToCoach = normalizeString(options.callSidToCoach);
-  }
-  if (Array.isArray(options.statusCallbackEvent) && options.statusCallbackEvent.length > 0) {
-    form.StatusCallbackEvent = options.statusCallbackEvent.join(' ');
-  }
-  if (options.earlyMedia === true) {
-    form.EarlyMedia = 'true';
-  }
-
-  const { data } = await twilioApiRequest(
-    `Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Conferences/${encodeURIComponent(conferenceName)}/Participants.json`,
-    {
-      method: 'POST',
-      form,
-    }
-  );
-  return data;
-}
-
-function buildTwilioConferenceAiAppTarget(appSid, sessionId) {
-  return `app:${encodeURIComponent(appSid)}?mode=ai&sessionId=${encodeURIComponent(sessionId)}`;
-}
-
-function buildTwilioConferenceAmbienceAppTarget(appSid, sessionId) {
-  return `app:${encodeURIComponent(appSid)}?mode=ambience&sessionId=${encodeURIComponent(sessionId)}`;
-}
-
-async function ensureTwilioConferenceAuxParticipantsStarted(sessionId) {
-  const session = getTwilioConferenceSession(sessionId);
-  if (!session) return null;
-  if (session.auxParticipantsStarted) return session;
-  if (session.auxParticipantsStarting) return session;
-  if (!normalizeString(session.publicBaseUrl)) {
-    throw new Error(`Twilio conference session ${sessionId} mist publicBaseUrl.`);
-  }
-  if (!normalizeString(session.prospectCallSid)) {
-    throw new Error(`Twilio conference session ${sessionId} mist prospectCallSid.`);
-  }
-
-  session.auxParticipantsStarting = true;
-  setTwilioConferenceSession(session);
-
-  try {
-    console.log(
-      '[Twilio Conference][AuxStartBegin]',
-      JSON.stringify(
-        {
-          sessionId: session.sessionId,
-          conferenceName: session.conferenceName,
-          prospectCallSid: session.prospectCallSid,
-        },
-        null,
-        2
-      )
-    );
-    const participantAppSid = await ensureTwilioConferenceParticipantApp(session.publicBaseUrl);
-
-    const aiData = await createTwilioConferenceParticipant(session.conferenceName, {
-      to: buildTwilioConferenceAiAppTarget(participantAppSid, session.sessionId),
-      label: 'ai',
-      endConferenceOnExit: true,
-      jitterBufferSize: 'off',
-      earlyMedia: true,
-      statusCallback: buildTwilioConferenceCallStatusUrl(session.publicBaseUrl, session.sessionId, 'ai'),
-      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-    });
-    session.aiCallSid = normalizeString(aiData?.call_sid || aiData?.callSid || aiData?.sid);
-    trackTwilioConferenceCallSid(session.sessionId, session.aiCallSid);
-    console.log(
-      '[Twilio Conference][AuxStartAi]',
-      JSON.stringify(
-        {
-          sessionId: session.sessionId,
-          participantAppSid,
-          aiCallSid: session.aiCallSid,
-        },
-        null,
-        2
-      )
-    );
-
-    session.auxParticipantsStarted = true;
-    session.auxParticipantsStartFailed = false;
-    console.log(
-      '[Twilio Conference][AuxStartComplete]',
-      JSON.stringify(
-        {
-          sessionId: session.sessionId,
-          aiCallSid: session.aiCallSid,
-          ambienceCallSid: session.ambienceCallSid || null,
-        },
-        null,
-        2
-      )
-    );
-    setTwilioConferenceSession(session, 'twilio_conference_aux_started');
-    if (isSupabaseConfigured()) {
-      await persistRuntimeStateToSupabase('twilio_conference_aux_started');
-    }
-    return session;
-  } catch (error) {
-    session.auxParticipantsStartFailed = true;
-    session.endedReason = normalizeString(error?.message || 'conference participant start failed');
-    setTwilioConferenceSession(session, 'twilio_conference_aux_failed');
-    if (isSupabaseConfigured()) {
-      await persistRuntimeStateToSupabase('twilio_conference_aux_failed');
-    }
-
-    if (normalizeString(session.prospectCallSid)) {
-      try {
-        await twilioApiRequest(`Accounts/${encodeURIComponent(TWILIO_ACCOUNT_SID)}/Calls/${encodeURIComponent(session.prospectCallSid)}.json`, {
-          method: 'POST',
-          form: { Status: 'completed' },
-        });
-      } catch (hangupError) {
-        console.error(
-          '[Twilio Conference][ProspectHangupAfterAuxFailure]',
-          JSON.stringify(
-            {
-              sessionId: session.sessionId,
-              message: hangupError?.message || 'Onbekende fout',
-            },
-            null,
-            2
-          )
-        );
-      }
-    }
-    throw error;
-  } finally {
-    session.auxParticipantsStarting = false;
-    setTwilioConferenceSession(session, 'twilio_conference_aux_starting_done');
-    if (isSupabaseConfigured()) {
-      await persistRuntimeStateToSupabase('twilio_conference_aux_starting_done');
-    }
-  }
-}
-
-async function ensureTwilioConferenceAmbienceParticipantStarted(sessionId) {
-  const session = getTwilioConferenceSession(sessionId);
-  if (!session) return null;
-  if (normalizeString(session.ambienceCallSid)) return session;
-  if (session.ambienceParticipantStarting) return session;
-  if (!normalizeString(session.prospectCallSid) || !normalizeString(session.aiCallSid)) return session;
-  if (!normalizeString(session.publicBaseUrl)) {
-    throw new Error(`Twilio conference session ${sessionId} mist publicBaseUrl.`);
-  }
-
-  session.ambienceParticipantStarting = true;
-  setTwilioConferenceSession(session, 'twilio_conference_ambience_starting');
-  if (isSupabaseConfigured()) {
-    await persistRuntimeStateToSupabase('twilio_conference_ambience_starting');
-  }
-
-  try {
-    const participantAppSid = await ensureTwilioConferenceParticipantApp(session.publicBaseUrl);
-    let lastError = null;
-
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        const ambienceData = await createTwilioConferenceParticipant(session.conferenceName, {
-          to: buildTwilioConferenceAmbienceAppTarget(participantAppSid, session.sessionId),
-          label: 'ambience',
-          endConferenceOnExit: false,
-          jitterBufferSize: 'off',
-          coaching: true,
-          earlyMedia: true,
-          callSidToCoach: session.prospectCallSid,
-          statusCallback: buildTwilioConferenceCallStatusUrl(session.publicBaseUrl, session.sessionId, 'ambience'),
-          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-        });
-        session.ambienceCallSid = normalizeString(ambienceData?.call_sid || ambienceData?.callSid || ambienceData?.sid);
-        session.ambienceStartWarning = '';
-        trackTwilioConferenceCallSid(session.sessionId, session.ambienceCallSid);
-        console.log(
-          '[Twilio Conference][AuxStartAmbience]',
-          JSON.stringify(
-            {
-              sessionId: session.sessionId,
-              ambienceCallSid: session.ambienceCallSid,
-              attempt: attempt + 1,
-            },
-            null,
-            2
-          )
-        );
-        setTwilioConferenceSession(session, 'twilio_conference_ambience_started');
-        if (isSupabaseConfigured()) {
-          await persistRuntimeStateToSupabase('twilio_conference_ambience_started');
-        }
-        return session;
-      } catch (error) {
-        lastError = error;
-        const message = normalizeString(error?.message || '').toLowerCase();
-        const canRetry =
-          Number(error?.status || 0) === 409 ||
-          message.includes('conference is not bridged') ||
-          message.includes('not bridged');
-        if (!canRetry || attempt >= 4) {
-          throw error;
-        }
-        await sleep(500 * (attempt + 1));
-      }
-    }
-
-    throw lastError || new Error('Ambience participant kon niet worden gestart.');
-  } finally {
-    session.ambienceParticipantStarting = false;
-    setTwilioConferenceSession(session, 'twilio_conference_ambience_starting_done');
-    if (isSupabaseConfigured()) {
-      await persistRuntimeStateToSupabase('twilio_conference_ambience_starting_done');
-    }
-  }
-}
-
-async function createTwilioConferenceColdcallingLead(lead, campaign) {
-  const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
-  const publicBaseUrl = getResolvedPublicBaseUrl();
-  if (!publicBaseUrl) {
-    throw new Error('PUBLIC_BASE_URL ontbreekt; kan Twilio callbacks/TwiML niet betrouwbaar configureren.');
-  }
-
-  await ensureTwilioConferenceParticipantApp(publicBaseUrl);
-
-  const session = buildTwilioConferenceSession(lead, campaign, normalizedPhone, publicBaseUrl);
-  setTwilioConferenceSession(session, 'twilio_conference_session_bootstrap');
-  if (isSupabaseConfigured()) {
-    const persisted = await persistRuntimeStateToSupabase('twilio_conference_session_bootstrap');
-    if (!persisted) {
-      throw new Error('Twilio conference session kon niet persistent worden opgeslagen.');
-    }
-  }
-
-  const prospectCallData = await createTwilioOutboundCall({
-    to: normalizedPhone,
-    url: buildTwilioConferenceCalleeUrl(publicBaseUrl, session.sessionId),
-    statusCallback: buildTwilioConferenceCallStatusUrl(publicBaseUrl, session.sessionId, 'prospect'),
-    statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-  });
-
-  session.prospectCallSid = normalizeString(
-    prospectCallData?.sid || prospectCallData?.call_sid || prospectCallData?.callSid
-  );
-  session.status = normalizeString(prospectCallData?.status || 'queued') || 'queued';
-  session.startedAt = nowIso();
-  setTwilioConferenceSession(session);
-  trackTwilioConferenceCallSid(session.sessionId, session.prospectCallSid);
-
-  upsertRecentCallUpdate(
-    buildTwilioConferenceCallUpdate(session, {
-      messageType: 'twilio.conference.start',
-      status: session.status,
-      startedAt: session.startedAt,
-    })
-  );
-
-  return {
-    session,
-    normalizedPhone,
-    data: prospectCallData,
   };
 }
 
@@ -5833,90 +4672,6 @@ async function createElevenLabsOutboundCall(lead, campaign) {
   }
 
   return { endpoint, data, normalizedPhone };
-}
-
-async function createSipMediaMixerOutboundCall(lead, campaign) {
-  const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
-  const endpoint = '/v1/outbound/start';
-  const payload = {
-    lead: {
-      name: normalizeString(lead?.name),
-      company: normalizeString(lead?.company),
-      phone: normalizedPhone,
-      region: normalizeString(lead?.region),
-    },
-    campaign: {
-      sector: normalizeString(campaign?.sector),
-      region: normalizeString(campaign?.region),
-      minProjectValue: parseNumberSafe(campaign?.minProjectValue, null),
-      maxDiscountPct: parseNumberSafe(campaign?.maxDiscountPct, null),
-      extraInstructions: normalizeString(campaign?.extraInstructions),
-      dispatchMode: normalizeString(campaign?.dispatchMode),
-      dispatchDelaySeconds: parseNumberSafe(campaign?.dispatchDelaySeconds, 0),
-    },
-    dynamicVariables: buildVariableValues(
-      {
-        ...lead,
-        phone: normalizedPhone,
-      },
-      campaign
-    ),
-    profileId: normalizeString(SIP_MIXER_PROFILE_ID),
-  };
-
-  const { response, data } = await fetchJsonWithTimeout(
-    buildSipMixerControlUrl(endpoint),
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${normalizeString(SIP_MIXER_CONTROL_API_KEY)}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    },
-    SIP_MIXER_REQUEST_TIMEOUT_MS
-  );
-
-  if (!response.ok) {
-    const error = new Error(
-      normalizeString(data?.error || data?.message || data?.detail) ||
-        `SIP mixer outbound call fout (${response.status})`
-    );
-    error.status = response.status;
-    error.data = data;
-    error.endpoint = endpoint;
-    throw error;
-  }
-
-  return { endpoint, data, normalizedPhone };
-}
-
-async function fetchSipMediaMixerCallStatus(callId) {
-  const normalizedCallId = normalizeString(callId);
-  const endpoint = `/v1/outbound/calls/${encodeURIComponent(normalizedCallId)}`;
-  const { response, data } = await fetchJsonWithTimeout(
-    buildSipMixerControlUrl(endpoint),
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${normalizeString(SIP_MIXER_CONTROL_API_KEY)}`,
-      },
-    },
-    SIP_MIXER_REQUEST_TIMEOUT_MS
-  );
-
-  if (!response.ok) {
-    const error = new Error(
-      normalizeString(data?.error || data?.message || data?.detail) ||
-        `SIP mixer status fout (${response.status})`
-    );
-    error.status = response.status;
-    error.data = data;
-    error.endpoint = endpoint;
-    throw error;
-  }
-
-  return { endpoint, data };
 }
 
 async function fetchElevenLabsConversationById(callId) {
@@ -6323,163 +5078,7 @@ async function processElevenLabsColdcallingLead(lead, campaign, index) {
   }
 }
 
-async function processSipMediaMixerColdcallingLead(lead, campaign, index) {
-  try {
-    const { endpoint, data, normalizedPhone } = await createSipMediaMixerOutboundCall(lead, campaign);
-    const callId = normalizeString(data?.callId || data?.sessionId || data?.id);
-    const callStatus = normalizeString(data?.status || 'queued') || 'queued';
-
-    if (callId) {
-      upsertRecentCallUpdate({
-        callId,
-        phone: normalizedPhone,
-        company: normalizeString(lead.company),
-        name: normalizeString(lead.name),
-        status: callStatus,
-        messageType: 'sip_media_mixer.start.response',
-        summary: '',
-        transcriptSnippet: '',
-        endedReason: '',
-        startedAt: new Date().toISOString(),
-        endedAt: '',
-        durationSeconds: null,
-        recordingUrl: normalizeString(data?.recordingUrl || ''),
-        updatedAt: new Date().toISOString(),
-        updatedAtMs: Date.now(),
-        provider: 'sip_media_mixer',
-      });
-    }
-
-    return {
-      index,
-      success: true,
-      lead: {
-        name: normalizeString(lead.name),
-        company: normalizeString(lead.company),
-        phone: normalizeString(lead.phone),
-        region: normalizeString(lead.region),
-        phoneE164: normalizedPhone,
-      },
-      vapi: {
-        endpoint,
-        callId,
-        status: callStatus,
-      },
-      sipMixer: {
-        endpoint,
-        callId,
-        status: callStatus,
-      },
-    };
-  } catch (error) {
-    console.error(
-      '[Coldcalling][Lead Error]',
-      JSON.stringify(
-        {
-          provider: 'sip_media_mixer',
-          lead: {
-            name: normalizeString(lead?.name),
-            company: normalizeString(lead?.company),
-            phone: normalizeString(lead?.phone),
-          },
-          error: error?.message || 'Onbekende fout',
-          statusCode: error?.status || null,
-          responseBody: error?.data || null,
-        },
-        null,
-        2
-      )
-    );
-
-    return {
-      index,
-      success: false,
-      lead: {
-        name: normalizeString(lead?.name),
-        company: normalizeString(lead?.company),
-        phone: normalizeString(lead?.phone),
-        region: normalizeString(lead?.region),
-      },
-      error: error?.message || 'Onbekende fout',
-      statusCode: error?.status || null,
-      cause: 'sip media mixer error',
-      causeExplanation: 'SIP media mixer call kon niet worden gestart.',
-      details: error?.data || null,
-    };
-  }
-}
-
-async function processTwilioConferenceColdcallingLead(lead, campaign, index) {
-  try {
-    const { session, normalizedPhone, data } = await createTwilioConferenceColdcallingLead(lead, campaign);
-    return {
-      index,
-      success: true,
-      lead: {
-        name: normalizeString(lead.name),
-        company: normalizeString(lead.company),
-        phone: normalizeString(lead.phone),
-        region: normalizeString(lead.region),
-        phoneE164: normalizedPhone,
-      },
-      vapi: {
-        endpoint: '/twilio/conference/outbound',
-        callId: normalizeString(session.sessionId),
-        status: normalizeString(data?.status || session.status || 'queued'),
-      },
-      twilio: {
-        provider: 'twilio_conference',
-        sessionId: normalizeString(session.sessionId),
-        conferenceName: normalizeString(session.conferenceName),
-        prospectCallSid: normalizeString(session.prospectCallSid),
-        status: normalizeString(data?.status || session.status || 'queued'),
-      },
-    };
-  } catch (error) {
-    console.error(
-      '[Coldcalling][Lead Error]',
-      JSON.stringify(
-        {
-          provider: 'twilio_conference',
-          lead: {
-            name: normalizeString(lead?.name),
-            company: normalizeString(lead?.company),
-            phone: normalizeString(lead?.phone),
-          },
-          error: error?.message || 'Onbekende fout',
-          statusCode: error?.status || null,
-          responseBody: error?.data || null,
-        },
-        null,
-        2
-      )
-    );
-
-    return {
-      index,
-      success: false,
-      lead: {
-        name: normalizeString(lead?.name),
-        company: normalizeString(lead?.company),
-        phone: normalizeString(lead?.phone),
-        region: normalizeString(lead?.region),
-      },
-      error: error?.message || 'Onbekende fout',
-      statusCode: error?.status || null,
-      cause: 'twilio conference error',
-      causeExplanation: 'Twilio conference call kon niet worden gestart.',
-      details: error?.data || null,
-    };
-  }
-}
-
 async function processColdcallingLead(lead, campaign, index) {
-  if (getColdcallingProvider() === 'sip_media_mixer') {
-    return processSipMediaMixerColdcallingLead(lead, campaign, index);
-  }
-  if (getColdcallingProvider() === 'twilio_conference') {
-    return processTwilioConferenceColdcallingLead(lead, campaign, index);
-  }
   return processElevenLabsColdcallingLead(lead, campaign, index);
 }
 
@@ -6814,103 +5413,6 @@ async function sendColdcallingStatusResponse(res, callId) {
   const cached = callUpdatesById.get(callId) || null;
   const provider = getColdcallingProvider();
 
-  if (provider === 'sip_media_mixer') {
-    if (!hasSipMediaMixerRuntimeConfig()) {
-      if (cached) {
-        return res.status(200).json({
-          ok: true,
-          source: 'cache',
-          provider: 'sip_media_mixer',
-          callId: normalizeString(cached.callId || callId),
-          status: normalizeString(cached.status || ''),
-          endedReason: normalizeString(cached.endedReason || ''),
-          startedAt: normalizeString(cached.startedAt || ''),
-          endedAt: normalizeString(cached.endedAt || ''),
-          durationSeconds: parseNumberSafe(cached.durationSeconds, null),
-          recordingUrl: normalizeString(cached.recordingUrl || ''),
-        });
-      }
-      return res.status(500).json({ ok: false, error: 'SIP mixer env vars ontbreken op server.' });
-    }
-
-    try {
-      const { endpoint, data } = await fetchSipMediaMixerCallStatus(callId);
-      const status = normalizeString(data?.status || data?.callStatus || '');
-      const endedReason = normalizeString(data?.endedReason || data?.reason || '');
-      const startedAt = normalizeString(data?.startedAt || data?.createdAt || '');
-      const endedAt = normalizeString(data?.endedAt || data?.completedAt || '');
-      const durationSeconds = parseNumberSafe(data?.durationSeconds, null);
-      const recordingUrl = normalizeString(data?.recordingUrl || '');
-
-      const update = upsertRecentCallUpdate({
-        callId: normalizeString(data?.callId || data?.sessionId || data?.id || callId),
-        phone: normalizeString(data?.phone || cached?.phone || ''),
-        company: normalizeString(data?.company || cached?.company || ''),
-        name: normalizeString(data?.name || cached?.name || ''),
-        status,
-        messageType: 'sip_media_mixer.call.status',
-        summary: normalizeString(cached?.summary || ''),
-        transcriptSnippet: normalizeString(cached?.transcriptSnippet || ''),
-        endedReason,
-        startedAt: startedAt || normalizeString(cached?.startedAt || ''),
-        endedAt: endedAt || normalizeString(cached?.endedAt || ''),
-        durationSeconds: Number.isFinite(durationSeconds) ? durationSeconds : parseNumberSafe(cached?.durationSeconds, null),
-        recordingUrl: recordingUrl || normalizeString(cached?.recordingUrl || ''),
-        updatedAt: new Date().toISOString(),
-        updatedAtMs: Date.now(),
-        provider: 'sip_media_mixer',
-      });
-
-      return res.status(200).json({
-        ok: true,
-        endpoint,
-        source: 'sip_media_mixer',
-        provider: 'sip_media_mixer',
-        callId: normalizeString(update?.callId || callId),
-        status: normalizeString(update?.status || ''),
-        endedReason: normalizeString(update?.endedReason || ''),
-        startedAt: normalizeString(update?.startedAt || ''),
-        endedAt: normalizeString(update?.endedAt || ''),
-        durationSeconds: parseNumberSafe(update?.durationSeconds, null),
-        recordingUrl: normalizeString(update?.recordingUrl || ''),
-      });
-    } catch (error) {
-      return res.status(Number(error?.status || 500)).json({
-        ok: false,
-        error: error?.message || 'Kon SIP mixer call status niet ophalen.',
-        endpoint: error?.endpoint || null,
-        details: error?.data || null,
-      });
-    }
-  }
-
-  if (provider === 'twilio_conference') {
-    const session = await findTwilioConferenceSession(callId, callId);
-    const update =
-      cached ||
-      (session
-        ? buildTwilioConferenceCallUpdate(session, {
-            status: normalizeString(session.status || ''),
-            endedReason: normalizeString(session.endedReason || ''),
-          })
-        : null);
-    if (!update) {
-      return res.status(404).json({ ok: false, error: 'Twilio conference call niet gevonden.' });
-    }
-    return res.status(200).json({
-      ok: true,
-      source: 'cache',
-      provider: 'twilio_conference',
-      callId: normalizeString(update.callId || callId),
-      status: normalizeString(update.status || ''),
-      endedReason: normalizeString(update.endedReason || ''),
-      startedAt: normalizeString(update.startedAt || ''),
-      endedAt: normalizeString(update.endedAt || ''),
-      durationSeconds: parseNumberSafe(update.durationSeconds, null),
-      recordingUrl: normalizeString(update.recordingUrl || ''),
-    });
-  }
-
   if (provider === 'elevenlabs') {
     if (!normalizeString(process.env.ELEVENLABS_API_KEY)) {
       if (cached) {
@@ -7004,370 +5506,8 @@ async function sendColdcallingStatusResponse(res, callId) {
   }
 }
 
-function sendTwimlResponse(res, xml) {
-  res.status(200).set('Content-Type', 'text/xml; charset=utf-8').send(xml);
-}
-
-function buildTwilioConferenceAiParticipantTwiml(session) {
-  const dynamicValues = {
-    ...buildVariableValues(
-      {
-        ...session.lead,
-        phone: session.lead.phoneE164,
-      },
-      session.campaign
-    ),
-    phone: session.lead.phoneE164,
-    callId: session.sessionId,
-  };
-
-  const parameterXml = Object.entries(dynamicValues)
-    .filter(([, value]) => value !== undefined && value !== null && normalizeString(value) !== '')
-    .map(
-      ([key, value]) =>
-        `      <Parameter name="${xmlEscape(key)}" value="${xmlEscape(String(value))}" />`
-    )
-    .join('\n');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Connect>
-    <Stream url="${xmlEscape(TWILIO_MEDIA_WS_URL)}">
-${parameterXml}
-    </Stream>
-  </Connect>
-</Response>`;
-}
-
-function buildTwilioConferenceAmbienceTwiml(session) {
-  const audioUrl = buildTwilioConferenceAmbienceAudioUrl(session.publicBaseUrl);
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Play loop="0">${xmlEscape(audioUrl)}</Play>
-</Response>`;
-}
-
-function buildTwilioConferenceCalleeTwiml(session) {
-  const conferenceStatusUrl = buildTwilioConferenceEventUrl(session.publicBaseUrl, session.sessionId);
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Dial>
-    <Conference
-      beep="false"
-      endConferenceOnExit="true"
-      jitterBufferSize="off"
-      startConferenceOnEnter="true"
-      statusCallback="${xmlEscape(conferenceStatusUrl)}"
-      statusCallbackEvent="start end join leave"
-    >${xmlEscape(session.conferenceName)}</Conference>
-  </Dial>
-</Response>`;
-}
-
-function parseTwilioConferenceCallStatus(req) {
-  const callSid = normalizeString(req.body?.CallSid || req.query?.CallSid);
-  const callStatus = normalizeString(req.body?.CallStatus || req.query?.CallStatus).toLowerCase();
-  const callDuration = parseNumberSafe(req.body?.CallDuration || req.query?.CallDuration, null);
-  const answeredBy = normalizeString(req.body?.AnsweredBy || req.query?.AnsweredBy);
-  const role = normalizeString(req.query?.role || req.body?.role).toLowerCase();
-  const sessionId =
-    normalizeString(req.query?.sessionId || req.body?.sessionId) ||
-    normalizeString(twilioConferenceSessionIdByCallSid.get(callSid) || '');
-
-  return {
-    callSid,
-    callStatus,
-    callDuration,
-    answeredBy,
-    role,
-    sessionId,
-  };
-}
-
-app.all('/api/twilio/conference/callee', async (req, res) => {
-  const publicBaseUrl = rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
-  const sessionId = normalizeString(req.query?.sessionId || req.body?.sessionId);
-  const session = await findTwilioConferenceSession(sessionId);
-  if (!session) {
-    return sendTwimlResponse(
-      res,
-      `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Hangup />
-</Response>`
-    );
-  }
-  if (publicBaseUrl && !session.publicBaseUrl) {
-    session.publicBaseUrl = publicBaseUrl;
-  }
-
-  const prospectCallSid = normalizeString(req.body?.CallSid || req.query?.CallSid);
-  const callStatus = normalizeString(req.body?.CallStatus || req.query?.CallStatus).toLowerCase();
-  if (prospectCallSid && !session.prospectCallSid) {
-    session.prospectCallSid = prospectCallSid;
-  }
-  if (prospectCallSid) {
-    trackTwilioConferenceCallSid(session.sessionId, prospectCallSid);
-  }
-  if ((callStatus === 'in-progress' || callStatus === 'answered') && !normalizeString(session.startedAt)) {
-    session.startedAt = nowIso();
-  }
-  if (callStatus === 'in-progress' || callStatus === 'answered') {
-    session.status = 'in-progress';
-  }
-  setTwilioConferenceSession(session, 'twilio_conference_callee');
-  if (isSupabaseConfigured()) {
-    await persistRuntimeStateToSupabase('twilio_conference_callee');
-  }
-
-  if (callStatus === 'in-progress' || callStatus === 'answered' || prospectCallSid) {
-    try {
-      await ensureTwilioConferenceAuxParticipantsStarted(session.sessionId);
-    } catch (error) {
-      console.error(
-        '[Twilio Conference][AuxStartFromCalleeError]',
-        JSON.stringify(
-          {
-            sessionId: session.sessionId,
-            callSid: prospectCallSid || session.prospectCallSid || null,
-            message: error?.message || 'Onbekende fout',
-            status: error?.status || null,
-            data: error?.data || null,
-          },
-          null,
-          2
-        )
-      );
-    }
-  }
-
-  return sendTwimlResponse(res, buildTwilioConferenceCalleeTwiml(session));
-});
-
-app.all('/api/twilio/conference/participant', async (req, res) => {
-  const publicBaseUrl = rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
-  const mode = normalizeString(req.query?.mode || req.body?.mode).toLowerCase();
-  const sessionId = normalizeString(req.query?.sessionId || req.body?.sessionId);
-  const session = await findTwilioConferenceSession(sessionId);
-  if (!session) {
-    return sendTwimlResponse(
-      res,
-      `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Hangup />
-</Response>`
-    );
-  }
-  if (publicBaseUrl && !session.publicBaseUrl) {
-    session.publicBaseUrl = publicBaseUrl;
-    setTwilioConferenceSession(session);
-  }
-  if (mode === 'ai') {
-    return sendTwimlResponse(res, buildTwilioConferenceAiParticipantTwiml(session));
-  }
-  if (mode === 'ambience') {
-    return sendTwimlResponse(res, buildTwilioConferenceAmbienceTwiml(session));
-  }
-  return sendTwimlResponse(
-    res,
-    `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Hangup />
-</Response>`
-  );
-});
-
-app.get('/api/twilio/conference/ambience-audio', (req, res) => {
-  rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
-  if (!fs.existsSync(TWILIO_AMBIENCE_AUDIO_FILE_PATH)) {
-    return res.status(404).send('not found');
-  }
-  res.set('Content-Type', 'audio/mpeg');
-  res.set('Cache-Control', 'public, max-age=3600');
-  return res.sendFile(TWILIO_AMBIENCE_AUDIO_FILE_PATH);
-});
-
-app.post('/api/twilio/conference/call-status', async (req, res) => {
-  rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
-  const { callSid, callStatus, callDuration, answeredBy, role, sessionId } =
-    parseTwilioConferenceCallStatus(req);
-  const session = await findTwilioConferenceSession(sessionId, callSid);
-
-  if (!session) {
-    return res.status(200).send('ok');
-  }
-
-  if (callSid) {
-    trackTwilioConferenceCallSid(session.sessionId, callSid);
-  }
-  if (role === 'prospect' && callSid && !session.prospectCallSid) {
-    session.prospectCallSid = callSid;
-  }
-  if (role === 'ai' && callSid && !session.aiCallSid) {
-    session.aiCallSid = callSid;
-  }
-  if (role === 'ambience' && callSid && !session.ambienceCallSid) {
-    session.ambienceCallSid = callSid;
-  }
-
-  if (role === 'prospect' && callStatus) {
-    session.status = callStatus;
-    if ((callStatus === 'in-progress' || callStatus === 'answered') && !normalizeString(session.startedAt)) {
-      session.startedAt = nowIso();
-    }
-    if (callStatus === 'completed' || callStatus === 'busy' || callStatus === 'failed' || callStatus === 'no-answer' || callStatus === 'canceled' || callStatus === 'cancelled') {
-      session.endedReason = callStatus;
-      session.endedAt = session.endedAt || nowIso();
-    }
-  }
-  if (Number.isFinite(callDuration) && callDuration >= 0) {
-    session.durationSeconds = Math.max(0, Math.round(callDuration));
-  }
-  setTwilioConferenceSession(session, 'twilio_conference_call_status');
-  if (isSupabaseConfigured()) {
-    await persistRuntimeStateToSupabase('twilio_conference_call_status');
-  }
-
-  const update = buildTwilioConferenceCallUpdate(session, {
-    status: role === 'prospect' ? callStatus || session.status : session.status,
-    endedReason:
-      role === 'prospect' && /^(completed|busy|failed|no-answer|canceled|cancelled)$/i.test(callStatus)
-        ? callStatus
-        : '',
-    durationSeconds: Number.isFinite(callDuration) ? callDuration : null,
-    messageType: `twilio.conference.${role || 'participant'}.status`,
-  });
-  const upserted = upsertRecentCallUpdate(update);
-  if (upserted && role === 'prospect' && normalizeString(upserted.endedReason || '')) {
-    triggerPostCallAutomation(upserted);
-  }
-
-  res.status(200).send('ok');
-
-  if (role === 'prospect' && (callStatus === 'in-progress' || callStatus === 'answered')) {
-    void ensureTwilioConferenceAuxParticipantsStarted(session.sessionId).catch((error) => {
-      console.error(
-        '[Twilio Conference][AuxStartError]',
-        JSON.stringify(
-          {
-            sessionId: session.sessionId,
-            callSid: session.prospectCallSid,
-            answeredBy,
-            message: error?.message || 'Onbekende fout',
-            status: error?.status || null,
-          },
-          null,
-          2
-        )
-      );
-    });
-  }
-});
-
-app.post('/api/twilio/conference/event', async (req, res) => {
-  rememberPublicBaseUrl(inferPublicBaseUrlFromReq(req));
-  const sessionId = normalizeString(req.query?.sessionId || req.body?.sessionId);
-  const statusCallbackEvent = normalizeString(req.body?.StatusCallbackEvent || req.body?.statusCallbackEvent).toLowerCase();
-  const conferenceSid = normalizeString(req.body?.ConferenceSid || '');
-  const callSid = normalizeString(req.body?.CallSid || '');
-  const participantLabel = normalizeString(
-    req.body?.ParticipantLabel || req.body?.participantLabel || req.body?.Label || req.body?.label
-  ).toLowerCase();
-  const session = await findTwilioConferenceSession(sessionId, callSid);
-  if (!session) {
-    return res.status(200).send('ok');
-  }
-
-  if (statusCallbackEvent === 'conference-end') {
-    session.status = 'completed';
-    session.endedReason = session.endedReason || 'conference-end';
-    session.endedAt = session.endedAt || nowIso();
-    if (!Number.isFinite(Number(session.durationSeconds)) && normalizeString(session.startedAt) && normalizeString(session.endedAt)) {
-      const durationSeconds = Math.round(
-        Math.max(0, Date.parse(session.endedAt) - Date.parse(session.startedAt)) / 1000
-      );
-      session.durationSeconds = Number.isFinite(durationSeconds) ? durationSeconds : null;
-    }
-    setTwilioConferenceSession(session, 'twilio_conference_event_end');
-    if (isSupabaseConfigured()) {
-      await persistRuntimeStateToSupabase('twilio_conference_event_end');
-    }
-    const update = upsertRecentCallUpdate(
-      buildTwilioConferenceCallUpdate(session, {
-        status: 'completed',
-        endedReason: session.endedReason,
-        endedAt: session.endedAt,
-        durationSeconds: session.durationSeconds,
-        messageType: 'twilio.conference.event',
-      })
-    );
-    if (update) {
-      triggerPostCallAutomation(update);
-    }
-  }
-
-  console.log(
-    '[Twilio Conference][Event]',
-    JSON.stringify(
-      {
-        sessionId: session.sessionId,
-        conferenceSid,
-        callSid,
-        statusCallbackEvent,
-        participantLabel,
-      },
-      null,
-      2
-    )
-  );
-
-  const aiParticipantJoined =
-    statusCallbackEvent === 'participant-join' &&
-    ((normalizeString(session.aiCallSid) && callSid === normalizeString(session.aiCallSid)) || participantLabel === 'ai');
-  const conferenceStarted = statusCallbackEvent === 'conference-start';
-
-  if (aiParticipantJoined || conferenceStarted) {
-    try {
-      await ensureTwilioConferenceAmbienceParticipantStarted(session.sessionId);
-    } catch (error) {
-      const message = normalizeString(error?.message || 'Onbekende fout');
-      session.ambienceStartWarning = message;
-      setTwilioConferenceSession(session, 'twilio_conference_ambience_warning');
-      if (isSupabaseConfigured()) {
-        await persistRuntimeStateToSupabase('twilio_conference_ambience_warning');
-      }
-      console.error(
-        '[Twilio Conference][AmbienceParticipantWarning]',
-        JSON.stringify(
-          {
-            sessionId: session.sessionId,
-            conferenceSid,
-            callSid,
-            participantLabel,
-            statusCallbackEvent,
-            message,
-            status: error?.status || null,
-            data: error?.data || null,
-          },
-          null,
-          2
-        )
-      );
-    }
-  }
-
-  return res.status(200).send('ok');
-});
-
 app.post('/api/coldcalling/start', async (req, res) => {
   const provider = getColdcallingProvider();
-  const inferredPublicBaseUrl = inferPublicBaseUrlFromReq(req);
-  if (inferredPublicBaseUrl) {
-    rememberPublicBaseUrl(inferredPublicBaseUrl);
-  }
-  if (provider === 'elevenlabs') {
-    void ensureElevenLabsInboundRouting({ reason: 'coldcalling-start' });
-  }
   const missingEnv = getMissingEnvVars(provider);
 
   if (missingEnv.length > 0) {
@@ -7376,11 +5516,7 @@ app.post('/api/coldcalling/start', async (req, res) => {
       error:
         provider === 'elevenlabs'
           ? 'Server mist vereiste environment variables voor ElevenLabs outbound calling.'
-          : provider === 'twilio_conference'
-            ? 'Server mist vereiste environment variables voor Twilio conference coldcalling.'
-            : provider === 'sip_media_mixer'
-              ? 'Server mist vereiste environment variables voor SIP media mixer coldcalling.'
-            : 'Server mist vereiste environment variables voor Vapi.',
+          : 'Server mist vereiste environment variables voor Vapi.',
       missingEnv,
       provider,
     });
@@ -8986,42 +7122,15 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 });
 
 // Simpele healthcheck voor hosting platforms (Render/Railway).
-app.get('/healthz', async (req, res) => {
+app.get('/healthz', (_req, res) => {
   const provider = getColdcallingProvider();
-  const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
-  const refreshTelephony = toBooleanSafe(req.query?.refresh, false);
-  const repairTelephony = toBooleanSafe(req.query?.repair, false);
-  const telephony =
-    provider === 'elevenlabs'
-      ? await ensureElevenLabsInboundRouting({
-          reason: 'healthz',
-          force: refreshTelephony || repairTelephony,
-          forceRelink: repairTelephony,
-        })
-      : null;
-  const ambienceSource =
-    provider === 'twilio_conference'
-      ? normalizeString(TWILIO_AMBIENCE_AUDIO_URL) || (hasBundledTwilioAmbienceAudio() ? '/api/twilio/conference/ambience-audio' : '')
-      : '';
-  const sipMixerControlConfigured = hasSipMediaMixerRuntimeConfig();
   res.status(200).json({
     ok: true,
-    service: 'softora-coldcalling-backend',
+    service: 'softora-vapi-coldcalling-backend',
     coldcalling: {
       provider,
-      providerLocked: isColdcallingProviderLocked(),
-      providerSelectionMode: getColdcallingProviderSelectionMode(),
-      allowImplicitTwilioConference: COLDCALLING_ALLOW_IMPLICIT_TWILIO_CONFERENCE,
-      agentId: getConfiguredElevenLabsAgentId(),
-      dashboardExtraInstructionsEnabled: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED,
-      targetBlocklistEnabled: isColdcallingTargetBlocklistEnabled(),
-      autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
-      explicitBlockedTargetsCount,
-      telephony,
-      sipMixerControlConfigured,
-      sipMixerControlUrl: SIP_MIXER_CONTROL_URL || null,
+      providerLocked: true,
       missingEnv: getMissingEnvVars(provider),
-      ambienceSource: ambienceSource || null,
     },
     supabase: {
       enabled: isSupabaseConfigured(),
@@ -9034,42 +7143,15 @@ app.get('/healthz', async (req, res) => {
 });
 
 // Alias voor serverless setups waar de backend onder /api/* hangt (zoals Vercel).
-app.get('/api/healthz', async (req, res) => {
+app.get('/api/healthz', (_req, res) => {
   const provider = getColdcallingProvider();
-  const explicitBlockedTargetsCount = getExplicitBlockedColdcallingTargetValues().length;
-  const refreshTelephony = toBooleanSafe(req.query?.refresh, false);
-  const repairTelephony = toBooleanSafe(req.query?.repair, false);
-  const telephony =
-    provider === 'elevenlabs'
-      ? await ensureElevenLabsInboundRouting({
-          reason: 'api-healthz',
-          force: refreshTelephony || repairTelephony,
-          forceRelink: repairTelephony,
-        })
-      : null;
-  const ambienceSource =
-    provider === 'twilio_conference'
-      ? normalizeString(TWILIO_AMBIENCE_AUDIO_URL) || (hasBundledTwilioAmbienceAudio() ? '/api/twilio/conference/ambience-audio' : '')
-      : '';
-  const sipMixerControlConfigured = hasSipMediaMixerRuntimeConfig();
   res.status(200).json({
     ok: true,
-    service: 'softora-coldcalling-backend',
+    service: 'softora-vapi-coldcalling-backend',
     coldcalling: {
       provider,
-      providerLocked: isColdcallingProviderLocked(),
-      providerSelectionMode: getColdcallingProviderSelectionMode(),
-      allowImplicitTwilioConference: COLDCALLING_ALLOW_IMPLICIT_TWILIO_CONFERENCE,
-      agentId: getConfiguredElevenLabsAgentId(),
-      dashboardExtraInstructionsEnabled: DASHBOARD_EXTRA_INSTRUCTIONS_ENABLED,
-      targetBlocklistEnabled: isColdcallingTargetBlocklistEnabled(),
-      autoBlockOwnNumbers: isColdcallingAutoBlockOwnNumbersEnabled(),
-      explicitBlockedTargetsCount,
-      telephony,
-      sipMixerControlConfigured,
-      sipMixerControlUrl: SIP_MIXER_CONTROL_URL || null,
+      providerLocked: true,
       missingEnv: getMissingEnvVars(provider),
-      ambienceSource: ambienceSource || null,
     },
     supabase: {
       enabled: isSupabaseConfigured(),
@@ -9082,34 +7164,6 @@ app.get('/api/healthz', async (req, res) => {
 });
 
 function sendRuntimeHealthDebug(_req, res) {
-  const latestTwilioConferenceSessions = Array.from(twilioConferenceSessionsById.values())
-    .slice()
-    .sort((a, b) => {
-      const aTs = Date.parse(normalizeString(a?.updatedAt || a?.createdAt || '')) || 0;
-      const bTs = Date.parse(normalizeString(b?.updatedAt || b?.createdAt || '')) || 0;
-      return bTs - aTs;
-    })
-    .slice(0, 10)
-    .map((session) => ({
-      sessionId: normalizeString(session?.sessionId),
-      conferenceName: normalizeString(session?.conferenceName),
-      status: normalizeString(session?.status),
-      createdAt: normalizeString(session?.createdAt),
-      updatedAt: normalizeString(session?.updatedAt),
-      startedAt: normalizeString(session?.startedAt),
-      endedAt: normalizeString(session?.endedAt),
-      durationSeconds: parseNumberSafe(session?.durationSeconds, null),
-      endedReason: normalizeString(session?.endedReason),
-      prospectCallSid: normalizeString(session?.prospectCallSid),
-      aiCallSid: normalizeString(session?.aiCallSid),
-      ambienceCallSid: normalizeString(session?.ambienceCallSid),
-      auxParticipantsStarted: Boolean(session?.auxParticipantsStarted),
-      auxParticipantsStarting: Boolean(session?.auxParticipantsStarting),
-      auxParticipantsStartFailed: Boolean(session?.auxParticipantsStartFailed),
-      ambienceParticipantStarting: Boolean(session?.ambienceParticipantStarting),
-      ambienceStartWarning: normalizeString(session?.ambienceStartWarning),
-    }));
-
   return res.status(200).json({
     ok: true,
     timestamp: new Date().toISOString(),
@@ -9127,7 +7181,6 @@ function sendRuntimeHealthDebug(_req, res) {
         const callId = normalizeString(item?.callId || '');
         return callId && !callId.startsWith('demo-');
       }).length,
-      latestTwilioConferenceSessions,
     },
     supabase: {
       enabled: isSupabaseConfigured(),
@@ -9451,26 +7504,13 @@ function seedDemoConfirmationTaskForUiTesting() {
 // demo-taak ook bij module-load. De functie is idempotent op basis van callId.
 seedDemoConfirmationTaskForUiTesting();
 void ensureRuntimeStateHydratedFromSupabase();
-if (getColdcallingProvider() === 'elevenlabs') {
-  void ensureElevenLabsInboundRouting({ reason: 'module-load', force: true }).catch((error) => {
-    console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
-  });
-}
 
 function startServer() {
   seedDemoConfirmationTaskForUiTesting();
   void ensureRuntimeStateHydratedFromSupabase();
-  if (getColdcallingProvider() === 'elevenlabs') {
-    void ensureElevenLabsInboundRouting({ reason: 'startup', force: true }).catch((error) => {
-      console.warn('[ElevenLabs Telephony Check Failed]', error?.message || error);
-    });
-  }
   app.listen(PORT, () => {
     const provider = getColdcallingProvider();
-    const selectionMode = getColdcallingProviderSelectionMode();
-    console.log(
-      `Softora coldcalling backend draait op http://localhost:${PORT} (provider: ${provider}, mode: ${selectionMode}, locked: ${isColdcallingProviderLocked()})`
-    );
+    console.log(`Softora coldcalling backend draait op http://localhost:${PORT} (provider: ${provider})`);
     const missingEnv = getMissingEnvVars(provider);
     if (missingEnv.length > 0) {
       console.warn(
@@ -9483,12 +7523,6 @@ function startServer() {
       );
     } else {
       console.log('[Startup] Supabase state persistence uit (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY ontbreken).');
-    }
-    if (provider === 'twilio_conference' && !normalizeString(TWILIO_AMBIENCE_AUDIO_URL) && !hasBundledTwilioAmbienceAudio()) {
-      console.warn('[Startup] Geen ambience audio bron gevonden voor twilio_conference. Zet TWILIO_AMBIENCE_AUDIO_URL of voeg het bundled bestand toe.');
-    }
-    if (provider === 'sip_media_mixer' && !hasSipMediaMixerRuntimeConfig()) {
-      console.warn('[Startup] SIP media mixer provider gekozen maar control endpoint envs ontbreken.');
     }
   });
 }
