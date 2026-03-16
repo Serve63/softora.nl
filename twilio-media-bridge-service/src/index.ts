@@ -128,7 +128,7 @@ function buildConversationInitiationPayload(parameters: JsonObject): JsonObject 
     };
   }
 
-  return Object.keys(payload).length > 1 ? payload : null;
+  return payload;
 }
 
 function sendConversationInitiationPayload(session: BridgeSession, reason: string): void {
@@ -691,6 +691,9 @@ wss.on('connection', (ws, req) => {
     remoteAddress,
     path: WS_PATH,
   });
+  if (!session.elevenWs && !session.elevenConnecting && !session.elevenUnavailable) {
+    void connectElevenLabsForSession(session);
+  }
 
   ws.on('message', (data, isBinary) => {
     if (isBinary) {
