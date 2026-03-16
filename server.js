@@ -42,6 +42,7 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const SUPABASE_STATE_TABLE = String(process.env.SUPABASE_STATE_TABLE || 'softora_runtime_state').trim();
 const SUPABASE_STATE_KEY = String(process.env.SUPABASE_STATE_KEY || 'core').trim();
+const DEFAULT_TWILIO_MEDIA_WS_URL = 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media';
 const MAIL_SMTP_HOST = String(
   process.env.MAIL_SMTP_HOST || process.env.SMTP_HOST || process.env.STRATO_SMTP_HOST || ''
 ).trim();
@@ -5267,6 +5268,76 @@ async function sendColdcallingStatusResponse(res, callId) {
     });
   }
 }
+
+function buildTwilioAllowedCallerSet() {
+  const raw = normalizeString(process.env.TWILIO_ALLOWED_CALLERS || '');
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(/[,\n]/)
+      .map((item) => normalizePhoneForTwilioMatch(item))
+      .filter(Boolean)
+  );
+}
+
+function normalizePhoneForTwilioMatch(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  const digits = raw.replace(/\D+/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('00')) return digits.slice(2);
+  if (digits.startsWith('0')) return `31${digits.slice(1)}`;
+  return digits;
+}
+
+function isTwilioInboundCallerAllowed(rawCaller) {
+  const allowed = buildTwilioAllowedCallerSet();
+  if (allowed.size === 0) return true;
+  const normalizedCaller = normalizePhoneForTwilioMatch(rawCaller);
+  if (!normalizedCaller) return false;
+  return allowed.has(normalizedCaller);
+}
+
+function sendTwimlXml(res, xml) {
+  res.setHeader('Content-Type', 'text/xml');
+  return res.status(200).send(xml);
+}
+
+function handleTwilioInboundVoice(req, res) {
+  const caller = normalizeString(req.body?.From || req.query?.From || '');
+
+  if (!isTwilioInboundCallerAllowed(caller)) {
+    return sendTwimlXml(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Reject reason="rejected" />
+</Response>`
+    );
+  }
+
+  const mediaWsUrl = normalizeString(process.env.TWILIO_MEDIA_WS_URL || DEFAULT_TWILIO_MEDIA_WS_URL);
+  if (!/^wss?:\/\//i.test(mediaWsUrl)) {
+    return res.status(500).json({
+      ok: false,
+      error: 'TWILIO_MEDIA_WS_URL ontbreekt of is ongeldig (verwacht ws:// of wss:// URL).',
+      value: mediaWsUrl || null,
+    });
+  }
+
+  return sendTwimlXml(
+    res,
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Connect>
+    <Stream url="${escapeHtml(mediaWsUrl)}" />
+  </Connect>
+</Response>`
+  );
+}
+
+app.get('/api/twilio/voice', handleTwilioInboundVoice);
+app.post('/api/twilio/voice', express.urlencoded({ extended: false }), handleTwilioInboundVoice);
 
 app.post('/api/coldcalling/start', async (req, res) => {
   const provider = getColdcallingProvider();
