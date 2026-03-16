@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: softora-sip-mixer-control
+    env: node
+    rootDir: .
+    buildCommand: npm -C sip-mixer-control-service install
+    startCommand: npm -C sip-mixer-control-service start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10001
+      - key: SIP_MIXER_CONTROL_API_KEY
+        sync: false
+      - key: SIP_MIXER_ENGINE_MODE
+        value: mock
+      - key: SIP_MIXER_REQUEST_TIMEOUT_MS
+        value: 15000
+      - key: SIP_MIXER_PROFILE_ID
+        value: default

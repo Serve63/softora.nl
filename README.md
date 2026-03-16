@@ -7,12 +7,19 @@ Huidige coldcalling-architecturen in deze repo:
 - `twilio_conference`:
   Twilio outbound prospect call -> Twilio Conference -> AI participant via Twilio Media Stream bridge -> ElevenLabs WebSocket
   plus een aparte coached ambience participant alleen voor de prospect
+- `sip_media_mixer`:
+  parallel provider voor externe SIP/media-mixer control plane (bedoeld voor de robuuste ambience-route)
 
 De actieve runtime-provider wordt als volgt gekozen:
 
 - als `COLDCALLING_PROVIDER` expliciet is gezet, volgt de backend die waarde
-- anders schakelt de backend automatisch naar `twilio_conference` zodra de vereiste Twilio envs aanwezig zijn
-- anders blijft hij op `elevenlabs`
+- anders blijft de backend standaard op `elevenlabs`
+- alleen als je `COLDCALLING_ALLOW_IMPLICIT_TWILIO_CONFERENCE=true` zet, mag hij impliciet naar `twilio_conference` schakelen zodra de vereiste Twilio envs aanwezig zijn
+
+Voor maximale stabiliteit in productie:
+
+- zet `COLDCALLING_PROVIDER=elevenlabs`
+- laat `COLDCALLING_ALLOW_IMPLICIT_TWILIO_CONFERENCE` uit (of expliciet `false`)
 
 ## Twilio Conference + Ambience flow
 
@@ -51,6 +58,29 @@ De aparte `twilio-media-bridge-service` heeft zelf wel deze envs nodig:
 ELEVENLABS_API_KEY=your_elevenlabs_api_key
 ELEVENLABS_AGENT_ID=your_elevenlabs_agent_id
 ```
+
+## SIP Media Mixer flow (parallel)
+
+Deze provider is bedoeld voor de route waarbij ambience op media-laag wordt gemixt (buiten deze app).
+
+```env
+COLDCALLING_PROVIDER=sip_media_mixer
+SIP_MIXER_CONTROL_URL=https://jouw-sip-mixer-control.example.com
+SIP_MIXER_CONTROL_API_KEY=your_sip_mixer_control_api_key
+SIP_MIXER_PROFILE_ID=default
+```
+
+Contract (control API) dat deze backend verwacht:
+
+- `POST /v1/outbound/start`
+  - body: lead + campaign + dynamic variables
+  - response: `{ callId, status }`
+- `GET /v1/outbound/calls/:callId`
+  - response: `{ callId, status, endedReason, startedAt, endedAt, durationSeconds, recordingUrl }`
+
+Er staat ook een Render blueprint klaar voor deze externe service:
+
+- [render.sip-mixer.yaml](/Users/servecreusen/softora.nl-7/render.sip-mixer.yaml)
 
 ## Legacy achtergrond
 

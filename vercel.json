@@ -16,6 +16,12 @@
     "api/coldcalling/[...path].js": {
       "maxDuration": 800
     },
+    "api/twilio/[...path].js": {
+      "maxDuration": 800
+    },
+    "api/twilio/conference/[...path].js": {
+      "maxDuration": 800
+    },
     "api/vapi/[...path].js": {
       "maxDuration": 800
     }
