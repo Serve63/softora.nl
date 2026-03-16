@@ -19,7 +19,6 @@
   const TEST_LEAD_STORAGE_KEY = 'softora_vapi_test_lead_phone';
   const LEAD_ROWS_STORAGE_KEY = 'softora_vapi_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
-  const CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS = 1773151035909;
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY = 'softora_campaign_amount_slider_index';
@@ -50,13 +49,6 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
-  }
-
-  function normalizeLooseText(value) {
-    return String(value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
   }
 
   function getNowTime() {
@@ -397,12 +389,7 @@
     scheduleRemoteUiStateSave();
   }
 
-  async function loadRemoteUiState(force = false) {
-    if (force) {
-      remoteUiStateLoaded = false;
-      remoteUiStateLastError = '';
-      remoteUiStateLastSource = '';
-    }
+  async function loadRemoteUiState() {
     if (remoteUiStateLoaded) return true;
     if (remoteUiStateLoadingPromise) return remoteUiStateLoadingPromise;
 
@@ -1704,35 +1691,7 @@
     return Number.isFinite(updatedAt) ? updatedAt : 0;
   }
 
-  function getConversationRecordTimelineMs(record) {
-    const candidates = [
-      String(record?.endedAt || '').trim(),
-      String(record?.startedAt || '').trim(),
-      String(record?.updatedAt || '').trim(),
-    ];
-
-    for (const value of candidates) {
-      if (!value) continue;
-      const parsed = Date.parse(value);
-      if (Number.isFinite(parsed) && parsed > 0) return parsed;
-    }
-
-    return getConversationRecordUpdatedMs(record);
-  }
-
-  function isConversationRecordVisible(record) {
-    if (!Number.isFinite(CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS) || CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS <= 0) {
-      return true;
-    }
-    return getConversationRecordTimelineMs(record) >= CALL_HISTORY_CLIENT_VISIBLE_AFTER_MS;
-  }
-
   function buildConversationRecordsFromUpdates(updates) {
-    const savedLeadRows = getSavedLeadRows();
-    const savedNotebookRows = getSavedAiNotebookRows();
-    const allLeadRows = [...savedLeadRows, ...savedNotebookRows];
-    const leadLookup = buildConversationLeadLookup(allLeadRows);
-
     const byId = new Map();
 
     (Array.isArray(updates) ? updates : []).forEach((item, index) => {
@@ -1741,26 +1700,14 @@
       const previous = byId.get(callId) || { callId };
       const durationSeconds = Number(item.durationSeconds);
       const updatedAtMs = getConversationRecordUpdatedMs(item);
-      const phone =
-        String(item.phone || previous.phone || '').trim() ||
-        extractPhoneFromConversationText(
-          [
-            String(item.transcriptFull || ''),
-            String(item.transcriptSnippet || ''),
-            String(item.summary || ''),
-          ].join('\n')
-        );
-      const fallbackLead = findConversationLeadByPhone(leadLookup, phone);
-      const company = String(item.company || previous.company || fallbackLead?.company || '').trim();
-      const name = String(item.name || previous.name || fallbackLead?.name || '').trim();
 
       byId.set(callId, {
         ...previous,
         ...item,
         callId,
-        company,
-        name,
-        phone,
+        company: String(item.company || previous.company || '').trim(),
+        name: String(item.name || previous.name || '').trim(),
+        phone: String(item.phone || previous.phone || '').trim(),
         status: String(item.status || previous.status || '').trim(),
         endedReason: String(item.endedReason || previous.endedReason || '').trim(),
         summary: String(item.summary || previous.summary || '').trim(),
@@ -1780,27 +1727,18 @@
       });
     });
 
-    return Array.from(byId.values())
-      .filter((record) => isConversationRecordVisible(record))
-      .sort((a, b) => getConversationRecordUpdatedMs(b) - getConversationRecordUpdatedMs(a));
+    return Array.from(byId.values()).sort((a, b) => getConversationRecordUpdatedMs(b) - getConversationRecordUpdatedMs(a));
   }
 
   function inferConversationAnswered(record) {
     const status = String(record?.status || '').toLowerCase();
     const endedReason = String(record?.endedReason || '').toLowerCase();
-    const transcript = String(record?.transcriptFull || record?.transcriptSnippet || '').toLowerCase();
-    const summary = String(record?.summary || '').toLowerCase();
-    const combined = `${status}\n${endedReason}\n${summary}\n${transcript}`;
     const hasConversationContent = Boolean(record?.summary || record?.transcriptFull || record?.transcriptSnippet);
-    if (
-      /(busy|voicemail|voice\s?mail|no[- ]?answer|no response|did not respond|geen gehoor|failed|cancelled|canceled|rejected|laat een bericht achter|na de toon|vodafone voicemail|kan geen voicemail)/.test(
-        combined
-      )
-    ) {
-      return false;
-    }
     if (hasConversationContent) return true;
     if (Number(record?.durationSeconds) >= 15) return true;
+    if (/(busy|voicemail|no[- ]?answer|failed|cancelled|canceled|rejected)/.test(`${status} ${endedReason}`)) {
+      return false;
+    }
     return null;
   }
 
@@ -1834,108 +1772,12 @@
     });
   }
 
-  function getConversationDisplayDate(record) {
-    const candidates = [
-      String(record?.updatedAt || '').trim(),
-      String(record?.endedAt || '').trim(),
-      String(record?.startedAt || '').trim(),
-    ];
-
-    for (const value of candidates) {
-      if (!value) continue;
-      const date = new Date(value);
-      if (!Number.isNaN(date.getTime())) return date;
-    }
-
-    const updatedAtMs = Number(record?.updatedAtMs);
-    if (Number.isFinite(updatedAtMs) && updatedAtMs > 0) {
-      const date = new Date(updatedAtMs);
-      if (!Number.isNaN(date.getTime())) return date;
-    }
-
-    return null;
-  }
-
-  function getConversationDateGroupKey(date) {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'unknown';
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  function formatConversationDateGroupLabel(date) {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'Onbekend';
-
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const diffDays = Math.round((todayStart.getTime() - dateStart.getTime()) / 86400000);
-
-    if (diffDays === 0) return 'Vandaag';
-    if (diffDays === 1) return 'Gisteren';
-
-    const sameYear = date.getFullYear() === today.getFullYear();
-    return date.toLocaleDateString('nl-NL', sameYear
-      ? { day: 'numeric', month: 'long' }
-      : { day: 'numeric', month: 'long', year: 'numeric' });
-  }
-
   function getConversationConclusion(record) {
     const source = String(record?.summary || record?.transcriptSnippet || '').replace(/\s+/g, ' ').trim();
     if (!source) return 'Nog geen conclusie beschikbaar.';
     const match = source.match(/[^.!?]+[.!?]/);
     const sentence = String(match ? match[0] : source).trim();
     return sentence.length > 180 ? `${sentence.slice(0, 177).trim()}...` : sentence;
-  }
-
-  function getConversationSummary(record) {
-    const source = String(record?.summary || record?.transcriptSnippet || '').replace(/\s+/g, ' ').trim();
-    if (!source) return 'Nog geen samenvatting beschikbaar.';
-    return source.length > 420 ? `${source.slice(0, 417).trim()}...` : source;
-  }
-
-  function inferConversationInterest(record) {
-    if (inferConversationAnswered(record) === false) {
-      return false;
-    }
-
-    const source = [
-      record?.summary,
-      record?.transcriptFull,
-      record?.transcriptSnippet,
-      record?.endedReason,
-      record?.status,
-    ]
-      .map((value) => String(value || '').toLowerCase())
-      .filter(Boolean)
-      .join('\n');
-
-    if (
-      /(geen interesse|niet geinteresseerd|niet geïnteresseerd|geen behoefte|geen tijd|nee bedankt|niet nodig|afmelden|bel niet meer|stop)/.test(
-        source
-      )
-    ) {
-      return false;
-    }
-
-    if (
-      /(geinteresseerd|geïnteresseerd|interesse|offerte|voorstel|prijsopgave|info sturen|informatie sturen|mail sturen|terugbellen|follow[- ]?up|afspraak|intake|kennismaking|demo)/.test(
-        source
-      )
-    ) {
-      return true;
-    }
-
-    if (Number(record?.durationSeconds) >= 20 && inferConversationAnswered(record) === true) {
-      return true;
-    }
-
-    return false;
-  }
-
-  function formatConversationInterestLabel(record) {
-    return inferConversationInterest(record) ? 'Geinteresseerd' : 'Niet geinteresseerd';
   }
 
   function getConversationLeadLabel(record) {
@@ -1960,191 +1802,6 @@
 
   function getConversationTranscript(record) {
     return String(record?.transcriptFull || record?.transcriptSnippet || '').trim();
-  }
-
-  function getConversationResolvedRecord(record, detailsById) {
-    if (!record || typeof record !== 'object') return record;
-    const detail = detailsById && record.callId ? detailsById[record.callId] : null;
-    return detail ? { ...record, ...detail } : record;
-  }
-
-  function getPhoneLookupKeys(value) {
-    const digits = String(value || '').replace(/\D/g, '');
-    if (!digits) return [];
-
-    const keys = new Set([digits]);
-    if (digits.startsWith('0031') && digits.length === 13) {
-      keys.add(digits.slice(2));
-      keys.add(`0${digits.slice(4)}`);
-    }
-    if (digits.startsWith('31') && digits.length === 11) {
-      keys.add(`0${digits.slice(2)}`);
-      keys.add(digits.slice(2));
-    }
-    if (digits.startsWith('0') && digits.length === 10) {
-      keys.add(`31${digits.slice(1)}`);
-      keys.add(digits.slice(1));
-    }
-    if (digits.length === 9 && digits.startsWith('6')) {
-      keys.add(`0${digits}`);
-      keys.add(`31${digits}`);
-    }
-    return Array.from(keys).filter(Boolean);
-  }
-
-  function normalizeConversationLeadKey(value) {
-    return normalizeLooseText(value).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
-  function buildConversationLeadLookup(rows) {
-    const lookup = new Map();
-    (Array.isArray(rows) ? rows : []).forEach((row) => {
-      const label = String(row?.company || row?.name || '').trim();
-      const phone = String(row?.phone || '').trim();
-      if (!label || !phone) return;
-      getPhoneLookupKeys(phone).forEach((key) => {
-        if (!key || lookup.has(key)) return;
-        lookup.set(key, {
-          company: label,
-          name: label,
-          phone,
-        });
-      });
-    });
-    return lookup;
-  }
-
-  function buildConversationLeadLabelLookup(rows) {
-    const lookup = new Map();
-    (Array.isArray(rows) ? rows : []).forEach((row) => {
-      const label = String(row?.company || row?.name || '').trim();
-      const phone = String(row?.phone || '').trim();
-      const key = normalizeConversationLeadKey(label);
-      if (!key || lookup.has(key)) return;
-      lookup.set(key, {
-        company: label,
-        name: label,
-        phone,
-      });
-    });
-    return lookup;
-  }
-
-  function findConversationLeadByPhone(leadLookup, phone) {
-    if (!(leadLookup instanceof Map)) return null;
-    for (const key of getPhoneLookupKeys(phone)) {
-      const match = leadLookup.get(key);
-      if (match) return match;
-    }
-    return null;
-  }
-
-  function findConversationLeadByLabel(leadLookup, label) {
-    if (!(leadLookup instanceof Map)) return null;
-    const key = normalizeConversationLeadKey(label);
-    if (!key) return null;
-
-    const exact = leadLookup.get(key);
-    if (exact) return exact;
-
-    const tokens = key.split(' ').filter((token) => token.length >= 2);
-    if (tokens.length < 2) return null;
-
-    for (const [candidateKey, match] of leadLookup.entries()) {
-      if (!candidateKey) continue;
-      if (tokens.every((token) => candidateKey.includes(token))) return match;
-    }
-
-    return null;
-  }
-
-  function looksLikeConversationLeadLabel(value) {
-    const text = String(value || '').replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
-    if (!text || text.length < 3) return false;
-    if (!/[a-zA-ZÀ-ÿ]/.test(text)) return false;
-    if (/\b(softora|agent|assistant|voicemail|website|google|afspraak|prospect)\b/i.test(text)) return false;
-    return true;
-  }
-
-  function extractPhoneFromConversationText(text) {
-    const source = String(text || '').trim();
-    if (!source) return '';
-
-    const digitMatches = source.match(/(?:\+?\d[\d\s().-]{7,}\d)/g) || [];
-    for (const match of digitMatches) {
-      const digits = String(match || '').replace(/\D/g, '');
-      if (getPhoneLookupKeys(digits).length > 0) return digits;
-    }
-
-    const digitWordMap = {
-      nul: '0',
-      zero: '0',
-      een: '1',
-      twee: '2',
-      drie: '3',
-      vier: '4',
-      vijf: '5',
-      zes: '6',
-      zeven: '7',
-      acht: '8',
-      negen: '9',
-    };
-
-    const tokens = normalizeLooseText(source).split(/[^a-z0-9]+/).filter(Boolean);
-    const sequences = [];
-    let current = '';
-
-    tokens.forEach((token) => {
-      const directDigit = /^\d$/.test(token) ? token : '';
-      const mappedDigit = directDigit || digitWordMap[token] || '';
-      if (mappedDigit) {
-        current += mappedDigit;
-        return;
-      }
-      if (current.length >= 9) sequences.push(current);
-      current = '';
-    });
-
-    if (current.length >= 9) sequences.push(current);
-
-    for (const digits of sequences) {
-      if (getPhoneLookupKeys(digits).length > 0) {
-        return digits;
-      }
-    }
-
-    return '';
-  }
-
-  function extractLeadLabelFromConversationText(text) {
-    const source = String(text || '').trim();
-    if (!source) return '';
-
-    const patterns = [
-      /the user,\s*([^,.\n]{3,80})\s*,/i,
-      /cold-called\s+([^,.\n]{3,80})\s+to/i,
-      /(?:^|\n)\s*user:\s*[^.\n]{0,80}?\bmet\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'’.-]+(?:\s+(?:van|der|den|de|ter|ten|te|op|het|von|da|di|del|la|le|du|des|vanden|vander))?(?:\s+[A-ZÀ-ÿ][A-Za-zÀ-ÿ'’.-]+){0,4})/i,
-      /\bmet\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'’.-]+(?:\s+(?:van|der|den|de|ter|ten|te|op|het|von|da|di|del|la|le|du|des|vanden|vander))?(?:\s+[A-ZÀ-ÿ][A-Za-zÀ-ÿ'’.-]+){0,4})/i,
-    ];
-
-    for (const pattern of patterns) {
-      const match = source.match(pattern);
-      const candidate = String(match?.[1] || '')
-        .replace(/\[[^\]]+\]/g, '')
-        .replace(/[|,:;]+$/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (looksLikeConversationLeadLabel(candidate)) return candidate;
-    }
-
-    return '';
-  }
-
-  function needsConversationIdentityResolution(record) {
-    if (!record || typeof record !== 'object') return false;
-    const company = String(record.company || '').trim();
-    const name = String(record.name || '').trim();
-    return !company && !name;
   }
 
   function getConversationThemeMode() {
@@ -2176,11 +1833,6 @@
         accentSoftBgActive: 'rgba(139, 34, 82, 0.12)',
         accentSoftText: '#8b2252',
         positive: '#2d8a5e',
-        negative: '#b95c6c',
-        positiveRowBg: 'rgba(45, 138, 94, 0.10)',
-        positiveRowBgActive: 'rgba(45, 138, 94, 0.16)',
-        negativeRowBg: 'rgba(185, 92, 108, 0.10)',
-        negativeRowBgActive: 'rgba(185, 92, 108, 0.16)',
         warning: '#b26b16',
         buttonBg: 'rgba(0, 0, 0, 0.03)',
         buttonBorder: 'rgba(0, 0, 0, 0.08)',
@@ -2210,11 +1862,6 @@
       accentSoftBgActive: 'rgba(139,34,82,0.12)',
       accentSoftText: '#f4d6e4',
       positive: '#7ce2aa',
-      negative: '#f19aaa',
-      positiveRowBg: 'rgba(124, 226, 170, 0.12)',
-      positiveRowBgActive: 'rgba(124, 226, 170, 0.18)',
-      negativeRowBg: 'rgba(241, 154, 170, 0.12)',
-      negativeRowBgActive: 'rgba(241, 154, 170, 0.18)',
       warning: '#f0b37a',
       buttonBg: 'rgba(255,255,255,0.03)',
       buttonBorder: 'rgba(255,255,255,0.08)',
@@ -2228,17 +1875,16 @@
     let modal = byId('aiNotebookModalOverlay');
     if (modal) return modal;
 
-      const state = {
-        loading: false,
-        error: '',
-        calls: [],
-        selectedCallId: '',
-        detailLoadingId: '',
-        detailErrorById: Object.create(null),
-        detailsById: Object.create(null),
-        detailFetchInFlight: new Set(),
-        pollTimer: null,
-      };
+    const state = {
+      loading: false,
+      error: '',
+      calls: [],
+      selectedCallId: '',
+      detailLoadingId: '',
+      detailErrorById: Object.create(null),
+      detailsById: Object.create(null),
+      pollTimer: null,
+    };
 
     modal = document.createElement('div');
     modal.id = 'aiNotebookModalOverlay';
@@ -2255,22 +1901,24 @@
       '  <div id="aiNotebookModalHeader" style="min-height:72px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; gap:12px;">',
       '    <div>',
       '      <div id="aiNotebookModalTitle" style="font-family:Oswald,sans-serif; font-size:30px; line-height:1; letter-spacing:0.03em; text-transform:uppercase;">Telefoongesprekken</div>',
+      '      <div id="aiNotebookDraftHint" style="margin-top:8px; font-size:13px;">Alle AI coldcalls met transcriptie, conclusie en opname op een plek.</div>',
       '    </div>',
       '    <div style="display:flex; align-items:center; gap:10px;">',
-      '      <button type="button" id="aiNotebookRefreshBtn" aria-label="Verversen" title="Verversen" style="height:40px; width:40px; padding:0; display:inline-flex; align-items:center; justify-content:center; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15.55-6.36L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15.55 6.36L3 16"/></svg></button>',
+      '      <button type="button" id="aiNotebookRefreshBtn" style="height:40px; padding:0 14px; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;">Verversen</button>',
       '      <button type="button" id="aiNotebookCancelBtn" style="height:40px; padding:0 14px; font-family:Oswald,sans-serif; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer;">Sluiten</button>',
       '    </div>',
       '  </div>',
       '  <div style="display:grid; grid-template-columns:minmax(340px, 420px) 1fr; min-height:0; flex:1;">',
       '    <div id="aiNotebookConversationPane" style="min-height:0; display:flex; flex-direction:column;">',
+      '      <div id="aiNotebookConversationPaneHeader" style="padding:16px 18px 12px; font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Laatste gesprekken</div>',
       '      <div id="aiNotebookConversationList" style="flex:1; min-height:0; overflow:auto; padding:0;"></div>',
       '    </div>',
-      '    <div id="aiNotebookConversationDetailPane" style="min-height:0; overflow:auto; padding:22px; display:flex;">',
-      '      <div id="aiNotebookConversationDetail" style="flex:1; width:100%;"></div>',
+      '    <div id="aiNotebookConversationDetailPane" style="min-height:0; overflow:auto; padding:22px;">',
+      '      <div id="aiNotebookConversationDetail"></div>',
       '    </div>',
       '  </div>',
       '  <div id="aiNotebookModalFooter" style="min-height:48px; display:flex; align-items:center; justify-content:flex-end; gap:12px; padding:0 20px; font-size:12px;">',
-      '    <div id="aiNotebookModalFooterBrand" style="font-family:Oswald,sans-serif; letter-spacing:0.12em; text-transform:uppercase;">Softora.nl</div>',
+      '    <div id="aiNotebookModalFooterBrand" style="font-family:Oswald,sans-serif; letter-spacing:0.12em; text-transform:uppercase;">Softora Premium</div>',
       '  </div>',
       '</div>',
     ].join('');
@@ -2362,34 +2010,35 @@
       const detailError = state.detailErrorById[record.callId] || '';
 
       detailEl.innerHTML = [
-        '<div style="max-width:100%; min-height:100%; display:flex; flex-direction:column;">',
-        '  <div>',
-        `    <div style="font-family:Oswald,sans-serif; font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:8px;">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
-        `    <div style="font-family:Oswald,sans-serif; font-size:34px; line-height:1; letter-spacing:0.01em; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div>`,
-        `    <div style="margin-top:12px; color:${theme.textMuted}; font-size:14px;">${escapeHtml(record.phone || 'Geen telefoonnummer beschikbaar')}</div>`,
-        `    <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:14px 28px; margin-top:28px; margin-bottom:28px;">`,
-        `      <div><div style="font-family:Oswald,sans-serif; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Gebelde lead</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div></div>`,
-        `      <div><div style="font-family:Oswald,sans-serif; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Opgenomen</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(formatConversationAnsweredLabel(record))}</div></div>`,
-        `      <div><div style="font-family:Oswald,sans-serif; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Gespreksduur</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div></div>`,
-        `      <div><div style="font-family:Oswald,sans-serif; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Call ID</div><div style="font-size:15px; line-height:1.5; color:${theme.text}; word-break:break-all;">${callId}</div></div>`,
-        `      <div><div style="font-family:Oswald,sans-serif; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Status</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(formatConversationInterestLabel(record))}</div></div>`,
-        '    </div>',
-        `    <div style="margin-bottom:26px;">`,
-        `      <div style="font-family:Oswald,sans-serif; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:10px;">Gespreksamenvatting</div>`,
-        `      <div style="font-size:15px; line-height:1.8; color:${theme.text};">${escapeHtml(getConversationSummary(record))}</div>`,
-        '    </div>',
-        `    <div style="margin-bottom:26px;">`,
-        '      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px;">',
-        `        <div style="font-family:Oswald,sans-serif; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted};">Volledige transcriptie</div>`,
-        detailLoading ? `        <div style="font-size:12px; color:${theme.textMuted};">Extra details laden...</div>` : '',
-        detailError ? `        <div style="font-size:12px; color:#d66f8b;">${escapeHtml(detailError)}</div>` : '',
-        '      </div>',
-        `      <div style="white-space:pre-wrap; font-size:14px; line-height:1.85; color:${transcript ? theme.text : theme.textMuted};">${transcript || 'Nog geen transcriptie beschikbaar voor dit gesprek.'}</div>`,
-        '    </div>',
+        '<div style="max-width:100%;">',
+        `  <div style="font-family:Oswald,sans-serif; font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:8px;">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
+        `  <div style="font-family:Oswald,sans-serif; font-size:34px; line-height:1; text-transform:uppercase; letter-spacing:0.03em; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div>`,
+        `  <div style="margin-top:12px; color:${theme.textMuted}; font-size:14px;">${escapeHtml(record.phone || 'Geen telefoonnummer beschikbaar')}</div>`,
+        `  <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:14px 28px; margin-top:28px; margin-bottom:28px;">`,
+        `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Gebelde lead</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div></div>`,
+        `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Opgenomen</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(formatConversationAnsweredLabel(record))}</div></div>`,
+        `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Gespreksduur</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div></div>`,
+        `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Call ID</div><div style="font-size:15px; line-height:1.5; color:${theme.text}; word-break:break-all;">${callId}</div></div>`,
+        `    <div><div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:6px;">Status</div><div style="font-size:15px; line-height:1.5; color:${theme.text};">${escapeHtml(String(record.status || 'Onbekend'))}</div></div>`,
         '  </div>',
+        `  <div style="margin-bottom:26px;">`,
+        `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:10px;">Conclusie in 1 zin</div>`,
+        `    <div style="font-size:15px; line-height:1.8; color:${theme.text};">${escapeHtml(getConversationConclusion(record))}</div>`,
+        '  </div>',
+        `  <div style="margin-bottom:26px;">`,
+        '    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px;">',
+        `      <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted};">Volledige transcriptie</div>`,
+        detailLoading ? `      <div style="font-size:12px; color:${theme.textMuted};">Extra details laden...</div>` : '',
+        detailError ? `      <div style="font-size:12px; color:#d66f8b;">${escapeHtml(detailError)}</div>` : '',
+        '    </div>',
+        `    <div style="white-space:pre-wrap; font-size:14px; line-height:1.85; color:${transcript ? theme.text : theme.textMuted};">${transcript || 'Nog geen transcriptie beschikbaar voor dit gesprek.'}</div>`,
+        '  </div>',
+        `  <div>`,
+        `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:12px;">Gesprek terugluisteren</div>`,
         recordingUrl
-          ? `  <div style="margin-top:auto; padding-top:22px;"><audio id="conversationAudioPlayer" controls preload="none" style="width:100%; color-scheme:${getConversationThemeMode()};"><source src="${escapeHtml(recordingUrl)}"></audio></div>`
-          : '',
+          ? `    <div style="display:flex; flex-direction:column; gap:12px;"><button type="button" data-conversation-play="${callId}" style="align-self:flex-start; height:42px; border:1px solid ${theme.borderStrong}; background:${theme.accentSoftBg}; color:${theme.accentSoftText}; padding:0 16px; font-family:Oswald,sans-serif; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer;">Afspelen</button><audio id="conversationAudioPlayer" controls preload="none" style="width:100%; color-scheme:${getConversationThemeMode()};"><source src="${escapeHtml(recordingUrl)}"></audio></div>`
+          : `    <div style="font-size:14px; color:${theme.textMuted};">Nog geen opname beschikbaar voor dit gesprek.</div>`,
+        '  </div>',
         '</div>',
       ].join('');
 
@@ -2413,46 +2062,28 @@
         return;
       }
 
-      const rows = [];
-      let previousGroupKey = '';
-
-      state.calls.forEach((record, index) => {
-        const mergedRecord = getConversationResolvedRecord(record, state.detailsById);
-        const displayDate = getConversationDisplayDate(mergedRecord);
-        const groupKey = getConversationDateGroupKey(displayDate);
-        if (groupKey !== previousGroupKey) {
-          rows.push([
-            `<div style="padding:${index === 0 ? '14px 16px 10px' : '18px 16px 10px'}; border-bottom:1px solid ${theme.border}; background:${theme.chromeAltBg};">`,
-            `  <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted};">${escapeHtml(formatConversationDateGroupLabel(displayDate))}</div>`,
-            '</div>',
-          ].join(''));
-          previousGroupKey = groupKey;
-        }
-
-        rows.push(
-          (() => {
-            const isActive = mergedRecord.callId === state.selectedCallId;
-            const label = escapeHtml(getConversationListLabel(mergedRecord));
-            const answeredState = inferConversationAnswered(mergedRecord);
-            const rowBg =
-              answeredState === true
-                ? (isActive ? theme.positiveRowBgActive : theme.positiveRowBg)
-                : answeredState === false
-                  ? (isActive ? theme.negativeRowBgActive : theme.negativeRowBg)
-                  : (isActive ? theme.accentSoftBgActive : 'transparent');
-            return [
-              `<button type="button" data-conversation-id="${escapeHtml(mergedRecord.callId)}" style="width:100%; text-align:left; padding:11px 16px; border:none; border-bottom:1px solid ${theme.border}; border-left:3px solid ${isActive ? theme.accent : 'transparent'}; background:${rowBg}; color:${theme.text}; cursor:pointer; transition:background 0.2s ease, border-color 0.2s ease;">`,
-              '  <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px;">',
-              `    <div style="min-width:0; font-family:Oswald,sans-serif; font-size:15px; line-height:1.1; letter-spacing:0.01em; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</div>`,
-              `    <div style="font-size:12px; color:${theme.textMuted}; white-space:nowrap;">${escapeHtml(formatConversationDuration(mergedRecord.durationSeconds))}</div>`,
-              '  </div>',
-              '</button>',
-            ].join('');
-          })()
-        );
-      });
-
-      listEl.innerHTML = rows.join('');
+      listEl.innerHTML = state.calls
+        .map((record) => {
+          const isActive = record.callId === state.selectedCallId;
+          const label = escapeHtml(getConversationListLabel(record));
+          const answered = escapeHtml(formatConversationAnsweredLabel(record));
+          const answeredColor =
+            inferConversationAnswered(record) === true
+              ? theme.positive
+              : inferConversationAnswered(record) === false
+                ? theme.warning
+                : theme.textMuted;
+          return [
+            `<button type="button" data-conversation-id="${escapeHtml(record.callId)}" style="width:100%; text-align:left; padding:11px 16px; border:none; border-bottom:1px solid ${theme.border}; border-left:3px solid ${isActive ? theme.accent : 'transparent'}; background:${isActive ? theme.accentSoftBgActive : 'transparent'}; color:${theme.text}; cursor:pointer; transition:background 0.2s ease, border-color 0.2s ease;">`,
+            '  <div style="display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px;">',
+            `    <div style="min-width:0; font-family:Oswald,sans-serif; font-size:15px; line-height:1; text-transform:uppercase; letter-spacing:0.04em; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</div>`,
+            `    <div style="font-size:12px; color:${theme.textMuted}; white-space:nowrap;">${escapeHtml(formatConversationDuration(record.durationSeconds))}</div>`,
+            `    <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:${answeredColor}; white-space:nowrap;">${answered}</div>`,
+            '  </div>',
+            '</button>',
+          ].join('');
+        })
+        .join('');
 
       listEl.querySelectorAll('[data-conversation-id]').forEach((button) => {
         button.addEventListener('click', () => {
@@ -2467,21 +2098,18 @@
       renderConversationDetail();
     }
 
-    async function loadConversationDetail(callId, options = {}) {
+    async function loadConversationDetail(callId) {
       const record = state.calls.find((item) => item.callId === callId);
       if (!record) return;
-      const forceRefresh = Boolean(options?.forceRefresh);
-      const silent = Boolean(options?.silent);
 
-      if (!forceRefresh && state.detailsById[callId]?._fetchedFromApi) return;
-      if (!forceRefresh && state.detailFetchInFlight.has(callId)) return;
+      const alreadyHasDetail =
+        (Number(record.durationSeconds) > 0 || Number(state.detailsById[callId]?.durationSeconds) > 0) &&
+        (String(record.recordingUrl || '').trim() || String(state.detailsById[callId]?.recordingUrl || '').trim());
+      if (alreadyHasDetail) return;
 
-      state.detailFetchInFlight.add(callId);
-      if (!silent) {
-        state.detailLoadingId = callId;
-        state.detailErrorById[callId] = '';
-        renderConversationDetail();
-      }
+      state.detailLoadingId = callId;
+      state.detailErrorById[callId] = '';
+      renderConversationDetail();
 
       try {
         const response = await fetchWithTimeout(
@@ -2494,101 +2122,29 @@
           throw new Error(String(data?.error || `Call details laden mislukt (${response.status})`));
         }
 
-        const allLeadRows = [
-          ...getSavedLeadRows(),
-          ...getSavedAiNotebookRows(),
-        ];
-        const leadLookup = buildConversationLeadLookup(allLeadRows);
-        const recoveredPhone =
-          String(data.phone || record.phone || '').trim() ||
-          extractPhoneFromConversationText(
-            [
-              String(data.transcriptFull || ''),
-              String(data.transcriptSnippet || ''),
-              String(data.summary || ''),
-            ].join('\n')
-          );
-        const fallbackLead = findConversationLeadByPhone(leadLookup, recoveredPhone);
-        const resolvedPhone = String(data.phone || fallbackLead?.phone || recoveredPhone || '').trim();
-        const resolvedCompany = String(data.company || record.company || fallbackLead?.company || '').trim();
-        const resolvedName = String(data.name || record.name || fallbackLead?.name || '').trim();
-
         state.detailsById[callId] = {
-          phone: resolvedPhone,
-          company: resolvedCompany,
-          name: resolvedName,
           status: String(data.status || '').trim(),
           endedReason: String(data.endedReason || '').trim(),
-          summary: String(data.summary || '').trim(),
-          transcriptSnippet: String(data.transcriptSnippet || '').trim(),
-          transcriptFull: String(data.transcriptFull || '').trim(),
           startedAt: String(data.startedAt || '').trim(),
           endedAt: String(data.endedAt || '').trim(),
           durationSeconds: Number.isFinite(Number(data.durationSeconds)) && Number(data.durationSeconds) > 0
             ? Math.round(Number(data.durationSeconds))
             : null,
           recordingUrl: String(data.recordingUrl || '').trim(),
-          _fetchedFromApi: true,
         };
-        state.calls = state.calls.map((item) => (
-          item.callId === callId
-            ? {
-                ...item,
-                phone: String(resolvedPhone || item.phone || '').trim(),
-                company: String(resolvedCompany || item.company || '').trim(),
-                name: String(resolvedName || item.name || '').trim(),
-                status: String(data.status || item.status || '').trim(),
-                endedReason: String(data.endedReason || item.endedReason || '').trim(),
-                summary: String(data.summary || item.summary || '').trim(),
-                transcriptSnippet: String(data.transcriptSnippet || item.transcriptSnippet || '').trim(),
-                transcriptFull: String(data.transcriptFull || item.transcriptFull || '').trim(),
-                recordingUrl: String(data.recordingUrl || item.recordingUrl || '').trim(),
-                durationSeconds:
-                  Number.isFinite(Number(data.durationSeconds)) && Number(data.durationSeconds) > 0
-                    ? Math.round(Number(data.durationSeconds))
-                    : item.durationSeconds,
-              }
-            : item
-        ));
       } catch (error) {
         state.detailErrorById[callId] = error?.message || 'Kon extra details niet laden.';
       } finally {
-        state.detailFetchInFlight.delete(callId);
         if (state.detailLoadingId === callId) {
           state.detailLoadingId = '';
         }
-        renderConversationList();
+        renderConversationDetail();
       }
     }
 
-    function prefetchConversationDetailsForUnknowns(limit = 60) {
-      const pendingCallIds = state.calls
-        .map((record) => getConversationResolvedRecord(record, state.detailsById))
-        .filter((record) => needsConversationIdentityResolution(record))
-        .map((record) => String(record.callId || '').trim())
-        .filter(Boolean)
-        .slice(0, limit);
-
-      if (!pendingCallIds.length) return;
-
-      void (async () => {
-        const batchSize = 6;
-        for (let index = 0; index < pendingCallIds.length; index += batchSize) {
-          const batch = pendingCallIds.slice(index, index + batchSize);
-          await Promise.all(batch.map((callId) => loadConversationDetail(callId, { silent: true })));
-        }
-      })();
-    }
-
-    async function loadConversations(options = {}) {
-      const forceDetailRefresh = Boolean(options?.forceDetailRefresh);
-      await loadRemoteUiState(true);
+    async function loadConversations() {
       state.loading = true;
       state.error = '';
-      if (forceDetailRefresh) {
-        state.detailsById = Object.create(null);
-        state.detailErrorById = Object.create(null);
-      }
       renderConversationList();
 
       try {
@@ -2619,9 +2175,8 @@
         state.loading = false;
         renderConversationList();
         if (state.selectedCallId) {
-          void loadConversationDetail(state.selectedCallId, { forceRefresh: forceDetailRefresh });
+          void loadConversationDetail(state.selectedCallId);
         }
-        prefetchConversationDetailsForUnknowns();
       }
     }
 
@@ -2653,7 +2208,7 @@
 
     byId('aiNotebookCancelBtn')?.addEventListener('click', closeModal);
     byId('aiNotebookRefreshBtn')?.addEventListener('click', () => {
-      void loadConversations({ forceDetailRefresh: true });
+      void loadConversations();
     });
 
     const themeObserver = new MutationObserver(() => {

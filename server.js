@@ -110,14 +110,12 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
-const COLDCALLING_PROVIDER_LOCK = 'elevenlabs';
 const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
 let elevenLabsConversationListCache = {
   fetchedAtMs: 0,
   agentId: '',
   conversations: [],
 };
-let coldcallingHistoryVisibleAfterMs = 0;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
 const inMemoryUiStateByScope = new Map();
@@ -441,9 +439,8 @@ function buildRuntimeStateSnapshotPayload() {
   }));
 
   return {
-    version: 3,
+    version: 2,
     savedAt: new Date().toISOString(),
-    coldcallingHistoryVisibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
     recentWebhookEvents: compactWebhookEvents,
     recentCallUpdates: recentCallUpdates.slice(0, 500),
     recentAiCallInsights: recentAiCallInsights.slice(0, 500),
@@ -456,25 +453,9 @@ function buildRuntimeStateSnapshotPayload() {
 function applyRuntimeStateSnapshotPayload(payload) {
   if (!payload || typeof payload !== 'object') return false;
 
-  coldcallingHistoryVisibleAfterMs = Math.max(
-    0,
-    Number(payload.coldcallingHistoryVisibleAfterMs || 0) || 0
-  );
-
   const nextWebhookEvents = Array.isArray(payload.recentWebhookEvents) ? payload.recentWebhookEvents.slice(0, 200) : [];
-  const nextCallUpdates = Array.isArray(payload.recentCallUpdates)
-    ? payload.recentCallUpdates.slice(0, 500).filter((item) => isCallUpdateVisibleForHistory(item))
-    : [];
-  const visibleCallIds = new Set(
-    nextCallUpdates
-      .map((item) => normalizeString(item?.callId || ''))
-      .filter(Boolean)
-  );
-  const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights)
-    ? payload.recentAiCallInsights
-        .slice(0, 500)
-        .filter((item) => visibleCallIds.has(normalizeString(item?.callId || '')))
-    : [];
+  const nextCallUpdates = Array.isArray(payload.recentCallUpdates) ? payload.recentCallUpdates.slice(0, 500) : [];
+  const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights) ? payload.recentAiCallInsights.slice(0, 500) : [];
   const nextDashboardActivities = Array.isArray(payload.recentDashboardActivities)
     ? payload.recentDashboardActivities.slice(0, 500)
     : [];
@@ -525,7 +506,7 @@ function applyRuntimeStateSnapshotPayload(payload) {
 async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
   const force = Boolean(options && options.force);
   if (!isSupabaseConfigured()) return false;
-  if (supabaseStateHydrated && !force) return true;
+  if (supabaseStateHydrated) return true;
   if (supabaseStateHydrationPromise) return supabaseStateHydrationPromise;
   if (!force && Date.now() < supabaseHydrateRetryNotBeforeMs) return false;
 
@@ -674,103 +655,6 @@ function queueRuntimeStatePersist(reason = 'unknown') {
       console.error('[Supabase][PersistQueueError]', error?.message || error);
       return false;
     });
-}
-
-function getColdcallingHistoryVisibleAfterMs() {
-  const value = Number(coldcallingHistoryVisibleAfterMs || 0);
-  return Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
-}
-
-function getCallUpdateRelevantMs(update) {
-  const candidates = [update?.endedAt, update?.startedAt, update?.updatedAt];
-  for (const candidate of candidates) {
-    const parsed = Date.parse(normalizeString(candidate || ''));
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  }
-
-  const updatedAtMs = Number(update?.updatedAtMs);
-  if (Number.isFinite(updatedAtMs) && updatedAtMs > 0) return Math.round(updatedAtMs);
-
-  return 0;
-}
-
-function isCallUpdateVisibleForHistory(update) {
-  const cutoffMs = getColdcallingHistoryVisibleAfterMs();
-  if (!cutoffMs) return true;
-  const updateMs = getCallUpdateRelevantMs(update);
-  return Number.isFinite(updateMs) && updateMs >= cutoffMs;
-}
-
-function clearColdcallingHistoryRuntime(options = {}) {
-  const nowMs = Date.now();
-  const requestedCutoffMs = Number(options.visibleAfterMs || nowMs) || nowMs;
-  coldcallingHistoryVisibleAfterMs = Math.max(nowMs, requestedCutoffMs);
-
-  recentWebhookEvents.splice(0, recentWebhookEvents.length);
-  recentCallUpdates.splice(0, recentCallUpdates.length);
-  callUpdatesById.clear();
-  recentAiCallInsights.splice(0, recentAiCallInsights.length);
-  aiCallInsightsByCallId.clear();
-  aiAnalysisFingerprintByCallId.clear();
-  aiAnalysisInFlightCallIds.clear();
-  elevenLabsConversationListCache = {
-    fetchedAtMs: 0,
-    agentId: '',
-    conversations: [],
-  };
-
-  return {
-    visibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
-    visibleAfter: new Date(getColdcallingHistoryVisibleAfterMs()).toISOString(),
-    counts: {
-      webhookEvents: recentWebhookEvents.length,
-      callUpdates: recentCallUpdates.length,
-      aiCallInsights: recentAiCallInsights.length,
-      appointments: generatedAgendaAppointments.length,
-    },
-  };
-}
-
-function parseHttpByteRange(rangeHeader, totalLength) {
-  const total = Number(totalLength);
-  if (!Number.isFinite(total) || total <= 0) return null;
-
-  const raw = normalizeString(rangeHeader || '');
-  const match = raw.match(/^bytes=(\d*)-(\d*)$/i);
-  if (!match) return null;
-
-  const startRaw = match[1];
-  const endRaw = match[2];
-
-  let start = startRaw === '' ? null : Number(startRaw);
-  let end = endRaw === '' ? null : Number(endRaw);
-
-  if (startRaw === '' && endRaw === '') return null;
-
-  if (startRaw === '') {
-    const suffixLength = Number(end);
-    if (!Number.isFinite(suffixLength) || suffixLength <= 0) return null;
-    start = Math.max(0, total - suffixLength);
-    end = total - 1;
-  } else {
-    if (!Number.isFinite(start) || start < 0) return null;
-    if (endRaw === '') {
-      end = total - 1;
-    } else if (!Number.isFinite(end) || end < start) {
-      return null;
-    }
-  }
-
-  if (start >= total) return { unsatisfiable: true, total };
-
-  end = Math.min(Number(end), total - 1);
-  return {
-    start,
-    end,
-    length: end - start + 1,
-    total,
-    unsatisfiable: false,
-  };
 }
 
 function createDashboardActivityEntry(input) {
@@ -1393,15 +1277,6 @@ function upsertRecentCallUpdate(update) {
       }
     : update;
 
-  if (!isCallUpdateVisibleForHistory(merged)) {
-    const existingIndex = recentCallUpdates.findIndex((item) => item.callId === merged.callId);
-    if (existingIndex >= 0) {
-      recentCallUpdates.splice(existingIndex, 1);
-    }
-    callUpdatesById.delete(merged.callId);
-    return null;
-  }
-
   callUpdatesById.set(merged.callId, merged);
 
   const existingIndex = recentCallUpdates.findIndex((item) => item.callId === merged.callId);
@@ -1476,94 +1351,6 @@ function normalizeNlPhoneToE164(input) {
   throw new Error(`Kan nummer niet omzetten naar NL E.164 formaat: ${raw}`);
 }
 
-function normalizePhoneComparisonKey(input) {
-  const raw = normalizeString(input);
-  if (!raw) return '';
-
-  try {
-    return normalizeNlPhoneToE164(raw).replace(/\D/g, '');
-  } catch {
-    const digits = raw.replace(/\D/g, '');
-    if (!digits) return '';
-    if (digits.startsWith('0031') && digits.length === 13) {
-      return `31${digits.slice(4)}`;
-    }
-    if (digits.startsWith('31') && digits.length === 11) {
-      return digits;
-    }
-    if (digits.startsWith('0') && digits.length === 10) {
-      return `31${digits.slice(1)}`;
-    }
-    if (digits.length === 9 && digits.startsWith('6')) {
-      return `31${digits}`;
-    }
-    return digits;
-  }
-}
-
-function getConfiguredBlockedColdcallingTargetKeys() {
-  const rawValues = [
-    process.env.COLDCALLING_BLOCKED_TARGET_NUMBERS,
-    process.env.ELEVENLABS_OUTBOUND_CALLER_NUMBER,
-    process.env.TWILIO_OUTBOUND_CALLER_NUMBER,
-    process.env.COMPANY_PHONE_NUMBER,
-    process.env.SOFTORA_PHONE_NUMBER,
-  ];
-
-  const keys = new Set();
-  rawValues
-    .flatMap((value) => String(value || '').split(/[\n,;]+/))
-    .map((value) => normalizePhoneComparisonKey(value))
-    .filter(Boolean)
-    .forEach((value) => keys.add(value));
-
-  return keys;
-}
-
-function buildBlockedColdcallingLeadResult(lead, index) {
-  return {
-    index,
-    success: false,
-    lead: {
-      name: normalizeString(lead?.name),
-      company: normalizeString(lead?.company),
-      phone: normalizeString(lead?.phone),
-      region: normalizeString(lead?.region),
-    },
-    error: 'Doelnummer is geblokkeerd.',
-    cause: 'blocked target number',
-    causeExplanation:
-      'Dit nummer is geblokkeerd als doelnummer zodat je eigen lijn alleen uitbelt en nooit zelf door een campagne wordt gebeld.',
-    details: {
-      blockedPhone: normalizeString(lead?.phone),
-    },
-  };
-}
-
-function filterBlockedColdcallingLeads(leads) {
-  const blockedKeys = getConfiguredBlockedColdcallingTargetKeys();
-  if (blockedKeys.size === 0) {
-    return {
-      allowedLeads: Array.isArray(leads) ? leads.slice() : [],
-      blockedResults: [],
-    };
-  }
-
-  const allowedLeads = [];
-  const blockedResults = [];
-
-  (Array.isArray(leads) ? leads : []).forEach((lead, index) => {
-    const phoneKey = normalizePhoneComparisonKey(lead?.phone);
-    if (phoneKey && blockedKeys.has(phoneKey)) {
-      blockedResults.push(buildBlockedColdcallingLeadResult(lead, index));
-      return;
-    }
-    allowedLeads.push(lead);
-  });
-
-  return { allowedLeads, blockedResults };
-}
-
 function getRequiredVapiEnv() {
   return ['VAPI_API_KEY', 'VAPI_ASSISTANT_ID', 'VAPI_PHONE_NUMBER_ID'];
 }
@@ -1581,9 +1368,10 @@ function isElevenLabsColdcallingConfigured() {
 }
 
 function getColdcallingProvider() {
-  // Coldcalling runtime is intentionally locked to ElevenLabs to keep voice, LLM,
-  // and transcriber on one provider and avoid legacy Vapi regressions.
-  return COLDCALLING_PROVIDER_LOCK;
+  const configured = normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase();
+  if (configured === 'elevenlabs') return 'elevenlabs';
+  if (configured === 'vapi') return 'vapi';
+  return isElevenLabsColdcallingConfigured() ? 'elevenlabs' : 'vapi';
 }
 
 function getMissingEnvVars(provider = getColdcallingProvider()) {
@@ -5079,7 +4867,10 @@ async function processElevenLabsColdcallingLead(lead, campaign, index) {
 }
 
 async function processColdcallingLead(lead, campaign, index) {
-  return processElevenLabsColdcallingLead(lead, campaign, index);
+  if (getColdcallingProvider() === 'elevenlabs') {
+    return processElevenLabsColdcallingLead(lead, campaign, index);
+  }
+  return processVapiColdcallingLead(lead, campaign, index);
 }
 
 function validateStartPayload(body) {
@@ -5365,35 +5156,6 @@ function isWebhookAuthorized(req) {
   return false;
 }
 
-function isAdminMutationAuthorized(req) {
-  const sharedSecrets = [
-    normalizeString(process.env.WEBHOOK_SECRET || ''),
-    normalizeString(process.env.ELEVENLABS_API_KEY || ''),
-    normalizeString(process.env.VAPI_API_KEY || ''),
-  ].filter(Boolean);
-
-  if (!sharedSecrets.length) return false;
-
-  const headerCandidates = [
-    req.get('x-admin-secret'),
-    req.get('authorization'),
-  ].filter(Boolean);
-
-  for (const candidate of headerCandidates) {
-    const normalizedCandidate = normalizeString(candidate);
-    if (!normalizedCandidate) continue;
-    if (sharedSecrets.includes(normalizedCandidate)) return true;
-    if (
-      normalizedCandidate.toLowerCase().startsWith('bearer ') &&
-      sharedSecrets.includes(normalizedCandidate.slice(7).trim())
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 async function fetchElevenLabsCallStatusPayload(callId) {
   const cached = callUpdatesById.get(callId) || null;
   const { endpoint, data } = await fetchElevenLabsConversationById(callId);
@@ -5411,7 +5173,7 @@ async function fetchElevenLabsCallStatusPayload(callId) {
 
 async function sendColdcallingStatusResponse(res, callId) {
   const cached = callUpdatesById.get(callId) || null;
-  const provider = getColdcallingProvider();
+  const provider = normalizeString(cached?.provider || getColdcallingProvider());
 
   if (provider === 'elevenlabs') {
     if (!normalizeString(process.env.ELEVENLABS_API_KEY)) {
@@ -5527,31 +5289,11 @@ app.post('/api/coldcalling/start', async (req, res) => {
     return res.status(400).json({ ok: false, error: validated.error });
   }
 
-  const campaign = validated.campaign;
-  const originalLeads = Array.isArray(validated.leads) ? validated.leads : [];
-  const { allowedLeads, blockedResults } = filterBlockedColdcallingLeads(originalLeads);
-
-  if (blockedResults.length > 0) {
-    console.warn(
-      `[Coldcalling] ${blockedResults.length} lead(s) geblokkeerd omdat het doelnummer op de blocklist staat.`
-    );
-  }
-
-  if (allowedLeads.length === 0) {
-    return res.status(400).json({
-      ok: false,
-      error:
-        'Alle geselecteerde leads zijn geblokkeerd als doelnummer. Je eigen lijn wordt daarom niet gebeld.',
-      provider,
-      results: blockedResults,
-    });
-  }
-
-  const leads = allowedLeads;
+  const { campaign, leads } = validated;
   const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
 
   console.log(
-    `[Coldcalling] Start campagne ontvangen via ${provider}: ${leadsToProcess.length}/${originalLeads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
+    `[Coldcalling] Start campagne ontvangen via ${provider}: ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
   );
 
   let results = [];
@@ -5565,10 +5307,9 @@ app.post('/api/coldcalling/start', async (req, res) => {
     await advanceSequentialDispatchQueue(queue.id, 'start-request');
     results = queue.results.slice();
 
+    const startedNow = results.filter((item) => item.success).length;
+    const failedNow = results.length - startedNow;
     const queuedRemaining = Math.max(0, queue.leads.length - queue.results.length);
-    const allResults = blockedResults.concat(results);
-    const totalStartedNow = allResults.filter((item) => item.success).length;
-    const totalFailedNow = allResults.length - totalStartedNow;
 
     console.log(
       `[Coldcalling][Sequential Queue] ${queue.id} gestart: direct ${results.length}/${queue.leads.length} verwerkt, ${queuedRemaining} wachtend`
@@ -5577,19 +5318,18 @@ app.post('/api/coldcalling/start', async (req, res) => {
     return res.status(200).json({
       ok: true,
       summary: {
-        requested: originalLeads.length,
+        requested: leads.length,
         attempted: leadsToProcess.length,
-        started: totalStartedNow,
-        failed: totalFailedNow,
+        started: startedNow,
+        failed: failedNow,
         provider,
         dispatchMode: campaign.dispatchMode,
         dispatchDelaySeconds: 0,
         sequentialWaitForCallEnd: true,
         queueId: queue.id,
         queuedRemaining,
-        blocked: blockedResults.length,
       },
-      results: allResults,
+      results,
     });
   } else {
     results = [];
@@ -5611,23 +5351,21 @@ app.post('/api/coldcalling/start', async (req, res) => {
     }
   }
 
-  const allResults = blockedResults.concat(results);
-  const started = allResults.filter((item) => item.success).length;
-  const failed = allResults.length - started;
+  const started = results.filter((item) => item.success).length;
+  const failed = results.length - started;
 
   return res.status(200).json({
     ok: true,
     summary: {
-      requested: originalLeads.length,
+      requested: leads.length,
       attempted: leadsToProcess.length,
       started,
       failed,
-      blocked: blockedResults.length,
       provider,
       dispatchMode: campaign.dispatchMode,
       dispatchDelaySeconds: campaign.dispatchMode === 'delay' ? campaign.dispatchDelaySeconds : 0,
     },
-    results: allResults,
+    results,
   });
 });
 
@@ -5662,28 +5400,10 @@ app.get('/api/coldcalling/recording', async (req, res) => {
   try {
     const { response } = await fetchElevenLabsConversationAudioResponse(callId);
     const contentType = normalizeString(response.headers.get('content-type') || 'audio/mpeg');
-    const audioBuffer = Buffer.from(await response.arrayBuffer());
-    const range = parseHttpByteRange(req.headers.range, audioBuffer.length);
-
+    const arrayBuffer = await response.arrayBuffer();
     res.setHeader('Content-Type', contentType || 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Content-Disposition', 'inline');
-
-    if (range && range.unsatisfiable) {
-      res.setHeader('Content-Range', `bytes */${range.total}`);
-      return res.status(416).end();
-    }
-
-    if (range) {
-      res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${range.total}`);
-      res.setHeader('Content-Length', String(range.length));
-      return res.status(206).send(audioBuffer.subarray(range.start, range.end + 1));
-    }
-
-    res.setHeader('Content-Length', String(audioBuffer.length));
-    res.setHeader('Content-Type', contentType || 'audio/mpeg');
-    return res.status(200).send(audioBuffer);
+    return res.status(200).send(Buffer.from(arrayBuffer));
   } catch (error) {
     return res.status(Number(error?.status || 500)).json({
       ok: false,
@@ -5694,51 +5414,7 @@ app.get('/api/coldcalling/recording', async (req, res) => {
   }
 });
 
-async function sendColdcallingHistoryResetResponse(req, res) {
-  if (!isAdminMutationAuthorized(req)) {
-    return res.status(401).json({ ok: false, error: 'Niet geautoriseerd.' });
-  }
-
-  if (isSupabaseConfigured() && !supabaseStateHydrated) {
-    await forceHydrateRuntimeStateWithRetries(3);
-  }
-
-  const before = {
-    webhookEvents: recentWebhookEvents.length,
-    callUpdates: recentCallUpdates.length,
-    aiCallInsights: recentAiCallInsights.length,
-    appointments: generatedAgendaAppointments.length,
-    visibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
-  };
-
-  const reset = clearColdcallingHistoryRuntime({ visibleAfterMs: Date.now() });
-  const persisted = await persistRuntimeStateToSupabase('coldcalling_history_reset');
-
-  return res.status(200).json({
-    ok: true,
-    persisted,
-    before,
-    after: reset,
-  });
-}
-
-app.post('/api/coldcalling/history/reset', async (req, res) => {
-  return sendColdcallingHistoryResetResponse(req, res);
-});
-
-app.post('/api/coldcalling-history-reset', async (req, res) => {
-  return sendColdcallingHistoryResetResponse(req, res);
-});
-
 app.post('/api/vapi/webhook', (req, res) => {
-  if (getColdcallingProvider() === 'elevenlabs') {
-    return res.status(200).json({
-      ok: true,
-      ignored: true,
-      reason: 'Legacy Vapi webhook uitgeschakeld: coldcalling draait volledig via ElevenLabs.',
-    });
-  }
-
   if (!isWebhookAuthorized(req)) {
     return res.status(401).json({ ok: false, error: 'Webhook secret ongeldig.' });
   }
@@ -5818,8 +5494,8 @@ app.post('/api/vapi/webhook', (req, res) => {
 });
 
 app.get('/api/vapi/call-updates', async (req, res) => {
-  if (isSupabaseConfigured()) {
-    await ensureRuntimeStateHydratedFromSupabase({ force: true });
+  if (isSupabaseConfigured() && !supabaseStateHydrated) {
+    await forceHydrateRuntimeStateWithRetries(3);
   }
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 200)));
   const sinceMs = parseNumberSafe(req.query.sinceMs, null);
@@ -5843,7 +5519,6 @@ app.get('/api/vapi/call-updates', async (req, res) => {
   }
 
   const filtered = recentCallUpdates.filter((item) => {
-    if (!isCallUpdateVisibleForHistory(item)) return false;
     if (!Number.isFinite(sinceMs)) return true;
     return Number(item.updatedAtMs || 0) > Number(sinceMs);
   });
@@ -7123,15 +6798,9 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 
 // Simpele healthcheck voor hosting platforms (Render/Railway).
 app.get('/healthz', (_req, res) => {
-  const provider = getColdcallingProvider();
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
-    coldcalling: {
-      provider,
-      providerLocked: true,
-      missingEnv: getMissingEnvVars(provider),
-    },
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
@@ -7144,15 +6813,9 @@ app.get('/healthz', (_req, res) => {
 
 // Alias voor serverless setups waar de backend onder /api/* hangt (zoals Vercel).
 app.get('/api/healthz', (_req, res) => {
-  const provider = getColdcallingProvider();
   res.status(200).json({
     ok: true,
     service: 'softora-vapi-coldcalling-backend',
-    coldcalling: {
-      provider,
-      providerLocked: true,
-      missingEnv: getMissingEnvVars(provider),
-    },
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
@@ -7172,11 +6835,6 @@ function sendRuntimeHealthDebug(_req, res) {
       callUpdates: recentCallUpdates.length,
       aiCallInsights: recentAiCallInsights.length,
       appointments: generatedAgendaAppointments.length,
-      callHistoryVisibleAfterMs: getColdcallingHistoryVisibleAfterMs(),
-      callHistoryVisibleAfter:
-        getColdcallingHistoryVisibleAfterMs() > 0
-          ? new Date(getColdcallingHistoryVisibleAfterMs()).toISOString()
-          : null,
       realCallUpdates: recentCallUpdates.filter((item) => {
         const callId = normalizeString(item?.callId || '');
         return callId && !callId.startsWith('demo-');
