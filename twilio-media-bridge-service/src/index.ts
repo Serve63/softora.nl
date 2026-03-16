@@ -16,7 +16,16 @@ type BridgeSession = {
   elevenConnecting: boolean;
   elevenConnectAttempts: number;
   elevenUnavailable: boolean;
+  elevenAgentOutputTelephony: boolean;
   bufferedUserAudioChunks: string[];
+  lastAgentAudioAtMs: number;
+  ambienceTickTimer: NodeJS.Timeout | null;
+  ambienceNoiseA: number;
+  ambienceNoiseB: number;
+  ambienceLfoPhase: number;
+  ambienceHumPhaseA: number;
+  ambienceHumPhaseB: number;
+  ambienceHumPhaseC: number;
   stopping: boolean;
 };
 
@@ -31,6 +40,21 @@ const VERBOSE_MEDIA_LOGS = /^(1|true|yes)$/i.test(normalizeString(process.env.VE
 const ELEVENLABS_SEND_USER_ACTIVITY_ON_OPEN = !/^(0|false|no)$/i.test(
   normalizeString(process.env.ELEVENLABS_SEND_USER_ACTIVITY_ON_OPEN || 'true')
 );
+const AMBIENCE_ENABLED = /^(1|true|yes)$/i.test(
+  normalizeString(process.env.AMBIENCE_ENABLED || process.env.TWILIO_AMBIENCE_ENABLED || '')
+);
+const AMBIENCE_LEVEL = Math.max(
+  0,
+  Math.min(0.45, Number(process.env.AMBIENCE_LEVEL || process.env.TWILIO_AMBIENCE_LEVEL || 0.12) || 0.12)
+);
+const AMBIENCE_IDLE_TRIGGER_MS = Math.max(
+  20,
+  Math.min(500, Number(process.env.AMBIENCE_IDLE_TRIGGER_MS || 80) || 80)
+);
+const AMBIENCE_TICK_MS = 20;
+const TELEPHONY_SAMPLE_RATE = 8000;
+const TELEPHONY_FRAME_SAMPLES = 160;
+const ULAW_SILENCE_BYTE = 0xff;
 
 let connectionCounter = 0;
 
@@ -303,6 +327,128 @@ function safeSendWsJson(ws: WebSocket, payload: JsonObject): boolean {
   return true;
 }
 
+function clampPcm16(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (value > 32767) return 32767;
+  if (value < -32768) return -32768;
+  return Math.trunc(value);
+}
+
+function decodeMuLawByte(input: number): number {
+  const muLaw = (~input) & 0xff;
+  const sign = muLaw & 0x80;
+  const exponent = (muLaw >> 4) & 0x07;
+  const mantissa = muLaw & 0x0f;
+  let sample = ((mantissa << 3) + 0x84) << exponent;
+  sample -= 0x84;
+  return sign ? -sample : sample;
+}
+
+function encodeMuLawSample(input: number): number {
+  let sample = clampPcm16(input);
+  const sign = sample < 0 ? 0x80 : 0x00;
+  if (sample < 0) sample = -sample;
+  if (sample > 32635) sample = 32635;
+  sample += 0x84;
+
+  let exponent = 7;
+  let expMask = 0x4000;
+  while (exponent > 0 && (sample & expMask) === 0) {
+    exponent -= 1;
+    expMask >>= 1;
+  }
+  const mantissa = (sample >> (exponent + 3)) & 0x0f;
+  const encoded = ~(sign | (exponent << 4) | mantissa);
+  return encoded & 0xff;
+}
+
+function nextAmbienceSample(session: BridgeSession): number {
+  // Lightweight synthetic office ambience: filtered random murmur + low hum.
+  const white = (Math.random() * 2 - 1) * 0.6;
+  session.ambienceNoiseA = session.ambienceNoiseA * 0.96 + white * 0.04;
+  session.ambienceNoiseB = session.ambienceNoiseB * 0.985 + session.ambienceNoiseA * 0.015;
+  session.ambienceLfoPhase += (2 * Math.PI * 0.23) / TELEPHONY_SAMPLE_RATE;
+  if (session.ambienceLfoPhase > Math.PI * 2) session.ambienceLfoPhase -= Math.PI * 2;
+  const lfo = 0.72 + 0.28 * Math.sin(session.ambienceLfoPhase);
+
+  session.ambienceHumPhaseA += (2 * Math.PI * 120) / TELEPHONY_SAMPLE_RATE;
+  session.ambienceHumPhaseB += (2 * Math.PI * 180) / TELEPHONY_SAMPLE_RATE;
+  session.ambienceHumPhaseC += (2 * Math.PI * 320) / TELEPHONY_SAMPLE_RATE;
+  if (session.ambienceHumPhaseA > Math.PI * 2) session.ambienceHumPhaseA -= Math.PI * 2;
+  if (session.ambienceHumPhaseB > Math.PI * 2) session.ambienceHumPhaseB -= Math.PI * 2;
+  if (session.ambienceHumPhaseC > Math.PI * 2) session.ambienceHumPhaseC -= Math.PI * 2;
+
+  const hum =
+    Math.sin(session.ambienceHumPhaseA) * 0.55 +
+    Math.sin(session.ambienceHumPhaseB) * 0.32 +
+    Math.sin(session.ambienceHumPhaseC) * 0.18;
+
+  const combined = (session.ambienceNoiseB * 0.78 + hum * 0.22) * lfo;
+  return clampPcm16(combined * 9000);
+}
+
+function buildAmbienceMuLawBuffer(session: BridgeSession, sampleCount: number): Buffer {
+  const count = Math.max(1, Math.min(3200, Math.floor(sampleCount) || TELEPHONY_FRAME_SAMPLES));
+  const out = Buffer.allocUnsafe(count);
+  for (let i = 0; i < count; i += 1) {
+    out[i] = encodeMuLawSample(nextAmbienceSample(session));
+  }
+  return out;
+}
+
+function mixMuLawWithAmbience(agentMuLaw: Buffer, ambienceMuLaw: Buffer, ambienceLevel: number): Buffer {
+  const out = Buffer.allocUnsafe(agentMuLaw.length);
+  const bgGain = Math.max(0, Math.min(0.7, ambienceLevel));
+  for (let i = 0; i < agentMuLaw.length; i += 1) {
+    const speech = decodeMuLawByte(agentMuLaw[i]);
+    const ambience = decodeMuLawByte(ambienceMuLaw[i] ?? ULAW_SILENCE_BYTE);
+    const mixed = clampPcm16(speech + ambience * bgGain);
+    out[i] = encodeMuLawSample(mixed);
+  }
+  return out;
+}
+
+function processAgentAudioForTwilio(session: BridgeSession, audioBase64: string): string {
+  if (!audioBase64) return '';
+  if (!AMBIENCE_ENABLED || !session.elevenAgentOutputTelephony) return audioBase64;
+
+  let agentAudio: Buffer;
+  try {
+    agentAudio = Buffer.from(audioBase64, 'base64');
+  } catch {
+    return audioBase64;
+  }
+  if (!agentAudio.length) return '';
+
+  const ambience = buildAmbienceMuLawBuffer(session, agentAudio.length);
+  const mixed = mixMuLawWithAmbience(agentAudio, ambience, AMBIENCE_LEVEL);
+  return mixed.toString('base64');
+}
+
+function sendIdleAmbienceFrame(session: BridgeSession): void {
+  if (!AMBIENCE_ENABLED) return;
+  if (!session.streamSid) return;
+  if (session.stopping) return;
+  if (Date.now() - session.lastAgentAudioAtMs < AMBIENCE_IDLE_TRIGGER_MS) return;
+
+  const ambienceFrame = buildAmbienceMuLawBuffer(session, TELEPHONY_FRAME_SAMPLES);
+  sendAudioToTwilio(session, ambienceFrame.toString('base64'));
+}
+
+function startAmbienceTickLoop(session: BridgeSession): void {
+  if (!AMBIENCE_ENABLED) return;
+  if (session.ambienceTickTimer) return;
+  session.ambienceTickTimer = setInterval(() => {
+    sendIdleAmbienceFrame(session);
+  }, AMBIENCE_TICK_MS);
+}
+
+function stopAmbienceTickLoop(session: BridgeSession): void {
+  if (!session.ambienceTickTimer) return;
+  clearInterval(session.ambienceTickTimer);
+  session.ambienceTickTimer = null;
+}
+
 function closeElevenLabsForSession(session: BridgeSession, reason: string): void {
   const elevenWs = session.elevenWs;
   if (!elevenWs) return;
@@ -460,6 +606,7 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
     const normalizedOutput = agentOutputAudioFormat.toLowerCase();
     const inputLooksTelephony = /ulaw|mulaw|g711/.test(normalizedInput);
     const outputLooksTelephony = /ulaw|mulaw|g711/.test(normalizedOutput);
+    session.elevenAgentOutputTelephony = !agentOutputAudioFormat || outputLooksTelephony;
     if ((userInputAudioFormat && !inputLooksTelephony) || (agentOutputAudioFormat && !outputLooksTelephony)) {
       log('WARN', 'elevenlabs audio format may not be telephony-compatible', {
         connectionId: session.connectionId,
@@ -490,7 +637,8 @@ function handleElevenLabsMessage(session: BridgeSession, raw: string): void {
   if (type === 'audio') {
     const audioEvent = asObject(payload.audio_event) || {};
     const audioBase64 = asString(audioEvent.audio_base_64);
-    sendAudioToTwilio(session, audioBase64);
+    session.lastAgentAudioAtMs = Date.now();
+    sendAudioToTwilio(session, processAgentAudioForTwilio(session, audioBase64));
     return;
   }
 
@@ -682,7 +830,16 @@ wss.on('connection', (ws, req) => {
     elevenConnecting: false,
     elevenConnectAttempts: 0,
     elevenUnavailable: false,
+    elevenAgentOutputTelephony: true,
     bufferedUserAudioChunks: [],
+    lastAgentAudioAtMs: Date.now(),
+    ambienceTickTimer: null,
+    ambienceNoiseA: 0,
+    ambienceNoiseB: 0,
+    ambienceLfoPhase: Math.random() * Math.PI * 2,
+    ambienceHumPhaseA: Math.random() * Math.PI * 2,
+    ambienceHumPhaseB: Math.random() * Math.PI * 2,
+    ambienceHumPhaseC: Math.random() * Math.PI * 2,
     stopping: false,
   };
 
@@ -765,6 +922,7 @@ wss.on('connection', (ws, req) => {
 
       sendConversationInitiationPayload(session, 'twilio_start');
       void connectElevenLabsForSession(session);
+      startAmbienceTickLoop(session);
       return;
     }
 
@@ -799,6 +957,7 @@ wss.on('connection', (ws, req) => {
         callSid: session.callSid,
       });
 
+      stopAmbienceTickLoop(session);
       closeElevenLabsForSession(session, 'twilio_stop');
       return;
     }
@@ -808,6 +967,7 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', (code, reason) => {
     session.stopping = true;
+    stopAmbienceTickLoop(session);
     closeElevenLabsForSession(session, 'twilio_close');
     log('INFO', 'twilio websocket close', {
       connectionId: session.connectionId,
@@ -819,6 +979,7 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('error', (error) => {
+    stopAmbienceTickLoop(session);
     log('ERROR', 'twilio websocket error', {
       connectionId: session.connectionId,
       streamSid: session.streamSid,
@@ -854,5 +1015,8 @@ server.listen(PORT, () => {
     health: '/',
     healthz: '/healthz',
     websocket: WS_PATH,
+    ambienceEnabled: AMBIENCE_ENABLED,
+    ambienceLevel: AMBIENCE_LEVEL,
+    ambienceIdleTriggerMs: AMBIENCE_IDLE_TRIGGER_MS,
   });
 });
