@@ -159,6 +159,49 @@ function sendText(res: ServerResponse, statusCode: number, body: string): void {
   res.end(body);
 }
 
+function sendXml(res: ServerResponse, statusCode: number, body: string): void {
+  res.statusCode = statusCode;
+  res.setHeader('Content-Type', 'text/xml; charset=utf-8');
+  res.end(body);
+}
+
+function getHeaderString(req: IncomingMessage, headerName: string): string {
+  const value = req.headers[headerName.toLowerCase()];
+  if (Array.isArray(value)) return normalizeString(value[0]);
+  return normalizeString(value);
+}
+
+function buildTwilioMediaWsUrlFromRequest(req: IncomingMessage): string {
+  const explicit = normalizeString(process.env.TWILIO_MEDIA_WS_URL);
+  if (explicit) return explicit;
+
+  const host = getHeaderString(req, 'x-forwarded-host') || getHeaderString(req, 'host');
+  if (!host) return '';
+
+  const forwardedProto = getHeaderString(req, 'x-forwarded-proto').toLowerCase();
+  const scheme = forwardedProto === 'http' ? 'ws' : 'wss';
+  return `${scheme}://${host}${WS_PATH}`;
+}
+
+function handleTwilioVoiceWebhook(req: IncomingMessage, res: ServerResponse): void {
+  const mediaWsUrl = buildTwilioMediaWsUrlFromRequest(req);
+  if (!/^wss?:\/\//i.test(mediaWsUrl)) {
+    sendText(res, 500, 'TWILIO_MEDIA_WS_URL ontbreekt of is ongeldig.');
+    return;
+  }
+
+  sendXml(
+    res,
+    200,
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Connect>
+    <Stream url="${mediaWsUrl}" />
+  </Connect>
+</Response>`
+  );
+}
+
 function buildElevenLabsApiUrl(path: string): string {
   const normalizedBase = ELEVENLABS_API_BASE_URL.replace(/\/+$/, '');
   const baseWithVersion = normalizedBase.endsWith('/v1') ? normalizedBase : `${normalizedBase}/v1`;
@@ -560,6 +603,10 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
 
 const server = http.createServer((req, res) => {
   const path = getPathFromRequest(req);
+  if (path === '/api/twilio/voice') {
+    handleTwilioVoiceWebhook(req, res);
+    return;
+  }
   if (path === '/' || path === '/healthz') {
     sendText(res, 200, 'ok');
     return;
