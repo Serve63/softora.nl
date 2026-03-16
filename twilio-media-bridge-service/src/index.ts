@@ -11,6 +11,7 @@ type BridgeSession = {
   callSid: string;
   customParameters: JsonObject;
   conversationInitiationPayload: JsonObject | null;
+  conversationInitiationPayloadSent: boolean;
   elevenWs: WebSocket | null;
   elevenConnecting: boolean;
   elevenConnectAttempts: number;
@@ -24,8 +25,12 @@ const WS_PATH = '/twilio-media';
 const MAX_BUFFERED_TWILIO_AUDIO_CHUNKS = 200;
 const ELEVENLABS_AGENT_ID = normalizeString(process.env.ELEVENLABS_AGENT_ID);
 const ELEVENLABS_API_KEY = normalizeString(process.env.ELEVENLABS_API_KEY);
+const ELEVENLABS_FIRST_MESSAGE = normalizeString(process.env.ELEVENLABS_FIRST_MESSAGE);
 const ELEVENLABS_API_BASE_URL = normalizeString(process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io');
 const VERBOSE_MEDIA_LOGS = /^(1|true|yes)$/i.test(normalizeString(process.env.VERBOSE_MEDIA_LOGS || ''));
+const ELEVENLABS_SEND_USER_ACTIVITY_ON_OPEN = !/^(0|false|no)$/i.test(
+  normalizeString(process.env.ELEVENLABS_SEND_USER_ACTIVITY_ON_OPEN || 'true')
+);
 
 let connectionCounter = 0;
 
@@ -107,11 +112,50 @@ function buildDynamicVariablesFromTwilioCustomParameters(parameters: JsonObject)
 
 function buildConversationInitiationPayload(parameters: JsonObject): JsonObject | null {
   const dynamicVariables = buildDynamicVariablesFromTwilioCustomParameters(parameters);
-  if (Object.keys(dynamicVariables).length === 0) return null;
-  return {
+  const payload: JsonObject = {
     type: 'conversation_initiation_client_data',
-    dynamic_variables: dynamicVariables,
   };
+
+  if (Object.keys(dynamicVariables).length > 0) {
+    payload.dynamic_variables = dynamicVariables;
+  }
+
+  if (ELEVENLABS_FIRST_MESSAGE) {
+    payload.conversation_config_override = {
+      agent: {
+        first_message: ELEVENLABS_FIRST_MESSAGE,
+      },
+    };
+  }
+
+  return Object.keys(payload).length > 1 ? payload : null;
+}
+
+function sendConversationInitiationPayload(session: BridgeSession, reason: string): void {
+  const payload = session.conversationInitiationPayload;
+  const elevenWs = session.elevenWs;
+  if (!payload || session.conversationInitiationPayloadSent || !elevenWs) return;
+
+  const ok = safeSendWsJson(elevenWs, payload);
+  if (!ok) {
+    log('WARN', 'elevenlabs conversation initiation payload not sent (socket not open)', {
+      connectionId: session.connectionId,
+      streamSid: session.streamSid,
+      callSid: session.callSid,
+      reason,
+    });
+    return;
+  }
+
+  session.conversationInitiationPayloadSent = true;
+  log('INFO', 'elevenlabs conversation initiation payload sent', {
+    connectionId: session.connectionId,
+    streamSid: session.streamSid,
+    callSid: session.callSid,
+    reason,
+    hasFirstMessageOverride: Boolean(ELEVENLABS_FIRST_MESSAGE),
+    dynamicVariableKeys: Object.keys(asObject(payload.dynamic_variables) || {}),
+  });
 }
 
 function extractTwilioCustomParameters(value: unknown): JsonObject {
@@ -551,16 +595,9 @@ async function connectElevenLabsForSession(session: BridgeSession): Promise<void
       streamSid: session.streamSid,
       callSid: session.callSid,
     });
-    if (session.conversationInitiationPayload) {
-      const ok = safeSendWsJson(elevenWs, session.conversationInitiationPayload);
-      log(ok ? 'INFO' : 'WARN', 'elevenlabs conversation initiation payload sent', {
-        connectionId: session.connectionId,
-        streamSid: session.streamSid,
-        callSid: session.callSid,
-        dynamicVariableKeys: Object.keys(
-          asObject(session.conversationInitiationPayload.dynamic_variables) || {}
-        ),
-      });
+    sendConversationInitiationPayload(session, 'elevenlabs_open');
+    if (ELEVENLABS_SEND_USER_ACTIVITY_ON_OPEN) {
+      safeSendWsJson(elevenWs, { type: 'user_activity' });
     }
     flushBufferedAudioToElevenLabs(session);
   });
@@ -640,6 +677,7 @@ wss.on('connection', (ws, req) => {
     callSid: '',
     customParameters: {},
     conversationInitiationPayload: null,
+    conversationInitiationPayloadSent: false,
     elevenWs: null,
     elevenConnecting: false,
     elevenConnectAttempts: 0,
@@ -682,6 +720,9 @@ wss.on('connection', (ws, req) => {
 
     if (event === 'connected') {
       log('INFO', 'twilio event: connected', { connectionId: session.connectionId });
+      if (!session.elevenWs && !session.elevenConnecting && !session.elevenUnavailable) {
+        void connectElevenLabsForSession(session);
+      }
       return;
     }
 
@@ -691,6 +732,7 @@ wss.on('connection', (ws, req) => {
       session.callSid = asString(start.callSid) || session.callSid;
       session.customParameters = extractTwilioCustomParameters(start.customParameters);
       session.conversationInitiationPayload = buildConversationInitiationPayload(session.customParameters);
+      session.conversationInitiationPayloadSent = false;
 
       log('INFO', 'twilio event: start', {
         connectionId: session.connectionId,
@@ -718,6 +760,7 @@ wss.on('connection', (ws, req) => {
         });
       }
 
+      sendConversationInitiationPayload(session, 'twilio_start');
       void connectElevenLabsForSession(session);
       return;
     }
