@@ -3,21 +3,12 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 type RequestLike = IncomingMessage & { method?: string };
 type ResponseLike = ServerResponse<IncomingMessage>;
 
-const ALLOWED_CALLER_DIGITS = '31629917185';
-const ALLOWED_CALLER_NATIONAL = '0629917185';
-const ALLOWED_CALLER_E164 = '+31629917185';
-const ALLOWED_MIN_ANSWER_DELAY_MS = 4000;
-const ALLOWED_MAX_ANSWER_DELAY_MS = 6000;
-const BLOCKED_RING_DELAY_MS = 10000;
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function randomIntBetween(min: number, max: number): number {
-  if (max <= min) return min;
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+const DEFAULT_MEDIA_STREAM_URL = 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media';
+const MEDIA_STREAM_URL = String(process.env.TWILIO_MEDIA_WS_URL || DEFAULT_MEDIA_STREAM_URL).trim();
+const ALLOWED_CALLERS = String(process.env.TWILIO_ALLOWED_CALLERS || '')
+  .split(/[,\n]/)
+  .map((item) => item.trim())
+  .filter(Boolean);
 
 function normalizePhone(value: string): string {
   const raw = String(value || '').trim();
@@ -26,6 +17,12 @@ function normalizePhone(value: string): string {
   if (digits.startsWith('00')) return digits.slice(2);
   if (digits.startsWith('0')) return `31${digits.slice(1)}`;
   return digits;
+}
+
+function sendXml(res: ResponseLike, xml: string): void {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/xml');
+  res.end(xml);
 }
 
 function getUrl(req: RequestLike): URL {
@@ -69,25 +66,15 @@ async function extractCallerNumber(req: RequestLike): Promise<string> {
 }
 
 function isAllowedCaller(rawCaller: string): boolean {
+  if (!ALLOWED_CALLERS.length) return true;
   const normalized = normalizePhone(rawCaller);
-  return (
-    normalized === ALLOWED_CALLER_DIGITS ||
-    normalized === normalizePhone(ALLOWED_CALLER_NATIONAL) ||
-    normalized === normalizePhone(ALLOWED_CALLER_E164)
-  );
-}
-
-function sendXml(res: ResponseLike, xml: string): void {
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'text/xml');
-  res.end(xml);
+  if (!normalized) return false;
+  return ALLOWED_CALLERS.some((value) => normalizePhone(value) === normalized);
 }
 
 export default async function handler(req: RequestLike, res: ResponseLike): Promise<void> {
   const caller = await extractCallerNumber(req);
-
   if (!isAllowedCaller(caller)) {
-    await wait(BLOCKED_RING_DELAY_MS);
     sendXml(
       res,
       `<?xml version="1.0" encoding="UTF-8"?>
@@ -98,14 +85,12 @@ export default async function handler(req: RequestLike, res: ResponseLike): Prom
     return;
   }
 
-  await wait(randomIntBetween(ALLOWED_MIN_ANSWER_DELAY_MS, ALLOWED_MAX_ANSWER_DELAY_MS));
-
   sendXml(
     res,
     `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="wss://twilio-media-bridge-pjzd.onrender.com/twilio-media" />
+    <Stream url="${MEDIA_STREAM_URL}" />
   </Connect>
 </Response>`
   );
