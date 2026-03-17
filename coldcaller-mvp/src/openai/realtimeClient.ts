@@ -22,6 +22,7 @@ export class OpenAiRealtimeTextBrain {
   private connected = false;
   private pendingTextByResponseId = new Map<string, string>();
   private queuedAudio: string[] = [];
+  private lastCommitAndRespondAtMs = 0;
 
   constructor(
     private readonly cfg: OpenAiRealtimeConfig,
@@ -94,6 +95,24 @@ export class OpenAiRealtimeTextBrain {
 
   cancelResponse(): void {
     this.send({ type: 'response.cancel' });
+  }
+
+  requestResponseFromInputBuffer(reason = 'manual'): void {
+    const now = Date.now();
+    if (now - this.lastCommitAndRespondAtMs < 250) {
+      return;
+    }
+    this.lastCommitAndRespondAtMs = now;
+
+    this.logger.debug('OpenAI commit + response.create', { reason });
+    this.send({ type: 'input_audio_buffer.commit' });
+    this.send({
+      type: 'response.create',
+      response: {
+        modalities: ['text'],
+        output_modalities: ['text'],
+      },
+    });
   }
 
   close(): void {
@@ -186,6 +205,11 @@ export class OpenAiRealtimeTextBrain {
 
     if (type === 'input_audio_buffer.speech_stopped') {
       this.handlers.onCallerSpeechStop?.();
+      return;
+    }
+
+    if (type === 'input_audio_buffer.committed') {
+      this.logger.debug('OpenAI input audio buffer committed');
       return;
     }
 
