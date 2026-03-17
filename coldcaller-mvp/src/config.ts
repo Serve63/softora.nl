@@ -18,7 +18,7 @@ const envSchema = z.object({
   TWILIO_VOICE_WEBHOOK_PATH: z.string().default('/twilio/voice'),
 
   OPENAI_API_KEY: z.string().min(1),
-  OPENAI_REALTIME_MODEL: z.string().default('gpt-audio-1.5'),
+  OPENAI_REALTIME_MODEL: z.string().default('gpt-realtime'),
   OPENAI_REALTIME_VAD_THRESHOLD: z.string().default('0.45'),
 
   ELEVENLABS_API_KEY: z.string().min(1),

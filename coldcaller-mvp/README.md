@@ -88,7 +88,7 @@ Zie `.env.example`. Belangrijkste:
 
 1. Zorg dat je API key Realtime toegang heeft.
 2. Gebruik model in `.env`:
-   - standaard: `gpt-audio-1.5`
+   - standaard: `gpt-realtime`
 3. Geen dashboard-flowbuilder nodig; backend doet direct websocket koppeling.
 
 ## Handmatige ElevenLabs stappen (jij moet doen)
