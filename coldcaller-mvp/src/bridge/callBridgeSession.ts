@@ -33,9 +33,6 @@ export class CallBridgeSession {
   private callSid = '';
   private isClosed = false;
   private activeSpeechAbort: AbortController | null = null;
-  private localSpeechActive = false;
-  private localSpeechLastAboveThresholdAtMs = 0;
-  private localSilenceResponseRequested = false;
   private assistantPlaybackStartedAtMs = 0;
   private bargeInFramesAboveThreshold = 0;
 
@@ -61,7 +58,6 @@ export class CallBridgeSession {
         },
         onCallerSpeechStop: () => {
           this.logger.debug('Caller speech gestopt (OpenAI VAD)');
-          this.brain.requestResponseFromInputBuffer('openai_vad_speech_stopped');
         },
         onError: (error) => {
           this.logger.error('OpenAI brain error', error);
@@ -167,32 +163,7 @@ export class CallBridgeSession {
       }
     }
 
-    this.updateLocalSpeechState(base64Payload);
-
     this.brain.appendInputAudio(base64Payload);
-  }
-
-  private updateLocalSpeechState(base64Payload: string): void {
-    const audioBuffer = Buffer.from(base64Payload, 'base64');
-    const energy = estimateUlawEnergy(audioBuffer);
-    const now = Date.now();
-    const voiceThreshold = 0.01;
-    const silenceMsToRespond = 550;
-
-    if (energy >= voiceThreshold) {
-      this.localSpeechActive = true;
-      this.localSpeechLastAboveThresholdAtMs = now;
-      this.localSilenceResponseRequested = false;
-      return;
-    }
-
-    if (!this.localSpeechActive) return;
-    if (this.localSilenceResponseRequested) return;
-    if (now - this.localSpeechLastAboveThresholdAtMs < silenceMsToRespond) return;
-
-    this.localSilenceResponseRequested = true;
-    this.localSpeechActive = false;
-    this.brain.requestResponseFromInputBuffer('local_silence_detector');
   }
 
   private async speakAssistantText(text: string): Promise<void> {

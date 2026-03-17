@@ -24,6 +24,7 @@ export class OpenAiRealtimeTextBrain {
   private queuedAudio: string[] = [];
   private lastCommitAndRespondAtMs = 0;
   private hasUncommittedAudio = false;
+  private hasActiveResponse = false;
 
   constructor(
     private readonly cfg: OpenAiRealtimeConfig,
@@ -97,6 +98,7 @@ export class OpenAiRealtimeTextBrain {
   }
 
   cancelResponse(): void {
+    if (!this.hasActiveResponse) return;
     this.send({ type: 'response.cancel' });
   }
 
@@ -136,10 +138,19 @@ export class OpenAiRealtimeTextBrain {
 
   private sendSessionUpdate(): void {
     const session = {
-      instructions: this.cfg.systemPrompt,
+      instructions: `${this.cfg.systemPrompt}
+
+Belangrijke regels:
+- Spreek ALTIJD Nederlands (nl-NL).
+- Blijf strikt in rol als coldcaller voor Softora.
+- Geef korte, zakelijke antwoorden (max 2-3 zinnen).
+- Stel per beurt maximaal 1 vraag.
+- Nooit gedichten, verhalen, recepten of random entertainmenttekst.`,
       modalities: ['text'],
       // Compat voor verschillende Realtime payload-shapes.
       input_audio_format: 'g711_ulaw',
+      temperature: 0.4,
+      max_response_output_tokens: 180,
       turn_detection: {
         type: 'server_vad',
         threshold: this.cfg.vadThreshold,
@@ -202,9 +213,18 @@ export class OpenAiRealtimeTextBrain {
         this.logger.debug('OpenAI commit genegeerd: nog niet genoeg audio in buffer');
         return;
       }
+      if (code === 'response_cancel_not_active') {
+        this.logger.debug('OpenAI cancel genegeerd: geen actieve response');
+        return;
+      }
       this.logger.error('OpenAI realtime event error', event);
       const message = this.extractErrorMessage(event) || 'Onbekende OpenAI realtime fout';
       this.handlers.onError?.(new Error(message));
+      return;
+    }
+
+    if (type === 'response.created') {
+      this.hasActiveResponse = true;
       return;
     }
 
@@ -247,6 +267,7 @@ export class OpenAiRealtimeTextBrain {
     }
 
     if (type === 'response.done' || type === 'response.completed') {
+      this.hasActiveResponse = false;
       const response = (event.response || {}) as JsonValue;
       const responseId = String(response.id || this.extractResponseId(event) || 'unknown');
       const fromBuffer = this.pendingTextByResponseId.get(responseId) || '';
