@@ -23,6 +23,7 @@ export class OpenAiRealtimeTextBrain {
   private pendingTextByResponseId = new Map<string, string>();
   private queuedAudio: string[] = [];
   private lastCommitAndRespondAtMs = 0;
+  private hasUncommittedAudio = false;
 
   constructor(
     private readonly cfg: OpenAiRealtimeConfig,
@@ -82,11 +83,13 @@ export class OpenAiRealtimeTextBrain {
     if (!base64Ulaw8k) return;
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       this.queuedAudio.push(base64Ulaw8k);
+      this.hasUncommittedAudio = true;
       if (this.queuedAudio.length > 100) {
         this.queuedAudio.splice(0, this.queuedAudio.length - 100);
       }
       return;
     }
+    this.hasUncommittedAudio = true;
     this.send({
       type: 'input_audio_buffer.append',
       audio: base64Ulaw8k,
@@ -98,6 +101,11 @@ export class OpenAiRealtimeTextBrain {
   }
 
   requestResponseFromInputBuffer(reason = 'manual'): void {
+    if (!this.hasUncommittedAudio) {
+      this.logger.debug('OpenAI commit overgeslagen: geen nieuwe audio', { reason });
+      return;
+    }
+
     const now = Date.now();
     if (now - this.lastCommitAndRespondAtMs < 250) {
       return;
@@ -110,9 +118,9 @@ export class OpenAiRealtimeTextBrain {
       type: 'response.create',
       response: {
         modalities: ['text'],
-        output_modalities: ['text'],
       },
     });
+    this.hasUncommittedAudio = false;
   }
 
   close(): void {
