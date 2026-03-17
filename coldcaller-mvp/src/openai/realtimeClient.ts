@@ -118,6 +118,8 @@ export class OpenAiRealtimeTextBrain {
       type: 'response.create',
       response: {
         modalities: ['text'],
+        instructions:
+          'Antwoord uitsluitend in vloeiend Nederlands (nl-NL). Gebruik nooit Spaans of Engels, tenzij de gebruiker daar expliciet om vraagt.',
       },
     });
     this.hasUncommittedAudio = false;
@@ -135,7 +137,7 @@ export class OpenAiRealtimeTextBrain {
   private sendSessionUpdate(): void {
     const session = {
       instructions: this.cfg.systemPrompt,
-      output_modalities: ['text'],
+      modalities: ['text'],
       // Compat voor verschillende Realtime payload-shapes.
       input_audio_format: 'g711_ulaw',
       turn_detection: {
@@ -195,6 +197,11 @@ export class OpenAiRealtimeTextBrain {
     if (!type) return;
 
     if (type === 'error') {
+      const code = this.extractErrorCode(event);
+      if (code === 'input_audio_buffer_commit_empty') {
+        this.logger.debug('OpenAI commit genegeerd: nog niet genoeg audio in buffer');
+        return;
+      }
       this.logger.error('OpenAI realtime event error', event);
       const message = this.extractErrorMessage(event) || 'Onbekende OpenAI realtime fout';
       this.handlers.onError?.(new Error(message));
@@ -302,5 +309,12 @@ export class OpenAiRealtimeTextBrain {
     if (!err || typeof err !== 'object') return '';
     const message = (err as JsonValue).message;
     return typeof message === 'string' ? message : '';
+  }
+
+  private extractErrorCode(event: JsonValue): string {
+    const err = event.error;
+    if (!err || typeof err !== 'object') return '';
+    const code = (err as JsonValue).code;
+    return typeof code === 'string' ? code : '';
   }
 }

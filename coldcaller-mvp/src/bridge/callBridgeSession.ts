@@ -36,6 +36,8 @@ export class CallBridgeSession {
   private localSpeechActive = false;
   private localSpeechLastAboveThresholdAtMs = 0;
   private localSilenceResponseRequested = false;
+  private assistantPlaybackStartedAtMs = 0;
+  private bargeInFramesAboveThreshold = 0;
 
   constructor(
     private readonly ws: WebSocket,
@@ -55,7 +57,7 @@ export class CallBridgeSession {
           void this.speakAssistantText(text);
         },
         onCallerSpeechStart: () => {
-          this.interrupt('openai_vad_speech_started');
+          this.logger.debug('Caller speech gestart (OpenAI VAD)');
         },
         onCallerSpeechStop: () => {
           this.logger.debug('Caller speech gestopt (OpenAI VAD)');
@@ -148,7 +150,19 @@ export class CallBridgeSession {
     if (this.activeSpeechAbort) {
       const audioBuffer = Buffer.from(base64Payload, 'base64');
       const energy = estimateUlawEnergy(audioBuffer);
-      if (energy > 0.015) {
+      const now = Date.now();
+      const minPlaybackMsBeforeBargeIn = 300;
+      const bargeInEnergyThreshold = 0.03;
+      const bargeInFramesNeeded = 3;
+
+      if (now - this.assistantPlaybackStartedAtMs >= minPlaybackMsBeforeBargeIn && energy >= bargeInEnergyThreshold) {
+        this.bargeInFramesAboveThreshold += 1;
+      } else {
+        this.bargeInFramesAboveThreshold = 0;
+      }
+
+      if (this.bargeInFramesAboveThreshold >= bargeInFramesNeeded) {
+        this.bargeInFramesAboveThreshold = 0;
         this.interrupt('inbound_energy_detected');
       }
     }
@@ -190,6 +204,8 @@ export class CallBridgeSession {
 
     const speechAbort = new AbortController();
     this.activeSpeechAbort = speechAbort;
+    this.assistantPlaybackStartedAtMs = Date.now();
+    this.bargeInFramesAboveThreshold = 0;
 
     this.logger.info('Assistant antwoord (tekst)', {
       callSid: this.callSid || null,
@@ -229,6 +245,7 @@ export class CallBridgeSession {
       this.activeSpeechAbort.abort();
       this.activeSpeechAbort = null;
     }
+    this.bargeInFramesAboveThreshold = 0;
 
     if (cancelOpenAiResponse) {
       this.brain.cancelResponse();
