@@ -59,6 +59,13 @@ export class CallBridgeSession {
         onCallerSpeechStop: () => {
           this.logger.debug('Caller speech gestopt (OpenAI VAD)');
         },
+        onCallerTranscript: (text) => {
+          this.logger.info('Caller transcript', {
+            callSid: this.callSid || null,
+            chars: text.length,
+            text: text.slice(0, 260),
+          });
+        },
         onError: (error) => {
           this.logger.error('OpenAI brain error', error);
         },

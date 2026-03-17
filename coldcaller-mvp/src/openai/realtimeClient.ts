@@ -5,6 +5,7 @@ type HandlerSet = {
   onAssistantText: (text: string) => void;
   onCallerSpeechStart?: () => void;
   onCallerSpeechStop?: () => void;
+  onCallerTranscript?: (text: string) => void;
   onError?: (error: Error) => void;
 };
 
@@ -248,6 +249,17 @@ Belangrijke regels:
       return;
     }
 
+    if (
+      type === 'conversation.item.input_audio_transcription.completed' ||
+      type === 'input_audio_transcription.completed'
+    ) {
+      const transcript = this.extractTranscript(event);
+      if (transcript) {
+        this.handlers.onCallerTranscript?.(transcript);
+      }
+      return;
+    }
+
     if (type === 'response.output_text.delta' || type === 'response.text.delta') {
       const responseId = this.extractResponseId(event) || 'unknown';
       const delta = String(event.delta || '');
@@ -337,5 +349,28 @@ Belangrijke regels:
     if (!err || typeof err !== 'object') return '';
     const code = (err as JsonValue).code;
     return typeof code === 'string' ? code : '';
+  }
+
+  private extractTranscript(event: JsonValue): string {
+    const direct = event.transcript;
+    if (typeof direct === 'string' && direct.trim()) {
+      return direct.trim();
+    }
+
+    const item = event.item;
+    if (item && typeof item === 'object') {
+      const content = Array.isArray((item as JsonValue).content)
+        ? ((item as JsonValue).content as unknown[])
+        : [];
+      for (const contentItem of content) {
+        if (!contentItem || typeof contentItem !== 'object') continue;
+        const maybeTranscript = (contentItem as JsonValue).transcript;
+        if (typeof maybeTranscript === 'string' && maybeTranscript.trim()) {
+          return maybeTranscript.trim();
+        }
+      }
+    }
+
+    return '';
   }
 }
