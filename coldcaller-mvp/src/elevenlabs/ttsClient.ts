@@ -16,6 +16,7 @@ type StreamMode = 'ulaw_8k' | 'pcm16_16k';
 
 export class ElevenLabsTtsClient {
   private loggedFormatOverride = false;
+  private loggedV3LatencyParamSkip = false;
 
   constructor(
     private readonly cfg: ElevenLabsTtsConfig,
@@ -64,7 +65,13 @@ export class ElevenLabsTtsClient {
       `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(this.cfg.voiceId)}/stream`
     );
     url.searchParams.set('output_format', outputFormat);
-    url.searchParams.set('optimize_streaming_latency', String(this.cfg.optimizeLatency));
+    const isV3Model = String(this.cfg.modelId || '').toLowerCase().includes('eleven_v3');
+    if (!isV3Model) {
+      url.searchParams.set('optimize_streaming_latency', String(this.cfg.optimizeLatency));
+    } else if (!this.loggedV3LatencyParamSkip) {
+      this.logger.info('ElevenLabs v3: optimize_streaming_latency overgeslagen (niet ondersteund)');
+      this.loggedV3LatencyParamSkip = true;
+    }
 
     const response = await fetch(url, {
       method: 'POST',
