@@ -148,7 +148,7 @@ export class OpenAiRealtimeTextBrain {
 
 Belangrijke regels:
 - Spreek ALTIJD Nederlands (nl-NL).
-- Blijf strikt in rol als coldcaller voor Softora.
+- Blijf strikt in de rol en bedrijfsidentiteit uit de system prompt.
 - Geef korte, zakelijke antwoorden (max 2-3 zinnen).
 - Stel per beurt maximaal 1 vraag.
 - Verzin nooit wat de prospect gezegd zou hebben.
