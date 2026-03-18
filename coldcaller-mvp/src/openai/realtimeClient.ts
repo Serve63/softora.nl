@@ -22,6 +22,7 @@ export class OpenAiRealtimeTextBrain {
   private socket: WebSocket | null = null;
   private connected = false;
   private pendingTextByResponseId = new Map<string, string>();
+  private completedResponseIds = new Set<string>();
   private queuedAudio: string[] = [];
   private lastCommitAndRespondAtMs = 0;
   private hasUncommittedAudio = false;
@@ -131,6 +132,7 @@ export class OpenAiRealtimeTextBrain {
   close(): void {
     this.connected = false;
     this.pendingTextByResponseId.clear();
+    this.completedResponseIds.clear();
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.close(1000, 'bridge_shutdown');
     }
@@ -294,6 +296,11 @@ Belangrijke regels:
       this.hasActiveResponse = false;
       const response = (event.response || {}) as JsonValue;
       const responseId = String(response.id || this.extractResponseId(event) || 'unknown');
+
+      if (responseId && this.completedResponseIds.has(responseId)) {
+        return;
+      }
+
       const fromBuffer = this.pendingTextByResponseId.get(responseId) || '';
       const fromPayload = this.extractTextFromResponse(response);
       const text = (fromBuffer || fromPayload).trim();
@@ -301,6 +308,7 @@ Belangrijke regels:
       if (responseId) this.pendingTextByResponseId.delete(responseId);
 
       if (text) {
+        if (responseId) this.completedResponseIds.add(responseId);
         this.handlers.onAssistantText(text);
       }
       return;

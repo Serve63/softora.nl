@@ -35,6 +35,8 @@ export class CallBridgeSession {
   private activeSpeechAbort: AbortController | null = null;
   private assistantPlaybackStartedAtMs = 0;
   private bargeInFramesAboveThreshold = 0;
+  private assistantTurnsSent = 0;
+  private callerActivitySinceLastAssistant = false;
 
   constructor(
     private readonly ws: WebSocket,
@@ -51,10 +53,17 @@ export class CallBridgeSession {
       },
       {
         onAssistantText: (text) => {
+          if (!this.shouldPlayAssistantText()) {
+            this.logger.debug('Assistant antwoord genegeerd (geen nieuwe caller activiteit)');
+            return;
+          }
+          this.callerActivitySinceLastAssistant = false;
+          this.assistantTurnsSent += 1;
           void this.speakAssistantText(text);
         },
         onCallerSpeechStart: () => {
           this.logger.debug('Caller speech gestart (OpenAI VAD)');
+          this.callerActivitySinceLastAssistant = true;
         },
         onCallerSpeechStop: () => {
           this.logger.debug('Caller speech gestopt (OpenAI VAD)');
@@ -65,6 +74,7 @@ export class CallBridgeSession {
             chars: text.length,
             text: text.slice(0, 260),
           });
+          this.callerActivitySinceLastAssistant = true;
         },
         onError: (error) => {
           this.logger.error('OpenAI brain error', error);
@@ -150,9 +160,14 @@ export class CallBridgeSession {
   private handleInboundAudio(base64Payload: string): void {
     if (!base64Payload) return;
 
+    const audioBuffer = Buffer.from(base64Payload, 'base64');
+    const energy = estimateUlawEnergy(audioBuffer);
+
+    if (energy >= 0.02) {
+      this.callerActivitySinceLastAssistant = true;
+    }
+
     if (this.activeSpeechAbort) {
-      const audioBuffer = Buffer.from(base64Payload, 'base64');
-      const energy = estimateUlawEnergy(audioBuffer);
       const now = Date.now();
       const minPlaybackMsBeforeBargeIn = 300;
       const bargeInEnergyThreshold = 0.03;
@@ -171,6 +186,13 @@ export class CallBridgeSession {
     }
 
     this.brain.appendInputAudio(base64Payload);
+  }
+
+  private shouldPlayAssistantText(): boolean {
+    if (this.assistantTurnsSent === 0) {
+      return true;
+    }
+    return this.callerActivitySinceLastAssistant;
   }
 
   private async speakAssistantText(text: string): Promise<void> {
