@@ -131,8 +131,6 @@ export class OpenAiRealtimeTextBrain {
       type: 'response.create',
       response: {
         modalities: ['text'],
-        instructions:
-          'Antwoord uitsluitend in vloeiend Nederlands (nl-NL). Gebruik nooit Spaans of Engels, tenzij de gebruiker daar expliciet om vraagt. Verzin nooit een reactie van de prospect en ga alleen verder na een expliciet antwoord. Houd elk antwoord kort: maximaal 1 zin + 1 vraag.',
       },
     });
   }

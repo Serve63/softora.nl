@@ -71,6 +71,8 @@ async function main(): Promise<void> {
       realtimeModel: config.openai.realtimeModel,
       elevenVoiceId: config.elevenlabs.voiceId,
       elevenOutputFormat: config.elevenlabs.outputFormat,
+      agentPromptSource: config.agent.promptSource,
+      agentPromptChars: config.agent.systemPrompt.length,
     });
   });
 }

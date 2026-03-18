@@ -71,6 +71,8 @@ export function loadConfig() {
 
   const publicWssUrl = env.PUBLIC_WSS_URL || toWsUrl(env.PUBLIC_BASE_URL);
 
+  const hasCustomAgentPrompt = Boolean(env.AGENT_SYSTEM_PROMPT?.trim());
+
   return {
     server: {
       port: Math.max(1, parseNumber('PORT', env.PORT)),
@@ -100,7 +102,8 @@ export function loadConfig() {
       useSpeakerBoost: parseBoolean('ELEVENLABS_USE_SPEAKER_BOOST', env.ELEVENLABS_USE_SPEAKER_BOOST),
     },
     agent: {
-      systemPrompt: env.AGENT_SYSTEM_PROMPT || defaultAgentPrompt,
+      systemPrompt: hasCustomAgentPrompt ? env.AGENT_SYSTEM_PROMPT! : defaultAgentPrompt,
+      promptSource: hasCustomAgentPrompt ? 'env' : 'default',
     },
   };
 }
