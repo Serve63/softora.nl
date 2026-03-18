@@ -7,6 +7,9 @@ export type ElevenLabsTtsConfig = {
   modelId: string;
   outputFormat: string;
   optimizeLatency: number;
+  stability: number;
+  similarityBoost: number;
+  useSpeakerBoost: boolean;
 };
 
 type StreamMode = 'ulaw_8k' | 'pcm16_16k';
@@ -67,6 +70,11 @@ export class ElevenLabsTtsClient {
       body: JSON.stringify({
         text,
         model_id: this.cfg.modelId,
+        voice_settings: {
+          stability: this.cfg.stability,
+          similarity_boost: this.cfg.similarityBoost,
+          use_speaker_boost: this.cfg.useSpeakerBoost,
+        },
       }),
       signal,
     });

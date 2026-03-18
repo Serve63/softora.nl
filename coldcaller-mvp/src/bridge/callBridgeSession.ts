@@ -249,19 +249,61 @@ export class CallBridgeSession {
     });
 
     try {
-      await this.tts.streamUlaw(
+      const frameQueue: Buffer[] = [];
+      const prebufferFrames = 6; // ~120ms bij 20ms frames
+      const maxQueueFrames = 300; // cap om geheugen te beschermen (~6s audio)
+      let producerDone = false;
+      let producerError: Error | null = null;
+      let playbackStarted = false;
+
+      const producerPromise = this.tts.streamUlaw(
         cleaned,
         async (chunk) => {
           if (this.isClosed || speechAbort.signal.aborted) return;
           const frames = chunkUlaw(chunk, 160);
           for (const frame of frames) {
             if (this.isClosed || speechAbort.signal.aborted) return;
-            this.sendTwilioMedia(frame);
-            await sleep(20);
+            frameQueue.push(frame);
+            if (frameQueue.length > maxQueueFrames) {
+              frameQueue.shift();
+            }
           }
         },
         speechAbort.signal
-      );
+      )
+        .then(() => {
+          producerDone = true;
+        })
+        .catch((error) => {
+          producerDone = true;
+          producerError = error as Error;
+        });
+
+      while (!this.isClosed && !speechAbort.signal.aborted) {
+        if (!playbackStarted) {
+          if (!producerDone && frameQueue.length < prebufferFrames) {
+            await sleep(10);
+            continue;
+          }
+          playbackStarted = frameQueue.length > 0 || producerDone;
+        }
+
+        if (!frameQueue.length) {
+          if (producerDone) break;
+          await sleep(10);
+          continue;
+        }
+
+        const frame = frameQueue.shift();
+        if (!frame) continue;
+        this.sendTwilioMedia(frame);
+        await sleep(20);
+      }
+
+      await producerPromise;
+      if (producerError && !speechAbort.signal.aborted) {
+        throw producerError;
+      }
     } catch (error) {
       if (speechAbort.signal.aborted) {
         this.logger.debug('TTS playback geannuleerd (interrupt)');

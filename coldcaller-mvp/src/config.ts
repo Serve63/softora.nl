@@ -25,7 +25,10 @@ const envSchema = z.object({
   ELEVENLABS_VOICE_ID: z.string().min(1),
   ELEVENLABS_MODEL_ID: z.string().default('eleven_turbo_v2_5'),
   ELEVENLABS_OUTPUT_FORMAT: z.string().default('ulaw_8000'),
-  ELEVENLABS_OPTIMIZE_LATENCY: z.string().default('3'),
+  ELEVENLABS_OPTIMIZE_LATENCY: z.string().default('2'),
+  ELEVENLABS_STABILITY: z.string().default('0.78'),
+  ELEVENLABS_SIMILARITY_BOOST: z.string().default('0.78'),
+  ELEVENLABS_USE_SPEAKER_BOOST: z.string().default('true'),
 
   AGENT_SYSTEM_PROMPT: z.string().optional(),
 });
@@ -45,6 +48,17 @@ function parseNumber(name: string, raw: string): number {
     throw new Error(`${name} moet een getal zijn`);
   }
   return parsed;
+}
+
+function parseBoolean(name: string, raw: string): boolean {
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') {
+    return true;
+  }
+  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') {
+    return false;
+  }
+  throw new Error(`${name} moet true/false zijn`);
 }
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -81,6 +95,9 @@ export function loadConfig() {
       modelId: env.ELEVENLABS_MODEL_ID,
       outputFormat: env.ELEVENLABS_OUTPUT_FORMAT,
       optimizeLatency: Math.max(0, Math.min(4, Math.round(parseNumber('ELEVENLABS_OPTIMIZE_LATENCY', env.ELEVENLABS_OPTIMIZE_LATENCY)))),
+      stability: Math.max(0, Math.min(1, parseNumber('ELEVENLABS_STABILITY', env.ELEVENLABS_STABILITY))),
+      similarityBoost: Math.max(0, Math.min(1, parseNumber('ELEVENLABS_SIMILARITY_BOOST', env.ELEVENLABS_SIMILARITY_BOOST))),
+      useSpeakerBoost: parseBoolean('ELEVENLABS_USE_SPEAKER_BOOST', env.ELEVENLABS_USE_SPEAKER_BOOST),
     },
     agent: {
       systemPrompt: env.AGENT_SYSTEM_PROMPT || defaultAgentPrompt,
