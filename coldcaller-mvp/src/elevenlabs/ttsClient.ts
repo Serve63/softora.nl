@@ -15,6 +15,8 @@ export type ElevenLabsTtsConfig = {
 type StreamMode = 'ulaw_8k' | 'pcm16_16k';
 
 export class ElevenLabsTtsClient {
+  private loggedFormatOverride = false;
+
   constructor(
     private readonly cfg: ElevenLabsTtsConfig,
     private readonly logger: Logger
@@ -28,7 +30,7 @@ export class ElevenLabsTtsClient {
     const cleaned = text.trim();
     if (!cleaned) return;
 
-    const preferredFormat = this.cfg.outputFormat;
+    const preferredFormat = this.resolvePreferredFormat(this.cfg.outputFormat);
 
     try {
       const preferred = await this.openTtsStream(cleaned, preferredFormat, signal);
@@ -37,6 +39,10 @@ export class ElevenLabsTtsClient {
       return;
     } catch (error) {
       if (signal?.aborted) throw error;
+
+      if (preferredFormat === 'pcm_16000') {
+        throw error;
+      }
 
       this.logger.warn('ElevenLabs preferred output_format faalde, fallback naar pcm_16000', {
         preferredFormat,
@@ -153,5 +159,22 @@ export class ElevenLabsTtsClient {
         }
       }
     }
+  }
+
+  private resolvePreferredFormat(configuredFormat: string): string {
+    const format = String(configuredFormat || '').trim();
+    const model = String(this.cfg.modelId || '').toLowerCase();
+    const isV3Model = model.includes('eleven_v3');
+    const isUlaw = /ulaw/i.test(format);
+
+    if (isV3Model && isUlaw) {
+      if (!this.loggedFormatOverride) {
+        this.logger.info('Output format override: eleven_v3 gebruikt pcm_16000 voor stabiele stream');
+        this.loggedFormatOverride = true;
+      }
+      return 'pcm_16000';
+    }
+
+    return format;
   }
 }

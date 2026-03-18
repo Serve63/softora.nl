@@ -97,15 +97,15 @@ Zie `.env.example`. Belangrijkste:
 2. Zet in `.env`:
    - `ELEVENLABS_API_KEY`
    - `ELEVENLABS_VOICE_ID`
-3. MVP gebruikt streaming endpoint met `output_format=ulaw_8000` zodat Twilio direct telephony audio kan afspelen zonder extra transcoding.
+3. Voor `eleven_v3` gebruikt MVP `output_format=pcm_16000` en transcodeert intern naar u-law 8k voor Twilio.
 
 ## Waarom deze ElevenLabs route
 
-Voor MVP-latency en stabiliteit is directe HTTP streaming TTS met `u-law 8k` de snelste haalbare route:
+Voor MVP-latency en stabiliteit is directe HTTP streaming TTS de snelste haalbare route:
 - geen extra no-code laag
 - geen ffmpeg transcode pad nodig
-- direct geschikt voor Twilio Media Streams output
-- automatische fallback aanwezig: als `ulaw_8000` niet geaccepteerd wordt, gebruikt de backend `pcm_16000` en transcodeert intern naar `u-law 8k`.
+- met `eleven_v3` gebruikt de backend `pcm_16000` (stabiel) en transcodeert intern naar `u-law 8k` voor Twilio
+- automatische fallback aanwezig: als een gekozen format niet geaccepteerd wordt, valt de backend terug naar `pcm_16000`.
 
 ## Logging
 
@@ -123,7 +123,7 @@ Logs zijn JSON in stdout, inclusief:
 
 ## Snelle troubleshooting
 
-- **Geen audio terug in call**: check `ELEVENLABS_OUTPUT_FORMAT` (u-law 8k) en kijk naar TTS error logs.
+- **Geen audio terug in call**: check `ELEVENLABS_OUTPUT_FORMAT` (`pcm_16000` voor v3) en kijk naar TTS error logs.
 - **Call hangt direct op**: check Twilio webhook URL + publieke HTTPS bereikbaarheid.
 - **Hoge latency**: controleer tunnel, regio en `ELEVENLABS_OPTIMIZE_LATENCY`.
 - **Modelfout OpenAI**: gebruik model dat in jouw account Realtime access heeft.
