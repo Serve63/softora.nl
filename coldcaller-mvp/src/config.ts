@@ -44,6 +44,12 @@ function parseNumber(name: string, raw: string): number {
   return parsed;
 }
 
+function parseOpenAiVoice(raw: string): string {
+  const value = raw.trim().toLowerCase();
+  if (!value) return 'shimmer';
+  return value;
+}
+
 export type AppConfig = ReturnType<typeof loadConfig>;
 
 export function loadConfig() {
@@ -72,7 +78,7 @@ export function loadConfig() {
     openai: {
       apiKey: env.OPENAI_API_KEY,
       realtimeModel: env.OPENAI_REALTIME_MODEL,
-      voice: env.OPENAI_REALTIME_VOICE,
+      voice: parseOpenAiVoice(env.OPENAI_REALTIME_VOICE),
       vadThreshold: Math.max(0, Math.min(1, parseNumber('OPENAI_REALTIME_VAD_THRESHOLD', env.OPENAI_REALTIME_VAD_THRESHOLD))),
       vadPrefixPaddingMs: Math.max(
         0,
