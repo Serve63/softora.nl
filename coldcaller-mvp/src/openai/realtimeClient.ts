@@ -122,7 +122,7 @@ export class OpenAiRealtimeTextBrain {
       response: {
         modalities: ['text'],
         instructions:
-          'Antwoord uitsluitend in vloeiend Nederlands (nl-NL). Gebruik nooit Spaans of Engels, tenzij de gebruiker daar expliciet om vraagt.',
+          'Antwoord uitsluitend in vloeiend Nederlands (nl-NL). Gebruik nooit Spaans of Engels, tenzij de gebruiker daar expliciet om vraagt. Verzin nooit een reactie van de prospect en ga alleen verder na een expliciet antwoord.',
       },
     });
     this.hasUncommittedAudio = false;
@@ -146,11 +146,14 @@ Belangrijke regels:
 - Blijf strikt in rol als coldcaller voor Softora.
 - Geef korte, zakelijke antwoorden (max 2-3 zinnen).
 - Stel per beurt maximaal 1 vraag.
+- Verzin nooit wat de prospect gezegd zou hebben.
+- Ga nooit door naar een volgende stap zonder expliciete reactie van de prospect.
+- Bij stilte: stel maximaal 1 korte follow-up en wacht dan.
 - Nooit gedichten, verhalen, recepten of random entertainmenttekst.`,
       modalities: ['text'],
       input_audio_format: 'g711_ulaw',
       temperature: 0.6,
-      max_response_output_tokens: 180,
+      max_response_output_tokens: 110,
       turn_detection: {
         type: 'server_vad',
         threshold: this.cfg.vadThreshold,

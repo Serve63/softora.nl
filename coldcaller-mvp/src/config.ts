@@ -19,7 +19,7 @@ const envSchema = z.object({
 
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_REALTIME_MODEL: z.string().default('gpt-realtime'),
-  OPENAI_REALTIME_VAD_THRESHOLD: z.string().default('0.45'),
+  OPENAI_REALTIME_VAD_THRESHOLD: z.string().default('0.62'),
 
   ELEVENLABS_API_KEY: z.string().min(1),
   ELEVENLABS_VOICE_ID: z.string().min(1),
