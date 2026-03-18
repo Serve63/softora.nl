@@ -19,18 +19,10 @@ const envSchema = z.object({
 
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_REALTIME_MODEL: z.string().default('gpt-realtime'),
+  OPENAI_REALTIME_VOICE: z.string().default('shimmer'),
   OPENAI_REALTIME_VAD_THRESHOLD: z.string().default('0.62'),
   OPENAI_REALTIME_VAD_PREFIX_PADDING_MS: z.string().default('320'),
   OPENAI_REALTIME_VAD_SILENCE_DURATION_MS: z.string().default('800'),
-
-  ELEVENLABS_API_KEY: z.string().min(1),
-  ELEVENLABS_VOICE_ID: z.string().min(1),
-  ELEVENLABS_MODEL_ID: z.string().default('eleven_v3'),
-  ELEVENLABS_OUTPUT_FORMAT: z.string().default('pcm_16000'),
-  ELEVENLABS_OPTIMIZE_LATENCY: z.string().default('3'),
-  ELEVENLABS_STABILITY: z.string().default('0.78'),
-  ELEVENLABS_SIMILARITY_BOOST: z.string().default('0.78'),
-  ELEVENLABS_USE_SPEAKER_BOOST: z.string().default('true'),
 
   AGENT_SYSTEM_PROMPT: z.string().optional(),
 });
@@ -50,17 +42,6 @@ function parseNumber(name: string, raw: string): number {
     throw new Error(`${name} moet een getal zijn`);
   }
   return parsed;
-}
-
-function parseBoolean(name: string, raw: string): boolean {
-  const normalized = raw.trim().toLowerCase();
-  if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') {
-    return true;
-  }
-  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') {
-    return false;
-  }
-  throw new Error(`${name} moet true/false zijn`);
 }
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -91,6 +72,7 @@ export function loadConfig() {
     openai: {
       apiKey: env.OPENAI_API_KEY,
       realtimeModel: env.OPENAI_REALTIME_MODEL,
+      voice: env.OPENAI_REALTIME_VOICE,
       vadThreshold: Math.max(0, Math.min(1, parseNumber('OPENAI_REALTIME_VAD_THRESHOLD', env.OPENAI_REALTIME_VAD_THRESHOLD))),
       vadPrefixPaddingMs: Math.max(
         0,
@@ -110,16 +92,6 @@ export function loadConfig() {
           )
         )
       ),
-    },
-    elevenlabs: {
-      apiKey: env.ELEVENLABS_API_KEY,
-      voiceId: env.ELEVENLABS_VOICE_ID,
-      modelId: env.ELEVENLABS_MODEL_ID,
-      outputFormat: env.ELEVENLABS_OUTPUT_FORMAT,
-      optimizeLatency: Math.max(0, Math.min(4, Math.round(parseNumber('ELEVENLABS_OPTIMIZE_LATENCY', env.ELEVENLABS_OPTIMIZE_LATENCY)))),
-      stability: Math.max(0, Math.min(1, parseNumber('ELEVENLABS_STABILITY', env.ELEVENLABS_STABILITY))),
-      similarityBoost: Math.max(0, Math.min(1, parseNumber('ELEVENLABS_SIMILARITY_BOOST', env.ELEVENLABS_SIMILARITY_BOOST))),
-      useSpeakerBoost: parseBoolean('ELEVENLABS_USE_SPEAKER_BOOST', env.ELEVENLABS_USE_SPEAKER_BOOST),
     },
     agent: {
       systemPrompt: hasCustomAgentPrompt ? env.AGENT_SYSTEM_PROMPT! : defaultAgentPrompt,

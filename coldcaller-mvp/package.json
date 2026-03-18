@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Directe AI coldcaller MVP met Twilio Media Streams, OpenAI Realtime en ElevenLabs TTS.",
+  "description": "Directe AI coldcaller MVP met Twilio Media Streams en OpenAI Realtime audio.",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",

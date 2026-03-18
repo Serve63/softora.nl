@@ -2,7 +2,10 @@ import WebSocket from 'ws';
 import type { Logger } from '../utils/logger.js';
 
 type HandlerSet = {
-  onAssistantText: (text: string) => void;
+  onAssistantAudio?: (base64Ulaw8k: string) => void;
+  onAssistantText?: (text: string) => void;
+  onAssistantResponseStarted?: () => void;
+  onAssistantResponseDone?: () => void;
   onCallerSpeechStart?: () => void;
   onCallerSpeechStop?: () => void;
   onCallerTranscript?: (text: string) => void;
@@ -12,6 +15,7 @@ type HandlerSet = {
 export type OpenAiRealtimeConfig = {
   apiKey: string;
   model: string;
+  voice: string;
   systemPrompt: string;
   vadThreshold: number;
   vadPrefixPaddingMs: number;
@@ -20,15 +24,11 @@ export type OpenAiRealtimeConfig = {
 
 type JsonValue = Record<string, unknown>;
 
-export class OpenAiRealtimeTextBrain {
+export class OpenAiRealtimeAudioBrain {
   private socket: WebSocket | null = null;
   private connected = false;
-  private pendingTextByResponseId = new Map<string, string>();
-  private completedResponseIds = new Set<string>();
-  private queuedAudio: string[] = [];
-  private lastCommitAndRespondAtMs = 0;
-  private hasUncommittedAudio = false;
   private hasActiveResponse = false;
+  private queuedAudio: string[] = [];
 
   constructor(
     private readonly cfg: OpenAiRealtimeConfig,
@@ -91,56 +91,38 @@ export class OpenAiRealtimeTextBrain {
     if (!base64Ulaw8k) return;
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       this.queuedAudio.push(base64Ulaw8k);
-      this.hasUncommittedAudio = true;
-      if (this.queuedAudio.length > 100) {
-        this.queuedAudio.splice(0, this.queuedAudio.length - 100);
+      if (this.queuedAudio.length > 120) {
+        this.queuedAudio.splice(0, this.queuedAudio.length - 120);
       }
       return;
     }
-    this.hasUncommittedAudio = true;
+
     this.send({
       type: 'input_audio_buffer.append',
       audio: base64Ulaw8k,
     });
   }
 
-  cancelResponse(): void {
-    if (!this.hasActiveResponse) return;
-    this.send({ type: 'response.cancel' });
-  }
-
-  requestResponseFromInputBuffer(reason = 'manual'): void {
-    if (!this.hasUncommittedAudio) {
-      this.logger.debug('OpenAI commit overgeslagen: geen nieuwe audio', { reason });
-      return;
-    }
-
-    this.logger.debug('OpenAI commit + response.create', { reason });
-    this.send({ type: 'input_audio_buffer.commit' });
-    this.requestResponse(reason);
-    this.hasUncommittedAudio = false;
-  }
-
   requestResponse(reason = 'manual'): void {
-    const now = Date.now();
-    if (now - this.lastCommitAndRespondAtMs < 250) {
-      return;
-    }
-    this.lastCommitAndRespondAtMs = now;
-
     this.logger.debug('OpenAI response.create', { reason });
     this.send({
       type: 'response.create',
       response: {
-        modalities: ['text'],
+        modalities: ['audio', 'text'],
       },
     });
   }
 
+  cancelResponse(): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    if (!this.hasActiveResponse) return;
+    this.send({ type: 'response.cancel' });
+  }
+
   close(): void {
     this.connected = false;
-    this.pendingTextByResponseId.clear();
-    this.completedResponseIds.clear();
+    this.hasActiveResponse = false;
+    this.queuedAudio = [];
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.close(1000, 'bridge_shutdown');
     }
@@ -154,23 +136,24 @@ export class OpenAiRealtimeTextBrain {
 Belangrijke regels:
 - Spreek ALTIJD Nederlands (nl-NL).
 - Blijf strikt in de rol en bedrijfsidentiteit uit de system prompt.
+- Luister eerst en reageer direct op wat de prospect net zei.
 - Geef korte, zakelijke antwoorden (max 2-3 zinnen).
 - Stel per beurt maximaal 1 vraag.
 - Verzin nooit wat de prospect gezegd zou hebben.
-- Ga nooit door naar een volgende stap zonder expliciete reactie van de prospect.
-- Bij stilte: stel maximaal 1 korte follow-up en wacht dan.
 - Bij een expliciete afwijzing (zoals "geen interesse", "geen behoefte", "nee bedankt"): bedank kort en sluit netjes af zonder nieuwe afspraakvraag.
 - Nooit gedichten, verhalen, recepten of random entertainmenttekst.`,
-      modalities: ['text'],
+      modalities: ['audio', 'text'],
+      voice: this.cfg.voice,
       input_audio_format: 'g711_ulaw',
+      output_audio_format: 'g711_ulaw',
       temperature: 0.6,
-      max_response_output_tokens: 70,
+      max_response_output_tokens: 90,
       turn_detection: {
         type: 'server_vad',
         threshold: this.cfg.vadThreshold,
         prefix_padding_ms: this.cfg.vadPrefixPaddingMs,
         silence_duration_ms: this.cfg.vadSilenceDurationMs,
-        create_response: false,
+        create_response: true,
         interrupt_response: true,
       },
     };
@@ -214,10 +197,6 @@ Belangrijke regels:
 
     if (type === 'error') {
       const code = this.extractErrorCode(event);
-      if (code === 'input_audio_buffer_commit_empty') {
-        this.logger.debug('OpenAI commit genegeerd: nog niet genoeg audio in buffer');
-        return;
-      }
       if (code === 'response_cancel_not_active') {
         this.logger.debug('OpenAI cancel genegeerd: geen actieve response');
         return;
@@ -228,13 +207,24 @@ Belangrijke regels:
       return;
     }
 
-    if (type === 'response.created') {
-      this.hasActiveResponse = true;
+    if (type === 'session.updated') {
+      this.logger.info('OpenAI sessie geupdate');
       return;
     }
 
-    if (type === 'session.updated') {
-      this.logger.info('OpenAI sessie geupdate');
+    if (type === 'response.created') {
+      this.hasActiveResponse = true;
+      this.handlers.onAssistantResponseStarted?.();
+      return;
+    }
+
+    if (type === 'response.done' || type === 'response.completed') {
+      this.hasActiveResponse = false;
+      this.handlers.onAssistantResponseDone?.();
+
+      const response = (event.response || {}) as JsonValue;
+      const text = this.extractTextFromResponse(response);
+      if (text) this.handlers.onAssistantText?.(text);
       return;
     }
 
@@ -245,11 +235,6 @@ Belangrijke regels:
 
     if (type === 'input_audio_buffer.speech_stopped') {
       this.handlers.onCallerSpeechStop?.();
-      return;
-    }
-
-    if (type === 'input_audio_buffer.committed') {
-      this.logger.debug('OpenAI input audio buffer committed');
       return;
     }
 
@@ -264,79 +249,25 @@ Belangrijke regels:
       return;
     }
 
-    if (type === 'response.output_text.delta' || type === 'response.text.delta') {
-      const responseId = this.extractResponseId(event) || 'unknown';
-      const delta = String(event.delta || '');
-      if (!delta) return;
-      const existing = this.pendingTextByResponseId.get(responseId) || '';
-      this.pendingTextByResponseId.set(responseId, existing + delta);
-      return;
-    }
-
-    if (type === 'response.output_text.done' || type === 'response.text.done') {
-      const responseId = this.extractResponseId(event) || 'unknown';
-      const finalText = String(event.text || event.delta || '').trim();
-      if (!finalText) return;
-      const existing = (this.pendingTextByResponseId.get(responseId) || '').trim();
-
-      // Sommige Realtime events leveren op *.done de volledige tekst terug.
-      // Voorkom dubbele zinnen wanneer delta's al zijn opgebouwd.
-      if (!existing) {
-        this.pendingTextByResponseId.set(responseId, finalText);
-        return;
-      }
-
-      if (finalText === existing) {
-        return;
-      }
-
-      if (finalText.startsWith(existing)) {
-        this.pendingTextByResponseId.set(responseId, finalText);
-        return;
-      }
-
-      if (existing.startsWith(finalText) || existing.endsWith(finalText)) {
-        return;
-      }
-
-      this.pendingTextByResponseId.set(responseId, `${existing} ${finalText}`.trim());
-      return;
-    }
-
-    if (type === 'response.done' || type === 'response.completed') {
-      this.hasActiveResponse = false;
-      const response = (event.response || {}) as JsonValue;
-      const responseId = String(response.id || this.extractResponseId(event) || 'unknown');
-
-      if (responseId && this.completedResponseIds.has(responseId)) {
-        return;
-      }
-
-      const fromBuffer = this.pendingTextByResponseId.get(responseId) || '';
-      const fromPayload = this.extractTextFromResponse(response);
-      const text = (fromBuffer || fromPayload).trim();
-
-      if (responseId) this.pendingTextByResponseId.delete(responseId);
-
-      if (text) {
-        if (responseId) this.completedResponseIds.add(responseId);
-        this.handlers.onAssistantText(text);
+    if (
+      type === 'response.audio.delta' ||
+      type === 'response.output_audio.delta' ||
+      type === 'output_audio.delta'
+    ) {
+      const audio = this.extractAudioDelta(event);
+      if (audio) {
+        this.handlers.onAssistantAudio?.(audio);
       }
       return;
     }
   }
 
-  private extractResponseId(event: JsonValue): string {
-    const direct = event.response_id;
-    if (typeof direct === 'string' && direct) return direct;
+  private extractAudioDelta(event: JsonValue): string {
+    const delta = event.delta;
+    if (typeof delta === 'string' && delta) return delta;
 
-    const response = event.response;
-    if (response && typeof response === 'object' && typeof (response as JsonValue).id === 'string') {
-      return String((response as JsonValue).id);
-    }
-
-    const itemId = event.item_id;
-    if (typeof itemId === 'string' && itemId) return itemId;
+    const audio = event.audio;
+    if (typeof audio === 'string' && audio) return audio;
 
     return '';
   }
@@ -356,6 +287,10 @@ Belangrijke regels:
         const text = item.text;
         if (typeof text === 'string' && text.trim()) {
           textParts.push(text.trim());
+        }
+        const transcript = item.transcript;
+        if (typeof transcript === 'string' && transcript.trim()) {
+          textParts.push(transcript.trim());
         }
       }
     }

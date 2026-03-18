@@ -1,8 +1,7 @@
 import WebSocket from 'ws';
 import type { AppConfig } from '../config.js';
 import { estimateUlawEnergy, sleep } from '../audio/ulaw.js';
-import { ElevenLabsTtsClient } from '../elevenlabs/ttsClient.js';
-import { OpenAiRealtimeTextBrain } from '../openai/realtimeClient.js';
+import { OpenAiRealtimeAudioBrain } from '../openai/realtimeClient.js';
 import type { Logger } from '../utils/logger.js';
 
 type TwilioStartPayload = {
@@ -26,24 +25,25 @@ type TwilioInboundEvent = {
 };
 
 export class CallBridgeSession {
-  private readonly brain: OpenAiRealtimeTextBrain;
-  private readonly tts: ElevenLabsTtsClient;
+  private readonly brain: OpenAiRealtimeAudioBrain;
 
   private streamSid = '';
   private callSid = '';
   private streamStartedAtMs = 0;
-  private firstAssistantTextAtMs = 0;
-  private initialOpeningRequested = false;
+  private firstAssistantAudioAtMs = 0;
   private isClosed = false;
-  private activeSpeechAbort: AbortController | null = null;
+
+  private openAiResponseActive = false;
+  private assistantOutputActive = false;
+  private assistantOutputActiveUntilMs = 0;
   private assistantPlaybackStartedAtMs = 0;
   private lastAssistantPlaybackEndedAtMs = 0;
-  private lastAssistantTurnStartedAtMs = 0;
-  private callerSpeechStartedAtMs = 0;
   private bargeInFramesAboveThreshold = 0;
-  private assistantTurnsSent = 0;
-  private callerActivitySinceLastAssistant = false;
-  private pendingSpeechStopCommitTimer: NodeJS.Timeout | null = null;
+
+  private outputFrameCarry = Buffer.alloc(0);
+  private readonly outputFrameQueue: Buffer[] = [];
+  private outputPumpRunning = false;
+
   private readonly metrics = {
     startedAtMs: Date.now(),
     inboundMediaEvents: 0,
@@ -53,13 +53,12 @@ export class CallBridgeSession {
     droppedDuringPlaybackEvents: 0,
     droppedPostPlaybackEchoEvents: 0,
     bargeInInterrupts: 0,
-    assistantTurnsSuppressed: 0,
-    assistantTurnsPlayed: 0,
-    ttsFramesSent: 0,
-    ttsBytesSent: 0,
-    ttsQueueMaxDepth: 0,
-    ttsQueueUnderflows: 0,
-    totalTtsPlaybackMs: 0,
+    assistantAudioChunks: 0,
+    assistantAudioBytes: 0,
+    assistantFramesSent: 0,
+    outputQueueMaxDepth: 0,
+    outputQueueUnderflows: 0,
+    totalAssistantPlaybackMs: 0,
   };
 
   constructor(
@@ -67,46 +66,36 @@ export class CallBridgeSession {
     private readonly config: AppConfig,
     private readonly logger: Logger
   ) {
-    this.tts = new ElevenLabsTtsClient(this.config.elevenlabs, this.logger.child('tts'));
-    this.brain = new OpenAiRealtimeTextBrain(
+    this.brain = new OpenAiRealtimeAudioBrain(
       {
         apiKey: this.config.openai.apiKey,
         model: this.config.openai.realtimeModel,
+        voice: this.config.openai.voice,
         systemPrompt: this.config.agent.systemPrompt,
         vadThreshold: this.config.openai.vadThreshold,
         vadPrefixPaddingMs: this.config.openai.vadPrefixPaddingMs,
         vadSilenceDurationMs: this.config.openai.vadSilenceDurationMs,
       },
       {
+        onAssistantAudio: (base64) => this.handleAssistantAudioChunk(base64),
         onAssistantText: (text) => {
-          if (!this.firstAssistantTextAtMs) {
-            this.firstAssistantTextAtMs = Date.now();
-          }
-          if (!this.shouldPlayAssistantText()) {
-            this.metrics.assistantTurnsSuppressed += 1;
-            this.logger.debug('Assistant antwoord genegeerd (geen nieuwe caller activiteit)');
-            return;
-          }
-          this.callerActivitySinceLastAssistant = false;
-          this.assistantTurnsSent += 1;
-          this.metrics.assistantTurnsPlayed += 1;
-          this.lastAssistantTurnStartedAtMs = Date.now();
-          void this.speakAssistantText(text);
+          this.logger.info('Assistant antwoord (tekst)', {
+            callSid: this.callSid || null,
+            chars: text.length,
+            preview: text.slice(0, 220),
+          });
+        },
+        onAssistantResponseStarted: () => {
+          this.openAiResponseActive = true;
+        },
+        onAssistantResponseDone: () => {
+          this.openAiResponseActive = false;
         },
         onCallerSpeechStart: () => {
           this.logger.debug('Caller speech gestart (OpenAI VAD)');
-          this.callerSpeechStartedAtMs = Date.now();
-          if (this.pendingSpeechStopCommitTimer) {
-            clearTimeout(this.pendingSpeechStopCommitTimer);
-            this.pendingSpeechStopCommitTimer = null;
-          }
-          if (!this.activeSpeechAbort) {
-            this.callerActivitySinceLastAssistant = true;
-          }
         },
         onCallerSpeechStop: () => {
           this.logger.debug('Caller speech gestopt (OpenAI VAD)');
-          this.scheduleCommitAfterSpeechStop();
         },
         onCallerTranscript: (text) => {
           this.logger.info('Caller transcript', {
@@ -114,7 +103,6 @@ export class CallBridgeSession {
             chars: text.length,
             text: text.slice(0, 260),
           });
-          this.callerActivitySinceLastAssistant = true;
         },
         onError: (error) => {
           this.logger.error('OpenAI brain error', error);
@@ -167,7 +155,6 @@ export class CallBridgeSession {
       this.streamSid = String(message.start?.streamSid || message.streamSid || '');
       this.callSid = String(message.start?.callSid || '');
       this.streamStartedAtMs = Date.now();
-      this.scheduleInitialOpeningIfNeeded();
       this.logger.info('Twilio stream gestart', {
         callSid: this.callSid || null,
         streamSid: this.streamSid || null,
@@ -199,45 +186,6 @@ export class CallBridgeSession {
     }
   }
 
-  private scheduleInitialOpeningIfNeeded(): void {
-    if (this.initialOpeningRequested) return;
-    this.initialOpeningRequested = true;
-
-    setTimeout(() => {
-      if (this.isClosed) return;
-      if (this.assistantTurnsSent > 0) return;
-      if (this.callerActivitySinceLastAssistant) return;
-      this.brain.requestResponse('initial_opening');
-    }, 450);
-  }
-
-  private scheduleCommitAfterSpeechStop(): void {
-    const speechDurationMs = this.callerSpeechStartedAtMs
-      ? Math.max(0, Date.now() - this.callerSpeechStartedAtMs)
-      : 0;
-    this.callerSpeechStartedAtMs = 0;
-
-    const minimumSpeechDurationMs = 320;
-    if (speechDurationMs > 0 && speechDurationMs < minimumSpeechDurationMs) {
-      this.logger.debug('VAD speech-stop genegeerd: te korte user beurt', {
-        speechDurationMs,
-      });
-      return;
-    }
-
-    if (this.pendingSpeechStopCommitTimer) {
-      clearTimeout(this.pendingSpeechStopCommitTimer);
-      this.pendingSpeechStopCommitTimer = null;
-    }
-
-    const responseDebounceMs = 220;
-    this.pendingSpeechStopCommitTimer = setTimeout(() => {
-      this.pendingSpeechStopCommitTimer = null;
-      if (this.isClosed) return;
-      this.brain.requestResponseFromInputBuffer('openai_vad_speech_stopped_debounced');
-    }, responseDebounceMs);
-  }
-
   private handleInboundAudio(base64Payload: string): void {
     if (!base64Payload) return;
 
@@ -247,18 +195,13 @@ export class CallBridgeSession {
 
     const energy = estimateUlawEnergy(audioBuffer);
     const now = Date.now();
-    const isAssistantSpeaking = Boolean(this.activeSpeechAbort);
+    const isAssistantSpeaking = this.isAssistantSpeaking(now);
     let interruptedForBargeIn = false;
 
-    if (!isAssistantSpeaking && energy >= 0.02) {
-      this.callerActivitySinceLastAssistant = true;
-    }
-
     if (isAssistantSpeaking) {
-      const now = Date.now();
-      const minPlaybackMsBeforeBargeIn = 900;
-      const bargeInEnergyThreshold = 0.06;
-      const bargeInFramesNeeded = 8;
+      const minPlaybackMsBeforeBargeIn = 450;
+      const bargeInEnergyThreshold = 0.055;
+      const bargeInFramesNeeded = 6;
 
       if (now - this.assistantPlaybackStartedAtMs >= minPlaybackMsBeforeBargeIn && energy >= bargeInEnergyThreshold) {
         this.bargeInFramesAboveThreshold += 1;
@@ -274,16 +217,16 @@ export class CallBridgeSession {
       }
     }
 
-    // Voorkom echo-loop: tijdens TTS-playback géén inbound audio naar OpenAI sturen,
-    // behalve als er echte barge-in is gedetecteerd en playback net is onderbroken.
+    // Tijdens assistant-audio inbound niet doorsturen (echo-protectie),
+    // behalve tijdens echte barge-in interrupt.
     if (isAssistantSpeaking && !interruptedForBargeIn) {
       this.metrics.droppedDuringPlaybackEvents += 1;
       return;
     }
 
-    // Direct na het einde van TTS negeren we lage-energie echo-restjes.
-    const postPlaybackEchoWindowMs = 550;
-    const postPlaybackHighEnergyThreshold = 0.05;
+    // Kort na assistant-audio lage-energie echo ook droppen.
+    const postPlaybackEchoWindowMs = 420;
+    const postPlaybackHighEnergyThreshold = 0.045;
     if (
       !isAssistantSpeaking &&
       now - this.lastAssistantPlaybackEndedAtMs < postPlaybackEchoWindowMs &&
@@ -298,158 +241,110 @@ export class CallBridgeSession {
     this.brain.appendInputAudio(base64Payload);
   }
 
-  private shouldPlayAssistantText(): boolean {
-    if (this.assistantTurnsSent === 0) {
-      return true;
-    }
-    if (!this.callerActivitySinceLastAssistant) {
-      return false;
-    }
-
-    const minGapBetweenAssistantTurnsMs = 1200;
-    if (Date.now() - this.lastAssistantTurnStartedAtMs < minGapBetweenAssistantTurnsMs) {
-      return false;
-    }
-
-    return true;
+  private isAssistantSpeaking(now: number): boolean {
+    if (this.openAiResponseActive) return true;
+    if (this.assistantOutputActive) return true;
+    if (this.outputFrameQueue.length > 0) return true;
+    return now < this.assistantOutputActiveUntilMs;
   }
 
-  private async speakAssistantText(text: string): Promise<void> {
-    const cleaned = text.trim();
-    if (!cleaned || this.isClosed) return;
+  private handleAssistantAudioChunk(base64Ulaw8k: string): void {
+    if (this.isClosed || !this.streamSid) return;
+    if (!base64Ulaw8k) return;
 
-    // Nieuw antwoord start -> oude playback stoppen.
-    this.interrupt('new_assistant_reply', false);
+    const chunk = Buffer.from(base64Ulaw8k, 'base64');
+    if (!chunk.length) return;
 
-    const speechAbort = new AbortController();
-    this.activeSpeechAbort = speechAbort;
-    this.assistantPlaybackStartedAtMs = Date.now();
-    this.bargeInFramesAboveThreshold = 0;
+    if (!this.firstAssistantAudioAtMs) {
+      this.firstAssistantAudioAtMs = Date.now();
+    }
 
-    this.logger.info('Assistant antwoord (tekst)', {
-      callSid: this.callSid || null,
-      chars: cleaned.length,
-      preview: cleaned.slice(0, 220),
-    });
+    this.metrics.assistantAudioChunks += 1;
+    this.metrics.assistantAudioBytes += chunk.length;
+
+    const combined = this.outputFrameCarry.length ? Buffer.concat([this.outputFrameCarry, chunk]) : chunk;
+    let offset = 0;
+    while (offset + 160 <= combined.length) {
+      this.outputFrameQueue.push(combined.subarray(offset, offset + 160));
+      offset += 160;
+    }
+    this.outputFrameCarry = Buffer.from(combined.subarray(offset));
+    if (this.outputFrameQueue.length > this.metrics.outputQueueMaxDepth) {
+      this.metrics.outputQueueMaxDepth = this.outputFrameQueue.length;
+    }
+
+    this.assistantOutputActive = true;
+    this.assistantOutputActiveUntilMs = Date.now() + 600;
+    if (!this.assistantPlaybackStartedAtMs) {
+      this.assistantPlaybackStartedAtMs = Date.now();
+    }
+
+    void this.startOutputPump();
+  }
+
+  private async startOutputPump(): Promise<void> {
+    if (this.outputPumpRunning) return;
+    this.outputPumpRunning = true;
+
+    const pumpStartedAtMs = Date.now();
+    let queueStarved = false;
 
     try {
-      const frameQueue: Buffer[] = [];
-      const prebufferFrames = 14; // ~280ms bij 20ms frames
-      const maxQueueFrames = 2400; // ~48s audio cap, voorkomt onnodig frame-droppen
-      let producerDone = false;
-      let producerError: Error | null = null;
-      let playbackStarted = false;
-      let nextFrameAtMs = 0;
-      let queueStarved = false;
-      const ttsTurnStartedAtMs = Date.now();
-      let frameCarry = Buffer.alloc(0);
-
-      const enqueueFrame = (frame: Buffer) => {
-        if (this.isClosed || speechAbort.signal.aborted) return;
-        if (frameQueue.length < maxQueueFrames) {
-          frameQueue.push(frame);
-          if (frameQueue.length > this.metrics.ttsQueueMaxDepth) {
-            this.metrics.ttsQueueMaxDepth = frameQueue.length;
+      while (!this.isClosed) {
+        if (!this.outputFrameQueue.length) {
+          if (!this.openAiResponseActive) {
+            if (this.outputFrameCarry.length > 0) {
+              const padded = Buffer.alloc(160, 0xff);
+              this.outputFrameCarry.copy(padded, 0, 0, this.outputFrameCarry.length);
+              this.outputFrameQueue.push(padded);
+              this.outputFrameCarry = Buffer.alloc(0);
+              continue;
+            }
+            break;
           }
-        }
-      };
 
-      const producerPromise = this.tts.streamUlaw(
-        cleaned,
-        async (chunk) => {
-          if (this.isClosed || speechAbort.signal.aborted) return;
-          const combined = frameCarry.length ? Buffer.concat([frameCarry, chunk]) : chunk;
-          let offset = 0;
-          while (offset + 160 <= combined.length) {
-            enqueueFrame(combined.subarray(offset, offset + 160));
-            offset += 160;
-          }
-          frameCarry = Buffer.from(combined.subarray(offset));
-        },
-        speechAbort.signal
-      )
-        .then(() => {
-          if (!this.isClosed && !speechAbort.signal.aborted && frameCarry.length > 0) {
-            // Laatste frame opvullen zodat pacing 20ms stabiel blijft.
-            const padded = Buffer.alloc(160, 0xff);
-            frameCarry.copy(padded, 0, 0, frameCarry.length);
-            enqueueFrame(padded);
-            frameCarry = Buffer.alloc(0);
-          }
-          producerDone = true;
-        })
-        .catch((error) => {
-          producerDone = true;
-          producerError = error as Error;
-        });
-
-      while (!this.isClosed && !speechAbort.signal.aborted) {
-        if (!playbackStarted) {
-          if (!producerDone && frameQueue.length < prebufferFrames) {
-            await sleep(10);
-            continue;
-          }
-          playbackStarted = frameQueue.length > 0 || producerDone;
-          nextFrameAtMs = Date.now();
-        }
-
-        if (!frameQueue.length) {
-          if (producerDone) break;
           if (!queueStarved) {
-            this.metrics.ttsQueueUnderflows += 1;
+            this.metrics.outputQueueUnderflows += 1;
             queueStarved = true;
           }
-          await sleep(10);
+          await sleep(8);
           continue;
         }
         queueStarved = false;
 
-        const frame = frameQueue.shift();
+        const frame = this.outputFrameQueue.shift();
         if (!frame) continue;
-
-        const now = Date.now();
-        if (nextFrameAtMs > now) {
-          await sleep(nextFrameAtMs - now);
-        } else if (now - nextFrameAtMs > 120) {
-          // Her-synchroniseer klok na event-loop/jitter spikes, voorkom burst playback.
-          nextFrameAtMs = now;
-        }
-
         this.sendTwilioMedia(frame);
-        this.metrics.ttsFramesSent += 1;
-        this.metrics.ttsBytesSent += frame.length;
-        nextFrameAtMs += 20;
+        this.metrics.assistantFramesSent += 1;
+        await sleep(20);
       }
-
-      await producerPromise;
-      if (producerError && !speechAbort.signal.aborted) {
-        throw producerError;
-      }
-      this.metrics.totalTtsPlaybackMs += Date.now() - ttsTurnStartedAtMs;
-    } catch (error) {
-      if (speechAbort.signal.aborted) {
-        this.logger.debug('TTS playback geannuleerd (interrupt)');
-        return;
-      }
-      this.logger.error('TTS playback fout', error);
     } finally {
-      if (this.activeSpeechAbort === speechAbort) {
-        this.activeSpeechAbort = null;
-      }
+      this.metrics.totalAssistantPlaybackMs += Date.now() - pumpStartedAtMs;
       this.lastAssistantPlaybackEndedAtMs = Date.now();
+      this.assistantPlaybackStartedAtMs = 0;
+      this.assistantOutputActive = false;
+      this.assistantOutputActiveUntilMs = Date.now() + 220;
+      this.outputPumpRunning = false;
+
+      if (!this.isClosed && this.outputFrameQueue.length > 0) {
+        void this.startOutputPump();
+      }
     }
   }
 
   private interrupt(reason: string, cancelOpenAiResponse = true): void {
-    if (this.activeSpeechAbort) {
-      this.activeSpeechAbort.abort();
-      this.activeSpeechAbort = null;
-    }
-    this.bargeInFramesAboveThreshold = 0;
-
     if (cancelOpenAiResponse) {
       this.brain.cancelResponse();
     }
+
+    this.openAiResponseActive = false;
+    this.assistantOutputActive = false;
+    this.assistantOutputActiveUntilMs = 0;
+    this.outputFrameQueue.length = 0;
+    this.outputFrameCarry = Buffer.alloc(0);
+    this.assistantPlaybackStartedAtMs = 0;
+    this.lastAssistantPlaybackEndedAtMs = Date.now();
+    this.bargeInFramesAboveThreshold = 0;
 
     if (this.streamSid) {
       this.sendTwilioEvent({
@@ -465,14 +360,14 @@ export class CallBridgeSession {
     });
   }
 
-  private sendTwilioMedia(chunk: Buffer): void {
-    if (!this.streamSid || !chunk.length) return;
+  private sendTwilioMedia(frame: Buffer): void {
+    if (!this.streamSid || !frame.length) return;
 
     this.sendTwilioEvent({
       event: 'media',
       streamSid: this.streamSid,
       media: {
-        payload: chunk.toString('base64'),
+        payload: frame.toString('base64'),
       },
     });
   }
@@ -487,10 +382,6 @@ export class CallBridgeSession {
     this.isClosed = true;
 
     this.interrupt(`shutdown:${reason}`, false);
-    if (this.pendingSpeechStopCommitTimer) {
-      clearTimeout(this.pendingSpeechStopCommitTimer);
-      this.pendingSpeechStopCommitTimer = null;
-    }
     this.brain.close();
 
     if (this.ws.readyState === WebSocket.OPEN) {
@@ -505,8 +396,8 @@ export class CallBridgeSession {
 
     const durationMs = Date.now() - this.metrics.startedAtMs;
     const firstAssistantResponseLatencyMs =
-      this.streamStartedAtMs && this.firstAssistantTextAtMs
-        ? Math.max(0, this.firstAssistantTextAtMs - this.streamStartedAtMs)
+      this.streamStartedAtMs && this.firstAssistantAudioAtMs
+        ? Math.max(0, this.firstAssistantAudioAtMs - this.streamStartedAtMs)
         : null;
     this.logger.info('Bridge sessie metrics', {
       callSid: this.callSid || null,
@@ -520,13 +411,12 @@ export class CallBridgeSession {
       droppedDuringPlaybackEvents: this.metrics.droppedDuringPlaybackEvents,
       droppedPostPlaybackEchoEvents: this.metrics.droppedPostPlaybackEchoEvents,
       bargeInInterrupts: this.metrics.bargeInInterrupts,
-      assistantTurnsPlayed: this.metrics.assistantTurnsPlayed,
-      assistantTurnsSuppressed: this.metrics.assistantTurnsSuppressed,
-      ttsFramesSent: this.metrics.ttsFramesSent,
-      ttsBytesSent: this.metrics.ttsBytesSent,
-      ttsQueueMaxDepth: this.metrics.ttsQueueMaxDepth,
-      ttsQueueUnderflows: this.metrics.ttsQueueUnderflows,
-      totalTtsPlaybackMs: this.metrics.totalTtsPlaybackMs,
+      assistantAudioChunks: this.metrics.assistantAudioChunks,
+      assistantAudioBytes: this.metrics.assistantAudioBytes,
+      assistantFramesSent: this.metrics.assistantFramesSent,
+      outputQueueMaxDepth: this.metrics.outputQueueMaxDepth,
+      outputQueueUnderflows: this.metrics.outputQueueUnderflows,
+      totalAssistantPlaybackMs: this.metrics.totalAssistantPlaybackMs,
     });
   }
 }

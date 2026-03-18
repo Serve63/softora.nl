@@ -69,8 +69,7 @@ async function main(): Promise<void> {
       publicWssUrl: config.server.publicWssUrl,
       voiceWebhookPath: config.twilio.voiceWebhookPath,
       realtimeModel: config.openai.realtimeModel,
-      elevenVoiceId: config.elevenlabs.voiceId,
-      elevenOutputFormat: config.elevenlabs.outputFormat,
+      realtimeVoice: config.openai.voice,
       agentPromptSource: config.agent.promptSource,
       agentPromptChars: config.agent.systemPrompt.length,
     });

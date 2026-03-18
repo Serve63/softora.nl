@@ -1,33 +1,30 @@
-# AI Coldcaller MVP (Directe Implementatie)
+# AI Coldcaller MVP (Twilio + OpenAI Realtime 1.5)
 
-Directe eigen stack zonder Vapi / ElevenAgents:
+Directe stack zonder Vapi/ElevenAgents:
 
-- Twilio = telefoonnummer + live call + Media Streams
-- OpenAI Realtime 1.5 = gesprekbrein (luisteren + beslissen wat gezegd wordt)
-- ElevenLabs = stemlaag (TTS)
-- Node.js + TypeScript backend = regellaag
+- Twilio = telefoonnummer + call + media stream
+- OpenAI Realtime 1.5 = luisteren + redeneren + stem-output
+- Node.js + TypeScript = bridge
 
-## Wat deze MVP doet
+## Wat deze versie doet
 
-1. Twilio webhook neemt inkomende calls aan en opent een Media Stream naar je backend.
-2. Backend stuurt inbound call-audio door naar OpenAI Realtime.
-3. OpenAI bepaalt het tekstantwoord.
-4. Backend stuurt die tekst naar ElevenLabs streaming TTS.
-5. ElevenLabs audio (u-law 8k) gaat terug de Twilio call in.
-6. Bij interruptie (prospect praat erdoorheen) stopt backend direct lopende playback.
+1. Twilio ontvangt de call en opent `/twilio-media`.
+2. Backend stuurt inbound audio naar OpenAI Realtime.
+3. OpenAI Realtime antwoordt direct met audio (g711_ulaw).
+4. Backend stuurt die audio direct terug naar Twilio.
+5. Barge-in werkt: als beller door de AI praat, wordt current output gecanceld.
 
-## Architectuur (MVP)
+## Architectuur
 
-`Caller <-> Twilio <-> WebSocket /twilio-media <-> OpenAI Realtime (text brain) <-> ElevenLabs TTS <-> Twilio`
+`Caller <-> Twilio <-> /twilio-media <-> OpenAI Realtime (audio in/out)`
 
 ## Projectstructuur
 
-```
+```txt
 coldcaller-mvp/
   src/
     audio/ulaw.ts
     bridge/callBridgeSession.ts
-    elevenlabs/ttsClient.ts
     openai/realtimeClient.ts
     twilio/routes.ts
     utils/logger.ts
@@ -40,92 +37,55 @@ coldcaller-mvp/
 
 ## Lokaal starten
 
-1. Ga naar de map:
-   ```bash
-   cd coldcaller-mvp
-   ```
-2. Installeer dependencies:
-   ```bash
-   npm install
-   ```
-3. Maak je env file:
-   ```bash
-   cp .env.example .env
-   ```
-4. Vul je keys en IDs in `.env`.
-5. Start in dev mode:
-   ```bash
-   npm run dev
-   ```
-6. Expose lokaal met HTTPS/WSS (bijv. ngrok of Cloudflare Tunnel).
+1. `cd coldcaller-mvp`
+2. `npm install`
+3. `cp .env.example .env`
+4. Vul `.env`
+5. `npm run dev`
 
-## Benodigde `.env` variabelen
+## Belangrijkste env vars
 
-Zie `.env.example`. Belangrijkste:
+- `PUBLIC_BASE_URL`
+- `PUBLIC_WSS_URL`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_PHONE_NUMBER`
+- `OPENAI_API_KEY`
+- `OPENAI_REALTIME_MODEL` (default `gpt-realtime`)
+- `OPENAI_REALTIME_VOICE` (bijv. `shimmer`)
+- `OPENAI_REALTIME_VAD_THRESHOLD`
+- `OPENAI_REALTIME_VAD_PREFIX_PADDING_MS`
+- `OPENAI_REALTIME_VAD_SILENCE_DURATION_MS`
+- `AGENT_SYSTEM_PROMPT` (optioneel, maar praktisch altijd zetten)
 
-- `PUBLIC_BASE_URL` = publieke https url van je backend
-- `PUBLIC_WSS_URL` = publieke wss url naar `/twilio-media`
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
-- `OPENAI_API_KEY`, `OPENAI_REALTIME_MODEL`
-- `OPENAI_REALTIME_VAD_THRESHOLD`, `OPENAI_REALTIME_VAD_PREFIX_PADDING_MS`, `OPENAI_REALTIME_VAD_SILENCE_DURATION_MS`
-- `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`
+## Twilio instellen
 
-## Handmatige Twilio stappen (jij moet doen)
-
-1. Open Twilio Console -> Phone Numbers -> jouw nummer.
-2. Zet Voice webhook op:
+1. Twilio Console -> Phone Numbers -> jouw nummer.
+2. Voice webhook:
    - URL: `https://<jouw-domein>/twilio/voice`
    - Method: `POST`
-3. Save config.
-4. Test inbound: bel je Twilio-nummer.
-5. Test outbound (optioneel):
-   ```bash
-   curl -X POST https://<jouw-domein>/api/calls/start \
-     -H 'content-type: application/json' \
-     -d '{"to":"+31XXXXXXXXX"}'
-   ```
+3. Save.
 
-## Handmatige OpenAI stappen (jij moet doen)
+## Outbound test (optioneel)
 
-1. Zorg dat je API key Realtime toegang heeft.
-2. Gebruik model in `.env`:
-   - standaard: `gpt-realtime`
-3. Geen dashboard-flowbuilder nodig; backend doet direct websocket koppeling.
-
-## Handmatige ElevenLabs stappen (jij moet doen)
-
-1. Maak/kies een voice in ElevenLabs.
-2. Zet in `.env`:
-   - `ELEVENLABS_API_KEY`
-   - `ELEVENLABS_VOICE_ID`
-3. Voor `eleven_v3` gebruikt MVP `output_format=pcm_16000` en transcodeert intern naar u-law 8k voor Twilio.
-
-## Waarom deze ElevenLabs route
-
-Voor MVP-latency en stabiliteit is directe HTTP streaming TTS de snelste haalbare route:
-- geen extra no-code laag
-- geen ffmpeg transcode pad nodig
-- met `eleven_v3` gebruikt de backend `pcm_16000` (stabiel) en transcodeert intern naar `u-law 8k` voor Twilio
-- automatische fallback aanwezig: als een gekozen format niet geaccepteerd wordt, valt de backend terug naar `pcm_16000`.
+```bash
+curl -X POST https://<jouw-domein>/api/calls/start \
+  -H 'content-type: application/json' \
+  -d '{"to":"+31XXXXXXXXX"}'
+```
 
 ## Logging
 
-Logs zijn JSON in stdout, inclusief:
-- Twilio stream start/stop
-- OpenAI connectie/events
-- Assistant tekstoutput
-- TTS errors/interrupts
+Belangrijk in logs:
 
-## Bekende MVP-beperkingen
+- `Twilio stream gestart`
+- `OpenAI Realtime socket verbonden`
+- `Bridge sessie metrics`
+- `OpenAI realtime event error` (als er iets kapot gaat)
 
-- Geen CRM, agenda, analytics of afspraakworkflow.
-- Geen persistente call-opslag.
-- E2E test zonder jouw keys/telefooninstellingen kan niet volledig automatisch.
+## Troubleshooting
 
-## Snelle troubleshooting
-
-- **Geen audio terug in call**: check `ELEVENLABS_OUTPUT_FORMAT` (`pcm_16000` voor v3) en kijk naar TTS error logs.
-- **Call hangt direct op**: check Twilio webhook URL + publieke HTTPS bereikbaarheid.
-- **Model reageert te vroeg / luistert slecht**: verhoog `OPENAI_REALTIME_VAD_SILENCE_DURATION_MS` (bijv. 900-1100).
-- **Hoge latency**: controleer tunnel, regio en `ELEVENLABS_OPTIMIZE_LATENCY`.
-- **Modelfout OpenAI**: gebruik model dat in jouw account Realtime access heeft.
+- Geen audio: check of Twilio webhook op `/twilio/voice` staat.
+- Te vroeg reageren: verhoog `OPENAI_REALTIME_VAD_SILENCE_DURATION_MS` (bv. `950` of `1100`).
+- Te sloom: verlaag `OPENAI_REALTIME_VAD_SILENCE_DURATION_MS` (bv. `700`).
+- Rare antwoorden: check `AGENT_SYSTEM_PROMPT` en logs op transcript.
