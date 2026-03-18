@@ -34,6 +34,8 @@ export class CallBridgeSession {
   private isClosed = false;
   private activeSpeechAbort: AbortController | null = null;
   private assistantPlaybackStartedAtMs = 0;
+  private lastAssistantPlaybackEndedAtMs = 0;
+  private lastAssistantTurnStartedAtMs = 0;
   private bargeInFramesAboveThreshold = 0;
   private assistantTurnsSent = 0;
   private callerActivitySinceLastAssistant = false;
@@ -59,6 +61,7 @@ export class CallBridgeSession {
           }
           this.callerActivitySinceLastAssistant = false;
           this.assistantTurnsSent += 1;
+          this.lastAssistantTurnStartedAtMs = Date.now();
           void this.speakAssistantText(text);
         },
         onCallerSpeechStart: () => {
@@ -164,6 +167,7 @@ export class CallBridgeSession {
 
     const audioBuffer = Buffer.from(base64Payload, 'base64');
     const energy = estimateUlawEnergy(audioBuffer);
+    const now = Date.now();
     const isAssistantSpeaking = Boolean(this.activeSpeechAbort);
     let interruptedForBargeIn = false;
 
@@ -196,6 +200,17 @@ export class CallBridgeSession {
       return;
     }
 
+    // Direct na het einde van TTS negeren we lage-energie echo-restjes.
+    const postPlaybackEchoWindowMs = 550;
+    const postPlaybackHighEnergyThreshold = 0.05;
+    if (
+      !isAssistantSpeaking &&
+      now - this.lastAssistantPlaybackEndedAtMs < postPlaybackEchoWindowMs &&
+      energy < postPlaybackHighEnergyThreshold
+    ) {
+      return;
+    }
+
     this.brain.appendInputAudio(base64Payload);
   }
 
@@ -203,7 +218,16 @@ export class CallBridgeSession {
     if (this.assistantTurnsSent === 0) {
       return true;
     }
-    return this.callerActivitySinceLastAssistant;
+    if (!this.callerActivitySinceLastAssistant) {
+      return false;
+    }
+
+    const minGapBetweenAssistantTurnsMs = 1200;
+    if (Date.now() - this.lastAssistantTurnStartedAtMs < minGapBetweenAssistantTurnsMs) {
+      return false;
+    }
+
+    return true;
   }
 
   private async speakAssistantText(text: string): Promise<void> {
@@ -248,6 +272,7 @@ export class CallBridgeSession {
       if (this.activeSpeechAbort === speechAbort) {
         this.activeSpeechAbort = null;
       }
+      this.lastAssistantPlaybackEndedAtMs = Date.now();
     }
   }
 
