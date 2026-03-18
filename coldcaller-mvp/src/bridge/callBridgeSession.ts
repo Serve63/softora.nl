@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import type { AppConfig } from '../config.js';
-import { chunkUlaw, estimateUlawEnergy, sleep } from '../audio/ulaw.js';
+import { estimateUlawEnergy, sleep } from '../audio/ulaw.js';
 import { ElevenLabsTtsClient } from '../elevenlabs/ttsClient.js';
 import { OpenAiRealtimeTextBrain } from '../openai/realtimeClient.js';
 import type { Logger } from '../utils/logger.js';
@@ -285,25 +285,40 @@ export class CallBridgeSession {
       let nextFrameAtMs = 0;
       let queueStarved = false;
       const ttsTurnStartedAtMs = Date.now();
+      let frameCarry = Buffer.alloc(0);
+
+      const enqueueFrame = (frame: Buffer) => {
+        if (this.isClosed || speechAbort.signal.aborted) return;
+        if (frameQueue.length < maxQueueFrames) {
+          frameQueue.push(frame);
+          if (frameQueue.length > this.metrics.ttsQueueMaxDepth) {
+            this.metrics.ttsQueueMaxDepth = frameQueue.length;
+          }
+        }
+      };
 
       const producerPromise = this.tts.streamUlaw(
         cleaned,
         async (chunk) => {
           if (this.isClosed || speechAbort.signal.aborted) return;
-          const frames = chunkUlaw(chunk, 160);
-          for (const frame of frames) {
-            if (this.isClosed || speechAbort.signal.aborted) return;
-            if (frameQueue.length < maxQueueFrames) {
-              frameQueue.push(frame);
-              if (frameQueue.length > this.metrics.ttsQueueMaxDepth) {
-                this.metrics.ttsQueueMaxDepth = frameQueue.length;
-              }
-            }
+          const combined = frameCarry.length ? Buffer.concat([frameCarry, chunk]) : chunk;
+          let offset = 0;
+          while (offset + 160 <= combined.length) {
+            enqueueFrame(combined.subarray(offset, offset + 160));
+            offset += 160;
           }
+          frameCarry = Buffer.from(combined.subarray(offset));
         },
         speechAbort.signal
       )
         .then(() => {
+          if (!this.isClosed && !speechAbort.signal.aborted && frameCarry.length > 0) {
+            // Laatste frame opvullen zodat pacing 20ms stabiel blijft.
+            const padded = Buffer.alloc(160, 0xff);
+            frameCarry.copy(padded, 0, 0, frameCarry.length);
+            enqueueFrame(padded);
+            frameCarry = Buffer.alloc(0);
+          }
           producerDone = true;
         })
         .catch((error) => {
