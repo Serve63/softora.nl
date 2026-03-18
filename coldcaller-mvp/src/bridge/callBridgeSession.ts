@@ -63,7 +63,9 @@ export class CallBridgeSession {
         },
         onCallerSpeechStart: () => {
           this.logger.debug('Caller speech gestart (OpenAI VAD)');
-          this.callerActivitySinceLastAssistant = true;
+          if (!this.activeSpeechAbort) {
+            this.callerActivitySinceLastAssistant = true;
+          }
         },
         onCallerSpeechStop: () => {
           this.logger.debug('Caller speech gestopt (OpenAI VAD)');
@@ -162,12 +164,14 @@ export class CallBridgeSession {
 
     const audioBuffer = Buffer.from(base64Payload, 'base64');
     const energy = estimateUlawEnergy(audioBuffer);
+    const isAssistantSpeaking = Boolean(this.activeSpeechAbort);
+    let interruptedForBargeIn = false;
 
-    if (energy >= 0.02) {
+    if (!isAssistantSpeaking && energy >= 0.02) {
       this.callerActivitySinceLastAssistant = true;
     }
 
-    if (this.activeSpeechAbort) {
+    if (isAssistantSpeaking) {
       const now = Date.now();
       const minPlaybackMsBeforeBargeIn = 300;
       const bargeInEnergyThreshold = 0.03;
@@ -182,7 +186,14 @@ export class CallBridgeSession {
       if (this.bargeInFramesAboveThreshold >= bargeInFramesNeeded) {
         this.bargeInFramesAboveThreshold = 0;
         this.interrupt('inbound_energy_detected');
+        interruptedForBargeIn = true;
       }
+    }
+
+    // Voorkom echo-loop: tijdens TTS-playback géén inbound audio naar OpenAI sturen,
+    // behalve als er echte barge-in is gedetecteerd en playback net is onderbroken.
+    if (isAssistantSpeaking && !interruptedForBargeIn) {
+      return;
     }
 
     this.brain.appendInputAudio(base64Payload);
