@@ -71,6 +71,7 @@ export class CallBridgeSession {
         apiKey: this.config.openai.apiKey,
         model: this.config.openai.realtimeModel,
         voice: this.config.openai.voice,
+        maxOutputTokens: this.config.openai.maxOutputTokens,
         systemPrompt: this.config.agent.systemPrompt,
         vadThreshold: this.config.openai.vadThreshold,
         vadPrefixPaddingMs: this.config.openai.vadPrefixPaddingMs,

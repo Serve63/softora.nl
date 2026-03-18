@@ -70,6 +70,7 @@ async function main(): Promise<void> {
       voiceWebhookPath: config.twilio.voiceWebhookPath,
       realtimeModel: config.openai.realtimeModel,
       realtimeVoice: config.openai.voice,
+      realtimeMaxOutputTokens: config.openai.maxOutputTokens,
       agentPromptSource: config.agent.promptSource,
       agentPromptChars: config.agent.systemPrompt.length,
     });

@@ -20,6 +20,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_REALTIME_MODEL: z.string().default('gpt-realtime'),
   OPENAI_REALTIME_VOICE: z.string().default('shimmer'),
+  OPENAI_REALTIME_MAX_OUTPUT_TOKENS: z.string().default('220'),
   OPENAI_REALTIME_VAD_THRESHOLD: z.string().default('0.62'),
   OPENAI_REALTIME_VAD_PREFIX_PADDING_MS: z.string().default('320'),
   OPENAI_REALTIME_VAD_SILENCE_DURATION_MS: z.string().default('800'),
@@ -79,6 +80,10 @@ export function loadConfig() {
       apiKey: env.OPENAI_API_KEY,
       realtimeModel: env.OPENAI_REALTIME_MODEL,
       voice: parseOpenAiVoice(env.OPENAI_REALTIME_VOICE),
+      maxOutputTokens: Math.max(
+        80,
+        Math.round(parseNumber('OPENAI_REALTIME_MAX_OUTPUT_TOKENS', env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS))
+      ),
       vadThreshold: Math.max(0, Math.min(1, parseNumber('OPENAI_REALTIME_VAD_THRESHOLD', env.OPENAI_REALTIME_VAD_THRESHOLD))),
       vadPrefixPaddingMs: Math.max(
         0,

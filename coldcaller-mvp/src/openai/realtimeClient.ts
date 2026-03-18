@@ -16,6 +16,7 @@ export type OpenAiRealtimeConfig = {
   apiKey: string;
   model: string;
   voice: string;
+  maxOutputTokens: number;
   systemPrompt: string;
   vadThreshold: number;
   vadPrefixPaddingMs: number;
@@ -137,7 +138,7 @@ Belangrijke regels:
 - Spreek ALTIJD Nederlands (nl-NL).
 - Blijf strikt in de rol en bedrijfsidentiteit uit de system prompt.
 - Luister eerst en reageer direct op wat de prospect net zei.
-- Geef korte, zakelijke antwoorden (max 2-3 zinnen).
+- Geef compacte maar volledige antwoorden (meestal 2-4 zinnen).
 - Stel per beurt maximaal 1 vraag.
 - Verzin nooit wat de prospect gezegd zou hebben.
 - Bij een expliciete afwijzing (zoals "geen interesse", "geen behoefte", "nee bedankt"): bedank kort en sluit netjes af zonder nieuwe afspraakvraag.
@@ -147,7 +148,7 @@ Belangrijke regels:
       input_audio_format: 'g711_ulaw',
       output_audio_format: 'g711_ulaw',
       temperature: 0.6,
-      max_response_output_tokens: 90,
+      max_response_output_tokens: this.cfg.maxOutputTokens,
       turn_detection: {
         type: 'server_vad',
         threshold: this.cfg.vadThreshold,
