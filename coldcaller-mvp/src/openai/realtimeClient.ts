@@ -113,23 +113,28 @@ export class OpenAiRealtimeTextBrain {
       return;
     }
 
+    this.logger.debug('OpenAI commit + response.create', { reason });
+    this.send({ type: 'input_audio_buffer.commit' });
+    this.requestResponse(reason);
+    this.hasUncommittedAudio = false;
+  }
+
+  requestResponse(reason = 'manual'): void {
     const now = Date.now();
     if (now - this.lastCommitAndRespondAtMs < 250) {
       return;
     }
     this.lastCommitAndRespondAtMs = now;
 
-    this.logger.debug('OpenAI commit + response.create', { reason });
-    this.send({ type: 'input_audio_buffer.commit' });
+    this.logger.debug('OpenAI response.create', { reason });
     this.send({
       type: 'response.create',
       response: {
         modalities: ['text'],
         instructions:
-          'Antwoord uitsluitend in vloeiend Nederlands (nl-NL). Gebruik nooit Spaans of Engels, tenzij de gebruiker daar expliciet om vraagt. Verzin nooit een reactie van de prospect en ga alleen verder na een expliciet antwoord.',
+          'Antwoord uitsluitend in vloeiend Nederlands (nl-NL). Gebruik nooit Spaans of Engels, tenzij de gebruiker daar expliciet om vraagt. Verzin nooit een reactie van de prospect en ga alleen verder na een expliciet antwoord. Houd elk antwoord kort: maximaal 1 zin + 1 vraag.',
       },
     });
-    this.hasUncommittedAudio = false;
   }
 
   close(): void {
@@ -162,7 +167,7 @@ Belangrijke regels:
       turn_detection: {
         type: 'server_vad',
         threshold: this.cfg.vadThreshold,
-        create_response: true,
+        create_response: false,
         interrupt_response: true,
       },
     };

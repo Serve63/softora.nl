@@ -31,6 +31,9 @@ export class CallBridgeSession {
 
   private streamSid = '';
   private callSid = '';
+  private streamStartedAtMs = 0;
+  private firstAssistantTextAtMs = 0;
+  private initialOpeningRequested = false;
   private isClosed = false;
   private activeSpeechAbort: AbortController | null = null;
   private assistantPlaybackStartedAtMs = 0;
@@ -72,6 +75,9 @@ export class CallBridgeSession {
       },
       {
         onAssistantText: (text) => {
+          if (!this.firstAssistantTextAtMs) {
+            this.firstAssistantTextAtMs = Date.now();
+          }
           if (!this.shouldPlayAssistantText()) {
             this.metrics.assistantTurnsSuppressed += 1;
             this.logger.debug('Assistant antwoord genegeerd (geen nieuwe caller activiteit)');
@@ -91,6 +97,7 @@ export class CallBridgeSession {
         },
         onCallerSpeechStop: () => {
           this.logger.debug('Caller speech gestopt (OpenAI VAD)');
+          this.brain.requestResponseFromInputBuffer('openai_vad_speech_stopped');
         },
         onCallerTranscript: (text) => {
           this.logger.info('Caller transcript', {
@@ -150,6 +157,8 @@ export class CallBridgeSession {
     if (eventType === 'start') {
       this.streamSid = String(message.start?.streamSid || message.streamSid || '');
       this.callSid = String(message.start?.callSid || '');
+      this.streamStartedAtMs = Date.now();
+      this.scheduleInitialOpeningIfNeeded();
       this.logger.info('Twilio stream gestart', {
         callSid: this.callSid || null,
         streamSid: this.streamSid || null,
@@ -179,6 +188,18 @@ export class CallBridgeSession {
       this.shutdown('twilio_stop_event');
       return;
     }
+  }
+
+  private scheduleInitialOpeningIfNeeded(): void {
+    if (this.initialOpeningRequested) return;
+    this.initialOpeningRequested = true;
+
+    setTimeout(() => {
+      if (this.isClosed) return;
+      if (this.assistantTurnsSent > 0) return;
+      if (this.callerActivitySinceLastAssistant) return;
+      this.brain.requestResponse('initial_opening');
+    }, 450);
   }
 
   private handleInboundAudio(base64Payload: string): void {
@@ -443,10 +464,15 @@ export class CallBridgeSession {
     });
 
     const durationMs = Date.now() - this.metrics.startedAtMs;
+    const firstAssistantResponseLatencyMs =
+      this.streamStartedAtMs && this.firstAssistantTextAtMs
+        ? Math.max(0, this.firstAssistantTextAtMs - this.streamStartedAtMs)
+        : null;
     this.logger.info('Bridge sessie metrics', {
       callSid: this.callSid || null,
       streamSid: this.streamSid || null,
       durationMs,
+      firstAssistantResponseLatencyMs,
       inboundMediaEvents: this.metrics.inboundMediaEvents,
       inboundAudioBytes: this.metrics.inboundAudioBytes,
       forwardedMediaEvents: this.metrics.forwardedMediaEvents,
