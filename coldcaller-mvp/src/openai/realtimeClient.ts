@@ -70,9 +70,12 @@ export class OpenAiRealtimeTextBrain {
     this.socket.on('message', (raw) => this.handleIncoming(raw));
     this.socket.on('close', (code, reason) => {
       this.connected = false;
-      this.logger.warn('OpenAI Realtime socket gesloten', {
+      const closeReason = reason.toString();
+      const isExpectedShutdown = code === 1000 && closeReason === 'bridge_shutdown';
+      const logFn = isExpectedShutdown ? this.logger.info.bind(this.logger) : this.logger.warn.bind(this.logger);
+      logFn('OpenAI Realtime socket gesloten', {
         code,
-        reason: reason.toString(),
+        reason: closeReason,
       });
     });
     this.socket.on('error', (error) => {
