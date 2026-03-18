@@ -148,7 +148,6 @@ Belangrijke regels:
 - Stel per beurt maximaal 1 vraag.
 - Nooit gedichten, verhalen, recepten of random entertainmenttekst.`,
       modalities: ['text'],
-      // Compat voor verschillende Realtime payload-shapes.
       input_audio_format: 'g711_ulaw',
       temperature: 0.4,
       max_response_output_tokens: 180,
@@ -157,17 +156,6 @@ Belangrijke regels:
         threshold: this.cfg.vadThreshold,
         create_response: true,
         interrupt_response: true,
-      },
-      audio: {
-        input: {
-          format: { type: 'audio/pcmu' },
-          turn_detection: {
-            type: 'server_vad',
-            threshold: this.cfg.vadThreshold,
-            create_response: true,
-            interrupt_response: true,
-          },
-        },
       },
     };
 
