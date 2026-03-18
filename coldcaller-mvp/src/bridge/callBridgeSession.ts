@@ -242,7 +242,8 @@ export class CallBridgeSession {
   }
 
   private isAssistantSpeaking(now: number): boolean {
-    if (this.openAiResponseActive) return true;
+    // Alleen als er daadwerkelijk audio-output is (of net was) behandelen we dit als "assistant spreekt".
+    // Een actieve OpenAI response zonder audio mag inbound caller-audio niet blokkeren.
     if (this.assistantOutputActive) return true;
     if (this.outputFrameQueue.length > 0) return true;
     return now < this.assistantOutputActiveUntilMs;
