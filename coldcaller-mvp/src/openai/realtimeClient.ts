@@ -16,7 +16,6 @@ export type OpenAiRealtimeConfig = {
   apiKey: string;
   model: string;
   voice: string;
-  maxOutputTokens: number;
   systemPrompt: string;
   vadThreshold: number;
   vadPrefixPaddingMs: number;
@@ -148,7 +147,6 @@ Belangrijke regels:
       input_audio_format: 'g711_ulaw',
       output_audio_format: 'g711_ulaw',
       temperature: 0.6,
-      max_response_output_tokens: this.cfg.maxOutputTokens,
       turn_detection: {
         type: 'server_vad',
         threshold: this.cfg.vadThreshold,
