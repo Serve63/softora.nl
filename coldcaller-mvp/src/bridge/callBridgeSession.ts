@@ -177,9 +177,9 @@ export class CallBridgeSession {
 
     if (isAssistantSpeaking) {
       const now = Date.now();
-      const minPlaybackMsBeforeBargeIn = 300;
-      const bargeInEnergyThreshold = 0.03;
-      const bargeInFramesNeeded = 3;
+      const minPlaybackMsBeforeBargeIn = 900;
+      const bargeInEnergyThreshold = 0.06;
+      const bargeInFramesNeeded = 8;
 
       if (now - this.assistantPlaybackStartedAtMs >= minPlaybackMsBeforeBargeIn && energy >= bargeInEnergyThreshold) {
         this.bargeInFramesAboveThreshold += 1;
@@ -250,11 +250,12 @@ export class CallBridgeSession {
 
     try {
       const frameQueue: Buffer[] = [];
-      const prebufferFrames = 6; // ~120ms bij 20ms frames
-      const maxQueueFrames = 300; // cap om geheugen te beschermen (~6s audio)
+      const prebufferFrames = 14; // ~280ms bij 20ms frames
+      const maxQueueFrames = 2400; // ~48s audio cap, voorkomt onnodig frame-droppen
       let producerDone = false;
       let producerError: Error | null = null;
       let playbackStarted = false;
+      let nextFrameAtMs = 0;
 
       const producerPromise = this.tts.streamUlaw(
         cleaned,
@@ -263,9 +264,8 @@ export class CallBridgeSession {
           const frames = chunkUlaw(chunk, 160);
           for (const frame of frames) {
             if (this.isClosed || speechAbort.signal.aborted) return;
-            frameQueue.push(frame);
-            if (frameQueue.length > maxQueueFrames) {
-              frameQueue.shift();
+            if (frameQueue.length < maxQueueFrames) {
+              frameQueue.push(frame);
             }
           }
         },
@@ -286,6 +286,7 @@ export class CallBridgeSession {
             continue;
           }
           playbackStarted = frameQueue.length > 0 || producerDone;
+          nextFrameAtMs = Date.now();
         }
 
         if (!frameQueue.length) {
@@ -296,8 +297,17 @@ export class CallBridgeSession {
 
         const frame = frameQueue.shift();
         if (!frame) continue;
+
+        const now = Date.now();
+        if (nextFrameAtMs > now) {
+          await sleep(nextFrameAtMs - now);
+        } else if (now - nextFrameAtMs > 120) {
+          // Her-synchroniseer klok na event-loop/jitter spikes, voorkom burst playback.
+          nextFrameAtMs = now;
+        }
+
         this.sendTwilioMedia(frame);
-        await sleep(20);
+        nextFrameAtMs += 20;
       }
 
       await producerPromise;

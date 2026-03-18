@@ -25,7 +25,7 @@ const envSchema = z.object({
   ELEVENLABS_VOICE_ID: z.string().min(1),
   ELEVENLABS_MODEL_ID: z.string().default('eleven_turbo_v2_5'),
   ELEVENLABS_OUTPUT_FORMAT: z.string().default('ulaw_8000'),
-  ELEVENLABS_OPTIMIZE_LATENCY: z.string().default('2'),
+  ELEVENLABS_OPTIMIZE_LATENCY: z.string().default('3'),
   ELEVENLABS_STABILITY: z.string().default('0.78'),
   ELEVENLABS_SIMILARITY_BOOST: z.string().default('0.78'),
   ELEVENLABS_USE_SPEAKER_BOOST: z.string().default('true'),
