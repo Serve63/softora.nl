@@ -259,10 +259,31 @@ Belangrijke regels:
 
     if (type === 'response.output_text.done' || type === 'response.text.done') {
       const responseId = this.extractResponseId(event) || 'unknown';
-      const finalText = String(event.text || event.delta || '');
+      const finalText = String(event.text || event.delta || '').trim();
       if (!finalText) return;
-      const existing = this.pendingTextByResponseId.get(responseId) || '';
-      this.pendingTextByResponseId.set(responseId, `${existing}${finalText}`);
+      const existing = (this.pendingTextByResponseId.get(responseId) || '').trim();
+
+      // Sommige Realtime events leveren op *.done de volledige tekst terug.
+      // Voorkom dubbele zinnen wanneer delta's al zijn opgebouwd.
+      if (!existing) {
+        this.pendingTextByResponseId.set(responseId, finalText);
+        return;
+      }
+
+      if (finalText === existing) {
+        return;
+      }
+
+      if (finalText.startsWith(existing)) {
+        this.pendingTextByResponseId.set(responseId, finalText);
+        return;
+      }
+
+      if (existing.startsWith(finalText) || existing.endsWith(finalText)) {
+        return;
+      }
+
+      this.pendingTextByResponseId.set(responseId, `${existing} ${finalText}`.trim());
       return;
     }
 
