@@ -149,7 +149,7 @@ Belangrijke regels:
 - Nooit gedichten, verhalen, recepten of random entertainmenttekst.`,
       modalities: ['text'],
       input_audio_format: 'g711_ulaw',
-      temperature: 0.4,
+      temperature: 0.6,
       max_response_output_tokens: 180,
       turn_detection: {
         type: 'server_vad',
