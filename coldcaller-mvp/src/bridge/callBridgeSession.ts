@@ -39,9 +39,11 @@ export class CallBridgeSession {
   private assistantPlaybackStartedAtMs = 0;
   private lastAssistantPlaybackEndedAtMs = 0;
   private lastAssistantTurnStartedAtMs = 0;
+  private callerSpeechStartedAtMs = 0;
   private bargeInFramesAboveThreshold = 0;
   private assistantTurnsSent = 0;
   private callerActivitySinceLastAssistant = false;
+  private pendingSpeechStopCommitTimer: NodeJS.Timeout | null = null;
   private readonly metrics = {
     startedAtMs: Date.now(),
     inboundMediaEvents: 0,
@@ -72,6 +74,8 @@ export class CallBridgeSession {
         model: this.config.openai.realtimeModel,
         systemPrompt: this.config.agent.systemPrompt,
         vadThreshold: this.config.openai.vadThreshold,
+        vadPrefixPaddingMs: this.config.openai.vadPrefixPaddingMs,
+        vadSilenceDurationMs: this.config.openai.vadSilenceDurationMs,
       },
       {
         onAssistantText: (text) => {
@@ -91,13 +95,18 @@ export class CallBridgeSession {
         },
         onCallerSpeechStart: () => {
           this.logger.debug('Caller speech gestart (OpenAI VAD)');
+          this.callerSpeechStartedAtMs = Date.now();
+          if (this.pendingSpeechStopCommitTimer) {
+            clearTimeout(this.pendingSpeechStopCommitTimer);
+            this.pendingSpeechStopCommitTimer = null;
+          }
           if (!this.activeSpeechAbort) {
             this.callerActivitySinceLastAssistant = true;
           }
         },
         onCallerSpeechStop: () => {
           this.logger.debug('Caller speech gestopt (OpenAI VAD)');
-          this.brain.requestResponseFromInputBuffer('openai_vad_speech_stopped');
+          this.scheduleCommitAfterSpeechStop();
         },
         onCallerTranscript: (text) => {
           this.logger.info('Caller transcript', {
@@ -200,6 +209,33 @@ export class CallBridgeSession {
       if (this.callerActivitySinceLastAssistant) return;
       this.brain.requestResponse('initial_opening');
     }, 450);
+  }
+
+  private scheduleCommitAfterSpeechStop(): void {
+    const speechDurationMs = this.callerSpeechStartedAtMs
+      ? Math.max(0, Date.now() - this.callerSpeechStartedAtMs)
+      : 0;
+    this.callerSpeechStartedAtMs = 0;
+
+    const minimumSpeechDurationMs = 320;
+    if (speechDurationMs > 0 && speechDurationMs < minimumSpeechDurationMs) {
+      this.logger.debug('VAD speech-stop genegeerd: te korte user beurt', {
+        speechDurationMs,
+      });
+      return;
+    }
+
+    if (this.pendingSpeechStopCommitTimer) {
+      clearTimeout(this.pendingSpeechStopCommitTimer);
+      this.pendingSpeechStopCommitTimer = null;
+    }
+
+    const responseDebounceMs = 220;
+    this.pendingSpeechStopCommitTimer = setTimeout(() => {
+      this.pendingSpeechStopCommitTimer = null;
+      if (this.isClosed) return;
+      this.brain.requestResponseFromInputBuffer('openai_vad_speech_stopped_debounced');
+    }, responseDebounceMs);
   }
 
   private handleInboundAudio(base64Payload: string): void {
@@ -451,6 +487,10 @@ export class CallBridgeSession {
     this.isClosed = true;
 
     this.interrupt(`shutdown:${reason}`, false);
+    if (this.pendingSpeechStopCommitTimer) {
+      clearTimeout(this.pendingSpeechStopCommitTimer);
+      this.pendingSpeechStopCommitTimer = null;
+    }
     this.brain.close();
 
     if (this.ws.readyState === WebSocket.OPEN) {

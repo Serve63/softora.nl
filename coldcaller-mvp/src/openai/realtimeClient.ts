@@ -14,6 +14,8 @@ export type OpenAiRealtimeConfig = {
   model: string;
   systemPrompt: string;
   vadThreshold: number;
+  vadPrefixPaddingMs: number;
+  vadSilenceDurationMs: number;
 };
 
 type JsonValue = Record<string, unknown>;
@@ -157,6 +159,7 @@ Belangrijke regels:
 - Verzin nooit wat de prospect gezegd zou hebben.
 - Ga nooit door naar een volgende stap zonder expliciete reactie van de prospect.
 - Bij stilte: stel maximaal 1 korte follow-up en wacht dan.
+- Bij een expliciete afwijzing (zoals "geen interesse", "geen behoefte", "nee bedankt"): bedank kort en sluit netjes af zonder nieuwe afspraakvraag.
 - Nooit gedichten, verhalen, recepten of random entertainmenttekst.`,
       modalities: ['text'],
       input_audio_format: 'g711_ulaw',
@@ -165,6 +168,8 @@ Belangrijke regels:
       turn_detection: {
         type: 'server_vad',
         threshold: this.cfg.vadThreshold,
+        prefix_padding_ms: this.cfg.vadPrefixPaddingMs,
+        silence_duration_ms: this.cfg.vadSilenceDurationMs,
         create_response: false,
         interrupt_response: true,
       },

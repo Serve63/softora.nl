@@ -67,6 +67,7 @@ Zie `.env.example`. Belangrijkste:
 - `PUBLIC_WSS_URL` = publieke wss url naar `/twilio-media`
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
 - `OPENAI_API_KEY`, `OPENAI_REALTIME_MODEL`
+- `OPENAI_REALTIME_VAD_THRESHOLD`, `OPENAI_REALTIME_VAD_PREFIX_PADDING_MS`, `OPENAI_REALTIME_VAD_SILENCE_DURATION_MS`
 - `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`
 
 ## Handmatige Twilio stappen (jij moet doen)
@@ -125,5 +126,6 @@ Logs zijn JSON in stdout, inclusief:
 
 - **Geen audio terug in call**: check `ELEVENLABS_OUTPUT_FORMAT` (`pcm_16000` voor v3) en kijk naar TTS error logs.
 - **Call hangt direct op**: check Twilio webhook URL + publieke HTTPS bereikbaarheid.
+- **Model reageert te vroeg / luistert slecht**: verhoog `OPENAI_REALTIME_VAD_SILENCE_DURATION_MS` (bijv. 900-1100).
 - **Hoge latency**: controleer tunnel, regio en `ELEVENLABS_OPTIMIZE_LATENCY`.
 - **Modelfout OpenAI**: gebruik model dat in jouw account Realtime access heeft.

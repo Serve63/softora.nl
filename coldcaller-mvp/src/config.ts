@@ -20,6 +20,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_REALTIME_MODEL: z.string().default('gpt-realtime'),
   OPENAI_REALTIME_VAD_THRESHOLD: z.string().default('0.62'),
+  OPENAI_REALTIME_VAD_PREFIX_PADDING_MS: z.string().default('320'),
+  OPENAI_REALTIME_VAD_SILENCE_DURATION_MS: z.string().default('800'),
 
   ELEVENLABS_API_KEY: z.string().min(1),
   ELEVENLABS_VOICE_ID: z.string().min(1),
@@ -90,6 +92,24 @@ export function loadConfig() {
       apiKey: env.OPENAI_API_KEY,
       realtimeModel: env.OPENAI_REALTIME_MODEL,
       vadThreshold: Math.max(0, Math.min(1, parseNumber('OPENAI_REALTIME_VAD_THRESHOLD', env.OPENAI_REALTIME_VAD_THRESHOLD))),
+      vadPrefixPaddingMs: Math.max(
+        0,
+        Math.round(
+          parseNumber(
+            'OPENAI_REALTIME_VAD_PREFIX_PADDING_MS',
+            env.OPENAI_REALTIME_VAD_PREFIX_PADDING_MS
+          )
+        )
+      ),
+      vadSilenceDurationMs: Math.max(
+        200,
+        Math.round(
+          parseNumber(
+            'OPENAI_REALTIME_VAD_SILENCE_DURATION_MS',
+            env.OPENAI_REALTIME_VAD_SILENCE_DURATION_MS
+          )
+        )
+      ),
     },
     elevenlabs: {
       apiKey: env.ELEVENLABS_API_KEY,
