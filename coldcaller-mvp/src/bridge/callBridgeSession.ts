@@ -39,6 +39,23 @@ export class CallBridgeSession {
   private bargeInFramesAboveThreshold = 0;
   private assistantTurnsSent = 0;
   private callerActivitySinceLastAssistant = false;
+  private readonly metrics = {
+    startedAtMs: Date.now(),
+    inboundMediaEvents: 0,
+    inboundAudioBytes: 0,
+    forwardedMediaEvents: 0,
+    forwardedAudioBytes: 0,
+    droppedDuringPlaybackEvents: 0,
+    droppedPostPlaybackEchoEvents: 0,
+    bargeInInterrupts: 0,
+    assistantTurnsSuppressed: 0,
+    assistantTurnsPlayed: 0,
+    ttsFramesSent: 0,
+    ttsBytesSent: 0,
+    ttsQueueMaxDepth: 0,
+    ttsQueueUnderflows: 0,
+    totalTtsPlaybackMs: 0,
+  };
 
   constructor(
     private readonly ws: WebSocket,
@@ -56,11 +73,13 @@ export class CallBridgeSession {
       {
         onAssistantText: (text) => {
           if (!this.shouldPlayAssistantText()) {
+            this.metrics.assistantTurnsSuppressed += 1;
             this.logger.debug('Assistant antwoord genegeerd (geen nieuwe caller activiteit)');
             return;
           }
           this.callerActivitySinceLastAssistant = false;
           this.assistantTurnsSent += 1;
+          this.metrics.assistantTurnsPlayed += 1;
           this.lastAssistantTurnStartedAtMs = Date.now();
           void this.speakAssistantText(text);
         },
@@ -166,6 +185,9 @@ export class CallBridgeSession {
     if (!base64Payload) return;
 
     const audioBuffer = Buffer.from(base64Payload, 'base64');
+    this.metrics.inboundMediaEvents += 1;
+    this.metrics.inboundAudioBytes += audioBuffer.length;
+
     const energy = estimateUlawEnergy(audioBuffer);
     const now = Date.now();
     const isAssistantSpeaking = Boolean(this.activeSpeechAbort);
@@ -189,6 +211,7 @@ export class CallBridgeSession {
 
       if (this.bargeInFramesAboveThreshold >= bargeInFramesNeeded) {
         this.bargeInFramesAboveThreshold = 0;
+        this.metrics.bargeInInterrupts += 1;
         this.interrupt('inbound_energy_detected');
         interruptedForBargeIn = true;
       }
@@ -197,6 +220,7 @@ export class CallBridgeSession {
     // Voorkom echo-loop: tijdens TTS-playback géén inbound audio naar OpenAI sturen,
     // behalve als er echte barge-in is gedetecteerd en playback net is onderbroken.
     if (isAssistantSpeaking && !interruptedForBargeIn) {
+      this.metrics.droppedDuringPlaybackEvents += 1;
       return;
     }
 
@@ -208,9 +232,12 @@ export class CallBridgeSession {
       now - this.lastAssistantPlaybackEndedAtMs < postPlaybackEchoWindowMs &&
       energy < postPlaybackHighEnergyThreshold
     ) {
+      this.metrics.droppedPostPlaybackEchoEvents += 1;
       return;
     }
 
+    this.metrics.forwardedMediaEvents += 1;
+    this.metrics.forwardedAudioBytes += audioBuffer.length;
     this.brain.appendInputAudio(base64Payload);
   }
 
@@ -256,6 +283,8 @@ export class CallBridgeSession {
       let producerError: Error | null = null;
       let playbackStarted = false;
       let nextFrameAtMs = 0;
+      let queueStarved = false;
+      const ttsTurnStartedAtMs = Date.now();
 
       const producerPromise = this.tts.streamUlaw(
         cleaned,
@@ -266,6 +295,9 @@ export class CallBridgeSession {
             if (this.isClosed || speechAbort.signal.aborted) return;
             if (frameQueue.length < maxQueueFrames) {
               frameQueue.push(frame);
+              if (frameQueue.length > this.metrics.ttsQueueMaxDepth) {
+                this.metrics.ttsQueueMaxDepth = frameQueue.length;
+              }
             }
           }
         },
@@ -291,9 +323,14 @@ export class CallBridgeSession {
 
         if (!frameQueue.length) {
           if (producerDone) break;
+          if (!queueStarved) {
+            this.metrics.ttsQueueUnderflows += 1;
+            queueStarved = true;
+          }
           await sleep(10);
           continue;
         }
+        queueStarved = false;
 
         const frame = frameQueue.shift();
         if (!frame) continue;
@@ -307,6 +344,8 @@ export class CallBridgeSession {
         }
 
         this.sendTwilioMedia(frame);
+        this.metrics.ttsFramesSent += 1;
+        this.metrics.ttsBytesSent += frame.length;
         nextFrameAtMs += 20;
       }
 
@@ -314,6 +353,7 @@ export class CallBridgeSession {
       if (producerError && !speechAbort.signal.aborted) {
         throw producerError;
       }
+      this.metrics.totalTtsPlaybackMs += Date.now() - ttsTurnStartedAtMs;
     } catch (error) {
       if (speechAbort.signal.aborted) {
         this.logger.debug('TTS playback geannuleerd (interrupt)');
@@ -385,6 +425,27 @@ export class CallBridgeSession {
       reason,
       callSid: this.callSid || null,
       streamSid: this.streamSid || null,
+    });
+
+    const durationMs = Date.now() - this.metrics.startedAtMs;
+    this.logger.info('Bridge sessie metrics', {
+      callSid: this.callSid || null,
+      streamSid: this.streamSid || null,
+      durationMs,
+      inboundMediaEvents: this.metrics.inboundMediaEvents,
+      inboundAudioBytes: this.metrics.inboundAudioBytes,
+      forwardedMediaEvents: this.metrics.forwardedMediaEvents,
+      forwardedAudioBytes: this.metrics.forwardedAudioBytes,
+      droppedDuringPlaybackEvents: this.metrics.droppedDuringPlaybackEvents,
+      droppedPostPlaybackEchoEvents: this.metrics.droppedPostPlaybackEchoEvents,
+      bargeInInterrupts: this.metrics.bargeInInterrupts,
+      assistantTurnsPlayed: this.metrics.assistantTurnsPlayed,
+      assistantTurnsSuppressed: this.metrics.assistantTurnsSuppressed,
+      ttsFramesSent: this.metrics.ttsFramesSent,
+      ttsBytesSent: this.metrics.ttsBytesSent,
+      ttsQueueMaxDepth: this.metrics.ttsQueueMaxDepth,
+      ttsQueueUnderflows: this.metrics.ttsQueueUnderflows,
+      totalTtsPlaybackMs: this.metrics.totalTtsPlaybackMs,
     });
   }
 }
