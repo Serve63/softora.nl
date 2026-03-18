@@ -199,9 +199,10 @@ export class CallBridgeSession {
     let interruptedForBargeIn = false;
 
     if (isAssistantSpeaking) {
-      const minPlaybackMsBeforeBargeIn = 450;
-      const bargeInEnergyThreshold = 0.055;
-      const bargeInFramesNeeded = 6;
+      // Conservatiever barge-in om false interrupts (en daarmee stotterende playback) te vermijden.
+      const minPlaybackMsBeforeBargeIn = 900;
+      const bargeInEnergyThreshold = 0.075;
+      const bargeInFramesNeeded = 9;
 
       if (now - this.assistantPlaybackStartedAtMs >= minPlaybackMsBeforeBargeIn && energy >= bargeInEnergyThreshold) {
         this.bargeInFramesAboveThreshold += 1;
@@ -288,10 +289,26 @@ export class CallBridgeSession {
     this.outputPumpRunning = true;
 
     const pumpStartedAtMs = Date.now();
+    const prebufferFrames = 6; // ~120ms
+    let playbackStarted = false;
+    let nextFrameAtMs = 0;
     let queueStarved = false;
 
     try {
       while (!this.isClosed) {
+        if (!playbackStarted) {
+          if (this.openAiResponseActive && this.outputFrameQueue.length < prebufferFrames) {
+            await sleep(6);
+            continue;
+          }
+          playbackStarted = this.outputFrameQueue.length > 0 || !this.openAiResponseActive;
+          if (!playbackStarted) {
+            await sleep(6);
+            continue;
+          }
+          nextFrameAtMs = Date.now();
+        }
+
         if (!this.outputFrameQueue.length) {
           if (!this.openAiResponseActive) {
             if (this.outputFrameCarry.length > 0) {
@@ -315,9 +332,16 @@ export class CallBridgeSession {
 
         const frame = this.outputFrameQueue.shift();
         if (!frame) continue;
+        const now = Date.now();
+        if (nextFrameAtMs > now) {
+          await sleep(nextFrameAtMs - now);
+        } else if (now - nextFrameAtMs > 120) {
+          // Klok opnieuw syncen bij event-loop jitter, voorkomt bursts.
+          nextFrameAtMs = now;
+        }
         this.sendTwilioMedia(frame);
         this.metrics.assistantFramesSent += 1;
-        await sleep(20);
+        nextFrameAtMs += 20;
       }
     } finally {
       this.metrics.totalAssistantPlaybackMs += Date.now() - pumpStartedAtMs;
