@@ -163,7 +163,7 @@ Belangrijke regels:
       modalities: ['text'],
       input_audio_format: 'g711_ulaw',
       temperature: 0.6,
-      max_response_output_tokens: 110,
+      max_response_output_tokens: 70,
       turn_detection: {
         type: 'server_vad',
         threshold: this.cfg.vadThreshold,
