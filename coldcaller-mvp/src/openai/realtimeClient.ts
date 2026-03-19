@@ -131,17 +131,7 @@ export class OpenAiRealtimeAudioBrain {
 
   private sendSessionUpdate(): void {
     const session = {
-      instructions: `${this.cfg.systemPrompt}
-
-Belangrijke regels:
-- Spreek ALTIJD Nederlands (nl-NL).
-- Blijf strikt in de rol en bedrijfsidentiteit uit de system prompt.
-- Luister eerst en reageer direct op wat de prospect net zei.
-- Geef compacte maar volledige antwoorden (meestal 2-4 zinnen).
-- Stel per beurt maximaal 1 vraag.
-- Verzin nooit wat de prospect gezegd zou hebben.
-- Bij een expliciete afwijzing (zoals "geen interesse", "geen behoefte", "nee bedankt"): bedank kort en sluit netjes af zonder nieuwe afspraakvraag.
-- Nooit gedichten, verhalen, recepten of random entertainmenttekst.`,
+      instructions: this.cfg.systemPrompt,
       modalities: ['audio', 'text'],
       voice: this.cfg.voice,
       input_audio_format: 'g711_ulaw',

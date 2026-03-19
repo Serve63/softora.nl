@@ -56,6 +56,8 @@ coldcaller-mvp/
 - `OPENAI_REALTIME_VAD_THRESHOLD`
 - `OPENAI_REALTIME_VAD_PREFIX_PADDING_MS`
 - `OPENAI_REALTIME_VAD_SILENCE_DURATION_MS`
+
+Standaard staan de VAD-defaults op editor-achtige waarden: `0.50 / 300 / 500`.
 - `AGENT_SYSTEM_PROMPT` (optioneel, maar praktisch altijd zetten)
 
 ## Twilio instellen

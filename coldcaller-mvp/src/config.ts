@@ -20,9 +20,9 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_REALTIME_MODEL: z.string().default('gpt-realtime'),
   OPENAI_REALTIME_VOICE: z.string().default('shimmer'),
-  OPENAI_REALTIME_VAD_THRESHOLD: z.string().default('0.62'),
-  OPENAI_REALTIME_VAD_PREFIX_PADDING_MS: z.string().default('320'),
-  OPENAI_REALTIME_VAD_SILENCE_DURATION_MS: z.string().default('800'),
+  OPENAI_REALTIME_VAD_THRESHOLD: z.string().default('0.50'),
+  OPENAI_REALTIME_VAD_PREFIX_PADDING_MS: z.string().default('300'),
+  OPENAI_REALTIME_VAD_SILENCE_DURATION_MS: z.string().default('500'),
 
   AGENT_SYSTEM_PROMPT: z.string().optional(),
 });
