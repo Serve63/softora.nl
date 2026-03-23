@@ -1314,16 +1314,9 @@
                         <label class="create-order-label" for="newOrderDeliveryTime">Oplevertijd</label>
                         <input class="create-order-input" id="newOrderDeliveryTime" name="deliveryTime" type="text" placeholder="Bijv. Binnen 3 weken" required>
                     </div>
-                    <div class="create-order-field">
+                    <div class="create-order-field full">
                         <label class="create-order-label" for="newOrderAmount">Bedrag (€)</label>
                         <input class="create-order-input" id="newOrderAmount" name="amount" type="number" min="1" step="100" placeholder="2800" required>
-                    </div>
-                    <div class="create-order-field">
-                        <label class="create-order-label" for="newOrderStatus">Status</label>
-                        <select class="create-order-select" id="newOrderStatus" name="status">
-                            <option value="wacht" selected>Wachtend</option>
-                            <option value="actief">Actief</option>
-                        </select>
                     </div>
                 </div>
                 <div class="create-order-meta">
@@ -2736,8 +2729,6 @@
             if (!modal) return;
             const form = document.getElementById('createOrderForm');
             if (form) form.reset();
-            const statusField = document.getElementById('newOrderStatus');
-            if (statusField) statusField.value = 'wacht';
             setCreateOrderMessage('', '');
             modal.classList.add('show');
             modal.setAttribute('aria-hidden', 'false');
@@ -2766,7 +2757,7 @@
             const description = String(data.get('description') || '').trim();
             const deliveryTime = String(data.get('deliveryTime') || '').trim();
             const amount = Math.round(Number(data.get('amount')));
-            const status = normalizeOrderStatus(data.get('status')).key;
+            const status = 'wacht';
 
             if (!companyName || !contactPerson || !title || !description || !deliveryTime) {
                 setCreateOrderMessage('Vul alle velden in.', 'error');
@@ -2810,8 +2801,6 @@
             void refreshEstimatedApiCost(record.id);
             persistOrdersRuntime();
             form.reset();
-            const statusField = document.getElementById('newOrderStatus');
-            if (statusField) statusField.value = 'wacht';
             closeCreateOrderModal();
         }
 
