@@ -615,26 +615,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-        }
-
-        .quote-bg {
-            position: absolute;
-            inset: 0;
-            z-index: 0;
-        }
-
-        .quote-bg img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            filter: brightness(0.72) contrast(1.05);
-        }
-
-        .quote-bg::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.58);
+            background: var(--bg-secondary);
         }
 
         .quote-text {
@@ -644,14 +625,14 @@
             text-transform: uppercase;
             line-height: 1.16;
             max-width: 780px;
-            color: #ffffff;
+            color: var(--text-primary);
             position: relative;
             z-index: 2;
             letter-spacing: 0.02em;
             opacity: 1;
             transform: none;
             transition: none;
-            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
+            text-shadow: none;
         }
 
         .quote-text.visible {
@@ -1223,9 +1204,6 @@
 
     <!-- QUOTE -->
     <section class="quote-section">
-        <div class="quote-bg">
-            <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1600&q=80" alt="Digital design" width="1600" height="900" loading="eager" decoding="async">
-        </div>
         <blockquote class="quote-text">
             <span class="quote-accent">Jouw website is je visitekaartje</span> —<br>
             maak het er eentje dat<br>
