@@ -17,11 +17,9 @@
                 var storageKey = isPremiumPersonnel
                     ? 'softora_premium_personnel_theme_mode'
                     : 'softora_software_personnel_theme_mode';
-                var mode = localStorage.getItem(storageKey);
-                if (mode === 'light' || mode === 'dark') {
-                    document.documentElement.setAttribute('data-theme-mode', mode);
-                    document.documentElement.setAttribute('data-theme', mode);
-                }
+                localStorage.setItem(storageKey, "light");
+                document.documentElement.setAttribute("data-theme-mode", "light");
+                document.documentElement.setAttribute("data-theme", "light");
             } catch (_error) {
                 /* ignore storage errors */
             }

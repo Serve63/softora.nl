@@ -12,10 +12,9 @@
     <script>
         (function () {
             try {
-                var mode = localStorage.getItem("softora_premium_public_theme_mode") || localStorage.getItem("softora_public_theme_mode");
-                if (mode === "light" || mode === "dark") {
-                    document.documentElement.setAttribute("data-public-theme", mode);
-                }
+                localStorage.setItem("softora_premium_public_theme_mode", "light");
+                localStorage.setItem("softora_public_theme_mode", "light");
+                document.documentElement.setAttribute("data-public-theme", "light");
             } catch (error) {
                 /* ignore storage errors */
             }

@@ -14,11 +14,9 @@
             var storageKey = isPremiumPersonnel
                 ? "softora_premium_personnel_theme_mode"
                 : "softora_software_personnel_theme_mode";
-            var mode = localStorage.getItem(storageKey);
-            if (mode === "light" || mode === "dark") {
-                document.documentElement.setAttribute("data-theme-mode", mode);
-                document.documentElement.setAttribute("data-theme", mode);
-            }
+            localStorage.setItem(storageKey, "light");
+                document.documentElement.setAttribute("data-theme-mode", "light");
+                document.documentElement.setAttribute("data-theme", "light");
         } catch (error) {
             /* ignore storage errors */
         }
@@ -49,20 +47,6 @@
     --table-hover: rgba(255, 255, 255, 0.02);
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
-
-:root[data-theme="dark"] {
-    --bg-primary: #080808;
-    --bg-secondary: #0d0d0d;
-    --bg-tertiary: #111111;
-    --bg-card: rgba(255, 255, 255, 0.02);
-    --text-primary: #f5f5f5;
-    --text-secondary: #8a8a94;
-    --text-tertiary: #5f5f68;
-    --border: rgba(255, 255, 255, 0.08);
-    --input-bg: rgba(255, 255, 255, 0.04);
-    --table-hover: rgba(255, 255, 255, 0.025);
-}
-
 :root[data-theme="light"] {
     --bg-primary: #f8f7f4;
     --bg-secondary: #ffffff;
@@ -927,12 +911,6 @@ body {
   z-index: 100;
   font-family: 'Inter', sans-serif;
 }
-
-html[data-theme="dark"] .sidebar {
-  background: #0d0d0d;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 .sidebar-logo {
   font-family: 'Oswald', sans-serif;
   font-size: 1.5rem;
@@ -986,11 +964,6 @@ html[data-theme="dark"] .sidebar {
   padding: 0 2rem;
   margin-bottom: 0.8rem;
 }
-
-html[data-theme="dark"] .sidebar-section-label {
-  color: #5f5f68;
-}
-
 .sidebar-link {
   display: flex;
   align-items: center;
@@ -1003,30 +976,14 @@ html[data-theme="dark"] .sidebar-section-label {
   transition: all 0.2s;
   position: relative;
 }
-
-html[data-theme="dark"] .sidebar-link {
-  color: #8a8a94;
-}
-
 .sidebar-link:hover {
   color: #1a1a2e;
   background: rgba(0, 0, 0, 0.02);
 }
-
-html[data-theme="dark"] .sidebar-link:hover {
-  color: #f5f5f5;
-  background: rgba(255, 255, 255, 0.02);
-}
-
 .sidebar-link.active {
   color: #1a1a2e;
   background: rgba(139, 34, 82, 0.06);
 }
-
-html[data-theme="dark"] .sidebar-link.active {
-  color: #f5f5f5;
-}
-
 .sidebar-link svg {
   width: 18px;
   height: 18px;
@@ -1044,11 +1001,6 @@ html[data-theme="dark"] .sidebar-link.active {
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   display: block;
 }
-
-html[data-theme="dark"] .sidebar-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 .sidebar-user {
   display: flex;
   align-items: center;
@@ -1082,20 +1034,10 @@ html[data-theme="dark"] .sidebar-footer {
   font-weight: 500;
   color: #1a1a2e;
 }
-
-html[data-theme="dark"] .sidebar-user-name {
-  color: #f5f5f5;
-}
-
 .sidebar-user-role {
   font-size: 0.75rem;
   color: #9599a8;
 }
-
-html[data-theme="dark"] .sidebar-user-role {
-  color: #5f5f68;
-}
-
 .logout-btn {
   background: none;
   border: none;
@@ -1107,11 +1049,6 @@ html[data-theme="dark"] .sidebar-user-role {
   align-items: center;
   opacity: 1;
 }
-
-html[data-theme="dark"] .logout-btn {
-  color: #5f5f68;
-}
-
 .logout-btn:hover {
   color: #d85f51;
   opacity: 1;
@@ -1127,7 +1064,7 @@ html[data-theme="dark"] .logout-btn {
 /* Match standard premium page background */
 :root,
 :root[data-theme="light"],
-:root[data-theme="dark"] {
+{
   --bg: var(--bg-primary);
   --sidebar-bg: var(--bg-secondary);
   --card-bg: var(--bg-secondary);
