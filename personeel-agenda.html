@@ -167,13 +167,6 @@
             font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; min-width: 220px; text-align: center;
         }
-        .today-btn {
-            font-family: 'Oswald', sans-serif; font-size: 0.75rem; font-weight: 500;
-            text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-color);
-            border: 1px solid rgba(74,95,215,0.2); background: transparent;
-            padding: 0.5rem 1rem; cursor: none; transition: all 0.2s;
-        }
-        .today-btn:hover { background: rgba(74,95,215,0.05); border-color: var(--accent-color); }
 
         @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
 
@@ -465,7 +458,6 @@
                 <button class="month-nav-btn magnetic" onclick="changeMonth(1)" type="button">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                 </button>
-                <button class="today-btn magnetic" onclick="goToday()" type="button">Vandaag</button>
             </div>
         </div>
 

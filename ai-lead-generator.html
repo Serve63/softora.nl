@@ -654,6 +654,42 @@
             margin-bottom: 0.5rem;
         }
 
+        .stat-card-label-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+        }
+
+        .stat-card-reset {
+            width: 1.8rem;
+            height: 1.8rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .stat-card-reset:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            transform: rotate(-12deg);
+        }
+
+        .stat-card-reset:active {
+            transform: rotate(-18deg) scale(0.96);
+        }
+
+        .stat-card-reset svg {
+            width: 14px;
+            height: 14px;
+            stroke-width: 2.6;
+        }
+
         .stat-card-value {
             font-family: 'Oswald', sans-serif;
             font-size: 2rem;
@@ -852,9 +888,9 @@
                     <h1>AI Coldcalling</h1>
                     <p>AI coldcalling campagne voor software & database projecten</p>
                 </div>
-                <div class="status-pill" id="statusPill">
+                <div class="status-pill active" id="statusPill">
                     <span class="dot"></span>
-                    Inactief
+                    Website's
                 </div>
             </div>
 
@@ -917,7 +953,15 @@
 
             <div class="stats-bar">
                 <div class="stat-card">
-                    <div class="stat-card-label">Gebeld Vandaag</div>
+                    <div class="stat-card-label stat-card-label-row">
+                        <span>Totaal gebeld</span>
+                        <button type="button" class="stat-card-reset" id="statsResetBtn" title="Statistieken resetten" aria-label="Statistieken resetten">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 12a9 9 0 1 0 2.64-6.36"></path>
+                                <polyline points="3 3 3 9 9 9"></polyline>
+                            </svg>
+                        </button>
+                    </div>
                     <div class="stat-card-value" id="statCalled">0</div>
                 </div>
                 <div class="stat-card">
@@ -936,8 +980,7 @@
 
             <div class="log-panel">
                 <div class="log-header">
-                    <span class="log-title">Live Activiteit</span>
-                    <span class="panel-badge" id="logCount">0 calls</span>
+                    <span class="log-title">Recente Activiteiten</span>
                 </div>
                 <div class="log-body" id="logBody">
                     <div class="log-empty">Start een campagne om activiteit te zien.</div>
@@ -1034,8 +1077,6 @@
             if (entries.length > 80) {
                 entries[entries.length - 1].remove();
             }
-
-            document.getElementById('logCount').textContent = `${totalCalled} calls`;
         }
 
         function simulateCall() {
@@ -1152,6 +1193,6 @@
             });
         }
     </script>
-    <script src="assets/coldcalling-vapi.js?v=20260311c"></script>
+    <script src="assets/coldcalling-dashboard.js?v=20260322d"></script>
 </body>
 </html>

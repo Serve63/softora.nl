@@ -1,8 +1,8 @@
 {
-  "name": "softora-vapi-coldcalling-backend",
+  "name": "softora-retell-coldcalling-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "Kleine Express backend voor Vapi outbound coldcalling vanuit het statische Softora dashboard.",
+  "description": "Express backend voor Retell outbound coldcalling vanuit het Softora dashboard.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: softora-vapi-coldcalling
+    name: softora-retell-coldcalling
     env: node
     buildCommand: npm install
     startCommand: npm start
@@ -9,11 +9,13 @@ services:
     envVars:
       - key: PORT
         value: 10000
-      - key: VAPI_API_KEY
+      - key: COLDCALLING_PROVIDER
+        value: retell
+      - key: RETELL_API_KEY
         sync: false
-      - key: VAPI_ASSISTANT_ID
+      - key: RETELL_FROM_NUMBER
         sync: false
-      - key: VAPI_PHONE_NUMBER_ID
+      - key: RETELL_AGENT_ID
         sync: false
       - key: WEBHOOK_SECRET
         sync: false

@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
@@ -9,8 +10,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const VAPI_BASE_URL = process.env.VAPI_BASE_URL || 'https://api.vapi.ai';
-const ELEVENLABS_API_BASE_URL = process.env.ELEVENLABS_API_BASE_URL || 'https://api.elevenlabs.io/v1';
+const RETELL_API_BASE_URL = process.env.RETELL_API_BASE_URL || 'https://api.retellai.com';
 const OPENAI_API_BASE_URL = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const ANTHROPIC_API_BASE_URL = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com/v1';
@@ -35,8 +35,8 @@ const WEBSITE_GENERATION_TIMEOUT_MS = Math.max(
   60_000,
   Math.min(600_000, Number(process.env.WEBSITE_GENERATION_TIMEOUT_MS || 300_000) || 300_000)
 );
-const VERBOSE_VAPI_WEBHOOK_LOGS = /^(1|true|yes)$/i.test(
-  String(process.env.VERBOSE_VAPI_WEBHOOK_LOGS || '')
+const VERBOSE_CALL_WEBHOOK_LOGS = /^(1|true|yes)$/i.test(
+  String(process.env.VERBOSE_CALL_WEBHOOK_LOGS || '')
 );
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -111,12 +111,8 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
 const recentWebhookEvents = [];
 const recentCallUpdates = [];
 const callUpdatesById = new Map();
-const DEFAULT_ELEVENLABS_AGENT_ID = 'agent_9801kk75c5c9e8gtqhcc9zwbtef3';
-let elevenLabsConversationListCache = {
-  fetchedAtMs: 0,
-  agentId: '',
-  conversations: [],
-};
+const retellCallStatusRefreshByCallId = new Map();
+const RETELL_STATUS_REFRESH_COOLDOWN_MS = 8000;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
 const inMemoryUiStateByScope = new Map();
@@ -143,6 +139,35 @@ let supabaseLastPersistError = '';
 const UI_STATE_SCOPE_PREFIX = 'ui_state:';
 const PREMIUM_ACTIVE_ORDERS_SCOPE = 'premium_active_orders';
 const PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
+const PREMIUM_ACTIVE_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
+const PREMIUM_CUSTOMERS_SCOPE = 'premium_customers_database';
+const PREMIUM_CUSTOMERS_KEY = 'softora_customers_premium_v1';
+const SEO_UI_STATE_SCOPE = 'seo';
+const SEO_UI_STATE_CONFIG_KEY = 'config_json';
+const SEO_CONFIG_CACHE_TTL_MS = 15_000;
+const SEO_MAX_IMAGES_PER_PAGE = 2000;
+const SEO_PAGE_FIELD_DEFS = [
+  { key: 'title', maxLength: 300 },
+  { key: 'metaDescription', maxLength: 1000 },
+  { key: 'metaKeywords', maxLength: 1000 },
+  { key: 'canonical', maxLength: 1200 },
+  { key: 'robots', maxLength: 250 },
+  { key: 'ogTitle', maxLength: 300 },
+  { key: 'ogDescription', maxLength: 1000 },
+  { key: 'ogImage', maxLength: 1200 },
+  { key: 'twitterTitle', maxLength: 300 },
+  { key: 'twitterDescription', maxLength: 1000 },
+  { key: 'twitterImage', maxLength: 1200 },
+  { key: 'h1', maxLength: 300 },
+];
+let seoConfigCache = {
+  loadedAtMs: 0,
+  config: {
+    version: 1,
+    pages: {},
+    images: {},
+  },
+};
 const DEMO_CONFIRMATION_TASK_ENABLED = /^(1|true|yes)$/i.test(
   String(process.env.ENABLE_DEMO_CONFIRMATION_TASK || '')
 );
@@ -809,6 +834,486 @@ async function setUiStateValues(scope, values, meta = {}) {
   }
 }
 
+function getDefaultSeoConfig() {
+  return {
+    version: 1,
+    pages: {},
+    images: {},
+  };
+}
+
+function sanitizeKnownHtmlFileName(fileNameRaw) {
+  const fileName = normalizeString(fileNameRaw);
+  if (!fileName || !/^[a-zA-Z0-9._-]+\.html$/.test(fileName)) return '';
+  if (!knownHtmlPageFiles.has(fileName)) return '';
+  return fileName;
+}
+
+function normalizeSeoFieldValue(value, maxLength = 1000) {
+  return truncateText(normalizeString(value), maxLength);
+}
+
+function normalizeSeoPageOverridePatch(raw) {
+  const patch = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return patch;
+
+  for (const field of SEO_PAGE_FIELD_DEFS) {
+    if (!Object.prototype.hasOwnProperty.call(raw, field.key)) continue;
+    patch[field.key] = normalizeSeoFieldValue(raw[field.key], field.maxLength);
+  }
+  return patch;
+}
+
+function normalizeSeoImageOverridePatch(raw) {
+  const patch = {};
+  if (!raw) return patch;
+
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      if (!entry || typeof entry !== 'object') continue;
+      const src = truncateText(normalizeString(entry.src), 1800);
+      if (!src) continue;
+      patch[src] = truncateText(normalizeString(entry.alt), 1200);
+    }
+    return patch;
+  }
+
+  if (typeof raw !== 'object') return patch;
+
+  for (const [srcRaw, altRaw] of Object.entries(raw)) {
+    const src = truncateText(normalizeString(srcRaw), 1800);
+    if (!src) continue;
+    patch[src] = truncateText(normalizeString(altRaw), 1200);
+  }
+  return patch;
+}
+
+function normalizeSeoStoredPageOverrides(raw) {
+  const patch = normalizeSeoPageOverridePatch(raw);
+  const stored = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (!value) continue;
+    stored[key] = value;
+  }
+  return stored;
+}
+
+function normalizeSeoStoredImageOverrides(raw) {
+  const patch = normalizeSeoImageOverridePatch(raw);
+  const stored = {};
+  for (const [src, alt] of Object.entries(patch)) {
+    if (!alt) continue;
+    stored[src] = alt;
+  }
+  return stored;
+}
+
+function normalizeSeoConfig(raw) {
+  const base = getDefaultSeoConfig();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base;
+
+  const pagesRaw = raw.pages && typeof raw.pages === 'object' ? raw.pages : {};
+  for (const [fileNameRaw, pageOverridesRaw] of Object.entries(pagesRaw)) {
+    const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
+    if (!fileName) continue;
+    const pageOverrides = normalizeSeoStoredPageOverrides(pageOverridesRaw);
+    if (Object.keys(pageOverrides).length === 0) continue;
+    base.pages[fileName] = pageOverrides;
+  }
+
+  const imagesRaw = raw.images && typeof raw.images === 'object' ? raw.images : {};
+  for (const [fileNameRaw, imageOverridesRaw] of Object.entries(imagesRaw)) {
+    const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
+    if (!fileName) continue;
+    const imageOverrides = normalizeSeoStoredImageOverrides(imageOverridesRaw);
+    if (Object.keys(imageOverrides).length === 0) continue;
+    base.images[fileName] = imageOverrides;
+  }
+
+  return base;
+}
+
+async function readSeoConfigFromUiState() {
+  const state = await getUiStateValues(SEO_UI_STATE_SCOPE);
+  const rawJson = normalizeString(state?.values?.[SEO_UI_STATE_CONFIG_KEY] || '');
+  if (!rawJson) return getDefaultSeoConfig();
+
+  try {
+    const parsed = JSON.parse(rawJson);
+    return normalizeSeoConfig(parsed);
+  } catch (error) {
+    console.warn('[SEO Config][ParseError]', error?.message || error);
+    return getDefaultSeoConfig();
+  }
+}
+
+async function getSeoConfigCached(forceFresh = false) {
+  const nowMs = Date.now();
+  if (!forceFresh && nowMs - seoConfigCache.loadedAtMs < SEO_CONFIG_CACHE_TTL_MS) {
+    return seoConfigCache.config;
+  }
+
+  const config = await readSeoConfigFromUiState();
+  seoConfigCache = {
+    loadedAtMs: nowMs,
+    config,
+  };
+  return config;
+}
+
+async function persistSeoConfig(config, meta = {}) {
+  const normalizedConfig = normalizeSeoConfig(config);
+  const payload = {
+    [SEO_UI_STATE_CONFIG_KEY]: JSON.stringify(normalizedConfig),
+  };
+
+  const state = await setUiStateValues(SEO_UI_STATE_SCOPE, payload, {
+    source: normalizeString(meta.source || 'seo-dashboard'),
+    actor: normalizeString(meta.actor || ''),
+  });
+
+  if (!state) return null;
+
+  seoConfigCache = {
+    loadedAtMs: Date.now(),
+    config: normalizedConfig,
+  };
+  return normalizedConfig;
+}
+
+function getSeoEditableHtmlFiles() {
+  return Array.from(knownHtmlPageFiles)
+    .filter((fileName) => fileName !== 'premium-seo.html')
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function decodeBasicHtmlEntities(valueRaw) {
+  const value = String(valueRaw || '');
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function stripHtmlTags(valueRaw) {
+  return String(valueRaw || '').replace(/<[^>]*>/g, ' ');
+}
+
+function parseHtmlTagAttributes(tagRaw) {
+  const tag = String(tagRaw || '');
+  const attrs = {};
+  const pattern = /([^\s=/>]+)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/g;
+  let match;
+  while ((match = pattern.exec(tag))) {
+    const key = normalizeString(match[1]).toLowerCase();
+    const value = decodeBasicHtmlEntities(match[3] || match[4] || match[5] || '');
+    if (!key) continue;
+    attrs[key] = value;
+  }
+  return attrs;
+}
+
+function extractTitleFromHtml(htmlRaw) {
+  const html = String(htmlRaw || '');
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (!match) return '';
+  return truncateText(normalizeString(decodeBasicHtmlEntities(stripHtmlTags(match[1]))), 300);
+}
+
+function extractMetaContentFromHtml(htmlRaw, selectorAttr, selectorValue) {
+  const html = String(htmlRaw || '');
+  const tagPattern = /<meta\b[^>]*>/gi;
+  const attrName = normalizeString(selectorAttr).toLowerCase();
+  const attrValue = normalizeString(selectorValue).toLowerCase();
+  let match;
+  while ((match = tagPattern.exec(html))) {
+    const attrs = parseHtmlTagAttributes(match[0]);
+    const selectedValue = normalizeString(attrs[attrName]).toLowerCase();
+    if (selectedValue !== attrValue) continue;
+    return truncateText(normalizeString(attrs.content || ''), 1200);
+  }
+  return '';
+}
+
+function extractCanonicalHrefFromHtml(htmlRaw) {
+  const html = String(htmlRaw || '');
+  const tagPattern = /<link\b[^>]*>/gi;
+  let match;
+  while ((match = tagPattern.exec(html))) {
+    const attrs = parseHtmlTagAttributes(match[0]);
+    const rel = normalizeString(attrs.rel || '').toLowerCase();
+    if (!rel.split(/\s+/).includes('canonical')) continue;
+    return truncateText(normalizeString(attrs.href || ''), 1200);
+  }
+  return '';
+}
+
+function extractFirstH1FromHtml(htmlRaw) {
+  const html = String(htmlRaw || '');
+  const match = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+  if (!match) return '';
+  return truncateText(normalizeString(decodeBasicHtmlEntities(stripHtmlTags(match[1]))), 300);
+}
+
+function extractImageEntriesFromHtml(htmlRaw) {
+  const html = String(htmlRaw || '');
+  const out = [];
+  const seen = new Set();
+  const pattern = /<img\b[^>]*>/gi;
+  let match;
+  while ((match = pattern.exec(html))) {
+    if (out.length >= SEO_MAX_IMAGES_PER_PAGE) break;
+    const attrs = parseHtmlTagAttributes(match[0]);
+    const src = truncateText(normalizeString(attrs.src || attrs['data-src'] || ''), 1800);
+    if (!src || seen.has(src)) continue;
+    seen.add(src);
+    out.push({
+      src,
+      alt: truncateText(normalizeString(attrs.alt || ''), 1200),
+    });
+  }
+  return out;
+}
+
+function extractSeoSourceFromHtml(htmlRaw) {
+  const html = String(htmlRaw || '');
+  return {
+    title: extractTitleFromHtml(html),
+    metaDescription: extractMetaContentFromHtml(html, 'name', 'description'),
+    metaKeywords: extractMetaContentFromHtml(html, 'name', 'keywords'),
+    canonical: extractCanonicalHrefFromHtml(html),
+    robots: extractMetaContentFromHtml(html, 'name', 'robots'),
+    ogTitle: extractMetaContentFromHtml(html, 'property', 'og:title'),
+    ogDescription: extractMetaContentFromHtml(html, 'property', 'og:description'),
+    ogImage: extractMetaContentFromHtml(html, 'property', 'og:image'),
+    twitterTitle: extractMetaContentFromHtml(html, 'name', 'twitter:title'),
+    twitterDescription: extractMetaContentFromHtml(html, 'name', 'twitter:description'),
+    twitterImage: extractMetaContentFromHtml(html, 'name', 'twitter:image'),
+    h1: extractFirstH1FromHtml(html),
+  };
+}
+
+function mergeSeoSourceWithOverrides(sourceRaw, overridesRaw) {
+  const source = normalizeSeoPageOverridePatch(sourceRaw);
+  const overrides = normalizeSeoStoredPageOverrides(overridesRaw);
+  const merged = {};
+  for (const field of SEO_PAGE_FIELD_DEFS) {
+    merged[field.key] = overrides[field.key] || source[field.key] || '';
+  }
+  return merged;
+}
+
+function escapeHtmlAttribute(valueRaw) {
+  return String(valueRaw || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeHtmlText(valueRaw) {
+  return String(valueRaw || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeRegex(valueRaw) {
+  return String(valueRaw || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function setOrUpdateTagAttribute(tagRaw, attrNameRaw, valueRaw) {
+  const tag = String(tagRaw || '');
+  const attrName = normalizeString(attrNameRaw).toLowerCase();
+  if (!attrName) return tag;
+  const escapedValue = escapeHtmlAttribute(valueRaw);
+  const attrPattern = new RegExp(`\\s${escapeRegex(attrName)}\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)`, 'i');
+
+  if (attrPattern.test(tag)) {
+    return tag.replace(attrPattern, ` ${attrName}="${escapedValue}"`);
+  }
+
+  if (tag.endsWith('/>')) {
+    return tag.replace(/\/>$/, ` ${attrName}="${escapedValue}" />`);
+  }
+
+  return tag.replace(/>$/, ` ${attrName}="${escapedValue}">`);
+}
+
+function upsertTitleInHtml(htmlRaw, title) {
+  const html = String(htmlRaw || '');
+  const value = normalizeSeoFieldValue(title, 300);
+  if (!value) return html;
+
+  if (/<title\b[^>]*>[\s\S]*?<\/title>/i.test(html)) {
+    return html.replace(
+      /<title\b[^>]*>[\s\S]*?<\/title>/i,
+      `<title>${escapeHtmlText(value)}</title>`
+    );
+  }
+
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `    <title>${escapeHtmlText(value)}</title>\n</head>`);
+  }
+
+  return html;
+}
+
+function upsertMetaInHtml(htmlRaw, selectorAttrRaw, selectorValueRaw, contentRaw) {
+  const html = String(htmlRaw || '');
+  const selectorAttr = normalizeString(selectorAttrRaw).toLowerCase();
+  const selectorValue = normalizeString(selectorValueRaw);
+  const content = normalizeString(contentRaw);
+
+  if (!selectorAttr || !selectorValue || !content) return html;
+
+  const tagPattern = new RegExp(
+    `<meta\\b[^>]*${escapeRegex(selectorAttr)}\\s*=\\s*["']${escapeRegex(selectorValue)}["'][^>]*>`,
+    'i'
+  );
+
+  if (tagPattern.test(html)) {
+    return html.replace(tagPattern, (tag) => setOrUpdateTagAttribute(tag, 'content', content));
+  }
+
+  const newTag = `    <meta ${selectorAttr}="${escapeHtmlAttribute(selectorValue)}" content="${escapeHtmlAttribute(content)}">`;
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `${newTag}\n</head>`);
+  }
+  return html;
+}
+
+function upsertCanonicalInHtml(htmlRaw, canonicalRaw) {
+  const html = String(htmlRaw || '');
+  const canonical = normalizeString(canonicalRaw);
+  if (!canonical) return html;
+
+  const tagPattern = /<link\b[^>]*rel\s*=\s*["']canonical["'][^>]*>/i;
+  if (tagPattern.test(html)) {
+    return html.replace(tagPattern, (tag) => setOrUpdateTagAttribute(tag, 'href', canonical));
+  }
+
+  const newTag = `    <link rel="canonical" href="${escapeHtmlAttribute(canonical)}">`;
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `${newTag}\n</head>`);
+  }
+  return html;
+}
+
+function upsertFirstH1InHtml(htmlRaw, h1Raw) {
+  const html = String(htmlRaw || '');
+  const h1 = normalizeSeoFieldValue(h1Raw, 300);
+  if (!h1) return html;
+
+  return html.replace(/<h1\b([^>]*)>[\s\S]*?<\/h1>/i, `<h1$1>${escapeHtmlText(h1)}</h1>`);
+}
+
+function applyImageAltOverridesToHtml(htmlRaw, imageOverridesRaw) {
+  const html = String(htmlRaw || '');
+  const imageOverrides = normalizeSeoStoredImageOverrides(imageOverridesRaw);
+  if (Object.keys(imageOverrides).length === 0) return html;
+
+  return html.replace(/<img\b[^>]*>/gi, (tag) => {
+    const attrs = parseHtmlTagAttributes(tag);
+    const src = truncateText(normalizeString(attrs.src || attrs['data-src'] || ''), 1800);
+    if (!src) return tag;
+    const alt = imageOverrides[src];
+    if (!alt) return tag;
+    return setOrUpdateTagAttribute(tag, 'alt', alt);
+  });
+}
+
+function applySeoOverridesToHtml(fileNameRaw, htmlRaw, configRaw) {
+  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
+  const html = String(htmlRaw || '');
+  if (!fileName || !html) return html;
+
+  const config = normalizeSeoConfig(configRaw || {});
+  const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
+  const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
+
+  let nextHtml = html;
+  if (pageOverrides.title) nextHtml = upsertTitleInHtml(nextHtml, pageOverrides.title);
+  if (pageOverrides.metaDescription) {
+    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'description', pageOverrides.metaDescription);
+  }
+  if (pageOverrides.metaKeywords) {
+    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'keywords', pageOverrides.metaKeywords);
+  }
+  if (pageOverrides.canonical) nextHtml = upsertCanonicalInHtml(nextHtml, pageOverrides.canonical);
+  if (pageOverrides.robots) {
+    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'robots', pageOverrides.robots);
+  }
+  if (pageOverrides.ogTitle) {
+    nextHtml = upsertMetaInHtml(nextHtml, 'property', 'og:title', pageOverrides.ogTitle);
+  }
+  if (pageOverrides.ogDescription) {
+    nextHtml = upsertMetaInHtml(nextHtml, 'property', 'og:description', pageOverrides.ogDescription);
+  }
+  if (pageOverrides.ogImage) {
+    nextHtml = upsertMetaInHtml(nextHtml, 'property', 'og:image', pageOverrides.ogImage);
+  }
+  if (pageOverrides.twitterTitle) {
+    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'twitter:title', pageOverrides.twitterTitle);
+  }
+  if (pageOverrides.twitterDescription) {
+    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'twitter:description', pageOverrides.twitterDescription);
+  }
+  if (pageOverrides.twitterImage) {
+    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'twitter:image', pageOverrides.twitterImage);
+  }
+  if (pageOverrides.h1) {
+    nextHtml = upsertFirstH1InHtml(nextHtml, pageOverrides.h1);
+  }
+  if (Object.keys(imageOverrides).length > 0) {
+    nextHtml = applyImageAltOverridesToHtml(nextHtml, imageOverrides);
+  }
+  return nextHtml;
+}
+
+async function readHtmlPageContent(fileNameRaw) {
+  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
+  if (!fileName) return '';
+  try {
+    return await fs.promises.readFile(path.join(__dirname, fileName), 'utf8');
+  } catch (error) {
+    console.error('[SEO][ReadPageError]', fileName, error?.message || error);
+    return '';
+  }
+}
+
+function resolveSeoPageFileFromRequest(fileRaw, slugRaw = '') {
+  const directFile = sanitizeKnownHtmlFileName(fileRaw);
+  if (directFile) return directFile;
+
+  const slug = normalizeString(slugRaw).toLowerCase();
+  if (!slug || !/^[a-z0-9_-]+$/.test(slug)) return '';
+
+  const mappedFile = knownPrettyPageSlugToFile.get(slug);
+  return sanitizeKnownHtmlFileName(mappedFile);
+}
+
+async function sendSeoManagedHtmlPageResponse(req, res, next, fileNameRaw) {
+  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
+  if (!fileName) return next();
+
+  try {
+    const html = await readHtmlPageContent(fileName);
+    if (!html) return next();
+    const config = await getSeoConfigCached();
+    const rendered = applySeoOverridesToHtml(fileName, html, config);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(rendered);
+  } catch (error) {
+    console.error('[SEO][RenderPageError]', fileName, error?.message || error);
+    return res.sendFile(path.join(__dirname, fileName), (sendErr) => {
+      if (sendErr) next();
+    });
+  }
+}
+
 function getByPath(obj, path) {
   return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
 }
@@ -977,192 +1482,77 @@ function extractTranscriptFull(payload) {
   return extractTranscriptText(payload, { maxLength: 8000, preferFull: true });
 }
 
-function extractSummaryFromVapiPayload(payload) {
-  const directSummaryPaths = [
-    'message.call.analysis.summary',
-    'message.analysis.summary',
-    'call.analysis.summary',
-    'analysis.summary',
-    'message.summary',
-    'summary',
-    'message.call.summary',
-    'message.artifact.summary',
-  ];
+function extractRetellTranscriptText(call, options = {}) {
+  const maxLength = Number.isFinite(options.maxLength) ? Math.max(80, options.maxLength) : 8000;
+  const preferFull = options.preferFull !== false;
+  if (!call || typeof call !== 'object') return '';
 
-  for (const path of directSummaryPaths) {
-    const value = getByPath(payload, path);
-    if (typeof value === 'string' && normalizeString(value)) {
-      return truncateText(value, 700);
-    }
-  }
+  const transcript = normalizeString(call?.transcript || '');
+  if (transcript) return truncateText(transcript, maxLength);
 
-  const summaries = collectStringValuesByKey(payload, /summary|recap|synopsis/i, {
-    maxItems: 5,
-    minLength: 12,
-  });
-  if (summaries.length > 0) {
-    return truncateText(summaries[0], 700);
+  const transcriptCandidates = [call?.transcript_with_tool_calls, call?.transcript_object];
+  for (const candidate of transcriptCandidates) {
+    if (!Array.isArray(candidate)) continue;
+    const formatted = formatTranscriptPartsFromEntries(candidate, { preferFull, maxLength });
+    if (formatted) return formatted;
   }
 
   return '';
 }
 
-function normalizeIsoTimestamp(value) {
-  const raw = normalizeString(value);
-  if (!raw) return '';
-  const ts = Date.parse(raw);
-  if (!Number.isFinite(ts)) return '';
-  return new Date(ts).toISOString();
-}
-
-function looksLikeAudioUrl(value) {
-  const raw = normalizeString(value);
-  return /^https?:\/\//i.test(raw) || /^data:audio\//i.test(raw);
-}
-
-function extractTimestampFromVapiPayload(payload, directPaths, keyRegex) {
-  for (const path of directPaths) {
-    const normalized = normalizeIsoTimestamp(getByPath(payload, path));
-    if (normalized) return normalized;
-  }
-
-  const candidates = collectStringValuesByKey(payload, keyRegex, {
-    maxItems: 10,
-    minLength: 10,
-  });
-
-  for (const candidate of candidates) {
-    const normalized = normalizeIsoTimestamp(candidate);
-    if (normalized) return normalized;
-  }
-
-  return '';
-}
-
-function extractCallStartedAt(payload) {
-  return extractTimestampFromVapiPayload(
-    payload,
-    ['message.call.startedAt', 'call.startedAt', 'message.startedAt', 'startedAt'],
-    /startedat|starttime|start(ed)?/i
-  );
-}
-
-function extractCallEndedAt(payload) {
-  return extractTimestampFromVapiPayload(
-    payload,
-    ['message.call.endedAt', 'call.endedAt', 'message.endedAt', 'endedAt'],
-    /endedat|endtime|end(ed)?/i
-  );
-}
-
-function extractCallDurationSeconds(payload) {
-  const directPaths = [
-    'message.call.durationSeconds',
-    'message.call.duration',
-    'message.call.artifact.durationSeconds',
-    'message.call.artifact.duration',
-    'call.durationSeconds',
-    'call.duration',
-    'message.durationSeconds',
-    'message.duration',
-    'durationSeconds',
-    'duration',
-  ];
-
-  for (const path of directPaths) {
-    const numeric = parseNumberSafe(getByPath(payload, path), null);
-    if (!Number.isFinite(numeric) || numeric <= 0) continue;
-    if (numeric > 86400 && numeric < 86400000) {
-      return Math.max(1, Math.round(numeric / 1000));
-    }
-    if (numeric <= 86400) {
-      return Math.max(1, Math.round(numeric));
-    }
-  }
-
-  const startedAt = extractCallStartedAt(payload);
-  const endedAt = extractCallEndedAt(payload);
-  const startTs = Date.parse(startedAt);
-  const endTs = Date.parse(endedAt);
-  if (Number.isFinite(startTs) && Number.isFinite(endTs) && endTs > startTs) {
-    return Math.max(1, Math.round((endTs - startTs) / 1000));
-  }
-
-  return null;
-}
-
-function extractCallRecordingUrl(payload) {
-  const directPaths = [
-    'message.call.recordingUrl',
-    'message.call.recording.url',
-    'message.call.artifact.recordingUrl',
-    'message.call.artifact.recording.url',
-    'message.artifact.recordingUrl',
-    'message.artifact.recording.url',
-    'call.recordingUrl',
-    'call.recording.url',
-    'call.artifact.recordingUrl',
-    'call.artifact.recording.url',
-    'recordingUrl',
-    'audioUrl',
-    'mediaUrl',
-  ];
-
-  for (const path of directPaths) {
-    const value = normalizeString(getByPath(payload, path));
-    if (looksLikeAudioUrl(value)) return value;
-  }
-
-  const candidates = collectStringValuesByKey(payload, /recording|audio|media/i, {
-    maxItems: 20,
-    minLength: 8,
-  });
-
-  return candidates.find((candidate) => looksLikeAudioUrl(candidate)) || '';
-}
-
-function extractCallUpdateFromWebhookPayload(payload) {
-  const messageType = normalizeString(payload?.message?.type || payload?.type || 'unknown');
-  const call = payload?.message?.call || payload?.call || {};
-  const callId = normalizeString(call?.id || payload?.callId || payload?.message?.callId);
+function extractCallUpdateFromRetellPayload(payload) {
+  const event = normalizeString(payload?.event || payload?.type || 'retell.webhook.unknown');
+  const call = payload?.call && typeof payload.call === 'object' ? payload.call : {};
+  const callId = normalizeString(call?.call_id || payload?.call_id || payload?.callId || '');
+  const status = normalizeString(call?.call_status || payload?.call_status || payload?.status || '');
   const phone =
-    normalizeString(call?.customer?.number) ||
-    normalizeString(payload?.message?.customer?.number) ||
-    normalizeString(call?.phoneNumber) ||
-    normalizeString(payload?.customer?.number);
+    normalizeString(call?.to_number) ||
+    normalizeString(call?.metadata?.leadPhoneE164) ||
+    normalizeString(call?.from_number);
   const company =
     normalizeString(call?.metadata?.leadCompany) ||
-    normalizeString(payload?.message?.call?.metadata?.leadCompany) ||
-    normalizeString(call?.customer?.name) ||
     normalizeString(call?.metadata?.company);
   const name =
     normalizeString(call?.metadata?.leadName) ||
-    normalizeString(call?.customer?.name) ||
-    normalizeString(payload?.message?.customer?.name);
-  const status = normalizeString(call?.status || payload?.status || '');
-  const summary = extractSummaryFromVapiPayload(payload);
-  const transcriptSnippet = extractTranscriptSnippet(payload);
-  const transcriptFull = extractTranscriptFull(payload);
-  const endedReason =
-    normalizeString(call?.endedReason) ||
-    normalizeString(getByPath(payload, 'message.call.endedReason')) ||
-    normalizeString(getByPath(payload, 'message.endedReason'));
-  const startedAt = extractCallStartedAt(payload);
-  const endedAt = extractCallEndedAt(payload);
-  const durationSeconds = extractCallDurationSeconds(payload);
-  const recordingUrl = extractCallRecordingUrl(payload);
+    normalizeString(call?.metadata?.lead_name);
+  const summary =
+    normalizeString(call?.call_analysis?.call_summary) ||
+    normalizeString(call?.call_analysis?.summary);
+  const transcriptFull = extractRetellTranscriptText(call, { maxLength: 9000, preferFull: true });
+  const transcriptSnippet = transcriptFull
+    ? truncateText(transcriptFull.replace(/\s+/g, ' '), 450)
+    : '';
+  const endedReason = normalizeString(call?.disconnection_reason || '');
+  const startedAt = toIsoFromUnixMilliseconds(call?.start_timestamp);
+  const endedAt = toIsoFromUnixMilliseconds(call?.end_timestamp);
+  const durationFromMs = parseNumberSafe(call?.duration_ms, null);
+  const durationSeconds =
+    Number.isFinite(durationFromMs) && durationFromMs > 0
+      ? Math.max(1, Math.round(durationFromMs / 1000))
+      : Number.isFinite(Date.parse(startedAt)) && Number.isFinite(Date.parse(endedAt))
+        ? Math.max(1, Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 1000))
+        : null;
+  const recordingUrl =
+    normalizeString(call?.recording_url) ||
+    normalizeString(call?.recording_multi_channel_url) ||
+    normalizeString(call?.scrubbed_recording_url) ||
+    normalizeString(call?.scrubbed_recording_multi_channel_url);
+  const terminal = isTerminalColdcallingStatus(status, endedReason);
+  const updatedAtMs = terminal
+    ? Number(call?.end_timestamp || call?.start_timestamp || Date.now())
+    : Date.now();
 
   if (!callId && !phone && !company && !summary && !transcriptSnippet && !status) {
     return null;
   }
 
   return {
-    callId: callId || `anon-${Date.now()}`,
+    callId: callId || `retell-anon-${Date.now()}`,
     phone,
     company,
     name,
     status,
-    messageType,
+    messageType: `retell.${event || 'webhook'}`,
     summary,
     transcriptSnippet,
     transcriptFull,
@@ -1171,67 +1561,51 @@ function extractCallUpdateFromWebhookPayload(payload) {
     endedAt,
     durationSeconds,
     recordingUrl,
-    updatedAt: new Date().toISOString(),
-    updatedAtMs: Date.now(),
+    updatedAt: new Date(updatedAtMs).toISOString(),
+    updatedAtMs,
+    provider: 'retell',
   };
 }
 
-function extractCallUpdateFromVapiCallStatusResponse(callId, data) {
+function extractCallUpdateFromRetellCallStatusResponse(callId, data) {
   const call =
-    data?.call && typeof data.call === 'object'
-      ? data.call
-      : data && typeof data === 'object'
-        ? data
-        : null;
-  if (!call || typeof call !== 'object') return null;
+    data && typeof data === 'object'
+      ? data
+      : null;
+  if (!call) return null;
 
-  const syntheticPayload = {
-    type: 'vapi-call-status-fetch',
-    message: {
-      type: 'vapi-call-status-fetch',
-      call,
-      analysis: call.analysis || data?.analysis || null,
-      artifact: call.artifact || data?.artifact || null,
-      summary: call.summary || data?.summary || null,
-      transcript: call.transcript || data?.transcript || null,
-      messages: call.messages || data?.messages || null,
-      conversation: call.conversation || data?.conversation || null,
-      customer: call.customer || data?.customer || null,
-    },
+  const extracted = extractCallUpdateFromRetellPayload({
+    event: 'call_status_fetch',
     call,
-    analysis: call.analysis || data?.analysis || null,
-    artifact: call.artifact || data?.artifact || null,
-    summary: call.summary || data?.summary || null,
-    transcript: call.transcript || data?.transcript || null,
-    messages: call.messages || data?.messages || null,
-  };
-
-  const extracted = extractCallUpdateFromWebhookPayload(syntheticPayload);
+  });
   if (!extracted) return null;
 
   return {
     ...extracted,
-    callId: normalizeString(call?.id || callId || extracted.callId),
-    messageType: 'vapi-call-status-fetch',
-    updatedAt: normalizeString(call?.updatedAt || data?.updatedAt || '') || new Date().toISOString(),
-    updatedAtMs:
-      Date.parse(normalizeString(call?.updatedAt || data?.updatedAt || '')) || Date.now(),
+    callId: normalizeString(call?.call_id || callId || extracted.callId),
+    messageType: 'retell.call_status_fetch',
+    updatedAtMs: Number(call?.end_timestamp || call?.start_timestamp || extracted.updatedAtMs || Date.now()),
+    updatedAt:
+      toIsoFromUnixMilliseconds(call?.end_timestamp || call?.start_timestamp) ||
+      new Date(
+        Number(call?.end_timestamp || call?.start_timestamp || extracted.updatedAtMs || Date.now())
+      ).toISOString(),
   };
 }
 
-async function refreshCallUpdateFromVapiStatusApi(callId) {
+async function refreshCallUpdateFromRetellStatusApi(callId) {
   const normalizedCallId = normalizeString(callId);
   if (!normalizedCallId) return null;
-  if (!normalizeString(process.env.VAPI_API_KEY)) return null;
+  if (!normalizeString(process.env.RETELL_API_KEY)) return null;
 
   try {
-    const { data } = await fetchVapiCallStatusById(normalizedCallId);
-    const update = extractCallUpdateFromVapiCallStatusResponse(normalizedCallId, data);
+    const { data } = await fetchRetellCallStatusById(normalizedCallId);
+    const update = extractCallUpdateFromRetellCallStatusResponse(normalizedCallId, data);
     if (!update) return null;
     return upsertRecentCallUpdate(update);
   } catch (error) {
     console.warn(
-      '[Vapi Call Status Refresh Failed]',
+      '[Retell Call Status Refresh Failed]',
       JSON.stringify(
         {
           callId: normalizedCallId,
@@ -1244,6 +1618,34 @@ async function refreshCallUpdateFromVapiStatusApi(callId) {
     );
     return null;
   }
+}
+
+function shouldRefreshRetellCallStatus(update, nowMs = Date.now()) {
+  const callId = normalizeString(update?.callId || '');
+  if (!callId || !callId.startsWith('call_')) return false;
+
+  const provider = normalizeString(update?.provider || 'retell').toLowerCase();
+  if (provider && provider !== 'retell') return false;
+
+  const status = normalizeString(update?.status || '').toLowerCase();
+  const endedReason = normalizeString(update?.endedReason || '');
+  if (isTerminalColdcallingStatus(status, endedReason)) {
+    retellCallStatusRefreshByCallId.delete(callId);
+    return false;
+  }
+
+  const updatedAtMs = Number(update?.updatedAtMs || 0);
+  if (Number.isFinite(updatedAtMs) && updatedAtMs > 0 && nowMs - updatedAtMs < 2500) {
+    return false;
+  }
+
+  const lastRefreshMs = Number(retellCallStatusRefreshByCallId.get(callId) || 0);
+  if (Number.isFinite(lastRefreshMs) && nowMs - lastRefreshMs < RETELL_STATUS_REFRESH_COOLDOWN_MS) {
+    return false;
+  }
+
+  retellCallStatusRefreshByCallId.set(callId, nowMs);
+  return true;
 }
 
 function upsertRecentCallUpdate(update) {
@@ -1279,6 +1681,10 @@ function upsertRecentCallUpdate(update) {
     : update;
 
   callUpdatesById.set(merged.callId, merged);
+
+  if (isTerminalColdcallingStatus(merged.status, merged.endedReason)) {
+    retellCallStatusRefreshByCallId.delete(merged.callId);
+  }
 
   const existingIndex = recentCallUpdates.findIndex((item) => item.callId === merged.callId);
   if (existingIndex >= 0) {
@@ -1352,34 +1758,26 @@ function normalizeNlPhoneToE164(input) {
   throw new Error(`Kan nummer niet omzetten naar NL E.164 formaat: ${raw}`);
 }
 
-function getRequiredVapiEnv() {
-  return ['VAPI_API_KEY', 'VAPI_ASSISTANT_ID', 'VAPI_PHONE_NUMBER_ID'];
+function getRequiredRetellEnv() {
+  return ['RETELL_API_KEY', 'RETELL_FROM_NUMBER', 'RETELL_AGENT_ID'];
 }
 
-function getRequiredElevenLabsEnv() {
-  return ['ELEVENLABS_API_KEY', 'ELEVENLABS_PHONE_NUMBER_ID'];
-}
-
-function getConfiguredElevenLabsAgentId() {
-  return normalizeString(process.env.ELEVENLABS_AGENT_ID || DEFAULT_ELEVENLABS_AGENT_ID);
-}
-
-function isElevenLabsColdcallingConfigured() {
-  return getRequiredElevenLabsEnv().every((key) => normalizeString(process.env[key]));
+function isRetellColdcallingConfigured() {
+  return getRequiredRetellEnv().every((key) => normalizeString(process.env[key]));
 }
 
 function getColdcallingProvider() {
   const configured = normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase();
-  if (configured === 'elevenlabs') return 'elevenlabs';
-  if (configured === 'vapi') return 'vapi';
-  return isElevenLabsColdcallingConfigured() ? 'elevenlabs' : 'vapi';
+  if (configured === 'retell') return 'retell';
+  if (isRetellColdcallingConfigured()) return 'retell';
+  return 'retell';
 }
 
 function getMissingEnvVars(provider = getColdcallingProvider()) {
-  if (provider === 'elevenlabs') {
-    return getRequiredElevenLabsEnv().filter((key) => !process.env[key]);
+  if (provider === 'retell') {
+    return getRequiredRetellEnv().filter((key) => !process.env[key]);
   }
-  return getRequiredVapiEnv().filter((key) => !process.env[key]);
+  return getRequiredRetellEnv().filter((key) => !process.env[key]);
 }
 
 function toBooleanSafe(value, fallback = false) {
@@ -2652,10 +3050,10 @@ function createRuleBasedInsightFromCallUpdate(callUpdate) {
       lower
     );
 
-  const vapiSummaryStrong =
+  const callSummaryStrong =
     /er is een afspraak ingepland|afspraak ingepland|afspraak gepland|intake ingepland/.test(lower);
 
-  const appointmentBooked = hasAppointmentLanguage || vapiSummaryStrong;
+  const appointmentBooked = hasAppointmentLanguage || callSummaryStrong;
   const appointmentDate = extractLikelyAppointmentDateFromText(sourceText, callUpdate.updatedAt);
   const appointmentTime = extractLikelyAppointmentTimeFromText(sourceText);
 
@@ -2679,7 +3077,7 @@ function createRuleBasedInsightFromCallUpdate(callUpdate) {
     estimatedValueEur: null,
     followUpRequired: Boolean(appointmentBooked),
     followUpReason: appointmentBooked
-      ? 'Bevestigingsmail sturen op basis van gedetecteerde afspraak in Vapi transcriptie.'
+      ? 'Bevestigingsmail sturen op basis van gedetecteerde afspraak in gesprekstranscriptie.'
       : '',
     source: 'rule',
     model: 'rule',
@@ -2925,7 +3323,7 @@ function buildConfirmationTaskDetail(appointment) {
     contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
     transcript,
     transcriptAvailable: Boolean(transcript),
-    vapiSummary: normalizeString(callUpdate?.summary || ''),
+    callSummary: normalizeString(callUpdate?.summary || ''),
     transcriptSnippet: normalizeString(callUpdate?.transcriptSnippet || ''),
     aiSummary: normalizeString(aiInsight?.summary || ''),
     confirmationEmailDraft: normalizeString(appointment.confirmationEmailDraft || ''),
@@ -3104,8 +3502,8 @@ function buildGeneratedAgendaAppointmentFromAiInsight(insight) {
     time,
     value: formatEuroLabel(insight.estimatedValueEur || insight.estimated_value_eur),
     branche,
-    source: 'AI Cold Calling (Vapi + AI)',
-    summary: summary || 'AI-samenvatting aangemaakt op basis van Vapi call update.',
+    source: 'AI Cold Calling (Retell + AI)',
+    summary: summary || 'AI-samenvatting aangemaakt op basis van call update.',
     aiGenerated: true,
     callId: normalizeString(insight.callId),
     createdAt: new Date().toISOString(),
@@ -3143,7 +3541,7 @@ async function createAiInsightFromCallUpdate(callUpdate) {
       company: callUpdate.company,
       name: callUpdate.name,
       phone: callUpdate.phone,
-      vapiSummary: callUpdate.summary,
+      callSummary: callUpdate.summary,
       transcriptSnippet: callUpdate.transcriptSnippet,
       transcriptFull: truncateText(normalizeString(callUpdate.transcriptFull || ''), 5000),
       updatedAt: callUpdate.updatedAt,
@@ -3382,7 +3780,7 @@ function buildConfirmationEmailDraftFallback(appointment, detail = {}) {
   const datetimeLabel = formatDateTimeLabelNl(date, time) || `${date} ${time}`;
 
   const summary =
-    normalizeString(detail?.aiSummary || detail?.vapiSummary || appointment?.summary || '').trim() ||
+    normalizeString(detail?.aiSummary || detail?.callSummary || appointment?.summary || '').trim() ||
     'Bedankt voor het prettige gesprek.';
 
   return [
@@ -4020,7 +4418,7 @@ async function generateConfirmationEmailDraftWithAi(appointment, detail = {}) {
     },
     context: {
       aiSummary: truncateText(normalizeString(detail?.aiSummary || ''), 1000),
-      vapiSummary: truncateText(normalizeString(detail?.vapiSummary || ''), 1000),
+      callSummary: truncateText(normalizeString(detail?.callSummary || ''), 1000),
       transcriptSnippet: truncateText(normalizeString(detail?.transcriptSnippet || ''), 1200),
       transcript: truncateText(normalizeString(detail?.transcript || ''), 4000),
     },
@@ -4081,130 +4479,71 @@ async function generateConfirmationEmailDraftWithAi(appointment, detail = {}) {
   };
 }
 
-async function createVapiOutboundCall(payload) {
-  const endpoints = ['/call', '/call/phone'];
-  let lastError = null;
+async function createRetellOutboundCall(payload) {
+  const endpoint = '/v2/create-phone-call';
+  const { response, data } = await fetchJsonWithTimeout(
+    buildRetellApiUrl(endpoint),
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RETELL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+    15000
+  );
 
-  for (const endpoint of endpoints) {
-    try {
-      const { response, data } = await fetchJsonWithTimeout(
-        `${VAPI_BASE_URL}${endpoint}`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.VAPI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      console.log(
-        '[Vapi Response]',
-        JSON.stringify(
-          {
-            endpoint,
-            statusCode: response.status,
-            ok: response.ok,
-            body: data,
-          },
-          null,
-          2
-        )
-      );
-
-      if (response.ok) {
-        return { endpoint, data };
-      }
-
-      const statusError = new Error(
-        data?.message ||
-          data?.error ||
-          data?.raw ||
-          `Vapi API fout (${response.status}) op ${endpoint}`
-      );
-      statusError.status = response.status;
-      statusError.endpoint = endpoint;
-      statusError.data = data;
-
-      if (response.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
-        lastError = statusError;
-        continue;
-      }
-
-      throw statusError;
-    } catch (error) {
-      lastError = error;
-      if (error.name === 'AbortError') {
-        throw new Error('Timeout bij aanroepen van Vapi API');
-      }
-      if (error.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
-        continue;
-      }
-      throw error;
-    }
+  if (!response.ok) {
+    const statusError = new Error(
+      data?.message ||
+        data?.error ||
+        data?.detail ||
+        data?.raw ||
+        `Retell API fout (${response.status})`
+    );
+    statusError.status = response.status;
+    statusError.endpoint = endpoint;
+    statusError.data = data;
+    throw statusError;
   }
 
-  throw lastError || new Error('Onbekende fout bij starten Vapi call');
+  return { endpoint, data };
 }
 
-async function fetchVapiCallStatusById(callId) {
+async function fetchRetellCallStatusById(callId) {
   const normalizedCallId = normalizeString(callId);
   if (!normalizedCallId) {
     throw new Error('callId ontbreekt');
   }
 
-  const encodedCallId = encodeURIComponent(normalizedCallId);
-  const endpoints = [`/call/${encodedCallId}`, `/calls/${encodedCallId}`];
-  let lastError = null;
+  const endpoint = `/v2/get-call/${encodeURIComponent(normalizedCallId)}`;
+  const { response, data } = await fetchJsonWithTimeout(
+    buildRetellApiUrl(endpoint),
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${process.env.RETELL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    },
+    10000
+  );
 
-  for (const endpoint of endpoints) {
-    try {
-      const { response, data } = await fetchJsonWithTimeout(
-        `${VAPI_BASE_URL}${endpoint}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${process.env.VAPI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        },
-        10000
-      );
-
-      if (response.ok) {
-        return { endpoint, data };
-      }
-
-      const statusError = new Error(
-        data?.message || data?.error || data?.raw || `Vapi call status fout (${response.status})`
-      );
-      statusError.status = response.status;
-      statusError.endpoint = endpoint;
-      statusError.data = data;
-      lastError = statusError;
-
-      if (response.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
-        continue;
-      }
-
-      throw statusError;
-    } catch (error) {
-      lastError = error;
-      if (error?.name === 'AbortError') {
-        throw new Error('Timeout bij ophalen Vapi call status');
-      }
-      if (error?.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
-        continue;
-      }
-      throw error;
-    }
+  if (!response.ok) {
+    const statusError = new Error(
+      data?.message || data?.error || data?.detail || data?.raw || `Retell call status fout (${response.status})`
+    );
+    statusError.status = response.status;
+    statusError.endpoint = endpoint;
+    statusError.data = data;
+    throw statusError;
   }
 
-  throw lastError || new Error('Kon Vapi call status niet ophalen');
+  return { endpoint, data };
 }
 
-function classifyVapiFailure(error) {
+function classifyRetellFailure(error) {
   const message = String(error?.message || '').toLowerCase();
   const detailText = JSON.stringify(error?.data || {}).toLowerCase();
   const combined = `${message} ${detailText}`;
@@ -4212,91 +4551,88 @@ function classifyVapiFailure(error) {
 
   if (
     status === 402 ||
-    /credit|credits|balance|billing|payment required|insufficient funds/.test(combined)
+    /credit|credits|balance|billing|payment required|insufficient funds|no_valid_payment/.test(combined)
   ) {
     return {
       cause: 'credits',
-      explanation: 'Waarschijnlijk onvoldoende Vapi-credits/balance om de call te starten.',
+      explanation: 'Waarschijnlijk onvoldoende Retell-credits/balance om de call te starten.',
     };
   }
 
-  if (
-    /free vapi number|free vapi numbers/.test(combined) &&
-    /international call|international calls/.test(combined)
-  ) {
+  if (status === 401 || /unauthorized|invalid api key|bearer/.test(combined)) {
     return {
-      cause: 'wrong phoneNumberId',
-      explanation:
-        'Je VAPI_PHONE_NUMBER_ID verwijst naar een gratis Vapi-nummer. Gratis Vapi-nummers ondersteunen geen internationale outbound calls (zoals +31). Gebruik een betaald/extern nummer met internationale outbound.',
+      cause: 'wrong retell api key',
+      explanation: 'RETELL_API_KEY lijkt ongeldig of ontbreekt.',
     };
   }
 
-  if (
-    /assistant/.test(combined) &&
-    /(not found|unknown|invalid|does not exist|no .*assistant)/.test(combined)
-  ) {
+  if (/override_agent_id|agent/.test(combined) && /(invalid|unknown|not found|missing|does not exist)/.test(combined)) {
     return {
-      cause: 'wrong assistantId',
-      explanation: 'De opgegeven VAPI_ASSISTANT_ID lijkt ongeldig of bestaat niet.',
+      cause: 'wrong retell agent',
+      explanation: 'RETELL_AGENT_ID lijkt ongeldig of niet beschikbaar.',
     };
   }
 
   if (
-    /(phone.?number.?id|phone number id|from number|caller id)/.test(combined) &&
-    /(not found|unknown|invalid|does not exist|unauthorized)/.test(combined)
-  ) {
-    return {
-      cause: 'wrong phoneNumberId',
-      explanation: 'De opgegeven VAPI_PHONE_NUMBER_ID lijkt ongeldig of niet beschikbaar voor dit account.',
-    };
-  }
-
-  if (
-    /invalid.*(phone|number)|invalid number|e\\.164|phone.*format|number.*format|telefoonnummer|kan nummer niet omzetten/.test(
-      combined
-    )
+    /from_number|to_number|invalid_destination|e\\.164|phone|number|nummer/.test(combined) &&
+    /(invalid|format|not found|permission|omzetten|ongeldig)/.test(combined)
   ) {
     return {
       cause: 'invalid number',
-      explanation: 'Het doelnummer is ongeldig of niet in het verwachte formaat beschikbaar.',
+      explanation: 'Het doelnummer of belnummer voor Retell is ongeldig of niet toegestaan.',
+    };
+  }
+
+  if (/dynamic variables?|retell_llm_dynamic_variables|key value pairs of strings/.test(combined)) {
+    return {
+      cause: 'invalid dynamic variables',
+      explanation:
+        'Retell verwacht platte dynamic variables met alleen string-waarden. De payload is nu aangepast om alleen string -> string mee te sturen.',
     };
   }
 
   if (
     status >= 500 ||
-    /provider|twilio|carrier|sip|telecom|downstream|upstream|timeout|temporar|rate limit|service unavailable/.test(
+    /provider|carrier|telecom|twilio|sip|timeout|temporar|rate limit|service unavailable|unavailable/.test(
       combined
     )
   ) {
     return {
       cause: 'provider issue',
-      explanation: 'Waarschijnlijk een issue bij Vapi/provider/carrier (tijdelijk of extern).',
+      explanation: 'Waarschijnlijk een issue bij Retell/provider/carrier (tijdelijk of extern).',
     };
   }
 
   return {
     cause: 'unknown',
     explanation:
-      'Oorzaak kon niet eenduidig worden bepaald. Controleer de exacte foutmelding en Vapi response body.',
+      'Oorzaak kon niet eenduidig worden bepaald. Controleer de exacte foutmelding en Retell response body.',
   };
 }
 
 function buildVariableValues(lead, campaign) {
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
-
-  return {
+  const minProjectValue = parseNumberSafe(campaign.minProjectValue, null);
+  const maxDiscountPct = parseNumberSafe(campaign.maxDiscountPct, null);
+  const rawValues = {
     name: normalizeString(lead.name),
     company: normalizeString(lead.company),
     sector: normalizeString(campaign.sector),
     region: effectiveRegion,
-    minProjectValue: campaign.minProjectValue,
-    maxDiscountPct: campaign.maxDiscountPct,
+    minProjectValue: Number.isFinite(minProjectValue) ? String(minProjectValue) : '',
+    maxDiscountPct: Number.isFinite(maxDiscountPct) ? String(maxDiscountPct) : '',
     extraInstructions: normalizeString(campaign.extraInstructions),
   };
+
+  return Object.fromEntries(
+    Object.entries(rawValues).filter(
+      ([key, value]) => normalizeString(key) && typeof value === 'string'
+    )
+  );
 }
 
-function buildElevenLabsApiUrl(relativePath, searchParams = null) {
-  const normalizedBase = `${normalizeString(ELEVENLABS_API_BASE_URL).replace(/\/+$/, '')}/`;
+function buildRetellApiUrl(relativePath, searchParams = null) {
+  const normalizedBase = `${normalizeString(RETELL_API_BASE_URL).replace(/\/+$/, '')}/`;
   const url = new URL(String(relativePath || '').replace(/^\/+/, ''), normalizedBase);
 
   if (searchParams && typeof searchParams === 'object') {
@@ -4310,381 +4646,40 @@ function buildElevenLabsApiUrl(relativePath, searchParams = null) {
   return url;
 }
 
-function toIsoFromUnixSeconds(value) {
+function toIsoFromUnixMilliseconds(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) return '';
-  return new Date(numeric * 1000).toISOString();
-}
-
-function buildElevenLabsRecordingProxyUrl(callId) {
-  const normalizedCallId = normalizeString(callId);
-  if (!normalizedCallId) return '';
-  return `/api/coldcalling/recording?callId=${encodeURIComponent(normalizedCallId)}`;
+  if (numeric < 1e11) {
+    return new Date(numeric * 1000).toISOString();
+  }
+  return new Date(numeric).toISOString();
 }
 
 function isTerminalColdcallingStatus(status, endedReason = '') {
   const combined = `${normalizeString(status).toLowerCase()} ${normalizeString(endedReason).toLowerCase()}`;
-  return /(ended|completed|failed|cancelled|canceled|busy|no-answer|no answer|voicemail|hungup|hangup|disconnected|done)/.test(
+  return /(ended|completed|failed|cancelled|canceled|busy|no-answer|no answer|voicemail|hungup|hangup|disconnected|done|error|not_connected|dial_)/.test(
     combined
   );
 }
 
-function extractElevenLabsTranscriptText(transcript) {
-  if (!transcript) return '';
-  if (typeof transcript === 'string') return normalizeString(transcript);
-  if (!Array.isArray(transcript)) return '';
-
-  return transcript
-    .map((item) => {
-      if (!item || typeof item !== 'object') return '';
-      const text =
-        normalizeString(item.message) ||
-        normalizeString(item.text) ||
-        normalizeString(item.transcript) ||
-        normalizeString(item.content);
-      if (!text) return '';
-      const role =
-        normalizeString(item.role) ||
-        normalizeString(item.speaker) ||
-        normalizeString(item.source) ||
-        normalizeString(item.type);
-      return role ? `${role}: ${text}` : text;
-    })
-    .filter(Boolean)
-    .join('\n');
-}
-
-function buildElevenLabsConversationInitiationData(lead, campaign, normalizedPhone) {
-  return {
-    dynamic_variables: {
-      ...buildVariableValues(
-        {
-          ...lead,
-          phone: normalizedPhone,
-        },
-        campaign
-      ),
-      phone: normalizedPhone,
-    },
-  };
-}
-
-function buildElevenLabsConversationUpdate(callId, details, fallback = {}) {
-  const metadata = details?.metadata && typeof details.metadata === 'object' ? details.metadata : {};
-  const transcriptFull = extractElevenLabsTranscriptText(details?.transcript);
-  const transcriptSnippet = transcriptFull
-    ? truncateText(transcriptFull.replace(/\s+/g, ' '), 280)
-    : normalizeString(fallback.transcriptSnippet || '');
-  const summary =
-    normalizeString(details?.analysis?.transcript_summary) ||
-    normalizeString(details?.analysis?.summary) ||
-    normalizeString(fallback.summary || '');
-  const startedAt =
-    toIsoFromUnixSeconds(metadata.start_time_unix_secs) ||
-    normalizeString(details?.created_at) ||
-    normalizeString(fallback.startedAt || '');
-  const durationSeconds =
-    parseNumberSafe(metadata.call_duration_secs, null) ||
-    parseNumberSafe(details?.call_duration_secs, null) ||
-    parseNumberSafe(fallback.durationSeconds, null);
-  const endedAt =
-    toIsoFromUnixSeconds(metadata.end_time_unix_secs) ||
-    (startedAt && Number.isFinite(durationSeconds) && durationSeconds > 0
-      ? new Date(Date.parse(startedAt) + durationSeconds * 1000).toISOString()
-      : normalizeString(fallback.endedAt || ''));
-  const status = normalizeString(details?.status || fallback.status || '');
-  const endedReason =
-    normalizeString(details?.analysis?.call_successful === false ? 'unsuccessful' : '') ||
-    normalizeString(details?.termination_reason) ||
-    normalizeString(details?.error?.message) ||
-    normalizeString(fallback.endedReason || '');
-  const hasAudio = Boolean(details?.has_audio);
-  const updatedAtMs =
-    isTerminalColdcallingStatus(status, endedReason) && endedAt
-      ? Date.parse(endedAt) || Date.now()
-      : Date.now();
-
-  return {
-    callId,
-    phone: normalizeString(fallback.phone || ''),
-    company: normalizeString(fallback.company || ''),
-    name: normalizeString(fallback.name || ''),
-    status,
-    messageType: 'elevenlabs.conversation',
-    summary,
-    transcriptSnippet,
-    transcriptFull: transcriptFull || normalizeString(fallback.transcriptFull || ''),
-    endedReason,
-    startedAt,
-    endedAt,
-    durationSeconds: Number.isFinite(durationSeconds) && durationSeconds > 0 ? Math.round(durationSeconds) : null,
-    recordingUrl: hasAudio ? buildElevenLabsRecordingProxyUrl(callId) : normalizeString(fallback.recordingUrl || ''),
-    updatedAt: new Date(updatedAtMs).toISOString(),
-    updatedAtMs,
-    provider: 'elevenlabs',
-  };
-}
-
-async function createElevenLabsOutboundCall(lead, campaign) {
-  const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
-  const payload = {
-    agent_id: getConfiguredElevenLabsAgentId(),
-    agent_phone_number_id: normalizeString(process.env.ELEVENLABS_PHONE_NUMBER_ID),
-    to_number: normalizedPhone,
-    conversation_initiation_client_data: buildElevenLabsConversationInitiationData(
-      lead,
-      campaign,
-      normalizedPhone
-    ),
-  };
-
-  const endpoint = '/convai/twilio/outbound-call';
-  const response = await fetch(buildElevenLabsApiUrl(endpoint), {
-    method: 'POST',
-    headers: {
-      'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const error = new Error(
-      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
-        `ElevenLabs outbound call fout (${response.status})`
-    );
-    error.status = response.status;
-    error.data = data;
-    error.endpoint = endpoint;
-    throw error;
-  }
-
-  return { endpoint, data, normalizedPhone };
-}
-
-async function fetchElevenLabsConversationById(callId) {
-  const normalizedCallId = normalizeString(callId);
-  const endpoint = `/convai/conversations/${encodeURIComponent(normalizedCallId)}`;
-  const response = await fetch(buildElevenLabsApiUrl(endpoint), {
-    method: 'GET',
-    headers: {
-      'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
-    },
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const error = new Error(
-      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
-        `ElevenLabs conversation ophalen mislukt (${response.status})`
-    );
-    error.status = response.status;
-    error.data = data;
-    error.endpoint = endpoint;
-    throw error;
-  }
-
-  return { endpoint, data };
-}
-
-async function fetchElevenLabsConversationAudioResponse(callId) {
-  const normalizedCallId = normalizeString(callId);
-  const endpoint = `/convai/conversations/${encodeURIComponent(normalizedCallId)}/audio`;
-  const response = await fetch(buildElevenLabsApiUrl(endpoint), {
-    method: 'GET',
-    headers: {
-      'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
-    },
-  });
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    const error = new Error(
-      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
-        `ElevenLabs audio ophalen mislukt (${response.status})`
-    );
-    error.status = response.status;
-    error.data = data;
-    error.endpoint = endpoint;
-    throw error;
-  }
-
-  return { endpoint, response };
-}
-
-function buildElevenLabsListCallUpdate(item, fallback = {}) {
-  const callId = normalizeString(item?.conversation_id || fallback.callId || '');
-  const status = normalizeString(item?.status || fallback.status || '');
-  const summary = normalizeString(item?.transcript_summary || fallback.summary || '');
-  const startedAt =
-    toIsoFromUnixSeconds(item?.start_time_unix_secs) ||
-    normalizeString(fallback.startedAt || '');
-  const durationSeconds =
-    parseNumberSafe(item?.call_duration_secs, null) ||
-    parseNumberSafe(fallback.durationSeconds, null);
-  const endedAt =
-    isTerminalColdcallingStatus(status, fallback.endedReason) && startedAt && Number.isFinite(durationSeconds)
-      ? new Date(Date.parse(startedAt) + durationSeconds * 1000).toISOString()
-      : normalizeString(fallback.endedAt || '');
-  const fingerprint = JSON.stringify({
-    status,
-    summary,
-    durationSeconds: Number.isFinite(durationSeconds) ? Math.round(durationSeconds) : null,
-    endedAt,
-  });
-  const previousFingerprint = JSON.stringify({
-    status: normalizeString(fallback.status || ''),
-    summary: normalizeString(fallback.summary || ''),
-    durationSeconds: Number.isFinite(Number(fallback.durationSeconds))
-      ? Math.round(Number(fallback.durationSeconds))
-      : null,
-    endedAt: normalizeString(fallback.endedAt || ''),
-  });
-  const changed = fingerprint !== previousFingerprint;
-  const updatedAtMs = changed
-    ? Date.now()
-    : Number(fallback.updatedAtMs || Date.parse(startedAt) || Date.now());
-
-  return {
-    callId,
-    phone: normalizeString(fallback.phone || ''),
-    company: normalizeString(fallback.company || ''),
-    name: normalizeString(fallback.name || ''),
-    status,
-    messageType: 'elevenlabs.conversation.list',
-    summary,
-    transcriptSnippet: normalizeString(fallback.transcriptSnippet || ''),
-    transcriptFull: normalizeString(fallback.transcriptFull || ''),
-    endedReason: normalizeString(fallback.endedReason || ''),
-    startedAt,
-    endedAt,
-    durationSeconds: Number.isFinite(durationSeconds) && durationSeconds > 0 ? Math.round(durationSeconds) : null,
-    recordingUrl:
-      Number.isFinite(durationSeconds) && durationSeconds > 0
-        ? buildElevenLabsRecordingProxyUrl(callId)
-        : normalizeString(fallback.recordingUrl || ''),
-    updatedAt: new Date(updatedAtMs).toISOString(),
-    updatedAtMs,
-    provider: 'elevenlabs',
-  };
-}
-
-async function listElevenLabsConversations(pageSize = 100) {
-  const agentId = getConfiguredElevenLabsAgentId();
-  const now = Date.now();
-  if (
-    elevenLabsConversationListCache.agentId === agentId &&
-    now - Number(elevenLabsConversationListCache.fetchedAtMs || 0) < 3000
-  ) {
-    return elevenLabsConversationListCache.conversations.slice();
-  }
-
-  const endpoint = '/convai/conversations';
-  const response = await fetch(
-    buildElevenLabsApiUrl(endpoint, {
-      agent_id: agentId,
-      page_size: String(Math.max(1, Math.min(100, pageSize))),
-      summary_mode: 'include',
-    }),
-    {
-      method: 'GET',
-      headers: {
-        'xi-api-key': normalizeString(process.env.ELEVENLABS_API_KEY),
-      },
-    }
-  );
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const error = new Error(
-      normalizeString(data?.detail?.message || data?.detail || data?.message || data?.error) ||
-        `ElevenLabs conversations laden mislukt (${response.status})`
-    );
-    error.status = response.status;
-    error.data = data;
-    error.endpoint = endpoint;
-    throw error;
-  }
-
-  const conversations = Array.isArray(data?.conversations) ? data.conversations : [];
-  elevenLabsConversationListCache = {
-    fetchedAtMs: now,
-    agentId,
-    conversations: conversations.slice(),
-  };
-  return conversations;
-}
-
-async function refreshElevenLabsRecentCallUpdates(limit = 200) {
-  const conversations = await listElevenLabsConversations(limit);
-  conversations.forEach((conversation) => {
-    const callId = normalizeString(conversation?.conversation_id);
-    if (!callId) return;
-    const fallback = callUpdatesById.get(callId) || {};
-    const update = upsertRecentCallUpdate(buildElevenLabsListCallUpdate(conversation, fallback));
-    triggerPostCallAutomation(update);
-  });
-}
-
-function classifyElevenLabsFailure(error) {
-  const status = Number(error?.status || 0);
-  const combined = `${normalizeString(error?.message)} ${JSON.stringify(error?.data || {})}`.toLowerCase();
-
-  if (status === 401 || /unauthorized|invalid api key|xi-api-key/.test(combined)) {
-    return {
-      cause: 'wrong elevenlabs api key',
-      explanation: 'ELEVENLABS_API_KEY lijkt ongeldig of ontbreekt.',
-    };
-  }
-
-  if (/phone number|agent_phone_number_id|phnum_/.test(combined) && /(invalid|unknown|not found|missing)/.test(combined)) {
-    return {
-      cause: 'wrong elevenlabs phone number',
-      explanation: 'ELEVENLABS_PHONE_NUMBER_ID lijkt ongeldig of niet beschikbaar voor outbound calls.',
-    };
-  }
-
-  if (/agent/.test(combined) && /(invalid|unknown|not found|missing)/.test(combined)) {
-    return {
-      cause: 'wrong elevenlabs agent',
-      explanation: 'ELEVENLABS_AGENT_ID lijkt ongeldig of niet beschikbaar.',
-    };
-  }
-
-  if (/twilio|carrier|telecom|rate limit|timeout|temporar|service unavailable/.test(combined) || status >= 500) {
-    return {
-      cause: 'provider issue',
-      explanation: 'Waarschijnlijk een issue bij ElevenLabs/Twilio/provider (tijdelijk of extern).',
-    };
-  }
-
-  return {
-    cause: 'unknown',
-    explanation: 'Oorzaak kon niet eenduidig worden bepaald. Controleer de exacte ElevenLabs response body.',
-  };
-}
-
-function buildVapiPayload(lead, campaign) {
+function buildRetellPayload(lead, campaign) {
   const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
+  const overrideAgentId = normalizeString(process.env.RETELL_AGENT_ID);
+  const overrideAgentVersion = parseIntSafe(process.env.RETELL_AGENT_VERSION, 0);
 
   return {
-    assistantId: process.env.VAPI_ASSISTANT_ID,
-    phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID,
-    customer: {
-      name: normalizeString(lead.name) || normalizeString(lead.company) || 'Onbekende lead',
-      number: normalizedPhone,
-    },
-    assistantOverrides: {
-      variableValues: buildVariableValues(
-        {
-          ...lead,
-          phone: normalizedPhone,
-        },
-        campaign
-      ),
-    },
+    from_number: normalizeString(process.env.RETELL_FROM_NUMBER),
+    to_number: normalizedPhone,
+    ...(overrideAgentId ? { override_agent_id: overrideAgentId } : {}),
+    ...(overrideAgentVersion > 0 ? { override_agent_version: overrideAgentVersion } : {}),
+    retell_llm_dynamic_variables: buildVariableValues(
+      {
+        ...lead,
+        phone: normalizedPhone,
+      },
+      campaign
+    ),
     metadata: {
       source: 'softora-coldcalling-dashboard',
       leadCompany: normalizeString(lead.company),
@@ -4696,95 +4691,17 @@ function buildVapiPayload(lead, campaign) {
   };
 }
 
-async function processVapiColdcallingLead(lead, campaign, index) {
+async function processRetellColdcallingLead(lead, campaign, index) {
   try {
-    const payload = buildVapiPayload(lead, campaign);
-    const normalizedPhone = payload.customer.number;
-    const { endpoint, data } = await createVapiOutboundCall(payload);
-    const callId = data?.id || data?.call?.id || null;
-    const callStatus = data?.status || data?.call?.status || null;
+    const payload = buildRetellPayload(lead, campaign);
+    const normalizedPhone = payload.to_number;
+    const { endpoint, data } = await createRetellOutboundCall(payload);
+    const callId = normalizeString(data?.call_id || data?.callId || data?.id);
+    const callStatus = normalizeString(data?.call_status || data?.status || 'registered');
+    let latestUpdate = null;
 
     if (callId) {
-      upsertRecentCallUpdate({
-        callId,
-        phone: normalizedPhone,
-        company: normalizeString(lead.company),
-        name: normalizeString(lead.name),
-        status: normalizeString(callStatus),
-        messageType: 'coldcalling.start.response',
-        summary: '',
-        transcriptSnippet: '',
-        endedReason: '',
-        updatedAt: new Date().toISOString(),
-        updatedAtMs: Date.now(),
-      });
-    }
-
-    return {
-      index,
-      success: true,
-      lead: {
-        name: normalizeString(lead.name),
-        company: normalizeString(lead.company),
-        phone: normalizeString(lead.phone),
-        region: normalizeString(lead.region),
-        phoneE164: normalizedPhone,
-      },
-      vapi: {
-        endpoint,
-        callId,
-        status: callStatus,
-      },
-    };
-  } catch (error) {
-    const failure = classifyVapiFailure(error);
-    console.error(
-      '[Coldcalling][Lead Error]',
-      JSON.stringify(
-        {
-          lead: {
-            name: normalizeString(lead?.name),
-            company: normalizeString(lead?.company),
-            phone: normalizeString(lead?.phone),
-          },
-          error: error.message || 'Onbekende fout',
-          statusCode: error.status || null,
-          cause: failure.cause,
-          explanation: failure.explanation,
-          vapiBody: error.data || null,
-        },
-        null,
-        2
-      )
-    );
-
-    return {
-      index,
-      success: false,
-      lead: {
-        name: normalizeString(lead?.name),
-        company: normalizeString(lead?.company),
-        phone: normalizeString(lead?.phone),
-        region: normalizeString(lead?.region),
-      },
-      error: error.message || 'Onbekende fout',
-      statusCode: error.status || null,
-      cause: failure.cause,
-      causeExplanation: failure.explanation,
-      details: error.data || null,
-    };
-  }
-}
-
-async function processElevenLabsColdcallingLead(lead, campaign, index) {
-  try {
-    const { endpoint, data, normalizedPhone } = await createElevenLabsOutboundCall(lead, campaign);
-    const callId = normalizeString(data?.conversation_id || data?.conversationId || data?.id);
-    const callStatus = normalizeString(data?.status || 'initiated');
-    const callSid = normalizeString(data?.callSid || data?.call_sid);
-
-    if (callId) {
-      upsertRecentCallUpdate({
+      latestUpdate = upsertRecentCallUpdate({
         callId,
         phone: normalizedPhone,
         company: normalizeString(lead.company),
@@ -4794,14 +4711,59 @@ async function processElevenLabsColdcallingLead(lead, campaign, index) {
         summary: '',
         transcriptSnippet: '',
         endedReason: '',
-        startedAt: new Date().toISOString(),
+        startedAt: toIsoFromUnixMilliseconds(data?.start_timestamp) || new Date().toISOString(),
         endedAt: '',
         durationSeconds: null,
         recordingUrl: '',
         updatedAt: new Date().toISOString(),
         updatedAtMs: Date.now(),
-        provider: 'elevenlabs',
+        provider: 'retell',
       });
+
+      // Bij sommige providerfouten (zoals dial_failed) wordt de call vrijwel direct terminal.
+      // Een korte status-refresh voorkomt dat de UI vals "gestart" meldt.
+      if (/^(registered|queued|initiated|dialing)$/i.test(callStatus)) {
+        await sleep(1200);
+        const refreshed = await refreshCallUpdateFromRetellStatusApi(callId);
+        if (refreshed) {
+          latestUpdate = refreshed;
+        }
+      }
+    }
+
+    const effectiveStatus = normalizeString(latestUpdate?.status || callStatus).toLowerCase();
+    const effectiveEndedReason = normalizeString(latestUpdate?.endedReason || '');
+    const effectiveStartedAt = normalizeString(
+      latestUpdate?.startedAt || toIsoFromUnixMilliseconds(data?.start_timestamp) || new Date().toISOString()
+    );
+
+    if (
+      effectiveStatus === 'not_connected' ||
+      /dial_failed|dial-failed|dial failed/.test(effectiveEndedReason.toLowerCase())
+    ) {
+      return {
+        index,
+        success: false,
+        lead: {
+          name: normalizeString(lead.name),
+          company: normalizeString(lead.company),
+          phone: normalizeString(lead.phone),
+          region: normalizeString(lead.region),
+          phoneE164: normalizedPhone,
+        },
+        error: `Call kon niet verbinden (${effectiveEndedReason || effectiveStatus || 'onbekende reden'}).`,
+        statusCode: null,
+        cause: 'dial failed',
+        causeExplanation:
+          'Retell kon het gesprek niet opzetten. Controleer outbound nummer/SIP-auth configuratie in Retell.',
+        details: {
+          endpoint,
+          callId,
+          status: effectiveStatus,
+          endedReason: effectiveEndedReason,
+          startedAt: effectiveStartedAt,
+        },
+      };
     }
 
     return {
@@ -4814,25 +4776,20 @@ async function processElevenLabsColdcallingLead(lead, campaign, index) {
         region: normalizeString(lead.region),
         phoneE164: normalizedPhone,
       },
-      vapi: {
+      call: {
         endpoint,
         callId,
-        status: callStatus,
-      },
-      elevenlabs: {
-        endpoint,
-        conversationId: callId,
-        callSid,
-        status: callStatus,
+        status: effectiveStatus || callStatus,
+        endedReason: effectiveEndedReason,
       },
     };
   } catch (error) {
-    const failure = classifyElevenLabsFailure(error);
+    const failure = classifyRetellFailure(error);
     console.error(
       '[Coldcalling][Lead Error]',
       JSON.stringify(
         {
-          provider: 'elevenlabs',
+          provider: 'retell',
           lead: {
             name: normalizeString(lead?.name),
             company: normalizeString(lead?.company),
@@ -4868,10 +4825,7 @@ async function processElevenLabsColdcallingLead(lead, campaign, index) {
 }
 
 async function processColdcallingLead(lead, campaign, index) {
-  if (getColdcallingProvider() === 'elevenlabs') {
-    return processElevenLabsColdcallingLead(lead, campaign, index);
-  }
-  return processVapiColdcallingLead(lead, campaign, index);
+  return processRetellColdcallingLead(lead, campaign, index);
 }
 
 function validateStartPayload(body) {
@@ -4931,7 +4885,7 @@ function isCallUpdateTerminalForSequentialDispatch(callUpdate) {
   if (messageType.includes('call.ended') || messageType.includes('end-of-call')) return true;
 
   if (
-    /(ended|completed|failed|cancelled|canceled|busy|no-answer|no answer|voicemail|hungup|hangup|disconnected)/.test(
+    /(ended|completed|failed|cancelled|canceled|busy|no-answer|no answer|voicemail|hungup|hangup|disconnected|error|not_connected|dial_)/.test(
       status
     )
   ) {
@@ -5009,7 +4963,7 @@ async function advanceSequentialDispatchQueue(queueId, reason = 'unknown') {
       const result = await processColdcallingLead(lead, queue.campaign, index);
       queue.results.push(result);
 
-      const callId = normalizeString(result?.vapi?.callId);
+      const callId = normalizeString(result?.call?.callId);
       const phoneKey = phoneDispatchKey(result?.lead?.phoneE164 || result?.lead?.phone);
       if (result.success && callId) {
         queue.waitingForCallId = callId;
@@ -5141,11 +5095,7 @@ function isWebhookAuthorized(req) {
     return true;
   }
 
-  const headerCandidates = [
-    req.get('x-vapi-secret'),
-    req.get('x-vapi-signature'),
-    req.get('authorization'),
-  ].filter(Boolean);
+  const headerCandidates = [req.get('x-retell-signature'), req.get('authorization')].filter(Boolean);
 
   for (const candidate of headerCandidates) {
     if (candidate === secret) return true;
@@ -5157,32 +5107,73 @@ function isWebhookAuthorized(req) {
   return false;
 }
 
-async function fetchElevenLabsCallStatusPayload(callId) {
-  const cached = callUpdatesById.get(callId) || null;
-  const { endpoint, data } = await fetchElevenLabsConversationById(callId);
-  const update = upsertRecentCallUpdate(
-    buildElevenLabsConversationUpdate(callId, data, cached || {})
-  );
-  triggerPostCallAutomation(update);
+function parseRetellSignatureHeader(signatureHeader) {
+  const raw = normalizeString(signatureHeader);
+  if (!raw) return null;
+  const match = raw.match(/v=(\d+),d=([a-fA-F0-9]+)/);
+  if (!match) return null;
+  const timestamp = Number(match[1]);
+  const digest = normalizeString(match[2]).toLowerCase();
+  if (!Number.isFinite(timestamp) || !digest) return null;
+  return { timestamp, digest };
+}
 
-  return {
-    endpoint,
-    update,
-    data,
-  };
+function verifyRetellWebhookSignature(req, maxSkewMs = 5 * 60 * 1000) {
+  const apiKey = normalizeString(process.env.RETELL_API_KEY);
+  const signatureHeader = normalizeString(req.get('x-retell-signature'));
+  if (!apiKey || !signatureHeader) return false;
+
+  const parsed = parseRetellSignatureHeader(signatureHeader);
+  if (!parsed) return false;
+
+  const now = Date.now();
+  if (Math.abs(now - parsed.timestamp) > maxSkewMs) {
+    return false;
+  }
+
+  const rawBody = Buffer.isBuffer(req.rawBody)
+    ? req.rawBody.toString('utf8')
+    : normalizeString(req.rawBody) || JSON.stringify(req.body || {});
+  const expectedDigest = crypto
+    .createHmac('sha256', apiKey)
+    .update(`${rawBody}${parsed.timestamp}`)
+    .digest('hex');
+
+  const expectedBuffer = Buffer.from(expectedDigest, 'hex');
+  const incomingBuffer = Buffer.from(parsed.digest, 'hex');
+  if (expectedBuffer.length !== incomingBuffer.length) return false;
+
+  return crypto.timingSafeEqual(expectedBuffer, incomingBuffer);
+}
+
+function isRetellWebhookAuthorized(req) {
+  const hasSecret = Boolean(normalizeString(process.env.WEBHOOK_SECRET));
+  const secretAuthorized = isWebhookAuthorized(req);
+  const hasRetellSignature = Boolean(normalizeString(req.get('x-retell-signature')));
+  const signatureAuthorized = hasRetellSignature ? verifyRetellWebhookSignature(req) : false;
+
+  if (hasSecret) {
+    return secretAuthorized || signatureAuthorized;
+  }
+
+  if (hasRetellSignature) {
+    return signatureAuthorized;
+  }
+
+  return true;
 }
 
 async function sendColdcallingStatusResponse(res, callId) {
   const cached = callUpdatesById.get(callId) || null;
-  const provider = normalizeString(cached?.provider || getColdcallingProvider());
+  const provider = 'retell';
 
-  if (provider === 'elevenlabs') {
-    if (!normalizeString(process.env.ELEVENLABS_API_KEY)) {
+  if (provider === 'retell') {
+    if (!normalizeString(process.env.RETELL_API_KEY)) {
       if (cached) {
         return res.status(200).json({
           ok: true,
           source: 'cache',
-          provider: 'elevenlabs',
+          provider: 'retell',
           callId: normalizeString(cached.callId || callId),
           status: normalizeString(cached.status || ''),
           endedReason: normalizeString(cached.endedReason || ''),
@@ -5192,80 +5183,48 @@ async function sendColdcallingStatusResponse(res, callId) {
           recordingUrl: normalizeString(cached.recordingUrl || ''),
         });
       }
-      return res.status(500).json({ ok: false, error: 'ELEVENLABS_API_KEY ontbreekt op server.' });
+      return res.status(500).json({ ok: false, error: 'RETELL_API_KEY ontbreekt op server.' });
     }
 
     try {
-      const { endpoint, update } = await fetchElevenLabsCallStatusPayload(callId);
+      const { endpoint, data } = await fetchRetellCallStatusById(callId);
+      const update = extractCallUpdateFromRetellCallStatusResponse(callId, data);
+      if (update) {
+        upsertRecentCallUpdate(update);
+        triggerPostCallAutomation(update);
+      }
+
       return res.status(200).json({
         ok: true,
         endpoint,
-        source: 'elevenlabs',
-        provider: 'elevenlabs',
-        callId: normalizeString(update?.callId || callId),
-        status: normalizeString(update?.status || ''),
-        endedReason: normalizeString(update?.endedReason || ''),
-        startedAt: normalizeString(update?.startedAt || ''),
-        endedAt: normalizeString(update?.endedAt || ''),
-        durationSeconds: parseNumberSafe(update?.durationSeconds, null),
-        recordingUrl: normalizeString(update?.recordingUrl || ''),
+        source: 'retell',
+        provider: 'retell',
+        callId: normalizeString(update?.callId || data?.call_id || callId),
+        status: normalizeString(update?.status || data?.call_status || ''),
+        endedReason: normalizeString(update?.endedReason || data?.disconnection_reason || ''),
+        startedAt: normalizeString(update?.startedAt || toIsoFromUnixMilliseconds(data?.start_timestamp)),
+        endedAt: normalizeString(update?.endedAt || toIsoFromUnixMilliseconds(data?.end_timestamp)),
+        durationSeconds:
+          parseNumberSafe(update?.durationSeconds, null) ||
+          (Number.isFinite(Number(data?.duration_ms)) && Number(data.duration_ms) > 0
+            ? Math.max(1, Math.round(Number(data.duration_ms) / 1000))
+            : null),
+        recordingUrl: normalizeString(
+          update?.recordingUrl ||
+            data?.recording_url ||
+            data?.recording_multi_channel_url ||
+            data?.scrubbed_recording_url ||
+            ''
+        ),
       });
     } catch (error) {
       return res.status(Number(error?.status || 500)).json({
         ok: false,
-        error: error?.message || 'Kon ElevenLabs call status niet ophalen.',
+        error: error?.message || 'Kon Retell call status niet ophalen.',
         endpoint: error?.endpoint || null,
         details: error?.data || null,
       });
     }
-  }
-
-  if (!normalizeString(process.env.VAPI_API_KEY)) {
-    if (cached) {
-      return res.status(200).json({
-        ok: true,
-        source: 'cache',
-        provider: 'vapi',
-        callId: normalizeString(cached.callId || callId),
-        status: normalizeString(cached.status || ''),
-        endedReason: normalizeString(cached.endedReason || ''),
-        startedAt: normalizeString(cached.startedAt || ''),
-        endedAt: normalizeString(cached.endedAt || ''),
-        durationSeconds: parseNumberSafe(cached.durationSeconds, null),
-        recordingUrl: normalizeString(cached.recordingUrl || ''),
-      });
-    }
-    return res.status(500).json({ ok: false, error: 'VAPI_API_KEY ontbreekt op server.' });
-  }
-
-  try {
-    const { endpoint, data } = await fetchVapiCallStatusById(callId);
-    const update = extractCallUpdateFromVapiCallStatusResponse(callId, data);
-    if (update) {
-      upsertRecentCallUpdate(update);
-    }
-    const call = data?.call && typeof data.call === 'object' ? data.call : data;
-
-    return res.status(200).json({
-      ok: true,
-      endpoint,
-      source: 'vapi',
-      provider: 'vapi',
-      callId: normalizeString(update?.callId || call?.id || callId),
-      status: normalizeString(update?.status || call?.status || data?.status || ''),
-      endedReason: normalizeString(update?.endedReason || call?.endedReason || data?.endedReason || ''),
-      startedAt: normalizeString(update?.startedAt || ''),
-      endedAt: normalizeString(update?.endedAt || ''),
-      durationSeconds: parseNumberSafe(update?.durationSeconds, null),
-      recordingUrl: normalizeString(update?.recordingUrl || ''),
-    });
-  } catch (error) {
-    return res.status(Number(error?.status || 500)).json({
-      ok: false,
-      error: error?.message || 'Kon Vapi call status niet ophalen.',
-      endpoint: error?.endpoint || null,
-      details: error?.data || null,
-    });
   }
 }
 
@@ -5346,10 +5305,7 @@ app.post('/api/coldcalling/start', async (req, res) => {
   if (missingEnv.length > 0) {
     return res.status(500).json({
       ok: false,
-      error:
-        provider === 'elevenlabs'
-          ? 'Server mist vereiste environment variables voor ElevenLabs outbound calling.'
-          : 'Server mist vereiste environment variables voor Vapi.',
+      error: 'Server mist vereiste environment variables voor Retell outbound calling.',
       missingEnv,
       provider,
     });
@@ -5458,46 +5414,19 @@ app.get('/api/coldcalling/status', async (req, res) => {
   return sendColdcallingStatusResponse(res, callId);
 });
 
-app.get('/api/coldcalling/recording', async (req, res) => {
-  const callId = normalizeString(req.query?.callId);
-  if (!callId) {
-    return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
+app.post('/api/retell/webhook', (req, res) => {
+  if (!isRetellWebhookAuthorized(req)) {
+    return res.status(401).json({ ok: false, error: 'Retell webhook signature/secret ongeldig.' });
   }
 
-  if (!normalizeString(process.env.ELEVENLABS_API_KEY)) {
-    return res.status(500).json({ ok: false, error: 'ELEVENLABS_API_KEY ontbreekt op server.' });
-  }
-
-  try {
-    const { response } = await fetchElevenLabsConversationAudioResponse(callId);
-    const contentType = normalizeString(response.headers.get('content-type') || 'audio/mpeg');
-    const arrayBuffer = await response.arrayBuffer();
-    res.setHeader('Content-Type', contentType || 'audio/mpeg');
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).send(Buffer.from(arrayBuffer));
-  } catch (error) {
-    return res.status(Number(error?.status || 500)).json({
-      ok: false,
-      error: error?.message || 'Kon ElevenLabs audio niet ophalen.',
-      endpoint: error?.endpoint || null,
-      details: error?.data || null,
-    });
-  }
-});
-
-app.post('/api/vapi/webhook', (req, res) => {
-  if (!isWebhookAuthorized(req)) {
-    return res.status(401).json({ ok: false, error: 'Webhook secret ongeldig.' });
-  }
-
-  const messageType = req.body?.message?.type || req.body?.type || 'unknown';
-  const callData = req.body?.message?.call || req.body?.call || null;
+  const eventType = normalizeString(req.body?.event || req.body?.type || 'unknown');
+  const callData = req.body?.call && typeof req.body.call === 'object' ? req.body.call : null;
 
   const record = {
     receivedAt: new Date().toISOString(),
-    messageType,
-    callId: callData?.id || null,
-    callStatus: callData?.status || null,
+    messageType: `retell.${eventType || 'unknown'}`,
+    callId: normalizeString(callData?.call_id || ''),
+    callStatus: normalizeString(callData?.call_status || ''),
     payload: req.body,
   };
 
@@ -5506,12 +5435,12 @@ app.post('/api/vapi/webhook', (req, res) => {
     recentWebhookEvents.pop();
   }
 
-  if (VERBOSE_VAPI_WEBHOOK_LOGS) {
+  if (VERBOSE_CALL_WEBHOOK_LOGS) {
     console.log(
-      '[Vapi Webhook]',
+      '[Retell Webhook]',
       JSON.stringify(
         {
-          messageType,
+          eventType,
           call: callData,
         },
         null,
@@ -5520,73 +5449,49 @@ app.post('/api/vapi/webhook', (req, res) => {
     );
   } else {
     console.log(
-      '[Vapi Webhook]',
+      '[Retell Webhook]',
       JSON.stringify({
-        messageType,
-        callId: callData?.id || null,
-        status: callData?.status || null,
-        endedReason: callData?.endedReason || null,
+        eventType,
+        callId: normalizeString(callData?.call_id || ''),
+        status: normalizeString(callData?.call_status || ''),
+        endedReason: normalizeString(callData?.disconnection_reason || ''),
       })
     );
   }
 
-  const callUpdate = upsertRecentCallUpdate(extractCallUpdateFromWebhookPayload(req.body));
+  const callUpdate = upsertRecentCallUpdate(extractCallUpdateFromRetellPayload(req.body));
   if (callUpdate) {
-    console.log(
-      '[Vapi Webhook -> CallUpdate]',
-      JSON.stringify(
-        {
-          callId: callUpdate.callId,
-          phone: callUpdate.phone,
-          company: callUpdate.company,
-          status: callUpdate.status,
-          messageType: callUpdate.messageType,
-          hasSummary: Boolean(callUpdate.summary),
-          hasTranscriptSnippet: Boolean(callUpdate.transcriptSnippet),
-          transcriptSnippetLen: normalizeString(callUpdate.transcriptSnippet).length || 0,
-          hasTranscriptFull: Boolean(callUpdate.transcriptFull),
-          transcriptFullLen: normalizeString(callUpdate.transcriptFull).length || 0,
-        },
-        null,
-        2
-      )
-    );
-
     triggerPostCallAutomation(callUpdate);
   }
 
-  // Reageer na de snelle lokale verwerking. Dit blijft snel genoeg en voorkomt gemiste taken.
-  res.status(200).json({ ok: true });
-
-  // TODO: Sla call-status updates op (bijv. queued/ringing/in-progress/ended).
-  // TODO: Sla transcript/events op zodra je transcriptie wilt tonen in het dashboard.
-  // TODO: Sla afspraken of opvolgacties op wanneer de call een afspraak boekt.
-  return;
+  return res.status(200).json({ ok: true });
 });
 
-app.get('/api/vapi/call-updates', async (req, res) => {
+app.get('/api/coldcalling/call-updates', async (req, res) => {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 200)));
   const sinceMs = parseNumberSafe(req.query.sinceMs, null);
+  const nowMs = Date.now();
 
-  if (getColdcallingProvider() === 'elevenlabs' && normalizeString(process.env.ELEVENLABS_API_KEY)) {
-    try {
-      await refreshElevenLabsRecentCallUpdates(limit);
-    } catch (error) {
-      console.warn(
-        '[ElevenLabs Call Updates Refresh Failed]',
-        JSON.stringify(
-          {
-            message: error?.message || 'Onbekende fout',
-            status: error?.status || null,
-          },
-          null,
-          2
-        )
-      );
-    }
+  const callIdsToRefresh = [];
+  const seenCallIds = new Set();
+  for (const item of recentCallUpdates) {
+    if (callIdsToRefresh.length >= 8) break;
+    const callId = normalizeString(item?.callId || '');
+    if (!callId || seenCallIds.has(callId)) continue;
+    if (!shouldRefreshRetellCallStatus(item, nowMs)) continue;
+    seenCallIds.add(callId);
+    callIdsToRefresh.push(callId);
+  }
+
+  if (callIdsToRefresh.length > 0) {
+    await Promise.allSettled(
+      callIdsToRefresh.map(async (callId) => {
+        await refreshCallUpdateFromRetellStatusApi(callId);
+      })
+    );
   }
 
   const filtered = recentCallUpdates.filter((item) => {
@@ -5601,33 +5506,21 @@ app.get('/api/vapi/call-updates', async (req, res) => {
   });
 });
 
-app.get('/api/vapi/webhook-debug', (req, res) => {
+app.get('/api/coldcalling/webhook-debug', (req, res) => {
   const limit = Math.max(1, Math.min(100, parseIntSafe(req.query.limit, 20)));
   const demoCallIdPrefix = 'demo-';
 
   const latestWebhookEvents = recentWebhookEvents.slice(0, limit).map((event) => {
     const payload = event?.payload && typeof event.payload === 'object' ? event.payload : null;
-    const message = payload?.message && typeof payload.message === 'object' ? payload.message : null;
-    const call = (message?.call && typeof message.call === 'object' ? message.call : null) ||
-      (payload?.call && typeof payload.call === 'object' ? payload.call : null);
-    const transcriptSnippet = extractTranscriptSnippet(payload || {});
-    const transcriptFull = extractTranscriptFull(payload || {});
-    const summary = extractSummaryFromVapiPayload(payload || {});
+    const call = payload?.call && typeof payload.call === 'object' ? payload.call : null;
 
     return {
       receivedAt: normalizeString(event?.receivedAt || ''),
       messageType: normalizeString(event?.messageType || ''),
-      callId: normalizeString(event?.callId || call?.id || ''),
-      callStatus: normalizeString(event?.callStatus || call?.status || ''),
-      endedReason: normalizeString(call?.endedReason || ''),
-      hasSummary: Boolean(summary),
-      summaryLen: normalizeString(summary).length || 0,
-      hasTranscriptSnippet: Boolean(transcriptSnippet),
-      transcriptSnippetLen: normalizeString(transcriptSnippet).length || 0,
-      hasTranscriptFull: Boolean(transcriptFull),
-      transcriptFullLen: normalizeString(transcriptFull).length || 0,
+      callId: normalizeString(event?.callId || call?.call_id || ''),
+      callStatus: normalizeString(event?.callStatus || call?.call_status || ''),
+      endedReason: normalizeString(call?.disconnection_reason || ''),
       topLevelKeys: payload ? Object.keys(payload).slice(0, 30) : [],
-      messageKeys: message ? Object.keys(message).slice(0, 30) : [],
       callKeys: call ? Object.keys(call).slice(0, 30) : [],
     };
   });
@@ -5684,6 +5577,500 @@ app.get('/api/ai/call-insights', async (req, res) => {
     openAiEnabled: Boolean(getOpenAiApiKey()),
     model: OPENAI_MODEL,
   });
+});
+
+function normalizeDashboardChatHistory(historyRaw) {
+  if (!Array.isArray(historyRaw)) return [];
+  return historyRaw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const roleRaw = normalizeString(item.role || '').toLowerCase();
+      const role = roleRaw === 'assistant' ? 'assistant' : 'user';
+      const content = truncateText(normalizeString(item.content || ''), 3000);
+      if (!content) return null;
+      return { role, content };
+    })
+    .filter(Boolean)
+    .slice(-12);
+}
+
+function parseDashboardChatRuntimeByOrderId(rawValue) {
+  const parsed = parseJsonLoose(rawValue);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+
+  const out = {};
+  for (const [rawId, rawRuntime] of Object.entries(parsed)) {
+    const id = Number(rawId);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    if (!rawRuntime || typeof rawRuntime !== 'object' || Array.isArray(rawRuntime)) continue;
+    out[String(id)] = {
+      statusKey: normalizeString(rawRuntime.statusKey || ''),
+      progressPct: parseNumberSafe(rawRuntime.progressPct, null),
+      paidAt: normalizeString(rawRuntime.paidAt || ''),
+      updatedAt: parseNumberSafe(rawRuntime.updatedAt, 0),
+    };
+  }
+  return out;
+}
+
+function parseDashboardChatCustomers(rawValue) {
+  const parsed = parseJsonLoose(rawValue);
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .map((item, index) => {
+      if (!item || typeof item !== 'object') return null;
+
+      const legacyAmount = parseNumberSafe(item.bedrag, null);
+      const type = truncateText(normalizeString(item.type || 'Website'), 80) || 'Website';
+      const websiteRaw = parseNumberSafe(item.websiteBedrag, null);
+      const maintenanceRaw = parseNumberSafe(item.onderhoudPerMaand, null);
+
+      const websiteBedrag = Number.isFinite(websiteRaw)
+        ? Math.max(0, Math.round(websiteRaw))
+        : ((type === 'Website' || type === 'Website + onderhoud') && Number.isFinite(legacyAmount)
+            ? Math.max(0, Math.round(legacyAmount))
+            : null);
+
+      const onderhoudPerMaand = Number.isFinite(maintenanceRaw)
+        ? Math.max(0, Math.round(maintenanceRaw))
+        : (type === 'Onderhoud' && Number.isFinite(legacyAmount)
+            ? Math.max(0, Math.round(legacyAmount))
+            : null);
+
+      const statusRaw = normalizeString(item.status || '').toLowerCase();
+      const status = statusRaw === 'open' ? 'Open' : 'Betaald';
+
+      return {
+        id: normalizeString(item.id || '') || `dashboard-customer-${index + 1}`,
+        naam: truncateText(normalizeString(item.naam || ''), 160) || 'Onbekend',
+        bedrijf: truncateText(normalizeString(item.bedrijf || ''), 160) || '-',
+        telefoon: truncateText(normalizeString(item.telefoon || ''), 80) || '-',
+        website: truncateText(normalizeString(item.website || ''), 220) || '-',
+        type,
+        status,
+        datum: normalizeDateYyyyMmDd(item.datum || ''),
+        websiteBedrag,
+        onderhoudPerMaand,
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildDashboardChatStatusCounts(rows, fieldName, fallback = 'Onbekend') {
+  const counts = {};
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const key = truncateText(normalizeString(row?.[fieldName] || ''), 80) || fallback;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
+}
+
+function trimDashboardChatContextForModel(rawContext, maxChars = 52000) {
+  const context = rawContext && typeof rawContext === 'object' ? rawContext : {};
+  const cloned = JSON.parse(JSON.stringify(context));
+
+  const listTargets = [
+    ['orders', 'items', 24],
+    ['customers', 'items', 30],
+    ['calls', 'items', 24],
+    ['agenda', 'items', 24],
+    ['aiCallInsights', 'items', 24],
+    ['recentActivities', null, 24],
+  ];
+
+  const safeStringify = () => {
+    try {
+      return JSON.stringify(cloned);
+    } catch {
+      return '{}';
+    }
+  };
+
+  let serialized = safeStringify();
+  if (serialized.length <= maxChars) return cloned;
+
+  for (const [section, key, minCount] of listTargets) {
+    const current =
+      key === null
+        ? (Array.isArray(cloned?.[section]) ? cloned[section] : null)
+        : (Array.isArray(cloned?.[section]?.[key]) ? cloned[section][key] : null);
+    if (!current || current.length <= minCount) continue;
+
+    const reduced = current.slice(0, Math.max(minCount, Math.floor(current.length / 2)));
+    if (key === null) cloned[section] = reduced;
+    else cloned[section][key] = reduced;
+
+    serialized = safeStringify();
+    if (serialized.length <= maxChars) return cloned;
+  }
+
+  for (const [section, key, minCount] of listTargets) {
+    const current =
+      key === null
+        ? (Array.isArray(cloned?.[section]) ? cloned[section] : null)
+        : (Array.isArray(cloned?.[section]?.[key]) ? cloned[section][key] : null);
+    if (!current || current.length <= minCount) continue;
+    const reduced = current.slice(0, minCount);
+    if (key === null) cloned[section] = reduced;
+    else cloned[section][key] = reduced;
+  }
+
+  serialized = safeStringify();
+  if (serialized.length <= maxChars) return cloned;
+
+  for (const [section, key] of listTargets) {
+    if (key === null) cloned[section] = [];
+    else if (cloned?.[section] && typeof cloned[section] === 'object') cloned[section][key] = [];
+  }
+
+  return cloned;
+}
+
+async function buildPremiumDashboardChatContext() {
+  const [orderState, customerState] = await Promise.all([
+    getUiStateValues(PREMIUM_ACTIVE_ORDERS_SCOPE),
+    getUiStateValues(PREMIUM_CUSTOMERS_SCOPE),
+  ]);
+
+  const orderValues = orderState?.values && typeof orderState.values === 'object' ? orderState.values : {};
+  const customerValues =
+    customerState?.values && typeof customerState.values === 'object' ? customerState.values : {};
+
+  const customOrders = parseCustomOrdersFromUiState(orderValues[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY]);
+  const runtimeByOrderId = parseDashboardChatRuntimeByOrderId(orderValues[PREMIUM_ACTIVE_RUNTIME_KEY]);
+  const customers = parseDashboardChatCustomers(customerValues[PREMIUM_CUSTOMERS_KEY]);
+
+  const orders = customOrders
+    .map((item) => {
+      const runtime = runtimeByOrderId[String(item.id)] || {};
+      const paidAt = normalizeString(runtime.paidAt || item.paidAt || '');
+      const updatedAtRaw =
+        (Number.isFinite(Number(runtime.updatedAt)) && Number(runtime.updatedAt) > 0
+          ? Number(runtime.updatedAt)
+          : Date.parse(normalizeString(item.updatedAt || item.createdAt || ''))) || 0;
+      return {
+        id: Number(item.id) || null,
+        klant: truncateText(normalizeString(item.clientName || ''), 160),
+        titel: truncateText(normalizeString(item.title || ''), 220),
+        locatie: truncateText(normalizeString(item.location || ''), 160),
+        status: truncateText(normalizeString(runtime.statusKey || item.status || ''), 80) || 'wacht',
+        bedragEur: Math.max(0, Math.round(Number(item.amount) || 0)),
+        betaaldOp: paidAt ? paidAt.slice(0, 10) : '',
+        laatstBijgewerkt: normalizeString(item.updatedAt || item.createdAt || ''),
+        updatedAtMs: Number(updatedAtRaw) || 0,
+      };
+    })
+    .sort((a, b) => (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
+
+  const callUpdates = recentCallUpdates
+    .map((item) => {
+      const updatedAt =
+        normalizeString(item?.updatedAt || item?.createdAt || '') || new Date().toISOString();
+      const updatedAtMs =
+        (Number.isFinite(Number(item?.updatedAtMs)) && Number(item.updatedAtMs) > 0
+          ? Number(item.updatedAtMs)
+          : Date.parse(updatedAt)) || 0;
+      const recordingUrl =
+        normalizeString(item?.recordingUrl || '') ||
+        normalizeString(item?.recording_url || '') ||
+        normalizeString(item?.recordingUrlProxy || '') ||
+        normalizeString(item?.audioUrl || '');
+      const hasRecording =
+        Boolean(recordingUrl) ||
+        toBooleanSafe(item?.recorded, false) ||
+        toBooleanSafe(item?.hasRecording, false);
+
+      return {
+        callId: truncateText(normalizeString(item?.callId || ''), 160),
+        bedrijf: truncateText(normalizeString(item?.company || ''), 160) || 'Onbekend',
+        contactpersoon: truncateText(normalizeString(item?.name || ''), 160),
+        telefoon: truncateText(normalizeString(item?.phone || ''), 80),
+        status: truncateText(normalizeString(item?.status || item?.messageType || ''), 80) || 'onbekend',
+        duur: truncateText(normalizeString(item?.durationLabel || ''), 40),
+        hasRecording,
+        samenvatting: truncateText(normalizeString(item?.summary || ''), 220),
+        transcriptSnippet: truncateText(normalizeString(item?.transcriptSnippet || ''), 220),
+        updatedAt,
+        updatedAtMs,
+      };
+    })
+    .sort((a, b) => (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
+
+  const agenda = generatedAgendaAppointments
+    .map((item) => {
+      const createdAt = normalizeString(item?.createdAt || '');
+      const updatedAt = normalizeString(item?.updatedAt || createdAt);
+      const updatedAtMs = Date.parse(updatedAt || createdAt || '') || 0;
+      return {
+        id: Number(item?.id) || null,
+        bedrijf: truncateText(normalizeString(item?.company || item?.leadCompany || ''), 160) || 'Onbekend',
+        contactpersoon: truncateText(
+          normalizeString(item?.contactName || item?.leadName || item?.name || ''),
+          160
+        ),
+        telefoon: truncateText(normalizeString(item?.phone || item?.leadPhone || ''), 80),
+        datum: normalizeDateYyyyMmDd(item?.date || item?.appointmentDate || ''),
+        tijd: normalizeTimeHhMm(item?.time || item?.appointmentTime || ''),
+        status: truncateText(
+          normalizeString(item?.status || item?.postCallStatus || item?.confirmationStatus || ''),
+          80
+        ) || 'onbekend',
+        notitie: truncateText(normalizeString(item?.summary || item?.notes || ''), 500),
+        updatedAt,
+        updatedAtMs,
+      };
+    })
+    .sort((a, b) => (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
+
+  const aiInsights = recentAiCallInsights
+    .map((item) => ({
+      callId: truncateText(normalizeString(item?.callId || ''), 160),
+      bedrijf: truncateText(normalizeString(item?.company || ''), 160) || 'Onbekend',
+      contactpersoon: truncateText(normalizeString(item?.contactName || ''), 160),
+      telefoon: truncateText(normalizeString(item?.phone || ''), 80),
+      branche: truncateText(normalizeString(item?.branche || ''), 120),
+      afspraakIngepland: toBooleanSafe(item?.appointmentBooked, false),
+      afspraakDatum: normalizeDateYyyyMmDd(item?.appointmentDate || ''),
+      afspraakTijd: normalizeTimeHhMm(item?.appointmentTime || ''),
+      followUpNodig: toBooleanSafe(item?.followUpRequired, false),
+      followUpReden: truncateText(normalizeString(item?.followUpReason || ''), 120),
+      samenvatting: truncateText(normalizeString(item?.summary || ''), 220),
+      analyzedAt: normalizeString(item?.analyzedAt || ''),
+    }))
+    .sort((a, b) => {
+      const aTs = Date.parse(a.analyzedAt || '') || 0;
+      const bTs = Date.parse(b.analyzedAt || '') || 0;
+      return bTs - aTs;
+    });
+
+  const activities = recentDashboardActivities
+    .map((item) => ({
+      tijd: normalizeString(item?.createdAt || ''),
+      titel: truncateText(normalizeString(item?.title || ''), 200),
+      detail: truncateText(normalizeString(item?.detail || ''), 180),
+      bedrijf: truncateText(normalizeString(item?.company || ''), 160),
+      bron: truncateText(normalizeString(item?.source || ''), 80),
+      actor: truncateText(normalizeString(item?.actor || ''), 120),
+    }))
+    .sort((a, b) => {
+      const aTs = Date.parse(a.tijd || '') || 0;
+      const bTs = Date.parse(b.tijd || '') || 0;
+      return bTs - aTs;
+    });
+
+  const orderTotalValueEur = orders.reduce((sum, item) => sum + (Number(item?.bedragEur) || 0), 0);
+  const orderPaidCount = orders.reduce((sum, item) => sum + (item?.betaaldOp ? 1 : 0), 0);
+  const customerPaidCount = customers.reduce(
+    (sum, item) => sum + (normalizeString(item?.status) === 'Betaald' ? 1 : 0),
+    0
+  );
+  const customerOpenCount = customers.length - customerPaidCount;
+  const customerWebsiteRevenueEur = customers.reduce(
+    (sum, item) => sum + (Number.isFinite(Number(item?.websiteBedrag)) ? Number(item.websiteBedrag) : 0),
+    0
+  );
+  const customerMaintenanceMonthlyEur = customers.reduce(
+    (sum, item) =>
+      sum + (Number.isFinite(Number(item?.onderhoudPerMaand)) ? Number(item.onderhoudPerMaand) : 0),
+    0
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    workspace: 'softora-premium-personeel-dashboard',
+    overview: {
+      totaalOpdrachten: orders.length,
+      totaalKlanten: customers.length,
+      totaalCalls: callUpdates.length,
+      totaalAgendaItems: agenda.length,
+      totaalAiInsights: aiInsights.length,
+      totaalActiviteiten: activities.length,
+    },
+    orders: {
+      total: orders.length,
+      paidCount: orderPaidCount,
+      statusCounts: buildDashboardChatStatusCounts(orders, 'status'),
+      totalValueEur: orderTotalValueEur,
+      items: orders.slice(0, 60),
+    },
+    customers: {
+      total: customers.length,
+      paidCount: customerPaidCount,
+      openCount: customerOpenCount,
+      websiteRevenueEur: customerWebsiteRevenueEur,
+      monthlyMaintenanceEur: customerMaintenanceMonthlyEur,
+      statusCounts: buildDashboardChatStatusCounts(customers, 'status'),
+      items: customers.slice(0, 80),
+    },
+    calls: {
+      total: callUpdates.length,
+      statusCounts: buildDashboardChatStatusCounts(callUpdates, 'status'),
+      withRecordingCount: callUpdates.reduce((sum, item) => sum + (item?.hasRecording ? 1 : 0), 0),
+      items: callUpdates.slice(0, 60),
+    },
+    agenda: {
+      total: agenda.length,
+      statusCounts: buildDashboardChatStatusCounts(agenda, 'status'),
+      items: agenda.slice(0, 60),
+    },
+    aiCallInsights: {
+      total: aiInsights.length,
+      appointmentsBooked: aiInsights.reduce(
+        (sum, item) => sum + (toBooleanSafe(item?.afspraakIngepland, false) ? 1 : 0),
+        0
+      ),
+      followUpsRequired: aiInsights.reduce(
+        (sum, item) => sum + (toBooleanSafe(item?.followUpNodig, false) ? 1 : 0),
+        0
+      ),
+      items: aiInsights.slice(0, 60),
+    },
+    recentActivities: activities.slice(0, 60),
+  };
+}
+
+async function generatePremiumDashboardChatReplyWithAi(options = {}) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) {
+    const err = new Error('OPENAI_API_KEY ontbreekt');
+    err.status = 503;
+    throw err;
+  }
+
+  const question = truncateText(normalizeString(options.question || ''), 4000);
+  if (!question) {
+    const err = new Error('Vraag ontbreekt');
+    err.status = 400;
+    throw err;
+  }
+
+  const history = normalizeDashboardChatHistory(options.history);
+  const context = options.context && typeof options.context === 'object' ? options.context : {};
+  const trimmedContext = trimDashboardChatContextForModel(context, 52000);
+  const contextJson = JSON.stringify(trimmedContext);
+
+  const systemPrompt = [
+    'Je bent de interne Softora AI-assistent voor het personeel-dashboard.',
+    'Je antwoordt altijd in duidelijk Nederlands.',
+    'Gebruik uitsluitend de aangeleverde dashboard-context.',
+    'Als data ontbreekt of niet zeker is, zeg dat expliciet en verzin niets.',
+    'Als de gebruiker vraagt om "alles", geef een compact overzicht per domein: omzet/opdrachten, klanten, calls, agenda en recente activiteiten.',
+    'Geef concrete aantallen en namen als die in de context staan.',
+    'Noem geen technische interne details (zoals API keys of serverconfiguratie).',
+  ].join('\n');
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'system', content: `DASHBOARD_CONTEXT_JSON:\n${contextJson}` },
+    ...history,
+    { role: 'user', content: question },
+  ];
+
+  const { response, data } = await fetchJsonWithTimeout(
+    `${OPENAI_API_BASE_URL}/chat/completions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.15,
+        messages,
+      }),
+    },
+    65000
+  );
+
+  if (!response.ok) {
+    const err = new Error(`OpenAI dashboard-chat mislukt (${response.status})`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+
+  const content = data?.choices?.[0]?.message?.content;
+  const answer = truncateText(normalizeString(extractOpenAiTextContent(content)), 12000);
+  if (!answer) {
+    const err = new Error('AI gaf geen antwoord terug.');
+    err.status = 502;
+    err.data = data;
+    throw err;
+  }
+
+  return {
+    answer,
+    model: OPENAI_MODEL,
+    usage: data?.usage || null,
+  };
+}
+
+async function sendPremiumDashboardChatResponse(req, res) {
+  try {
+    if (isSupabaseConfigured() && !supabaseStateHydrated) {
+      await forceHydrateRuntimeStateWithRetries(3);
+    }
+    backfillInsightsAndAppointmentsFromRecentCallUpdates();
+
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const question = normalizeString(body.question || body.message || body.prompt || '');
+    if (!question) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Vraag ontbreekt',
+        detail: 'Stuur JSON met { question: "..." }',
+      });
+    }
+    if (question.length > 4000) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Vraag te lang',
+        detail: 'Gebruik maximaal 4000 tekens.',
+      });
+    }
+
+    const context = await buildPremiumDashboardChatContext();
+    const result = await generatePremiumDashboardChatReplyWithAi({
+      question,
+      history: body.history,
+      context,
+    });
+
+    return res.status(200).json({
+      ok: true,
+      answer: result.answer,
+      model: result.model,
+      usage: result.usage,
+      contextMeta: {
+        generatedAt: context.generatedAt || null,
+        totals: context.overview || {},
+      },
+      openAiEnabled: true,
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    const safeStatus = status >= 400 && status < 600 ? status : 500;
+    return res.status(safeStatus).json({
+      ok: false,
+      error:
+        safeStatus === 503
+          ? 'AI dashboard assistent niet beschikbaar'
+          : 'AI dashboard assistent mislukt',
+      detail: String(error?.message || 'Onbekende fout'),
+      openAiEnabled: Boolean(getOpenAiApiKey()),
+    });
+  }
+}
+
+app.post('/api/ai/dashboard-chat', async (req, res) => {
+  return sendPremiumDashboardChatResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ai-dashboard-chat', async (req, res) => {
+  return sendPremiumDashboardChatResponse(req, res);
 });
 
 app.post('/api/ai/summarize', async (req, res) => {
@@ -6012,6 +6399,188 @@ app.post('/api/ui-state/:scope', async (req, res) => {
 // Vercel fallback voor diepe API-paths in sommige regio's.
 app.post('/api/ui-state-set', async (req, res) => {
   return sendUiStateSetResponse(req, res, req.query.scope);
+});
+
+app.get('/api/seo/pages', async (req, res) => {
+  const files = getSeoEditableHtmlFiles();
+  const query = normalizeString(req.query.q || '').toLowerCase();
+
+  try {
+    const config = await getSeoConfigCached();
+    const pages = [];
+
+    for (const fileName of files) {
+      const html = await readHtmlPageContent(fileName);
+      if (!html) continue;
+      const source = extractSeoSourceFromHtml(html);
+      const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
+      const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
+      const effective = mergeSeoSourceWithOverrides(source, pageOverrides);
+      const images = extractImageEntriesFromHtml(html);
+      const slug = String(fileName).replace(/\.html$/i, '');
+      const pathName = slug === 'index' ? '/' : `/${slug}`;
+      const searchIndex = `${fileName} ${pathName} ${effective.title || ''}`.toLowerCase();
+
+      if (query && !searchIndex.includes(query)) continue;
+
+      pages.push({
+        file: fileName,
+        slug,
+        path: pathName,
+        title: effective.title || source.title || slug,
+        metaDescription: effective.metaDescription || source.metaDescription || '',
+        imageCount: images.length,
+        pageOverrideCount: Object.keys(pageOverrides).length,
+        imageOverrideCount: Object.keys(imageOverrides).length,
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      count: pages.length,
+      pages,
+    });
+  } catch (error) {
+    console.error('[SEO][PagesError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon SEO pagina-overzicht niet ophalen.',
+    });
+  }
+});
+
+app.get('/api/seo/page', async (req, res) => {
+  const fileName = resolveSeoPageFileFromRequest(req.query.file, req.query.slug);
+  if (!fileName) {
+    return res.status(400).json({ ok: false, error: 'Ongeldig of onbekend HTML-bestand.' });
+  }
+
+  const html = await readHtmlPageContent(fileName);
+  if (!html) {
+    return res.status(404).json({ ok: false, error: 'Pagina niet gevonden of onleesbaar.' });
+  }
+
+  try {
+    const config = await getSeoConfigCached();
+    const source = extractSeoSourceFromHtml(html);
+    const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
+    const effective = mergeSeoSourceWithOverrides(source, pageOverrides);
+    const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
+    const images = extractImageEntriesFromHtml(html).map((entry) => {
+      const overrideAlt = normalizeString(imageOverrides[entry.src] || '');
+      return {
+        src: entry.src,
+        sourceAlt: entry.alt || '',
+        overrideAlt,
+        effectiveAlt: overrideAlt || entry.alt || '',
+      };
+    });
+
+    return res.status(200).json({
+      ok: true,
+      file: fileName,
+      slug: String(fileName).replace(/\.html$/i, ''),
+      seo: {
+        source,
+        overrides: pageOverrides,
+        effective,
+      },
+      imageCount: images.length,
+      images,
+    });
+  } catch (error) {
+    console.error('[SEO][PageError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon SEO data voor deze pagina niet ophalen.',
+    });
+  }
+});
+
+app.post('/api/seo/page', async (req, res) => {
+  const fileName = resolveSeoPageFileFromRequest(req.body?.file, req.body?.slug);
+  if (!fileName) {
+    return res.status(400).json({ ok: false, error: 'Ongeldig of onbekend HTML-bestand.' });
+  }
+
+  const pageOverridePatch = normalizeSeoPageOverridePatch(req.body?.pageOverrides || req.body?.page || {});
+  const imageOverridePatch = normalizeSeoImageOverridePatch(
+    req.body?.imageAltOverrides || req.body?.imageOverrides || req.body?.images || {}
+  );
+
+  try {
+    const currentConfig = await getSeoConfigCached(true);
+    const nextConfig = normalizeSeoConfig(currentConfig);
+
+    const nextPageOverrides = {
+      ...(nextConfig.pages[fileName] || {}),
+    };
+    for (const field of SEO_PAGE_FIELD_DEFS) {
+      if (!Object.prototype.hasOwnProperty.call(pageOverridePatch, field.key)) continue;
+      const value = normalizeString(pageOverridePatch[field.key]);
+      if (!value) {
+        delete nextPageOverrides[field.key];
+        continue;
+      }
+      nextPageOverrides[field.key] = value;
+    }
+    if (Object.keys(nextPageOverrides).length > 0) {
+      nextConfig.pages[fileName] = nextPageOverrides;
+    } else {
+      delete nextConfig.pages[fileName];
+    }
+
+    const nextImageOverrides = {
+      ...(nextConfig.images[fileName] || {}),
+    };
+    for (const [src, altRaw] of Object.entries(imageOverridePatch)) {
+      const alt = normalizeString(altRaw);
+      if (!alt) {
+        delete nextImageOverrides[src];
+        continue;
+      }
+      nextImageOverrides[src] = alt;
+    }
+    if (Object.keys(nextImageOverrides).length > 0) {
+      nextConfig.images[fileName] = nextImageOverrides;
+    } else {
+      delete nextConfig.images[fileName];
+    }
+
+    const saved = await persistSeoConfig(nextConfig, {
+      source: 'seo-dashboard',
+      actor: normalizeString(req.body?.actor || 'dashboard'),
+    });
+    if (!saved) {
+      return res.status(500).json({ ok: false, error: 'Kon SEO wijzigingen niet opslaan.' });
+    }
+
+    appendDashboardActivity(
+      {
+        type: 'seo_page_updated',
+        title: 'SEO-instellingen opgeslagen',
+        detail: `SEO updates opgeslagen voor ${fileName}.`,
+        source: 'premium-seo',
+        actor: normalizeString(req.body?.actor || 'dashboard'),
+      },
+      'dashboard_activity_seo_updated'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      file: fileName,
+      saved: {
+        pageOverrideCount: Object.keys(saved.pages[fileName] || {}).length,
+        imageOverrideCount: Object.keys(saved.images[fileName] || {}).length,
+      },
+    });
+  } catch (error) {
+    console.error('[SEO][SaveError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'SEO wijzigingen opslaan mislukt.',
+    });
+  }
 });
 
 app.post('/api/dashboard/activity', (req, res) => {
@@ -6437,7 +7006,7 @@ async function sendConfirmationTaskDetailResponse(req, res, taskIdRaw) {
   const appointment = generatedAgendaAppointments[idx];
   let detail = buildConfirmationTaskDetail(appointment);
   if (detail && !detail.transcriptAvailable && normalizeString(appointment?.callId || '')) {
-    await refreshCallUpdateFromVapiStatusApi(appointment.callId);
+    await refreshCallUpdateFromRetellStatusApi(appointment.callId);
     detail = buildConfirmationTaskDetail(generatedAgendaAppointments[idx] || appointment);
   }
   if (!detail) {
@@ -6871,7 +7440,7 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 app.get('/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
-    service: 'softora-vapi-coldcalling-backend',
+    service: 'softora-retell-coldcalling-backend',
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
@@ -6886,7 +7455,7 @@ app.get('/healthz', (_req, res) => {
 app.get('/api/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
-    service: 'softora-vapi-coldcalling-backend',
+    service: 'softora-retell-coldcalling-backend',
     supabase: {
       enabled: isSupabaseConfigured(),
       hydrated: supabaseStateHydrated,
@@ -7062,8 +7631,8 @@ app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/output', express.static(path.join(__dirname, 'output')));
 app.use('/scripts', express.static(path.join(__dirname, 'scripts')));
 
-app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'premium-website.html'));
+app.get('/', async (req, res, next) => {
+  return sendSeoManagedHtmlPageResponse(req, res, next, 'premium-website.html');
 });
 
 app.get('/:page', (req, res, next) => {
@@ -7083,7 +7652,7 @@ app.get('/:page', (req, res, next) => {
   return res.redirect(301, `${destination}${query}`);
 });
 
-app.get('/:slug', (req, res, next) => {
+app.get('/:slug', async (req, res, next) => {
   const slug = String(req.params.slug || '').trim();
 
   if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
@@ -7099,9 +7668,7 @@ app.get('/:slug', (req, res, next) => {
     return next();
   }
 
-  return res.sendFile(path.join(__dirname, fileName), (err) => {
-    if (err) next();
-  });
+  return sendSeoManagedHtmlPageResponse(req, res, next, fileName);
 });
 
 app.use((req, res) => {

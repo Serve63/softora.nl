@@ -512,30 +512,6 @@
             color: var(--text-primary);
         }
 
-        .topbar-theme-toggle {
-            width: 44px;
-            height: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text-tertiary);
-            cursor: none;
-            transition: background 0.2s var(--ease-out-expo), border-color 0.2s var(--ease-out-expo), color 0.2s var(--ease-out-expo);
-        }
-
-        .topbar-theme-toggle:hover {
-            background: rgba(139, 34, 82, 0.08);
-            border-color: rgba(139, 34, 82, 0.24);
-            color: var(--text-primary);
-        }
-
-        .topbar-theme-toggle svg {
-            width: 18px;
-            height: 18px;
-        }
-
         /* KPI Cards */
         .kpi-grid {
             display: grid;
@@ -1146,6 +1122,216 @@
             line-height: 1.45;
         }
 
+        .dashboard-ai-chat {
+            position: fixed;
+            right: 1.35rem;
+            bottom: 1.35rem;
+            z-index: 12050;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.65rem;
+        }
+
+        .dashboard-ai-chat-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            border: 1px solid rgba(139, 34, 82, 0.35);
+            background: linear-gradient(135deg, rgba(139, 34, 82, 0.94), rgba(74, 17, 43, 0.98));
+            color: #fff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.86rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 0.62rem 0.88rem;
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+        }
+
+        .dashboard-ai-chat-toggle-dot {
+            width: 0.52rem;
+            height: 0.52rem;
+            border-radius: 50%;
+            background: #44d286;
+            box-shadow: 0 0 0 4px rgba(68, 210, 134, 0.15);
+        }
+
+        .dashboard-ai-chat-panel {
+            width: min(27rem, calc(100vw - 2rem));
+            height: min(33rem, calc(100vh - 6rem));
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 44px rgba(0, 0, 0, 0.36);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .dashboard-ai-chat-panel[hidden] {
+            display: none !important;
+        }
+
+        .dashboard-ai-chat-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.92rem 1rem;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .dashboard-ai-chat-head-title {
+            display: flex;
+            flex-direction: column;
+            gap: 0.14rem;
+        }
+
+        .dashboard-ai-chat-head-title strong {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.95rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            line-height: 1.05;
+        }
+
+        .dashboard-ai-chat-head-title span {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+        }
+
+        .dashboard-ai-chat-close {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 1rem;
+            line-height: 1;
+            width: 1.9rem;
+            height: 1.9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dashboard-ai-chat-close:hover {
+            color: var(--text-primary);
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+
+        .dashboard-ai-chat-messages {
+            flex: 1;
+            padding: 0.88rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.66rem;
+        }
+
+        .dashboard-ai-chat-message {
+            display: flex;
+            width: 100%;
+        }
+
+        .dashboard-ai-chat-message.is-user {
+            justify-content: flex-end;
+        }
+
+        .dashboard-ai-chat-bubble {
+            max-width: 88%;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+            padding: 0.62rem 0.74rem;
+            font-size: 0.82rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .dashboard-ai-chat-message.is-user .dashboard-ai-chat-bubble {
+            border-color: rgba(139, 34, 82, 0.4);
+            background: rgba(139, 34, 82, 0.18);
+        }
+
+        .dashboard-ai-chat-message.is-assistant .dashboard-ai-chat-bubble {
+            border-color: rgba(255, 255, 255, 0.09);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .dashboard-ai-chat-message.is-typing .dashboard-ai-chat-bubble {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .dashboard-ai-chat-foot {
+            padding: 0.8rem;
+            border-top: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .dashboard-ai-chat-status {
+            min-height: 1rem;
+            margin-bottom: 0.42rem;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .dashboard-ai-chat-status.is-ok {
+            color: #43c17d;
+        }
+
+        .dashboard-ai-chat-status.is-error {
+            color: #e87c7c;
+        }
+
+        .dashboard-ai-chat-form {
+            display: flex;
+            align-items: flex-end;
+            gap: 0.52rem;
+        }
+
+        .dashboard-ai-chat-input {
+            flex: 1;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.83rem;
+            line-height: 1.42;
+            min-height: 2.45rem;
+            max-height: 9rem;
+            padding: 0.62rem 0.7rem;
+            resize: vertical;
+        }
+
+        .dashboard-ai-chat-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .dashboard-ai-chat-send {
+            border: 1px solid rgba(139, 34, 82, 0.42);
+            background: rgba(139, 34, 82, 0.14);
+            color: var(--accent-light);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.64rem 0.8rem;
+            min-width: 5.1rem;
+        }
+
+        .dashboard-ai-chat-send:disabled {
+            opacity: 0.55;
+            cursor: default;
+        }
+
+        .dashboard-ai-chat-send:not(:disabled):hover {
+            border-color: rgba(139, 34, 82, 0.62);
+            background: rgba(139, 34, 82, 0.2);
+            color: #fff;
+        }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .kpi-grid {
@@ -1173,6 +1359,14 @@
             .confirm-task-statuses { justify-content: flex-start; }
             .confirm-task-detail-grid { grid-template-columns: 1fr; }
             .confirm-task-detail-actions { flex-direction: column; }
+            .dashboard-ai-chat {
+                right: 0.7rem;
+                bottom: 0.7rem;
+            }
+            .dashboard-ai-chat-panel {
+                width: calc(100vw - 1.4rem);
+                height: min(32rem, calc(100vh - 4.8rem));
+            }
         }
     </style>
 </head>
@@ -1203,11 +1397,6 @@
                         Agenda
                     </a>
                     
-                    <a href="/premium-bevestigingsmails" class="sidebar-link magnetic">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
-                        Bevestigingsmails
-                    </a>
-                    
                     <a href="/premium-ai-lead-generator" class="sidebar-link magnetic">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"/></svg>
                         AI Coldcalling
@@ -1219,6 +1408,10 @@
                     <a href="/premium-klanten" class="sidebar-link magnetic">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                         Klanten
+                    </a>
+                    <a href="/premium-seo" class="sidebar-link magnetic">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"/></svg>
+                        SEO
                     </a>
                     <a href="/premium-pakketten" class="sidebar-link magnetic">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"/></svg>
@@ -1257,12 +1450,6 @@
                     <p>Overzicht van je bedrijfsprestaties</p>
                 </div>
                 <div class="topbar-right">
-                    <button type="button" class="topbar-theme-toggle magnetic" id="topbarThemeToggle" aria-label="Wissel thema" title="Wissel thema">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7">
-                            <circle cx="12" cy="12" r="4"></circle>
-                            <path stroke-linecap="round" d="M12 2.5v2.2M12 19.3v2.2M4.93 4.93l1.56 1.56M17.51 17.51l1.56 1.56M2.5 12h2.2M19.3 12h2.2M4.93 19.07l1.56-1.56M17.51 6.49l1.56-1.56"></path>
-                        </svg>
-                    </button>
                     <div class="topbar-date">
                         <span id="currentDate"></span>
                     </div>
@@ -1347,6 +1534,30 @@
 
             </div>
         </main>
+    </div>
+
+    <div class="dashboard-ai-chat" id="dashboardAiChat" data-open="false">
+        <button type="button" class="dashboard-ai-chat-toggle" id="dashboardAiChatToggle" aria-expanded="false" aria-controls="dashboardAiChatPanel">
+            <span class="dashboard-ai-chat-toggle-dot"></span>
+            <span>AI Chat</span>
+        </button>
+        <section class="dashboard-ai-chat-panel" id="dashboardAiChatPanel" hidden>
+            <div class="dashboard-ai-chat-head">
+                <div class="dashboard-ai-chat-head-title">
+                    <strong>AI Assistent</strong>
+                    <span>Vraag alles over je bedrijf en dashboarddata.</span>
+                </div>
+                <button type="button" class="dashboard-ai-chat-close" id="dashboardAiChatClose" aria-label="Sluiten">×</button>
+            </div>
+            <div class="dashboard-ai-chat-messages" id="dashboardAiChatMessages" aria-live="polite"></div>
+            <div class="dashboard-ai-chat-foot">
+                <div class="dashboard-ai-chat-status" id="dashboardAiChatStatus"></div>
+                <form class="dashboard-ai-chat-form" id="dashboardAiChatForm">
+                    <textarea class="dashboard-ai-chat-input" id="dashboardAiChatInput" placeholder="Typ je vraag..." rows="1"></textarea>
+                    <button type="submit" class="dashboard-ai-chat-send" id="dashboardAiChatSend">Verstuur</button>
+                </form>
+            </div>
+        </section>
     </div>
 
     <script>
@@ -2113,7 +2324,7 @@
             const transcript = detail?.transcript ? String(detail.transcript) : '';
             const transcriptHtml = transcript
                 ? `<div class="confirm-task-transcript">${escapeHtml(transcript)}</div>`
-                : `<div class="confirm-task-transcript empty">Nog geen transcript beschikbaar vanuit Vapi webhook voor deze call.</div>`;
+                : `<div class="confirm-task-transcript empty">Nog geen transcript beschikbaar vanuit call webhook voor deze call.</div>`;
 
             const draft = detail?.confirmationEmailDraft ? String(detail.confirmationEmailDraft) : '';
             const draftMeta = [];
@@ -2126,7 +2337,7 @@
                 draftMeta.push(`Bron: ${String(detail.confirmationEmailDraftSource)}`);
             }
 
-            const aiSummary = String(detail?.aiSummary || detail?.vapiSummary || task?.summary || '').trim();
+            const aiSummary = String(detail?.aiSummary || detail?.callSummary || task?.summary || '').trim();
             const infoLines = [];
             if (aiSummary) infoLines.push(`Samenvatting: ${aiSummary}`);
             if (detail?.phone) infoLines.push(`Telefoon: ${detail.phone}`);
@@ -2406,36 +2617,6 @@
             }
         });
 
-        (function initTopbarThemeToggle() {
-            const toggle = document.getElementById('topbarThemeToggle');
-            if (!toggle) return;
-
-            const root = document.documentElement;
-
-            function getCurrentMode() {
-                const mode = String(root.getAttribute('data-theme-mode') || root.getAttribute('data-theme') || '').toLowerCase();
-                return mode === 'light' ? 'light' : 'dark';
-            }
-
-            function syncToggleLabel() {
-                const nextMode = getCurrentMode() === 'light' ? 'donker' : 'licht';
-                const label = `Wissel naar ${nextMode} thema`;
-                toggle.setAttribute('aria-label', label);
-                toggle.setAttribute('title', label);
-            }
-
-            toggle.addEventListener('click', () => {
-                const targetMode = getCurrentMode() === 'light' ? 'dark' : 'light';
-                if (window.SoftoraPersonnelTheme && typeof window.SoftoraPersonnelTheme.applyMode === 'function') {
-                    window.SoftoraPersonnelTheme.applyMode(targetMode);
-                }
-            });
-
-            const observer = new MutationObserver(syncToggleLabel);
-            observer.observe(root, { attributes: true, attributeFilter: ['data-theme-mode', 'data-theme'] });
-            syncToggleLabel();
-        })();
-
         const cursor = document.querySelector('.cursor');
         const cursorDot = document.querySelector('.cursor-dot');
         const magneticElements = document.querySelectorAll('.magnetic');
@@ -2491,6 +2672,245 @@
                 elem.style.cursor = 'pointer';
             });
         }
+    </script>
+    <script>
+        (function () {
+            const chatRoot = document.getElementById('dashboardAiChat');
+            if (!chatRoot) return;
+
+            const toggleButton = document.getElementById('dashboardAiChatToggle');
+            const closeButton = document.getElementById('dashboardAiChatClose');
+            const panel = document.getElementById('dashboardAiChatPanel');
+            const messagesEl = document.getElementById('dashboardAiChatMessages');
+            const statusEl = document.getElementById('dashboardAiChatStatus');
+            const form = document.getElementById('dashboardAiChatForm');
+            const input = document.getElementById('dashboardAiChatInput');
+            const sendButton = document.getElementById('dashboardAiChatSend');
+
+            if (!toggleButton || !closeButton || !panel || !messagesEl || !statusEl || !form || !input || !sendButton) {
+                return;
+            }
+
+            const CHAT_STORAGE_KEY = 'softora_premium_dashboard_ai_chat_v1';
+            const CHAT_ENDPOINTS = ['/api/ai/dashboard-chat', '/api/ai-dashboard-chat'];
+            const MAX_MESSAGES = 30;
+            const state = {
+                open: false,
+                sending: false,
+                messages: []
+            };
+
+            function normalizeStoredMessages(rawList) {
+                if (!Array.isArray(rawList)) return [];
+                return rawList
+                    .map((item) => {
+                        if (!item || typeof item !== 'object') return null;
+                        const role = item.role === 'assistant' ? 'assistant' : 'user';
+                        const content = String(item.content || '').trim();
+                        if (!content) return null;
+                        return { role, content };
+                    })
+                    .filter(Boolean)
+                    .slice(-MAX_MESSAGES);
+            }
+
+            function readStoredMessages() {
+                try {
+                    const parsed = JSON.parse(String(sessionStorage.getItem(CHAT_STORAGE_KEY) || '[]'));
+                    return normalizeStoredMessages(parsed);
+                } catch (_) {
+                    return [];
+                }
+            }
+
+            function writeStoredMessages() {
+                try {
+                    sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(state.messages.slice(-MAX_MESSAGES)));
+                } catch (_) {
+                    /* ignore storage errors */
+                }
+            }
+
+            function formatStatus(text, tone) {
+                statusEl.textContent = String(text || '');
+                statusEl.classList.toggle('is-ok', tone === 'ok');
+                statusEl.classList.toggle('is-error', tone === 'error');
+            }
+
+            function scrollMessagesToBottom() {
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+
+            function renderMessages(typing) {
+                messagesEl.innerHTML = '';
+
+                state.messages.forEach((item) => {
+                    const row = document.createElement('div');
+                    row.className = `dashboard-ai-chat-message ${item.role === 'assistant' ? 'is-assistant' : 'is-user'}`;
+
+                    const bubble = document.createElement('div');
+                    bubble.className = 'dashboard-ai-chat-bubble';
+                    bubble.textContent = item.content;
+
+                    row.appendChild(bubble);
+                    messagesEl.appendChild(row);
+                });
+
+                if (typing) {
+                    const row = document.createElement('div');
+                    row.className = 'dashboard-ai-chat-message is-assistant is-typing';
+
+                    const bubble = document.createElement('div');
+                    bubble.className = 'dashboard-ai-chat-bubble';
+                    bubble.textContent = 'AI denkt na...';
+
+                    row.appendChild(bubble);
+                    messagesEl.appendChild(row);
+                }
+
+                scrollMessagesToBottom();
+            }
+
+            function setOpen(nextOpen) {
+                const shouldOpen = Boolean(nextOpen);
+                state.open = shouldOpen;
+                chatRoot.setAttribute('data-open', shouldOpen ? 'true' : 'false');
+                panel.hidden = !shouldOpen;
+                toggleButton.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+                if (shouldOpen) {
+                    window.setTimeout(() => {
+                        input.focus();
+                        scrollMessagesToBottom();
+                    }, 0);
+                }
+            }
+
+            function setSending(nextSending) {
+                state.sending = Boolean(nextSending);
+                input.disabled = state.sending;
+                sendButton.disabled = state.sending || !String(input.value || '').trim();
+            }
+
+            function appendMessage(role, content) {
+                const safeRole = role === 'assistant' ? 'assistant' : 'user';
+                const safeContent = String(content || '').trim();
+                if (!safeContent) return;
+                state.messages.push({
+                    role: safeRole,
+                    content: safeContent
+                });
+                if (state.messages.length > MAX_MESSAGES) {
+                    state.messages = state.messages.slice(-MAX_MESSAGES);
+                }
+                writeStoredMessages();
+            }
+
+            async function requestDashboardAi(payload) {
+                let lastError = null;
+
+                for (const url of CHAT_ENDPOINTS) {
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload || {})
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data?.ok) {
+                            throw new Error(
+                                String(data?.detail || data?.error || `AI request mislukt (${response.status})`)
+                            );
+                        }
+                        return data;
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+
+                throw lastError || new Error('AI request mislukt');
+            }
+
+            async function sendCurrentMessage() {
+                if (state.sending) return;
+                const question = String(input.value || '').trim();
+                if (!question) return;
+
+                input.value = '';
+                appendMessage('user', question);
+                renderMessages(true);
+                formatStatus('AI verwerkt je vraag...', '');
+                setSending(true);
+
+                try {
+                    const history = state.messages
+                        .slice(0, -1)
+                        .slice(-10)
+                        .map((item) => ({
+                            role: item.role === 'assistant' ? 'assistant' : 'user',
+                            content: item.content
+                        }));
+
+                    const data = await requestDashboardAi({
+                        question,
+                        history
+                    });
+                    const answer = String(data?.answer || '').trim() || 'Geen antwoord ontvangen.';
+                    appendMessage('assistant', answer);
+                    renderMessages(false);
+                    formatStatus('Bijgewerkt met de nieuwste dashboarddata.', 'ok');
+                } catch (error) {
+                    appendMessage(
+                        'assistant',
+                        'Ik kon nu geen antwoord ophalen. Probeer het opnieuw over een paar seconden.'
+                    );
+                    renderMessages(false);
+                    formatStatus(String(error?.message || 'Onbekende fout'), 'error');
+                } finally {
+                    setSending(false);
+                    input.focus();
+                }
+            }
+
+            state.messages = readStoredMessages();
+            if (!state.messages.length) {
+                appendMessage(
+                    'assistant',
+                    'Hoi, ik ben je AI-assistent. Je kunt me hier alles vragen over omzet, klanten, actieve opdrachten, agenda, calls en recente activiteiten.'
+                );
+            }
+            renderMessages(false);
+            setSending(false);
+
+            toggleButton.addEventListener('click', () => {
+                setOpen(!state.open);
+            });
+
+            closeButton.addEventListener('click', () => {
+                setOpen(false);
+            });
+
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                void sendCurrentMessage();
+            });
+
+            input.addEventListener('input', () => {
+                sendButton.disabled = state.sending || !String(input.value || '').trim();
+            });
+
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendCurrentMessage();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && state.open) {
+                    setOpen(false);
+                }
+            });
+        })();
     </script>
 </body>
 </html>
