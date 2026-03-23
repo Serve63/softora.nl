@@ -606,45 +606,6 @@
             align-items: center;
         }
 
-        .quote-section {
-            padding: 9rem 4rem;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-            min-height: 58vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-secondary);
-        }
-
-        .quote-text {
-            font-family: 'Oswald', sans-serif;
-            font-size: clamp(1.7rem, 4.2vw, 3.3rem);
-            font-weight: 600;
-            text-transform: uppercase;
-            line-height: 1.16;
-            max-width: 780px;
-            color: var(--text-primary);
-            position: relative;
-            z-index: 2;
-            letter-spacing: 0.02em;
-            opacity: 1;
-            transform: none;
-            transition: none;
-            text-shadow: none;
-        }
-
-        .quote-text.visible {
-            opacity: 1;
-            transform: none;
-        }
-
-        .quote-accent {
-            color: var(--accent-light);
-            font-weight: 700;
-        }
-
         .stat-item {
             padding: 2rem;
             border-left: 4px solid var(--border);
@@ -1091,7 +1052,6 @@
             .image-side { clip-path: none; height: 400px; }
             .image-text-section { --content-overlap: 0px; }
             .content-side { padding: 4rem 2rem; }
-            .quote-section { padding: 7rem 2rem; min-height: 48vh; }
             .cta-section { padding: 6rem 2rem; min-height: 40vh; }
             .footer-grid { grid-template-columns: 1fr 1fr; gap: 3rem; }
             .pricing-card.featured { transform: none; order: -1; }
@@ -1200,15 +1160,6 @@
                 </div>
             </div>
         </div>
-    </section>
-
-    <!-- QUOTE -->
-    <section class="quote-section">
-        <blockquote class="quote-text">
-            <span class="quote-accent">Jouw website is je visitekaartje</span> —<br>
-            maak het er eentje dat<br>
-            niemand vergeet.
-        </blockquote>
     </section>
 
     <!-- OVER + IMAGE -->
@@ -1603,7 +1554,7 @@
         window.addEventListener("scroll", onScroll, { passive: true });
         updateScrollUi();
 
-        document.querySelectorAll(".fade-up, .quote-text").forEach(function (element) {
+        document.querySelectorAll(".fade-up").forEach(function (element) {
             element.classList.add("visible");
         });
 
