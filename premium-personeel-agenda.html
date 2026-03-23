@@ -482,25 +482,25 @@
                 <div class="modal-summary" id="modalSummary">-</div>
             </div>
             <div class="modal-workspace" id="modalWorkspace">
-                <div class="modal-workspace-label">Na de afspraak</div>
+                <div class="modal-workspace-label">Meeting notities</div>
                 <div class="modal-workspace-help">
-                    Neem via spraak op wat de klant exact wil. We slaan de transcriptie direct op bij deze afspraak.
+                    Noteer hier de wensen van de klant uit de meeting. Deze info wordt gekoppeld aan de case en gaat mee naar actieve opdrachten.
                 </div>
                 <div class="modal-workspace-actions">
                     <button class="modal-btn subtle magnetic" id="voiceStartBtn" type="button">Start spraakopname</button>
                     <button class="modal-btn subtle magnetic" id="voiceStopBtn" type="button" disabled>Stop opname</button>
-                    <button class="modal-btn subtle magnetic" id="voiceClearBtn" type="button">Wis transcriptie</button>
-                    <button class="modal-btn subtle magnetic" id="workspaceGeneratePromptBtn" type="button">Zet transcriptie om naar exacte prompt</button>
+                    <button class="modal-btn subtle magnetic" id="voiceClearBtn" type="button">Wis notities</button>
+                    <button class="modal-btn subtle magnetic" id="workspaceGeneratePromptBtn" type="button">Maak AI bouwprompt van notities</button>
                 </div>
                 <div class="modal-workspace-status" id="workspaceVoiceStatus"></div>
                 <div class="modal-workspace-grid">
                     <div class="modal-workspace-field">
-                        <div class="modal-workspace-label">Spraaktranscriptie (exact)</div>
-                        <textarea id="workspaceTranscript" placeholder="Vertel hier via microfoon exact wat de klant wil."></textarea>
+                        <div class="modal-workspace-label">Notities meeting & klantwensen</div>
+                        <textarea id="workspaceTranscript" placeholder="Zet hier alle meetingnotities: doelen, wensen, stijl, functionaliteiten, planning, budget, bijzonderheden..."></textarea>
                     </div>
                     <div class="modal-workspace-field">
-                        <div class="modal-workspace-label">Prompt voor website-AI</div>
-                        <textarea id="workspacePrompt" placeholder="Klik op 'Zet transcriptie om naar exacte prompt'."></textarea>
+                        <div class="modal-workspace-label">AI bouwprompt (automatisch)</div>
+                        <textarea id="workspacePrompt" placeholder="Wordt automatisch gemaakt vanuit je notities (optioneel handmatig te bewerken)."></textarea>
                     </div>
                 </div>
                 <div class="modal-workspace-status" id="workspaceSaveStatus"></div>
@@ -710,6 +710,10 @@
         return String(workspacePromptEl.value || '').trim().length >= 10;
     }
 
+    function hasWorkspaceNotesReady() {
+        return String(workspaceTranscriptEl.value || '').trim().length >= 10;
+    }
+
     function hasWorkspaceLinkedOrder() {
         const apt = getActiveAppointment();
         return Boolean(apt?.activeOrderId || apt?.activeOrderAddedAt);
@@ -724,15 +728,13 @@
         }
 
         if (hasWorkspaceLinkedOrder()) {
-            modalPrimaryBtn.textContent = 'Toegevoegd aan actieve opdrachten';
+            modalPrimaryBtn.textContent = 'Case Geactiveerd';
             modalPrimaryBtn.disabled = true;
             return;
         }
 
-        modalPrimaryBtn.textContent = hasWorkspacePromptReady()
-            ? 'Toevoegen aan actieve opdrachten'
-            : 'Opslaan';
-        modalPrimaryBtn.disabled = workspaceBusy;
+        modalPrimaryBtn.textContent = 'Case Activeren';
+        modalPrimaryBtn.disabled = workspaceBusy || !hasWorkspaceNotesReady();
     }
 
     async function markActiveAppointmentNoDeal() {
@@ -772,7 +774,7 @@
         const updatedAt = String(apt?.postCallUpdatedAt || '');
         const activeOrderId = Number(apt?.activeOrderId || 0) || null;
         if (activeOrderId) {
-            setWorkspaceStatus(`Al toegevoegd aan actieve opdrachten (opdracht #${activeOrderId}).`, 'success');
+            setWorkspaceStatus(`Case al geactiveerd (opdracht #${activeOrderId}).`, 'success');
         } else if (updatedAt) {
             setWorkspaceStatus(`Laatst opgeslagen: ${new Date(updatedAt).toLocaleString('nl-NL')}`);
         } else {
@@ -951,31 +953,57 @@
         }
     }
 
-    async function addActiveOrderForActiveAppointment() {
+    async function addActiveOrderForActiveAppointment(options = {}) {
         const apt = getActiveAppointment();
         if (!apt) {
             setWorkspaceStatus('Afspraak niet gevonden.', 'error');
             return null;
         }
-        if (!hasWorkspacePromptReady()) {
-            setWorkspaceStatus('Maak eerst een prompt voordat je toevoegt aan actieve opdrachten.', 'error');
+        const transcriptText = String(workspaceTranscriptEl.value || '').trim();
+        if (transcriptText.length < 10) {
+            setWorkspaceStatus('Vul eerst meetingnotities in (minimaal 10 tekens).', 'error');
             return null;
         }
         if (hasWorkspaceLinkedOrder()) {
-            setWorkspaceStatus('Deze afspraak is al toegevoegd aan actieve opdrachten.', 'success');
+            setWorkspaceStatus('Deze case is al geactiveerd en gekoppeld aan actieve opdrachten.', 'success');
             return null;
         }
         if (workspaceBusy) return null;
 
         workspaceBusy = true;
         refreshWorkspacePrimaryButtonLabel();
-        setWorkspaceStatus('Toevoegen aan actieve opdrachten...', '');
+        setWorkspaceStatus('Case activeren...', '');
 
         try {
+            let promptText = String(workspacePromptEl.value || '').trim();
+            const shouldGeneratePrompt = options?.autoGeneratePrompt !== false;
+
+            if (!promptText && shouldGeneratePrompt) {
+                setWorkspaceStatus('Notities verwerken naar AI bouwprompt... (kan 20-45 sec duren)', '');
+                const promptResult = await postJsonWithFallback(
+                    ['/api/ai-transcript-to-prompt', '/api/ai/transcript-to-prompt'],
+                    {
+                        transcript: transcriptText,
+                        language: 'nl',
+                        appointmentId: activeAppointmentId,
+                    },
+                    { timeoutMs: 50000 }
+                );
+                promptText = String(promptResult?.prompt || '').trim();
+                if (promptText) {
+                    workspacePromptEl.value = promptText;
+                }
+            }
+
+            if (!promptText) {
+                setWorkspaceStatus('Prompt kon niet worden gemaakt. Vul handmatig een prompt in of probeer opnieuw.', 'error');
+                return null;
+            }
+
             const payload = {
                 status: 'customer_wants_to_proceed',
-                transcript: String(workspaceTranscriptEl.value || '').trim(),
-                prompt: String(workspacePromptEl.value || '').trim(),
+                transcript: transcriptText,
+                prompt: promptText,
                 actor: 'premium-personeel-agenda',
             };
             const result = await postJsonWithFallback(
@@ -988,13 +1016,13 @@
             );
             updateAppointmentPostCallFields(result?.appointment || {});
             if (result?.alreadyExisted) {
-                setWorkspaceStatus('Deze afspraak stond al bij actieve opdrachten en is bijgewerkt.', 'success');
+                setWorkspaceStatus('Case was al actief en is bijgewerkt met je nieuwste notities.', 'success');
             } else {
-                setWorkspaceStatus('Toegevoegd aan actieve opdrachten. Je ziet hem nu op die pagina.', 'success');
+                setWorkspaceStatus('Case geactiveerd. Opdracht staat nu bij actieve opdrachten.', 'success');
             }
             return result;
         } catch (error) {
-            setWorkspaceStatus(`Toevoegen mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
+            setWorkspaceStatus(`Case activeren mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
             return null;
         } finally {
             workspaceBusy = false;
@@ -1026,9 +1054,9 @@
             );
             workspacePromptEl.value = String(result?.prompt || '').trim();
             if (String(result?.source || '') === 'template-fallback') {
-                setWorkspaceStatus('Prompt gemaakt via fallback-template. Klik op "Toevoegen aan actieve opdrachten".', 'success');
+                setWorkspaceStatus('Prompt gemaakt via fallback-template. Je kunt nu op "Case Activeren" klikken.', 'success');
             } else {
-                setWorkspaceStatus('Prompt gegenereerd. Klik op "Toevoegen aan actieve opdrachten".', 'success');
+                setWorkspaceStatus('Prompt gegenereerd. Je kunt nu op "Case Activeren" klikken.', 'success');
             }
             refreshWorkspacePrimaryButtonLabel();
         } catch (error) {
@@ -1179,13 +1207,12 @@
     function handleModalPrimaryAction() {
         if (!modalWorkspaceMode) {
             applyWorkspaceMode(true);
+            window.setTimeout(() => {
+                workspaceTranscriptEl.focus();
+            }, 30);
             return;
         }
-        if (hasWorkspacePromptReady()) {
-            void addActiveOrderForActiveAppointment();
-            return;
-        }
-        void saveWorkspaceForActiveAppointment();
+        void addActiveOrderForActiveAppointment({ autoGeneratePrompt: true });
     }
 
     function handleModalSecondaryAction() {
@@ -1205,8 +1232,10 @@
     voiceStopBtn.addEventListener('click', stopVoiceRecording);
     voiceClearBtn.addEventListener('click', () => {
         workspaceTranscriptEl.value = '';
-        setVoiceStatus('Transcriptie gewist.');
+        setVoiceStatus('Notities gewist.');
+        refreshWorkspacePrimaryButtonLabel();
     });
+    workspaceTranscriptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);
     workspacePromptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);
 
     // Init
