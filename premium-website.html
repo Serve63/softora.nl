@@ -842,7 +842,7 @@
 
         .faq-question {
             width: 100%;
-            padding: 2.5rem 0;
+            padding: 1.35rem 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -850,7 +850,7 @@
             border: none;
             color: var(--text-primary);
             font-family: 'Oswald', sans-serif;
-            font-size: 1.3rem;
+            font-size: 1.05rem;
             font-weight: 500;
             text-align: left;
             cursor: pointer;
@@ -864,8 +864,8 @@
         }
 
         .faq-icon {
-            width: 40px;
-            height: 40px;
+            width: 30px;
+            height: 30px;
             border: 2px solid var(--border);
             display: flex;
             align-items: center;
@@ -873,7 +873,7 @@
             position: relative;
             transition: all 0.4s var(--ease-out-expo);
             flex-shrink: 0;
-            margin-left: 2rem;
+            margin-left: 1rem;
         }
 
         .faq-icon::before,
@@ -885,13 +885,13 @@
         }
 
         .faq-icon::before {
-            width: 14px;
+            width: 10px;
             height: 2px;
         }
 
         .faq-icon::after {
             width: 2px;
-            height: 14px;
+            height: 10px;
         }
 
         .faq-item.active .faq-icon {
@@ -910,14 +910,19 @@
             overflow: hidden;
             transition: max-height 0.6s var(--ease-out-expo), padding 0.6s var(--ease-out-expo);
             color: var(--text-secondary);
-            line-height: 1.8;
-            padding-right: 60px;
+            line-height: 1.6;
+            padding-right: 40px;
             font-weight: 300;
+            font-size: 0.95rem;
+        }
+
+        .faq-answer p {
+            margin: 0;
         }
 
         .faq-item.active .faq-answer {
-            max-height: 300px;
-            padding-bottom: 2.5rem;
+            max-height: 240px;
+            padding-bottom: 1.25rem;
         }
 
         .cta-section {
@@ -1293,14 +1298,14 @@
     </section>
 
     <!-- FAQ -->
-    <section id="faq" style="background: var(--bg-secondary); padding: 4rem 4rem 10rem;">
+    <section id="faq" style="background: var(--bg-secondary); padding: 2.5rem 4rem 5.5rem;">
         <div style="max-width: 900px; margin: 0 auto;">
             <div class="section-header fade-up" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
                 <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">FAQ</span>
                 <h2 style="text-align: center;">Veelgestelde Vragen</h2>
             </div>
 
-            <div class="faq-container" style="margin-top: 4rem;">
+            <div class="faq-container" style="margin-top: 2rem;">
                 <div class="faq-item fade-up">
                     <button class="faq-question magnetic">
                         Hoe lang duurt het om een website te bouwen?
