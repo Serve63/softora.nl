@@ -242,21 +242,57 @@ button,
     cursor: pointer !important;
 }
 
-/* Keep the sidebar footer in a fixed, identical position on desktop pages. */
-@media (min-width: 1025px) {
+/* Keep sidebar behavior identical across pages and prevent footer jumping. */
+@media (min-width: 901px) {
     .sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 280px !important;
         height: 100vh !important;
-        display: flex !important;
-        flex-direction: column !important;
+        min-height: 100vh !important;
     }
 
     .sidebar-nav {
         flex: 1 1 auto !important;
         min-height: 0 !important;
+        overflow: visible !important;
     }
 
     .sidebar-footer {
         margin-top: auto !important;
         flex-shrink: 0 !important;
+    }
+
+    .main,
+    .page-shell,
+    .main-content {
+        margin-left: 280px !important;
+    }
+}
+
+@media (max-width: 900px) {
+    .sidebar {
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+    }
+
+    .sidebar-nav {
+        flex: 1 1 auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+    }
+
+    .sidebar-footer {
+        margin-top: 0 !important;
+        flex-shrink: 0 !important;
+    }
+
+    .main,
+    .page-shell,
+    .main-content {
+        margin-left: 0 !important;
     }
 }
