@@ -633,7 +633,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: none;
+            background: rgba(0, 0, 0, 0.36);
         }
 
         .quote-text {
@@ -643,13 +643,14 @@
             text-transform: uppercase;
             line-height: 1.16;
             max-width: 780px;
+            color: #ffffff;
             position: relative;
             z-index: 2;
             letter-spacing: 0.02em;
             opacity: 1;
             transform: none;
             transition: none;
-            text-shadow: 0 2px 12px rgba(15, 17, 28, 0.14);
+            text-shadow: 0 3px 14px rgba(0, 0, 0, 0.32);
         }
 
         .quote-text.visible {
@@ -998,7 +999,18 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: none;
+            background: rgba(0, 0, 0, 0.42);
+        }
+
+        .cta-section .magnetic-btn.secondary {
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.45);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .cta-section .magnetic-btn.secondary:hover {
+            border-color: rgba(255, 255, 255, 0.65);
+            background: rgba(255, 255, 255, 0.14);
         }
 
         .cta-content {
@@ -1405,12 +1417,12 @@
             <img src="https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80" alt="Team working" width="1600" height="900" loading="eager" decoding="async">
         </div>
         <div class="cta-content">
-            <span class="eyebrow fade-up" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem; display: inline-block; margin-bottom: 2rem;">Laten We Beginnen</span>
-            <h2 class="cta-title fade-up" style="color: var(--text-primary);">
+            <span class="eyebrow fade-up" style="border: none; padding: 0; color: rgba(255,255,255,0.78); font-size: 0.9rem; display: inline-block; margin-bottom: 2rem;">Laten We Beginnen</span>
+            <h2 class="cta-title fade-up" style="color: #ffffff;">
                 Klaar Voor Een<br>
                 <span class="text-accent">Website Die Werkt</span>?
             </h2>
-            <p class="fade-up" style="color: var(--text-secondary); max-width: 500px; margin: 0 auto 3rem; font-size: 1.1rem; font-weight: 300;">
+            <p class="fade-up" style="color: rgba(255,255,255,0.86); max-width: 500px; margin: 0 auto 3rem; font-size: 1.1rem; font-weight: 300;">
                 Plan een vrijblijvend strategiegesprek en ontdek wat wij voor jouw bedrijf kunnen betekenen.
             </p>
             <div class="fade-up" style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;">
