@@ -712,7 +712,7 @@
 
         .pricing-grid {
             display: flex;
-            gap: 2rem;
+            gap: 1.25rem;
             perspective: 1000px;
         }
 
@@ -720,19 +720,19 @@
             flex: 1;
             background: var(--bg-secondary);
             border: 2px solid var(--border);
-            padding: 4rem 3rem;
+            padding: 2.3rem 1.9rem;
             position: relative;
             transform-style: preserve-3d;
             transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
             display: flex;
             flex-direction: column;
-            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%);
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
         }
 
         .pricing-card.featured {
             background: linear-gradient(135deg, rgba(139,34,82,0.15), rgba(139,34,82,0.02));
             border-color: var(--accent);
-            transform: translateY(-10px) scale(1.015);
+            transform: translateY(-6px) scale(1.01);
             box-shadow: 0 12px 28px rgba(15, 17, 28, 0.12), 0 0 22px rgba(139,34,82,0.14);
             z-index: 2;
         }
@@ -744,9 +744,9 @@
             right: 0;
             background: var(--accent);
             color: white;
-            padding: 0.5rem 2rem;
+            padding: 0.4rem 1.5rem;
             font-family: 'Oswald', sans-serif;
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             font-weight: 700;
             letter-spacing: 0.1em;
             clip-path: polygon(0 0, 100% 0, 100% 100%, 10% 100%);
@@ -759,69 +759,75 @@
 
         .pricing-header {
             text-align: center;
-            margin-bottom: 3rem;
+            margin-bottom: 1.5rem;
             border-bottom: 1px solid var(--border);
-            padding-bottom: 2rem;
+            padding-bottom: 1.25rem;
         }
 
         .sessions {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.9rem;
+            font-size: 0.78rem;
             text-transform: uppercase;
-            letter-spacing: 0.15em;
+            letter-spacing: 0.13em;
             color: var(--text-tertiary);
-            margin-bottom: 1rem;
+            margin-bottom: 0.6rem;
             font-weight: 500;
         }
 
         .price {
             font-family: 'Oswald', sans-serif;
-            font-size: 5rem;
+            font-size: 4rem;
             font-weight: 700;
             color: var(--text-primary);
             line-height: 1;
-            margin: 1rem 0;
+            margin: 0.6rem 0 0.4rem;
         }
 
         .price-currency {
-            font-size: 2rem;
+            font-size: 1.55rem;
             vertical-align: top;
             color: var(--accent-light);
         }
 
         .price-note {
-            font-size: 1.2rem;
+            font-size: 0.95rem;
             color: var(--text-tertiary);
         }
 
         .pricing-features {
             list-style: none;
-            margin: 2rem 0;
+            margin: 1.1rem 0;
             flex-grow: 1;
         }
 
         .pricing-features li {
-            padding: 1rem 0;
+            padding: 0.7rem 0;
             border-bottom: 1px solid var(--border);
             color: var(--text-secondary);
-            font-size: 0.95rem;
+            font-size: 0.82rem;
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
             font-weight: 300;
             transition: all 0.3s;
+            line-height: 1.35;
         }
 
         .pricing-features li::before {
             content: '✓';
             color: var(--accent-light);
             font-weight: 700;
-            font-size: 1.2rem;
+            font-size: 1rem;
         }
 
         .pricing-features li:hover {
             color: var(--text-primary);
-            padding-left: 10px;
+            padding-left: 6px;
+        }
+
+        .pricing-card .magnetic-btn {
+            padding: 0.85rem 1rem;
+            font-size: 0.8rem;
         }
 
         .faq-container {
@@ -1234,9 +1240,9 @@
                 <div class="pricing-card fade-up" data-tilt>
                     <div class="pricing-header">
                         <div class="sessions">Starter</div>
-                        <h3 style="font-size: 2rem;">Starter Website</h3>
+                        <h3 style="font-size: 1.55rem;">Starter Website</h3>
                         <div class="price"><span class="price-currency">€</span>2.500</div>
-                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Ideaal voor starters & ZZP'ers</p>
+                        <p style="color: var(--text-secondary); font-size: 0.8rem;">Ideaal voor starters & ZZP'ers</p>
                     </div>
                     <ul class="pricing-features">
                         <li>Custom design (tot 5 pagina's)</li>
@@ -1251,9 +1257,9 @@
                 <div class="pricing-card featured fade-up" data-tilt style="transition-delay: 0.1s">
                     <div class="pricing-header">
                         <div class="sessions">Groei</div>
-                        <h3 style="font-size: 2rem;">Premium Website</h3>
+                        <h3 style="font-size: 1.55rem;">Premium Website</h3>
                         <div class="price"><span class="price-currency">€</span>5.500</div>
-                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Voor bedrijven die willen groeien</p>
+                        <p style="color: var(--text-secondary); font-size: 0.8rem;">Voor bedrijven die willen groeien</p>
                     </div>
                     <ul class="pricing-features">
                         <li>Volledig custom design (tot 12 pagina's)</li>
@@ -1269,9 +1275,9 @@
                 <div class="pricing-card fade-up" data-tilt style="transition-delay: 0.2s">
                     <div class="pricing-header">
                         <div class="sessions">Enterprise</div>
-                        <h3 style="font-size: 2rem;">Webapplicatie</h3>
+                        <h3 style="font-size: 1.55rem;">Webapplicatie</h3>
                         <div class="price"><span class="price-currency">€</span>10K<span class="price-note">+</span></div>
-                        <p style="color: var(--text-secondary); font-size: 0.9rem;">Complexe maatwerkoplossingen</p>
+                        <p style="color: var(--text-secondary); font-size: 0.8rem;">Complexe maatwerkoplossingen</p>
                     </div>
                     <ul class="pricing-features">
                         <li>Volledige webapplicatie op maat</li>
