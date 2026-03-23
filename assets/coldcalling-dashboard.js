@@ -141,7 +141,7 @@
 
     return {
       title: defaultTopbarTitleText || "Website's",
-      subtitle: defaultTopbarSubtitleText || 'AI coldcalling campagne configureren & starten',
+      subtitle: defaultTopbarSubtitleText || 'Website-campagne configureren & starten',
       leadListLabel: 'Database',
       leadListGroup: 'Telefoonlijsten',
       dbHint: 'Zakelijke bellijst met AI-status per bedrijf.',
