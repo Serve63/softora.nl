@@ -7,7 +7,7 @@
   }
   const topbarTitleEl = document.querySelector('.topbar .topbar-left h1');
   const topbarSubtitleEl = document.querySelector('.topbar .topbar-left p');
-  const defaultTopbarTitleText = String(topbarTitleEl?.textContent || 'AI Coldcalling').trim();
+  const defaultTopbarTitleText = String(topbarTitleEl?.textContent || "Website's").trim();
   const defaultTopbarSubtitleText = String(topbarSubtitleEl?.textContent || '').trim();
 
   let isSubmitting = false;
@@ -140,7 +140,7 @@
     }
 
     return {
-      title: defaultTopbarTitleText || 'AI Coldcalling',
+      title: defaultTopbarTitleText || "Website's",
       subtitle: defaultTopbarSubtitleText || 'AI coldcalling campagne configureren & starten',
       leadListLabel: 'Database',
       leadListGroup: 'Telefoonlijsten',
