@@ -379,22 +379,38 @@
             gap: 0.45rem;
         }
 
-        .modal-workspace-actions .modal-btn {
-            flex: 0 0 auto;
-            padding: 0.65rem 0.85rem;
-            font-size: 0.72rem;
-            letter-spacing: 0.04em;
-        }
-
-        .modal-btn.subtle {
-            background: transparent;
-            color: var(--text-secondary);
+        .modal-upload-icon-btn {
+            width: 44px;
+            height: 44px;
             border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            cursor: none;
         }
 
-        .modal-btn.subtle:hover {
+        .modal-upload-icon-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .modal-upload-icon-btn:hover {
             color: var(--text-primary);
             border-color: var(--accent-light);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .modal-upload-icon-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .workspace-file-input {
+            display: none;
         }
 
         .modal-footer {
@@ -487,10 +503,13 @@
                     Noteer hier de wensen van de klant uit de meeting. Deze info wordt gekoppeld aan de case en gaat mee naar actieve opdrachten.
                 </div>
                 <div class="modal-workspace-actions">
-                    <button class="modal-btn subtle magnetic" id="voiceStartBtn" type="button">Start spraakopname</button>
-                    <button class="modal-btn subtle magnetic" id="voiceStopBtn" type="button" disabled>Stop opname</button>
-                    <button class="modal-btn subtle magnetic" id="voiceClearBtn" type="button">Wis notities</button>
-                    <button class="modal-btn subtle magnetic" id="workspaceGeneratePromptBtn" type="button">Maak AI bouwprompt van notities</button>
+                    <button class="modal-upload-icon-btn magnetic" id="notesImageUploadBtn" type="button" title="Upload foto notitieblok" aria-label="Upload foto notitieblok">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5v9A1.5 1.5 0 0 1 18.5 18h-13A1.5 1.5 0 0 1 4 16.5v-9Z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 10.75h.01M20 15l-4.5-4.5L7 19.5"/>
+                        </svg>
+                    </button>
+                    <input class="workspace-file-input" id="notesImageUploadInput" type="file" accept="image/*" capture="environment">
                 </div>
                 <div class="modal-workspace-status" id="workspaceVoiceStatus"></div>
                 <div class="modal-workspace-grid">
@@ -639,19 +658,12 @@
     const workspacePromptEl = document.getElementById('workspacePrompt');
     const workspaceVoiceStatusEl = document.getElementById('workspaceVoiceStatus');
     const workspaceSaveStatusEl = document.getElementById('workspaceSaveStatus');
-    const workspaceGeneratePromptBtn = document.getElementById('workspaceGeneratePromptBtn');
-    const voiceStartBtn = document.getElementById('voiceStartBtn');
-    const voiceStopBtn = document.getElementById('voiceStopBtn');
-    const voiceClearBtn = document.getElementById('voiceClearBtn');
+    const notesImageUploadBtn = document.getElementById('notesImageUploadBtn');
+    const notesImageUploadInput = document.getElementById('notesImageUploadInput');
 
     let activeAppointmentId = null;
     let modalWorkspaceMode = false;
-    let speechRecognizer = null;
-    let speechListening = false;
-    let pendingSpeechFinalText = '';
     let workspaceBusy = false;
-
-    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
     function appointmentFingerprint(apt) {
         return [apt.date || '', apt.time || '', apt.company || '', apt.phone || ''].join('|');
@@ -837,78 +849,116 @@
         throw lastError || new Error('Request mislukt.');
     }
 
-    function getSpeechRecognizer() {
-        if (!SpeechRecognitionCtor) return null;
-        if (speechRecognizer) return speechRecognizer;
-
-        speechRecognizer = new SpeechRecognitionCtor();
-        speechRecognizer.lang = 'nl-NL';
-        speechRecognizer.continuous = true;
-        speechRecognizer.interimResults = true;
-
-        speechRecognizer.onresult = (event) => {
-            let interim = '';
-            let finalText = '';
-            for (let i = event.resultIndex; i < event.results.length; i += 1) {
-                const transcript = String(event.results[i]?.[0]?.transcript || '').trim();
-                if (!transcript) continue;
-                if (event.results[i].isFinal) finalText += `${transcript}\n`;
-                else interim += `${transcript} `;
-            }
-            if (finalText) {
-                pendingSpeechFinalText += finalText;
-                workspaceTranscriptEl.value = `${workspaceTranscriptEl.value || ''}${workspaceTranscriptEl.value ? '\n' : ''}${finalText.trim()}`.trim();
-                setVoiceStatus('Spraak verwerkt.', 'success');
-            }
-            if (interim.trim()) {
-                setVoiceStatus(`Luistert: ${interim.trim()}`);
-            }
-        };
-
-        speechRecognizer.onerror = (event) => {
-            speechListening = false;
-            voiceStartBtn.disabled = false;
-            voiceStopBtn.disabled = true;
-            setVoiceStatus(`Spraakopname fout: ${String(event?.error || 'onbekend')}`, 'error');
-        };
-
-        speechRecognizer.onend = () => {
-            speechListening = false;
-            voiceStartBtn.disabled = false;
-            voiceStopBtn.disabled = true;
-            if (!workspaceVoiceStatusEl.textContent) {
-                setVoiceStatus('Spraakopname gestopt.');
-            }
-        };
-
-        return speechRecognizer;
+    function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('Bestand kon niet worden gelezen.'));
+            reader.readAsDataURL(file);
+        });
     }
 
-    function startVoiceRecording() {
-        const recognizer = getSpeechRecognizer();
-        if (!recognizer) {
-            setVoiceStatus('Deze browser ondersteunt geen spraak-naar-tekst.', 'error');
-            return;
-        }
-        if (speechListening) return;
-        pendingSpeechFinalText = '';
-        try {
-            recognizer.start();
-            speechListening = true;
-            voiceStartBtn.disabled = true;
-            voiceStopBtn.disabled = false;
-            setVoiceStatus('Luistert... spreek nu in.');
-        } catch (error) {
-            setVoiceStatus(`Spraakopname kon niet starten: ${String(error?.message || error)}`, 'error');
-        }
+    function loadImageFromDataUrl(dataUrl) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('Afbeelding kon niet worden geladen.'));
+            img.src = dataUrl;
+        });
     }
 
-    function stopVoiceRecording() {
-        if (!speechRecognizer || !speechListening) return;
+    function getDataUrlApproxBytes(dataUrl) {
+        const base64 = String(dataUrl || '').split(',')[1] || '';
+        return Math.max(0, Math.floor((base64.length * 3) / 4));
+    }
+
+    async function compressImageToDataUrl(file, options = {}) {
+        const maxDimension = Math.max(320, Math.min(2400, Number(options?.maxDimension || 1600)));
+        const quality = Math.max(0.45, Math.min(0.92, Number(options?.quality || 0.82)));
+        const sourceDataUrl = await readFileAsDataUrl(file);
+        const image = await loadImageFromDataUrl(sourceDataUrl);
+
+        const scale = Math.min(1, maxDimension / Math.max(image.width || 1, image.height || 1));
+        const targetWidth = Math.max(1, Math.round((image.width || 1) * scale));
+        const targetHeight = Math.max(1, Math.round((image.height || 1) * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas context niet beschikbaar.');
+        ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+        return canvas.toDataURL('image/jpeg', quality);
+    }
+
+    async function normalizeNotesImageForUpload(file) {
+        if (!file || !String(file.type || '').startsWith('image/')) {
+            throw new Error('Upload een geldige afbeelding.');
+        }
+
+        const attempts = [
+            { maxDimension: 1600, quality: 0.82 },
+            { maxDimension: 1400, quality: 0.74 },
+            { maxDimension: 1200, quality: 0.66 },
+            { maxDimension: 1000, quality: 0.58 },
+        ];
+        const maxBytes = 700 * 1024;
+        let latest = '';
+
+        for (let i = 0; i < attempts.length; i += 1) {
+            latest = await compressImageToDataUrl(file, attempts[i]);
+            if (getDataUrlApproxBytes(latest) <= maxBytes) {
+                return latest;
+            }
+        }
+
+        throw new Error('Foto is te groot. Maak een scherpere close-up of upload een kleinere afbeelding.');
+    }
+
+    async function handleNotesImageUpload(file) {
+        if (!file || workspaceBusy) return;
+
+        workspaceBusy = true;
+        refreshWorkspacePrimaryButtonLabel();
+        notesImageUploadBtn.disabled = true;
+        setVoiceStatus('Foto verwerken naar notities... (kan 20-45 sec duren)');
+
         try {
-            speechRecognizer.stop();
+            const imageDataUrl = await normalizeNotesImageForUpload(file);
+            const result = await postJsonWithFallback(
+                ['/api/ai/notes-image-to-text', '/api/ai-notes-image-to-text'],
+                {
+                    imageDataUrl,
+                    language: 'nl',
+                    appointmentId: activeAppointmentId,
+                },
+                { timeoutMs: 70000 }
+            );
+
+            const extractedNotes = String(result?.transcript || result?.text || '').trim();
+            if (!extractedNotes) {
+                throw new Error('Geen leesbare notities gevonden op de foto.');
+            }
+
+            const currentNotes = String(workspaceTranscriptEl.value || '').trim();
+            workspaceTranscriptEl.value = currentNotes
+                ? `${currentNotes}\n\n${extractedNotes}`
+                : extractedNotes;
+
+            const generatedPrompt = String(result?.prompt || '').trim();
+            if (generatedPrompt) {
+                workspacePromptEl.value = generatedPrompt;
+            }
+
+            setVoiceStatus('Foto verwerkt. Notities toegevoegd.', 'success');
+            setWorkspaceStatus('Notities uit foto toegevoegd en prompt bijgewerkt.', 'success');
         } catch (error) {
-            setVoiceStatus(`Spraakopname kon niet stoppen: ${String(error?.message || error)}`, 'error');
+            setVoiceStatus(`Foto verwerken mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
+        } finally {
+            workspaceBusy = false;
+            notesImageUploadBtn.disabled = false;
+            refreshWorkspacePrimaryButtonLabel();
+            if (notesImageUploadInput) notesImageUploadInput.value = '';
         }
     }
 
@@ -1026,44 +1076,6 @@
             return null;
         } finally {
             workspaceBusy = false;
-            refreshWorkspacePrimaryButtonLabel();
-        }
-    }
-
-    async function generatePromptFromTranscript() {
-        const transcript = String(workspaceTranscriptEl.value || '').trim();
-        if (transcript.length < 10) {
-            setWorkspaceStatus('Voeg eerst transcriptie toe voordat je een prompt maakt.', 'error');
-            return;
-        }
-        if (workspaceBusy) return;
-
-        workspaceBusy = true;
-        workspaceGeneratePromptBtn.disabled = true;
-        setWorkspaceStatus('Prompt genereren... (kan 20-45 sec duren)', '');
-
-        try {
-            const result = await postJsonWithFallback(
-                ['/api/ai-transcript-to-prompt', '/api/ai/transcript-to-prompt'],
-                {
-                    transcript,
-                    language: 'nl',
-                    appointmentId: activeAppointmentId,
-                },
-                { timeoutMs: 50000 }
-            );
-            workspacePromptEl.value = String(result?.prompt || '').trim();
-            if (String(result?.source || '') === 'template-fallback') {
-                setWorkspaceStatus('Prompt gemaakt via fallback-template. Je kunt nu op "Case Activeren" klikken.', 'success');
-            } else {
-                setWorkspaceStatus('Prompt gegenereerd. Je kunt nu op "Case Activeren" klikken.', 'success');
-            }
-            refreshWorkspacePrimaryButtonLabel();
-        } catch (error) {
-            setWorkspaceStatus(`Prompt genereren mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
-        } finally {
-            workspaceBusy = false;
-            workspaceGeneratePromptBtn.disabled = false;
             refreshWorkspacePrimaryButtonLabel();
         }
     }
@@ -1200,7 +1212,7 @@
     }
 
     function closeModal() {
-        stopVoiceRecording();
+        if (notesImageUploadInput) notesImageUploadInput.value = '';
         modalElement.classList.remove('show');
     }
 
@@ -1220,20 +1232,20 @@
             closeModal();
             return;
         }
-        stopVoiceRecording();
         applyWorkspaceMode(false);
     }
 
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
     modalSecondaryBtn.addEventListener('click', handleModalSecondaryAction);
-    workspaceGeneratePromptBtn.addEventListener('click', () => { void generatePromptFromTranscript(); });
-    voiceStartBtn.addEventListener('click', startVoiceRecording);
-    voiceStopBtn.addEventListener('click', stopVoiceRecording);
-    voiceClearBtn.addEventListener('click', () => {
-        workspaceTranscriptEl.value = '';
-        setVoiceStatus('Notities gewist.');
-        refreshWorkspacePrimaryButtonLabel();
+    notesImageUploadBtn.addEventListener('click', () => {
+        if (workspaceBusy) return;
+        notesImageUploadInput.click();
+    });
+    notesImageUploadInput.addEventListener('change', (event) => {
+        const file = event?.target?.files?.[0] || null;
+        if (!file) return;
+        void handleNotesImageUpload(file);
     });
     workspaceTranscriptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);
     workspacePromptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);

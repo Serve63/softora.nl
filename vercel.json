@@ -46,6 +46,10 @@
     {
       "source": "/api/active-orders/launch-site",
       "destination": "/api/active-order-launch-site"
+    },
+    {
+      "source": "/api/ai/notes-image-to-text",
+      "destination": "/api/ai-notes-image-to-text"
     }
   ]
 }

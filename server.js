@@ -2184,6 +2184,113 @@ async function generateWebsitePromptFromTranscriptWithAi(options = {}) {
   };
 }
 
+async function extractMeetingNotesFromImageWithAi(options = {}) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) {
+    const err = new Error('OPENAI_API_KEY ontbreekt');
+    err.status = 503;
+    throw err;
+  }
+
+  const imageDataUrl = normalizeString(options.imageDataUrl || options.image || '').replace(/\s+/g, '');
+  if (!imageDataUrl) {
+    const err = new Error('Afbeelding ontbreekt');
+    err.status = 400;
+    throw err;
+  }
+  if (!/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(imageDataUrl)) {
+    const err = new Error('Ongeldige afbeelding. Gebruik PNG, JPG of WEBP als data URL.');
+    err.status = 400;
+    throw err;
+  }
+  if (imageDataUrl.length > 900000) {
+    const err = new Error('Afbeelding te groot. Lever een compactere foto aan.');
+    err.status = 413;
+    throw err;
+  }
+
+  const language = normalizeString(options.language || 'nl') || 'nl';
+  const systemPrompt = [
+    'Je bent een nauwkeurige notitie-assistent.',
+    'Lees de geuploade foto van meetingnotities en zet dit om naar leesbare tekst.',
+    'Verzin geen feiten. Als een woord onduidelijk is, gebruik [ONLEESBAAR].',
+    'Output exact JSON met veld "transcript". Geen markdown, geen extra velden.',
+  ].join('\n');
+
+  const userPrompt = [
+    `Taal voor transcript: ${language}.`,
+    'Zet de notities om naar een compacte, duidelijke transcriptie met regeleinden.',
+    'Behoud concrete wensen, functionaliteiten, planning, budget en stijlkeuzes als die zichtbaar zijn.',
+    'Output JSON voorbeeld: {"transcript":"..."}',
+  ].join('\n');
+
+  const { response, data } = await fetchJsonWithTimeout(
+    `${OPENAI_API_BASE_URL}/chat/completions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.1,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: userPrompt },
+              { type: 'image_url', image_url: { url: imageDataUrl } },
+            ],
+          },
+        ],
+      }),
+    },
+    70000
+  );
+
+  if (!response.ok) {
+    const err = new Error(`OpenAI image-notes extractie mislukt (${response.status})`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+
+  const content = data?.choices?.[0]?.message?.content;
+  const textContent = normalizeString(extractOpenAiTextContent(content));
+  if (!textContent) {
+    const err = new Error('OpenAI gaf geen notities terug uit de afbeelding.');
+    err.status = 502;
+    err.data = data;
+    throw err;
+  }
+
+  const parsed = parseJsonLoose(textContent);
+  const transcript = truncateText(
+    normalizeString(
+      parsed && typeof parsed === 'object' && typeof parsed.transcript === 'string'
+        ? parsed.transcript
+        : textContent
+    ),
+    20000
+  );
+
+  if (!transcript) {
+    const err = new Error('Er kon geen transcriptie uit de notitiefoto worden gehaald.');
+    err.status = 502;
+    throw err;
+  }
+
+  return {
+    transcript,
+    source: 'openai-vision',
+    model: OPENAI_MODEL,
+    usage: data?.usage || null,
+    language,
+  };
+}
+
 function buildWebsitePromptFallback(options = {}) {
   const language = normalizeString(options.language || 'nl') || 'nl';
   const context = truncateText(normalizeString(options.context || ''), 2000);
@@ -6265,6 +6372,92 @@ app.post('/api/ai/transcript-to-prompt', async (req, res) => {
 // Vercel fallback voor diepe API-paths in sommige regio's.
 app.post('/api/ai-transcript-to-prompt', async (req, res) => {
   return sendAiTranscriptToPromptResponse(req, res);
+});
+
+async function sendAiNotesImageToTextResponse(req, res) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const imageDataUrl = normalizeString(body.imageDataUrl || body.image || '').replace(/\s+/g, '');
+  const language = normalizeString(body.language || 'nl') || 'nl';
+  const context = normalizeString(body.context || '');
+
+  if (!imageDataUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Afbeelding ontbreekt',
+      detail: 'Stuur een JSON body met { imageDataUrl: "data:image/...;base64,..." }',
+    });
+  }
+
+  if (imageDataUrl.length > 900000) {
+    return res.status(413).json({
+      ok: false,
+      error: 'Afbeelding te groot',
+      detail: 'Lever een compactere afbeelding aan (max ~700KB geadviseerd).',
+    });
+  }
+
+  try {
+    const extraction = await extractMeetingNotesFromImageWithAi({
+      imageDataUrl,
+      language,
+    });
+
+    let promptResult = null;
+    try {
+      promptResult = await generateWebsitePromptFromTranscriptWithAi({
+        transcript: extraction.transcript,
+        language,
+        context,
+      });
+    } catch (promptError) {
+      promptResult = {
+        prompt: buildWebsitePromptFallback({
+          transcript: extraction.transcript,
+          language,
+          context,
+        }),
+        source: 'template-fallback',
+        model: null,
+        usage: null,
+      };
+    }
+
+    return res.status(200).json({
+      ok: true,
+      transcript: extraction.transcript,
+      prompt: String(promptResult?.prompt || '').trim(),
+      source: extraction.source,
+      model: extraction.model,
+      promptSource: String(promptResult?.source || ''),
+      usage: {
+        extraction: extraction.usage || null,
+        prompt: promptResult?.usage || null,
+      },
+      language,
+      openAiEnabled: true,
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    const safeStatus = status >= 400 && status < 600 ? status : 500;
+    return res.status(safeStatus).json({
+      ok: false,
+      error:
+        safeStatus === 503
+          ? 'AI notitie-herkenning niet beschikbaar'
+          : 'AI notitie-herkenning mislukt',
+      detail: String(error?.message || 'Onbekende fout'),
+      openAiEnabled: Boolean(getOpenAiApiKey()),
+    });
+  }
+}
+
+app.post('/api/ai/notes-image-to-text', async (req, res) => {
+  return sendAiNotesImageToTextResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ai-notes-image-to-text', async (req, res) => {
+  return sendAiNotesImageToTextResponse(req, res);
 });
 
 async function sendActiveOrderGenerateSiteResponse(req, res) {
