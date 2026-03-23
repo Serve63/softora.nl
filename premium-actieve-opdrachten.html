@@ -682,6 +682,22 @@
             line-height: 1.5;
         }
 
+        .order-delivery {
+            margin-top: 0.45rem;
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            line-height: 1.45;
+        }
+
+        .order-delivery strong {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.62rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-right: 0.4rem;
+        }
+
         .order-price { text-align: right; min-width: 120px; }
 
         .order-price-label {
@@ -1279,12 +1295,12 @@
             <form class="create-order-form" id="createOrderForm">
                 <div class="create-order-grid">
                     <div class="create-order-field">
-                        <label class="create-order-label" for="newOrderClient">Klantnaam</label>
-                        <input class="create-order-input" id="newOrderClient" name="clientName" type="text" placeholder="Bijv. Salon Nova" required>
+                        <label class="create-order-label" for="newOrderCompany">Bedrijfsnaam</label>
+                        <input class="create-order-input" id="newOrderCompany" name="companyName" type="text" placeholder="Bijv. Salon Nova B.V." required>
                     </div>
                     <div class="create-order-field">
-                        <label class="create-order-label" for="newOrderLocation">Plaats</label>
-                        <input class="create-order-input" id="newOrderLocation" name="location" type="text" placeholder="Bijv. Breda" required>
+                        <label class="create-order-label" for="newOrderContact">Contactpersoon</label>
+                        <input class="create-order-input" id="newOrderContact" name="contactPerson" type="text" placeholder="Bijv. Sanne de Vries" required>
                     </div>
                     <div class="create-order-field full">
                         <label class="create-order-label" for="newOrderTitle">Opdracht Titel</label>
@@ -1293,6 +1309,10 @@
                     <div class="create-order-field full">
                         <label class="create-order-label" for="newOrderDesc">Omschrijving</label>
                         <textarea class="create-order-textarea" id="newOrderDesc" name="description" placeholder="Korte omschrijving van de opdracht..." required></textarea>
+                    </div>
+                    <div class="create-order-field full">
+                        <label class="create-order-label" for="newOrderDeliveryTime">Oplevertijd</label>
+                        <input class="create-order-input" id="newOrderDeliveryTime" name="deliveryTime" type="text" placeholder="Bijv. Binnen 3 weken" required>
                     </div>
                     <div class="create-order-field">
                         <label class="create-order-label" for="newOrderAmount">Bedrag (€)</label>
@@ -1892,6 +1912,7 @@
             const parts = clientLine.split('—').map(s => s.trim()).filter(Boolean);
             const clientName = parts[0] || orders[id]?.name || 'Bedrijf';
             const location = parts[1] || '';
+            const deliveryTime = String(getCustomOrderById(id)?.deliveryTime || '').trim();
 
             const features = deriveFeatures(description);
 
@@ -1901,6 +1922,7 @@
                 location,
                 title: title || (orders[id]?.type || 'Project'),
                 description,
+                deliveryTime,
                 budget,
                 features
             };
@@ -2255,6 +2277,7 @@
                         const location = String(item?.location || '').trim();
                         const title = String(item?.title || '').trim();
                         const description = String(item?.description || '').trim();
+                        const deliveryTime = String(item?.deliveryTime || '').trim();
                         const prompt = String(item?.prompt || '').trim();
                         const transcript = String(item?.transcript || '').trim();
                         const apiCostEur = parseNullableNumber(item?.apiCostEur);
@@ -2283,6 +2306,7 @@
                             location,
                             title,
                             description,
+                            deliveryTime,
                             amount: Math.round(amount),
                             status: normalizeOrderStatus(item?.status).key,
                             prompt,
@@ -2561,8 +2585,12 @@
             const isDelivered = ui.isBuilt;
             const isPaid = ui.isPaid;
             const clientLine = [record.clientName, record.location].filter(Boolean).join(' — ');
+            const deliveryTime = String(record.deliveryTime || '').trim();
             const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
             const apiCostText = formatApiCostLabel(record);
+            const deliveryHtml = deliveryTime
+                ? `<div class="order-delivery"><strong>Oplevertijd</strong>${escapeHtml(deliveryTime)}</div>`
+                : '';
 
             return `
                 <div class="order-card ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
@@ -2571,6 +2599,7 @@
                             <div class="order-client">${escapeHtml(clientLine || 'Nieuwe opdracht')}</div>
                             <div class="order-title">${escapeHtml(record.title)}</div>
                             <div class="order-desc">${escapeHtml(record.description)}</div>
+                            ${deliveryHtml}
                         </div>
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
@@ -2713,7 +2742,7 @@
             modal.classList.add('show');
             modal.setAttribute('aria-hidden', 'false');
             window.setTimeout(() => {
-                document.getElementById('newOrderClient')?.focus();
+                document.getElementById('newOrderCompany')?.focus();
             }, 40);
         }
 
@@ -2731,14 +2760,15 @@
             const form = event.currentTarget;
             const data = new FormData(form);
 
-            const clientName = String(data.get('clientName') || '').trim();
-            const location = String(data.get('location') || '').trim();
+            const companyName = String(data.get('companyName') || '').trim();
+            const contactPerson = String(data.get('contactPerson') || '').trim();
             const title = String(data.get('title') || '').trim();
             const description = String(data.get('description') || '').trim();
+            const deliveryTime = String(data.get('deliveryTime') || '').trim();
             const amount = Math.round(Number(data.get('amount')));
             const status = normalizeOrderStatus(data.get('status')).key;
 
-            if (!clientName || !location || !title || !description) {
+            if (!companyName || !contactPerson || !title || !description || !deliveryTime) {
                 setCreateOrderMessage('Vul alle velden in.', 'error');
                 return;
             }
@@ -2749,10 +2779,11 @@
 
             const record = {
                 id: getNextOrderId(),
-                clientName,
-                location,
+                clientName: companyName,
+                location: contactPerson,
                 title,
                 description,
+                deliveryTime,
                 amount,
                 status,
                 prompt: '',
@@ -2898,10 +2929,12 @@
             const company = String(meta?.clientName || customOrder?.clientName || 'bedrijf').trim();
             const title = String(meta?.title || customOrder?.title || 'website').trim();
             const description = String(meta?.description || customOrder?.description || '').trim();
+            const deliveryTime = String(meta?.deliveryTime || customOrder?.deliveryTime || '').trim();
             return [
                 `Bouw een premium maatwerk HTML website voor ${company}.`,
                 `Projecttitel: ${title}.`,
                 description ? `Context: ${description}` : '',
+                deliveryTime ? `Gewenste oplevertermijn: ${deliveryTime}.` : '',
                 'Doel: maak een website die voelt als high-end maatwerk en niet als een template.',
                 'Werk als creative director, UX designer, copywriter en senior front-end developer in één.',
                 'Begin met een sterke merkhoek en heldere waardepropositie, en bouw daarna een logisch verhaal van hero naar aanbod, vertrouwen en contact.',
@@ -2921,7 +2954,8 @@
                 id: String(activeId),
                 clientName: orders[id]?.name || 'Bedrijf',
                 title: orders[id]?.type || 'Project',
-                description: ''
+                description: '',
+                deliveryTime: String(getCustomOrderById(activeId)?.deliveryTime || '').trim()
             };
             const customOrder = getCustomOrderById(activeId);
             const prompt = String(customOrder?.prompt || '').trim() || buildFallbackSitePrompt(meta, customOrder);
@@ -2931,6 +2965,7 @@
                 company: meta.clientName,
                 title: meta.title,
                 description: meta.description,
+                deliveryTime: meta.deliveryTime,
                 prompt,
                 buildMode,
                 language: 'nl'
