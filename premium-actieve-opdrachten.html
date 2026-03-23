@@ -1171,6 +1171,35 @@
             -moz-appearance: none;
         }
 
+        .create-order-select-wrap {
+            position: relative;
+        }
+
+        .create-order-select-wrap::after {
+            content: '';
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            width: 8px;
+            height: 8px;
+            border-right: 1.5px solid var(--text-tertiary);
+            border-bottom: 1.5px solid var(--text-tertiary);
+            transform: translateY(-65%) rotate(45deg);
+            pointer-events: none;
+        }
+
+        .create-order-hint {
+            font-size: 0.74rem;
+            color: var(--text-tertiary);
+            font-weight: 300;
+            line-height: 1.45;
+            min-height: 1rem;
+        }
+
+        .create-order-hint.warning {
+            color: #b05b77;
+        }
+
         .create-order-textarea {
             min-height: 96px;
             resize: vertical;
@@ -1292,6 +1321,25 @@
             </div>
             <form class="create-order-form" id="createOrderForm">
                 <div class="create-order-grid">
+                    <div class="create-order-field full">
+                        <label class="create-order-label" for="newOrderAgendaLeadId">Koppel aan agenda-lead (optioneel)</label>
+                        <div class="create-order-select-wrap">
+                            <select class="create-order-select" id="newOrderAgendaLeadId" name="agendaLeadId">
+                                <option value="">Geen koppeling</option>
+                            </select>
+                        </div>
+                        <div class="create-order-hint" id="newOrderAgendaLeadHint"></div>
+                    </div>
+                    <div class="create-order-field full">
+                        <label class="create-order-label" for="newOrderIncludeSampleDesign">Voorbeelddesign meenemen als basis</label>
+                        <div class="create-order-select-wrap">
+                            <select class="create-order-select" id="newOrderIncludeSampleDesign" name="includeSampleDesign">
+                                <option value="no" selected>Nee, bouw vanaf briefing</option>
+                                <option value="yes">Ja, gebruik voorbeelddesign als basis</option>
+                            </select>
+                        </div>
+                        <div class="create-order-hint">Gebruik dit als je de stijl/richting van het voorbeelddesign wilt doorzetten in de echte build.</div>
+                    </div>
                     <div class="create-order-field">
                         <label class="create-order-label" for="newOrderCompany">Bedrijfsnaam</label>
                         <input class="create-order-input" id="newOrderCompany" name="companyName" type="text" placeholder="Bijv. Salon Nova B.V." required>
@@ -1483,6 +1531,10 @@
             5: { name: 'Bakkerij Jansen', type: 'Bakkerij Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null }
         };
         let customOrders = [];
+        let agendaLeadOptions = [];
+        let agendaLeadOptionsLoadedAt = 0;
+        let agendaLeadOptionsPromise = null;
+        const AGENDA_LEAD_CACHE_MS = 90000;
 
         const quickBuildSteps = [
             { pct: 5, step: 1, msg: 'Opdracht ontvangen, klantgegevens analyseren...' },
@@ -1899,11 +1951,14 @@
             const description = (card.querySelector('.order-desc')?.textContent || '').trim();
             const priceText = (card.querySelector('.order-price-value')?.textContent || '').trim();
             const budget = moneyToNumber(priceText);
+            const customOrder = getCustomOrderById(id);
 
             const parts = clientLine.split('—').map(s => s.trim()).filter(Boolean);
             const clientName = parts[0] || orders[id]?.name || 'Bedrijf';
             const location = parts[1] || '';
-            const deliveryTime = String(getCustomOrderById(id)?.deliveryTime || '').trim();
+            const deliveryTime = String(customOrder?.deliveryTime || '').trim();
+            const sourceAppointmentLabel = String(customOrder?.sourceAppointmentLabel || '').trim();
+            const includeSampleDesign = Boolean(customOrder?.includeSampleDesign);
 
             const features = deriveFeatures(description);
 
@@ -1914,6 +1969,8 @@
                 title: title || (orders[id]?.type || 'Project'),
                 description,
                 deliveryTime,
+                sourceAppointmentLabel,
+                includeSampleDesign,
                 budget,
                 features
             };
@@ -2285,8 +2342,12 @@
                         const estimatedApiGeneratedAt = String(item?.estimatedApiGeneratedAt || '').trim();
                         const lastRunAt = String(item?.lastRunAt || '').trim();
                         const paidAt = String(item?.paidAt || '').trim();
+                        const includeSampleDesignRaw = item?.includeSampleDesign;
+                        const includeSampleDesign = includeSampleDesignRaw === true ||
+                            ['true', '1', 'yes'].includes(String(includeSampleDesignRaw || '').trim().toLowerCase());
                         const sourceAppointmentId = Number(item?.sourceAppointmentId);
                         const sourceCallId = String(item?.sourceCallId || '').trim();
+                        const sourceAppointmentLabel = String(item?.sourceAppointmentLabel || '').trim();
                         if (!Number.isFinite(id) || id <= 0) return null;
                         if (!clientName || !title || !description) return null;
                         if (!Number.isFinite(amount) || amount <= 0) return null;
@@ -2320,8 +2381,10 @@
                             estimatedApiGeneratedAt: estimatedApiGeneratedAt || null,
                             lastRunAt: lastRunAt || null,
                             paidAt: paidAt || null,
+                            includeSampleDesign,
                             sourceAppointmentId: Number.isFinite(sourceAppointmentId) && sourceAppointmentId > 0 ? sourceAppointmentId : null,
-                            sourceCallId: sourceCallId || null
+                            sourceCallId: sourceCallId || null,
+                            sourceAppointmentLabel: sourceAppointmentLabel || null
                         });
                     })
                     .filter(Boolean);
@@ -2577,10 +2640,18 @@
             const isPaid = ui.isPaid;
             const clientLine = [record.clientName, record.location].filter(Boolean).join(' — ');
             const deliveryTime = String(record.deliveryTime || '').trim();
+            const appointmentLabel = String(record.sourceAppointmentLabel || '').trim();
+            const includeSampleDesign = Boolean(record.includeSampleDesign);
             const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
             const apiCostText = formatApiCostLabel(record);
             const deliveryHtml = deliveryTime
                 ? `<div class="order-delivery"><strong>Oplevertijd</strong>${escapeHtml(deliveryTime)}</div>`
+                : '';
+            const appointmentHtml = appointmentLabel
+                ? `<div class="order-delivery"><strong>Agenda lead</strong>${escapeHtml(appointmentLabel)}</div>`
+                : '';
+            const sampleDesignHtml = includeSampleDesign
+                ? `<div class="order-delivery"><strong>Voorbeelddesign</strong>Wordt meegenomen als basis</div>`
                 : '';
 
             return `
@@ -2591,6 +2662,8 @@
                             <div class="order-title">${escapeHtml(record.title)}</div>
                             <div class="order-desc">${escapeHtml(record.description)}</div>
                             ${deliveryHtml}
+                            ${appointmentHtml}
+                            ${sampleDesignHtml}
                         </div>
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
@@ -2722,16 +2795,257 @@
             el.className = 'create-order-message' + (type ? ' ' + type : '');
         }
 
-        function openCreateOrderModal() {
+        function setCreateOrderAgendaHint(message, type) {
+            const el = document.getElementById('newOrderAgendaLeadHint');
+            if (!el) return;
+            el.textContent = message || '';
+            el.className = 'create-order-hint' + (type ? ' ' + type : '');
+        }
+
+        function formatAgendaLeadDateTimeLabel(dateValue, timeValue) {
+            const date = String(dateValue || '').trim();
+            const time = String(timeValue || '').trim() || '09:00';
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+            const parsed = new Date(`${date}T${/^\d{2}:\d{2}$/.test(time) ? time : '09:00'}:00`);
+            if (Number.isNaN(parsed.getTime())) return `${date} ${time}`;
+            return parsed.toLocaleString('nl-NL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function normalizeAgendaLeadOption(item) {
+            if (!item || typeof item !== 'object') return null;
+            const id = Number(item?.id);
+            if (!Number.isFinite(id) || id <= 0) return null;
+
+            const date = String(item?.date || '').trim();
+            const time = String(item?.time || '').trim();
+            const callId = String(item?.callId || '').trim();
+
+            return {
+                id,
+                company: String(item?.company || 'Onbekende lead').trim() || 'Onbekende lead',
+                contact: String(item?.contact || 'Onbekend').trim() || 'Onbekend',
+                date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '',
+                time: /^\d{2}:\d{2}$/.test(time) ? time : '09:00',
+                summary: String(item?.summary || '').trim(),
+                value: String(item?.value || '').trim(),
+                postCallPrompt: String(item?.postCallPrompt || '').trim(),
+                postCallNotesTranscript: String(item?.postCallNotesTranscript || '').trim(),
+                activeOrderId: Number(item?.activeOrderId) || null,
+                callId: callId || null
+            };
+        }
+
+        function compareAgendaLeadOptions(a, b) {
+            const aTs = Date.parse(`${String(a?.date || '1970-01-01')}T${String(a?.time || '00:00')}:00`) || 0;
+            const bTs = Date.parse(`${String(b?.date || '1970-01-01')}T${String(b?.time || '00:00')}:00`) || 0;
+            if (aTs === bTs) return Number(b?.id || 0) - Number(a?.id || 0);
+            return bTs - aTs;
+        }
+
+        async function fetchAgendaLeadOptions(force) {
+            const shouldForce = Boolean(force);
+            const now = Date.now();
+            if (
+                !shouldForce &&
+                agendaLeadOptions.length &&
+                (now - agendaLeadOptionsLoadedAt) < AGENDA_LEAD_CACHE_MS
+            ) {
+                return agendaLeadOptions;
+            }
+
+            if (agendaLeadOptionsPromise) return agendaLeadOptionsPromise;
+
+            agendaLeadOptionsPromise = (async () => {
+                const endpoint = '/api/agenda/appointments?limit=250';
+                try {
+                    const response = await fetch(endpoint, { cache: 'no-store' });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok || !result?.ok || !Array.isArray(result?.appointments)) {
+                        throw new Error('Agenda data niet beschikbaar.');
+                    }
+                    agendaLeadOptions = result.appointments
+                        .map(normalizeAgendaLeadOption)
+                        .filter(Boolean)
+                        .sort(compareAgendaLeadOptions);
+                    agendaLeadOptionsLoadedAt = Date.now();
+                } catch (_) {
+                    if (!agendaLeadOptions.length) {
+                        agendaLeadOptions = [];
+                        agendaLeadOptionsLoadedAt = Date.now();
+                    }
+                }
+                return agendaLeadOptions;
+            })().finally(() => {
+                agendaLeadOptionsPromise = null;
+            });
+
+            return agendaLeadOptionsPromise;
+        }
+
+        function getAgendaLeadById(id) {
+            const numericId = Number(id);
+            if (!Number.isFinite(numericId) || numericId <= 0) return null;
+            return agendaLeadOptions.find((item) => Number(item?.id) === numericId) || null;
+        }
+
+        function getAgendaLeadOptionLabel(lead) {
+            if (!lead) return '';
+            const dateLabel = formatAgendaLeadDateTimeLabel(lead.date, lead.time);
+            const extras = [];
+            if (dateLabel) extras.push(dateLabel);
+            if (lead.activeOrderId) extras.push(`al gekoppeld #${lead.activeOrderId}`);
+            const base = `${lead.company} - ${lead.contact}`;
+            return extras.length ? `${base} · ${extras.join(' · ')}` : base;
+        }
+
+        function getAgendaLeadReferenceLabel(lead) {
+            if (!lead) return '';
+            const dateLabel = formatAgendaLeadDateTimeLabel(lead.date, lead.time);
+            return `#${lead.id} · ${lead.company}${dateLabel ? ` · ${dateLabel}` : ''}`;
+        }
+
+        function renderCreateOrderAgendaLeadOptions(selectedId) {
+            const select = document.getElementById('newOrderAgendaLeadId');
+            if (!select) return;
+
+            const previous = Number(selectedId || select.value);
+            select.innerHTML = '';
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Geen koppeling';
+            select.appendChild(defaultOption);
+
+            agendaLeadOptions.forEach((lead) => {
+                const option = document.createElement('option');
+                option.value = String(lead.id);
+                option.textContent = getAgendaLeadOptionLabel(lead);
+                select.appendChild(option);
+            });
+
+            if (Number.isFinite(previous) && previous > 0) {
+                select.value = String(previous);
+            }
+        }
+
+        function hydrateCreateOrderFormFromLead(lead) {
+            if (!lead) return;
+
+            const companyInput = document.getElementById('newOrderCompany');
+            const contactInput = document.getElementById('newOrderContact');
+            const titleInput = document.getElementById('newOrderTitle');
+            const descInput = document.getElementById('newOrderDesc');
+            const deliveryInput = document.getElementById('newOrderDeliveryTime');
+            const amountInput = document.getElementById('newOrderAmount');
+
+            if (companyInput) {
+                companyInput.value = lead.company;
+                companyInput.dataset.agendaAutofill = '1';
+            }
+            if (contactInput) {
+                contactInput.value = lead.contact || '';
+                contactInput.dataset.agendaAutofill = '1';
+            }
+            if (titleInput) {
+                if (!titleInput.value.trim() || titleInput.dataset.agendaAutofill === '1') {
+                    titleInput.value = `Website traject voor ${lead.company}`;
+                    titleInput.dataset.agendaAutofill = '1';
+                }
+            }
+            if (descInput) {
+                if (lead.summary && (!descInput.value.trim() || descInput.dataset.agendaAutofill === '1')) {
+                    descInput.value = lead.summary;
+                    descInput.dataset.agendaAutofill = '1';
+                }
+            }
+            if (deliveryInput) {
+                const deliveryLabel = formatAgendaLeadDateTimeLabel(lead.date, lead.time);
+                if (deliveryLabel && (!deliveryInput.value.trim() || deliveryInput.dataset.agendaAutofill === '1')) {
+                    deliveryInput.value = `Volgens afspraak op ${deliveryLabel}`;
+                    deliveryInput.dataset.agendaAutofill = '1';
+                }
+            }
+            if (amountInput) {
+                const amount = moneyToNumber(lead.value);
+                if (amount && (!String(amountInput.value || '').trim() || amountInput.dataset.agendaAutofill === '1')) {
+                    amountInput.value = String(amount);
+                    amountInput.dataset.agendaAutofill = '1';
+                }
+            }
+        }
+
+        function handleCreateOrderAgendaLeadChange() {
+            const select = document.getElementById('newOrderAgendaLeadId');
+            if (!select) return;
+            const lead = getAgendaLeadById(select.value);
+            if (!lead) {
+                setCreateOrderAgendaHint('Koppel optioneel aan een bestaande agenda-afspraak of lead.', '');
+                return;
+            }
+
+            hydrateCreateOrderFormFromLead(lead);
+            const hasPrompt = Boolean(String(lead.postCallPrompt || '').trim());
+            const hasTranscript = Boolean(String(lead.postCallNotesTranscript || '').trim());
+            const parts = [`Gekoppeld: afspraak #${lead.id}`];
+            const dateLabel = formatAgendaLeadDateTimeLabel(lead.date, lead.time);
+            if (dateLabel) parts.push(dateLabel);
+            if (hasPrompt) parts.push('prompt beschikbaar');
+            if (hasTranscript) parts.push('transcript beschikbaar');
+            if (lead.activeOrderId) parts.push(`staat al bij actieve opdracht #${lead.activeOrderId}`);
+            setCreateOrderAgendaHint(parts.join(' · '), lead.activeOrderId ? 'warning' : '');
+        }
+
+        async function populateCreateOrderAgendaLeadOptions(force) {
+            const select = document.getElementById('newOrderAgendaLeadId');
+            if (!select) return;
+            const selectedId = select.value;
+
+            setCreateOrderAgendaHint('Agenda-leads laden...', '');
+            await fetchAgendaLeadOptions(force);
+            renderCreateOrderAgendaLeadOptions(selectedId);
+
+            if (!agendaLeadOptions.length) {
+                setCreateOrderAgendaHint('Geen agenda-afspraken gevonden om aan te koppelen.', '');
+                return;
+            }
+            if (select.value) {
+                handleCreateOrderAgendaLeadChange();
+                return;
+            }
+            setCreateOrderAgendaHint('Koppel optioneel aan een bestaande agenda-afspraak of lead.', '');
+        }
+
+        async function openCreateOrderModal() {
             const modal = document.getElementById('createOrderModal');
             if (!modal) return;
             const form = document.getElementById('createOrderForm');
             if (form) form.reset();
+            [
+                'newOrderCompany',
+                'newOrderContact',
+                'newOrderTitle',
+                'newOrderDesc',
+                'newOrderDeliveryTime',
+                'newOrderAmount'
+            ].forEach((fieldId) => {
+                const field = document.getElementById(fieldId);
+                if (field && field.dataset) {
+                    delete field.dataset.agendaAutofill;
+                }
+            });
             setCreateOrderMessage('', '');
+            setCreateOrderAgendaHint('Agenda-leads laden...', '');
             modal.classList.add('show');
             modal.setAttribute('aria-hidden', 'false');
+            void populateCreateOrderAgendaLeadOptions(false);
             window.setTimeout(() => {
-                document.getElementById('newOrderCompany')?.focus();
+                document.getElementById('newOrderAgendaLeadId')?.focus();
             }, 40);
         }
 
@@ -2755,6 +3069,20 @@
             const description = String(data.get('description') || '').trim();
             const deliveryTime = String(data.get('deliveryTime') || '').trim();
             const amount = Math.round(Number(data.get('amount')));
+            const selectedAppointmentId = Number(data.get('agendaLeadId'));
+            const includeSampleDesign = String(data.get('includeSampleDesign') || 'no').trim().toLowerCase() === 'yes';
+            const linkedLead = Number.isFinite(selectedAppointmentId) && selectedAppointmentId > 0
+                ? getAgendaLeadById(selectedAppointmentId)
+                : null;
+            const sourceAppointmentId = linkedLead
+                ? Number(linkedLead.id)
+                : (Number.isFinite(selectedAppointmentId) && selectedAppointmentId > 0 ? selectedAppointmentId : null);
+            const sourceCallId = String(linkedLead?.callId || '').trim() || null;
+            const sourceAppointmentLabel = linkedLead
+                ? getAgendaLeadReferenceLabel(linkedLead)
+                : null;
+            const linkedPrompt = String(linkedLead?.postCallPrompt || '').trim();
+            const linkedTranscript = String(linkedLead?.postCallNotesTranscript || '').trim();
             const status = 'wacht';
 
             if (!companyName || !contactPerson || !title || !description || !deliveryTime) {
@@ -2775,8 +3103,9 @@
                 deliveryTime,
                 amount,
                 status,
-                prompt: '',
-                transcript: '',
+                prompt: linkedPrompt,
+                transcript: linkedTranscript,
+                includeSampleDesign,
                 apiCostEur: null,
                 apiCostUsd: null,
                 apiTokensInput: null,
@@ -2790,7 +3119,10 @@
                 estimatedApiBuildMode: null,
                 estimatedApiGeneratedAt: null,
                 lastRunAt: null,
-                paidAt: null
+                paidAt: null,
+                sourceAppointmentId,
+                sourceCallId,
+                sourceAppointmentLabel
             };
 
             customOrders.push(record);
@@ -2917,11 +3249,17 @@
             const title = String(meta?.title || customOrder?.title || 'website').trim();
             const description = String(meta?.description || customOrder?.description || '').trim();
             const deliveryTime = String(meta?.deliveryTime || customOrder?.deliveryTime || '').trim();
+            const sourceAppointmentLabel = String(meta?.sourceAppointmentLabel || customOrder?.sourceAppointmentLabel || '').trim();
+            const includeSampleDesign = Boolean(meta?.includeSampleDesign || customOrder?.includeSampleDesign);
             return [
                 `Bouw een premium maatwerk HTML website voor ${company}.`,
                 `Projecttitel: ${title}.`,
                 description ? `Context: ${description}` : '',
                 deliveryTime ? `Gewenste oplevertermijn: ${deliveryTime}.` : '',
+                sourceAppointmentLabel ? `Gekoppelde agenda-afspraak: ${sourceAppointmentLabel}.` : '',
+                includeSampleDesign
+                    ? 'Gebruik het voorbeelddesign als basis voor de echte websitebouw. Behoud richting, sfeer en structuur, en werk het door naar een productieklare site.'
+                    : '',
                 'Doel: maak een website die voelt als high-end maatwerk en niet als een template.',
                 'Werk als creative director, UX designer, copywriter en senior front-end developer in één.',
                 'Begin met een sterke merkhoek en heldere waardepropositie, en bouw daarna een logisch verhaal van hero naar aanbod, vertrouwen en contact.',
@@ -2935,6 +3273,22 @@
             ].filter(Boolean).join('\n');
         }
 
+        function appendSampleDesignInstruction(promptText, customOrder) {
+            const basePrompt = String(promptText || '').trim();
+            if (!basePrompt) return '';
+            if (!customOrder?.includeSampleDesign) return basePrompt;
+
+            const lower = basePrompt.toLowerCase();
+            if (lower.includes('voorbeelddesign') || lower.includes('voorbeeld design')) {
+                return basePrompt;
+            }
+
+            return [
+                basePrompt,
+                'BELANGRIJK: gebruik het voorbeelddesign als basis voor de definitieve build en behoud visuele richting + componentstructuur waar logisch.'
+            ].join('\n');
+        }
+
         function getOrderBuildRequestPayload(id) {
             const activeId = selectActiveOrderId(id);
             const meta = getOrderMeta(activeId) || {
@@ -2942,10 +3296,13 @@
                 clientName: orders[id]?.name || 'Bedrijf',
                 title: orders[id]?.type || 'Project',
                 description: '',
-                deliveryTime: String(getCustomOrderById(activeId)?.deliveryTime || '').trim()
+                deliveryTime: String(getCustomOrderById(activeId)?.deliveryTime || '').trim(),
+                sourceAppointmentLabel: String(getCustomOrderById(activeId)?.sourceAppointmentLabel || '').trim(),
+                includeSampleDesign: Boolean(getCustomOrderById(activeId)?.includeSampleDesign)
             };
             const customOrder = getCustomOrderById(activeId);
-            const prompt = String(customOrder?.prompt || '').trim() || buildFallbackSitePrompt(meta, customOrder);
+            const basePrompt = String(customOrder?.prompt || '').trim() || buildFallbackSitePrompt(meta, customOrder);
+            const prompt = appendSampleDesignInstruction(basePrompt, customOrder);
 
             return {
                 orderId: activeId,
@@ -2955,7 +3312,10 @@
                 deliveryTime: meta.deliveryTime,
                 prompt,
                 buildMode,
-                language: 'nl'
+                language: 'nl',
+                sourceAppointmentId: Number(customOrder?.sourceAppointmentId) || null,
+                sourceCallId: String(customOrder?.sourceCallId || '').trim() || null,
+                includeSampleDesign: Boolean(customOrder?.includeSampleDesign)
             };
         }
 
@@ -3651,6 +4011,7 @@
         document.getElementById('createOrderCloseBtn')?.addEventListener('click', closeCreateOrderModal);
         document.getElementById('createOrderCancelBtn')?.addEventListener('click', closeCreateOrderModal);
         document.getElementById('createOrderForm')?.addEventListener('submit', handleCreateOrderSubmit);
+        document.getElementById('newOrderAgendaLeadId')?.addEventListener('change', handleCreateOrderAgendaLeadChange);
         document.getElementById('createOrderModal')?.addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeCreateOrderModal();
         });
