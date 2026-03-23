@@ -30,18 +30,19 @@
         }
 
         :root {
-            --bg-primary: #080808;
-            --bg-secondary: #0d0d0d;
-            --bg-tertiary: #111;
-            --bg-card: rgba(255, 255, 255, 0.03);
+            color-scheme: light;
+            --bg-primary: #f8f7f4;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #efeee9;
+            --bg-card: rgba(15, 23, 42, 0.03);
             --accent: #8B2252;
             --accent-dark: #6B1A3F;
             --accent-glow: rgba(139, 34, 82, 0.4);
             --accent-light: #A62D65;
-            --text-primary: #f5f5f5;
-            --text-secondary: #888;
-            --text-tertiary: #555;
-            --border: rgba(255, 255, 255, 0.06);
+            --text-primary: #1a1a2e;
+            --text-secondary: #606272;
+            --text-tertiary: #9599a8;
+            --border: rgba(0, 0, 0, 0.08);
             --border-hover: rgba(139, 34, 82, 0.4);
             
             --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -58,7 +59,7 @@
             color: var(--text-primary);
             line-height: 1.6;
             overflow-x: hidden;
-            cursor: none;
+            cursor: auto;
         }
 
         h1, h2, h3, h4 {
@@ -154,6 +155,11 @@
             transition: transform 0.02s linear;
         }
 
+        .cursor,
+        .cursor-dot {
+            display: none !important;
+        }
+
         .scroll-progress {
             position: fixed;
             top: 0;
@@ -215,9 +221,10 @@
 
         nav.scrolled {
             padding: 1rem 4rem;
-            background: rgba(8, 8, 8, 0.9);
+            background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
+            box-shadow: 0 8px 28px rgba(15, 17, 28, 0.08);
         }
 
         .logo {
@@ -261,7 +268,7 @@
             font-weight: 500;
             position: relative;
             padding: 0.5rem 0;
-            cursor: none;
+            cursor: pointer;
             transition: color 0.3s;
         }
 
@@ -299,7 +306,7 @@
             letter-spacing: 0.05em;
             text-transform: uppercase;
             border: none;
-            cursor: none;
+            cursor: pointer;
             overflow: hidden;
             transition: all 0.3s var(--ease-out-expo);
             clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
@@ -532,7 +539,7 @@
         }
 
         .tilt-card {
-            background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+            background: linear-gradient(145deg, rgba(15,23,42,0.05), rgba(15,23,42,0.015));
             border: 1px solid var(--border);
             border-radius: 0;
             padding: 3rem;
@@ -562,7 +569,7 @@
         .tilt-card:hover {
             border-color: var(--border-hover);
             transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 60px rgba(139,34,82,0.1);
+            box-shadow: 0 16px 34px rgba(15, 17, 28, 0.14), 0 0 40px rgba(139,34,82,0.08);
         }
 
         .card-number {
@@ -621,7 +628,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: grayscale(100%) contrast(1.2) brightness(0.3);
+            filter: grayscale(100%) contrast(1.2) brightness(0.55);
         }
 
         .quote-bg::after {
@@ -645,7 +652,7 @@
             opacity: 1;
             transform: none;
             transition: none;
-            text-shadow: 0 4px 30px rgba(0,0,0,0.8);
+            text-shadow: 0 2px 12px rgba(15, 17, 28, 0.14);
         }
 
         .quote-text.visible {
@@ -786,7 +793,7 @@
             background: linear-gradient(135deg, rgba(139,34,82,0.15), rgba(139,34,82,0.02));
             border-color: var(--accent);
             transform: translateY(-10px) scale(1.015);
-            box-shadow: 0 14px 30px rgba(0,0,0,0.35), 0 0 24px rgba(139,34,82,0.16);
+            box-shadow: 0 12px 28px rgba(15, 17, 28, 0.12), 0 0 22px rgba(139,34,82,0.14);
             z-index: 2;
         }
 
@@ -900,7 +907,7 @@
             font-size: 1.3rem;
             font-weight: 500;
             text-align: left;
-            cursor: none;
+            cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 0.02em;
             transition: color 0.3s;
@@ -988,7 +995,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: grayscale(100%) contrast(1.1) brightness(0.2);
+            filter: grayscale(100%) contrast(1.1) brightness(0.45);
         }
 
         .cta-bg::after {
@@ -1054,7 +1061,7 @@
             margin-bottom: 1rem;
             font-size: 0.95rem;
             transition: all 0.3s;
-            cursor: none;
+            cursor: pointer;
             font-weight: 300;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -1404,7 +1411,7 @@
         </div>
         <div class="cta-content">
             <span class="eyebrow fade-up" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem; display: inline-block; margin-bottom: 2rem;">Laten We Beginnen</span>
-            <h2 class="cta-title fade-up" style="color: white;">
+            <h2 class="cta-title fade-up" style="color: var(--text-primary);">
                 Klaar Voor Een<br>
                 <span class="text-accent">Website Die Werkt</span>?
             </h2>
@@ -1464,7 +1471,7 @@
         const anchors = document.querySelectorAll('a[href^="#"]');
         const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
         const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+        const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
 
         if (!enablePointerFx) {
             document.body.style.cursor = "auto";

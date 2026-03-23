@@ -21,15 +21,15 @@
             --bg-primary: #f8f7f4;
             --bg-secondary: #ffffff;
             --bg-tertiary: #efeee9;
-            --accent: #1a1a2e;
-            --accent-light: #2d2d5e;
-            --accent-color: #4a5fd7;
-            --accent-color-glow: rgba(74, 95, 215, 0.2);
+            --accent: #8B2252;
+            --accent-light: #A62D65;
+            --accent-color: #8B2252;
+            --accent-color-glow: rgba(139, 34, 82, 0.4);
             --accent-warm: #8B2252;
-            --accent-warm-glow: rgba(139, 34, 82, 0.2);
+            --accent-warm-glow: rgba(139, 34, 82, 0.4);
             --text-primary: #1a1a2e;
-            --text-secondary: #6b6b7b;
-            --text-tertiary: #a0a0b0;
+            --text-secondary: #606272;
+            --text-tertiary: #9599a8;
             --border: rgba(0, 0, 0, 0.08);
             
             --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -46,7 +46,7 @@
             color: var(--text-primary);
             line-height: 1.6;
             overflow-x: hidden;
-            cursor: none;
+            cursor: auto;
             display: flex;
             flex-direction: column;
         }
@@ -108,6 +108,11 @@
             z-index: 10001;
             transform: translate(-50%, -50%);
             transition: transform 0.02s linear;
+        }
+
+        .cursor,
+        .cursor-dot {
+            display: none !important;
         }
 
         /* Ambient */
@@ -254,7 +259,7 @@
             border: 2px solid var(--border);
             text-decoration: none;
             color: var(--text-primary);
-            cursor: none;
+            cursor: pointer;
             transition: all 0.5s var(--ease-out-expo);
             display: flex;
             flex-direction: column;
@@ -704,7 +709,7 @@
         const magneticElements = document.querySelectorAll(".magnetic");
         const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
         const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+        const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
 
         if (!enablePointerFx) {
             document.body.style.cursor = "auto";
