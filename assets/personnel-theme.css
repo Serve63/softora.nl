@@ -241,3 +241,22 @@ button,
 .appointment {
     cursor: pointer !important;
 }
+
+/* Keep the sidebar footer in a fixed, identical position on desktop pages. */
+@media (min-width: 1025px) {
+    .sidebar {
+        height: 100vh !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    .sidebar-nav {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+    }
+
+    .sidebar-footer {
+        margin-top: auto !important;
+        flex-shrink: 0 !important;
+    }
+}
