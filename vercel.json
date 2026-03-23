@@ -42,6 +42,10 @@
     {
       "source": "/api/active-orders/generate-site",
       "destination": "/api/active-order-generate-site"
+    },
+    {
+      "source": "/api/active-orders/launch-site",
+      "destination": "/api/active-order-launch-site"
     }
   ]
 }

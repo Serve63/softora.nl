@@ -2,6 +2,8 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { spawn } = require('child_process');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
@@ -35,6 +37,50 @@ const WEBSITE_GENERATION_TIMEOUT_MS = Math.max(
   60_000,
   Math.min(600_000, Number(process.env.WEBSITE_GENERATION_TIMEOUT_MS || 300_000) || 300_000)
 );
+const ACTIVE_ORDER_AUTOMATION_ENABLED = /^(1|true|yes)$/i.test(
+  String(process.env.ACTIVE_ORDER_AUTOMATION_ENABLED || '')
+);
+const ACTIVE_ORDER_AUTOMATION_OUTPUT_ROOT = path.resolve(
+  String(
+    process.env.ACTIVE_ORDER_AUTOMATION_OUTPUT_ROOT ||
+      path.join(process.cwd(), 'output', 'generated-sites')
+  ).trim()
+);
+const ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN = String(
+  process.env.ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN || process.env.GITHUB_TOKEN || ''
+).trim();
+const ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER = String(
+  process.env.ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER || process.env.GITHUB_OWNER || ''
+).trim();
+const ACTIVE_ORDER_AUTOMATION_GITHUB_PRIVATE = !/^(0|false|no)$/i.test(
+  String(process.env.ACTIVE_ORDER_AUTOMATION_GITHUB_PRIVATE || 'true')
+);
+const ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER_IS_ORG = /^(1|true|yes)$/i.test(
+  String(process.env.ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER_IS_ORG || '')
+);
+const ACTIVE_ORDER_AUTOMATION_GITHUB_REPO_PREFIX = String(
+  process.env.ACTIVE_ORDER_AUTOMATION_GITHUB_REPO_PREFIX || 'softora-case-'
+)
+  .trim()
+  .toLowerCase();
+const ACTIVE_ORDER_AUTOMATION_GITHUB_DEFAULT_BRANCH = String(
+  process.env.ACTIVE_ORDER_AUTOMATION_GITHUB_DEFAULT_BRANCH || 'main'
+).trim() || 'main';
+const ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN = String(
+  process.env.ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN || process.env.VERCEL_TOKEN || ''
+).trim();
+const ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE = String(
+  process.env.ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE || process.env.VERCEL_SCOPE || ''
+).trim();
+const ACTIVE_ORDER_AUTOMATION_STRATO_COMMAND = String(
+  process.env.ACTIVE_ORDER_AUTOMATION_STRATO_COMMAND || ''
+).trim();
+const ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_URL = String(
+  process.env.ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_URL || ''
+).trim();
+const ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_TOKEN = String(
+  process.env.ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_TOKEN || ''
+).trim();
 const VERBOSE_CALL_WEBHOOK_LOGS = /^(1|true|yes)$/i.test(
   String(process.env.VERBOSE_CALL_WEBHOOK_LOGS || '')
 );
@@ -6319,6 +6365,69 @@ app.post('/api/active-order-generate-site', async (req, res) => {
   return sendActiveOrderGenerateSiteResponse(req, res);
 });
 
+async function sendActiveOrderLaunchSiteResponse(req, res) {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const html = String(body.html || '');
+    const orderId = Number(body.orderId) || null;
+    const company = truncateText(normalizeString(body.company || body.clientName || ''), 160);
+    const title = truncateText(normalizeString(body.title || ''), 200);
+    const description = truncateText(normalizeString(body.description || ''), 3000);
+    const deliveryTime = truncateText(normalizeString(body.deliveryTime || ''), 200);
+    const domainName = sanitizeLaunchDomainName(body.domainName || body.domain || '');
+
+    if (!html.trim()) {
+      return res.status(400).json({
+        ok: false,
+        error: 'HTML ontbreekt',
+        detail: 'Stuur een body met minimaal { html: "..." }.'
+      });
+    }
+
+    const launchResult = await runActiveOrderLaunchPipeline({
+      orderId,
+      company,
+      title,
+      description,
+      deliveryTime,
+      domainName,
+      html
+    });
+
+    appendDashboardActivity(
+      {
+        type: 'active_order_automation_completed',
+        title: 'Case automatisch gelanceerd',
+        detail: `${company || 'Case'} is doorgezet naar lokaal, GitHub en Vercel.`,
+        company,
+        actor: 'api',
+        taskId: Number.isFinite(orderId) ? orderId : null,
+        source: 'premium-actieve-opdrachten'
+      },
+      'dashboard_activity_active_order_launch'
+    );
+
+    return res.status(200).json(launchResult);
+  } catch (error) {
+    const detail = String(error?.message || 'Onbekende launch fout');
+    const status = /ontbreekt|missing|niet compleet|staat uit|verwacht/i.test(detail) ? 400 : 500;
+    return res.status(status).json({
+      ok: false,
+      error: 'Launch pipeline mislukt',
+      detail
+    });
+  }
+}
+
+app.post('/api/active-orders/launch-site', async (req, res) => {
+  return sendActiveOrderLaunchSiteResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/active-order-launch-site', async (req, res) => {
+  return sendActiveOrderLaunchSiteResponse(req, res);
+});
+
 app.get('/api/dashboard/activity', (req, res) => {
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
   return res.status(200).json({
@@ -6628,6 +6737,542 @@ function normalizePostCallStatus(value) {
 
 function sanitizePostCallText(value, maxLen = 20000) {
   return truncateText(normalizeString(value || ''), maxLen);
+}
+
+function slugifyAutomationText(value, fallback = 'project') {
+  const ascii = String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '');
+  const slug = ascii
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+  return slug || fallback;
+}
+
+function sanitizeLaunchDomainName(value) {
+  const raw = normalizeString(value || '')
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .trim();
+  if (!raw) return '';
+  if (!raw.includes('.')) return '';
+  if (!/^[a-z0-9][a-z0-9.-]{1,251}[a-z0-9]$/.test(raw)) return '';
+  if (raw.includes('..')) return '';
+  return raw;
+}
+
+async function ensureDirectoryExists(dirPath) {
+  await fs.promises.mkdir(dirPath, { recursive: true });
+}
+
+async function makeUniqueProjectDirectory(baseDir, preferredName) {
+  await ensureDirectoryExists(baseDir);
+  const base = slugifyAutomationText(preferredName || 'project', 'project');
+  for (let i = 0; i < 9999; i += 1) {
+    const suffix = i === 0 ? '' : `-${i + 1}`;
+    const candidate = path.join(baseDir, `${base}${suffix}`);
+    try {
+      await fs.promises.mkdir(candidate, { recursive: false });
+      return candidate;
+    } catch (error) {
+      if (String(error?.code || '') === 'EEXIST') continue;
+      throw error;
+    }
+  }
+  throw new Error('Kon geen unieke projectmap aanmaken.');
+}
+
+async function runCommandWithOutput(command, args = [], options = {}) {
+  const cwd = options.cwd || process.cwd();
+  const timeoutMs = Math.max(1_000, Math.min(900_000, Number(options.timeoutMs || 300_000)));
+  const env = {
+    ...process.env,
+    ...(options.env && typeof options.env === 'object' ? options.env : {})
+  };
+
+  return await new Promise((resolve, reject) => {
+    const child = spawn(command, Array.isArray(args) ? args : [], {
+      cwd,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let done = false;
+
+    const finish = (error, result) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      try {
+        child.kill('SIGKILL');
+      } catch (_) {
+        // ignore kill errors
+      }
+      const error = new Error(`Command timeout na ${Math.round(timeoutMs / 1000)}s: ${command}`);
+      error.code = 'COMMAND_TIMEOUT';
+      error.stdout = stdout;
+      error.stderr = stderr;
+      finish(error);
+    }, timeoutMs);
+
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk || '');
+      if (stdout.length > 200_000) stdout = stdout.slice(-200_000);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk || '');
+      if (stderr.length > 200_000) stderr = stderr.slice(-200_000);
+    });
+
+    child.on('error', (error) => {
+      error.stdout = stdout;
+      error.stderr = stderr;
+      finish(error);
+    });
+    child.on('close', (code, signal) => {
+      const exitCode = Number(code);
+      if (Number.isFinite(exitCode) && exitCode === 0) {
+        finish(null, {
+          code: exitCode,
+          signal: signal || null,
+          stdout,
+          stderr
+        });
+        return;
+      }
+      const error = new Error(`Command faalde (${command}) met code ${Number.isFinite(exitCode) ? exitCode : 'onbekend'}`);
+      error.code = 'COMMAND_FAILED';
+      error.exitCode = Number.isFinite(exitCode) ? exitCode : null;
+      error.signal = signal || null;
+      error.stdout = stdout;
+      error.stderr = stderr;
+      finish(error);
+    });
+  });
+}
+
+function parseFirstVercelUrl(text) {
+  const match = String(text || '').match(/https:\/\/[a-z0-9-]+(?:-[a-z0-9-]+)*\.vercel\.app/gi);
+  if (!match || !match.length) return '';
+  return String(match[match.length - 1] || '').trim();
+}
+
+async function fetchGitHubApi(pathname, options = {}) {
+  const token = String(options.token || ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN || '').trim();
+  if (!token) {
+    throw new Error('ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN ontbreekt.');
+  }
+
+  const method = String(options.method || 'GET').toUpperCase();
+  const endpoint = `https://api.github.com${pathname}`;
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'softora-automation'
+  };
+  if (method !== 'GET' && method !== 'HEAD') {
+    headers['Content-Type'] = 'application/json';
+  }
+  const response = await fetch(endpoint, {
+    method,
+    headers,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+  });
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (_) {
+    data = null;
+  }
+  return {
+    ok: response.ok,
+    status: Number(response.status) || 0,
+    data,
+    text
+  };
+}
+
+async function ensureGitHubRepository(owner, repoName) {
+  const lookup = await fetchGitHubApi(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`);
+  if (lookup.ok) {
+    const htmlUrl = normalizeString(lookup?.data?.html_url || '');
+    return {
+      owner,
+      repo: repoName,
+      htmlUrl: htmlUrl || `https://github.com/${owner}/${repoName}`,
+      created: false
+    };
+  }
+  if (lookup.status !== 404) {
+    throw new Error(`GitHub repository check mislukt (${lookup.status}).`);
+  }
+
+  const payload = {
+    name: repoName,
+    private: ACTIVE_ORDER_AUTOMATION_GITHUB_PRIVATE,
+    auto_init: false,
+    description: 'Automatisch gegenereerde Softora website case'
+  };
+  const createPath = ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER_IS_ORG
+    ? `/orgs/${encodeURIComponent(owner)}/repos`
+    : '/user/repos';
+  const createRes = await fetchGitHubApi(createPath, {
+    method: 'POST',
+    body: payload
+  });
+  if (!createRes.ok) {
+    const detail = normalizeString(createRes?.data?.message || createRes?.text || '');
+    throw new Error(`GitHub repository aanmaken mislukt (${createRes.status})${detail ? `: ${detail}` : ''}`);
+  }
+  const htmlUrl = normalizeString(createRes?.data?.html_url || '');
+  return {
+    owner,
+    repo: repoName,
+    htmlUrl: htmlUrl || `https://github.com/${owner}/${repoName}`,
+    created: true
+  };
+}
+
+async function upsertGitHubFile(owner, repo, filePath, content, message) {
+  const encodedPath = String(filePath || '')
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+  let sha = null;
+  const current = await fetchGitHubApi(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}?ref=${encodeURIComponent(ACTIVE_ORDER_AUTOMATION_GITHUB_DEFAULT_BRANCH)}`
+  );
+  if (current.ok && current?.data?.sha) {
+    sha = String(current.data.sha);
+  } else if (!current.ok && current.status !== 404) {
+    throw new Error(`GitHub bestand lezen mislukt (${filePath})`);
+  }
+
+  const body = {
+    message: String(message || `Update ${filePath}`),
+    content: Buffer.from(String(content || ''), 'utf8').toString('base64'),
+    branch: ACTIVE_ORDER_AUTOMATION_GITHUB_DEFAULT_BRANCH
+  };
+  if (sha) body.sha = sha;
+
+  const save = await fetchGitHubApi(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}`,
+    {
+      method: 'PUT',
+      body
+    }
+  );
+  if (!save.ok) {
+    const detail = normalizeString(save?.data?.message || save?.text || '');
+    throw new Error(`GitHub bestand opslaan mislukt (${filePath})${detail ? `: ${detail}` : ''}`);
+  }
+  return save?.data?.content || null;
+}
+
+async function runStratoAutomationHook({ domainName, projectDir, deploymentUrl }) {
+  const domain = sanitizeLaunchDomainName(domainName);
+  if (!domain) {
+    return {
+      status: 'skipped',
+      message: 'Geen domein opgegeven; Strato stap overgeslagen.'
+    };
+  }
+
+  if (ACTIVE_ORDER_AUTOMATION_STRATO_COMMAND) {
+    const escapedDomain = domain.replace(/'/g, `'\\''`);
+    const escapedProjectDir = String(projectDir || '').replace(/'/g, `'\\''`);
+    const escapedDeploymentUrl = String(deploymentUrl || '').replace(/'/g, `'\\''`);
+    const command = ACTIVE_ORDER_AUTOMATION_STRATO_COMMAND
+      .replace(/\{\{domain\}\}/g, escapedDomain)
+      .replace(/\{\{projectDir\}\}/g, escapedProjectDir)
+      .replace(/\{\{deploymentUrl\}\}/g, escapedDeploymentUrl);
+    const result = await runCommandWithOutput('bash', ['-lc', command], {
+      cwd: projectDir || process.cwd(),
+      timeoutMs: 300000
+    });
+    const info = parseFirstVercelUrl(result.stdout || '') || normalizeString(result.stdout || result.stderr || '');
+    return {
+      status: 'ok',
+      message: info ? truncateText(info, 220) : 'Strato command uitgevoerd.'
+    };
+  }
+
+  if (ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_URL) {
+    const response = await fetch(ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_TOKEN
+          ? { Authorization: `Bearer ${ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_TOKEN}` }
+          : {})
+      },
+      body: JSON.stringify({
+        domain: domain,
+        deploymentUrl: String(deploymentUrl || ''),
+        projectDir: String(projectDir || '')
+      })
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Strato webhook faalde (${response.status})${text ? `: ${truncateText(text, 180)}` : ''}`);
+    }
+    return {
+      status: 'ok',
+      message: 'Strato webhook uitgevoerd.'
+    };
+  }
+
+  throw new Error('Strato automatisering niet geconfigureerd (set ACTIVE_ORDER_AUTOMATION_STRATO_COMMAND of _WEBHOOK_URL).');
+}
+
+async function runActiveOrderLaunchPipeline(input = {}) {
+  if (!ACTIVE_ORDER_AUTOMATION_ENABLED) {
+    return {
+      ok: true,
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      outputs: {
+        domainStatus: 'skipped',
+        domainMessage: 'Automation disabled'
+      },
+      steps: [
+        {
+          id: 'automation_toggle',
+          label: 'Automation',
+          status: 'skipped',
+          message: 'ACTIVE_ORDER_AUTOMATION_ENABLED staat uit.'
+        }
+      ]
+    };
+  }
+
+  const orderId = Number(input.orderId) || null;
+  const company = truncateText(normalizeString(input.company || input.clientName || ''), 160) || 'Softora Case';
+  const title = truncateText(normalizeString(input.title || ''), 200) || 'Website';
+  const description = truncateText(normalizeString(input.description || ''), 2000);
+  const deliveryTime = truncateText(normalizeString(input.deliveryTime || ''), 200);
+  const html = String(input.html || '');
+  const domainName = sanitizeLaunchDomainName(input.domainName || input.domain || '');
+
+  if (!html.trim()) {
+    throw new Error('Launch pipeline verwacht HTML in body.html.');
+  }
+
+  if (!ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN || !ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER) {
+    throw new Error('GitHub automation niet compleet: set ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN en ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER.');
+  }
+  if (!ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN) {
+    throw new Error('Vercel automation niet compleet: set ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN.');
+  }
+
+  const steps = [];
+  const outputs = {};
+  const startedAt = new Date().toISOString();
+
+  const projectBase = domainName
+    ? slugifyAutomationText(domainName.replace(/\.[^.]+$/, ''), 'project')
+    : slugifyAutomationText(`${company}-${title}`, 'project');
+  const projectFolderLabel = orderId ? `${projectBase}-${orderId}` : `${projectBase}-${Date.now()}`;
+  const projectDir = await makeUniqueProjectDirectory(
+    ACTIVE_ORDER_AUTOMATION_OUTPUT_ROOT,
+    projectFolderLabel
+  );
+  outputs.localDir = projectDir;
+
+  const meta = {
+    orderId,
+    company,
+    title,
+    description,
+    deliveryTime,
+    domainName: domainName || null,
+    generatedAt: startedAt
+  };
+  await fs.promises.writeFile(path.join(projectDir, 'index.html'), html, 'utf8');
+  await fs.promises.writeFile(path.join(projectDir, 'softora-case.json'), JSON.stringify(meta, null, 2), 'utf8');
+  await fs.promises.writeFile(
+    path.join(projectDir, 'README.md'),
+    [
+      `# ${title}`,
+      '',
+      `- Bedrijf: ${company}`,
+      `- Order: ${orderId || 'n/a'}`,
+      domainName ? `- Domein: ${domainName}` : '- Domein: niet opgegeven',
+      `- Gegenereerd: ${startedAt}`,
+      '',
+      'Deze map is automatisch aangemaakt door Softora Active Order Automation.'
+    ].join('\n'),
+    'utf8'
+  );
+  steps.push({
+    id: 'local_files',
+    label: 'Lokale projectmap',
+    status: 'ok',
+    message: `Bestanden opgeslagen in ${projectDir}`
+  });
+
+  const repoName = `${ACTIVE_ORDER_AUTOMATION_GITHUB_REPO_PREFIX}${projectBase}${orderId ? `-${orderId}` : ''}`.slice(0, 95);
+  const repoInfo = await ensureGitHubRepository(ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER, repoName);
+  await upsertGitHubFile(
+    repoInfo.owner,
+    repoInfo.repo,
+    'index.html',
+    html,
+    `Publish case ${orderId || ''}`.trim()
+  );
+  await upsertGitHubFile(
+    repoInfo.owner,
+    repoInfo.repo,
+    'softora-case.json',
+    JSON.stringify(meta, null, 2),
+    `Update case metadata ${orderId || ''}`.trim()
+  );
+  await upsertGitHubFile(
+    repoInfo.owner,
+    repoInfo.repo,
+    'README.md',
+    [
+      `# ${title}`,
+      '',
+      `Automatisch gepubliceerd vanuit Softora Active Opdrachten.`,
+      '',
+      `- Bedrijf: ${company}`,
+      `- Order ID: ${orderId || 'n/a'}`,
+      domainName ? `- Domein: ${domainName}` : '- Domein: niet opgegeven',
+      `- Laatste update: ${new Date().toISOString()}`
+    ].join('\n'),
+    `Update README ${orderId || ''}`.trim()
+  );
+  outputs.githubRepoUrl = repoInfo.htmlUrl;
+  steps.push({
+    id: 'github',
+    label: 'GitHub push',
+    status: 'ok',
+    message: repoInfo.created
+      ? `Repo aangemaakt + bestanden gepusht (${repoInfo.htmlUrl})`
+      : `Bestanden gepusht (${repoInfo.htmlUrl})`
+  });
+
+  const vercelArgs = [
+    '--yes',
+    'vercel',
+    'deploy',
+    projectDir,
+    '--prod',
+    '--yes',
+    '--token',
+    ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN
+  ];
+  if (ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE) {
+    vercelArgs.push('--scope', ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE);
+  }
+  const vercelResult = await runCommandWithOutput('npx', vercelArgs, {
+    cwd: projectDir,
+    timeoutMs: 600000,
+    env: {
+      HOME: process.env.HOME || os.homedir()
+    }
+  });
+  const deploymentUrl = parseFirstVercelUrl(`${vercelResult.stdout}\n${vercelResult.stderr}`);
+  if (!deploymentUrl) {
+    throw new Error('Vercel deploy uitgevoerd, maar deployment URL niet gevonden in output.');
+  }
+  outputs.deploymentUrl = deploymentUrl;
+  steps.push({
+    id: 'vercel',
+    label: 'Vercel deploy',
+    status: 'ok',
+    message: deploymentUrl
+  });
+
+  if (domainName) {
+    const stratoResult = await runStratoAutomationHook({
+      domainName,
+      projectDir,
+      deploymentUrl
+    });
+    outputs.domainStatus = stratoResult.status;
+    outputs.domainMessage = stratoResult.message || '';
+    steps.push({
+      id: 'strato',
+      label: 'Strato domein',
+      status: stratoResult.status === 'ok' ? 'ok' : 'skipped',
+      message: stratoResult.message || (stratoResult.status === 'ok' ? 'Domeinstap gereed.' : 'Overgeslagen.')
+    });
+
+    try {
+      const aliasArgs = [
+        '--yes',
+        'vercel',
+        'alias',
+        'set',
+        deploymentUrl,
+        domainName,
+        '--token',
+        ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN
+      ];
+      if (ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE) {
+        aliasArgs.push('--scope', ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE);
+      }
+      await runCommandWithOutput('npx', aliasArgs, {
+        cwd: projectDir,
+        timeoutMs: 180000,
+        env: {
+          HOME: process.env.HOME || os.homedir()
+        }
+      });
+      outputs.domainStatus = 'ok';
+      outputs.domainMessage = `Domein alias gezet op ${domainName}`;
+      steps.push({
+        id: 'vercel_domain_alias',
+        label: 'Vercel domein alias',
+        status: 'ok',
+        message: domainName
+      });
+    } catch (error) {
+      const message = truncateText(normalizeString(error?.stderr || error?.message || ''), 220) || 'Alias mislukt.';
+      outputs.domainStatus = outputs.domainStatus || 'pending';
+      outputs.domainMessage = outputs.domainMessage || message;
+      steps.push({
+        id: 'vercel_domain_alias',
+        label: 'Vercel domein alias',
+        status: 'skipped',
+        message
+      });
+    }
+  } else {
+    outputs.domainStatus = 'skipped';
+    outputs.domainMessage = 'Geen domein opgegeven.';
+    steps.push({
+      id: 'strato',
+      label: 'Strato domein',
+      status: 'skipped',
+      message: 'Geen domein opgegeven; stap overgeslagen.'
+    });
+  }
+
+  return {
+    ok: true,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    outputs,
+    steps
+  };
 }
 
 function buildPostCallPayload(body = {}) {

@@ -696,6 +696,12 @@
             margin-right: 0.4rem;
         }
 
+        .order-delivery a {
+            color: var(--accent-light);
+            text-decoration: none;
+            border-bottom: 1px dotted rgba(139,34,82,0.5);
+        }
+
         .order-price { text-align: right; min-width: 120px; }
 
         .order-price-label {
@@ -1361,6 +1367,11 @@
                         <input class="create-order-input" id="newOrderDeliveryTime" name="deliveryTime" type="text" placeholder="Bijv. Binnen 3 weken" required>
                     </div>
                     <div class="create-order-field full">
+                        <label class="create-order-label" for="newOrderDomain">Domeinnaam (voor live launch)</label>
+                        <input class="create-order-input" id="newOrderDomain" name="domainName" type="text" placeholder="Bijv. salonnova.nl">
+                        <div class="create-order-hint">Optioneel, maar nodig als je ook domein-koppeling/registratie wilt automatiseren.</div>
+                    </div>
+                    <div class="create-order-field full">
                         <label class="create-order-label" for="newOrderAmount">Bedrag (€)</label>
                         <input class="create-order-input" id="newOrderAmount" name="amount" type="number" min="1" step="100" placeholder="2800" required>
                     </div>
@@ -1957,6 +1968,7 @@
             const clientName = parts[0] || orders[id]?.name || 'Bedrijf';
             const location = parts[1] || '';
             const deliveryTime = String(customOrder?.deliveryTime || '').trim();
+            const domainName = String(customOrder?.domainName || '').trim();
             const sourceAppointmentLabel = String(customOrder?.sourceAppointmentLabel || '').trim();
             const includeSampleDesign = Boolean(customOrder?.includeSampleDesign);
 
@@ -1969,6 +1981,7 @@
                 title: title || (orders[id]?.type || 'Project'),
                 description,
                 deliveryTime,
+                domainName,
                 sourceAppointmentLabel,
                 includeSampleDesign,
                 budget,
@@ -2326,6 +2339,7 @@
                         const title = String(item?.title || '').trim();
                         const description = String(item?.description || '').trim();
                         const deliveryTime = String(item?.deliveryTime || '').trim();
+                        const domainName = String(item?.domainName || '').trim();
                         const prompt = String(item?.prompt || '').trim();
                         const transcript = String(item?.transcript || '').trim();
                         const apiCostEur = parseNullableNumber(item?.apiCostEur);
@@ -2342,6 +2356,12 @@
                         const estimatedApiGeneratedAt = String(item?.estimatedApiGeneratedAt || '').trim();
                         const lastRunAt = String(item?.lastRunAt || '').trim();
                         const paidAt = String(item?.paidAt || '').trim();
+                        const launchLocalDir = String(item?.launchLocalDir || '').trim();
+                        const launchRepoUrl = String(item?.launchRepoUrl || '').trim();
+                        const launchDeploymentUrl = String(item?.launchDeploymentUrl || '').trim();
+                        const launchDomainStatus = String(item?.launchDomainStatus || '').trim();
+                        const launchDomainMessage = String(item?.launchDomainMessage || '').trim();
+                        const launchedAt = String(item?.launchedAt || '').trim();
                         const includeSampleDesignRaw = item?.includeSampleDesign;
                         const includeSampleDesign = includeSampleDesignRaw === true ||
                             ['true', '1', 'yes'].includes(String(includeSampleDesignRaw || '').trim().toLowerCase());
@@ -2359,6 +2379,7 @@
                             title,
                             description,
                             deliveryTime,
+                            domainName,
                             amount: Math.round(amount),
                             status: normalizeOrderStatus(item?.status).key,
                             prompt,
@@ -2381,6 +2402,12 @@
                             estimatedApiGeneratedAt: estimatedApiGeneratedAt || null,
                             lastRunAt: lastRunAt || null,
                             paidAt: paidAt || null,
+                            launchLocalDir: launchLocalDir || null,
+                            launchRepoUrl: launchRepoUrl || null,
+                            launchDeploymentUrl: launchDeploymentUrl || null,
+                            launchDomainStatus: launchDomainStatus || null,
+                            launchDomainMessage: launchDomainMessage || null,
+                            launchedAt: launchedAt || null,
                             includeSampleDesign,
                             sourceAppointmentId: Number.isFinite(sourceAppointmentId) && sourceAppointmentId > 0 ? sourceAppointmentId : null,
                             sourceCallId: sourceCallId || null,
@@ -2642,16 +2669,24 @@
             const deliveryTime = String(record.deliveryTime || '').trim();
             const appointmentLabel = String(record.sourceAppointmentLabel || '').trim();
             const includeSampleDesign = Boolean(record.includeSampleDesign);
+            const domainName = String(record.domainName || '').trim();
+            const launchDeploymentUrl = String(record.launchDeploymentUrl || '').trim();
             const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
             const apiCostText = formatApiCostLabel(record);
             const deliveryHtml = deliveryTime
                 ? `<div class="order-delivery"><strong>Oplevertijd</strong>${escapeHtml(deliveryTime)}</div>`
+                : '';
+            const domainHtml = domainName
+                ? `<div class="order-delivery"><strong>Domein</strong>${escapeHtml(domainName)}</div>`
                 : '';
             const appointmentHtml = appointmentLabel
                 ? `<div class="order-delivery"><strong>Agenda lead</strong>${escapeHtml(appointmentLabel)}</div>`
                 : '';
             const sampleDesignHtml = includeSampleDesign
                 ? `<div class="order-delivery"><strong>Voorbeelddesign</strong>Wordt meegenomen als basis</div>`
+                : '';
+            const liveUrlHtml = launchDeploymentUrl
+                ? `<div class="order-delivery"><strong>Live URL</strong><a href="${escapeHtml(launchDeploymentUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(launchDeploymentUrl)}</a></div>`
                 : '';
 
             return `
@@ -2662,8 +2697,10 @@
                             <div class="order-title">${escapeHtml(record.title)}</div>
                             <div class="order-desc">${escapeHtml(record.description)}</div>
                             ${deliveryHtml}
+                            ${domainHtml}
                             ${appointmentHtml}
                             ${sampleDesignHtml}
+                            ${liveUrlHtml}
                         </div>
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
@@ -3032,6 +3069,7 @@
                 'newOrderTitle',
                 'newOrderDesc',
                 'newOrderDeliveryTime',
+                'newOrderDomain',
                 'newOrderAmount'
             ].forEach((fieldId) => {
                 const field = document.getElementById(fieldId);
@@ -3068,6 +3106,7 @@
             const title = String(data.get('title') || '').trim();
             const description = String(data.get('description') || '').trim();
             const deliveryTime = String(data.get('deliveryTime') || '').trim();
+            const domainName = String(data.get('domainName') || '').trim();
             const amount = Math.round(Number(data.get('amount')));
             const selectedAppointmentId = Number(data.get('agendaLeadId'));
             const includeSampleDesign = String(data.get('includeSampleDesign') || 'no').trim().toLowerCase() === 'yes';
@@ -3101,6 +3140,7 @@
                 title,
                 description,
                 deliveryTime,
+                domainName,
                 amount,
                 status,
                 prompt: linkedPrompt,
@@ -3120,6 +3160,12 @@
                 estimatedApiGeneratedAt: null,
                 lastRunAt: null,
                 paidAt: null,
+                launchLocalDir: null,
+                launchRepoUrl: null,
+                launchDeploymentUrl: null,
+                launchDomainStatus: null,
+                launchDomainMessage: null,
+                launchedAt: null,
                 sourceAppointmentId,
                 sourceCallId,
                 sourceAppointmentLabel
@@ -3249,6 +3295,7 @@
             const title = String(meta?.title || customOrder?.title || 'website').trim();
             const description = String(meta?.description || customOrder?.description || '').trim();
             const deliveryTime = String(meta?.deliveryTime || customOrder?.deliveryTime || '').trim();
+            const domainName = String(meta?.domainName || customOrder?.domainName || '').trim();
             const sourceAppointmentLabel = String(meta?.sourceAppointmentLabel || customOrder?.sourceAppointmentLabel || '').trim();
             const includeSampleDesign = Boolean(meta?.includeSampleDesign || customOrder?.includeSampleDesign);
             return [
@@ -3256,6 +3303,7 @@
                 `Projecttitel: ${title}.`,
                 description ? `Context: ${description}` : '',
                 deliveryTime ? `Gewenste oplevertermijn: ${deliveryTime}.` : '',
+                domainName ? `Gewenst domein: ${domainName}.` : '',
                 sourceAppointmentLabel ? `Gekoppelde agenda-afspraak: ${sourceAppointmentLabel}.` : '',
                 includeSampleDesign
                     ? 'Gebruik het voorbeelddesign als basis voor de echte websitebouw. Behoud richting, sfeer en structuur, en werk het door naar een productieklare site.'
@@ -3297,6 +3345,7 @@
                 title: orders[id]?.type || 'Project',
                 description: '',
                 deliveryTime: String(getCustomOrderById(activeId)?.deliveryTime || '').trim(),
+                domainName: String(getCustomOrderById(activeId)?.domainName || '').trim(),
                 sourceAppointmentLabel: String(getCustomOrderById(activeId)?.sourceAppointmentLabel || '').trim(),
                 includeSampleDesign: Boolean(getCustomOrderById(activeId)?.includeSampleDesign)
             };
@@ -3310,6 +3359,7 @@
                 title: meta.title,
                 description: meta.description,
                 deliveryTime: meta.deliveryTime,
+                domainName: String(customOrder?.domainName || meta?.domainName || '').trim(),
                 prompt,
                 buildMode,
                 language: 'nl',
@@ -3665,6 +3715,72 @@
             throw lastError || new Error('Website generatie mislukt.');
         }
 
+        async function postLaunchSiteRequest(payload) {
+            const endpoints = [
+                '/api/active-order-launch-site',
+                '/api/active-orders/launch-site'
+            ];
+            let lastError = null;
+
+            for (let i = 0; i < endpoints.length; i++) {
+                const endpoint = endpoints[i];
+                const controller = new AbortController();
+                const timer = window.setTimeout(() => controller.abort(), 600000);
+                try {
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload || {}),
+                        signal: controller.signal,
+                        cache: 'no-store'
+                    });
+                    const raw = await res.text();
+                    let data = {};
+                    try {
+                        data = raw ? JSON.parse(raw) : {};
+                    } catch (_) {
+                        data = {};
+                    }
+                    if (!res.ok || !data?.ok) {
+                        const message = String(
+                            data?.detail ||
+                            data?.error ||
+                            raw ||
+                            `Launch pipeline mislukt (${res.status})`
+                        ).trim();
+                        const error = new Error(message || `Launch pipeline mislukt (${res.status})`);
+                        error.status = Number(res.status) || 0;
+                        const canTryNextEndpoint =
+                            i < endpoints.length - 1 &&
+                            (error.status === 404 || error.status === 405 || error.status >= 500);
+                        if (canTryNextEndpoint) {
+                            lastError = error;
+                            continue;
+                        }
+                        throw error;
+                    }
+                    return data;
+                } catch (error) {
+                    if (String(error?.name || '') === 'AbortError') {
+                        lastError = new Error('Timeout: launch pipeline duurde te lang.');
+                    } else if (
+                        Number(error?.status) >= 400 &&
+                        Number(error?.status) < 500 &&
+                        Number(error?.status) !== 404 &&
+                        Number(error?.status) !== 405
+                    ) {
+                        throw error;
+                    } else {
+                        lastError = error;
+                    }
+                } finally {
+                    window.clearTimeout(timer);
+                }
+            }
+
+            throw lastError || new Error('Launch pipeline mislukt.');
+        }
+
         async function executeOrder(id) {
             const activeId = selectActiveOrderId(id);
             const btn = document.getElementById(`btn-${id}`);
@@ -3757,7 +3873,13 @@
                         estimatedApiGeneratedAt: null,
                         lastRunAt: nowIso,
                         paidAt: existingPaidAt,
-                        status: existingPaidAt ? 'betaald' : 'klaar'
+                        status: existingPaidAt ? 'betaald' : 'klaar',
+                        launchLocalDir: null,
+                        launchRepoUrl: null,
+                        launchDeploymentUrl: null,
+                        launchDomainStatus: null,
+                        launchDomainMessage: null,
+                        launchedAt: null
                     });
                 }
                 updateApiCostLabel(activeId, getCustomOrderById(activeId) || apiCostRecord);
@@ -3780,7 +3902,61 @@
                 if (Number.isFinite(apiCostEur) && apiCostEur >= 0) {
                     appendOrderLog(id, `API kosten (geschat): ${formatApiCostAmount(apiCostEur) || 'onbekend'} (${apiModel || 'model'})`, true);
                 }
-                appendOrderLog(id, 'Website opgeleverd. Klik op "Bekijk website" om de preview te openen.', true);
+                appendOrderLog(id, 'Launch pipeline gestart: lokale map, GitHub, Vercel en domein.', true);
+
+                const launchPayload = {
+                    orderId: activeId,
+                    company: buildPayload.company,
+                    title: buildPayload.title,
+                    description: buildPayload.description,
+                    deliveryTime: buildPayload.deliveryTime,
+                    domainName: String(buildPayload.domainName || '').trim(),
+                    html
+                };
+                const launchResult = await postLaunchSiteRequest(launchPayload);
+                const launchSteps = Array.isArray(launchResult?.steps) ? launchResult.steps : [];
+                launchSteps.forEach((step) => {
+                    const stepLabel = String(step?.label || step?.name || step?.id || 'Stap').trim();
+                    const stepStatus = String(step?.status || '').trim().toLowerCase();
+                    const stepMessage = String(step?.message || '').trim();
+                    const prefix = stepStatus === 'ok'
+                        ? 'OK'
+                        : (stepStatus === 'skipped' ? 'SKIP' : 'INFO');
+                    appendOrderLog(
+                        id,
+                        `${prefix} ${stepLabel}${stepMessage ? ` - ${stepMessage}` : ''}`,
+                        stepStatus === 'ok'
+                    );
+                });
+
+                const launchedAt = new Date().toISOString();
+                const launchOutputs = launchResult?.outputs || {};
+                const launchLocalDir = String(launchOutputs?.localDir || '').trim() || null;
+                const launchRepoUrl = String(launchOutputs?.githubRepoUrl || '').trim() || null;
+                const launchDeploymentUrl = String(launchOutputs?.deploymentUrl || '').trim() || null;
+                const launchDomainStatus = String(launchOutputs?.domainStatus || '').trim() || null;
+                const launchDomainMessage = String(launchOutputs?.domainMessage || '').trim() || null;
+                if (customOrder) {
+                    updateCustomOrderById(activeId, {
+                        launchLocalDir,
+                        launchRepoUrl,
+                        launchDeploymentUrl,
+                        launchDomainStatus,
+                        launchDomainMessage,
+                        launchedAt
+                    });
+                }
+                if (launchDeploymentUrl) {
+                    appendOrderLog(id, `Live deployment: ${launchDeploymentUrl}`, true);
+                }
+                if (launchRepoUrl) {
+                    appendOrderLog(id, `GitHub repo: ${launchRepoUrl}`, true);
+                }
+                if (launchLocalDir) {
+                    appendOrderLog(id, `Lokale map: ${launchLocalDir}`, true);
+                }
+
+                appendOrderLog(id, 'Website opgeleverd en automatische launch afgerond.', true);
 
                 applyOrderUiStateToCard(id);
             } catch (error) {
