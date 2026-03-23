@@ -1024,51 +1024,81 @@
         .modal-close:hover { border-color: var(--red); color: var(--red); }
         .modal-close svg { width: 16px; height: 16px; }
 
-        .modal-log {
-            max-height: 250px;
-            overflow-y: auto;
-            margin-bottom: 2rem;
-            padding: 1.5rem;
+        .modal-overview {
+            max-height: 54vh;
+            overflow: auto;
+            margin-bottom: 1.35rem;
+            padding: 0.9rem;
             background: var(--bg-primary);
             border: 1px solid var(--border);
         }
 
-        .modal-log::-webkit-scrollbar { width: 3px; }
-        .modal-log::-webkit-scrollbar-thumb { background: var(--border); }
-
-        .modal-log-entry {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            font-weight: 300;
-            padding: 0.4rem 0;
-            line-height: 1.6;
+        .modal-overview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.7rem;
         }
 
-        .modal-log-entry .time { color: var(--text-tertiary); font-size: 0.7rem; margin-right: 0.5rem; }
-        .modal-log-entry .highlight { color: var(--accent-light); font-weight: 500; }
-        .modal-log-entry .success { color: var(--green); font-weight: 500; }
-
-        .modal-progress { margin-bottom: 2rem; }
-
-        .modal-progress-text {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
+        .modal-overview-item {
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.01);
+            padding: 0.6rem 0.7rem;
         }
 
-        .modal-progress-label {
+        .modal-overview-item.full {
+            grid-column: 1 / -1;
+        }
+
+        .modal-overview-label {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.75rem;
+            font-size: 0.66rem;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.11em;
             color: var(--text-tertiary);
+            margin-bottom: 0.3rem;
         }
 
-        .modal-progress-pct {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 700;
+        .modal-overview-value {
+            font-size: 0.84rem;
+            color: var(--text-primary);
+            line-height: 1.55;
+            word-break: break-word;
+        }
+
+        .modal-overview-value a {
             color: var(--accent-light);
+            text-decoration: none;
+            border-bottom: 1px dotted rgba(139,34,82,0.5);
+        }
+
+        .modal-overview-block {
+            white-space: pre-wrap;
+            max-height: 150px;
+            overflow: auto;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.01);
+            padding: 0.5rem 0.55rem;
+        }
+
+        .modal-attachments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+            gap: 0.45rem;
+            margin-top: 0.45rem;
+        }
+
+        .modal-attachment-thumb {
+            border: 1px solid var(--border);
+            background: #0a0a0a;
+            min-height: 64px;
+            overflow: hidden;
+        }
+
+        .modal-attachment-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }
 
         .modal-btn {
@@ -1275,6 +1305,7 @@
             .build-mode { width: 100%; }
             .mode-btn { flex: 1; justify-content: center; }
             .build-mode-hint { display: none; }
+            .modal-overview-grid { grid-template-columns: 1fr; }
             .modal.create-order-dialog { width: 94%; padding: 1.25rem; }
             .create-order-grid { grid-template-columns: 1fr; }
             .create-order-actions { flex-direction: column; }
@@ -1293,21 +1324,14 @@
         <div class="modal" role="dialog" aria-modal="true" aria-label="Opdracht uitvoeren">
             <div class="modal-header">
                 <div>
-                    <div class="modal-title" id="modalTitle">Opdracht Uitvoeren</div>
-                    <div class="modal-subtitle" id="modalSubtitle">AI bouwt de website...</div>
+                    <div class="modal-title" id="modalTitle">Opdracht Overzicht</div>
+                    <div class="modal-subtitle" id="modalSubtitle">Alle gekoppelde informatie van deze opdracht</div>
                 </div>
                 <button class="modal-close magnetic" type="button" id="modalCloseBtn">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="modal-progress">
-                <div class="modal-progress-text">
-                    <span class="modal-progress-label">Voortgang</span>
-                    <span class="modal-progress-pct" id="modalPct">0%</span>
-                </div>
-                <div class="progress-bar-bg"><div class="progress-bar-fill" id="modalBar" style="width: 0%;"></div></div>
-            </div>
-            <div class="modal-log" id="modalLog"></div>
+            <div class="modal-overview" id="modalOverview"></div>
             <button class="modal-btn primary magnetic" id="modalBtn" type="button" style="display: none;">Bekijk website</button>
             <button class="modal-btn danger magnetic" id="modalDeleteBtn" type="button" style="display: none;">Project uit systeem halen</button>
             <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
@@ -1791,6 +1815,44 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        function normalizeDataUrlImage(value) {
+            const raw = String(value || '').replace(/\s+/g, '').trim();
+            if (!raw) return '';
+            if (!/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(raw)) return '';
+            return raw;
+        }
+
+        function getDataUrlApproxBytes(dataUrl) {
+            const base64 = String(dataUrl || '').split(',')[1] || '';
+            return Math.max(0, Math.floor((base64.length * 3) / 4));
+        }
+
+        function getDataUrlMimeType(dataUrl) {
+            const match = String(dataUrl || '').match(/^data:(image\/(?:png|jpe?g|webp));base64,/i);
+            return match ? String(match[1]).toLowerCase() : 'image/jpeg';
+        }
+
+        function normalizeReferenceImageList(input) {
+            if (!Array.isArray(input)) return [];
+            return input
+                .map((item, index) => {
+                    const dataUrl = normalizeDataUrlImage(item?.dataUrl || item?.imageDataUrl || item?.url || '');
+                    if (!dataUrl) return null;
+                    const sizeBytes = getDataUrlApproxBytes(dataUrl);
+                    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return null;
+                    const name = String(item?.name || item?.fileName || `bijlage-${index + 1}`).trim().slice(0, 120);
+                    return {
+                        id: String(item?.id || `img_${index + 1}`),
+                        name: name || `bijlage-${index + 1}`,
+                        mimeType: getDataUrlMimeType(dataUrl),
+                        sizeBytes,
+                        dataUrl
+                    };
+                })
+                .filter(Boolean)
+                .slice(0, 8);
         }
 
         function normalizeMatchValue(value) {
@@ -2368,6 +2430,7 @@
                         const sourceAppointmentId = Number(item?.sourceAppointmentId);
                         const sourceCallId = String(item?.sourceCallId || '').trim();
                         const sourceAppointmentLabel = String(item?.sourceAppointmentLabel || '').trim();
+                        const referenceImages = normalizeReferenceImageList(item?.referenceImages || item?.attachments || []);
                         if (!Number.isFinite(id) || id <= 0) return null;
                         if (!clientName || !title || !description) return null;
                         if (!Number.isFinite(amount) || amount <= 0) return null;
@@ -2409,6 +2472,7 @@
                             launchDomainMessage: launchDomainMessage || null,
                             launchedAt: launchedAt || null,
                             includeSampleDesign,
+                            referenceImages,
                             sourceAppointmentId: Number.isFinite(sourceAppointmentId) && sourceAppointmentId > 0 ? sourceAppointmentId : null,
                             sourceCallId: sourceCallId || null,
                             sourceAppointmentLabel: sourceAppointmentLabel || null
@@ -2530,12 +2594,12 @@
                         viewBtnEl.dataset.action = 'preview';
                         viewBtnEl.onclick = () => openPreview(id);
                     } else {
-                        viewBtnEl.textContent = 'Bekijk Voortgang';
+                        viewBtnEl.textContent = 'Bekijk opdracht';
                         viewBtnEl.dataset.action = 'modal';
                         viewBtnEl.onclick = () => openModal(id);
                     }
                 } else {
-                    viewBtnEl.textContent = 'Bekijk Voortgang';
+                    viewBtnEl.textContent = 'Bekijk opdracht';
                     viewBtnEl.dataset.action = 'modal';
                     viewBtnEl.onclick = () => openModal(id);
                 }
@@ -2669,6 +2733,7 @@
             const deliveryTime = String(record.deliveryTime || '').trim();
             const appointmentLabel = String(record.sourceAppointmentLabel || '').trim();
             const includeSampleDesign = Boolean(record.includeSampleDesign);
+            const referenceImageCount = Array.isArray(record.referenceImages) ? record.referenceImages.length : 0;
             const domainName = String(record.domainName || '').trim();
             const launchDeploymentUrl = String(record.launchDeploymentUrl || '').trim();
             const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
@@ -2685,6 +2750,9 @@
             const sampleDesignHtml = includeSampleDesign
                 ? `<div class="order-delivery"><strong>Voorbeelddesign</strong>Wordt meegenomen als basis</div>`
                 : '';
+            const attachmentsHtml = referenceImageCount > 0
+                ? `<div class="order-delivery"><strong>Foto-bijlagen</strong>${referenceImageCount}</div>`
+                : '';
             const liveUrlHtml = launchDeploymentUrl
                 ? `<div class="order-delivery"><strong>Live URL</strong><a href="${escapeHtml(launchDeploymentUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(launchDeploymentUrl)}</a></div>`
                 : '';
@@ -2700,6 +2768,7 @@
                             ${domainHtml}
                             ${appointmentHtml}
                             ${sampleDesignHtml}
+                            ${attachmentsHtml}
                             ${liveUrlHtml}
                         </div>
                         <div class="order-price">
@@ -2713,7 +2782,7 @@
                                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                 Voer Opdracht Uit
                             </button>
-                            <button class="view-btn magnetic" id="view-${id}" type="button" data-order="${id}" data-action="modal">Bekijk Voortgang</button>
+                            <button class="view-btn magnetic" id="view-${id}" type="button" data-order="${id}" data-action="modal">Bekijk opdracht</button>
                             <button class="payment-btn magnetic" id="pay-${id}" type="button" data-order="${id}">Klant heeft betaald</button>
                         </div>
                     </div>
@@ -3166,6 +3235,7 @@
                 launchDomainStatus: null,
                 launchDomainMessage: null,
                 launchedAt: null,
+                referenceImages: [],
                 sourceAppointmentId,
                 sourceCallId,
                 sourceAppointmentLabel
@@ -3298,6 +3368,7 @@
             const domainName = String(meta?.domainName || customOrder?.domainName || '').trim();
             const sourceAppointmentLabel = String(meta?.sourceAppointmentLabel || customOrder?.sourceAppointmentLabel || '').trim();
             const includeSampleDesign = Boolean(meta?.includeSampleDesign || customOrder?.includeSampleDesign);
+            const referenceImages = normalizeReferenceImageList(customOrder?.referenceImages || []);
             return [
                 `Bouw een premium maatwerk HTML website voor ${company}.`,
                 `Projecttitel: ${title}.`,
@@ -3305,6 +3376,7 @@
                 deliveryTime ? `Gewenste oplevertermijn: ${deliveryTime}.` : '',
                 domainName ? `Gewenst domein: ${domainName}.` : '',
                 sourceAppointmentLabel ? `Gekoppelde agenda-afspraak: ${sourceAppointmentLabel}.` : '',
+                referenceImages.length ? `Er zijn ${referenceImages.length} referentiebeeld(en) toegevoegd; gebruik die als visuele richting.` : '',
                 includeSampleDesign
                     ? 'Gebruik het voorbeelddesign als basis voor de echte websitebouw. Behoud richting, sfeer en structuur, en werk het door naar een productieklare site.'
                     : '',
@@ -3347,7 +3419,8 @@
                 deliveryTime: String(getCustomOrderById(activeId)?.deliveryTime || '').trim(),
                 domainName: String(getCustomOrderById(activeId)?.domainName || '').trim(),
                 sourceAppointmentLabel: String(getCustomOrderById(activeId)?.sourceAppointmentLabel || '').trim(),
-                includeSampleDesign: Boolean(getCustomOrderById(activeId)?.includeSampleDesign)
+                includeSampleDesign: Boolean(getCustomOrderById(activeId)?.includeSampleDesign),
+                referenceImages: normalizeReferenceImageList(getCustomOrderById(activeId)?.referenceImages || [])
             };
             const customOrder = getCustomOrderById(activeId);
             const basePrompt = String(customOrder?.prompt || '').trim() || buildFallbackSitePrompt(meta, customOrder);
@@ -3365,7 +3438,8 @@
                 language: 'nl',
                 sourceAppointmentId: Number(customOrder?.sourceAppointmentId) || null,
                 sourceCallId: String(customOrder?.sourceCallId || '').trim() || null,
-                includeSampleDesign: Boolean(customOrder?.includeSampleDesign)
+                includeSampleDesign: Boolean(customOrder?.includeSampleDesign),
+                referenceImages: normalizeReferenceImageList(customOrder?.referenceImages || [])
             };
         }
 
@@ -3496,17 +3570,11 @@
             return Math.max(1, Math.min(5, currentStep));
         }
 
-        function syncOpenModalProgress(id, pct) {
+        function refreshOpenModalOverview(id) {
             if (Number(currentModalId) !== Number(id)) return;
-            const modalBar = document.getElementById('modalBar');
-            const modalPct = document.getElementById('modalPct');
-            const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
-            if (modalBar) {
-                modalBar.style.width = clamped + '%';
-                modalBar.classList.toggle('green', clamped >= 100);
-            }
-            if (modalPct) {
-                modalPct.textContent = `${Math.round(clamped)}%`;
+            const overview = document.getElementById('modalOverview');
+            if (overview) {
+                overview.innerHTML = renderModalOverviewHtml(id);
             }
         }
 
@@ -3535,7 +3603,7 @@
             }
             orders[id].progressPct = clamped;
             orders[id].updatedAt = Date.now();
-            syncOpenModalProgress(id, clamped);
+            refreshOpenModalOverview(id);
             if (options.persist !== false) persistOrdersRuntime();
         }
 
@@ -3548,17 +3616,7 @@
             };
             orders[id].logs.push(entry);
             orders[id].updatedAt = Date.now();
-
-            if (Number(currentModalId) === Number(id)) {
-                const log = document.getElementById('modalLog');
-                if (log) {
-                    const div = document.createElement('div');
-                    div.className = 'modal-log-entry';
-                    div.innerHTML = `<span class="time">[${escapeHtml(entry.time)}]</span> <span class="${entry.highlight ? 'success' : 'highlight'}">${escapeHtml(entry.msg)}</span>`;
-                    log.appendChild(div);
-                    log.scrollTop = log.scrollHeight;
-                }
-            }
+            refreshOpenModalOverview(id);
             persistOrdersRuntime();
         }
 
@@ -3809,7 +3867,7 @@
             if (progress) progress.classList.add('show');
             if (viewBtn) {
                 viewBtn.classList.add('show');
-                viewBtn.textContent = 'Bekijk Voortgang';
+                viewBtn.textContent = 'Bekijk opdracht';
                 viewBtn.dataset.action = 'modal';
                 viewBtn.onclick = () => openModal(id);
             }
@@ -3981,7 +4039,7 @@
                         viewBtn.dataset.action = 'preview';
                         viewBtn.onclick = () => openPreview(activeId);
                     } else {
-                        viewBtn.textContent = 'Bekijk Voortgang';
+                        viewBtn.textContent = 'Bekijk opdracht';
                         viewBtn.dataset.action = 'modal';
                         viewBtn.onclick = () => openModal(id);
                     }
@@ -3992,11 +4050,131 @@
             }
         }
 
+        function formatModalDateTime(value) {
+            const raw = String(value || '').trim();
+            if (!raw) return '—';
+
+            const asNumber = Number(raw);
+            if (Number.isFinite(asNumber) && asNumber > 0) {
+                const d = new Date(asNumber);
+                if (!Number.isNaN(d.getTime())) {
+                    return d.toLocaleString('nl-NL');
+                }
+            }
+
+            const date = new Date(raw);
+            if (Number.isNaN(date.getTime())) return raw;
+            return date.toLocaleString('nl-NL');
+        }
+
+        function renderModalOverviewHtml(id) {
+            const runtimeOrder = orders[id] || {};
+            const customOrder = getCustomOrderById(id);
+            const ui = resolveOrderUiState({
+                status: customOrder?.status || runtimeOrder?.statusKey || 'wacht',
+                paidAt: customOrder?.paidAt || runtimeOrder?.paidAt || null,
+                progressPct: Number(runtimeOrder?.progressPct) || 0
+            });
+
+            const description = String(customOrder?.description || '').trim();
+            const transcript = String(customOrder?.transcript || '').trim();
+            const prompt = String(customOrder?.prompt || '').trim();
+            const sourceLabel = String(customOrder?.sourceAppointmentLabel || '').trim();
+            const domainName = String(customOrder?.domainName || '').trim();
+            const deliveryTime = String(customOrder?.deliveryTime || '').trim();
+            const includeSampleDesign = Boolean(customOrder?.includeSampleDesign);
+            const launchDeploymentUrl = String(customOrder?.launchDeploymentUrl || '').trim();
+            const launchRepoUrl = String(customOrder?.launchRepoUrl || '').trim();
+            const launchLocalDir = String(customOrder?.launchLocalDir || '').trim();
+            const launchDomainStatus = String(customOrder?.launchDomainStatus || '').trim();
+            const launchDomainMessage = String(customOrder?.launchDomainMessage || '').trim();
+            const lastRunAt = String(customOrder?.lastRunAt || '').trim();
+            const launchedAt = String(customOrder?.launchedAt || '').trim();
+            const referenceImages = normalizeReferenceImageList(customOrder?.referenceImages || []);
+            const amount = Number(customOrder?.amount);
+            const amountLabel = Number.isFinite(amount) && amount > 0
+                ? `€${Math.round(amount).toLocaleString('nl-NL')}`
+                : '—';
+
+            const infoItems = [
+                { label: 'Bedrijfsnaam', value: customOrder?.clientName || runtimeOrder?.name || '—' },
+                { label: 'Contactpersoon', value: customOrder?.location || '—' },
+                { label: 'Status', value: ui.status?.text || '—' },
+                { label: 'Voortgang', value: `${Math.round(Math.max(0, Math.min(100, Number(runtimeOrder?.progressPct) || 0)))}%` },
+                { label: 'Bedrag', value: amountLabel },
+                { label: 'Oplevertijd', value: deliveryTime || '—' },
+                { label: 'Domein', value: domainName || '—' },
+                { label: 'Agenda-koppeling', value: sourceLabel || '—' },
+                { label: 'Voorbeelddesign', value: includeSampleDesign ? 'Ja, meenemen als basis' : 'Nee' },
+                { label: 'Foto-bijlagen', value: referenceImages.length ? String(referenceImages.length) : '0' },
+                { label: 'Laatste build run', value: formatModalDateTime(lastRunAt) },
+                { label: 'Launch afgerond', value: formatModalDateTime(launchedAt) },
+                {
+                    label: 'Live URL',
+                    value: launchDeploymentUrl
+                        ? `<a href="${escapeHtml(launchDeploymentUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(launchDeploymentUrl)}</a>`
+                        : '—',
+                    raw: true
+                },
+                {
+                    label: 'GitHub repo',
+                    value: launchRepoUrl
+                        ? `<a href="${escapeHtml(launchRepoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(launchRepoUrl)}</a>`
+                        : '—',
+                    raw: true
+                },
+                { label: 'Lokale map', value: launchLocalDir || '—' },
+                { label: 'Domeinstatus', value: launchDomainStatus || '—' },
+                { label: 'Domeinmelding', value: launchDomainMessage || '—' }
+            ];
+
+            const itemsHtml = infoItems
+                .map((item) => `
+                    <div class="modal-overview-item">
+                        <div class="modal-overview-label">${escapeHtml(item.label)}</div>
+                        <div class="modal-overview-value">${item.raw ? String(item.value || '') : escapeHtml(item.value || '—')}</div>
+                    </div>
+                `)
+                .join('');
+
+            const attachmentsHtml = referenceImages.length
+                ? `
+                    <div class="modal-attachments-grid">
+                        ${referenceImages.map((img) => `
+                            <div class="modal-attachment-thumb">
+                                <img src="${escapeHtml(img.dataUrl)}" alt="${escapeHtml(img.name || 'Bijlage')}">
+                            </div>
+                        `).join('')}
+                    </div>
+                `
+                : `<div class="modal-overview-value">Geen foto-bijlagen gekoppeld.</div>`;
+
+            return `
+                <div class="modal-overview-grid">
+                    ${itemsHtml}
+                    <div class="modal-overview-item full">
+                        <div class="modal-overview-label">Omschrijving opdracht</div>
+                        <div class="modal-overview-value modal-overview-block">${escapeHtml(description || '—')}</div>
+                    </div>
+                    <div class="modal-overview-item full">
+                        <div class="modal-overview-label">Meeting notities</div>
+                        <div class="modal-overview-value modal-overview-block">${escapeHtml(transcript || '—')}</div>
+                    </div>
+                    <div class="modal-overview-item full">
+                        <div class="modal-overview-label">AI bouwprompt</div>
+                        <div class="modal-overview-value modal-overview-block">${escapeHtml(prompt || '—')}</div>
+                    </div>
+                    <div class="modal-overview-item full">
+                        <div class="modal-overview-label">Foto-bijlagen preview</div>
+                        ${attachmentsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
         function openModal(id) {
             const modal = document.getElementById('modal');
-            const log = document.getElementById('modalLog');
-            const bar = document.getElementById('modalBar');
-            const pct = document.getElementById('modalPct');
+            const overview = document.getElementById('modalOverview');
             const title = document.getElementById('modalTitle');
             const subtitle = document.getElementById('modalSubtitle');
             const primaryBtn = document.getElementById('modalBtn');
@@ -4005,31 +4183,14 @@
 
             currentModalId = id;
 
-            title.textContent = orders[id].type;
-            subtitle.textContent = orders[id].name;
-
-            log.innerHTML = '';
-            if (!orders[id].logs.length) {
-                const div = document.createElement('div');
-                div.className = 'modal-log-entry';
-                div.innerHTML = '<span class="time">[--:--:--]</span> <span class="highlight">Nog geen activiteit. Start de opdracht om voortgang te zien.</span>';
-                log.appendChild(div);
-            } else {
-                orders[id].logs.forEach(entry => {
-                    const div = document.createElement('div');
-                    div.className = 'modal-log-entry';
-                    div.innerHTML = `<span class="time">[${entry.time}]</span> <span class="${entry.highlight ? 'success' : 'highlight'}">${entry.msg}</span>`;
-                    log.appendChild(div);
-                });
+            title.textContent = orders[id]?.type || 'Opdracht';
+            subtitle.textContent = orders[id]?.name || '';
+            if (overview) {
+                overview.innerHTML = renderModalOverviewHtml(id);
+                overview.scrollTop = 0;
             }
 
-            const pctValue = Number(orders[id].progressPct) || 0;
-            bar.style.width = pctValue + '%';
-            if (pctValue === 100) bar.classList.add('green');
-            else bar.classList.remove('green');
-
-            pct.textContent = pctValue + '%';
-
+            const pctValue = Number(orders[id]?.progressPct) || 0;
             if (pctValue === 100 && hasGeneratedPreviewHtml(id)) {
                 primaryBtn.style.display = 'block';
                 primaryBtn.onclick = () => {
@@ -4054,7 +4215,6 @@
                 }
             }
 
-            log.scrollTop = log.scrollHeight;
             modal.classList.add('show');
             modal.setAttribute('aria-hidden', 'false');
         }

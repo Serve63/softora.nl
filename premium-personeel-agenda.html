@@ -345,7 +345,7 @@
 
         .modal-workspace-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
             gap: 0.75rem;
         }
 
@@ -411,6 +411,84 @@
 
         .workspace-file-input {
             display: none;
+        }
+
+        .workspace-attachment-btn {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 0.65rem 0.8rem;
+            cursor: none;
+            transition: all 0.2s ease;
+        }
+
+        .workspace-attachment-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-light);
+        }
+
+        .workspace-attachments {
+            margin-top: 0.6rem;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            padding: 0.55rem;
+        }
+
+        .workspace-attachments-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 0.45rem;
+        }
+
+        .workspace-attachments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+            gap: 0.45rem;
+        }
+
+        .workspace-attachment-item {
+            position: relative;
+            border: 1px solid var(--border);
+            background: #0a0a0a;
+            min-height: 76px;
+            overflow: hidden;
+        }
+
+        .workspace-attachment-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .workspace-attachment-remove {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            border: 1px solid rgba(255,255,255,0.28);
+            background: rgba(8,8,8,0.84);
+            color: #fff;
+            font-size: 0.75rem;
+            line-height: 1;
+            cursor: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .workspace-attachment-empty {
+            font-size: 0.76rem;
+            color: var(--text-tertiary);
+            font-weight: 300;
         }
 
         .modal-footer {
@@ -500,7 +578,7 @@
             <div class="modal-workspace" id="modalWorkspace">
                 <div class="modal-workspace-label">Meeting notities</div>
                 <div class="modal-workspace-help">
-                    Noteer hier de wensen van de klant uit de meeting. Deze info wordt gekoppeld aan de case en gaat mee naar actieve opdrachten.
+                    Noteer hier de wensen van de klant uit de meeting. Deze info wordt gekoppeld aan de opdracht en gaat mee naar actieve opdrachten.
                 </div>
                 <div class="modal-workspace-actions">
                     <button class="modal-upload-icon-btn magnetic" id="notesImageUploadBtn" type="button" title="Upload foto notitieblok" aria-label="Upload foto notitieblok">
@@ -510,16 +588,19 @@
                         </svg>
                     </button>
                     <input class="workspace-file-input" id="notesImageUploadInput" type="file" accept="image/*" capture="environment">
+                    <button class="workspace-attachment-btn magnetic" id="referencePhotosBtn" type="button">Foto-bijlagen toevoegen</button>
+                    <input class="workspace-file-input" id="referencePhotosInput" type="file" accept="image/*" multiple>
                 </div>
                 <div class="modal-workspace-status" id="workspaceVoiceStatus"></div>
                 <div class="modal-workspace-grid">
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Notities meeting & klantwensen</div>
                         <textarea id="workspaceTranscript" placeholder="Zet hier alle meetingnotities: doelen, wensen, stijl, functionaliteiten, planning, budget, bijzonderheden..."></textarea>
-                    </div>
-                    <div class="modal-workspace-field">
-                        <div class="modal-workspace-label">AI bouwprompt (automatisch)</div>
-                        <textarea id="workspacePrompt" placeholder="Wordt automatisch gemaakt vanuit je notities (optioneel handmatig te bewerken)."></textarea>
+                        <div class="workspace-attachments">
+                            <div class="workspace-attachments-label">Foto-bijlagen voor website-bouw</div>
+                            <div class="workspace-attachments-grid" id="workspaceAttachmentsList"></div>
+                            <div class="workspace-attachment-empty" id="workspaceAttachmentsEmpty">Nog geen bijlagen toegevoegd.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-workspace-status" id="workspaceSaveStatus"></div>
@@ -655,18 +736,133 @@
     const modalNoDealBtn = document.getElementById('modalNoDealBtn');
     const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
     const workspaceTranscriptEl = document.getElementById('workspaceTranscript');
-    const workspacePromptEl = document.getElementById('workspacePrompt');
     const workspaceVoiceStatusEl = document.getElementById('workspaceVoiceStatus');
     const workspaceSaveStatusEl = document.getElementById('workspaceSaveStatus');
     const notesImageUploadBtn = document.getElementById('notesImageUploadBtn');
     const notesImageUploadInput = document.getElementById('notesImageUploadInput');
+    const referencePhotosBtn = document.getElementById('referencePhotosBtn');
+    const referencePhotosInput = document.getElementById('referencePhotosInput');
+    const workspaceAttachmentsList = document.getElementById('workspaceAttachmentsList');
+    const workspaceAttachmentsEmpty = document.getElementById('workspaceAttachmentsEmpty');
+    const ACTIVE_ORDERS_UI_SCOPE = 'premium_active_orders';
+    const ACTIVE_ORDERS_CUSTOM_KEY = 'softora_custom_orders_premium_v1';
 
     let activeAppointmentId = null;
     let modalWorkspaceMode = false;
     let workspaceBusy = false;
+    let workspaceDraftPrompt = '';
+    let workspaceReferenceImages = [];
+    let knownActiveOrderIds = new Set();
+    let knownActiveOrderByAppointmentId = new Map();
 
     function appointmentFingerprint(apt) {
         return [apt.date || '', apt.time || '', apt.company || '', apt.phone || ''].join('|');
+    }
+
+    function normalizeDataUrlImage(value) {
+        const raw = String(value || '').replace(/\s+/g, '').trim();
+        if (!raw) return '';
+        if (!/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(raw)) return '';
+        return raw;
+    }
+
+    function getDataUrlMimeType(dataUrl) {
+        const match = String(dataUrl || '').match(/^data:(image\/(?:png|jpe?g|webp));base64,/i);
+        return match ? String(match[1]).toLowerCase() : 'image/jpeg';
+    }
+
+    function getDataUrlApproxBytes(dataUrl) {
+        const base64 = String(dataUrl || '').split(',')[1] || '';
+        return Math.max(0, Math.floor((base64.length * 3) / 4));
+    }
+
+    function normalizeReferenceImageList(input) {
+        if (!Array.isArray(input)) return [];
+        return input
+            .map((item, index) => {
+                const dataUrl = normalizeDataUrlImage(item?.dataUrl || item?.imageDataUrl || item?.url || '');
+                if (!dataUrl) return null;
+                const mimeType = getDataUrlMimeType(dataUrl);
+                const sizeBytes = Math.max(1, getDataUrlApproxBytes(dataUrl));
+                const name = String(item?.name || item?.fileName || `bijlage-${index + 1}`).trim().slice(0, 120);
+                return {
+                    id: String(item?.id || `img_${Date.now()}_${index}`),
+                    name: name || `bijlage-${index + 1}`,
+                    mimeType,
+                    sizeBytes,
+                    dataUrl
+                };
+            })
+            .filter(Boolean)
+            .slice(0, 8);
+    }
+
+    async function fetchJsonGetWithFallback(urls, options = {}) {
+        const endpointList = Array.isArray(urls) ? urls : [urls];
+        const timeoutMs = Math.max(3000, Math.min(60000, Number(options?.timeoutMs || 20000)));
+        let lastError = null;
+
+        for (const url of endpointList) {
+            const controller = new AbortController();
+            const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    signal: controller.signal,
+                    cache: 'no-store'
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data?.ok) {
+                    const err = new Error(String(data?.detail || data?.error || `Request mislukt (${response.status})`));
+                    err.status = Number(response.status) || 0;
+                    throw err;
+                }
+                return data;
+            } catch (error) {
+                lastError = String(error?.name || '') === 'AbortError'
+                    ? new Error(`Timeout na ${Math.round(timeoutMs / 1000)}s (${url})`)
+                    : error;
+            } finally {
+                window.clearTimeout(timer);
+            }
+        }
+
+        throw lastError || new Error('Request mislukt.');
+    }
+
+    async function refreshKnownActiveOrdersIndex() {
+        const scope = encodeURIComponent(ACTIVE_ORDERS_UI_SCOPE);
+        const result = await fetchJsonGetWithFallback([
+            `/api/ui-state-get?scope=${scope}`,
+            `/api/ui-state/${scope}`
+        ], { timeoutMs: 12000 });
+
+        const values = result?.values && typeof result.values === 'object' ? result.values : {};
+        const raw = String(values[ACTIVE_ORDERS_CUSTOM_KEY] || '');
+        let parsed = [];
+        try {
+            parsed = JSON.parse(raw || '[]');
+        } catch (_) {
+            parsed = [];
+        }
+        if (!Array.isArray(parsed)) parsed = [];
+
+        const nextIds = new Set();
+        const nextByAppointment = new Map();
+        parsed.forEach((item) => {
+            const orderId = Number(item?.id);
+            if (Number.isFinite(orderId) && orderId > 0) {
+                nextIds.add(orderId);
+            }
+            const appointmentId = Number(item?.sourceAppointmentId);
+            if (Number.isFinite(orderId) && orderId > 0 && Number.isFinite(appointmentId) && appointmentId > 0) {
+                nextByAppointment.set(appointmentId, orderId);
+            }
+        });
+
+        knownActiveOrderIds = nextIds;
+        knownActiveOrderByAppointmentId = nextByAppointment;
+        return { ids: nextIds, byAppointment: nextByAppointment };
     }
 
     function normalizeServerAppointment(item) {
@@ -691,6 +887,7 @@
             postCallUpdatedAt: String(item.postCallUpdatedAt || ''),
             activeOrderId: Number(item.activeOrderId || 0) || null,
             activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
+            referenceImages: normalizeReferenceImageList(item.referenceImages || item.attachments || []),
         };
     }
 
@@ -702,6 +899,46 @@
     function setVoiceStatus(message, variant = '') {
         workspaceVoiceStatusEl.textContent = message || '';
         workspaceVoiceStatusEl.className = `modal-workspace-status${variant ? ` ${variant}` : ''}`;
+    }
+
+    function renderWorkspaceReferenceImages() {
+        if (!workspaceAttachmentsList || !workspaceAttachmentsEmpty) return;
+        workspaceAttachmentsList.innerHTML = '';
+
+        if (!workspaceReferenceImages.length) {
+            workspaceAttachmentsEmpty.style.display = 'block';
+            return;
+        }
+
+        workspaceAttachmentsEmpty.style.display = 'none';
+        workspaceReferenceImages.forEach((image) => {
+            const item = document.createElement('div');
+            item.className = 'workspace-attachment-item';
+
+            const preview = document.createElement('img');
+            preview.src = image.dataUrl;
+            preview.alt = image.name || 'Bijlage';
+            item.appendChild(preview);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'workspace-attachment-remove magnetic';
+            removeBtn.setAttribute('aria-label', 'Verwijder bijlage');
+            removeBtn.title = 'Verwijder';
+            removeBtn.textContent = '×';
+            removeBtn.addEventListener('click', () => {
+                workspaceReferenceImages = workspaceReferenceImages.filter((entry) => String(entry.id) !== String(image.id));
+                renderWorkspaceReferenceImages();
+            });
+            item.appendChild(removeBtn);
+
+            workspaceAttachmentsList.appendChild(item);
+        });
+    }
+
+    function setWorkspaceReferenceImages(list) {
+        workspaceReferenceImages = normalizeReferenceImageList(list);
+        renderWorkspaceReferenceImages();
     }
 
     function applyWorkspaceMode(enabled) {
@@ -718,17 +955,38 @@
         return appointments.find((item) => Number(item.id) === Number(activeAppointmentId)) || null;
     }
 
-    function hasWorkspacePromptReady() {
-        return String(workspacePromptEl.value || '').trim().length >= 10;
-    }
-
     function hasWorkspaceNotesReady() {
         return String(workspaceTranscriptEl.value || '').trim().length >= 10;
     }
 
     function hasWorkspaceLinkedOrder() {
         const apt = getActiveAppointment();
-        return Boolean(apt?.activeOrderId || apt?.activeOrderAddedAt);
+        if (!apt) return false;
+
+        const orderId = Number(apt?.activeOrderId || 0);
+        if (Number.isFinite(orderId) && orderId > 0 && knownActiveOrderIds.has(orderId)) {
+            return true;
+        }
+
+        const appointmentId = Number(apt?.id || 0);
+        if (Number.isFinite(appointmentId) && appointmentId > 0 && knownActiveOrderByAppointmentId.has(appointmentId)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function getLinkedOrderIdForAppointment(apt) {
+        if (!apt) return null;
+        const orderId = Number(apt?.activeOrderId || 0);
+        if (Number.isFinite(orderId) && orderId > 0 && knownActiveOrderIds.has(orderId)) {
+            return orderId;
+        }
+        const appointmentId = Number(apt?.id || 0);
+        if (Number.isFinite(appointmentId) && appointmentId > 0 && knownActiveOrderByAppointmentId.has(appointmentId)) {
+            return Number(knownActiveOrderByAppointmentId.get(appointmentId)) || null;
+        }
+        return null;
     }
 
     function refreshWorkspacePrimaryButtonLabel() {
@@ -740,12 +998,12 @@
         }
 
         if (hasWorkspaceLinkedOrder()) {
-            modalPrimaryBtn.textContent = 'Case Geactiveerd';
+            modalPrimaryBtn.textContent = 'Opdracht aangemaakt';
             modalPrimaryBtn.disabled = true;
             return;
         }
 
-        modalPrimaryBtn.textContent = 'Case Activeren';
+        modalPrimaryBtn.textContent = 'Opdracht aanmaken';
         modalPrimaryBtn.disabled = workspaceBusy || !hasWorkspaceNotesReady();
     }
 
@@ -782,11 +1040,15 @@
 
     function fillWorkspaceFromAppointment(apt) {
         workspaceTranscriptEl.value = String(apt?.postCallNotesTranscript || '');
-        workspacePromptEl.value = String(apt?.postCallPrompt || '');
+        workspaceDraftPrompt = String(apt?.postCallPrompt || '');
+        setWorkspaceReferenceImages(apt?.referenceImages || []);
         const updatedAt = String(apt?.postCallUpdatedAt || '');
-        const activeOrderId = Number(apt?.activeOrderId || 0) || null;
-        if (activeOrderId) {
-            setWorkspaceStatus(`Case al geactiveerd (opdracht #${activeOrderId}).`, 'success');
+        const linkedOrderId = getLinkedOrderIdForAppointment(apt);
+        const appointmentOrderId = Number(apt?.activeOrderId || 0) || null;
+        if (linkedOrderId) {
+            setWorkspaceStatus(`Opdracht al aangemaakt (opdracht #${linkedOrderId}).`, 'success');
+        } else if (appointmentOrderId) {
+            setWorkspaceStatus('Gekoppelde opdracht niet meer gevonden. Je kunt opnieuw opdracht aanmaken.', 'error');
         } else if (updatedAt) {
             setWorkspaceStatus(`Laatst opgeslagen: ${new Date(updatedAt).toLocaleString('nl-NL')}`);
         } else {
@@ -808,7 +1070,18 @@
             postCallUpdatedAt: String(update?.postCallUpdatedAt || ''),
             activeOrderId: Number(update?.activeOrderId || appointments[idx].activeOrderId || 0) || null,
             activeOrderAddedAt: String(update?.activeOrderAddedAt || appointments[idx].activeOrderAddedAt || ''),
+            referenceImages: normalizeReferenceImageList(update?.referenceImages || appointments[idx].referenceImages || []),
         };
+
+        const appointmentIdResolved = Number(appointments[idx]?.id || 0);
+        const linkedOrderId = Number(appointments[idx]?.activeOrderId || 0);
+        if (Number.isFinite(linkedOrderId) && linkedOrderId > 0) {
+            knownActiveOrderIds.add(linkedOrderId);
+            if (Number.isFinite(appointmentIdResolved) && appointmentIdResolved > 0) {
+                knownActiveOrderByAppointmentId.set(appointmentIdResolved, linkedOrderId);
+            }
+        }
+
         refreshWorkspacePrimaryButtonLabel();
     }
 
@@ -867,11 +1140,6 @@
         });
     }
 
-    function getDataUrlApproxBytes(dataUrl) {
-        const base64 = String(dataUrl || '').split(',')[1] || '';
-        return Math.max(0, Math.floor((base64.length * 3) / 4));
-    }
-
     async function compressImageToDataUrl(file, options = {}) {
         const maxDimension = Math.max(320, Math.min(2400, Number(options?.maxDimension || 1600)));
         const quality = Math.max(0.45, Math.min(0.92, Number(options?.quality || 0.82)));
@@ -902,7 +1170,7 @@
             { maxDimension: 1200, quality: 0.66 },
             { maxDimension: 1000, quality: 0.58 },
         ];
-        const maxBytes = 700 * 1024;
+        const maxBytes = 600 * 1024;
         let latest = '';
 
         for (let i = 0; i < attempts.length; i += 1) {
@@ -947,11 +1215,11 @@
 
             const generatedPrompt = String(result?.prompt || '').trim();
             if (generatedPrompt) {
-                workspacePromptEl.value = generatedPrompt;
+                workspaceDraftPrompt = generatedPrompt;
             }
 
             setVoiceStatus('Foto verwerkt. Notities toegevoegd.', 'success');
-            setWorkspaceStatus('Notities uit foto toegevoegd en prompt bijgewerkt.', 'success');
+            setWorkspaceStatus('Notities uit foto toegevoegd.', 'success');
         } catch (error) {
             setVoiceStatus(`Foto verwerken mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
         } finally {
@@ -959,6 +1227,67 @@
             notesImageUploadBtn.disabled = false;
             refreshWorkspacePrimaryButtonLabel();
             if (notesImageUploadInput) notesImageUploadInput.value = '';
+        }
+    }
+
+    async function normalizeReferenceImageForUpload(file) {
+        if (!file || !String(file.type || '').startsWith('image/')) {
+            throw new Error('Alleen afbeelding-bestanden zijn toegestaan.');
+        }
+
+        const attempts = [
+            { maxDimension: 1600, quality: 0.8 },
+            { maxDimension: 1360, quality: 0.72 },
+            { maxDimension: 1180, quality: 0.64 },
+            { maxDimension: 960, quality: 0.58 },
+        ];
+        const maxBytes = 420 * 1024;
+        let latest = '';
+
+        for (let i = 0; i < attempts.length; i += 1) {
+            latest = await compressImageToDataUrl(file, attempts[i]);
+            if (getDataUrlApproxBytes(latest) <= maxBytes) {
+                const mimeType = getDataUrlMimeType(latest);
+                return {
+                    id: `ref_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                    name: String(file.name || 'bijlage.jpg').trim().slice(0, 120),
+                    mimeType,
+                    sizeBytes: getDataUrlApproxBytes(latest),
+                    dataUrl: latest
+                };
+            }
+        }
+
+        throw new Error(`Foto "${String(file.name || 'onbekend')}" is te groot, zelfs na compressie.`);
+    }
+
+    async function addReferencePhotoFiles(fileList) {
+        const files = Array.from(fileList || []).filter(Boolean);
+        if (!files.length || workspaceBusy) return;
+
+        workspaceBusy = true;
+        refreshWorkspacePrimaryButtonLabel();
+        if (referencePhotosBtn) referencePhotosBtn.disabled = true;
+        setVoiceStatus('Bijlagen verwerken...', '');
+
+        try {
+            const existing = normalizeReferenceImageList(workspaceReferenceImages);
+            const combined = existing.slice();
+            for (const file of files) {
+                if (combined.length >= 8) break;
+                const normalized = await normalizeReferenceImageForUpload(file);
+                combined.push(normalized);
+            }
+            workspaceReferenceImages = combined.slice(0, 8);
+            renderWorkspaceReferenceImages();
+            setVoiceStatus(`Bijlagen toegevoegd (${workspaceReferenceImages.length}).`, 'success');
+        } catch (error) {
+            setVoiceStatus(`Bijlagen toevoegen mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
+        } finally {
+            workspaceBusy = false;
+            if (referencePhotosBtn) referencePhotosBtn.disabled = false;
+            refreshWorkspacePrimaryButtonLabel();
+            if (referencePhotosInput) referencePhotosInput.value = '';
         }
     }
 
@@ -978,7 +1307,8 @@
             const payload = {
                 status: 'customer_wants_to_proceed',
                 transcript: String(workspaceTranscriptEl.value || '').trim(),
-                prompt: String(workspacePromptEl.value || '').trim(),
+                prompt: String(workspaceDraftPrompt || '').trim(),
+                referenceImages: normalizeReferenceImageList(workspaceReferenceImages),
                 actor: 'premium-personeel-agenda',
             };
             const result = await postJsonWithFallback(
@@ -991,7 +1321,7 @@
             updateAppointmentPostCallFields(result?.appointment || payload);
             const successMessage = options?.silent
                 ? 'Opgeslagen.'
-                : 'Klantwens + prompt opgeslagen bij deze afspraak.';
+                : 'Klantwens opgeslagen bij deze afspraak.';
             setWorkspaceStatus(successMessage, 'success');
             return result;
         } catch (error) {
@@ -1015,17 +1345,17 @@
             return null;
         }
         if (hasWorkspaceLinkedOrder()) {
-            setWorkspaceStatus('Deze case is al geactiveerd en gekoppeld aan actieve opdrachten.', 'success');
+            setWorkspaceStatus('Deze afspraak is al gekoppeld aan een actieve opdracht.', 'success');
             return null;
         }
         if (workspaceBusy) return null;
 
         workspaceBusy = true;
         refreshWorkspacePrimaryButtonLabel();
-        setWorkspaceStatus('Case activeren...', '');
+        setWorkspaceStatus('Opdracht aanmaken...', '');
 
         try {
-            let promptText = String(workspacePromptEl.value || '').trim();
+            let promptText = String(workspaceDraftPrompt || '').trim();
             const shouldGeneratePrompt = options?.autoGeneratePrompt !== false;
 
             if (!promptText && shouldGeneratePrompt) {
@@ -1041,7 +1371,7 @@
                 );
                 promptText = String(promptResult?.prompt || '').trim();
                 if (promptText) {
-                    workspacePromptEl.value = promptText;
+                    workspaceDraftPrompt = promptText;
                 }
             }
 
@@ -1054,6 +1384,7 @@
                 status: 'customer_wants_to_proceed',
                 transcript: transcriptText,
                 prompt: promptText,
+                referenceImages: normalizeReferenceImageList(workspaceReferenceImages),
                 actor: 'premium-personeel-agenda',
             };
             const result = await postJsonWithFallback(
@@ -1065,14 +1396,26 @@
                 { timeoutMs: 30000 }
             );
             updateAppointmentPostCallFields(result?.appointment || {});
+            if (Array.isArray(result?.order?.referenceImages)) {
+                workspaceReferenceImages = normalizeReferenceImageList(result.order.referenceImages);
+                renderWorkspaceReferenceImages();
+            }
+            const createdOrderId = Number(result?.order?.id || 0) || null;
+            const appointmentId = Number(result?.appointment?.id || apt?.id || 0) || null;
+            if (createdOrderId) {
+                knownActiveOrderIds.add(createdOrderId);
+                if (appointmentId) {
+                    knownActiveOrderByAppointmentId.set(appointmentId, createdOrderId);
+                }
+            }
             if (result?.alreadyExisted) {
-                setWorkspaceStatus('Case was al actief en is bijgewerkt met je nieuwste notities.', 'success');
+                setWorkspaceStatus('Opdracht bestond al en is bijgewerkt met je nieuwste notities.', 'success');
             } else {
-                setWorkspaceStatus('Case geactiveerd. Opdracht staat nu bij actieve opdrachten.', 'success');
+                setWorkspaceStatus('Opdracht aangemaakt en toegevoegd aan actieve opdrachten.', 'success');
             }
             return result;
         } catch (error) {
-            setWorkspaceStatus(`Case activeren mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
+            setWorkspaceStatus(`Opdracht aanmaken mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
             return null;
         } finally {
             workspaceBusy = false;
@@ -1087,11 +1430,28 @@
             if (!response.ok || !data?.ok || !Array.isArray(data.appointments)) return;
 
             const existing = new Set(appointments.map(appointmentFingerprint));
+            const indexById = new Map(
+                appointments
+                    .map((item, idx) => ({ id: Number(item?.id || 0), idx }))
+                    .filter((entry) => Number.isFinite(entry.id) && entry.id > 0)
+                    .map((entry) => [entry.id, entry.idx])
+            );
             let added = 0;
+            let updated = 0;
 
             data.appointments.forEach((item) => {
                 const apt = normalizeServerAppointment(item);
                 if (!apt) return;
+                const aptId = Number(apt.id || 0);
+                if (Number.isFinite(aptId) && aptId > 0 && indexById.has(aptId)) {
+                    const existingIndex = indexById.get(aptId);
+                    appointments[existingIndex] = {
+                        ...appointments[existingIndex],
+                        ...apt
+                    };
+                    updated += 1;
+                    return;
+                }
                 const fp = appointmentFingerprint(apt);
                 if (existing.has(fp)) return;
                 existing.add(fp);
@@ -1099,7 +1459,7 @@
                 added += 1;
             });
 
-            if (added > 0) {
+            if (added > 0 || updated > 0) {
                 appointments.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
                 renderCalendar();
             }
@@ -1191,10 +1551,16 @@
         renderCalendar();
     }
 
-    function openAppointment(id) {
+    async function openAppointment(id) {
         const apt = appointments.find((a) => a.id === id);
         if (!apt) return;
         activeAppointmentId = apt.id;
+
+        try {
+            await refreshKnownActiveOrdersIndex();
+        } catch (_) {
+            // Zonder actieve opdrachten index blijven we op afspraakdata draaien.
+        }
 
         document.getElementById('modalBadge').textContent = 'Meeting';
         document.getElementById('modalBadge').className = 'modal-type-badge meeting';
@@ -1213,6 +1579,7 @@
 
     function closeModal() {
         if (notesImageUploadInput) notesImageUploadInput.value = '';
+        if (referencePhotosInput) referencePhotosInput.value = '';
         modalElement.classList.remove('show');
     }
 
@@ -1238,20 +1605,34 @@
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
     modalSecondaryBtn.addEventListener('click', handleModalSecondaryAction);
-    notesImageUploadBtn.addEventListener('click', () => {
-        if (workspaceBusy) return;
-        notesImageUploadInput.click();
-    });
-    notesImageUploadInput.addEventListener('change', (event) => {
-        const file = event?.target?.files?.[0] || null;
-        if (!file) return;
-        void handleNotesImageUpload(file);
-    });
+    if (notesImageUploadBtn && notesImageUploadInput) {
+        notesImageUploadBtn.addEventListener('click', () => {
+            if (workspaceBusy) return;
+            notesImageUploadInput.click();
+        });
+        notesImageUploadInput.addEventListener('change', (event) => {
+            const file = event?.target?.files?.[0] || null;
+            if (!file) return;
+            void handleNotesImageUpload(file);
+        });
+    }
+    if (referencePhotosBtn && referencePhotosInput) {
+        referencePhotosBtn.addEventListener('click', () => {
+            if (workspaceBusy) return;
+            referencePhotosInput.click();
+        });
+        referencePhotosInput.addEventListener('change', (event) => {
+            const files = event?.target?.files || [];
+            if (!files || !files.length) return;
+            void addReferencePhotoFiles(files);
+        });
+    }
     workspaceTranscriptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);
-    workspacePromptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);
 
     // Init
     renderCalendar();
+    renderWorkspaceReferenceImages();
+    void refreshKnownActiveOrdersIndex();
     void loadServerAppointments();
     window.setInterval(() => { void loadServerAppointments(); }, 15000);
 

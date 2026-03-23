@@ -252,7 +252,7 @@ app.disable('x-powered-by');
 
 app.use(
   express.json({
-    limit: '1mb',
+    limit: '8mb',
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
@@ -2698,6 +2698,11 @@ function buildWebsiteGenerationContext(options = {}) {
   const title = truncateText(normalizeString(options.title || ''), 200);
   const description = truncateText(normalizeString(options.description || ''), 3000);
   const language = normalizeString(options.language || 'nl') || 'nl';
+  const referenceImages = sanitizeReferenceImages(options.referenceImages || options.attachments || [], {
+    maxItems: 6,
+    maxBytesPerImage: 550 * 1024,
+    maxTotalBytes: 3 * 1024 * 1024,
+  });
   const industry = inferWebsiteIndustryProfile({ company, title, description, promptText });
 
   return {
@@ -2706,13 +2711,14 @@ function buildWebsiteGenerationContext(options = {}) {
     description,
     language,
     promptText,
+    referenceImages,
     industry,
   };
 }
 
 function buildWebsiteGenerationPrompts(options = {}) {
   const context = buildWebsiteGenerationContext(options);
-  const { company, title, description, language, promptText, industry } = context;
+  const { company, title, description, language, promptText, referenceImages, industry } = context;
 
   const systemPrompt = [
     'Je bent een elite webdesigner, conversion strategist en senior front-end engineer.',
@@ -2735,11 +2741,18 @@ function buildWebsiteGenerationPrompts(options = {}) {
     `<style_direction>${escapeHtml(industry.style)}</style_direction>`,
     `<trust_notes>${escapeHtml(industry.trust)}</trust_notes>`,
     `<primary_cta>${escapeHtml(industry.cta)}</primary_cta>`,
+    referenceImages.length ? `<reference_image_count>${referenceImages.length}</reference_image_count>` : '',
+    referenceImages.length
+      ? `<reference_images>${escapeHtml(referenceImages.map((item) => item.name).join(', '))}</reference_images>`
+      : '',
     '<quality_bar>',
     'Maak een premium website die voelt als maatwerk, niet als template.',
     'Zorg dat compositie, breedtes, hiërarchie, witruimte, CTA-flow en mobiele layout coherent zijn.',
     'Gebruik een duidelijk visueel systeem: sterke typografie, ritme tussen secties, onderscheidende hero en consequente componenten.',
     'Als informatie ontbreekt, vul dan geen nep-feiten in maar ontwerp de structuur slim en geloofwaardig.',
+    referenceImages.length
+      ? 'Gebruik de meegeleverde referentiebeelden als visuele input voor stijl, compositie en sfeer.'
+      : '',
     '</quality_bar>',
     '<project_prompt>',
     promptText,
@@ -2758,7 +2771,7 @@ function buildWebsiteGenerationPrompts(options = {}) {
 
 function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
   const context = buildWebsiteGenerationContext(options);
-  const { company, title, description, language, promptText } = context;
+  const { company, title, description, language, promptText, referenceImages } = context;
 
   const systemPrompt = [
     'Je bent een elite front-end designer en engineer die premium marketingwebsites bouwt.',
@@ -2778,6 +2791,7 @@ function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
     company ? `<company>${escapeHtml(company)}</company>` : '',
     title ? `<project_title>${escapeHtml(title)}</project_title>` : '',
     description ? `<project_description>${escapeHtml(description)}</project_description>` : '',
+    referenceImages.length ? `<reference_image_count>${referenceImages.length}</reference_image_count>` : '',
     '<source_prompt>',
     promptText,
     '</source_prompt>',
@@ -2793,6 +2807,9 @@ function buildAnthropicWebsiteHtmlPrompts(options = {}, blueprintText = '') {
     '- Vermijd een smalle gecentreerde hero-card op een willekeurige achtergrond tenzij de briefing dat expliciet vraagt.',
     '- Laat navigatie, hero, aanbod, vertrouwen, over-ons, contact en footer als één logisch verhaal voelen.',
     '- Gebruik onderscheidende maar betrouwbare typografie en een kleurpalet dat past bij de briefing.',
+    referenceImages.length
+      ? '- Er zijn referentiebeelden meegestuurd: gebruik die als visuele richting voor stijl, compositie en sfeer.'
+      : '',
     '- Geen fake testimonials, nep-statistieken of verzonnen adressen.',
     '- Contactformulier en CTA moeten visueel kloppen en logisch geplaatst zijn.',
     '- Alle content moet direct renderen zonder externe assets of libraries.',
@@ -2900,6 +2917,30 @@ async function sendAnthropicMessage(options = {}) {
     throw err;
   }
   const effort = getAnthropicWebsiteStageEffort(options.stage || 'build');
+  const referenceImages = sanitizeReferenceImages(options.referenceImages || options.attachments || [], {
+    maxItems: 6,
+    maxBytesPerImage: 550 * 1024,
+    maxTotalBytes: 3 * 1024 * 1024,
+  });
+  const imageBlocks = referenceImages
+    .map((item) => {
+      const parsed = parseImageDataUrl(item?.dataUrl || '');
+      if (!parsed) return null;
+      return {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: parsed.mimeType,
+          data: parsed.base64Payload,
+        },
+      };
+    })
+    .filter(Boolean);
+  const userContentBlocks = [
+    ...imageBlocks,
+    { type: 'text', text: userPrompt },
+  ];
+
   const basePayload = {
     model,
     max_tokens: maxTokens,
@@ -2907,7 +2948,7 @@ async function sendAnthropicMessage(options = {}) {
     messages: [
       {
         role: 'user',
-        content: [{ type: 'text', text: userPrompt }],
+        content: userContentBlocks,
       },
     ],
   };
@@ -2962,7 +3003,16 @@ async function generateWebsiteHtmlWithOpenAi(options = {}) {
     throw err;
   }
 
-  const { company, title, userPrompt, systemPrompt } = buildWebsiteGenerationPrompts(options);
+  const { company, title, userPrompt, systemPrompt, referenceImages } = buildWebsiteGenerationPrompts(options);
+  const userContent = referenceImages.length
+    ? [
+        { type: 'text', text: userPrompt },
+        ...referenceImages.map((item) => ({
+          type: 'image_url',
+          image_url: { url: item.dataUrl },
+        })),
+      ]
+    : userPrompt;
 
   const { response, data } = await fetchJsonWithTimeout(
     `${OPENAI_API_BASE_URL}/chat/completions`,
@@ -2977,7 +3027,7 @@ async function generateWebsiteHtmlWithOpenAi(options = {}) {
         temperature: 0.3,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
+          { role: 'user', content: userContent },
         ],
       }),
     },
@@ -3027,6 +3077,7 @@ async function generateWebsiteHtmlWithAnthropic(options = {}) {
     model: websiteModel,
     systemPrompt: buildPrompts.systemPrompt,
     userPrompt: buildPrompts.userPrompt,
+    referenceImages: buildPrompts.referenceImages,
     maxTokens: getAnthropicWebsiteStageMaxTokens('build'),
     stage: 'build',
   });
@@ -6470,6 +6521,11 @@ async function sendActiveOrderGenerateSiteResponse(req, res) {
     const language = normalizeString(body.language || 'nl') || 'nl';
     const orderId = Number(body.orderId) || null;
     const buildMode = normalizeString(body.buildMode || '') || null;
+    const referenceImages = sanitizeReferenceImages(body.referenceImages || body.attachments || [], {
+      maxItems: 6,
+      maxBytesPerImage: 550 * 1024,
+      maxTotalBytes: 3 * 1024 * 1024,
+    });
 
     if (!prompt) {
       return res.status(400).json({
@@ -6485,13 +6541,14 @@ async function sendActiveOrderGenerateSiteResponse(req, res) {
       title,
       description,
       language,
+      referenceImages,
     });
 
     appendDashboardActivity(
       {
         type: 'active_order_generated',
         title: 'AI website gegenereerd',
-        detail: `HTML-opzet gegenereerd${company ? ` voor ${company}` : ''}.`,
+        detail: `HTML-opzet gegenereerd${company ? ` voor ${company}` : ''}${referenceImages.length ? ` met ${referenceImages.length} referentiebeeld(en)` : ''}.`,
         company,
         actor: 'api',
         taskId: Number.isFinite(orderId) ? orderId : null,
@@ -6516,6 +6573,7 @@ async function sendActiveOrderGenerateSiteResponse(req, res) {
         company,
         title,
         buildMode,
+        referenceImageCount: referenceImages.length,
         generatedAt: new Date().toISOString(),
       },
     });
@@ -6930,6 +6988,75 @@ function normalizePostCallStatus(value) {
 
 function sanitizePostCallText(value, maxLen = 20000) {
   return truncateText(normalizeString(value || ''), maxLen);
+}
+
+function parseImageDataUrl(rawValue) {
+  const raw = normalizeString(rawValue || '').replace(/\s+/g, '');
+  if (!raw) return null;
+  const match = raw.match(/^data:(image\/(?:png|jpe?g|webp));base64,([a-z0-9+/=]+)$/i);
+  if (!match) return null;
+
+  const mimeType = String(match[1] || '').toLowerCase();
+  const base64Payload = String(match[2] || '');
+  if (!base64Payload) return null;
+
+  let sizeBytes = 0;
+  try {
+    sizeBytes = Buffer.from(base64Payload, 'base64').length;
+  } catch {
+    return null;
+  }
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return null;
+
+  return {
+    mimeType,
+    base64Payload,
+    sizeBytes,
+    dataUrl: `data:${mimeType};base64,${base64Payload}`,
+  };
+}
+
+function sanitizeReferenceImages(input, options = {}) {
+  const maxItems = Math.max(0, Math.min(12, Number(options.maxItems || 8) || 8));
+  const maxBytesPerImage = Math.max(
+    50 * 1024,
+    Math.min(2 * 1024 * 1024, Number(options.maxBytesPerImage || 550 * 1024) || 550 * 1024)
+  );
+  const maxTotalBytes = Math.max(
+    maxBytesPerImage,
+    Math.min(8 * 1024 * 1024, Number(options.maxTotalBytes || 3 * 1024 * 1024) || 3 * 1024 * 1024)
+  );
+
+  const source = Array.isArray(input) ? input : [];
+  const out = [];
+  let totalBytes = 0;
+
+  for (let i = 0; i < source.length; i += 1) {
+    if (out.length >= maxItems) break;
+    const item = source[i];
+    if (!item || typeof item !== 'object') continue;
+
+    const parsed = parseImageDataUrl(item.dataUrl || item.imageDataUrl || item.url || '');
+    if (!parsed) continue;
+    if (parsed.sizeBytes > maxBytesPerImage) continue;
+    if (totalBytes + parsed.sizeBytes > maxTotalBytes) continue;
+
+    const name = truncateText(normalizeString(item.name || item.fileName || `bijlage-${i + 1}`), 140) || `bijlage-${i + 1}`;
+    const id =
+      truncateText(normalizeString(item.id || ''), 80) ||
+      `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    out.push({
+      id,
+      name,
+      mimeType: parsed.mimeType,
+      sizeBytes: parsed.sizeBytes,
+      dataUrl: parsed.dataUrl,
+    });
+    totalBytes += parsed.sizeBytes;
+  }
+
+  return out;
 }
 
 function slugifyAutomationText(value, fallback = 'project') {
@@ -7479,6 +7606,7 @@ function buildPostCallPayload(body = {}) {
       body.prompt || body.postCallPrompt || body.generatedPrompt,
       25000
     ),
+    referenceImages: sanitizeReferenceImages(body.referenceImages || body.attachments || []),
     postCallUpdatedBy: truncateText(normalizeString(body.actor || body.doneBy || ''), 120),
   };
 }
@@ -7501,6 +7629,10 @@ function updateAgendaAppointmentPostCallDataById(req, res, appointmentIdRaw) {
         payload.postCallNotesTranscript ||
         sanitizePostCallText(appointment?.postCallNotesTranscript || '', 25000),
       postCallPrompt: payload.postCallPrompt || sanitizePostCallText(appointment?.postCallPrompt || '', 25000),
+      referenceImages:
+        (Array.isArray(payload.referenceImages) && payload.referenceImages.length
+          ? sanitizeReferenceImages(payload.referenceImages)
+          : sanitizeReferenceImages(appointment?.referenceImages || [])),
       postCallUpdatedAt: nowIso,
       postCallUpdatedBy: payload.postCallUpdatedBy || null,
     },
@@ -7578,6 +7710,7 @@ function parseCustomOrdersFromUiState(rawValue) {
           status: normalizeActiveOrderStatusKey(item.status),
           sourceAppointmentId: Number(item.sourceAppointmentId) || null,
           sourceCallId: normalizeString(item.sourceCallId || '') || null,
+          referenceImages: sanitizeReferenceImages(item.referenceImages || item.attachments || []),
           prompt: sanitizePostCallText(item.prompt || '', 25000),
           transcript: sanitizePostCallText(item.transcript || '', 25000),
           createdAt: normalizeString(item.createdAt || '') || null,
@@ -7625,6 +7758,9 @@ function buildActiveOrderRecordFromAppointment(appointment, input = {}, nextId =
     (Number.isFinite(amountCandidate) && amountCandidate > 0
       ? amountCandidate
       : parseAmountFromEuroLabel(appointment?.value || '')) || 2500;
+  const referenceImages = sanitizeReferenceImages(
+    input.referenceImages || input.attachments || appointment?.referenceImages || []
+  );
 
   return {
     id: Number(nextId) || 1,
@@ -7638,6 +7774,7 @@ function buildActiveOrderRecordFromAppointment(appointment, input = {}, nextId =
     sourceAppointmentId: Number(appointment?.id) || null,
     sourceCallId: normalizeString(appointment?.callId || '') || null,
     contact,
+    referenceImages,
     prompt,
     transcript,
     createdAt: new Date().toISOString(),
@@ -7661,6 +7798,9 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
   const transcriptText = sanitizePostCallText(
     req.body?.transcript || appointment?.postCallNotesTranscript || '',
     25000
+  );
+  const referenceImages = sanitizeReferenceImages(
+    req.body?.referenceImages || req.body?.attachments || appointment?.referenceImages || []
   );
   if (!promptText) {
     return res.status(400).json({
@@ -7687,6 +7827,10 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
       ...existingOrder,
       prompt: promptText,
       transcript: transcriptText || sanitizePostCallText(existingOrder?.transcript || '', 25000),
+      referenceImages:
+        referenceImages.length > 0
+          ? referenceImages
+          : sanitizeReferenceImages(existingOrder?.referenceImages || []),
       updatedAt: new Date().toISOString(),
     };
     for (let i = 0; i < customOrders.length; i += 1) {
@@ -7698,9 +7842,13 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
     const nextId = getNextCustomOrderId(customOrders);
     const record = buildActiveOrderRecordFromAppointment(
       {
-        ...appointment,
-        postCallPrompt: promptText,
-        postCallNotesTranscript: transcriptText,
+      ...appointment,
+      postCallPrompt: promptText,
+      postCallNotesTranscript: transcriptText,
+      referenceImages:
+        referenceImages.length > 0
+          ? referenceImages
+          : sanitizeReferenceImages(appointment?.referenceImages || []),
       },
       req.body || {},
       nextId
@@ -7730,11 +7878,16 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
       postCallStatus: normalizePostCallStatus(req.body?.status || appointment?.postCallStatus),
       postCallNotesTranscript: transcriptText,
       postCallPrompt: promptText,
+      referenceImages:
+        referenceImages.length > 0
+          ? referenceImages
+          : sanitizeReferenceImages(appointment?.referenceImages || []),
       postCallUpdatedAt: nowIso,
       postCallUpdatedBy: actor || null,
       activeOrderId: Number(existingOrder?.id) || null,
       activeOrderAddedAt: nowIso,
       activeOrderAddedBy: actor || null,
+      activeOrderReferenceImageCount: referenceImages.length,
     },
     'agenda_add_active_order'
   );
