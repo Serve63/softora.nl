@@ -581,6 +581,49 @@
                 statusEl.className = `lead-status${variant ? ` ${variant}` : ''}`;
             }
 
+            function mapLeadModeToLabel(value) {
+                const raw = normalize(value).replace(/[\s-]+/g, '_');
+                if (!raw) return '';
+                if (raw === 'voice_software' || raw === 'voice' || raw === 'voicesoftware') return 'Voice software';
+                if (raw === 'business_software' || raw === 'business' || raw === 'bedrijfssoftware') return 'Bedrijfssoftware';
+                if (raw === 'website' || raw === 'websites' || raw === 'web') return 'Website';
+                return '';
+            }
+
+            function inferLeadTypeFromText(value) {
+                const text = normalize(value);
+                if (!text) return '';
+                if (/(voice\s*software|voice\s*agent|spraaksoftware|belsoftware)/.test(text)) return 'Voice software';
+                if (/(bedrijfssoftware|business\s*software|crm|erp)/.test(text)) return 'Bedrijfssoftware';
+                if (/(website|web\s*site|webshop|webdesign)/.test(text)) return 'Website';
+                return '';
+            }
+
+            function resolveLeadType(item) {
+                const modeFields = [
+                    item?.leadType,
+                    item?.lead_type,
+                    item?.productType,
+                    item?.product_type,
+                    item?.businessMode,
+                    item?.business_mode,
+                    item?.serviceType,
+                    item?.service_type,
+                    item?.offerType,
+                    item?.offer_type,
+                ];
+
+                for (const field of modeFields) {
+                    const byMode = mapLeadModeToLabel(field);
+                    if (byMode) return byMode;
+                    const byText = inferLeadTypeFromText(field);
+                    if (byText) return byText;
+                }
+
+                const hintText = [item?.summary, item?.source, item?.location, item?.whatsappInfo].join(' ');
+                return inferLeadTypeFromText(hintText) || 'Website';
+            }
+
             function renderList() {
                 if (!allLeads.length) {
                     listEl.innerHTML = '<div class="lead-empty">Nog geen leads gevonden.</div>';
@@ -592,6 +635,7 @@
                     const contact = esc(item.contact || 'Onbekend contact');
                     const phone = esc(item.phone || 'Geen telefoon');
                     const moment = esc(formatDateTime(item));
+                    const leadType = esc(resolveLeadType(item));
                     const chipClass = 'pending';
                     const chipLabel = 'LEAD';
 
@@ -600,6 +644,7 @@
                             <div>
                                 <div class="lead-name">${company}</div>
                                 <div class="lead-meta">${contact} · ${phone}</div>
+                                <div class="lead-meta">Type: ${leadType}</div>
                                 <div class="lead-meta">${moment}</div>
                             </div>
                             <span class="lead-chip ${chipClass}">${chipLabel}</span>
@@ -623,6 +668,23 @@
                     phone: String(item?.phone || '').trim(),
                     date: String(item?.date || '').trim(),
                     time: String(item?.time || '').trim(),
+                    source: String(item?.source || '').trim(),
+                    summary: String(item?.summary || '').trim(),
+                    location: String(item?.location || item?.appointmentLocation || '').trim(),
+                    whatsappInfo: String(item?.whatsappInfo || item?.whatsappNotes || item?.whatsapp || '').trim(),
+                    leadType: String(
+                        item?.leadType ||
+                            item?.lead_type ||
+                            item?.productType ||
+                            item?.product_type ||
+                            item?.businessMode ||
+                            item?.business_mode ||
+                            item?.serviceType ||
+                            item?.service_type ||
+                            item?.offerType ||
+                            item?.offer_type ||
+                            ''
+                    ).trim(),
                 };
             }
 
@@ -636,7 +698,17 @@
                         normalize(row.date),
                         normalize(row.time),
                     ].join('|');
-                    if (!map.has(key)) map.set(key, row);
+                    if (!map.has(key)) {
+                        map.set(key, row);
+                        return;
+                    }
+                    const existing = map.get(key) || {};
+                    if (!existing.source && row.source) existing.source = row.source;
+                    if (!existing.summary && row.summary) existing.summary = row.summary;
+                    if (!existing.location && row.location) existing.location = row.location;
+                    if (!existing.whatsappInfo && row.whatsappInfo) existing.whatsappInfo = row.whatsappInfo;
+                    if (!existing.leadType && row.leadType) existing.leadType = row.leadType;
+                    map.set(key, existing);
                 });
                 return Array.from(map.values());
             }
