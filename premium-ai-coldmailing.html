@@ -501,7 +501,7 @@
 
         .lead-modal-info-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
             gap: 0.8rem;
         }
 
@@ -759,10 +759,6 @@
                         <div class="lead-modal-info-label">Gesprek samenvatting</div>
                         <div class="lead-modal-info-text" id="leadModalSummary">Nog geen samenvatting beschikbaar.</div>
                     </div>
-                    <div class="lead-modal-info">
-                        <div class="lead-modal-info-label">Wat is afgesproken</div>
-                        <div class="lead-modal-info-text" id="leadModalAgreements">Nog geen afsprakeninfo beschikbaar.</div>
-                    </div>
                 </div>
 
                 <div class="lead-modal-grid">
@@ -801,7 +797,6 @@
             const modalOverlay = document.getElementById('leadModalOverlay');
             const modalSub = document.getElementById('leadModalSub');
             const modalSummary = document.getElementById('leadModalSummary');
-            const modalAgreements = document.getElementById('leadModalAgreements');
             const modalDate = document.getElementById('leadModalDate');
             const modalTime = document.getElementById('leadModalTime');
             const modalLocation = document.getElementById('leadModalLocation');
@@ -818,7 +813,6 @@
                 !modalOverlay ||
                 !modalSub ||
                 !modalSummary ||
-                !modalAgreements ||
                 !modalDate ||
                 !modalTime ||
                 !modalLocation ||
@@ -1006,8 +1000,7 @@
                 if (leadAiCopyById[cacheKey]) {
                     const cached = leadAiCopyById[cacheKey];
                     if (activeTaskId === id) {
-                        if (cached.conversation) modalSummary.textContent = cached.conversation;
-                        if (cached.agreements) modalAgreements.textContent = cached.agreements;
+                        if (cached.summaryText) modalSummary.textContent = cached.summaryText;
                     }
                     return;
                 }
@@ -1033,15 +1026,17 @@
 
                     const conversation = sanitizeConversationCopy(conversationRaw);
                     const agreements = sanitizeAgreementCopy(agreementsRaw);
+                    const summaryText = [conversation, agreements ? `Afspraken en vervolg:\n${agreements}` : '']
+                        .filter(Boolean)
+                        .join('\n\n')
+                        .trim();
 
                     leadAiCopyById[cacheKey] = {
-                        conversation: conversation || '',
-                        agreements: agreements || '',
+                        summaryText: summaryText || '',
                     };
 
                     if (activeTaskId !== id) return;
-                    if (conversation) modalSummary.textContent = conversation;
-                    if (agreements) modalAgreements.textContent = agreements;
+                    if (summaryText) modalSummary.textContent = summaryText;
                 } catch (error) {
                     // Fallback blijft zichtbaar; geen harde fout tonen in de modal.
                 }
@@ -1094,11 +1089,12 @@
                 );
                 const fallbackSummary = readableSummary || 'Samenvatting wordt nu opgebouwd...';
                 const fallbackAgreements = buildFallbackAgreementsText(lead, detail);
+                const fallbackCombined = [fallbackSummary, `Afspraken en vervolg:\n${fallbackAgreements}`]
+                    .filter(Boolean)
+                    .join('\n\n');
 
                 modalSummary.textContent =
-                    String(aiCopy?.conversation || '').trim() || fallbackSummary;
-                modalAgreements.textContent =
-                    String(aiCopy?.agreements || '').trim() || fallbackAgreements;
+                    String(aiCopy?.summaryText || '').trim() || fallbackCombined;
             }
 
             async function openLeadModal(taskId) {
