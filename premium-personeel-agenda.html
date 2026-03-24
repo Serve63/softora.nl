@@ -362,6 +362,27 @@
             outline: none;
         }
 
+        .modal-workspace-input {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 0.7rem 0.75rem;
+            font-size: 0.84rem;
+            outline: none;
+        }
+
+        .modal-workspace-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .modal-workspace-hint {
+            margin-top: 0.35rem;
+            font-size: 0.72rem;
+            color: var(--text-tertiary);
+            line-height: 1.45;
+        }
+
         .modal-workspace-status {
             margin-top: 0.45rem;
             font-size: 0.75rem;
@@ -571,6 +592,10 @@
                         <div class="modal-detail-label">Bron</div>
                         <div class="modal-detail-value" id="modalSource">-</div>
                     </div>
+                    <div class="modal-detail-item">
+                        <div class="modal-detail-label">Domein</div>
+                        <div class="modal-detail-value" id="modalDomain">Nog niet ingevuld</div>
+                    </div>
                 </div>
                 <div class="modal-summary-label">AI Samenvatting van Lead</div>
                 <div class="modal-summary" id="modalSummary">-</div>
@@ -593,6 +618,11 @@
                 </div>
                 <div class="modal-workspace-status" id="workspaceVoiceStatus"></div>
                 <div class="modal-workspace-grid">
+                    <div class="modal-workspace-field">
+                        <div class="modal-workspace-label">Gewenste domeinnaam</div>
+                        <input class="modal-workspace-input" id="workspaceDomain" type="text" placeholder="Bijv. salonnova.nl" autocomplete="off">
+                        <div class="modal-workspace-hint">Optioneel, maar nodig als je later domein-koppeling/registratie wilt automatiseren.</div>
+                    </div>
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Notities meeting & klantwensen</div>
                         <textarea id="workspaceTranscript" placeholder="Zet hier alle meetingnotities: doelen, wensen, stijl, functionaliteiten, planning, budget, bijzonderheden..."></textarea>
@@ -736,6 +766,7 @@
     const modalNoDealBtn = document.getElementById('modalNoDealBtn');
     const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
     const workspaceTranscriptEl = document.getElementById('workspaceTranscript');
+    const workspaceDomainEl = document.getElementById('workspaceDomain');
     const workspaceVoiceStatusEl = document.getElementById('workspaceVoiceStatus');
     const workspaceSaveStatusEl = document.getElementById('workspaceSaveStatus');
     const notesImageUploadBtn = document.getElementById('notesImageUploadBtn');
@@ -754,6 +785,34 @@
     let workspaceReferenceImages = [];
     let knownActiveOrderIds = new Set();
     let knownActiveOrderByAppointmentId = new Map();
+
+    function normalizeWorkspaceDomainName(value) {
+        const raw = String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/^https?:\/\//, '')
+            .replace(/^www\./, '')
+            .replace(/\/.*$/, '');
+        if (!raw) return '';
+        if (!raw.includes('.')) return '';
+        if (!/^[a-z0-9][a-z0-9.-]{1,251}[a-z0-9]$/.test(raw)) return '';
+        if (raw.includes('..')) return '';
+        return raw;
+    }
+
+    function resolveWorkspaceDomainNameOrFail() {
+        if (!workspaceDomainEl) return '';
+        const raw = String(workspaceDomainEl.value || '').trim();
+        if (!raw) return '';
+        const normalized = normalizeWorkspaceDomainName(raw);
+        if (!normalized) {
+            setWorkspaceStatus('Vul een geldige domeinnaam in (bijv. bedrijfsnaam.nl).', 'error');
+            workspaceDomainEl.focus();
+            return null;
+        }
+        workspaceDomainEl.value = normalized;
+        return normalized;
+    }
 
     function appointmentFingerprint(apt) {
         return [apt.date || '', apt.time || '', apt.company || '', apt.phone || ''].join('|');
@@ -884,6 +943,7 @@
             postCallStatus: String(item.postCallStatus || ''),
             postCallNotesTranscript: String(item.postCallNotesTranscript || ''),
             postCallPrompt: String(item.postCallPrompt || ''),
+            postCallDomainName: String(item.postCallDomainName || item.domainName || ''),
             postCallUpdatedAt: String(item.postCallUpdatedAt || ''),
             activeOrderId: Number(item.activeOrderId || 0) || null,
             activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
@@ -1019,6 +1079,7 @@
                 status: 'no_deal',
                 transcript: String(apt?.postCallNotesTranscript || ''),
                 prompt: String(apt?.postCallPrompt || ''),
+                domainName: normalizeWorkspaceDomainName(workspaceDomainEl?.value || apt?.postCallDomainName || ''),
                 actor: 'premium-personeel-agenda',
             };
             const result = await postJsonWithFallback(
@@ -1041,6 +1102,9 @@
     function fillWorkspaceFromAppointment(apt) {
         workspaceTranscriptEl.value = String(apt?.postCallNotesTranscript || '');
         workspaceDraftPrompt = String(apt?.postCallPrompt || '');
+        if (workspaceDomainEl) {
+            workspaceDomainEl.value = String(apt?.postCallDomainName || '');
+        }
         setWorkspaceReferenceImages(apt?.referenceImages || []);
         const updatedAt = String(apt?.postCallUpdatedAt || '');
         const linkedOrderId = getLinkedOrderIdForAppointment(apt);
@@ -1067,11 +1131,17 @@
             postCallStatus: String(update?.postCallStatus || appointments[idx].postCallStatus || ''),
             postCallNotesTranscript: String(update?.postCallNotesTranscript || ''),
             postCallPrompt: String(update?.postCallPrompt || ''),
+            postCallDomainName: String(update?.postCallDomainName || update?.domainName || appointments[idx].postCallDomainName || ''),
             postCallUpdatedAt: String(update?.postCallUpdatedAt || ''),
             activeOrderId: Number(update?.activeOrderId || appointments[idx].activeOrderId || 0) || null,
             activeOrderAddedAt: String(update?.activeOrderAddedAt || appointments[idx].activeOrderAddedAt || ''),
             referenceImages: normalizeReferenceImageList(update?.referenceImages || appointments[idx].referenceImages || []),
         };
+
+        if (Number(activeAppointmentId) === appointmentId && document.getElementById('modalDomain')) {
+            document.getElementById('modalDomain').textContent =
+                String(appointments[idx]?.postCallDomainName || '').trim() || 'Nog niet ingevuld';
+        }
 
         const appointmentIdResolved = Number(appointments[idx]?.id || 0);
         const linkedOrderId = Number(appointments[idx]?.activeOrderId || 0);
@@ -1299,6 +1369,9 @@
         }
         if (workspaceBusy) return null;
 
+        const domainName = resolveWorkspaceDomainNameOrFail();
+        if (domainName === null) return null;
+
         workspaceBusy = true;
         refreshWorkspacePrimaryButtonLabel();
         setWorkspaceStatus('Opslaan...', '');
@@ -1308,6 +1381,7 @@
                 status: 'customer_wants_to_proceed',
                 transcript: String(workspaceTranscriptEl.value || '').trim(),
                 prompt: String(workspaceDraftPrompt || '').trim(),
+                domainName,
                 referenceImages: normalizeReferenceImageList(workspaceReferenceImages),
                 actor: 'premium-personeel-agenda',
             };
@@ -1339,6 +1413,8 @@
             setWorkspaceStatus('Afspraak niet gevonden.', 'error');
             return null;
         }
+        const domainName = resolveWorkspaceDomainNameOrFail();
+        if (domainName === null) return null;
         const transcriptText = String(workspaceTranscriptEl.value || '').trim();
         if (transcriptText.length < 10) {
             setWorkspaceStatus('Vul eerst meetingnotities in (minimaal 10 tekens).', 'error');
@@ -1384,6 +1460,7 @@
                 status: 'customer_wants_to_proceed',
                 transcript: transcriptText,
                 prompt: promptText,
+                domainName,
                 referenceImages: normalizeReferenceImageList(workspaceReferenceImages),
                 actor: 'premium-personeel-agenda',
             };
@@ -1570,6 +1647,7 @@
         document.getElementById('modalValue').textContent = apt.value;
         document.getElementById('modalBranche').textContent = apt.branche;
         document.getElementById('modalSource').textContent = apt.source;
+        document.getElementById('modalDomain').textContent = String(apt.postCallDomainName || '').trim() || 'Nog niet ingevuld';
         document.getElementById('modalSummary').textContent = apt.summary;
         fillWorkspaceFromAppointment(apt);
         applyWorkspaceMode(false);
@@ -1625,6 +1703,13 @@
             const files = event?.target?.files || [];
             if (!files || !files.length) return;
             void addReferencePhotoFiles(files);
+        });
+    }
+    if (workspaceDomainEl) {
+        workspaceDomainEl.addEventListener('blur', () => {
+            const normalized = normalizeWorkspaceDomainName(workspaceDomainEl.value || '');
+            if (!workspaceDomainEl.value.trim()) return;
+            if (normalized) workspaceDomainEl.value = normalized;
         });
     }
     workspaceTranscriptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);

@@ -7606,6 +7606,9 @@ function buildPostCallPayload(body = {}) {
       body.prompt || body.postCallPrompt || body.generatedPrompt,
       25000
     ),
+    postCallDomainName: sanitizeLaunchDomainName(
+      body.domainName || body.domain || body.postCallDomainName || ''
+    ),
     referenceImages: sanitizeReferenceImages(body.referenceImages || body.attachments || []),
     postCallUpdatedBy: truncateText(normalizeString(body.actor || body.doneBy || ''), 120),
   };
@@ -7629,6 +7632,9 @@ function updateAgendaAppointmentPostCallDataById(req, res, appointmentIdRaw) {
         payload.postCallNotesTranscript ||
         sanitizePostCallText(appointment?.postCallNotesTranscript || '', 25000),
       postCallPrompt: payload.postCallPrompt || sanitizePostCallText(appointment?.postCallPrompt || '', 25000),
+      postCallDomainName:
+        payload.postCallDomainName ||
+        sanitizeLaunchDomainName(appointment?.postCallDomainName || appointment?.domainName || ''),
       referenceImages:
         (Array.isArray(payload.referenceImages) && payload.referenceImages.length
           ? sanitizeReferenceImages(payload.referenceImages)
@@ -7707,6 +7713,7 @@ function parseCustomOrdersFromUiState(rawValue) {
           title,
           description,
           amount,
+          domainName: sanitizeLaunchDomainName(item.domainName || item.domain || ''),
           status: normalizeActiveOrderStatusKey(item.status),
           sourceAppointmentId: Number(item.sourceAppointmentId) || null,
           sourceCallId: normalizeString(item.sourceCallId || '') || null,
@@ -7758,6 +7765,9 @@ function buildActiveOrderRecordFromAppointment(appointment, input = {}, nextId =
     (Number.isFinite(amountCandidate) && amountCandidate > 0
       ? amountCandidate
       : parseAmountFromEuroLabel(appointment?.value || '')) || 2500;
+  const domainName = sanitizeLaunchDomainName(
+    input.domainName || input.domain || appointment?.postCallDomainName || appointment?.domainName || ''
+  );
   const referenceImages = sanitizeReferenceImages(
     input.referenceImages || input.attachments || appointment?.referenceImages || []
   );
@@ -7769,6 +7779,7 @@ function buildActiveOrderRecordFromAppointment(appointment, input = {}, nextId =
     title,
     description,
     amount,
+    domainName,
     status: normalizeActiveOrderStatusKey(input.status || 'wacht'),
     source: 'agenda_post_call_prompt',
     sourceAppointmentId: Number(appointment?.id) || null,
@@ -7799,6 +7810,9 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
     req.body?.transcript || appointment?.postCallNotesTranscript || '',
     25000
   );
+  const domainName = sanitizeLaunchDomainName(
+    req.body?.domainName || req.body?.domain || appointment?.postCallDomainName || appointment?.domainName || ''
+  );
   const referenceImages = sanitizeReferenceImages(
     req.body?.referenceImages || req.body?.attachments || appointment?.referenceImages || []
   );
@@ -7827,6 +7841,7 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
       ...existingOrder,
       prompt: promptText,
       transcript: transcriptText || sanitizePostCallText(existingOrder?.transcript || '', 25000),
+      domainName: domainName || sanitizeLaunchDomainName(existingOrder?.domainName || existingOrder?.domain || ''),
       referenceImages:
         referenceImages.length > 0
           ? referenceImages
@@ -7845,6 +7860,7 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
       ...appointment,
       postCallPrompt: promptText,
       postCallNotesTranscript: transcriptText,
+      postCallDomainName: domainName || sanitizeLaunchDomainName(appointment?.postCallDomainName || appointment?.domainName || ''),
       referenceImages:
         referenceImages.length > 0
           ? referenceImages
@@ -7878,6 +7894,7 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
       postCallStatus: normalizePostCallStatus(req.body?.status || appointment?.postCallStatus),
       postCallNotesTranscript: transcriptText,
       postCallPrompt: promptText,
+      postCallDomainName: domainName || sanitizeLaunchDomainName(appointment?.postCallDomainName || appointment?.domainName || ''),
       referenceImages:
         referenceImages.length > 0
           ? referenceImages
