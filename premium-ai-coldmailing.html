@@ -836,6 +836,7 @@
             let activeTaskId = 0;
             let modalBusy = false;
             const leadDetailsById = Object.create(null);
+            const leadAiCopyById = Object.create(null);
 
             function esc(value) {
                 return String(value || '')
@@ -900,6 +901,152 @@
                 return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
             }
 
+            function looksLikeTranscriptText(value) {
+                const raw = String(value || '').trim();
+                if (!raw) return false;
+                const lower = normalize(raw);
+                if (/(^|\s)(user|bot|agent|klant)\s*:/.test(lower)) return true;
+                if (raw.includes('|') && /(user|bot|agent|klant)\s*:/i.test(raw)) return true;
+                if (raw.split(/\||\n/).length >= 4 && /(user|bot|agent|klant)\s*:/i.test(raw)) return true;
+                return false;
+            }
+
+            function stripDialogueMarkers(value) {
+                return String(value || '')
+                    .replace(/\s*\|\s*/g, ' ')
+                    .replace(/\b(user|bot|agent|klant)\s*:\s*/gi, '')
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+            }
+
+            function sanitizeConversationCopy(value) {
+                const stripped = stripDialogueMarkers(value);
+                return stripped.replace(/\s*\n+\s*/g, ' ').trim();
+            }
+
+            function sanitizeAgreementCopy(value) {
+                return String(value || '')
+                    .split('\n')
+                    .map((line) => stripDialogueMarkers(line))
+                    .map((line) => line.replace(/^[-*]\s*/, '- ').trim())
+                    .filter(Boolean)
+                    .join('\n');
+            }
+
+            function pickReadableSummary(...candidates) {
+                for (const candidate of candidates) {
+                    const raw = String(candidate || '').trim();
+                    if (!raw) continue;
+                    if (looksLikeTranscriptText(raw)) continue;
+                    const cleaned = sanitizeConversationCopy(raw);
+                    if (cleaned) return cleaned;
+                }
+                return '';
+            }
+
+            function buildModalSourceText(lead, detail) {
+                return [
+                    detail?.transcript,
+                    detail?.transcriptSnippet,
+                    detail?.summary,
+                    detail?.callSummary,
+                    detail?.aiSummary,
+                    lead?.summary,
+                ]
+                    .map((value) => String(value || '').trim())
+                    .filter(Boolean)
+                    .join('\n\n');
+            }
+
+            function buildFallbackAgreementsText(lead, detail) {
+                const lines = [];
+                const date = String(detail?.date || lead?.date || '').trim();
+                const time = normalizeTimeValue(detail?.time || lead?.time || '');
+                if (date || time) {
+                    lines.push(`Afspraakmoment: ${formatDateTime({ date, time })}`);
+                } else {
+                    lines.push('Afspraakmoment: nog niet bevestigd.');
+                }
+
+                const location = String(detail?.location || lead?.location || '').trim();
+                lines.push(`Locatie: ${location || 'nog niet ingevuld'}.`);
+
+                const whatsappInfo = String(detail?.whatsappInfo || lead?.whatsappInfo || '').trim();
+                if (whatsappInfo) {
+                    lines.push(`Overige info uit WhatsApp: ${whatsappInfo}`);
+                }
+
+                const summaryNote = pickReadableSummary(detail?.summary, detail?.callSummary, detail?.aiSummary);
+                if (summaryNote) {
+                    lines.push(`Notitie: ${summaryNote}`);
+                }
+
+                lines.push('Vervolg: controleer de gegevens en klik daarna op "In agenda zetten".');
+                return lines.join('\n');
+            }
+
+            async function summarizeWithAi(text, options = {}) {
+                if (!window.SoftoraAI || typeof window.SoftoraAI.summarizeText !== 'function') return '';
+                const payload = {
+                    text: String(text || ''),
+                    style: options.style || 'medium',
+                    language: 'nl',
+                    maxSentences: Number(options.maxSentences || 4),
+                    extraInstructions: String(options.extraInstructions || ''),
+                };
+                const result = await window.SoftoraAI.summarizeText(payload);
+                return String(result?.summary || '').trim();
+            }
+
+            async function improveModalCopyWithAi(taskId, lead, detail) {
+                const id = Number(taskId) || 0;
+                if (!id) return;
+
+                const cacheKey = String(id);
+                if (leadAiCopyById[cacheKey]) {
+                    const cached = leadAiCopyById[cacheKey];
+                    if (activeTaskId === id) {
+                        if (cached.conversation) modalSummary.textContent = cached.conversation;
+                        if (cached.agreements) modalAgreements.textContent = cached.agreements;
+                    }
+                    return;
+                }
+
+                const sourceText = buildModalSourceText(lead, detail);
+                if (sourceText.length < 24) return;
+
+                try {
+                    const [conversationRaw, agreementsRaw] = await Promise.all([
+                        summarizeWithAi(sourceText, {
+                            style: 'short',
+                            maxSentences: 4,
+                            extraInstructions:
+                                'Schrijf voor een accountmanager van Softora. Geef een natuurlijke, zakelijke samenvatting van het gesprek: doel, reactie klant, belangrijkste wensen/bezwaren en uitkomst. Gebruik GEEN labels zoals user:, bot:, agent: of klant:. Gebruik geen letterlijke transcriptregels.',
+                        }),
+                        summarizeWithAi(sourceText, {
+                            style: 'bullets',
+                            maxSentences: 4,
+                            extraInstructions:
+                                'Vat alleen concrete afspraken en vervolgstappen samen. Noem datum/tijd, locatie en actiehouder alleen als expliciet genoemd. Gebruik maximaal 4 bullets en start elke regel met "- ". Gebruik GEEN labels zoals user:, bot:, agent: of klant:.',
+                        }),
+                    ]);
+
+                    const conversation = sanitizeConversationCopy(conversationRaw);
+                    const agreements = sanitizeAgreementCopy(agreementsRaw);
+
+                    leadAiCopyById[cacheKey] = {
+                        conversation: conversation || '',
+                        agreements: agreements || '',
+                    };
+
+                    if (activeTaskId !== id) return;
+                    if (conversation) modalSummary.textContent = conversation;
+                    if (agreements) modalAgreements.textContent = agreements;
+                } catch (error) {
+                    // Fallback blijft zichtbaar; geen harde fout tonen in de modal.
+                }
+            }
+
             function getLeadById(taskId) {
                 const id = Number(taskId);
                 if (!id) return null;
@@ -935,41 +1082,23 @@
                 return data.task;
             }
 
-            function renderLeadDetailsInModal(lead, detail) {
-                const conversationSummary = String(
-                    detail?.aiSummary ||
-                        detail?.callSummary ||
-                        detail?.summary ||
-                        lead?.summary ||
-                        detail?.transcriptSnippet ||
-                        ''
-                ).trim();
+            function renderLeadDetailsInModal(lead, detail, taskId) {
+                const id = Number(taskId || lead?.id || 0) || 0;
+                const aiCopy = id ? leadAiCopyById[String(id)] : null;
 
-                const agreements = [];
-                const proposedMoment = formatDateTime({
-                    date: detail?.date || lead?.date || '',
-                    time: detail?.time || lead?.time || '',
-                });
-                if (proposedMoment && proposedMoment !== 'Geen afspraakmoment') {
-                    agreements.push(`Voorgesteld moment: ${proposedMoment}`);
-                }
-                if (String(detail?.summary || '').trim()) {
-                    agreements.push(String(detail.summary).trim());
-                }
-                if (String(detail?.location || lead?.location || '').trim()) {
-                    agreements.push(`Locatie: ${String(detail?.location || lead?.location || '').trim()}`);
-                }
-                if (String(detail?.whatsappInfo || lead?.whatsappInfo || '').trim()) {
-                    agreements.push(
-                        `Overige info uit WhatsApp:\n${String(detail?.whatsappInfo || lead?.whatsappInfo || '').trim()}`
-                    );
-                }
-                if (String(detail?.transcriptSnippet || '').trim() && agreements.length === 0) {
-                    agreements.push(`Gespreksnotitie: ${String(detail.transcriptSnippet).trim()}`);
-                }
+                const readableSummary = pickReadableSummary(
+                    detail?.aiSummary,
+                    detail?.callSummary,
+                    detail?.summary,
+                    lead?.summary
+                );
+                const fallbackSummary = readableSummary || 'Samenvatting wordt nu opgebouwd...';
+                const fallbackAgreements = buildFallbackAgreementsText(lead, detail);
 
-                modalSummary.textContent = conversationSummary || 'Nog geen samenvatting van het gesprek beschikbaar.';
-                modalAgreements.textContent = agreements.join('\n\n') || 'Nog geen afsprakeninfo beschikbaar.';
+                modalSummary.textContent =
+                    String(aiCopy?.conversation || '').trim() || fallbackSummary;
+                modalAgreements.textContent =
+                    String(aiCopy?.agreements || '').trim() || fallbackAgreements;
             }
 
             async function openLeadModal(taskId) {
@@ -981,14 +1110,13 @@
                 activeTaskId = normalizedTaskId;
                 const leadType = resolveLeadType(lead);
                 modalSub.textContent = `${String(lead.company || 'Onbekende lead')} · ${leadType}`;
-                modalSummary.textContent = 'Samenvatting laden...';
-                modalAgreements.textContent = 'Afsprakeninfo laden...';
                 modalDate.value = String(lead.date || '').slice(0, 10);
                 modalTime.value = normalizeTimeValue(lead.time || '09:00') || '09:00';
                 modalLocation.value = String(lead.location || '').trim();
                 modalWhatsappInfo.value = String(lead.whatsappInfo || '').trim();
                 setModalStatus('');
                 setModalBusy(false);
+                renderLeadDetailsInModal(lead, null, normalizedTaskId);
                 modalOverlay.classList.add('show');
                 modalOverlay.setAttribute('aria-hidden', 'false');
                 window.setTimeout(() => {
@@ -997,7 +1125,12 @@
 
                 const cached = leadDetailsById[String(normalizedTaskId)];
                 if (cached) {
-                    renderLeadDetailsInModal(lead, cached);
+                    renderLeadDetailsInModal(lead, cached, normalizedTaskId);
+                    modalDate.value = String(cached?.date || lead.date || '').slice(0, 10);
+                    modalTime.value = normalizeTimeValue(cached?.time || lead.time || '09:00') || '09:00';
+                    modalLocation.value = String(cached?.location || lead.location || '').trim();
+                    modalWhatsappInfo.value = String(cached?.whatsappInfo || lead.whatsappInfo || '').trim();
+                    improveModalCopyWithAi(normalizedTaskId, lead, cached);
                     return;
                 }
 
@@ -1005,14 +1138,15 @@
                     const detail = await fetchTaskDetail(normalizedTaskId);
                     leadDetailsById[String(normalizedTaskId)] = detail;
                     if (activeTaskId !== normalizedTaskId) return;
-                    renderLeadDetailsInModal(lead, detail);
+                    renderLeadDetailsInModal(lead, detail, normalizedTaskId);
                     modalDate.value = String(detail?.date || lead.date || '').slice(0, 10);
                     modalTime.value = normalizeTimeValue(detail?.time || lead.time || '09:00') || '09:00';
                     modalLocation.value = String(detail?.location || lead.location || '').trim();
                     modalWhatsappInfo.value = String(detail?.whatsappInfo || lead.whatsappInfo || '').trim();
+                    improveModalCopyWithAi(normalizedTaskId, lead, detail);
                 } catch (error) {
                     if (activeTaskId !== normalizedTaskId) return;
-                    renderLeadDetailsInModal(lead, null);
+                    renderLeadDetailsInModal(lead, null, normalizedTaskId);
                     setModalStatus(String(error?.message || 'Details laden mislukt.'), 'error');
                 }
             }
@@ -1081,6 +1215,7 @@
 
                     allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
                     delete leadDetailsById[String(taskId)];
+                    delete leadAiCopyById[String(taskId)];
                     renderList();
                     if (allLeads.length > 0) {
                         setStatusLastUpdatedNow();
