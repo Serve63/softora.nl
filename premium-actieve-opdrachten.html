@@ -547,30 +547,18 @@
         }
 
         .order-card.delivered {
-            border-color: rgba(110, 212, 154, 0.5);
-            box-shadow: 0 16px 42px rgba(76, 142, 104, 0.12), 0 0 46px rgba(110, 212, 154, 0.1);
-            background: linear-gradient(135deg, rgba(225, 249, 234, 0.96), rgba(205, 242, 219, 0.93));
+            border-color: var(--border);
+            box-shadow: none;
+            background: var(--bg-secondary);
         }
 
         .order-card.delivered::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            background:
-                linear-gradient(135deg, rgba(120, 227, 172, 0.18), rgba(120, 227, 172, 0.08) 36%, rgba(255,255,255,0.2) 62%, rgba(120, 227, 172, 0.14) 100%),
-                radial-gradient(circle at top right, rgba(182, 247, 205, 0.22), transparent 34%);
-            opacity: 1;
-        }
-
-        .order-card.delivered > * {
-            position: relative;
-            z-index: 1;
+            content: none;
         }
 
         .order-card.delivered:hover {
-            border-color: rgba(120, 227, 172, 0.72);
-            box-shadow: 0 18px 46px rgba(76, 142, 104, 0.14), 0 0 52px rgba(120, 227, 172, 0.12);
+            border-color: rgba(139,34,82,0.3);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3), 0 0 40px rgba(139,34,82,0.05);
         }
 
         .order-card.paid {
@@ -599,7 +587,7 @@
         }
 
         .order-card.delivered .order-title {
-            color: #123e27;
+            color: var(--text-primary);
         }
 
         .order-card.paid .order-title {
@@ -614,7 +602,16 @@
         .order-card.delivered .order-api-cost .label,
         .order-card.delivered .order-price-value .currency,
         .order-card.delivered .order-api-cost .value {
-            color: #2b6a45;
+            color: var(--text-secondary);
+        }
+
+        .order-card.delivered .order-client,
+        .order-card.delivered .order-price-value .currency {
+            color: var(--accent-light);
+        }
+
+        .order-card.delivered .order-price-value {
+            color: var(--text-primary);
         }
 
         .order-card.paid .order-client,
@@ -628,19 +625,12 @@
             color: rgba(233, 255, 242, 0.92);
         }
 
-        .order-card.delivered .order-status,
-        .order-card.delivered .order-actions {
-            position: relative;
-            z-index: 3;
-            align-self: center;
-        }
-
         .order-card.delivered .order-status {
-            min-width: 128px;
+            min-width: 110px;
         }
 
         .order-card.delivered .order-actions {
-            min-width: 250px;
+            min-width: 220px;
         }
 
         .order-main {
@@ -678,6 +668,10 @@
             color: var(--text-secondary);
             font-weight: 300;
             line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         .order-delivery {
@@ -700,6 +694,10 @@
             color: var(--accent-light);
             text-decoration: none;
             border-bottom: 1px dotted rgba(139,34,82,0.5);
+        }
+
+        .order-info .order-delivery + .order-delivery {
+            display: none;
         }
 
         .order-price { text-align: right; min-width: 120px; }
@@ -759,7 +757,7 @@
 
         .status-tag.wacht { color: var(--yellow); background: var(--yellow-glow); }
         .status-tag.actief { color: var(--accent-light); background: rgba(139,34,82,0.1); }
-        .status-tag.bezig { color: var(--green); background: var(--green-glow); }
+        .status-tag.bezig { color: var(--accent-light); background: rgba(139,34,82,0.1); }
         .status-tag.klaar { color: var(--accent-light); background: rgba(139,34,82,0.1); }
         .status-tag.betaald { color: #e8fff0; background: rgba(12, 64, 35, 0.34); }
 
