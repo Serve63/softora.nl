@@ -619,6 +619,38 @@
             user-select: none;
         }
 
+        .lead-modal-left-actions {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.28rem;
+        }
+
+        .lead-modal-delete-btn {
+            border: none;
+            background: transparent;
+            color: var(--text-tertiary);
+            font-size: 0.74rem;
+            line-height: 1.1;
+            padding: 0;
+            margin-left: 1.45rem;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-color: rgba(134, 143, 160, 0.45);
+            text-underline-offset: 2px;
+            opacity: 0.92;
+        }
+
+        .lead-modal-delete-btn:hover {
+            color: #8f4f66;
+            text-decoration-color: rgba(139, 34, 82, 0.6);
+        }
+
+        .lead-modal-delete-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
         .lead-modal-actions-right {
             margin-left: auto;
             display: inline-flex;
@@ -812,9 +844,12 @@
 
                 <div class="lead-modal-status" id="leadModalStatus"></div>
                 <div class="lead-modal-actions">
-                    <div class="lead-modal-confirm-wrap">
-                        <input id="leadModalWhatsappConfirm" type="checkbox">
-                        <label for="leadModalWhatsappConfirm">Bevestigd via Whatsapp</label>
+                    <div class="lead-modal-left-actions">
+                        <div class="lead-modal-confirm-wrap">
+                            <input id="leadModalWhatsappConfirm" type="checkbox">
+                            <label for="leadModalWhatsappConfirm">Bevestigd via Whatsapp</label>
+                        </div>
+                        <button class="lead-modal-delete-btn" id="leadModalDeleteBtn" type="button">Lead verwijderen</button>
                     </div>
                     <div class="lead-modal-actions-right">
                         <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
@@ -838,6 +873,7 @@
             const modalLocation = document.getElementById('leadModalLocation');
             const modalWhatsappInfo = document.getElementById('leadModalWhatsappInfo');
             const modalWhatsappConfirm = document.getElementById('leadModalWhatsappConfirm');
+            const modalDeleteBtn = document.getElementById('leadModalDeleteBtn');
             const modalStatus = document.getElementById('leadModalStatus');
             const modalCloseBtn = document.getElementById('leadModalClose');
             const modalCancelBtn = document.getElementById('leadModalCancelBtn');
@@ -855,6 +891,7 @@
                 !modalLocation ||
                 !modalWhatsappInfo ||
                 !modalWhatsappConfirm ||
+                !modalDeleteBtn ||
                 !modalStatus ||
                 !modalCloseBtn ||
                 !modalCancelBtn ||
@@ -1067,6 +1104,7 @@
             function setModalBusy(nextBusy) {
                 modalBusy = Boolean(nextBusy);
                 modalSubmitBtn.disabled = modalBusy;
+                modalDeleteBtn.disabled = modalBusy;
             }
 
             function setModalStatus(message, variant) {
@@ -1257,6 +1295,55 @@
                     closeLeadModal();
                 } catch (error) {
                     setModalStatus(String(error?.message || 'Invoegen in agenda mislukt.'), 'error');
+                } finally {
+                    setModalBusy(false);
+                }
+            }
+
+            async function removeLead() {
+                const taskId = Number(activeTaskId) || 0;
+                if (!taskId || modalBusy) return;
+                const lead = getLeadById(taskId);
+                const company = String(lead?.company || 'deze lead');
+                const confirmed = window.confirm(`Weet je zeker dat je ${company} wilt verwijderen?`);
+                if (!confirmed) return;
+
+                setModalBusy(true);
+                setModalStatus('Lead wordt verwijderd...', '');
+                try {
+                    await postJsonWithFallback(
+                        [`/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/mark-cancelled`],
+                        {
+                            actor: 'Leads pagina',
+                            reason: 'Handmatig verwijderd via lead-popup',
+                        }
+                    );
+
+                    allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
+                    delete leadDetailsById[String(taskId)];
+                    delete leadAiCopyById[String(taskId)];
+                    renderList();
+                    if (allLeads.length > 0) {
+                        setStatusLastUpdatedNow();
+                    } else {
+                        setStatus('Nog geen leads gevonden.', '');
+                    }
+
+                    if (
+                        window.SoftoraPersonnelTheme &&
+                        typeof window.SoftoraPersonnelTheme.refreshSidebarCounts === 'function'
+                    ) {
+                        window.SoftoraPersonnelTheme.refreshSidebarCounts();
+                    } else if (
+                        window.SoftoraPersonnelTheme &&
+                        typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
+                    ) {
+                        window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
+                    }
+
+                    closeLeadModal();
+                } catch (error) {
+                    setModalStatus(String(error?.message || 'Lead verwijderen mislukt.'), 'error');
                 } finally {
                     setModalBusy(false);
                 }
@@ -1468,6 +1555,10 @@
 
             modalSubmitBtn.addEventListener('click', () => {
                 submitLeadToAgenda();
+            });
+
+            modalDeleteBtn.addEventListener('click', () => {
+                removeLead();
             });
 
             window.addEventListener('keydown', (event) => {
