@@ -918,15 +918,6 @@
                 return stripped.replace(/\s*\n+\s*/g, ' ').trim();
             }
 
-            function sanitizeAgreementCopy(value) {
-                return String(value || '')
-                    .split('\n')
-                    .map((line) => stripDialogueMarkers(line))
-                    .map((line) => line.replace(/^[-*]\s*/, '- ').trim())
-                    .filter(Boolean)
-                    .join('\n');
-            }
-
             function pickReadableSummary(...candidates) {
                 for (const candidate of candidates) {
                     const raw = String(candidate || '').trim();
@@ -953,30 +944,30 @@
             }
 
             function buildFallbackAgreementsText(lead, detail) {
-                const lines = [];
+                const parts = [];
                 const date = String(detail?.date || lead?.date || '').trim();
                 const time = normalizeTimeValue(detail?.time || lead?.time || '');
                 if (date || time) {
-                    lines.push(`Afspraakmoment: ${formatDateTime({ date, time })}`);
+                    parts.push(`Afspraak staat op ${formatDateTime({ date, time })}.`);
                 } else {
-                    lines.push('Afspraakmoment: nog niet bevestigd.');
+                    parts.push('Afspraakmoment is nog niet bevestigd.');
                 }
 
                 const location = String(detail?.location || lead?.location || '').trim();
-                lines.push(`Locatie: ${location || 'nog niet ingevuld'}.`);
+                parts.push(`Locatie is ${location || 'nog niet ingevuld'}.`);
 
                 const whatsappInfo = String(detail?.whatsappInfo || lead?.whatsappInfo || '').trim();
                 if (whatsappInfo) {
-                    lines.push(`Overige info uit WhatsApp: ${whatsappInfo}`);
+                    parts.push(`Relevante WhatsApp-info: ${whatsappInfo}`);
                 }
 
                 const summaryNote = pickReadableSummary(detail?.summary, detail?.callSummary, detail?.aiSummary);
                 if (summaryNote) {
-                    lines.push(`Notitie: ${summaryNote}`);
+                    parts.push(`Belangrijk punt: ${summaryNote}`);
                 }
 
-                lines.push('Vervolg: controleer de gegevens en klik daarna op "In agenda zetten".');
-                return lines.join('\n');
+                parts.push('Controleer de gegevens en zet daarna de afspraak in de agenda.');
+                return parts.join(' ');
             }
 
             async function summarizeWithAi(text, options = {}) {
@@ -1009,27 +1000,14 @@
                 if (sourceText.length < 24) return;
 
                 try {
-                    const [conversationRaw, agreementsRaw] = await Promise.all([
-                        summarizeWithAi(sourceText, {
-                            style: 'short',
-                            maxSentences: 4,
-                            extraInstructions:
-                                'Schrijf voor een accountmanager van Softora. Geef een natuurlijke, zakelijke samenvatting van het gesprek: doel, reactie klant, belangrijkste wensen/bezwaren en uitkomst. Gebruik GEEN labels zoals user:, bot:, agent: of klant:. Gebruik geen letterlijke transcriptregels.',
-                        }),
-                        summarizeWithAi(sourceText, {
-                            style: 'bullets',
-                            maxSentences: 4,
-                            extraInstructions:
-                                'Vat alleen concrete afspraken en vervolgstappen samen. Noem datum/tijd, locatie en actiehouder alleen als expliciet genoemd. Gebruik maximaal 4 bullets en start elke regel met "- ". Gebruik GEEN labels zoals user:, bot:, agent: of klant:.',
-                        }),
-                    ]);
+                    const mergedRaw = await summarizeWithAi(sourceText, {
+                        style: 'medium',
+                        maxSentences: 5,
+                        extraInstructions:
+                            'Schrijf voor een accountmanager van Softora. Geef een korte, efficiënte samenvatting in doorlopende tekst. Verwerk uitkomst, afspraken, datum/tijd, locatie en vervolgactie in dezelfde tekst als dat bekend is. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+                    });
 
-                    const conversation = sanitizeConversationCopy(conversationRaw);
-                    const agreements = sanitizeAgreementCopy(agreementsRaw);
-                    const summaryText = [conversation, agreements ? `Afspraken en vervolg:\n${agreements}` : '']
-                        .filter(Boolean)
-                        .join('\n\n')
-                        .trim();
+                    const summaryText = sanitizeConversationCopy(mergedRaw);
 
                     leadAiCopyById[cacheKey] = {
                         summaryText: summaryText || '',
@@ -1089,9 +1067,9 @@
                 );
                 const fallbackSummary = readableSummary || 'Samenvatting wordt nu opgebouwd...';
                 const fallbackAgreements = buildFallbackAgreementsText(lead, detail);
-                const fallbackCombined = [fallbackSummary, `Afspraken en vervolg:\n${fallbackAgreements}`]
+                const fallbackCombined = [fallbackSummary, fallbackAgreements]
                     .filter(Boolean)
-                    .join('\n\n');
+                    .join(' ');
 
                 modalSummary.textContent =
                     String(aiCopy?.summaryText || '').trim() || fallbackCombined;
