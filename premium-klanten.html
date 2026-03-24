@@ -1281,7 +1281,9 @@
             const isApplicable = isWebsite ? customerHasWebsite(customer) : customerHasMaintenance(customer);
 
             if (!isApplicable) {
-                return "<span class=\"service-na\">Niet van toepassing</span>";
+                return isWebsite
+                    ? "<span class=\"service-na\">Niet van toepassing</span>"
+                    : "<span class=\"service-na\">Nee</span>";
             }
 
             const serviceName = "";
