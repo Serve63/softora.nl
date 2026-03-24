@@ -567,13 +567,16 @@
                 if (!date) return time;
                 const dt = new Date(`${date}T${time || '09:00'}:00`);
                 if (Number.isNaN(dt.getTime())) return `${date}${time ? ` ${time}` : ''}`;
-                return dt.toLocaleString('nl-NL', {
-                    weekday: 'short',
+                const dateLabel = dt.toLocaleDateString('nl-NL', {
+                    weekday: 'long',
                     day: '2-digit',
-                    month: '2-digit',
+                    month: 'long',
+                });
+                const timeLabel = dt.toLocaleTimeString('nl-NL', {
                     hour: '2-digit',
                     minute: '2-digit',
                 });
+                return `${dateLabel}, ${timeLabel}`;
             }
 
             function setStatus(message, variant) {
