@@ -162,8 +162,9 @@
 
         .sidebar-logo span { color: var(--accent-color); }
         .sidebar-nav {
-            overflow-y: auto;
+            flex: 1;
             min-height: 0;
+            overflow-y: auto;
         }
         .sidebar-section { margin-bottom: 2rem; }
 
@@ -237,7 +238,7 @@
         .sidebar-link:hover svg { opacity: 1; }
 
         .sidebar-footer {
-            margin-top: auto;
+            flex-shrink: 0;
             padding: 2rem;
         }
 

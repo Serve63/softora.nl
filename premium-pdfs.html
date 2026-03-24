@@ -95,7 +95,7 @@
         }
 
         .sidebar-nav {
-            flex: 1 1 auto;
+            flex: 1;
             min-height: 0;
             overflow-y: auto;
         }
@@ -176,11 +176,8 @@
         }
 
         .sidebar-footer {
-            padding: 2rem;
-            border-top: 1px solid var(--border);
-            margin-top: auto;
             flex-shrink: 0;
-            background: var(--bg-secondary);
+            padding: 2rem;
         }
 
         .sidebar-user {
@@ -676,8 +673,8 @@
 
         .sidebar-nav {
             flex: 1;
-            min-height: auto;
-            overflow: visible;
+            min-height: 0;
+            overflow-y: auto;
         }
 
         .sidebar-section {
@@ -756,11 +753,8 @@
         }
 
         .sidebar-footer {
+            flex-shrink: 0;
             padding: 2rem;
-            border-top: 1px solid var(--border);
-            margin-top: 0;
-            flex-shrink: 1;
-            background: transparent;
         }
 
         .sidebar-user {

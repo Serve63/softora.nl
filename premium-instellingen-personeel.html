@@ -106,8 +106,9 @@
         }
 
         .sidebar-nav {
-            overflow-y: auto;
+            flex: 1;
             min-height: 0;
+            overflow-y: auto;
         }
         .sidebar-section { margin-bottom: 2rem; }
         .sidebar-flow-section { position: relative; }
@@ -165,9 +166,8 @@
         }
 
         .sidebar-footer {
-            padding: 0 2rem;
-            border-top: 1px solid var(--border);
-            padding-top: 1.5rem;
+            flex-shrink: 0;
+            padding: 2rem;
         }
 
         .sidebar-user {

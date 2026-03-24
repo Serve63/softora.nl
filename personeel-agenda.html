@@ -106,8 +106,9 @@
         }
         .sidebar-logo span { color: var(--accent-color); }
         .sidebar-nav {
-            overflow-y: auto;
+            flex: 1;
             min-height: 0;
+            overflow-y: auto;
         }
         .sidebar-section { margin-bottom: 2rem; }
         .sidebar-section-label {
@@ -130,7 +131,7 @@
         .sidebar-link svg { width: 18px; height: 18px; opacity: 0.4; flex-shrink: 0; }
         .sidebar-link.active svg, .sidebar-link:hover svg { opacity: 0.8; }
         .sidebar-footer {
-            margin-top: auto;
+            flex-shrink: 0;
             padding: 2rem;
         }
         .sidebar-user { display: flex; align-items: center; gap: 0.8rem; }

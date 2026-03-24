@@ -95,8 +95,9 @@
 
         .sidebar-logo span { color: var(--accent-light); }
         .sidebar-nav {
-            overflow-y: auto;
+            flex: 1;
             min-height: 0;
+            overflow-y: auto;
         }
         .sidebar-section { margin-bottom: 2rem; }
 
@@ -164,9 +165,8 @@
         }
 
         .sidebar-footer {
-            padding: 1.6rem 1.2rem 0.9rem;
-            border-top: 1px solid var(--border);
-            margin-top: auto;
+            flex-shrink: 0;
+            padding: 2rem;
         }
 
         .sidebar-user {
