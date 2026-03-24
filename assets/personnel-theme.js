@@ -301,7 +301,6 @@
         const runtimeMap = runtimeRaw && typeof runtimeRaw === "object" && !Array.isArray(runtimeRaw)
             ? runtimeRaw
             : {};
-        const countableIds = new Set();
 
         function normalizeOrderStatusForSidebar(value) {
             const key = String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -322,37 +321,40 @@
             const isBuilt = baseStatus === "klaar" || baseStatus === "betaald" || pct >= 100;
             const isPaid = Boolean(paidAt) && isBuilt;
             const status = isPaid ? "betaald" : (isBuilt ? "klaar" : baseStatus);
-            return { status: status };
+            return {
+                status: status,
+                isPaid: isPaid,
+            };
         }
 
-        function shouldCountActiveOrder(orderLike) {
-            const ui = resolveOrderUiForSidebar(orderLike);
-            return ui.status === "wacht" || ui.status === "actief" || ui.status === "bezig";
+        function isValidCustomOrderForSidebar(item) {
+            const id = Number(item && item.id);
+            const amount = Number(item && item.amount);
+            const clientName = String((item && item.clientName) || "").trim();
+            const title = String((item && item.title) || "").trim();
+            const description = String((item && item.description) || "").trim();
+            if (!Number.isFinite(id) || id <= 0) return false;
+            if (!Number.isFinite(amount) || amount <= 0) return false;
+            if (!clientName || !title || !description) return false;
+            return true;
         }
 
-        if (Array.isArray(customRaw)) {
-            customRaw.forEach(function (item) {
-                const id = Number(item && item.id);
-                if (!Number.isFinite(id) || id <= 0) return;
-                const runtime = runtimeMap[String(id)] || {};
-                const merged = {
-                    status: String(runtime.statusKey || (item && item.status) || "").trim(),
-                    statusKey: String(runtime.statusKey || (item && item.status) || "").trim(),
-                    progressPct: Number(runtime.progressPct),
-                    paidAt: String(runtime.paidAt || (item && item.paidAt) || "").trim(),
-                };
-                if (shouldCountActiveOrder(merged)) countableIds.add(id);
-            });
-        }
+        const validCustomOrders = Array.isArray(customRaw)
+            ? customRaw.filter(isValidCustomOrderForSidebar)
+            : [];
 
-        Object.keys(runtimeMap).forEach(function (key) {
-            const id = Number(key);
-            if (!Number.isFinite(id) || id <= 0) return;
-            if (countableIds.has(id)) return;
-            if (shouldCountActiveOrder(runtimeMap[key])) countableIds.add(id);
-        });
-
-        return countableIds.size;
+        return validCustomOrders.reduce(function (count, item) {
+            const id = Number(item && item.id);
+            const runtime = runtimeMap[String(id)] || {};
+            const merged = {
+                status: String(runtime.statusKey || (item && item.status) || "").trim(),
+                statusKey: String(runtime.statusKey || (item && item.status) || "").trim(),
+                progressPct: Number(runtime.progressPct),
+                paidAt: String(runtime.paidAt || (item && item.paidAt) || "").trim(),
+            };
+            const ui = resolveOrderUiForSidebar(merged);
+            return count + (ui.isPaid ? 0 : 1);
+        }, 0);
     }
 
     async function fetchActiveOrdersUiValues() {
