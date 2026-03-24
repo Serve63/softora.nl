@@ -73,8 +73,7 @@
         const isActive = link.key === activeKey;
         const classes = `sidebar-link magnetic${isActive ? " active" : ""}`;
         const labelHtml = `<span class="sidebar-link-text">${link.label}</span>`;
-        const hasCountBadge =
-            link.key === "leads" || link.key === "agenda" || link.key === "active_orders";
+        const hasCountBadge = link.key === "leads";
         const countBadgeHtml = hasCountBadge
             ? `<span class="sidebar-notification-badge" data-sidebar-count-key="${link.key}" hidden>0</span>`
             : "";
