@@ -219,6 +219,11 @@
     flex-shrink: 0 !important;
 }
 
+.sidebar-link[href="/premium-ai-coldmailing"] svg {
+    width: 21px !important;
+    height: 21px !important;
+}
+
 .sidebar-link.active svg,
 .sidebar-link:hover svg {
     opacity: 1 !important;
