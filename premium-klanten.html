@@ -479,10 +479,13 @@
 
         .table-wrap {
             padding: 0;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         table {
             width: 100%;
+            min-width: 1080px;
             border-collapse: separate;
             border-spacing: 0;
         }
@@ -787,6 +790,10 @@
 
             .table-wrap {
                 padding: 0 0.9rem 0.9rem;
+            }
+
+            table {
+                min-width: 0;
             }
 
             thead {
