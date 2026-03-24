@@ -177,7 +177,7 @@
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    background: var(--warn) !important;
+    background: var(--accent) !important;
     color: #ffffff !important;
     font-family: 'Oswald', sans-serif !important;
     font-size: 0.64rem !important;
