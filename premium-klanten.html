@@ -479,34 +479,53 @@
 
         .table-wrap {
             padding: 0;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
+            overflow-x: hidden;
         }
 
         table {
             width: 100%;
-            min-width: 1080px;
+            min-width: 0;
+            table-layout: fixed;
             border-collapse: separate;
             border-spacing: 0;
         }
 
         thead th {
-            padding: 0.9rem 1.5rem;
+            padding: 0.85rem 0.75rem;
             border-bottom: 1px solid var(--border);
             text-align: left;
             color: var(--text-tertiary);
             font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
+            font-size: 0.64rem;
             letter-spacing: 0.14em;
             text-transform: uppercase;
             white-space: nowrap;
         }
 
         tbody td {
-            padding: 1rem 1.5rem;
+            padding: 0.9rem 0.75rem;
             border-bottom: 1px solid var(--border);
             vertical-align: top;
         }
+
+        thead th:first-child,
+        tbody td:first-child {
+            padding-left: 1rem;
+        }
+
+        thead th:last-child,
+        tbody td:last-child {
+            padding-right: 1rem;
+        }
+
+        thead th:nth-child(1) { width: 19%; }
+        thead th:nth-child(2) { width: 15%; }
+        thead th:nth-child(3) { width: 12%; }
+        thead th:nth-child(4) { width: 13%; }
+        thead th:nth-child(5) { width: 9%; }
+        thead th:nth-child(6) { width: 8%; }
+        thead th:nth-child(7) { width: 12%; }
+        thead th:nth-child(8) { width: 12%; }
 
         tbody tr:hover td {
             background: var(--table-hover);
@@ -519,7 +538,7 @@
         .client-name {
             font-weight: 700;
             color: var(--text-primary);
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             line-height: 1.35;
             white-space: nowrap;
             overflow: hidden;
@@ -529,12 +548,15 @@
         .client-company {
             margin-top: 0.25rem;
             color: var(--text-secondary);
-            font-size: 0.88rem;
+            font-size: 0.80rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .muted-cell {
             color: var(--text-secondary);
-            font-size: 0.92rem;
+            font-size: 0.84rem;
         }
 
         .cell-phone {
@@ -543,7 +565,7 @@
         }
 
         .service-cell {
-            min-width: 180px;
+            min-width: 0;
         }
 
         .service-stack {
@@ -560,20 +582,20 @@
 
         .service-price {
             color: var(--text-secondary);
-            font-size: 0.88rem;
+            font-size: 0.84rem;
             line-height: 1.45;
             white-space: nowrap;
         }
 
         .service-na {
             color: var(--text-tertiary);
-            font-size: 0.86rem;
+            font-size: 0.82rem;
             line-height: 1.45;
         }
 
         .status-text {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.78rem;
+            font-size: 0.74rem;
             font-weight: 500;
             letter-spacing: 0.08em;
             text-transform: uppercase;
@@ -590,7 +612,7 @@
 
         .active-text {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.78rem;
+            font-size: 0.74rem;
             font-weight: 500;
             letter-spacing: 0.08em;
             text-transform: uppercase;
@@ -614,11 +636,12 @@
 
         .action-btn {
             border: 1px solid var(--border);
-            padding: 0.45rem 0.7rem;
+            padding: 0.38rem 0.6rem;
             background: transparent;
             color: var(--text-secondary);
-            font-size: 0.78rem;
+            font-size: 0.74rem;
             font-weight: 500;
+            white-space: nowrap;
         }
 
         .action-btn:hover {
