@@ -105,7 +105,9 @@
             margin-bottom: 3rem; display: block;
         }
         .sidebar-logo span { color: var(--accent-color); }
-        .sidebar-nav { flex: 1;     overflow-y: auto;
+        .sidebar-nav {
+            overflow-y: auto;
+            min-height: 0;
         }
         .sidebar-section { margin-bottom: 2rem; }
         .sidebar-section-label {
@@ -127,7 +129,10 @@
         .sidebar-link.active::before { opacity: 1; }
         .sidebar-link svg { width: 18px; height: 18px; opacity: 0.4; flex-shrink: 0; }
         .sidebar-link.active svg, .sidebar-link:hover svg { opacity: 0.8; }
-        .sidebar-footer { padding: 2rem; }
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 2rem;
+        }
         .sidebar-user { display: flex; align-items: center; gap: 0.8rem; }
         .sidebar-avatar {
             width: 36px; height: 36px; background: var(--accent-color); border-radius: 50%;

@@ -150,7 +150,9 @@
         }
 
         .sidebar-logo span { color: var(--accent-color); }
-        .sidebar-nav { flex: 1;     overflow-y: auto;
+        .sidebar-nav {
+            overflow-y: auto;
+            min-height: 0;
         }
         .sidebar-section { margin-bottom: 2rem; }
 
@@ -216,7 +218,10 @@
             letter-spacing: 0.05em;
         }
 
-        .sidebar-footer { padding: 2rem; }
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 2rem;
+        }
 
         .sidebar-user { display: flex; align-items: center; gap: 0.8rem; }
 
