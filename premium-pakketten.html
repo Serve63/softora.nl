@@ -455,6 +455,12 @@ body {
     margin-bottom: 16px;
   }
 
+  #tab-bouwen .features-list {
+    max-height: 124px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
   .features-list li {
     display: flex;
     align-items: flex-start;
@@ -684,6 +690,12 @@ body {
   @media (max-width: 920px) {
     body {
       display: block;
+    }
+
+    #tab-bouwen .features-list {
+      max-height: none;
+      overflow-y: visible;
+      padding-right: 0;
     }
 
     .sidebar {
