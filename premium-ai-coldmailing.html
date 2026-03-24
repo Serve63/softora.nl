@@ -466,13 +466,6 @@
             gap: 0.8rem;
         }
 
-        .lead-modal-header-right {
-            display: inline-flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.28rem;
-        }
-
         .lead-modal-title {
             font-family: 'Oswald', sans-serif;
             text-transform: uppercase;
@@ -659,14 +652,27 @@
 
         .lead-modal-actions-right {
             margin-left: auto;
-            display: inline-flex;
+            display: grid;
+            grid-template-columns: auto auto;
+            grid-template-areas:
+                ". delete"
+                "cancel submit";
+            column-gap: 0.55rem;
+            row-gap: 0.22rem;
             align-items: center;
         }
 
-        .lead-modal-actions-row {
-            display: inline-flex;
-            gap: 0.55rem;
-            align-items: center;
+        .lead-modal-actions-right #leadModalDeleteBtn {
+            grid-area: delete;
+            justify-self: center;
+        }
+
+        .lead-modal-actions-right #leadModalCancelBtn {
+            grid-area: cancel;
+        }
+
+        .lead-modal-actions-right #leadModalSubmitBtn {
+            grid-area: submit;
         }
 
         .lead-modal-btn {
@@ -824,10 +830,7 @@
                         <div class="lead-modal-title">Lead details</div>
                         <div class="lead-modal-sub" id="leadModalSub">-</div>
                     </div>
-                    <div class="lead-modal-header-right">
-                        <button class="lead-modal-close" id="leadModalClose" type="button" aria-label="Sluiten">×</button>
-                        <button class="lead-modal-delete-btn" id="leadModalDeleteBtn" type="button">Lead verwijderen</button>
-                    </div>
+                    <button class="lead-modal-close" id="leadModalClose" type="button" aria-label="Sluiten">×</button>
                 </div>
 
                 <div class="lead-modal-info-grid">
@@ -865,10 +868,9 @@
                         </div>
                     </div>
                     <div class="lead-modal-actions-right">
-                        <div class="lead-modal-actions-row">
-                            <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
-                            <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
-                        </div>
+                        <button class="lead-modal-delete-btn" id="leadModalDeleteBtn" type="button">Lead verwijderen</button>
+                        <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
+                        <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
                     </div>
                 </div>
             </div>
