@@ -592,8 +592,38 @@
 
         .lead-modal-actions {
             display: flex;
-            justify-content: flex-end;
+            align-items: center;
+            justify-content: space-between;
             gap: 0.55rem;
+        }
+
+        .lead-modal-confirm-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.84rem;
+            line-height: 1.2;
+        }
+
+        .lead-modal-confirm-wrap input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .lead-modal-confirm-wrap label {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .lead-modal-actions-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 0.55rem;
+            align-items: center;
         }
 
         .lead-modal-btn {
@@ -782,8 +812,14 @@
 
                 <div class="lead-modal-status" id="leadModalStatus"></div>
                 <div class="lead-modal-actions">
-                    <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
-                    <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
+                    <div class="lead-modal-confirm-wrap">
+                        <input id="leadModalWhatsappConfirm" type="checkbox">
+                        <label for="leadModalWhatsappConfirm">Bevestigd via Whatsapp</label>
+                    </div>
+                    <div class="lead-modal-actions-right">
+                        <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
+                        <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -801,6 +837,7 @@
             const modalTime = document.getElementById('leadModalTime');
             const modalLocation = document.getElementById('leadModalLocation');
             const modalWhatsappInfo = document.getElementById('leadModalWhatsappInfo');
+            const modalWhatsappConfirm = document.getElementById('leadModalWhatsappConfirm');
             const modalStatus = document.getElementById('leadModalStatus');
             const modalCloseBtn = document.getElementById('leadModalClose');
             const modalCancelBtn = document.getElementById('leadModalCancelBtn');
@@ -817,6 +854,7 @@
                 !modalTime ||
                 !modalLocation ||
                 !modalWhatsappInfo ||
+                !modalWhatsappConfirm ||
                 !modalStatus ||
                 !modalCloseBtn ||
                 !modalCancelBtn ||
@@ -1088,6 +1126,7 @@
                 modalTime.value = normalizeTimeValue(lead.time || '09:00') || '09:00';
                 modalLocation.value = String(lead.location || '').trim();
                 modalWhatsappInfo.value = String(lead.whatsappInfo || '').trim();
+                modalWhatsappConfirm.checked = false;
                 setModalStatus('');
                 setModalBusy(false);
                 renderLeadDetailsInModal(lead, null, normalizedTaskId);
@@ -1158,6 +1197,7 @@
                 const time = normalizeTimeValue(modalTime.value || '');
                 const location = String(modalLocation.value || '').trim();
                 const whatsappInfo = String(modalWhatsappInfo.value || '').trim();
+                const whatsappConfirmed = Boolean(modalWhatsappConfirm.checked);
 
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
                     setModalStatus('Kies een geldige datum.', 'error');
@@ -1167,6 +1207,11 @@
                 if (!/^\d{2}:\d{2}$/.test(time)) {
                     setModalStatus('Kies een geldige tijd.', 'error');
                     modalTime.focus();
+                    return;
+                }
+                if (!whatsappConfirmed) {
+                    setModalStatus('Vink eerst "Bevestigd via Whatsapp" aan.', 'error');
+                    modalWhatsappConfirm.focus();
                     return;
                 }
 
