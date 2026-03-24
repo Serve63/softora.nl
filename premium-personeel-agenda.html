@@ -334,6 +334,7 @@
             font-size: 0.82rem; color: var(--text-secondary); font-weight: 300;
             line-height: 1.6; padding: 0.8rem 0.9rem;
             background: var(--bg-primary); border: 1px solid var(--border);
+            white-space: pre-line;
         }
 
         .modal-workspace { display: none; }
@@ -603,6 +604,10 @@
                     <div class="modal-detail-item">
                         <div class="modal-detail-label">Bron</div>
                         <div class="modal-detail-value" id="modalSource">-</div>
+                    </div>
+                    <div class="modal-detail-item">
+                        <div class="modal-detail-label">Locatie</div>
+                        <div class="modal-detail-value" id="modalLocation">Nog niet ingevuld</div>
                     </div>
                     <div class="modal-detail-item">
                         <div class="modal-detail-label">Domein</div>
@@ -949,6 +954,8 @@
             branche: String(item.branche || 'Onbekend'),
             source: String(item.source || 'AI Cold Calling'),
             summary: String(item.summary || 'AI-samenvatting niet beschikbaar.'),
+            location: String(item.location || item.appointmentLocation || ''),
+            whatsappInfo: String(item.whatsappInfo || item.whatsappNotes || ''),
             postCallStatus: String(item.postCallStatus || ''),
             postCallNotesTranscript: String(item.postCallNotesTranscript || ''),
             postCallPrompt: String(item.postCallPrompt || ''),
@@ -1656,8 +1663,13 @@
         document.getElementById('modalValue').textContent = apt.value;
         document.getElementById('modalBranche').textContent = apt.branche;
         document.getElementById('modalSource').textContent = apt.source;
+        document.getElementById('modalLocation').textContent = String(apt.location || '').trim() || 'Nog niet ingevuld';
         document.getElementById('modalDomain').textContent = String(apt.postCallDomainName || '').trim() || 'Nog niet ingevuld';
-        document.getElementById('modalSummary').textContent = apt.summary;
+        const summaryParts = [String(apt.summary || '').trim()].filter(Boolean);
+        if (String(apt.whatsappInfo || '').trim()) {
+            summaryParts.push(`Overige info uit WhatsApp:\n${String(apt.whatsappInfo || '').trim()}`);
+        }
+        document.getElementById('modalSummary').textContent = summaryParts.join('\n\n') || '-';
         fillWorkspaceFromAppointment(apt);
         applyWorkspaceMode(false);
 

@@ -3416,6 +3416,28 @@ function formatDateTimeLabelNl(dateYmd, timeHm) {
   });
 }
 
+function sanitizeAppointmentLocation(value) {
+  return truncateText(normalizeString(value || ''), 220);
+}
+
+function sanitizeAppointmentWhatsappInfo(value) {
+  return truncateText(normalizeString(value || ''), 6000);
+}
+
+function buildLeadToAgendaSummary(baseSummary, location, whatsappInfo) {
+  const parts = [];
+  const summaryText = normalizeString(baseSummary || '');
+  const locationText = sanitizeAppointmentLocation(location || '');
+  const whatsappText = sanitizeAppointmentWhatsappInfo(whatsappInfo || '');
+
+  if (summaryText) parts.push(summaryText);
+  if (locationText) parts.push(`Locatie afspraak: ${locationText}`);
+  if (whatsappText) parts.push(`Overige info uit WhatsApp:\n${whatsappText}`);
+
+  const merged = parts.join('\n\n');
+  return truncateText(merged, 4000) || 'Lead handmatig ingepland vanuit Leads.';
+}
+
 function mapAppointmentToConfirmationTask(appointment) {
   if (!appointment || typeof appointment !== 'object') return null;
   const needsConfirmation = toBooleanSafe(
@@ -3447,6 +3469,10 @@ function mapAppointmentToConfirmationTask(appointment) {
     appointmentId: Number(appointment.id) || 0,
     callId: normalizeString(appointment.callId || ''),
     contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
+    location: sanitizeAppointmentLocation(appointment.location || appointment.appointmentLocation || ''),
+    whatsappInfo: sanitizeAppointmentWhatsappInfo(
+      appointment.whatsappInfo || appointment.whatsappNotes || appointment.whatsapp || ''
+    ),
     mailDraftAvailable: Boolean(normalizeString(appointment.confirmationEmailDraft || '')),
     mailSent: Boolean(appointment.confirmationEmailSent || appointment.confirmationEmailSentAt),
     mailSentAt: normalizeString(appointment.confirmationEmailSentAt || '') || null,
@@ -3525,6 +3551,10 @@ function buildConfirmationTaskDetail(appointment) {
   return {
     ...task,
     contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
+    location: sanitizeAppointmentLocation(appointment.location || appointment.appointmentLocation || ''),
+    whatsappInfo: sanitizeAppointmentWhatsappInfo(
+      appointment.whatsappInfo || appointment.whatsappNotes || appointment.whatsapp || ''
+    ),
     transcript,
     transcriptAvailable: Boolean(transcript),
     callSummary: normalizeString(callUpdate?.summary || ''),
@@ -8286,6 +8316,99 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-sent', (req, res) => {
     taskUpdated: true,
     task: buildConfirmationTaskDetail(updatedAppointment),
   });
+});
+
+function setLeadTaskInAgendaById(req, res, taskIdRaw) {
+  const idx = getGeneratedAppointmentIndexById(taskIdRaw);
+  if (idx < 0) {
+    return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
+  }
+
+  const appointment = generatedAgendaAppointments[idx];
+  const task = mapAppointmentToConfirmationTask(appointment);
+  if (!task) {
+    return res.status(409).json({ ok: false, error: 'Taak is al afgerond of niet beschikbaar' });
+  }
+
+  const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
+  const appointmentDate = normalizeDateYyyyMmDd(
+    req.body?.appointmentDate || req.body?.date || appointment?.date || ''
+  );
+  const appointmentTime = normalizeTimeHhMm(
+    req.body?.appointmentTime || req.body?.time || appointment?.time || ''
+  );
+  const location = sanitizeAppointmentLocation(
+    req.body?.location || req.body?.appointmentLocation || appointment?.location || ''
+  );
+  const whatsappInfo = sanitizeAppointmentWhatsappInfo(
+    req.body?.whatsappInfo ||
+      req.body?.whatsappNotes ||
+      req.body?.notes ||
+      appointment?.whatsappInfo ||
+      ''
+  );
+
+  if (!appointmentDate) {
+    return res.status(400).json({ ok: false, error: 'Vul een geldige datum in (YYYY-MM-DD).' });
+  }
+  if (!appointmentTime) {
+    return res.status(400).json({ ok: false, error: 'Vul een geldige tijd in (HH:MM).' });
+  }
+
+  const nowIso = new Date().toISOString();
+  const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
+    idx,
+    {
+      ...appointment,
+      date: appointmentDate,
+      time: appointmentTime,
+      location: location || null,
+      whatsappInfo: whatsappInfo || null,
+      summary: buildLeadToAgendaSummary(appointment?.summary, location, whatsappInfo),
+      needsConfirmationEmail: false,
+      confirmationEmailSent: true,
+      confirmationEmailSentAt: normalizeString(appointment?.confirmationEmailSentAt || '') || nowIso,
+      confirmationEmailSentBy: normalizeString(appointment?.confirmationEmailSentBy || '') || actor || null,
+      confirmationResponseReceived: true,
+      confirmationResponseReceivedAt: nowIso,
+      confirmationResponseReceivedBy: actor || null,
+      confirmationAppointmentCancelled: false,
+      confirmationAppointmentCancelledAt: null,
+      confirmationAppointmentCancelledBy: null,
+    },
+    'confirmation_task_set_in_agenda'
+  );
+
+  appendDashboardActivity(
+    {
+      type: 'lead_set_in_agenda',
+      title: 'Lead in agenda gezet',
+      detail: `Lead handmatig ingepland op ${appointmentDate} om ${appointmentTime}${
+        location ? ` (${location})` : ''
+      }.`,
+      company: updatedAppointment?.company || appointment?.company || '',
+      actor,
+      taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
+      callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+      source: 'premium-ai-lead-generator',
+    },
+    'dashboard_activity_lead_set_in_agenda'
+  );
+
+  return res.status(200).json({
+    ok: true,
+    taskCompleted: true,
+    appointment: updatedAppointment,
+  });
+}
+
+app.post('/api/agenda/confirmation-tasks/:id/set-in-agenda', (req, res) => {
+  return setLeadTaskInAgendaById(req, res, req.params.id);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/agenda/lead-to-agenda', (req, res) => {
+  return setLeadTaskInAgendaById(req, res, req.query.taskId);
 });
 
 app.post('/api/agenda/confirmation-tasks/:id/mark-response-received', (req, res) => {

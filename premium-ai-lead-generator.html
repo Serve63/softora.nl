@@ -1334,6 +1334,141 @@
             line-height: 1.45;
         }
 
+        .lead-agenda-modal-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(9, 11, 20, 0.76);
+            z-index: 1200;
+            padding: 1.2rem;
+        }
+
+        .lead-agenda-modal-overlay.show {
+            display: flex;
+        }
+
+        .lead-agenda-modal {
+            width: min(620px, 100%);
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(18, 22, 38, 0.98), rgba(14, 17, 28, 0.98));
+            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+            padding: 1.1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+        }
+
+        .lead-agenda-modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .lead-agenda-modal-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.05rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            margin-bottom: 0.12rem;
+        }
+
+        .lead-agenda-modal-sub {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            line-height: 1.45;
+        }
+
+        .lead-agenda-close {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-tertiary);
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            cursor: none;
+        }
+
+        .lead-agenda-close:hover {
+            color: var(--accent-light);
+            border-color: rgba(139,34,82,0.45);
+        }
+
+        .lead-agenda-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8rem;
+        }
+
+        .lead-agenda-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .lead-agenda-field-full {
+            grid-column: 1 / -1;
+        }
+
+        .lead-agenda-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.66rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .lead-agenda-input,
+        .lead-agenda-textarea {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 0.6rem 0.65rem;
+            font-size: 0.84rem;
+            line-height: 1.35;
+            outline: none;
+        }
+
+        .lead-agenda-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .lead-agenda-input:focus,
+        .lead-agenda-textarea:focus {
+            border-color: rgba(139,34,82,0.5);
+            box-shadow: 0 0 0 1px rgba(139,34,82,0.22);
+        }
+
+        .lead-agenda-status {
+            min-height: 1.25rem;
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            line-height: 1.35;
+        }
+
+        .lead-agenda-status.error {
+            color: #f59b9b;
+        }
+
+        .lead-agenda-status.success {
+            color: #6ae6a2;
+        }
+
+        .lead-agenda-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.55rem;
+            flex-wrap: wrap;
+        }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .generator-grid { grid-template-columns: 1fr; }
@@ -1358,6 +1493,7 @@
             .log-task-statuses { justify-content: flex-start; }
             .log-task-detail-grid { grid-template-columns: 1fr; }
             .log-task-actions { flex-direction: column; }
+            .lead-agenda-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -1546,9 +1682,53 @@
                 <div class="log-body" id="logBody">
                     <div class="log-empty">Start een campagne om activiteit te zien.</div>
                 </div>
+                <div class="log-task-section">
+                    <div class="log-task-header">
+                        <span class="log-task-title">Leads met afspraak</span>
+                        <span class="log-task-count" id="logTaskCount">0 leads</span>
+                    </div>
+                    <div class="log-task-list" id="logTaskList"></div>
+                </div>
             </div>
 
         </main>
+    </div>
+
+    <div class="lead-agenda-modal-overlay" id="leadAgendaModalOverlay" aria-hidden="true">
+        <div class="lead-agenda-modal">
+            <div class="lead-agenda-modal-header">
+                <div>
+                    <div class="lead-agenda-modal-title">Lead in agenda zetten</div>
+                    <div class="lead-agenda-modal-sub" id="leadAgendaModalSub">-</div>
+                </div>
+                <button class="lead-agenda-close magnetic" id="leadAgendaModalClose" type="button" aria-label="Sluiten">×</button>
+            </div>
+
+            <div class="lead-agenda-grid">
+                <div class="lead-agenda-field">
+                    <label class="lead-agenda-label" for="leadAgendaDate">Datum</label>
+                    <input class="lead-agenda-input magnetic" id="leadAgendaDate" type="date">
+                </div>
+                <div class="lead-agenda-field">
+                    <label class="lead-agenda-label" for="leadAgendaTime">Tijd</label>
+                    <input class="lead-agenda-input magnetic" id="leadAgendaTime" type="time" step="60">
+                </div>
+                <div class="lead-agenda-field lead-agenda-field-full">
+                    <label class="lead-agenda-label" for="leadAgendaLocation">Locatie</label>
+                    <input class="lead-agenda-input magnetic" id="leadAgendaLocation" type="text" placeholder="Bijv. Kantoor Softora, Oisterwijk">
+                </div>
+                <div class="lead-agenda-field lead-agenda-field-full">
+                    <label class="lead-agenda-label" for="leadAgendaWhatsappInfo">Overige info uit WhatsApp</label>
+                    <textarea class="lead-agenda-textarea magnetic" id="leadAgendaWhatsappInfo" placeholder="Bijv. contactvoorkeur, aandachtspunten, extra vragen..."></textarea>
+                </div>
+            </div>
+
+            <div class="lead-agenda-status" id="leadAgendaModalStatus"></div>
+            <div class="lead-agenda-actions">
+                <button class="log-task-btn magnetic" id="leadAgendaCancelBtn" type="button">Annuleren</button>
+                <button class="log-task-btn success magnetic" id="leadAgendaSubmitBtn" type="button">Zet in agenda</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -2110,7 +2290,17 @@
             const listEl = document.getElementById('logTaskList');
             const countEl = document.getElementById('logTaskCount');
             const logBody = document.getElementById('logBody');
-            if (!listEl || !countEl) return;
+            const modalOverlay = document.getElementById('leadAgendaModalOverlay');
+            const modalSub = document.getElementById('leadAgendaModalSub');
+            const modalStatus = document.getElementById('leadAgendaModalStatus');
+            const modalDate = document.getElementById('leadAgendaDate');
+            const modalTime = document.getElementById('leadAgendaTime');
+            const modalLocation = document.getElementById('leadAgendaLocation');
+            const modalWhatsappInfo = document.getElementById('leadAgendaWhatsappInfo');
+            const modalCloseBtn = document.getElementById('leadAgendaModalClose');
+            const modalCancelBtn = document.getElementById('leadAgendaCancelBtn');
+            const modalSubmitBtn = document.getElementById('leadAgendaSubmitBtn');
+            if (!listEl || !countEl || !modalOverlay) return;
 
             const state = {
                 loading: false,
@@ -2120,6 +2310,8 @@
                 detailsById: {},
                 actionBusyById: {},
                 pollTimer: null,
+                scheduleTaskId: null,
+                scheduleBusy: false,
             };
 
             function esc(str) {
@@ -2131,10 +2323,19 @@
                     .replace(/'/g, '&#039;');
             }
 
+            function normalizeTimeValue(value) {
+                const raw = String(value || '').trim();
+                const match = raw.match(/^(\d{1,2}):(\d{2})/);
+                if (!match) return '';
+                const hours = Math.max(0, Math.min(23, Number(match[1])));
+                const mins = Math.max(0, Math.min(59, Number(match[2])));
+                return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+            }
+
             function formatTaskDateTime(task) {
                 if (task && task.datetimeLabel) return String(task.datetimeLabel);
                 const date = String(task?.date || '');
-                const time = String(task?.time || '09:00');
+                const time = normalizeTimeValue(task?.time || '09:00') || '09:00';
                 if (!date) return time;
                 const d = new Date(`${date}T${time}:00`);
                 if (Number.isNaN(d.getTime())) return `${date} ${time}`;
@@ -2163,6 +2364,19 @@
 
             function isBusy(taskId) {
                 return Boolean(state.actionBusyById[String(taskId)]);
+            }
+
+            function setScheduleStatus(message, variant = '') {
+                if (!modalStatus) return;
+                modalStatus.textContent = String(message || '');
+                modalStatus.className = `lead-agenda-status${variant ? ` ${variant}` : ''}`;
+            }
+
+            function setScheduleBusy(value) {
+                state.scheduleBusy = Boolean(value);
+                if (modalSubmitBtn) modalSubmitBtn.disabled = state.scheduleBusy;
+                if (modalCancelBtn) modalCancelBtn.disabled = state.scheduleBusy;
+                if (modalCloseBtn) modalCloseBtn.disabled = state.scheduleBusy;
             }
 
             function addActivityLine(type, htmlText) {
@@ -2212,6 +2426,8 @@
                 const summary = String(detail?.aiSummary || detail?.callSummary || task?.summary || '').trim();
                 if (summary) infoLines.push(`Samenvatting: ${summary}`);
                 if (detail?.phone) infoLines.push(`Telefoon: ${detail.phone}`);
+                if (detail?.location) infoLines.push(`Locatie: ${detail.location}`);
+                if (detail?.whatsappInfo) infoLines.push(`WhatsApp: ${detail.whatsappInfo}`);
                 if (detail?.source || task?.source) infoLines.push(`Bron: ${detail?.source || task?.source}`);
                 if (detail?.confirmationEmailDraftGeneratedAt) {
                     try {
@@ -2242,13 +2458,144 @@
                 `;
             }
 
+            async function postJsonWithFallbackLocal(urls, body, timeoutMs = 20000) {
+                const endpointList = Array.isArray(urls) ? urls : [urls];
+                let lastError = null;
+
+                for (const url of endpointList) {
+                    const controller = new AbortController();
+                    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body || {}),
+                            signal: controller.signal,
+                            cache: 'no-store',
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data?.ok) {
+                            const err = new Error(String(data?.detail || data?.error || `Request mislukt (${response.status})`));
+                            err.status = Number(response.status) || 0;
+                            throw err;
+                        }
+                        return data;
+                    } catch (error) {
+                        lastError = String(error?.name || '') === 'AbortError'
+                            ? new Error(`Timeout na ${Math.round(timeoutMs / 1000)}s (${url})`)
+                            : error;
+                    } finally {
+                        window.clearTimeout(timer);
+                    }
+                }
+
+                throw lastError || new Error('Request mislukt.');
+            }
+
+            function closeScheduleModal() {
+                if (state.scheduleBusy) return;
+                state.scheduleTaskId = null;
+                modalOverlay.classList.remove('show');
+                modalOverlay.setAttribute('aria-hidden', 'true');
+                setScheduleStatus('');
+            }
+
+            async function openScheduleModal(taskId) {
+                const task = getTaskById(taskId);
+                if (!task) return;
+
+                if (!state.detailsById[String(taskId)]) {
+                    await loadTaskDetail(taskId);
+                }
+                const detail = state.detailsById[String(taskId)] || {};
+
+                state.scheduleTaskId = taskId;
+                if (modalSub) {
+                    modalSub.textContent = `${String(task.company || 'Onbekende lead')} · ${String(task.contact || 'Onbekend')}`;
+                }
+                if (modalDate) modalDate.value = String(detail.date || task.date || '').slice(0, 10);
+                if (modalTime) modalTime.value = normalizeTimeValue(detail.time || task.time || '09:00') || '09:00';
+                if (modalLocation) modalLocation.value = String(detail.location || task.location || '').trim();
+                if (modalWhatsappInfo) {
+                    modalWhatsappInfo.value = String(detail.whatsappInfo || task.whatsappInfo || '').trim();
+                }
+
+                setScheduleStatus('');
+                setScheduleBusy(false);
+                modalOverlay.classList.add('show');
+                modalOverlay.setAttribute('aria-hidden', 'false');
+                window.setTimeout(() => {
+                    if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
+                }, 20);
+            }
+
+            async function submitScheduleToAgenda() {
+                const taskId = Number(state.scheduleTaskId || 0);
+                if (!taskId || state.scheduleBusy) return;
+                const task = getTaskById(taskId);
+                if (!task) return;
+
+                const date = String(modalDate?.value || '').trim();
+                const time = normalizeTimeValue(modalTime?.value || '');
+                const location = String(modalLocation?.value || '').trim();
+                const whatsappInfo = String(modalWhatsappInfo?.value || '').trim();
+
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+                    setScheduleStatus('Kies een geldige datum.', 'error');
+                    if (modalDate) modalDate.focus();
+                    return;
+                }
+                if (!/^\d{2}:\d{2}$/.test(time)) {
+                    setScheduleStatus('Kies een geldige tijd.', 'error');
+                    if (modalTime) modalTime.focus();
+                    return;
+                }
+
+                setScheduleBusy(true);
+                setScheduleStatus('Bezig met inplannen...', '');
+                try {
+                    const data = await postJsonWithFallbackLocal(
+                        [
+                            `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/set-in-agenda`,
+                            `/api/agenda/lead-to-agenda?taskId=${encodeURIComponent(String(taskId))}`,
+                        ],
+                        {
+                            appointmentDate: date,
+                            appointmentTime: time,
+                            location,
+                            whatsappInfo,
+                            actor: 'AI leads pagina',
+                        },
+                        25000
+                    );
+
+                    state.tasks = state.tasks.filter((item) => Number(item.id) !== Number(taskId));
+                    delete state.detailsById[String(taskId)];
+                    delete state.actionBusyById[String(taskId)];
+                    if (Number(state.expandedTaskId) === Number(taskId)) state.expandedTaskId = null;
+                    renderTasks();
+
+                    const company = data?.appointment?.company || task.company || 'Lead';
+                    addActivityLine(
+                        'success',
+                        `<strong>${esc(company)}</strong> in agenda gezet op ${esc(date)} om ${esc(time)}.`
+                    );
+
+                    closeScheduleModal();
+                } catch (error) {
+                    setScheduleStatus(String(error?.message || 'Inplannen mislukt.'), 'error');
+                } finally {
+                    setScheduleBusy(false);
+                }
+            }
+
             function renderTasks() {
                 const tasks = Array.isArray(state.tasks) ? state.tasks : [];
-                countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
+                countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'lead' : 'leads'}`;
 
                 if (!tasks.length) {
                     state.expandedTaskId = null;
-                    listEl.innerHTML = '<div class="log-task-empty">Nog geen open bevestigingstaken. Zodra AI een afspraak plant verschijnt die hier.</div>';
+                    listEl.innerHTML = '<div class="log-task-empty">Nog geen leads met ingeplande afspraak. Zodra een afspraak via coldcalling wordt gedetecteerd verschijnt die hier.</div>';
                     return;
                 }
 
@@ -2264,14 +2611,15 @@
                         <div class="log-task-item" data-task-item-id="${taskId}">
                             <div class="log-task-top">
                                 <div class="log-task-left">
-                                    <button type="button" class="log-task-company-btn magnetic" data-task-open="${taskId}">
+                                    <button type="button" class="log-task-company-btn magnetic" data-task-schedule="${taskId}">
                                         <div class="log-task-company"><strong>${company}</strong> · ${contact}</div>
                                     </button>
-                                    <div class="log-task-meta">Bevestigingsmail sturen voor afspraak op ${dt}</div>
+                                    <div class="log-task-meta">Afspraak voorgesteld op ${dt} · klik op de lead om in agenda te zetten</div>
                                     ${note}
                                 </div>
                                 <div class="log-task-side">
                                     <div class="log-task-statuses">${badgesHtml(task)}</div>
+                                    <button type="button" class="log-task-btn success magnetic" data-task-schedule="${taskId}">Zet in agenda</button>
                                     <button type="button" class="log-task-btn magnetic" data-task-open="${taskId}">${openLabel}</button>
                                 </div>
                             </div>
@@ -2279,6 +2627,16 @@
                         </div>
                     `;
                 }).join('');
+
+                listEl.querySelectorAll('[data-task-schedule]').forEach((btn) => {
+                    btn.addEventListener('click', async (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const taskId = Number(btn.getAttribute('data-task-schedule'));
+                        if (!taskId) return;
+                        await openScheduleModal(taskId);
+                    });
+                });
 
                 listEl.querySelectorAll('[data-task-open]').forEach((btn) => {
                     btn.addEventListener('click', async (event) => {
@@ -2346,13 +2704,14 @@
 
             async function generateDraft(taskId) {
                 try {
-                    const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/draft-email`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ actor: 'AI coldcalling pagina' })
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok || !data?.ok || !data.task) return false;
+                    const data = await postJsonWithFallbackLocal(
+                        [
+                            `/api/agenda/confirmation-tasks/${taskId}/draft-email`,
+                            `/api/agenda/confirmation-task-draft-email?taskId=${taskId}`,
+                        ],
+                        { actor: 'AI leads pagina' }
+                    );
+                    if (!data?.task) return false;
                     state.detailsById[String(taskId)] = data.task;
                     mergeTask(data.task);
                     renderTasks();
@@ -2364,13 +2723,11 @@
 
             async function markSent(taskId) {
                 try {
-                    const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/mark-sent`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ actor: 'AI coldcalling pagina' })
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok || !data?.ok || !data.task) return false;
+                    const data = await postJsonWithFallbackLocal(
+                        [`/api/agenda/confirmation-tasks/${taskId}/mark-sent`],
+                        { actor: 'AI leads pagina' }
+                    );
+                    if (!data?.task) return false;
                     state.detailsById[String(taskId)] = data.task;
                     mergeTask(data.task);
                     renderTasks();
@@ -2385,13 +2742,11 @@
                 const task = getTaskById(taskId);
                 if (!task || !task.mailSent) return false;
                 try {
-                    const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/mark-response-received`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ actor: 'AI coldcalling pagina' })
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok || !data?.ok) return false;
+                    const data = await postJsonWithFallbackLocal(
+                        [`/api/agenda/confirmation-tasks/${taskId}/mark-response-received`],
+                        { actor: 'AI leads pagina' }
+                    );
+                    if (!data?.ok) return false;
 
                     state.tasks = state.tasks.filter((item) => Number(item.id) !== Number(taskId));
                     delete state.detailsById[String(taskId)];
@@ -2427,6 +2782,23 @@
                     state.loading = false;
                 }
             }
+
+            modalOverlay.addEventListener('click', (event) => {
+                if (event.target === modalOverlay) {
+                    closeScheduleModal();
+                }
+            });
+            if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeScheduleModal);
+            if (modalCancelBtn) modalCancelBtn.addEventListener('click', closeScheduleModal);
+            if (modalSubmitBtn) modalSubmitBtn.addEventListener('click', () => {
+                void submitScheduleToAgenda();
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modalOverlay.classList.contains('show')) {
+                    event.preventDefault();
+                    closeScheduleModal();
+                }
+            });
 
             renderTasks();
             loadTasks();
