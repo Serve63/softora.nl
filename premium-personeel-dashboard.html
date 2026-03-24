@@ -1702,7 +1702,7 @@
         function normalizePremiumOrderStatus(value) {
             const key = String(value || '').trim().toLowerCase();
             if (key === 'actief') return { key: 'actief', text: 'Openstaand' };
-            if (key === 'bezig') return { key: 'bezig', text: 'Nog bezig' };
+            if (key === 'bezig') return { key: 'bezig', text: 'In behandeling' };
             if (key === 'klaar') return { key: 'klaar', text: 'Gebouwd' };
             if (key === 'betaald') return { key: 'betaald', text: 'Betaald' };
             return { key: 'wacht', text: 'Openstaand' };
@@ -1867,7 +1867,7 @@
                 return { text: 'Gebouwd', className: 'status-review' };
             }
             if (order?.ui?.status?.key === 'bezig') {
-                return { text: 'Nog bezig', className: 'status-active' };
+                return { text: 'In behandeling', className: 'status-active' };
             }
             return { text: 'Openstaand', className: 'status-active' };
         }
