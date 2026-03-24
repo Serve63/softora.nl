@@ -631,9 +631,13 @@
                 }
 
                 listEl.innerHTML = allLeads.map((item) => {
-                    const company = esc(item.company || 'Onbekende lead');
-                    const contact = esc(item.contact || 'Onbekend contact');
-                    const phone = esc(item.phone || 'Geen telefoon');
+                    const companyRaw = String(item.company || 'Onbekende lead').trim() || 'Onbekende lead';
+                    const contactRaw = String(item.contact || '').trim();
+                    const phoneRaw = String(item.phone || '').trim();
+                    const sameName = contactRaw && normalize(contactRaw) === normalize(companyRaw);
+                    const contactLine = sameName || !contactRaw ? phoneRaw || 'Geen telefoon' : `${contactRaw} · ${phoneRaw || 'Geen telefoon'}`;
+                    const company = esc(companyRaw);
+                    const contact = esc(contactLine);
                     const moment = esc(formatDateTime(item));
                     const leadType = esc(resolveLeadType(item));
                     const chipClass = 'pending';
