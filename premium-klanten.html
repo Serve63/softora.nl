@@ -537,6 +537,11 @@
             font-size: 0.92rem;
         }
 
+        .cell-phone {
+            font-size: 0.86rem;
+            white-space: nowrap;
+        }
+
         .service-cell {
             min-width: 180px;
         }
@@ -1582,7 +1587,7 @@
                                 ? "<div class=\"client-company\">" + escapeHtml(customerSubLabel) + "</div>"
                                 : ""),
                         "</td>",
-                        "<td data-label=\"Telefoonnummer\" class=\"muted-cell\">" + escapeHtml(customer.telefoon) + "</td>",
+                        "<td data-label=\"Telefoonnummer\" class=\"muted-cell cell-phone\">" + escapeHtml(customer.telefoon) + "</td>",
                         "<td data-label=\"Website\" class=\"service-cell\">",
                             renderServiceCell(customer, "website"),
                         "</td>",
