@@ -279,9 +279,8 @@
         .modal-overlay.show .modal { transform: translateY(0); }
 
         .modal-top {
-            padding: 1.35rem 1.5rem 1rem;
+            padding: 1.35rem 1.5rem 0;
             display: flex; justify-content: space-between; align-items: flex-start;
-            border-bottom: 1px solid var(--border);
         }
         .modal-close {
             width: 36px; height: 36px; border: 1px solid var(--border);
@@ -293,15 +292,11 @@
         .modal-close svg { width: 16px; height: 16px; }
 
         .modal-type-badge {
-            font-family: 'Oswald', sans-serif; font-size: 0.68rem; font-weight: 600;
-            text-transform: uppercase; letter-spacing: 0.12em;
-            padding: 0.28rem 0.75rem; display: inline-block; margin-bottom: 0.75rem;
+            font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            padding: 0.3rem 0.8rem; display: inline-block; margin-bottom: 1rem;
         }
-        .modal-type-badge.meeting {
-            background: rgba(139,34,82,0.15);
-            color: var(--accent-light);
-            border: 1px solid rgba(139,34,82,0.25);
-        }
+        .modal-type-badge.meeting { background: rgba(139,34,82,0.12); color: var(--accent-light); }
 
         .modal-company {
             font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 700;
@@ -312,7 +307,7 @@
         }
 
         .modal-body {
-            padding: 1.2rem 1.5rem;
+            padding: 1rem 1.5rem;
             overflow-y: auto;
         }
 
@@ -344,81 +339,45 @@
         .modal-workspace { display: none; }
         .modal-workspace.show { display: block; }
 
-        .modal-workspace > .modal-workspace-label {
-            font-family: 'Oswald', sans-serif; font-size: 0.8rem; font-weight: 600;
-            text-transform: uppercase; letter-spacing: 0.14em;
-            color: var(--text-primary); margin-bottom: 0;
-            display: flex; align-items: center; gap: 0.5rem;
-        }
-        .modal-workspace > .modal-workspace-label::before {
-            content: '';
-            display: inline-block;
-            width: 3px; height: 14px;
-            background: var(--accent-light);
-            border-radius: 2px;
-            flex-shrink: 0;
-        }
-
         .modal-workspace-label {
-            font-family: 'Oswald', sans-serif; font-size: 0.68rem; font-weight: 500;
+            font-family: 'Oswald', sans-serif; font-size: 0.72rem; font-weight: 500;
             text-transform: uppercase; letter-spacing: 0.12em;
-            color: var(--text-tertiary); margin-bottom: 0.4rem;
+            color: var(--text-tertiary); margin-bottom: 0.45rem;
         }
 
         .modal-workspace-help {
-            font-size: 0.76rem; color: var(--text-secondary); font-weight: 300;
-            margin-bottom: 0.75rem; line-height: 1.5;
-            padding: 0.55rem 0.75rem;
-            background: rgba(139,34,82,0.06);
-            border-left: 2px solid rgba(139,34,82,0.3);
+            font-size: 0.78rem; color: var(--text-secondary); font-weight: 300;
+            margin-bottom: 0.55rem; line-height: 1.45;
         }
 
         .modal-workspace-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 0.85rem;
-        }
-
-        .modal-workspace-field {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            padding: 0.65rem 0.75rem 0.6rem;
+            gap: 0.75rem;
         }
 
         .modal-workspace-field textarea {
             width: 100%;
             min-height: 130px;
             max-height: 220px;
-            border: none;
-            border-top: 1px solid var(--border);
-            background: transparent;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
             color: var(--text-primary);
-            padding: 0.55rem 0;
+            padding: 0.65rem;
             resize: vertical;
             line-height: 1.5;
             font-size: 0.8rem;
             outline: none;
-            margin-top: 0.1rem;
-        }
-
-        .modal-workspace-field textarea:focus {
-            border-top-color: var(--accent-light);
         }
 
         .modal-workspace-input {
             width: 100%;
-            border: none;
-            border-top: 1px solid var(--border);
-            background: transparent;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
             color: var(--text-primary);
-            padding: 0.5rem 0 0.35rem;
-            font-size: 0.85rem;
+            padding: 0.6rem 0.7rem;
+            font-size: 0.8rem;
             outline: none;
-            margin-top: 0.1rem;
-        }
-
-        .modal-workspace-input:focus {
-            border-top-color: var(--accent-light);
         }
 
         .modal-workspace-input::placeholder {
@@ -426,14 +385,14 @@
         }
 
         .modal-workspace-hint {
-            margin-top: 0.35rem;
-            font-size: 0.66rem;
+            margin-top: 0.3rem;
+            font-size: 0.68rem;
             color: var(--text-tertiary);
             line-height: 1.4;
         }
 
         .modal-workspace-status {
-            margin-top: 0.5rem;
+            margin-top: 0.35rem;
             font-size: 0.7rem;
             color: var(--text-tertiary);
             min-height: 1.2em;
@@ -443,8 +402,7 @@
         .modal-workspace-status.success { color: var(--green); }
 
         .modal-workspace-actions {
-            margin-top: 0.6rem;
-            margin-bottom: 0.75rem;
+            margin-top: 0.5rem;
             display: flex;
             flex-wrap: wrap;
             gap: 0.45rem;
@@ -489,44 +447,29 @@
             background: transparent;
             color: var(--text-secondary);
             font-family: 'Oswald', sans-serif;
-            font-size: 0.67rem;
-            letter-spacing: 0.06em;
+            font-size: 0.68rem;
+            letter-spacing: 0.04em;
             text-transform: uppercase;
-            padding: 0.5rem 0.9rem;
+            padding: 0.55rem 0.72rem;
             cursor: none;
             transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-        }
-
-        .workspace-attachment-btn::before {
-            content: '';
-            display: inline-block;
-            width: 14px; height: 14px;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888' stroke-width='1.8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 002.112 2.13'/%3E%3C/svg%3E");
-            background-size: contain;
-            background-repeat: no-repeat;
-            flex-shrink: 0;
         }
 
         .workspace-attachment-btn:hover {
             color: var(--text-primary);
             border-color: var(--accent-light);
-            box-shadow: 0 0 16px var(--accent-glow);
         }
 
         .workspace-attachments {
-            margin-top: 0.75rem;
+            margin-top: 0.45rem;
             border: 1px solid var(--border);
-            border-style: dashed;
-            background: rgba(255,255,255,0.015);
-            padding: 0.55rem 0.65rem;
+            background: var(--bg-primary);
+            padding: 0.45rem;
         }
 
         .workspace-attachments-label {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.65rem;
+            font-size: 0.68rem;
             letter-spacing: 0.1em;
             text-transform: uppercase;
             color: var(--text-tertiary);
@@ -578,9 +521,8 @@
         }
 
         .modal-footer {
-            padding: 0.85rem 1.5rem 1.1rem;
+            padding: 0.4rem 1.5rem 1.2rem;
             display: flex; gap: 0.5rem;
-            border-top: 1px solid var(--border);
         }
         .modal-btn {
             flex: 1; padding: 0.8rem;
@@ -687,7 +629,7 @@
                         <div class="modal-workspace-hint">Optioneel, maar nodig als je later domein-koppeling/registratie wilt automatiseren.</div>
                     </div>
                     <div class="modal-workspace-field">
-                        <div class="modal-workspace-label">Notities &amp; klantwensen</div>
+                        <div class="modal-workspace-label">Notities meeting & klantwensen</div>
                         <textarea id="workspaceTranscript" placeholder="Zet hier alle meetingnotities: doelen, wensen, stijl, functionaliteiten, planning, budget, bijzonderheden..."></textarea>
                         <div class="workspace-attachments">
                             <div class="workspace-attachments-label">Foto-bijlagen voor website-bouw</div>
