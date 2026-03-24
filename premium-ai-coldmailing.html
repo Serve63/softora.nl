@@ -466,6 +466,13 @@
             gap: 0.8rem;
         }
 
+        .lead-modal-header-right {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.28rem;
+        }
+
         .lead-modal-title {
             font-family: 'Oswald', sans-serif;
             text-transform: uppercase;
@@ -653,9 +660,7 @@
         .lead-modal-actions-right {
             margin-left: auto;
             display: inline-flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.4rem;
+            align-items: center;
         }
 
         .lead-modal-actions-row {
@@ -819,7 +824,10 @@
                         <div class="lead-modal-title">Lead details</div>
                         <div class="lead-modal-sub" id="leadModalSub">-</div>
                     </div>
-                    <button class="lead-modal-close" id="leadModalClose" type="button" aria-label="Sluiten">×</button>
+                    <div class="lead-modal-header-right">
+                        <button class="lead-modal-close" id="leadModalClose" type="button" aria-label="Sluiten">×</button>
+                        <button class="lead-modal-delete-btn" id="leadModalDeleteBtn" type="button">Lead verwijderen</button>
+                    </div>
                 </div>
 
                 <div class="lead-modal-info-grid">
@@ -857,7 +865,6 @@
                         </div>
                     </div>
                     <div class="lead-modal-actions-right">
-                        <button class="lead-modal-delete-btn" id="leadModalDeleteBtn" type="button">Lead verwijderen</button>
                         <div class="lead-modal-actions-row">
                             <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
                             <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
