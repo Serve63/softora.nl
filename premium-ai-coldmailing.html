@@ -1199,6 +1199,11 @@
 
                     if (
                         window.SoftoraPersonnelTheme &&
+                        typeof window.SoftoraPersonnelTheme.refreshSidebarCounts === 'function'
+                    ) {
+                        window.SoftoraPersonnelTheme.refreshSidebarCounts();
+                    } else if (
+                        window.SoftoraPersonnelTheme &&
                         typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
                     ) {
                         window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();

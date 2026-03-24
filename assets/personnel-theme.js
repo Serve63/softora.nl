@@ -73,11 +73,12 @@
         const isActive = link.key === activeKey;
         const classes = `sidebar-link magnetic${isActive ? " active" : ""}`;
         const labelHtml = `<span class="sidebar-link-text">${link.label}</span>`;
-        const leadsBadgeHtml =
-            link.key === "leads"
-                ? '<span class="sidebar-notification-badge" data-sidebar-leads-count hidden>0</span>'
-                : "";
-        return `<a href="${link.href}" class="${classes}">${link.icon}${labelHtml}${leadsBadgeHtml}</a>`;
+        const hasCountBadge =
+            link.key === "leads" || link.key === "agenda" || link.key === "active_orders";
+        const countBadgeHtml = hasCountBadge
+            ? `<span class="sidebar-notification-badge" data-sidebar-count-key="${link.key}" hidden>0</span>`
+            : "";
+        return `<a href="${link.href}" class="${classes}">${link.icon}${labelHtml}${countBadgeHtml}</a>`;
     }
 
     function buildUnifiedPremiumSidebarHtml(activeKey) {
@@ -227,8 +228,12 @@
         }
     }
 
-    function paintSidebarLeadsCount(count) {
-        const badge = document.querySelector("[data-sidebar-leads-count]");
+    function getSidebarCountBadge(countKey) {
+        return document.querySelector(`[data-sidebar-count-key="${String(countKey || "").trim()}"]`);
+    }
+
+    function paintSidebarCount(countKey, count, labels) {
+        const badge = getSidebarCountBadge(countKey);
         if (!badge) return;
         if (!Number.isFinite(count) || count < 0) {
             badge.hidden = true;
@@ -237,17 +242,19 @@
         badge.hidden = false;
         badge.dataset.countZero = count === 0 ? "1" : "0";
         badge.textContent = count > 99 ? "99+" : String(count);
-        badge.title = `${count} open lead${count === 1 ? "" : "s"}`;
+        const singular = String(labels && labels.singular ? labels.singular : "item");
+        const plural = String(labels && labels.plural ? labels.plural : `${singular}s`);
+        badge.title = `${count} ${count === 1 ? singular : plural}`;
         badge.setAttribute("aria-label", badge.title);
     }
 
     async function refreshSidebarLeadsCount() {
-        const badge = document.querySelector("[data-sidebar-leads-count]");
+        const badge = getSidebarCountBadge("leads");
         if (!badge) return;
 
         const tasksData = await fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400");
         if (!tasksData) {
-            paintSidebarLeadsCount(null);
+            paintSidebarCount("leads", null);
             return;
         }
 
@@ -255,14 +262,91 @@
             ? tasksData.tasks.map(normalizeLeadRowForCount)
             : [];
         const total = dedupeLeadRowsForCount(pendingRows).length;
-        paintSidebarLeadsCount(total);
+        paintSidebarCount("leads", total, { singular: "open lead", plural: "open leads" });
     }
 
-    function initSidebarLeadsCount() {
+    async function refreshSidebarAgendaCount() {
+        const badge = getSidebarCountBadge("agenda");
+        if (!badge) return;
+
+        const appointmentsData = await fetchJsonNoStore("/api/agenda/appointments?limit=400");
+        if (!appointmentsData) {
+            paintSidebarCount("agenda", null);
+            return;
+        }
+
+        const rows = Array.isArray(appointmentsData && appointmentsData.appointments)
+            ? appointmentsData.appointments.map(normalizeLeadRowForCount)
+            : [];
+        const total = dedupeLeadRowsForCount(rows).length;
+        paintSidebarCount("agenda", total, { singular: "afspraak", plural: "afspraken" });
+    }
+
+    function parseJsonMaybe(value) {
+        if (value === null || value === undefined) return null;
+        if (typeof value === "object") return value;
+        const raw = String(value || "").trim();
+        if (!raw) return null;
+        try {
+            return JSON.parse(raw);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function getActiveOrdersCountFromUiValues(values) {
+        const source = values && typeof values === "object" ? values : {};
+        const customRaw = parseJsonMaybe(source.softora_custom_orders_premium_v1);
+        if (Array.isArray(customRaw)) {
+            const ids = new Set();
+            customRaw.forEach(function (item) {
+                const id = Number(item && item.id);
+                if (Number.isFinite(id) && id > 0) ids.add(id);
+            });
+            return ids.size;
+        }
+
+        const runtimeRaw = parseJsonMaybe(source.softora_order_runtime_premium_v1);
+        if (runtimeRaw && typeof runtimeRaw === "object" && !Array.isArray(runtimeRaw)) {
+            return Object.keys(runtimeRaw).reduce(function (count, key) {
+                const id = Number(key);
+                return Number.isFinite(id) && id > 0 ? count + 1 : count;
+            }, 0);
+        }
+
+        return 0;
+    }
+
+    async function refreshSidebarActiveOrdersCount() {
+        const badge = getSidebarCountBadge("active_orders");
+        if (!badge) return;
+
+        const state = await fetchJsonNoStore("/api/ui-state/premium_active_orders");
+        if (!state || state.ok === false) {
+            paintSidebarCount("active_orders", null);
+            return;
+        }
+
+        const total = getActiveOrdersCountFromUiValues(state.values);
+        paintSidebarCount("active_orders", total, {
+            singular: "actieve opdracht",
+            plural: "actieve opdrachten",
+        });
+    }
+
+    async function refreshSidebarNotificationCounts() {
+        await Promise.all([
+            refreshSidebarActiveOrdersCount(),
+            refreshSidebarAgendaCount(),
+            refreshSidebarLeadsCount(),
+        ]);
+    }
+
+    function initSidebarNotificationCounts() {
         if (!isPremiumPersonnelContext) return;
-        if (!document.querySelector("[data-sidebar-leads-count]")) return;
-        refreshSidebarLeadsCount();
-        window.setInterval(refreshSidebarLeadsCount, 45000);
+        if (!document.querySelector("[data-sidebar-count-key]")) return;
+        refreshSidebarNotificationCounts();
+        window.setInterval(refreshSidebarNotificationCounts, 45000);
     }
 
     function forceLightTheme() {
@@ -312,9 +396,12 @@
         return Promise.resolve(true);
     };
     window.SoftoraPersonnelTheme.refreshSidebarLeadsCount = refreshSidebarLeadsCount;
+    window.SoftoraPersonnelTheme.refreshSidebarAgendaCount = refreshSidebarAgendaCount;
+    window.SoftoraPersonnelTheme.refreshSidebarActiveOrdersCount = refreshSidebarActiveOrdersCount;
+    window.SoftoraPersonnelTheme.refreshSidebarCounts = refreshSidebarNotificationCounts;
 
     applyUnifiedPremiumSidebar();
-    initSidebarLeadsCount();
+    initSidebarNotificationCounts();
     forceLightTheme();
     syncThemeButtonsToLight();
 })();
