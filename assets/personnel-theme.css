@@ -127,6 +127,13 @@
     transform-origin: center;
 }
 
+/* Maak de flow-pijl in de premium sidebar net iets langer:
+   van "Actieve Opdrachten" t/m "Coldcalling". */
+.sidebar-flow-section::before {
+    top: 5.95rem !important;
+    bottom: 0.55rem !important;
+}
+
 .theme-scope-modal {
     position: fixed;
     inset: 0;
