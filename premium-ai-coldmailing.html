@@ -498,13 +498,6 @@
             </div>
 
             <section class="panel">
-                <div class="panel-head">
-                    <div class="panel-title">Leads lijst</div>
-                    <div class="panel-count" id="leadCount">0 leads</div>
-                </div>
-                <div class="search-wrap">
-                    <input type="search" class="search-input" id="leadSearchInput" placeholder="Zoek op bedrijfsnaam, contact of telefoon">
-                </div>
                 <div class="lead-status" id="leadStatus">Leads laden...</div>
                 <div class="lead-list" id="leadList"></div>
             </section>
@@ -514,11 +507,9 @@
     <script>
         (function initLeadsOverview() {
             const listEl = document.getElementById('leadList');
-            const countEl = document.getElementById('leadCount');
             const statusEl = document.getElementById('leadStatus');
-            const searchEl = document.getElementById('leadSearchInput');
             const reloadBtn = document.getElementById('reloadLeadsBtn');
-            if (!listEl || !countEl || !statusEl || !searchEl || !reloadBtn) return;
+            if (!listEl || !statusEl || !reloadBtn) return;
 
             let allLeads = [];
             let pollTimer = null;
@@ -562,26 +553,12 @@
             }
 
             function renderList() {
-                const q = normalize(searchEl.value);
-                const filtered = allLeads.filter((item) => {
-                    if (!q) return true;
-                    const haystack = normalize([
-                        item.company,
-                        item.contact,
-                        item.phone,
-                        item.source,
-                    ].join(' '));
-                    return haystack.includes(q);
-                });
-
-                countEl.textContent = `${filtered.length} ${filtered.length === 1 ? 'lead' : 'leads'}`;
-
-                if (!filtered.length) {
-                    listEl.innerHTML = '<div class="lead-empty">Geen leads gevonden voor deze zoekopdracht.</div>';
+                if (!allLeads.length) {
+                    listEl.innerHTML = '<div class="lead-empty">Nog geen leads gevonden.</div>';
                     return;
                 }
 
-                listEl.innerHTML = filtered.map((item) => {
+                listEl.innerHTML = allLeads.map((item) => {
                     const company = esc(item.company || 'Onbekende lead');
                     const contact = esc(item.contact || 'Onbekend contact');
                     const phone = esc(item.phone || 'Geen telefoon');
@@ -675,7 +652,6 @@
                 }
             }
 
-            searchEl.addEventListener('input', renderList);
             reloadBtn.addEventListener('click', () => {
                 loadLeads();
             });
