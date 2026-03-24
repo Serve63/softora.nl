@@ -372,6 +372,21 @@
             gap: 0.8rem;
         }
 
+        .lead-item.clickable {
+            cursor: pointer;
+        }
+
+        .lead-item.clickable:hover {
+            border-color: rgba(139, 34, 82, 0.42);
+            box-shadow: 0 0 0 1px rgba(139, 34, 82, 0.2);
+        }
+
+        .lead-item.clickable:focus-visible {
+            outline: none;
+            border-color: rgba(139, 34, 82, 0.62);
+            box-shadow: 0 0 0 2px rgba(139, 34, 82, 0.24);
+        }
+
         .lead-name {
             font-weight: 700;
             color: var(--text-primary);
@@ -417,6 +432,198 @@
             background: rgba(255, 255, 255, 0.01);
         }
 
+        .lead-modal-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(9, 11, 20, 0.62);
+            z-index: 1200;
+            padding: 1.2rem;
+        }
+
+        .lead-modal-overlay.show {
+            display: flex;
+        }
+
+        .lead-modal {
+            width: min(760px, 100%);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--bg-secondary);
+            box-shadow: 0 26px 70px rgba(0, 0, 0, 0.34);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+        }
+
+        .lead-modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.8rem;
+        }
+
+        .lead-modal-title {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .lead-modal-sub {
+            margin-top: 0.18rem;
+            color: var(--text-tertiary);
+            font-size: 0.83rem;
+        }
+
+        .lead-modal-close {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .lead-modal-close:hover {
+            color: var(--accent-light);
+            border-color: rgba(139, 34, 82, 0.42);
+        }
+
+        .lead-modal-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8rem;
+        }
+
+        .lead-modal-info {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--bg-primary);
+            padding: 0.7rem 0.75rem;
+        }
+
+        .lead-modal-info-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 0.33rem;
+        }
+
+        .lead-modal-info-text {
+            color: var(--text-secondary);
+            font-size: 0.86rem;
+            line-height: 1.5;
+            white-space: pre-line;
+        }
+
+        .lead-modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8rem;
+        }
+
+        .lead-modal-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .lead-modal-field-full {
+            grid-column: 1 / -1;
+        }
+
+        .lead-modal-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.66rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .lead-modal-input,
+        .lead-modal-textarea {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 0.58rem 0.65rem;
+            font-size: 0.85rem;
+            line-height: 1.35;
+            outline: none;
+        }
+
+        .lead-modal-textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .lead-modal-input:focus,
+        .lead-modal-textarea:focus {
+            border-color: rgba(139, 34, 82, 0.5);
+            box-shadow: 0 0 0 1px rgba(139, 34, 82, 0.2);
+        }
+
+        .lead-modal-status {
+            min-height: 1.2rem;
+            color: var(--text-tertiary);
+            font-size: 0.8rem;
+        }
+
+        .lead-modal-status.error {
+            color: #f06b82;
+        }
+
+        .lead-modal-status.success {
+            color: #2ecc71;
+        }
+
+        .lead-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.55rem;
+        }
+
+        .lead-modal-btn {
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-radius: 9px;
+            padding: 0.55rem 0.9rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.79rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .lead-modal-btn:hover {
+            border-color: rgba(139, 34, 82, 0.4);
+        }
+
+        .lead-modal-btn.primary {
+            background: linear-gradient(180deg, var(--accent-light), var(--accent));
+            color: #fff;
+            border-color: transparent;
+        }
+
+        .lead-modal-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
         @media (max-width: 900px) {
             .sidebar {
                 position: static;
@@ -438,6 +645,11 @@
             .lead-item {
                 flex-direction: column;
                 align-items: flex-start;
+            }
+
+            .lead-modal-info-grid,
+            .lead-modal-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -531,6 +743,54 @@
                 <div class="lead-list" id="leadList"></div>
             </section>
         </main>
+
+        <div class="lead-modal-overlay" id="leadModalOverlay" aria-hidden="true">
+            <div class="lead-modal">
+                <div class="lead-modal-header">
+                    <div>
+                        <div class="lead-modal-title">Lead details</div>
+                        <div class="lead-modal-sub" id="leadModalSub">-</div>
+                    </div>
+                    <button class="lead-modal-close" id="leadModalClose" type="button" aria-label="Sluiten">×</button>
+                </div>
+
+                <div class="lead-modal-info-grid">
+                    <div class="lead-modal-info">
+                        <div class="lead-modal-info-label">Gesprek samenvatting</div>
+                        <div class="lead-modal-info-text" id="leadModalSummary">Nog geen samenvatting beschikbaar.</div>
+                    </div>
+                    <div class="lead-modal-info">
+                        <div class="lead-modal-info-label">Wat is afgesproken</div>
+                        <div class="lead-modal-info-text" id="leadModalAgreements">Nog geen afsprakeninfo beschikbaar.</div>
+                    </div>
+                </div>
+
+                <div class="lead-modal-grid">
+                    <div class="lead-modal-field">
+                        <label class="lead-modal-label" for="leadModalDate">Datum</label>
+                        <input class="lead-modal-input" id="leadModalDate" type="date">
+                    </div>
+                    <div class="lead-modal-field">
+                        <label class="lead-modal-label" for="leadModalTime">Tijd</label>
+                        <input class="lead-modal-input" id="leadModalTime" type="time" step="60">
+                    </div>
+                    <div class="lead-modal-field lead-modal-field-full">
+                        <label class="lead-modal-label" for="leadModalLocation">Locatie</label>
+                        <input class="lead-modal-input" id="leadModalLocation" type="text" placeholder="Bijv. Kantoor Softora, Oisterwijk">
+                    </div>
+                    <div class="lead-modal-field lead-modal-field-full">
+                        <label class="lead-modal-label" for="leadModalWhatsappInfo">Overige info uit WhatsApp</label>
+                        <textarea class="lead-modal-textarea" id="leadModalWhatsappInfo" placeholder="Bijv. contactvoorkeur, aandachtspunten, extra vragen..."></textarea>
+                    </div>
+                </div>
+
+                <div class="lead-modal-status" id="leadModalStatus"></div>
+                <div class="lead-modal-actions">
+                    <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
+                    <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -538,10 +798,44 @@
             const listEl = document.getElementById('leadList');
             const statusEl = document.getElementById('leadStatus');
             const reloadBtn = document.getElementById('reloadLeadsBtn');
-            if (!listEl || !statusEl || !reloadBtn) return;
+            const modalOverlay = document.getElementById('leadModalOverlay');
+            const modalSub = document.getElementById('leadModalSub');
+            const modalSummary = document.getElementById('leadModalSummary');
+            const modalAgreements = document.getElementById('leadModalAgreements');
+            const modalDate = document.getElementById('leadModalDate');
+            const modalTime = document.getElementById('leadModalTime');
+            const modalLocation = document.getElementById('leadModalLocation');
+            const modalWhatsappInfo = document.getElementById('leadModalWhatsappInfo');
+            const modalStatus = document.getElementById('leadModalStatus');
+            const modalCloseBtn = document.getElementById('leadModalClose');
+            const modalCancelBtn = document.getElementById('leadModalCancelBtn');
+            const modalSubmitBtn = document.getElementById('leadModalSubmitBtn');
+
+            if (
+                !listEl ||
+                !statusEl ||
+                !reloadBtn ||
+                !modalOverlay ||
+                !modalSub ||
+                !modalSummary ||
+                !modalAgreements ||
+                !modalDate ||
+                !modalTime ||
+                !modalLocation ||
+                !modalWhatsappInfo ||
+                !modalStatus ||
+                !modalCloseBtn ||
+                !modalCancelBtn ||
+                !modalSubmitBtn
+            ) {
+                return;
+            }
 
             let allLeads = [];
             let pollTimer = null;
+            let activeTaskId = 0;
+            let modalBusy = false;
+            const leadDetailsById = Object.create(null);
 
             function esc(value) {
                 return String(value || '')
@@ -582,6 +876,231 @@
             function setStatus(message, variant) {
                 statusEl.textContent = String(message || '');
                 statusEl.className = `lead-status${variant ? ` ${variant}` : ''}`;
+            }
+
+            function setStatusLastUpdatedNow() {
+                setStatus(
+                    `Laatste update: ${new Date().toLocaleTimeString('nl-NL', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    })}`,
+                    ''
+                );
+            }
+
+            function normalizeTimeValue(value) {
+                const raw = String(value || '').trim();
+                if (!raw) return '';
+                const match = raw.match(/^(\d{1,2})(?::?(\d{1,2}))?$/);
+                if (!match) return '';
+                const hours = Number(match[1]);
+                const minutes = Number(match[2] || 0);
+                if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return '';
+                if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return '';
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            }
+
+            function getLeadById(taskId) {
+                const id = Number(taskId);
+                if (!id) return null;
+                return allLeads.find((item) => Number(item.id) === id) || null;
+            }
+
+            function setModalBusy(nextBusy) {
+                modalBusy = Boolean(nextBusy);
+                modalSubmitBtn.disabled = modalBusy;
+            }
+
+            function setModalStatus(message, variant) {
+                modalStatus.textContent = String(message || '');
+                modalStatus.className = `lead-modal-status${variant ? ` ${variant}` : ''}`;
+            }
+
+            function closeLeadModal() {
+                activeTaskId = 0;
+                setModalBusy(false);
+                setModalStatus('');
+                modalOverlay.classList.remove('show');
+                modalOverlay.setAttribute('aria-hidden', 'true');
+            }
+
+            async function fetchTaskDetail(taskId) {
+                const response = await fetch(`/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}`, {
+                    cache: 'no-store',
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data?.ok || !data?.task) {
+                    throw new Error(String(data?.error || data?.detail || `Details laden mislukt (${response.status})`));
+                }
+                return data.task;
+            }
+
+            function renderLeadDetailsInModal(lead, detail) {
+                const conversationSummary = String(
+                    detail?.aiSummary ||
+                        detail?.callSummary ||
+                        detail?.summary ||
+                        lead?.summary ||
+                        detail?.transcriptSnippet ||
+                        ''
+                ).trim();
+
+                const agreements = [];
+                const proposedMoment = formatDateTime({
+                    date: detail?.date || lead?.date || '',
+                    time: detail?.time || lead?.time || '',
+                });
+                if (proposedMoment && proposedMoment !== 'Geen afspraakmoment') {
+                    agreements.push(`Voorgesteld moment: ${proposedMoment}`);
+                }
+                if (String(detail?.summary || '').trim()) {
+                    agreements.push(String(detail.summary).trim());
+                }
+                if (String(detail?.location || lead?.location || '').trim()) {
+                    agreements.push(`Locatie: ${String(detail?.location || lead?.location || '').trim()}`);
+                }
+                if (String(detail?.whatsappInfo || lead?.whatsappInfo || '').trim()) {
+                    agreements.push(
+                        `Overige info uit WhatsApp:\n${String(detail?.whatsappInfo || lead?.whatsappInfo || '').trim()}`
+                    );
+                }
+                if (String(detail?.transcriptSnippet || '').trim() && agreements.length === 0) {
+                    agreements.push(`Gespreksnotitie: ${String(detail.transcriptSnippet).trim()}`);
+                }
+
+                modalSummary.textContent = conversationSummary || 'Nog geen samenvatting van het gesprek beschikbaar.';
+                modalAgreements.textContent = agreements.join('\n\n') || 'Nog geen afsprakeninfo beschikbaar.';
+            }
+
+            async function openLeadModal(taskId) {
+                const normalizedTaskId = Number(taskId) || 0;
+                if (!normalizedTaskId) return;
+                const lead = getLeadById(normalizedTaskId);
+                if (!lead) return;
+
+                activeTaskId = normalizedTaskId;
+                const leadType = resolveLeadType(lead);
+                modalSub.textContent = `${String(lead.company || 'Onbekende lead')} · ${leadType}`;
+                modalSummary.textContent = 'Samenvatting laden...';
+                modalAgreements.textContent = 'Afsprakeninfo laden...';
+                modalDate.value = String(lead.date || '').slice(0, 10);
+                modalTime.value = normalizeTimeValue(lead.time || '09:00') || '09:00';
+                modalLocation.value = String(lead.location || '').trim();
+                modalWhatsappInfo.value = String(lead.whatsappInfo || '').trim();
+                setModalStatus('');
+                setModalBusy(false);
+                modalOverlay.classList.add('show');
+                modalOverlay.setAttribute('aria-hidden', 'false');
+                window.setTimeout(() => {
+                    if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
+                }, 20);
+
+                const cached = leadDetailsById[String(normalizedTaskId)];
+                if (cached) {
+                    renderLeadDetailsInModal(lead, cached);
+                    return;
+                }
+
+                try {
+                    const detail = await fetchTaskDetail(normalizedTaskId);
+                    leadDetailsById[String(normalizedTaskId)] = detail;
+                    if (activeTaskId !== normalizedTaskId) return;
+                    renderLeadDetailsInModal(lead, detail);
+                    modalDate.value = String(detail?.date || lead.date || '').slice(0, 10);
+                    modalTime.value = normalizeTimeValue(detail?.time || lead.time || '09:00') || '09:00';
+                    modalLocation.value = String(detail?.location || lead.location || '').trim();
+                    modalWhatsappInfo.value = String(detail?.whatsappInfo || lead.whatsappInfo || '').trim();
+                } catch (error) {
+                    if (activeTaskId !== normalizedTaskId) return;
+                    renderLeadDetailsInModal(lead, null);
+                    setModalStatus(String(error?.message || 'Details laden mislukt.'), 'error');
+                }
+            }
+
+            async function postJsonWithFallback(endpoints, body) {
+                const list = Array.isArray(endpoints) ? endpoints : [endpoints];
+                let lastError = null;
+                for (const endpoint of list) {
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body || {}),
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || data?.ok === false) {
+                            lastError = new Error(
+                                String(data?.error || data?.detail || `Serverfout (${response.status})`)
+                            );
+                            continue;
+                        }
+                        return data;
+                    } catch (error) {
+                        lastError = error instanceof Error ? error : new Error(String(error || 'Onbekende fout'));
+                    }
+                }
+                throw lastError || new Error('Actie mislukt.');
+            }
+
+            async function submitLeadToAgenda() {
+                const taskId = Number(activeTaskId) || 0;
+                if (!taskId || modalBusy) return;
+
+                const date = String(modalDate.value || '').trim();
+                const time = normalizeTimeValue(modalTime.value || '');
+                const location = String(modalLocation.value || '').trim();
+                const whatsappInfo = String(modalWhatsappInfo.value || '').trim();
+
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+                    setModalStatus('Kies een geldige datum.', 'error');
+                    modalDate.focus();
+                    return;
+                }
+                if (!/^\d{2}:\d{2}$/.test(time)) {
+                    setModalStatus('Kies een geldige tijd.', 'error');
+                    modalTime.focus();
+                    return;
+                }
+
+                setModalBusy(true);
+                setModalStatus('Afspraak wordt in agenda gezet...', '');
+                try {
+                    await postJsonWithFallback(
+                        [
+                            `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/set-in-agenda`,
+                            `/api/agenda/lead-to-agenda?taskId=${encodeURIComponent(String(taskId))}`,
+                        ],
+                        {
+                            appointmentDate: date,
+                            appointmentTime: time,
+                            location,
+                            whatsappInfo,
+                            actor: 'Leads pagina',
+                        }
+                    );
+
+                    allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
+                    delete leadDetailsById[String(taskId)];
+                    renderList();
+                    if (allLeads.length > 0) {
+                        setStatusLastUpdatedNow();
+                    } else {
+                        setStatus('Nog geen leads gevonden.', '');
+                    }
+
+                    if (
+                        window.SoftoraPersonnelTheme &&
+                        typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
+                    ) {
+                        window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
+                    }
+
+                    closeLeadModal();
+                } catch (error) {
+                    setModalStatus(String(error?.message || 'Invoegen in agenda mislukt.'), 'error');
+                } finally {
+                    setModalBusy(false);
+                }
             }
 
             function mapLeadModeToLabel(value) {
@@ -640,9 +1159,13 @@
                     const leadType = esc(resolveLeadType(item));
                     const chipClass = 'pending';
                     const chipLabel = 'LEAD';
+                    const taskId = Number(item.id) || 0;
+                    const openAttrs = taskId
+                        ? ` class="lead-item clickable" data-lead-open="${taskId}" role="button" tabindex="0"`
+                        : ' class="lead-item"';
 
                     return `
-                        <article class="lead-item">
+                        <article${openAttrs}>
                             <div>
                                 <div class="lead-name">${company}</div>
                                 <div class="lead-meta">Type: ${leadType}</div>
@@ -652,6 +1175,19 @@
                         </article>
                     `;
                 }).join('');
+
+                listEl.querySelectorAll('[data-lead-open]').forEach((itemEl) => {
+                    const taskId = Number(itemEl.getAttribute('data-lead-open')) || 0;
+                    if (!taskId) return;
+                    itemEl.addEventListener('click', () => {
+                        openLeadModal(taskId);
+                    });
+                    itemEl.addEventListener('keydown', (event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        openLeadModal(taskId);
+                    });
+                });
             }
 
             function sortByDateDesc(a, b) {
@@ -692,6 +1228,14 @@
             function dedupe(rows) {
                 const map = new Map();
                 rows.forEach((row) => {
+                    const rowId = Number(row?.id) || 0;
+                    if (rowId > 0) {
+                        const idKey = `id:${rowId}`;
+                        if (!map.has(idKey)) {
+                            map.set(idKey, row);
+                            return;
+                        }
+                    }
                     const key = [
                         normalize(row.company),
                         normalize(row.contact),
@@ -718,32 +1262,21 @@
                 setStatus('Leads laden...', '');
                 reloadBtn.disabled = true;
                 try {
-                    const [tasksRes, appointmentsRes] = await Promise.all([
-                        fetch('/api/agenda/confirmation-tasks?limit=400', { cache: 'no-store' }),
-                        fetch('/api/agenda/appointments?limit=400', { cache: 'no-store' }),
-                    ]);
-
+                    const tasksRes = await fetch('/api/agenda/confirmation-tasks?limit=400', { cache: 'no-store' });
+                    if (!tasksRes.ok) {
+                        throw new Error(`Serverfout bij leads laden (${tasksRes.status})`);
+                    }
                     const tasksData = await tasksRes.json().catch(() => ({}));
-                    const appointmentsData = await appointmentsRes.json().catch(() => ({}));
 
                     const pendingRows = Array.isArray(tasksData?.tasks)
                         ? tasksData.tasks.map((item) => normalizeLeadRow(item))
                         : [];
-                    const agendaRows = Array.isArray(appointmentsData?.appointments)
-                        ? appointmentsData.appointments.map((item) => normalizeLeadRow(item))
-                        : [];
 
-                    allLeads = dedupe(pendingRows.concat(agendaRows)).sort(sortByDateDesc);
+                    allLeads = dedupe(pendingRows).sort(sortByDateDesc);
                     renderList();
 
                     if (allLeads.length > 0) {
-                        setStatus(
-                            `Laatste update: ${new Date().toLocaleTimeString('nl-NL', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                            })}`,
-                            ''
-                        );
+                        setStatusLastUpdatedNow();
                     } else {
                         setStatus('Nog geen leads gevonden.', '');
                     }
@@ -758,6 +1291,31 @@
 
             reloadBtn.addEventListener('click', () => {
                 loadLeads();
+            });
+
+            modalCloseBtn.addEventListener('click', () => {
+                closeLeadModal();
+            });
+
+            modalCancelBtn.addEventListener('click', () => {
+                closeLeadModal();
+            });
+
+            modalOverlay.addEventListener('click', (event) => {
+                if (event.target === modalOverlay) {
+                    closeLeadModal();
+                }
+            });
+
+            modalSubmitBtn.addEventListener('click', () => {
+                submitLeadToAgenda();
+            });
+
+            window.addEventListener('keydown', (event) => {
+                if (event.key !== 'Escape') return;
+                if (!modalOverlay.classList.contains('show')) return;
+                event.preventDefault();
+                closeLeadModal();
             });
 
             loadLeads();

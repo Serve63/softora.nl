@@ -245,12 +245,8 @@
         const badge = document.querySelector("[data-sidebar-leads-count]");
         if (!badge) return;
 
-        const [tasksData, appointmentsData] = await Promise.all([
-            fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400"),
-            fetchJsonNoStore("/api/agenda/appointments?limit=400"),
-        ]);
-
-        if (!tasksData && !appointmentsData) {
+        const tasksData = await fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400");
+        if (!tasksData) {
             paintSidebarLeadsCount(null);
             return;
         }
@@ -258,10 +254,7 @@
         const pendingRows = Array.isArray(tasksData && tasksData.tasks)
             ? tasksData.tasks.map(normalizeLeadRowForCount)
             : [];
-        const agendaRows = Array.isArray(appointmentsData && appointmentsData.appointments)
-            ? appointmentsData.appointments.map(normalizeLeadRowForCount)
-            : [];
-        const total = dedupeLeadRowsForCount(pendingRows.concat(agendaRows)).length;
+        const total = dedupeLeadRowsForCount(pendingRows).length;
         paintSidebarLeadsCount(total);
     }
 
@@ -318,6 +311,7 @@
         forceLightTheme();
         return Promise.resolve(true);
     };
+    window.SoftoraPersonnelTheme.refreshSidebarLeadsCount = refreshSidebarLeadsCount;
 
     applyUnifiedPremiumSidebar();
     initSidebarLeadsCount();
