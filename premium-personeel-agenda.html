@@ -165,9 +165,9 @@
         .logout-btn svg { width: 18px; height: 18px; }
 
         /* Main */
-        .main-content { flex: 1; margin-left: 280px; padding: 3rem; }
+        .main-content { flex: 1; margin-left: 280px; padding: 2.1rem 2.4rem 1.35rem; }
 
-        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.3rem; }
         .topbar-left h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.3rem; }
         .topbar-left p { color: var(--text-tertiary); font-size: 0.9rem; font-weight: 300; }
 
@@ -195,7 +195,7 @@
         /* Calendar */
         .calendar-wrapper {
             background: var(--bg-secondary); border: 1px solid var(--border);
-            max-width: 1240px; margin: 0 auto;
+            max-width: 1180px; margin: 0 auto;
             opacity: 0; transform: translateY(15px);
             animation: fadeUp 0.5s var(--ease-out-expo) 0.2s forwards;
         }
@@ -205,7 +205,7 @@
             border-bottom: 1px solid var(--border);
         }
         .calendar-header-day {
-            padding: 0.8rem; text-align: center;
+            padding: 0.65rem; text-align: center;
             font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
             text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-tertiary);
         }
@@ -215,7 +215,7 @@
         }
 
         .calendar-day {
-            min-height: 102px; border-right: 1px solid var(--border);
+            min-height: clamp(72px, calc((100vh - 360px) / 6), 102px); border-right: 1px solid var(--border);
             border-bottom: 1px solid var(--border); padding: 0.5rem;
             position: relative; transition: background 0.2s;
         }
@@ -251,7 +251,7 @@
 
         /* Legend */
         .calendar-legend {
-            display: flex; gap: 1.2rem; padding: 1rem 1.2rem;
+            display: flex; gap: 1rem; padding: 0.75rem 1rem;
             border-top: 1px solid var(--border);
         }
         .legend-item {
@@ -550,7 +550,7 @@
 
         /* Responsive */
         @media (max-width: 1200px) {
-            .calendar-day { min-height: 82px; }
+            .calendar-day { min-height: clamp(66px, calc((100vh - 330px) / 6), 82px); }
             .appointment { font-size: 0.65rem; padding: 0.25rem 0.4rem; }
         }
         @media (max-width: 1024px) {
