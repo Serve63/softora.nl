@@ -53,17 +53,128 @@
         }, { once: true });
     }
 
-    function placeSidebarLogoutNextToRole() {
-        document.querySelectorAll(".sidebar-footer .sidebar-user").forEach(function (user) {
-            const info = user.querySelector(".sidebar-user-info");
-            const role = info && info.querySelector(".sidebar-user-role");
-            const logout = user.querySelector(".logout-btn");
+    function getSidebarActiveKey(path) {
+        const p = String(path || "").toLowerCase();
+        if (p.indexOf("/premium-actieve-opdrachten") === 0 || p.indexOf("/premium-opdracht-preview") === 0) {
+            return "active_orders";
+        }
+        if (p.indexOf("/premium-personeel-agenda") === 0) return "agenda";
+        if (p.indexOf("/premium-ai-coldmailing") === 0) return "leads";
+        if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldcalling";
+        if (p.indexOf("/premium-klanten") === 0) return "customers";
+        if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
+        if (p.indexOf("/premium-pakketten") === 0) return "packages";
+        if (p.indexOf("/premium-pdfs") === 0) return "pdfs";
+        if (p.indexOf("/premium-instellingen") === 0) return "settings";
+        return "dashboard";
+    }
 
-            if (!role || !logout) return;
-            if (logout.parentElement === role) return;
+    function renderSidebarLink(link, activeKey) {
+        const isActive = link.key === activeKey;
+        const classes = `sidebar-link magnetic${isActive ? " active" : ""}`;
+        return `<a href="${link.href}" class="${classes}">${link.icon}${link.label}</a>`;
+    }
 
-            role.appendChild(logout);
-        });
+    function buildUnifiedPremiumSidebarHtml(activeKey) {
+        const overviewLinks = [
+            {
+                key: "dashboard",
+                href: "/premium-personeel-dashboard",
+                label: "Dashboard",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>',
+            },
+            {
+                key: "active_orders",
+                href: "/premium-actieve-opdrachten",
+                label: "Actieve Opdrachten",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>',
+            },
+            {
+                key: "agenda",
+                href: "/premium-personeel-agenda",
+                label: "Agenda",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg>',
+            },
+            {
+                key: "leads",
+                href: "/premium-ai-coldmailing",
+                label: "Leads",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2.8c.2 2.3-1 3.6-2.2 4.9-1.1 1.2-2.2 2.5-2.2 4.6a4.4 4.4 0 1 0 8.8 0c0-2.4-1.4-3.8-2.7-5.1-1.1-1.1-2.1-2.1-1.7-4.4Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 9.6c.1 1.2-.5 1.9-1.1 2.5-.5.6-1 1.1-1 2a2.1 2.1 0 1 0 4.2 0c0-1-.6-1.7-1.2-2.3-.5-.5-.9-1-.9-2.2Z"></path></svg>',
+            },
+            {
+                key: "coldcalling",
+                href: "/premium-ai-lead-generator",
+                label: "Coldcalling",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg>',
+            },
+        ];
+
+        const managementLinks = [
+            {
+                key: "customers",
+                href: "/premium-klanten",
+                label: "Klanten",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>',
+            },
+            {
+                key: "seo",
+                href: "/premium-seo",
+                label: "SEO",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg>',
+            },
+            {
+                key: "packages",
+                href: "/premium-pakketten",
+                label: "Pakketten",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg>',
+            },
+            {
+                key: "pdfs",
+                href: "/premium-pdfs",
+                label: "PDF'S",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg>',
+            },
+            {
+                key: "settings",
+                href: "/premium-instellingen",
+                label: "Instellingen",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg>',
+            },
+        ];
+
+        return [
+            '<a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>',
+            '<nav class="sidebar-nav">',
+            '  <div class="sidebar-section sidebar-flow-section">',
+            '    <div class="sidebar-section-label">Overzicht</div>',
+            overviewLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
+            "  </div>",
+            '  <div class="sidebar-section">',
+            '    <div class="sidebar-section-label">Beheer</div>',
+            managementLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
+            "  </div>",
+            "</nav>",
+            '<div class="sidebar-footer">',
+            '  <div class="sidebar-user">',
+            '    <div class="sidebar-avatar">SP</div>',
+            '    <div class="sidebar-user-info">',
+            '      <div class="sidebar-user-name">Softora Premium</div>',
+            '      <div class="sidebar-user-role">Administrator</div>',
+            "    </div>",
+            '    <a href="/premium-personeel-login" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">',
+            '      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>',
+            "    </a>",
+            "  </div>",
+            "</div>",
+        ].join("");
+    }
+
+    function applyUnifiedPremiumSidebar() {
+        if (!isPremiumPersonnelContext) return;
+        const sidebar = document.querySelector(".sidebar");
+        if (!sidebar) return;
+        const activeKey = getSidebarActiveKey(pathname);
+        sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
     }
 
     function forceLightTheme() {
@@ -113,7 +224,7 @@
         return Promise.resolve(true);
     };
 
+    applyUnifiedPremiumSidebar();
     forceLightTheme();
     syncThemeButtonsToLight();
-    placeSidebarLogoutNextToRole();
 })();
