@@ -1583,7 +1583,6 @@
 
         // Days in month
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const daysInPrevMonth = new Date(year, month, 0).getDate();
 
         // Total cells (6 rows)
         const totalCells = Math.ceil((startDay + daysInMonth) / 7) * 7;
@@ -1597,16 +1596,12 @@
             let isToday = false;
 
             if (i < startDay) {
-                day = daysInPrevMonth - startDay + i + 1;
-                const m = month === 0 ? 12 : month;
-                const y = month === 0 ? year - 1 : year;
-                dateStr = `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                day = '';
+                dateStr = '';
                 isOtherMonth = true;
             } else if (i >= startDay + daysInMonth) {
-                day = i - startDay - daysInMonth + 1;
-                const m = month + 2 > 12 ? 1 : month + 2;
-                const y = month + 2 > 12 ? year + 1 : year;
-                dateStr = `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                day = '';
+                dateStr = '';
                 isOtherMonth = true;
             } else {
                 day = i - startDay + 1;
@@ -1614,14 +1609,17 @@
                 isToday = (day === today.getDate() && month === today.getMonth() && year === today.getFullYear());
             }
 
-            const dayAppointments = appointments.filter((a) => a.date === dateStr);
+            const dayAppointments = dateStr
+                ? appointments.filter((a) => a.date === dateStr)
+                : [];
 
             let classes = 'calendar-day';
-            if (isOtherMonth) classes += ' other-month';
             if (isToday) classes += ' today';
 
             html += `<div class="${classes}">`;
-            html += `<div class="day-number">${day}</div>`;
+            if (!isOtherMonth) {
+                html += `<div class="day-number">${day}</div>`;
+            }
 
             dayAppointments.forEach((apt) => {
                 html += `<div class="appointment meeting magnetic" onclick="openAppointment(${apt.id})">
