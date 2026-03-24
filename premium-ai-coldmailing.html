@@ -579,17 +579,16 @@
                     const company = esc(item.company || 'Onbekende lead');
                     const contact = esc(item.contact || 'Onbekend contact');
                     const phone = esc(item.phone || 'Geen telefoon');
-                    const source = esc(item.source || 'Coldcalling');
                     const moment = esc(formatDateTime(item));
-                    const chipClass = item.status === 'In agenda' ? 'confirmed' : 'pending';
-                    const chipLabel = esc(item.status || 'Lead');
+                    const chipClass = 'pending';
+                    const chipLabel = 'LEAD';
 
                     return `
                         <article class="lead-item">
                             <div>
                                 <div class="lead-name">${company}</div>
                                 <div class="lead-meta">${contact} · ${phone}</div>
-                                <div class="lead-meta">${moment} · ${source}</div>
+                                <div class="lead-meta">${moment}</div>
                             </div>
                             <span class="lead-chip ${chipClass}">${chipLabel}</span>
                         </article>
@@ -604,7 +603,7 @@
                 return bTs - aTs;
             }
 
-            function normalizeLeadRow(item, statusLabel) {
+            function normalizeLeadRow(item) {
                 return {
                     id: Number(item?.id) || 0,
                     company: String(item?.company || 'Onbekende lead').trim() || 'Onbekende lead',
@@ -612,8 +611,6 @@
                     phone: String(item?.phone || '').trim(),
                     date: String(item?.date || '').trim(),
                     time: String(item?.time || '').trim(),
-                    source: String(item?.source || 'AI Cold Calling').trim(),
-                    status: statusLabel,
                 };
             }
 
@@ -626,7 +623,6 @@
                         normalize(row.phone),
                         normalize(row.date),
                         normalize(row.time),
-                        normalize(row.status),
                     ].join('|');
                     if (!map.has(key)) map.set(key, row);
                 });
@@ -646,10 +642,10 @@
                     const appointmentsData = await appointmentsRes.json().catch(() => ({}));
 
                     const pendingRows = Array.isArray(tasksData?.tasks)
-                        ? tasksData.tasks.map((item) => normalizeLeadRow(item, 'Lead'))
+                        ? tasksData.tasks.map((item) => normalizeLeadRow(item))
                         : [];
                     const agendaRows = Array.isArray(appointmentsData?.appointments)
-                        ? appointmentsData.appointments.map((item) => normalizeLeadRow(item, 'In agenda'))
+                        ? appointmentsData.appointments.map((item) => normalizeLeadRow(item))
                         : [];
 
                     allLeads = dedupe(pendingRows.concat(agendaRows)).sort(sortByDateDesc);
