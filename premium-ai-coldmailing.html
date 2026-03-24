@@ -737,7 +737,13 @@
                     renderList();
 
                     if (allLeads.length > 0) {
-                        setStatus(`Laatste update: ${new Date().toLocaleTimeString('nl-NL')}`, '');
+                        setStatus(
+                            `Laatste update: ${new Date().toLocaleTimeString('nl-NL', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                            })}`,
+                            ''
+                        );
                     } else {
                         setStatus('Nog geen leads gevonden.', '');
                     }
