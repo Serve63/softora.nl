@@ -297,37 +297,111 @@
     function getActiveOrdersCountFromUiValues(values) {
         const source = values && typeof values === "object" ? values : {};
         const customRaw = parseJsonMaybe(source.softora_custom_orders_premium_v1);
+        const runtimeRaw = parseJsonMaybe(source.softora_order_runtime_premium_v1);
+        const runtimeMap = runtimeRaw && typeof runtimeRaw === "object" && !Array.isArray(runtimeRaw)
+            ? runtimeRaw
+            : {};
+        const countableIds = new Set();
+
+        function normalizeOrderStatusForSidebar(value) {
+            const key = String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+            if (key === "actief" || key === "active" || key === "open" || key === "openstaand") return "actief";
+            if (key === "bezig" || key === "inbehandeling" || key === "inprogress" || key === "progress") return "bezig";
+            if (key === "klaar" || key === "gebouwd" || key === "done") return "klaar";
+            if (key === "betaald" || key === "paid") return "betaald";
+            return "wacht";
+        }
+
+        function resolveOrderUiForSidebar(orderLike) {
+            const pct = Math.max(0, Math.min(100, Number(orderLike && orderLike.progressPct) || 0));
+            const paidAt = String((orderLike && orderLike.paidAt) || "").trim();
+            const fallbackStatus = pct >= 100 ? "klaar" : pct > 0 ? "bezig" : "wacht";
+            const baseStatus = normalizeOrderStatusForSidebar(
+                (orderLike && (orderLike.statusKey || orderLike.status)) || fallbackStatus
+            );
+            const isBuilt = baseStatus === "klaar" || baseStatus === "betaald" || pct >= 100;
+            const isPaid = Boolean(paidAt) && isBuilt;
+            const status = isPaid ? "betaald" : (isBuilt ? "klaar" : baseStatus);
+            return { status: status };
+        }
+
+        function shouldCountActiveOrder(orderLike) {
+            const ui = resolveOrderUiForSidebar(orderLike);
+            return ui.status === "wacht" || ui.status === "actief" || ui.status === "bezig";
+        }
+
         if (Array.isArray(customRaw)) {
-            const ids = new Set();
             customRaw.forEach(function (item) {
                 const id = Number(item && item.id);
-                if (Number.isFinite(id) && id > 0) ids.add(id);
+                if (!Number.isFinite(id) || id <= 0) return;
+                const runtime = runtimeMap[String(id)] || {};
+                const merged = {
+                    status: String(runtime.statusKey || (item && item.status) || "").trim(),
+                    statusKey: String(runtime.statusKey || (item && item.status) || "").trim(),
+                    progressPct: Number(runtime.progressPct),
+                    paidAt: String(runtime.paidAt || (item && item.paidAt) || "").trim(),
+                };
+                if (shouldCountActiveOrder(merged)) countableIds.add(id);
             });
-            return ids.size;
         }
 
-        const runtimeRaw = parseJsonMaybe(source.softora_order_runtime_premium_v1);
-        if (runtimeRaw && typeof runtimeRaw === "object" && !Array.isArray(runtimeRaw)) {
-            return Object.keys(runtimeRaw).reduce(function (count, key) {
-                const id = Number(key);
-                return Number.isFinite(id) && id > 0 ? count + 1 : count;
-            }, 0);
+        Object.keys(runtimeMap).forEach(function (key) {
+            const id = Number(key);
+            if (!Number.isFinite(id) || id <= 0) return;
+            if (countableIds.has(id)) return;
+            if (shouldCountActiveOrder(runtimeMap[key])) countableIds.add(id);
+        });
+
+        return countableIds.size;
+    }
+
+    async function fetchActiveOrdersUiValues() {
+        const scope = "premium_active_orders";
+        const encodedScope = encodeURIComponent(scope);
+        const responses = await Promise.all([
+            fetchJsonNoStore(`/api/ui-state-get?scope=${encodedScope}`),
+            fetchJsonNoStore(`/api/ui-state/${encodedScope}`),
+        ]);
+
+        for (let i = 0; i < responses.length; i += 1) {
+            const payload = responses[i];
+            if (!payload || payload.ok === false || typeof payload !== "object") continue;
+            if (payload.values && typeof payload.values === "object") return payload.values;
         }
 
-        return 0;
+        return null;
     }
 
     async function refreshSidebarActiveOrdersCount() {
         const badge = getSidebarCountBadge("active_orders");
         if (!badge) return;
 
-        const state = await fetchJsonNoStore("/api/ui-state/premium_active_orders");
-        if (!state || state.ok === false) {
+        const remoteValues = await fetchActiveOrdersUiValues();
+        if (remoteValues) {
+            const total = getActiveOrdersCountFromUiValues(remoteValues);
+            paintSidebarCount("active_orders", total, {
+                singular: "actieve opdracht",
+                plural: "actieve opdrachten",
+            });
+            return;
+        }
+
+        let localValues = null;
+        try {
+            localValues = {
+                softora_custom_orders_premium_v1: localStorage.getItem("softora_custom_orders_premium_v1"),
+                softora_order_runtime_premium_v1: localStorage.getItem("softora_order_runtime_premium_v1"),
+            };
+        } catch (error) {
+            localValues = null;
+        }
+
+        if (!localValues) {
             paintSidebarCount("active_orders", null);
             return;
         }
 
-        const total = getActiveOrdersCountFromUiValues(state.values);
+        const total = getActiveOrdersCountFromUiValues(localValues);
         paintSidebarCount("active_orders", total, {
             singular: "actieve opdracht",
             plural: "actieve opdrachten",
