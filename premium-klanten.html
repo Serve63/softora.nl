@@ -580,6 +580,23 @@
             color: var(--warning);
         }
 
+        .active-text {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .active-text.is-yes {
+            color: var(--success);
+        }
+
+        .active-text.is-no {
+            color: var(--text-tertiary);
+        }
+
         .actions {
             display: flex;
             justify-content: flex-end;
@@ -949,6 +966,7 @@
                                     <th>Website</th>
                                     <th>Onderhoud</th>
                                     <th>Status</th>
+                                    <th>Actief</th>
                                     <th>Betaaldatum</th>
                                     <th></th>
                                 </tr>
@@ -1025,6 +1043,14 @@
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label class="form-label" for="fieldActive">Actief</label>
+                        <select class="form-select" id="fieldActive" name="actief" required>
+                            <option value="Ja" selected>Ja</option>
+                            <option value="Nee">Nee</option>
+                        </select>
+                    </div>
+
                     <div class="form-group is-full">
                         <label class="form-label" for="fieldDate">Betaaldatum</label>
                         <input class="form-input" id="fieldDate" name="datum" type="date" required>
@@ -1077,6 +1103,7 @@
             fieldWebsiteAmount: document.getElementById("fieldWebsiteAmount"),
             fieldMaintenanceAmount: document.getElementById("fieldMaintenanceAmount"),
             fieldStatus: document.getElementById("fieldStatus"),
+            fieldActive: document.getElementById("fieldActive"),
             fieldDate: document.getElementById("fieldDate")
         };
 
@@ -1095,6 +1122,10 @@
         function normalizeDate(value) {
             const raw = normalizeString(value);
             return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
+        }
+
+        function normalizeActiveValue(value) {
+            return normalizeString(value).toLowerCase() === "nee" ? "Nee" : "Ja";
         }
 
         function normalizeOptionalAmount(value) {
@@ -1121,6 +1152,7 @@
                 nodes.fieldWebsiteAmount,
                 nodes.fieldMaintenanceAmount,
                 nodes.fieldStatus,
+                nodes.fieldActive,
                 nodes.fieldDate
             ].filter(Boolean);
         }
@@ -1174,6 +1206,7 @@
                 onderhoudPerMaand: onderhoudPerMaand,
                 bedrag: bedrag,
                 status: status,
+                actief: normalizeActiveValue(raw && raw.actief),
                 datum: normalizeDate(raw && raw.datum)
             };
         }
@@ -1460,6 +1493,7 @@
                     website: order.title || "-",
                     bedrag: order.amount || 0,
                     status: status,
+                    actief: "Ja",
                     datum: paidDate
                 }));
             });
@@ -1502,7 +1536,8 @@
                     customer.telefoon,
                     customer.website,
                     customer.type,
-                    customer.status
+                    customer.status,
+                    customer.actief
                 ].join(" ").toLowerCase();
                 return haystack.indexOf(query) !== -1;
             });
@@ -1524,6 +1559,7 @@
 
             nodes.body.innerHTML = filtered.map(function (customer) {
                 const statusClass = customer.status === "Betaald" ? "is-paid" : "is-open";
+                const activeClass = customer.actief === "Ja" ? "is-yes" : "is-no";
                 const websiteLabel = normalizeString(customer && customer.website);
                 const customerSubLabel = websiteLabel && websiteLabel !== "-"
                     ? websiteLabel
@@ -1545,6 +1581,7 @@
                             renderServiceCell(customer, "maintenance"),
                         "</td>",
                         "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
+                        "<td data-label=\"Actief\"><span class=\"active-text " + activeClass + "\">" + escapeHtml(customer.actief || "Ja") + "</span></td>",
                         "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td class=\"cell-actions\" data-label=\"Acties\">",
                             "<div class=\"actions\">",
@@ -1565,6 +1602,7 @@
             nodes.form.reset();
             nodes.fieldType.value = "Website";
             nodes.fieldStatus.value = "Betaald";
+            if (nodes.fieldActive) nodes.fieldActive.value = "Ja";
             nodes.fieldDate.value = "";
             if (nodes.fieldWebsiteAmount) nodes.fieldWebsiteAmount.value = "";
             if (nodes.fieldMaintenanceAmount) nodes.fieldMaintenanceAmount.value = "";
@@ -1604,6 +1642,7 @@
                         : "";
                 }
                 nodes.fieldStatus.value = customer.status;
+                if (nodes.fieldActive) nodes.fieldActive.value = customer.actief || "Ja";
                 nodes.fieldDate.value = customer.datum || "";
                 updateAmountFieldVisibility();
             } else {
@@ -1681,6 +1720,7 @@
                 websiteBedrag: websiteBedrag,
                 onderhoudPerMaand: onderhoudPerMaand,
                 status: nodes.fieldStatus.value,
+                actief: nodes.fieldActive ? nodes.fieldActive.value : "Ja",
                 datum: nodes.fieldDate.value
             });
         }
