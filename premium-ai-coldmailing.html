@@ -633,7 +633,6 @@
             font-size: 0.74rem;
             line-height: 1.1;
             padding: 0;
-            margin-left: 1.45rem;
             cursor: pointer;
             text-decoration: underline;
             text-decoration-color: rgba(134, 143, 160, 0.45);
@@ -653,6 +652,13 @@
 
         .lead-modal-actions-right {
             margin-left: auto;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.4rem;
+        }
+
+        .lead-modal-actions-row {
             display: inline-flex;
             gap: 0.55rem;
             align-items: center;
@@ -849,11 +855,13 @@
                             <input id="leadModalWhatsappConfirm" type="checkbox">
                             <label for="leadModalWhatsappConfirm">Bevestigd via Whatsapp</label>
                         </div>
-                        <button class="lead-modal-delete-btn" id="leadModalDeleteBtn" type="button">Lead verwijderen</button>
                     </div>
                     <div class="lead-modal-actions-right">
-                        <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
-                        <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
+                        <button class="lead-modal-delete-btn" id="leadModalDeleteBtn" type="button">Lead verwijderen</button>
+                        <div class="lead-modal-actions-row">
+                            <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
+                            <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
+                        </div>
                     </div>
                 </div>
             </div>
