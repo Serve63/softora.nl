@@ -72,7 +72,12 @@
     function renderSidebarLink(link, activeKey) {
         const isActive = link.key === activeKey;
         const classes = `sidebar-link magnetic${isActive ? " active" : ""}`;
-        return `<a href="${link.href}" class="${classes}">${link.icon}${link.label}</a>`;
+        const labelHtml = `<span class="sidebar-link-text">${link.label}</span>`;
+        const leadsBadgeHtml =
+            link.key === "leads"
+                ? '<span class="sidebar-notification-badge" data-sidebar-leads-count hidden>0</span>'
+                : "";
+        return `<a href="${link.href}" class="${classes}">${link.icon}${labelHtml}${leadsBadgeHtml}</a>`;
     }
 
     function buildUnifiedPremiumSidebarHtml(activeKey) {
@@ -177,6 +182,96 @@
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
     }
 
+    function normalizeLeadFieldForCount(value) {
+        return String(value || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .trim();
+    }
+
+    function normalizeLeadRowForCount(item) {
+        return {
+            company: String((item && item.company) || "Onbekende lead").trim(),
+            contact: String((item && item.contact) || "").trim(),
+            phone: String((item && item.phone) || "").trim(),
+            date: String((item && item.date) || "").trim(),
+            time: String((item && item.time) || "").trim(),
+        };
+    }
+
+    function dedupeLeadRowsForCount(rows) {
+        const map = new Map();
+        (Array.isArray(rows) ? rows : []).forEach(function (row) {
+            const key = [
+                normalizeLeadFieldForCount(row.company),
+                normalizeLeadFieldForCount(row.contact),
+                normalizeLeadFieldForCount(row.phone),
+                normalizeLeadFieldForCount(row.date),
+                normalizeLeadFieldForCount(row.time),
+            ].join("|");
+            if (!map.has(key)) map.set(key, row);
+        });
+        return Array.from(map.values());
+    }
+
+    async function fetchJsonNoStore(url) {
+        try {
+            const response = await fetch(url, { cache: "no-store" });
+            if (!response.ok) return null;
+            return await response.json().catch(function () {
+                return null;
+            });
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function paintSidebarLeadsCount(count) {
+        const badge = document.querySelector("[data-sidebar-leads-count]");
+        if (!badge) return;
+        if (!Number.isFinite(count) || count < 0) {
+            badge.hidden = true;
+            return;
+        }
+        badge.hidden = false;
+        badge.dataset.countZero = count === 0 ? "1" : "0";
+        badge.textContent = count > 99 ? "99+" : String(count);
+        badge.title = `${count} open lead${count === 1 ? "" : "s"}`;
+        badge.setAttribute("aria-label", badge.title);
+    }
+
+    async function refreshSidebarLeadsCount() {
+        const badge = document.querySelector("[data-sidebar-leads-count]");
+        if (!badge) return;
+
+        const [tasksData, appointmentsData] = await Promise.all([
+            fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400"),
+            fetchJsonNoStore("/api/agenda/appointments?limit=400"),
+        ]);
+
+        if (!tasksData && !appointmentsData) {
+            paintSidebarLeadsCount(null);
+            return;
+        }
+
+        const pendingRows = Array.isArray(tasksData && tasksData.tasks)
+            ? tasksData.tasks.map(normalizeLeadRowForCount)
+            : [];
+        const agendaRows = Array.isArray(appointmentsData && appointmentsData.appointments)
+            ? appointmentsData.appointments.map(normalizeLeadRowForCount)
+            : [];
+        const total = dedupeLeadRowsForCount(pendingRows.concat(agendaRows)).length;
+        paintSidebarLeadsCount(total);
+    }
+
+    function initSidebarLeadsCount() {
+        if (!isPremiumPersonnelContext) return;
+        if (!document.querySelector("[data-sidebar-leads-count]")) return;
+        refreshSidebarLeadsCount();
+        window.setInterval(refreshSidebarLeadsCount, 45000);
+    }
+
     function forceLightTheme() {
         root.setAttribute("data-theme-mode", "light");
         root.setAttribute("data-theme", "light");
@@ -225,6 +320,7 @@
     };
 
     applyUnifiedPremiumSidebar();
+    initSidebarLeadsCount();
     forceLightTheme();
     syncThemeButtonsToLight();
 })();

@@ -164,6 +164,38 @@
     transition: all 0.2s !important;
 }
 
+.sidebar-link .sidebar-link-text {
+    min-width: 0 !important;
+}
+
+.sidebar-link .sidebar-notification-badge {
+    margin-left: auto !important;
+    min-width: 20px !important;
+    height: 20px !important;
+    padding: 0 6px !important;
+    border-radius: 999px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: var(--warn) !important;
+    color: #ffffff !important;
+    font-family: 'Oswald', sans-serif !important;
+    font-size: 0.64rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.05em !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebar-link .sidebar-notification-badge[data-count-zero="1"] {
+    background: rgba(155, 163, 178, 0.35) !important;
+    color: var(--text-primary) !important;
+}
+
+.sidebar-link .sidebar-notification-badge[hidden] {
+    display: none !important;
+}
+
 .sidebar-link::before {
     content: none !important;
 }
