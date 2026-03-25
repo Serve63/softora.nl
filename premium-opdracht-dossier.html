@@ -144,7 +144,7 @@
         .page-body {
             padding: 0.8rem 0.9rem;
             display: grid;
-            gap: 0.5rem;
+            gap: 0.42rem;
             align-content: start;
             overflow: hidden;
         }
@@ -172,7 +172,12 @@
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
-            gap: 0.6rem;
+            gap: 0.5rem;
+        }
+
+        .top-row > div:first-child {
+            min-width: 0;
+            flex: 1 1 auto;
         }
 
         .eyebrow {
@@ -187,17 +192,18 @@
         .title {
             margin-top: 0.18rem;
             font-family: 'Oswald', sans-serif;
-            font-size: clamp(1.04rem, 2.1vw, 1.58rem);
+            font-size: clamp(0.98rem, 2vw, 1.46rem);
             line-height: 1.04;
             letter-spacing: 0.02em;
             text-transform: uppercase;
             color: #171b2f;
+            max-width: 32ch;
         }
 
         .subtitle {
             margin-top: 0.24rem;
             color: var(--muted);
-            font-size: 0.68rem;
+            font-size: 0.64rem;
             line-height: 1.38;
             max-width: 58ch;
         }
@@ -205,16 +211,17 @@
         .actions {
             display: flex;
             gap: 0.34rem;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             justify-content: flex-end;
+            flex: 0 0 auto;
         }
 
         .btn {
             appearance: none;
             border: 1px solid var(--line);
             border-radius: 8px;
-            padding: 0.41rem 0.56rem;
-            font-size: 0.56rem;
+            padding: 0.36rem 0.5rem;
+            font-size: 0.53rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -241,7 +248,7 @@
             background: #fbfcff;
             border-radius: 8px;
             padding: 0.36rem 0.44rem;
-            min-height: 56px;
+            min-height: 50px;
         }
 
         .meta-label {
@@ -264,7 +271,7 @@
             border: 1px solid var(--line);
             background: #fafbff;
             border-radius: 8px;
-            padding: 0.4rem 0.5rem;
+            padding: 0.34rem 0.44rem;
         }
 
         .section-head {
@@ -272,7 +279,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 0.48rem;
-            margin-bottom: 0.24rem;
+            margin-bottom: 0.18rem;
         }
 
         .section-title {
@@ -284,11 +291,12 @@
         }
 
         .wishes-text {
-            font-size: 0.69rem;
-            line-height: 1.42;
+            font-size: 0.66rem;
+            line-height: 1.34;
             color: #1f243a;
             word-break: break-word;
-            min-height: 70px;
+            max-height: 88px;
+            overflow: hidden;
         }
 
         .prompt-box {
@@ -296,12 +304,12 @@
             border-radius: 8px;
             background: #fff;
             color: #1f243a;
-            font-size: 0.66rem;
-            line-height: 1.36;
+            font-size: 0.62rem;
+            line-height: 1.28;
             padding: 0.42rem;
             white-space: pre-wrap;
             overflow: hidden;
-            min-height: 128px;
+            height: 146px;
         }
 
         .copy-status {
@@ -313,16 +321,16 @@
 
         @media (max-width: 1200px) {
             .title {
-                font-size: clamp(0.97rem, 2vw, 1.42rem);
+                font-size: clamp(0.92rem, 1.95vw, 1.32rem);
             }
 
             .subtitle {
-                font-size: 0.64rem;
+                font-size: 0.6rem;
             }
 
             .wishes-text,
             .prompt-box {
-                font-size: 0.63rem;
+                font-size: 0.59rem;
             }
         }
 
@@ -373,6 +381,18 @@
 
             .meta-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .actions {
+                flex-wrap: wrap;
+            }
+
+            .wishes-text {
+                max-height: none;
+            }
+
+            .prompt-box {
+                height: auto;
             }
         }
 
@@ -435,6 +455,14 @@
             .section,
             .prompt-box {
                 break-inside: avoid;
+            }
+
+            .wishes-text {
+                max-height: none;
+            }
+
+            .prompt-box {
+                height: auto;
             }
         }
     </style>
@@ -571,7 +599,7 @@
                     merged = 'Er zijn nog geen uitgebreide wensen vastgelegd. Gebruik dit dossier als startpunt en vul de klantwensen aan na direct klantcontact.';
                 }
 
-                return truncateText(merged, 620);
+                return truncateText(merged, 420);
             }
 
             function buildOpusPrompt(data) {
@@ -580,7 +608,7 @@
                 const title = String(data.title || 'Website opdracht').trim() || 'Website opdracht';
                 const domainName = String(data.domainName || '').trim();
                 const deliveryTime = String(data.deliveryTime || '').trim();
-                const wishesText = truncateText(String(data.wishesText || '').trim(), 260);
+                const wishesText = truncateText(String(data.wishesText || '').trim(), 150);
 
                 const lines = [
                     'Je bent senior webbouwer bij Softora. Werk deze opdracht uit in Claude Opus 4.6.',
@@ -602,7 +630,7 @@
                     'Schrijf praktisch en concreet, zonder vage tekst.'
                 ];
 
-                return truncateText(lines.join('\n'), 980);
+                return truncateText(lines.join('\n'), 720);
             }
 
             async function copyText(value) {
