@@ -428,35 +428,36 @@ button,
         width: 280px !important;
         height: 100vh !important;
         min-height: 100vh !important;
-        padding-top: 2.1rem !important;
+        padding-top: 1.95rem !important;
     }
 
     .sidebar-logo {
         display: block !important;
-        padding: 0 1.8rem !important;
-        margin-bottom: 1.55rem !important;
-        font-size: 1.46rem !important;
+        padding: 0 1.75rem !important;
+        margin-bottom: 1.35rem !important;
+        font-size: 1.42rem !important;
     }
 
     .sidebar-section {
-        margin-bottom: 1.35rem !important;
+        margin-bottom: 1.1rem !important;
     }
 
     .sidebar-section-label {
-        padding: 0 1.8rem !important;
-        margin-bottom: 0.62rem !important;
-        font-size: 0.67rem !important;
-        letter-spacing: 0.18em !important;
+        padding: 0 1.75rem !important;
+        margin-bottom: 0.5rem !important;
+        font-size: 0.65rem !important;
+        letter-spacing: 0.17em !important;
     }
 
     .sidebar-link {
-        gap: 0.74rem !important;
-        padding: 0.68rem 1.8rem !important;
-        font-size: 0.88rem !important;
+        gap: 0.7rem !important;
+        padding: 0.6rem 1.75rem !important;
+        font-size: 0.86rem !important;
+        line-height: 1.25 !important;
     }
 
     .sidebar-flow-section .sidebar-link {
-        padding-left: 2.55rem !important;
+        padding-left: 2.45rem !important;
     }
 
     .sidebar-link svg {
@@ -465,47 +466,39 @@ button,
     }
 
     .sidebar-link[href="/premium-ai-coldmailing"] svg {
-        width: 20px !important;
-        height: 20px !important;
+        width: 19px !important;
+        height: 19px !important;
     }
 
     .sidebar-nav {
         flex: 1 !important;
         min-height: 0 !important;
-        overflow-y: auto !important;
-        scrollbar-width: none !important;
-        -ms-overflow-style: none !important;
-    }
-
-    .sidebar-nav::-webkit-scrollbar {
-        width: 0 !important;
-        height: 0 !important;
-        display: none !important;
+        overflow-y: hidden !important;
     }
 
     .sidebar-footer {
         flex-shrink: 0 !important;
         margin-top: 0 !important;
-        padding: 1.55rem 1.8rem !important;
+        padding: 1.3rem 1.65rem !important;
     }
 
     .sidebar-user {
-        gap: 0.74rem !important;
+        gap: 0.68rem !important;
     }
 
     .sidebar-avatar {
-        width: 34px !important;
-        height: 34px !important;
-        font-size: 0.8rem !important;
+        width: 33px !important;
+        height: 33px !important;
+        font-size: 0.78rem !important;
     }
 
     .sidebar-user-name {
-        font-size: 0.83rem !important;
+        font-size: 0.8rem !important;
         line-height: 1.2 !important;
     }
 
     .sidebar-footer .sidebar-user .sidebar-user-role {
-        font-size: 0.72rem !important;
+        font-size: 0.7rem !important;
         line-height: 1.2 !important;
     }
 
@@ -514,13 +507,13 @@ button,
     }
 
     .sidebar-footer .sidebar-user .logout-btn svg {
-        width: 17px !important;
-        height: 17px !important;
+        width: 16px !important;
+        height: 16px !important;
     }
 
     .sidebar-flow-section::before {
-        top: 5.36rem !important;
-        bottom: 0.72rem !important;
+        top: 5.1rem !important;
+        bottom: 0.66rem !important;
     }
 
     .main,
