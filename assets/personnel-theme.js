@@ -148,12 +148,6 @@
 
         const extraLinks = [
             {
-                key: "settings",
-                href: "/premium-instellingen",
-                label: "Instellingen",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg>',
-            },
-            {
                 key: "monthly_costs",
                 href: "/premium-maandelijkse-kosten",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg>',
@@ -162,8 +156,14 @@
             {
                 key: "analytics",
                 href: "/premium-analytics",
-                label: "Analytics",
+                label: "Google analytics",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg>',
+            },
+            {
+                key: "settings",
+                href: "/premium-instellingen",
+                label: "Instellingen",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg>',
             },
         ];
 
