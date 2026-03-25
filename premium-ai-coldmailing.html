@@ -526,6 +526,7 @@
             font-size: 0.83rem;
             line-height: 1.42;
             white-space: pre-line;
+            min-height: 150px;
             max-height: 150px;
             overflow-y: auto;
         }
@@ -965,6 +966,9 @@
             let modalBusy = false;
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
+            const leadDetailLoadPromiseById = Object.create(null);
+            const leadAiCopyPromiseById = Object.create(null);
+            let modalOpenSequence = 0;
 
             function esc(value) {
                 return String(value || '')
@@ -1134,23 +1138,23 @@
                 return String(result?.summary || '').trim();
             }
 
-            async function improveModalCopyWithAi(taskId, lead, detail) {
+            async function ensureModalCopyWithAi(taskId, lead, detail) {
                 const id = Number(taskId) || 0;
-                if (!id) return;
+                if (!id) return '';
 
                 const cacheKey = String(id);
                 if (leadAiCopyById[cacheKey]) {
                     const cached = leadAiCopyById[cacheKey];
-                    if (activeTaskId === id) {
-                        if (cached.summaryText) modalSummary.textContent = cached.summaryText;
-                    }
-                    return;
+                    return String(cached.summaryText || '').trim();
                 }
 
                 const sourceText = buildModalSourceText(lead, detail);
-                if (sourceText.length < 24) return;
+                if (sourceText.length < 24) return '';
+                if (leadAiCopyPromiseById[cacheKey]) {
+                    return leadAiCopyPromiseById[cacheKey];
+                }
 
-                try {
+                const run = (async () => {
                     const mergedRaw = await summarizeWithAi(sourceText, {
                         style: 'medium',
                         maxSentences: 5,
@@ -1163,12 +1167,14 @@
                     leadAiCopyById[cacheKey] = {
                         summaryText: summaryText || '',
                     };
-
-                    if (activeTaskId !== id) return;
-                    if (summaryText) modalSummary.textContent = summaryText;
-                } catch (error) {
-                    // Fallback blijft zichtbaar; geen harde fout tonen in de modal.
-                }
+                    return summaryText || '';
+                })()
+                    .catch(() => '')
+                    .finally(() => {
+                        delete leadAiCopyPromiseById[cacheKey];
+                    });
+                leadAiCopyPromiseById[cacheKey] = run;
+                return run;
             }
 
             function getLeadById(taskId) {
@@ -1189,6 +1195,7 @@
             }
 
             function closeLeadModal() {
+                modalOpenSequence += 1;
                 activeTaskId = 0;
                 modalAudioPlayer.pause();
                 modalAudioPlayer.currentTime = 0;
@@ -1209,9 +1216,29 @@
                 return data.task;
             }
 
-            function renderLeadDetailsInModal(lead, detail, taskId) {
+            async function ensureTaskDetailLoaded(taskId) {
+                const id = Number(taskId) || 0;
+                if (!id) return null;
+                const cacheKey = String(id);
+                if (leadDetailsById[cacheKey]) return leadDetailsById[cacheKey];
+                if (leadDetailLoadPromiseById[cacheKey]) return leadDetailLoadPromiseById[cacheKey];
+
+                const run = fetchTaskDetail(id)
+                    .then((detail) => {
+                        leadDetailsById[cacheKey] = detail;
+                        return detail;
+                    })
+                    .finally(() => {
+                        delete leadDetailLoadPromiseById[cacheKey];
+                    });
+                leadDetailLoadPromiseById[cacheKey] = run;
+                return run;
+            }
+
+            function renderLeadDetailsInModal(lead, detail, taskId, options = {}) {
                 const id = Number(taskId || lead?.id || 0) || 0;
                 const aiCopy = id ? leadAiCopyById[String(id)] : null;
+                const preferredSummary = String(options?.summaryText || '').trim();
 
                 const readableSummary = pickReadableSummary(
                     detail?.aiSummary,
@@ -1226,7 +1253,7 @@
                     .join(' ');
 
                 modalSummary.textContent =
-                    String(aiCopy?.summaryText || '').trim() || fallbackCombined;
+                    preferredSummary || String(aiCopy?.summaryText || '').trim() || fallbackCombined;
 
                 const recordingUrl = pickRecordingUrl(
                     detail?.recordingUrl,
@@ -1266,48 +1293,50 @@
                 const lead = getLeadById(normalizedTaskId);
                 if (!lead) return;
 
-                activeTaskId = normalizedTaskId;
-                const leadType = resolveLeadType(lead);
-                modalSub.textContent = `${String(lead.company || 'Onbekende lead')} · ${leadType}`;
-                modalDate.value = String(lead.date || '').slice(0, 10);
-                modalTime.value = normalizeTimeValue(lead.time || '09:00') || '09:00';
-                modalLocation.value = String(lead.location || '').trim();
-                modalWhatsappInfo.value = String(lead.whatsappInfo || '').trim();
-                modalWhatsappConfirm.checked = false;
-                setModalStatus('');
-                setModalBusy(false);
-                renderLeadDetailsInModal(lead, null, normalizedTaskId);
-                modalOverlay.classList.add('show');
-                modalOverlay.setAttribute('aria-hidden', 'false');
-                window.setTimeout(() => {
-                    if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
-                }, 20);
-
-                const cached = leadDetailsById[String(normalizedTaskId)];
-                if (cached) {
-                    renderLeadDetailsInModal(lead, cached, normalizedTaskId);
-                    modalDate.value = String(cached?.date || lead.date || '').slice(0, 10);
-                    modalTime.value = normalizeTimeValue(cached?.time || lead.time || '09:00') || '09:00';
-                    modalLocation.value = String(cached?.location || lead.location || '').trim();
-                    modalWhatsappInfo.value = String(cached?.whatsappInfo || lead.whatsappInfo || '').trim();
-                    improveModalCopyWithAi(normalizedTaskId, lead, cached);
-                    return;
-                }
-
+                const openSeq = ++modalOpenSequence;
+                setModalStatus('Lead details laden...', '');
                 try {
-                    const detail = await fetchTaskDetail(normalizedTaskId);
-                    leadDetailsById[String(normalizedTaskId)] = detail;
-                    if (activeTaskId !== normalizedTaskId) return;
-                    renderLeadDetailsInModal(lead, detail, normalizedTaskId);
+                    const detail = await ensureTaskDetailLoaded(normalizedTaskId);
+                    if (openSeq !== modalOpenSequence) return;
+
+                    const summaryText = await ensureModalCopyWithAi(normalizedTaskId, lead, detail);
+                    if (openSeq !== modalOpenSequence) return;
+
+                    activeTaskId = normalizedTaskId;
+                    const leadType = resolveLeadType(lead);
+                    modalSub.textContent = `${String(lead.company || 'Onbekende lead')} · ${leadType}`;
                     modalDate.value = String(detail?.date || lead.date || '').slice(0, 10);
                     modalTime.value = normalizeTimeValue(detail?.time || lead.time || '09:00') || '09:00';
                     modalLocation.value = String(detail?.location || lead.location || '').trim();
                     modalWhatsappInfo.value = String(detail?.whatsappInfo || lead.whatsappInfo || '').trim();
-                    improveModalCopyWithAi(normalizedTaskId, lead, detail);
+                    modalWhatsappConfirm.checked = false;
+                    renderLeadDetailsInModal(lead, detail, normalizedTaskId, { summaryText });
+                    setModalBusy(false);
+                    setModalStatus('');
+                    modalOverlay.classList.add('show');
+                    modalOverlay.setAttribute('aria-hidden', 'false');
+                    window.setTimeout(() => {
+                        if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
+                    }, 20);
                 } catch (error) {
-                    if (activeTaskId !== normalizedTaskId) return;
+                    if (openSeq !== modalOpenSequence) return;
+
+                    activeTaskId = normalizedTaskId;
+                    const leadType = resolveLeadType(lead);
+                    modalSub.textContent = `${String(lead.company || 'Onbekende lead')} · ${leadType}`;
+                    modalDate.value = String(lead.date || '').slice(0, 10);
+                    modalTime.value = normalizeTimeValue(lead.time || '09:00') || '09:00';
+                    modalLocation.value = String(lead.location || '').trim();
+                    modalWhatsappInfo.value = String(lead.whatsappInfo || '').trim();
+                    modalWhatsappConfirm.checked = false;
                     renderLeadDetailsInModal(lead, null, normalizedTaskId);
+                    setModalBusy(false);
                     setModalStatus(String(error?.message || 'Details laden mislukt.'), 'error');
+                    modalOverlay.classList.add('show');
+                    modalOverlay.setAttribute('aria-hidden', 'false');
+                    window.setTimeout(() => {
+                        if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
+                    }, 20);
                 }
             }
 
