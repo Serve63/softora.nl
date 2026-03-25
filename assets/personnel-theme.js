@@ -67,6 +67,7 @@
         if (p.indexOf("/premium-pakketten") === 0) return "packages";
         if (p.indexOf("/premium-pdfs") === 0) return "pdfs";
         if (p.indexOf("/premium-instellingen") === 0) return "settings";
+        if (p.indexOf("/premium-financiele-kosten") === 0) return "financial_costs";
         return "dashboard";
     }
 
@@ -140,11 +141,20 @@
                 label: "PDF'S",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg>',
             },
+        ];
+
+        const extraLinks = [
             {
                 key: "settings",
                 href: "/premium-instellingen",
                 label: "Instellingen",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg>',
+            },
+            {
+                key: "financial_costs",
+                href: "/premium-financiele-kosten",
+                label: "Financiele kosten",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg>',
             },
         ];
 
@@ -158,6 +168,10 @@
             '  <div class="sidebar-section">',
             '    <div class="sidebar-section-label">Beheer</div>',
             managementLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
+            "  </div>",
+            '  <div class="sidebar-section">',
+            '    <div class="sidebar-section-label">Extra</div>',
+            extraLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
             "  </div>",
             "</nav>",
             '<div class="sidebar-footer">',
