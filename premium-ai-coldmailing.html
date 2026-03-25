@@ -448,15 +448,15 @@
         }
 
         .lead-modal {
-            width: min(760px, 100%);
+            width: min(720px, 100%);
             border: 1px solid var(--border);
             border-radius: 14px;
             background: var(--bg-secondary);
             box-shadow: 0 26px 70px rgba(0, 0, 0, 0.34);
-            padding: 1rem;
+            padding: 0.9rem;
             display: flex;
             flex-direction: column;
-            gap: 0.9rem;
+            gap: 0.75rem;
         }
 
         .lead-modal-header {
@@ -502,14 +502,14 @@
         .lead-modal-info-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 0.8rem;
+            gap: 0.55rem;
         }
 
         .lead-modal-info {
             border: 1px solid var(--border);
             border-radius: 10px;
             background: var(--bg-primary);
-            padding: 0.7rem 0.75rem;
+            padding: 0.58rem 0.65rem;
         }
 
         .lead-modal-info-label {
@@ -523,29 +523,48 @@
 
         .lead-modal-info-text {
             color: var(--text-secondary);
-            font-size: 0.86rem;
-            line-height: 1.5;
+            font-size: 0.83rem;
+            line-height: 1.42;
             white-space: pre-line;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .lead-modal-audio-info {
+            display: flex;
+            align-items: center;
+            gap: 0.58rem;
+            padding-top: 0.45rem;
+            padding-bottom: 0.45rem;
+        }
+
+        .lead-modal-audio-info .lead-modal-info-label {
+            margin-bottom: 0;
+            min-width: 8.35rem;
+            font-size: 0.63rem;
+            white-space: nowrap;
         }
 
         .lead-modal-audio-player {
             width: 100%;
-            min-height: 36px;
+            height: 30px;
+            min-height: 30px;
             border-radius: 9px;
-            margin-top: 0.08rem;
+            margin-top: 0;
         }
 
         .lead-modal-audio-empty {
-            margin-top: 0.2rem;
+            margin-top: 0;
             color: var(--text-tertiary);
-            font-size: 0.8rem;
+            font-size: 0.74rem;
             line-height: 1.35;
+            flex: 1;
         }
 
         .lead-modal-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 0.8rem;
+            gap: 0.65rem;
         }
 
         .lead-modal-field {
@@ -580,7 +599,7 @@
         }
 
         .lead-modal-textarea {
-            min-height: 110px;
+            min-height: 84px;
             resize: vertical;
         }
 
@@ -852,7 +871,7 @@
                         <div class="lead-modal-info-label">Gesprek samenvatting</div>
                         <div class="lead-modal-info-text" id="leadModalSummary">Nog geen samenvatting beschikbaar.</div>
                     </div>
-                    <div class="lead-modal-info">
+                    <div class="lead-modal-info lead-modal-audio-info">
                         <div class="lead-modal-info-label">Gespreksopname</div>
                         <audio class="lead-modal-audio-player" id="leadModalAudioPlayer" controls preload="none" hidden></audio>
                         <div class="lead-modal-audio-empty" id="leadModalAudioEmpty">Nog geen audio-opname beschikbaar voor deze lead.</div>
