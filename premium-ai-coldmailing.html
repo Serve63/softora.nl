@@ -964,11 +964,15 @@
             let pollTimer = null;
             let activeTaskId = 0;
             let modalBusy = false;
+            const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v1';
+            const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
             const leadDetailLoadPromiseById = Object.create(null);
             const leadAiCopyPromiseById = Object.create(null);
             let modalOpenSequence = 0;
+            let loadLeadsPromise = null;
+            let queuedReload = false;
 
             function esc(value) {
                 return String(value || '')
@@ -1028,9 +1032,11 @@
                 statusEl.className = `lead-status${variant ? ` ${variant}` : ''}`;
             }
 
-            function setStatusLastUpdatedNow() {
+            function setStatusLastUpdatedNow(dateValue = new Date()) {
+                const timestamp = dateValue instanceof Date ? dateValue : new Date(dateValue);
+                const safeDate = Number.isNaN(timestamp.getTime()) ? new Date() : timestamp;
                 setStatus(
-                    `Laatste update: ${new Date().toLocaleTimeString('nl-NL', {
+                    `Laatste update: ${safeDate.toLocaleTimeString('nl-NL', {
                         hour: '2-digit',
                         minute: '2-digit',
                     })}`,
@@ -1651,39 +1657,137 @@
                 return Array.from(map.values());
             }
 
-            async function loadLeads() {
-                setStatus('Leads laden...', '');
-                reloadBtn.disabled = true;
+            function loadCachedLeads() {
                 try {
-                    const tasksRes = await fetch('/api/agenda/confirmation-tasks?limit=400', { cache: 'no-store' });
-                    if (!tasksRes.ok) {
-                        throw new Error(`Serverfout bij leads laden (${tasksRes.status})`);
+                    const raw = window.localStorage.getItem(LEADS_CACHE_KEY);
+                    if (!raw) return { leads: [], savedAt: 0 };
+                    const parsed = JSON.parse(raw);
+                    const savedAt = Number(parsed?.savedAt) || 0;
+                    if (!savedAt || Date.now() - savedAt > LEADS_CACHE_MAX_AGE_MS) {
+                        return { leads: [], savedAt: 0 };
                     }
-                    const tasksData = await tasksRes.json().catch(() => ({}));
+                    const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
+                    const normalized = dedupe(rows.map((item) => normalizeLeadRow(item))).sort(sortByDateDesc);
+                    return { leads: normalized, savedAt };
+                } catch (_) {
+                    return { leads: [], savedAt: 0 };
+                }
+            }
 
-                    const pendingRows = Array.isArray(tasksData?.tasks)
-                        ? tasksData.tasks.map((item) => normalizeLeadRow(item))
-                        : [];
+            function persistCachedLeads(rows) {
+                if (!Array.isArray(rows)) return;
+                try {
+                    window.localStorage.setItem(
+                        LEADS_CACHE_KEY,
+                        JSON.stringify({
+                            savedAt: Date.now(),
+                            rows: rows.slice(0, 400),
+                        })
+                    );
+                } catch (_) {
+                    // localStorage kan uitstaan; dan slaan we deze stap over.
+                }
+            }
 
-                    allLeads = dedupe(pendingRows).sort(sortByDateDesc);
+            async function fetchTasksJson(url, timeoutMs) {
+                const controller = new AbortController();
+                const timeoutId = window.setTimeout(() => {
+                    controller.abort();
+                }, Math.max(500, Number(timeoutMs) || 7000));
+                try {
+                    const response = await fetch(url, {
+                        cache: 'no-store',
+                        signal: controller.signal,
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(`Serverfout bij leads laden (${response.status})`);
+                    }
+                    return data;
+                } catch (error) {
+                    if (error?.name === 'AbortError') {
+                        throw new Error('Leads laden duurde te lang');
+                    }
+                    throw error;
+                } finally {
+                    window.clearTimeout(timeoutId);
+                }
+            }
+
+            async function fetchLeadRows() {
+                const endpoints = [
+                    { url: '/api/agenda/confirmation-tasks?quick=1&limit=400', timeoutMs: 5000 },
+                    { url: '/api/agenda/confirmation-tasks?fast=1&limit=400', timeoutMs: 5000 },
+                    { url: '/api/agenda/confirmation-tasks?limit=400', timeoutMs: 9000 },
+                ];
+                let lastError = null;
+                for (const endpoint of endpoints) {
+                    try {
+                        const tasksData = await fetchTasksJson(endpoint.url, endpoint.timeoutMs);
+                        const pendingRows = Array.isArray(tasksData?.tasks)
+                            ? tasksData.tasks.map((item) => normalizeLeadRow(item))
+                            : [];
+                        return dedupe(pendingRows).sort(sortByDateDesc);
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+                throw lastError || new Error('Leads laden mislukt');
+            }
+
+            async function loadLeads(options = {}) {
+                const silent = Boolean(options?.silent);
+                if (loadLeadsPromise) {
+                    if (!silent) queuedReload = true;
+                    return loadLeadsPromise;
+                }
+
+                if (!silent) {
+                    setStatus(allLeads.length ? 'Leads verversen...' : 'Leads laden...', '');
+                }
+                reloadBtn.disabled = true;
+
+                loadLeadsPromise = (async () => {
+                    const freshLeads = await fetchLeadRows();
+                    allLeads = freshLeads;
                     renderList();
-
+                    persistCachedLeads(allLeads);
                     if (allLeads.length > 0) {
                         setStatusLastUpdatedNow();
                     } else {
                         setStatus('Nog geen leads gevonden.', '');
                     }
-                } catch (error) {
-                    setStatus(`Leads laden mislukt: ${String(error?.message || error || 'onbekende fout')}`, 'error');
-                    allLeads = [];
-                    renderList();
-                } finally {
-                    reloadBtn.disabled = false;
-                }
+                })()
+                    .catch((error) => {
+                        const message = String(error?.message || error || 'onbekende fout');
+                        if (allLeads.length > 0) {
+                            setStatus(`Live verversen mislukt, laatste data blijft zichtbaar (${message})`, 'error');
+                            return;
+                        }
+                        const cached = loadCachedLeads();
+                        if (cached.leads.length > 0) {
+                            allLeads = cached.leads;
+                            renderList();
+                            setStatusLastUpdatedNow(new Date(cached.savedAt));
+                            return;
+                        }
+                        setStatus(`Leads laden mislukt: ${message}`, 'error');
+                        renderList();
+                    })
+                    .finally(() => {
+                        reloadBtn.disabled = false;
+                        loadLeadsPromise = null;
+                        if (queuedReload) {
+                            queuedReload = false;
+                            loadLeads({ silent: true });
+                        }
+                    });
+
+                return loadLeadsPromise;
             }
 
             reloadBtn.addEventListener('click', () => {
-                loadLeads();
+                loadLeads({ silent: false });
             });
 
             modalCloseBtn.addEventListener('click', () => {
@@ -1715,10 +1819,17 @@
                 closeLeadModal();
             });
 
-            loadLeads();
+            const cachedLeads = loadCachedLeads();
+            if (cachedLeads.leads.length > 0) {
+                allLeads = cachedLeads.leads;
+                renderList();
+                setStatusLastUpdatedNow(new Date(cachedLeads.savedAt));
+            }
+
+            loadLeads({ silent: cachedLeads.leads.length > 0 });
 
             pollTimer = window.setInterval(() => {
-                loadLeads();
+                loadLeads({ silent: true });
             }, 45000);
 
             window.addEventListener('beforeunload', () => {
