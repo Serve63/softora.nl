@@ -56,7 +56,11 @@
 
     function getSidebarActiveKey(path) {
         const p = String(path || "").toLowerCase();
-        if (p.indexOf("/premium-actieve-opdrachten") === 0 || p.indexOf("/premium-opdracht-preview") === 0) {
+        if (
+            p.indexOf("/premium-actieve-opdrachten") === 0 ||
+            p.indexOf("/premium-opdracht-preview") === 0 ||
+            p.indexOf("/premium-opdracht-dossier") === 0
+        ) {
             return "active_orders";
         }
         if (p.indexOf("/premium-personeel-agenda") === 0) return "agenda";

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Softora | Opdracht dossier</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/personnel-theme.css">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                localStorage.setItem("softora_premium_personnel_theme_mode", "light");
+                localStorage.setItem("softora_premium_public_theme_mode", "light");
+                document.documentElement.setAttribute("data-theme-mode", "light");
+                document.documentElement.setAttribute("data-theme", "light");
+            } catch (error) {
+                /* ignore storage errors */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js" defer></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --surface: #ffffff;
+            --surface-alt: #f7f8fb;
+            --ink: #1b1f33;
+            --muted: #687089;
+            --line: rgba(26, 31, 52, 0.12);
+            --accent: #8b2252;
+            --ok: #2d9f6f;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 8% 0%, rgba(139, 34, 82, 0.15), transparent 34%),
+                radial-gradient(circle at 98% 18%, rgba(139, 34, 82, 0.08), transparent 32%),
+                #f6f6f8;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content {
+            margin-left: 280px;
+            width: calc(100% - 280px);
+            min-height: 100vh;
+            padding: clamp(1rem, 2.8vw, 2.2rem);
+        }
+
+        .dossier-shell {
+            width: min(1180px, 100%);
+            margin: 0 auto;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .dossier-header {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: clamp(1rem, 2.4vw, 1.5rem);
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .eyebrow {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.75rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #8a8fa3;
+        }
+
+        .dossier-title {
+            margin-top: 0.25rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(1.7rem, 3vw, 2.4rem);
+            line-height: 1.02;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            color: #171b2f;
+        }
+
+        .dossier-sub {
+            margin-top: 0.5rem;
+            color: var(--muted);
+            font-size: 0.95rem;
+            line-height: 1.55;
+            max-width: 70ch;
+        }
+
+        .status-pill {
+            align-self: flex-start;
+            border-radius: 999px;
+            border: 1px solid rgba(139, 34, 82, 0.28);
+            background: rgba(139, 34, 82, 0.08);
+            color: var(--accent);
+            padding: 0.42rem 0.8rem;
+            font-size: 0.77rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .actions {
+            display: flex;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 0.66rem 0.92rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            text-decoration: none;
+            cursor: pointer;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #8b2252, #a62d65);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 14px 28px rgba(139, 34, 82, 0.2);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.75);
+            color: #1e243a;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            gap: 1rem;
+        }
+
+        .section {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 1rem;
+        }
+
+        .section h2 {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.11em;
+            color: #868da2;
+            margin-bottom: 0.75rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.66rem;
+        }
+
+        .info-item {
+            border: 1px solid var(--line);
+            background: var(--surface-alt);
+            border-radius: 10px;
+            padding: 0.62rem 0.7rem;
+        }
+
+        .label {
+            font-size: 0.67rem;
+            font-weight: 700;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            color: #8b92a6;
+        }
+
+        .value {
+            margin-top: 0.23rem;
+            font-size: 0.89rem;
+            color: #20253d;
+            line-height: 1.5;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        .value a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px dotted rgba(139, 34, 82, 0.4);
+        }
+
+        .block {
+            border: 1px solid var(--line);
+            background: var(--surface-alt);
+            border-radius: 10px;
+            padding: 0.76rem 0.82rem;
+            min-height: 110px;
+            font-size: 0.89rem;
+            line-height: 1.6;
+            color: #1f243a;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .attachments {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 0.55rem;
+        }
+
+        .attachments img {
+            width: 100%;
+            height: 90px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            object-fit: cover;
+            background: #fff;
+        }
+
+        .timeline {
+            display: grid;
+            gap: 0.52rem;
+            max-height: 340px;
+            overflow: auto;
+            padding-right: 0.2rem;
+        }
+
+        .timeline-item {
+            border: 1px solid var(--line);
+            background: var(--surface-alt);
+            border-radius: 10px;
+            padding: 0.62rem 0.7rem;
+        }
+
+        .timeline-time {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8991a8;
+        }
+
+        .timeline-msg {
+            margin-top: 0.26rem;
+            font-size: 0.86rem;
+            line-height: 1.55;
+            color: #22283f;
+            white-space: pre-wrap;
+        }
+
+        .json-box {
+            margin-top: 0.8rem;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #101321;
+            color: #dde2ff;
+            padding: 0.75rem;
+            max-height: 420px;
+            overflow: auto;
+            font-size: 0.76rem;
+            line-height: 1.45;
+            white-space: pre;
+        }
+
+        .loading,
+        .error {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 1rem;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .error {
+            color: #8f2f51;
+            border-color: rgba(139, 34, 82, 0.24);
+            background: rgba(139, 34, 82, 0.06);
+        }
+
+        .print-only {
+            display: none;
+        }
+
+        @media (max-width: 1080px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .sidebar {
+                position: static;
+                width: 100%;
+                height: auto;
+            }
+
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+                padding: 0.75rem;
+            }
+        }
+
+        @media print {
+            @page {
+                size: A4;
+                margin: 12mm;
+            }
+
+            body {
+                background: #fff !important;
+            }
+
+            .sidebar,
+            .screen-only {
+                display: none !important;
+            }
+
+            .print-only {
+                display: block;
+            }
+
+            .main-content {
+                margin: 0 !important;
+                width: 100% !important;
+                padding: 0 !important;
+            }
+
+            .section,
+            .dossier-header {
+                break-inside: avoid;
+                box-shadow: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar"></aside>
+        <main class="main-content">
+            <div class="dossier-shell" id="dossierRoot">
+                <div class="loading">Dossier laden...</div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        (function initDossierPage() {
+            const REMOTE_SCOPE = 'premium_active_orders';
+            const CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
+            const ORDER_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
+            const root = document.getElementById('dossierRoot');
+
+            function esc(value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function safeJsonParse(value, fallback) {
+                try {
+                    const parsed = JSON.parse(String(value || ''));
+                    return parsed === null || parsed === undefined ? fallback : parsed;
+                } catch (_) {
+                    return fallback;
+                }
+            }
+
+            function parseNullableNumber(value) {
+                if (value === null || value === undefined) return null;
+                if (typeof value === 'string' && value.trim() === '') return null;
+                const n = Number(value);
+                return Number.isFinite(n) ? n : null;
+            }
+
+            function formatMoney(value) {
+                const n = parseNullableNumber(value);
+                if (!Number.isFinite(n) || n < 0) return '—';
+                return `€${n.toLocaleString('nl-NL', { minimumFractionDigits: n < 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+            }
+
+            function formatDateTime(value) {
+                const raw = String(value || '').trim();
+                if (!raw) return '—';
+                const asNumber = Number(raw);
+                if (Number.isFinite(asNumber) && asNumber > 0) {
+                    const d = new Date(asNumber);
+                    return Number.isNaN(d.getTime()) ? raw : d.toLocaleString('nl-NL');
+                }
+                const d = new Date(raw);
+                return Number.isNaN(d.getTime()) ? raw : d.toLocaleString('nl-NL');
+            }
+
+            function normalizeStatus(value) {
+                const key = String(value || '').trim().toLowerCase();
+                if (key === 'bezig') return 'In behandeling';
+                if (key === 'klaar') return 'Gebouwd';
+                if (key === 'betaald') return 'Betaald';
+                if (key === 'actief') return 'Actief';
+                return 'Wachtend';
+            }
+
+            function normalizeReferenceImages(list) {
+                if (!Array.isArray(list)) return [];
+                return list
+                    .map((item, index) => {
+                        const dataUrl = String(item?.dataUrl || item?.imageDataUrl || item?.url || '').trim();
+                        if (!/^data:image\//i.test(dataUrl)) return null;
+                        const name = String(item?.name || item?.fileName || `bijlage-${index + 1}`).trim();
+                        return { dataUrl, name: name || `bijlage-${index + 1}` };
+                    })
+                    .filter(Boolean)
+                    .slice(0, 12);
+            }
+
+            async function fetchUiStateValues(scope) {
+                const encoded = encodeURIComponent(String(scope || ''));
+                const endpoints = [
+                    `/api/ui-state-get?scope=${encoded}`,
+                    `/api/ui-state/${encoded}`
+                ];
+
+                for (const endpoint of endpoints) {
+                    try {
+                        const response = await fetch(endpoint, { cache: 'no-store' });
+                        if (!response.ok) continue;
+                        const data = await response.json().catch(() => ({}));
+                        if (data?.ok && data?.values && typeof data.values === 'object') {
+                            return data.values;
+                        }
+                    } catch (_) {
+                        // try next endpoint
+                    }
+                }
+                return {};
+            }
+
+            function getOrderIdFromQuery() {
+                const params = new URLSearchParams(window.location.search || '');
+                const id = Number(params.get('id'));
+                return Number.isFinite(id) && id > 0 ? id : 0;
+            }
+
+            function shouldAutoPrint() {
+                const params = new URLSearchParams(window.location.search || '');
+                return /^(1|true|yes)$/i.test(String(params.get('autoprint') || ''));
+            }
+
+            function renderError(message) {
+                root.innerHTML = `<div class="error">${esc(message || 'Dossier niet gevonden.')}</div>`;
+            }
+
+            function renderDossier(orderId, customOrder, runtimeOrder) {
+                const order = customOrder || {};
+                const runtime = runtimeOrder || {};
+                const status = normalizeStatus(order?.status || runtime?.statusKey || '');
+                const title = String(order?.title || runtime?.type || `Opdracht #${orderId}`).trim();
+                const company = String(order?.clientName || runtime?.name || 'Onbekend').trim();
+                const contact = String(order?.location || '').trim();
+                const description = String(order?.description || '').trim();
+                const transcript = String(order?.transcript || '').trim();
+                const prompt = String(order?.prompt || '').trim();
+                const sourceAppointmentLabel = String(order?.sourceAppointmentLabel || '').trim();
+                const sourceCallId = String(order?.sourceCallId || '').trim();
+                const deliveryTime = String(order?.deliveryTime || '').trim();
+                const domainName = String(order?.domainName || '').trim();
+                const claimBy = String(order?.claimedBy || runtime?.claimedBy || '').trim();
+                const claimAt = String(order?.claimedAt || runtime?.claimedAt || '').trim();
+                const attachments = normalizeReferenceImages(order?.referenceImages || []);
+                const logs = Array.isArray(runtime?.logs) ? runtime.logs : [];
+                const progressPct = Math.max(0, Math.min(100, Number(runtime?.progressPct) || 0));
+                const paidAt = String(order?.paidAt || runtime?.paidAt || '').trim();
+
+                document.title = `Softora | Dossier #${orderId}`;
+
+                const attachmentHtml = attachments.length
+                    ? attachments.map((img) => `<img src="${esc(img.dataUrl)}" alt="${esc(img.name)}">`).join('')
+                    : '<div class="value">Geen foto-bijlagen gekoppeld.</div>';
+
+                const logHtml = logs.length
+                    ? logs.slice().reverse().map((entry) => `
+                        <article class="timeline-item">
+                            <div class="timeline-time">${esc(String(entry?.time || '—'))}</div>
+                            <div class="timeline-msg">${esc(String(entry?.msg || ''))}</div>
+                        </article>
+                    `).join('')
+                    : '<div class="value">Nog geen logregels beschikbaar.</div>';
+
+                const rawPayload = {
+                    orderId,
+                    customOrder: order,
+                    runtimeOrder: runtime
+                };
+
+                root.innerHTML = `
+                    <header class="dossier-header">
+                        <div>
+                            <div class="eyebrow">Uitvoerdossier · Order #${esc(orderId)}</div>
+                            <h1 class="dossier-title">${esc(title)}</h1>
+                            <p class="dossier-sub">Compleet werkdossier voor uitvoering. Dit document bevat alle bekende intake-, planning-, prompt- en statusdata voor deze opdracht.</p>
+                        </div>
+                        <div style="display: grid; gap: 0.75rem; justify-items: end;">
+                            <div class="status-pill">${esc(status)}</div>
+                            <div class="actions screen-only">
+                                <button type="button" class="btn btn-primary" id="printBtn">Download PDF</button>
+                                <a class="btn btn-secondary" href="/premium-actieve-opdrachten">Terug naar opdrachten</a>
+                            </div>
+                        </div>
+                    </header>
+
+                    <section class="grid">
+                        <article class="section">
+                            <h2>Project Kern</h2>
+                            <div class="info-grid">
+                                <div class="info-item"><div class="label">Klant</div><div class="value">${esc(company || '—')}</div></div>
+                                <div class="info-item"><div class="label">Contactpersoon</div><div class="value">${esc(contact || '—')}</div></div>
+                                <div class="info-item"><div class="label">Bedrag</div><div class="value">${esc(formatMoney(order?.amount))}</div></div>
+                                <div class="info-item"><div class="label">Voortgang</div><div class="value">${esc(`${progressPct}%`)}</div></div>
+                                <div class="info-item"><div class="label">Oplevertijd</div><div class="value">${esc(deliveryTime || '—')}</div></div>
+                                <div class="info-item"><div class="label">Domein</div><div class="value">${esc(domainName || '—')}</div></div>
+                                <div class="info-item"><div class="label">Agenda koppeling</div><div class="value">${esc(sourceAppointmentLabel || '—')}</div></div>
+                                <div class="info-item"><div class="label">Call ID</div><div class="value">${esc(sourceCallId || '—')}</div></div>
+                                <div class="info-item"><div class="label">Geclaimd door</div><div class="value">${esc(claimBy || 'Nog niet geclaimd')}</div></div>
+                                <div class="info-item"><div class="label">Geclaimd op</div><div class="value">${esc(formatDateTime(claimAt))}</div></div>
+                                <div class="info-item"><div class="label">Laatst bijgewerkt</div><div class="value">${esc(formatDateTime(runtime?.updatedAt))}</div></div>
+                                <div class="info-item"><div class="label">Klant betaald op</div><div class="value">${esc(formatDateTime(paidAt))}</div></div>
+                            </div>
+                        </article>
+
+                        <article class="section">
+                            <h2>Financieel & Launch</h2>
+                            <div class="info-grid">
+                                <div class="info-item"><div class="label">API kosten EUR</div><div class="value">${esc(formatMoney(order?.apiCostEur))}</div></div>
+                                <div class="info-item"><div class="label">API kosten USD</div><div class="value">${esc(parseNullableNumber(order?.apiCostUsd) ?? '—')}</div></div>
+                                <div class="info-item"><div class="label">Input tokens</div><div class="value">${esc(parseNullableNumber(order?.apiTokensInput) ?? '—')}</div></div>
+                                <div class="info-item"><div class="label">Output tokens</div><div class="value">${esc(parseNullableNumber(order?.apiTokensOutput) ?? '—')}</div></div>
+                                <div class="info-item"><div class="label">Model</div><div class="value">${esc(String(order?.apiModel || '—'))}</div></div>
+                                <div class="info-item"><div class="label">Laatste run</div><div class="value">${esc(formatDateTime(order?.lastRunAt))}</div></div>
+                                <div class="info-item"><div class="label">Live URL</div><div class="value">${order?.launchDeploymentUrl ? `<a href="${esc(order.launchDeploymentUrl)}" target="_blank" rel="noopener noreferrer">${esc(order.launchDeploymentUrl)}</a>` : '—'}</div></div>
+                                <div class="info-item"><div class="label">GitHub repo</div><div class="value">${order?.launchRepoUrl ? `<a href="${esc(order.launchRepoUrl)}" target="_blank" rel="noopener noreferrer">${esc(order.launchRepoUrl)}</a>` : '—'}</div></div>
+                            </div>
+                        </article>
+                    </section>
+
+                    <section class="section">
+                        <h2>Omschrijving Opdracht</h2>
+                        <div class="block">${esc(description || 'Geen omschrijving beschikbaar.')}</div>
+                    </section>
+
+                    <section class="section">
+                        <h2>Meeting / Transcript</h2>
+                        <div class="block">${esc(transcript || 'Geen transcript of meetingnotities beschikbaar.')}</div>
+                    </section>
+
+                    <section class="section">
+                        <h2>AI Prompt / Instructies</h2>
+                        <div class="block">${esc(prompt || 'Geen AI prompt opgeslagen.')}</div>
+                    </section>
+
+                    <section class="section">
+                        <h2>Bijlagen</h2>
+                        <div class="attachments">${attachmentHtml}</div>
+                    </section>
+
+                    <section class="section">
+                        <h2>Logboek</h2>
+                        <div class="timeline">${logHtml}</div>
+                    </section>
+
+                    <section class="section">
+                        <h2>Volledige Data</h2>
+                        <div class="json-box">${esc(JSON.stringify(rawPayload, null, 2))}</div>
+                    </section>
+                `;
+
+                const printBtn = document.getElementById('printBtn');
+                if (printBtn) {
+                    printBtn.addEventListener('click', () => {
+                        window.print();
+                    });
+                }
+            }
+
+            async function start() {
+                const orderId = getOrderIdFromQuery();
+                if (!orderId) {
+                    renderError('Geen geldig order-ID meegegeven.');
+                    return;
+                }
+
+                const values = await fetchUiStateValues(REMOTE_SCOPE);
+                const customOrders = safeJsonParse(values?.[CUSTOM_ORDERS_KEY], []);
+                const runtimeMap = safeJsonParse(values?.[ORDER_RUNTIME_KEY], {});
+                const customOrder = Array.isArray(customOrders)
+                    ? customOrders.find((item) => Number(item?.id) === orderId)
+                    : null;
+                const runtimeOrder = runtimeMap && typeof runtimeMap === 'object'
+                    ? runtimeMap[String(orderId)] || null
+                    : null;
+
+                if (!customOrder && !runtimeOrder) {
+                    renderError(`Geen dossierdata gevonden voor opdracht #${orderId}.`);
+                    return;
+                }
+
+                renderDossier(orderId, customOrder, runtimeOrder);
+
+                if (shouldAutoPrint()) {
+                    window.setTimeout(() => {
+                        window.print();
+                    }, 420);
+                }
+            }
+
+            void start();
+        })();
+    </script>
+</body>
+</html>
