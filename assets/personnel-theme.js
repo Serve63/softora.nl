@@ -213,7 +213,11 @@
 
     function sidebarFitsViewport(sidebarEl) {
         if (!sidebarEl) return true;
-        return sidebarEl.scrollHeight <= sidebarEl.clientHeight + 8;
+        const nav = sidebarEl.querySelector(".sidebar-nav");
+        if (nav && nav.scrollHeight > nav.clientHeight + 1) {
+            return false;
+        }
+        return sidebarEl.scrollHeight <= sidebarEl.clientHeight + 2;
     }
 
     function applySidebarFitLayout() {
