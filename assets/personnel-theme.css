@@ -429,6 +429,7 @@ button,
         height: 100vh !important;
         min-height: 100vh !important;
         padding-top: 1.95rem !important;
+        overflow: hidden !important;
     }
 
     .sidebar-logo {
@@ -474,6 +475,132 @@ button,
         flex: 1 !important;
         min-height: 0 !important;
         overflow-y: hidden !important;
+    }
+
+    .sidebar.sidebar-fit-compact {
+        padding-top: 1.72rem !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-logo {
+        margin-bottom: 1.15rem !important;
+        font-size: 1.34rem !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-section {
+        margin-bottom: 0.9rem !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-section-label {
+        margin-bottom: 0.38rem !important;
+        font-size: 0.62rem !important;
+        letter-spacing: 0.15em !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-link {
+        gap: 0.62rem !important;
+        padding: 0.5rem 1.72rem !important;
+        font-size: 0.83rem !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-flow-section .sidebar-link {
+        padding-left: 2.32rem !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-flow-section::before {
+        top: 4.8rem !important;
+        bottom: 0.58rem !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-footer {
+        padding: 1rem 1.58rem !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-avatar {
+        width: 31px !important;
+        height: 31px !important;
+        font-size: 0.74rem !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-user-name {
+        font-size: 0.77rem !important;
+    }
+
+    .sidebar.sidebar-fit-compact .sidebar-footer .sidebar-user .sidebar-user-role {
+        font-size: 0.67rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight {
+        padding-top: 1.54rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-logo {
+        margin-bottom: 0.98rem !important;
+        font-size: 1.27rem !important;
+        padding: 0 1.6rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-section {
+        margin-bottom: 0.68rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-section-label {
+        margin-bottom: 0.3rem !important;
+        font-size: 0.58rem !important;
+        letter-spacing: 0.14em !important;
+        padding: 0 1.6rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-link {
+        gap: 0.56rem !important;
+        padding: 0.42rem 1.6rem !important;
+        font-size: 0.78rem !important;
+        line-height: 1.2 !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-flow-section .sidebar-link {
+        padding-left: 2.2rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-link svg {
+        width: 15px !important;
+        height: 15px !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-link[href="/premium-ai-coldmailing"] svg {
+        width: 17px !important;
+        height: 17px !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-flow-section::before {
+        top: 4.56rem !important;
+        bottom: 0.48rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-footer {
+        padding: 0.86rem 1.45rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-user {
+        gap: 0.55rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-avatar {
+        width: 29px !important;
+        height: 29px !important;
+        font-size: 0.68rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-user-name {
+        font-size: 0.72rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-footer .sidebar-user .sidebar-user-role {
+        font-size: 0.62rem !important;
+    }
+
+    .sidebar.sidebar-fit-tight .sidebar-footer .sidebar-user .logout-btn svg {
+        width: 14px !important;
+        height: 14px !important;
     }
 
     .sidebar-footer {

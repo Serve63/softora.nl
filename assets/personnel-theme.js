@@ -204,6 +204,41 @@
         if (!sidebar) return;
         const activeKey = getSidebarActiveKey(pathname);
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
+        queueSidebarFitLayout();
+    }
+
+    function sidebarFitsViewport(sidebarEl) {
+        if (!sidebarEl) return true;
+        return sidebarEl.scrollHeight <= sidebarEl.clientHeight + 1;
+    }
+
+    function applySidebarFitLayout() {
+        if (!isPremiumPersonnelContext) return;
+        const sidebar = document.querySelector(".sidebar");
+        if (!sidebar) return;
+
+        sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
+        if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
+            return;
+        }
+
+        if (sidebarFitsViewport(sidebar)) return;
+        sidebar.classList.add("sidebar-fit-compact");
+        if (sidebarFitsViewport(sidebar)) return;
+
+        sidebar.classList.remove("sidebar-fit-compact");
+        sidebar.classList.add("sidebar-fit-tight");
+    }
+
+    let sidebarFitRaf = 0;
+    function queueSidebarFitLayout() {
+        if (sidebarFitRaf) {
+            cancelAnimationFrame(sidebarFitRaf);
+        }
+        sidebarFitRaf = requestAnimationFrame(function () {
+            sidebarFitRaf = 0;
+            applySidebarFitLayout();
+        });
     }
 
     function normalizeLeadFieldForCount(value) {
@@ -306,6 +341,7 @@
         badge.title = `${count} ${count === 1 ? singular : plural}`;
         badge.setAttribute("aria-label", badge.title);
         writeSidebarCountCache(countKey, count);
+        queueSidebarFitLayout();
     }
 
     async function refreshSidebarLeadsCount() {
@@ -548,6 +584,18 @@
     window.SoftoraPersonnelTheme.refreshSidebarCounts = refreshSidebarNotificationCounts;
 
     applyUnifiedPremiumSidebar();
+    queueSidebarFitLayout();
+    window.addEventListener("resize", queueSidebarFitLayout);
+    window.addEventListener("load", queueSidebarFitLayout, { once: true });
+    if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === "function") {
+        document.fonts.ready
+            .then(function () {
+                queueSidebarFitLayout();
+            })
+            .catch(function () {
+                /* ignore font ready errors */
+            });
+    }
     initSidebarNotificationCounts();
     forceLightTheme();
     syncThemeButtonsToLight();
