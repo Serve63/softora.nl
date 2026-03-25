@@ -473,6 +473,14 @@ button,
         flex: 1 !important;
         min-height: 0 !important;
         overflow-y: auto !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+    }
+
+    .sidebar-nav::-webkit-scrollbar {
+        width: 0 !important;
+        height: 0 !important;
+        display: none !important;
     }
 
     .sidebar-footer {
