@@ -213,7 +213,7 @@
 
     function sidebarFitsViewport(sidebarEl) {
         if (!sidebarEl) return true;
-        return sidebarEl.scrollHeight <= sidebarEl.clientHeight + 1;
+        return sidebarEl.scrollHeight <= sidebarEl.clientHeight + 8;
     }
 
     function applySidebarFitLayout() {

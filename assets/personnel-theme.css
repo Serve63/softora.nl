@@ -428,47 +428,47 @@ button,
         width: 280px !important;
         height: 100vh !important;
         min-height: 100vh !important;
-        padding-top: 1.95rem !important;
+        padding-top: 2.45rem !important;
         overflow: hidden !important;
     }
 
     .sidebar-logo {
         display: block !important;
-        padding: 0 1.75rem !important;
-        margin-bottom: 1.35rem !important;
-        font-size: 1.42rem !important;
+        padding: 0 1.85rem !important;
+        margin-bottom: 1.85rem !important;
+        font-size: 1.7rem !important;
     }
 
     .sidebar-section {
-        margin-bottom: 1.1rem !important;
+        margin-bottom: 1.5rem !important;
     }
 
     .sidebar-section-label {
-        padding: 0 1.75rem !important;
-        margin-bottom: 0.5rem !important;
-        font-size: 0.65rem !important;
-        letter-spacing: 0.17em !important;
+        padding: 0 1.85rem !important;
+        margin-bottom: 0.72rem !important;
+        font-size: 0.76rem !important;
+        letter-spacing: 0.19em !important;
     }
 
     .sidebar-link {
-        gap: 0.7rem !important;
-        padding: 0.6rem 1.75rem !important;
-        font-size: 0.86rem !important;
-        line-height: 1.25 !important;
+        gap: 0.88rem !important;
+        padding: 0.8rem 1.85rem !important;
+        font-size: 1rem !important;
+        line-height: 1.32 !important;
     }
 
     .sidebar-flow-section .sidebar-link {
-        padding-left: 2.45rem !important;
+        padding-left: 2.7rem !important;
     }
 
     .sidebar-link svg {
-        width: 17px !important;
-        height: 17px !important;
+        width: 20px !important;
+        height: 20px !important;
     }
 
     .sidebar-link[href="/premium-ai-coldmailing"] svg {
-        width: 19px !important;
-        height: 19px !important;
+        width: 22px !important;
+        height: 22px !important;
     }
 
     .sidebar-nav {
@@ -478,154 +478,154 @@ button,
     }
 
     .sidebar.sidebar-fit-compact {
-        padding-top: 1.72rem !important;
+        padding-top: 2.08rem !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-logo {
-        margin-bottom: 1.15rem !important;
-        font-size: 1.34rem !important;
+        margin-bottom: 1.35rem !important;
+        font-size: 1.5rem !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-section {
-        margin-bottom: 0.9rem !important;
+        margin-bottom: 1.18rem !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-section-label {
-        margin-bottom: 0.38rem !important;
-        font-size: 0.62rem !important;
-        letter-spacing: 0.15em !important;
+        margin-bottom: 0.52rem !important;
+        font-size: 0.7rem !important;
+        letter-spacing: 0.17em !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-link {
-        gap: 0.62rem !important;
-        padding: 0.5rem 1.72rem !important;
-        font-size: 0.83rem !important;
+        gap: 0.76rem !important;
+        padding: 0.64rem 1.75rem !important;
+        font-size: 0.92rem !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-flow-section .sidebar-link {
-        padding-left: 2.32rem !important;
+        padding-left: 2.5rem !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-flow-section::before {
-        top: 4.8rem !important;
-        bottom: 0.58rem !important;
+        top: 5.3rem !important;
+        bottom: 0.7rem !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-footer {
-        padding: 1rem 1.58rem !important;
+        padding: 1.3rem 1.68rem !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-avatar {
-        width: 31px !important;
-        height: 31px !important;
-        font-size: 0.74rem !important;
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 0.8rem !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-user-name {
-        font-size: 0.77rem !important;
+        font-size: 0.83rem !important;
     }
 
     .sidebar.sidebar-fit-compact .sidebar-footer .sidebar-user .sidebar-user-role {
-        font-size: 0.67rem !important;
+        font-size: 0.71rem !important;
     }
 
     .sidebar.sidebar-fit-tight {
-        padding-top: 1.54rem !important;
+        padding-top: 1.8rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-logo {
-        margin-bottom: 0.98rem !important;
-        font-size: 1.27rem !important;
-        padding: 0 1.6rem !important;
+        margin-bottom: 1.2rem !important;
+        font-size: 1.38rem !important;
+        padding: 0 1.7rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-section {
-        margin-bottom: 0.68rem !important;
+        margin-bottom: 0.96rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-section-label {
-        margin-bottom: 0.3rem !important;
-        font-size: 0.58rem !important;
-        letter-spacing: 0.14em !important;
-        padding: 0 1.6rem !important;
+        margin-bottom: 0.4rem !important;
+        font-size: 0.63rem !important;
+        letter-spacing: 0.15em !important;
+        padding: 0 1.7rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-link {
-        gap: 0.56rem !important;
-        padding: 0.42rem 1.6rem !important;
-        font-size: 0.78rem !important;
-        line-height: 1.2 !important;
+        gap: 0.66rem !important;
+        padding: 0.52rem 1.7rem !important;
+        font-size: 0.87rem !important;
+        line-height: 1.22 !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-flow-section .sidebar-link {
-        padding-left: 2.2rem !important;
+        padding-left: 2.34rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-link svg {
-        width: 15px !important;
-        height: 15px !important;
+        width: 18px !important;
+        height: 18px !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-link[href="/premium-ai-coldmailing"] svg {
-        width: 17px !important;
-        height: 17px !important;
+        width: 20px !important;
+        height: 20px !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-flow-section::before {
-        top: 4.56rem !important;
-        bottom: 0.48rem !important;
+        top: 4.9rem !important;
+        bottom: 0.62rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-footer {
-        padding: 0.86rem 1.45rem !important;
+        padding: 1.06rem 1.6rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-user {
-        gap: 0.55rem !important;
+        gap: 0.64rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-avatar {
-        width: 29px !important;
-        height: 29px !important;
-        font-size: 0.68rem !important;
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 0.75rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-user-name {
-        font-size: 0.72rem !important;
+        font-size: 0.78rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-footer .sidebar-user .sidebar-user-role {
-        font-size: 0.62rem !important;
+        font-size: 0.68rem !important;
     }
 
     .sidebar.sidebar-fit-tight .sidebar-footer .sidebar-user .logout-btn svg {
-        width: 14px !important;
-        height: 14px !important;
+        width: 15px !important;
+        height: 15px !important;
     }
 
     .sidebar-footer {
         flex-shrink: 0 !important;
         margin-top: 0 !important;
-        padding: 1.3rem 1.65rem !important;
+        padding: 1.7rem 1.85rem !important;
     }
 
     .sidebar-user {
-        gap: 0.68rem !important;
+        gap: 0.84rem !important;
     }
 
     .sidebar-avatar {
-        width: 33px !important;
-        height: 33px !important;
-        font-size: 0.78rem !important;
+        width: 38px !important;
+        height: 38px !important;
+        font-size: 0.86rem !important;
     }
 
     .sidebar-user-name {
-        font-size: 0.8rem !important;
+        font-size: 0.9rem !important;
         line-height: 1.2 !important;
     }
 
     .sidebar-footer .sidebar-user .sidebar-user-role {
-        font-size: 0.7rem !important;
+        font-size: 0.77rem !important;
         line-height: 1.2 !important;
     }
 
@@ -634,13 +634,13 @@ button,
     }
 
     .sidebar-footer .sidebar-user .logout-btn svg {
-        width: 16px !important;
-        height: 16px !important;
+        width: 18px !important;
+        height: 18px !important;
     }
 
     .sidebar-flow-section::before {
-        top: 5.1rem !important;
-        bottom: 0.66rem !important;
+        top: 5.92rem !important;
+        bottom: 0.84rem !important;
     }
 
     .main,
