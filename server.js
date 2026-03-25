@@ -7993,20 +7993,25 @@ app.post('/api/agenda/add-active-order', async (req, res) => {
 });
 
 app.get('/api/agenda/confirmation-tasks', async (req, res) => {
+  const includeDemo = /^(1|true|yes)$/i.test(String(req.query.includeDemo || ''));
+  const quickMode = /^(1|true|yes)$/i.test(String(req.query.quick || req.query.fast || ''));
+  const countOnly = /^(1|true|yes)$/i.test(String(req.query.countOnly || req.query.count_only || ''));
+
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
-  if (isImapMailConfigured()) {
+  if (!quickMode && isImapMailConfigured()) {
     await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
   }
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
-  generatedAgendaAppointments.forEach((appointment, idx) => {
-    if (!appointment) return;
-    if (!mapAppointmentToConfirmationTask(appointment)) return;
-    ensureConfirmationEmailDraftAtIndex(idx, { reason: 'confirmation_task_list_auto_draft' });
-  });
-  const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 100)));
-  const includeDemo = /^(1|true|yes)$/i.test(String(req.query.includeDemo || ''));
+  if (!quickMode) {
+    generatedAgendaAppointments.forEach((appointment, idx) => {
+      if (!appointment) return;
+      if (!mapAppointmentToConfirmationTask(appointment)) return;
+      ensureConfirmationEmailDraftAtIndex(idx, { reason: 'confirmation_task_list_auto_draft' });
+    });
+  }
+
   const tasks = generatedAgendaAppointments
     .filter((appointment) => {
       if (includeDemo) return true;
@@ -8015,8 +8020,48 @@ app.get('/api/agenda/confirmation-tasks', async (req, res) => {
       return !callId.startsWith('demo-');
     })
     .map(mapAppointmentToConfirmationTask)
-    .filter(Boolean)
-    .sort(compareConfirmationTasks);
+    .filter(Boolean);
+
+  if (countOnly) {
+    const dedupe = new Set();
+    tasks.forEach((task) => {
+      const key = [
+        normalizeString(task?.company || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim(),
+        normalizeString(task?.contact || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim(),
+        normalizeString(task?.phone || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim(),
+        normalizeString(task?.date || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim(),
+        normalizeString(task?.time || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim(),
+      ].join('|');
+      dedupe.add(key);
+    });
+    return res.status(200).json({
+      ok: true,
+      count: dedupe.size,
+    });
+  }
+
+  const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 100)));
+  tasks.sort(compareConfirmationTasks);
 
   return res.status(200).json({
     ok: true,

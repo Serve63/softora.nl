@@ -6,6 +6,7 @@
         : "softora_software_personnel_theme_mode";
     const publicStorageKey = "softora_premium_public_theme_mode";
     const publicFallbackStorageKey = "softora_public_theme_mode";
+    const sidebarCountCacheStorageKey = "softora_sidebar_count_cache_v1";
     const root = document.documentElement;
     const themeButtons = document.querySelectorAll(".theme-switch-btn[data-theme-value]");
 
@@ -231,6 +232,42 @@
         return document.querySelector(`[data-sidebar-count-key="${String(countKey || "").trim()}"]`);
     }
 
+    function readSidebarCountCache() {
+        try {
+            const raw = localStorage.getItem(sidebarCountCacheStorageKey);
+            if (!raw) return {};
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+            return parsed;
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function writeSidebarCountCache(countKey, count) {
+        if (!Number.isFinite(count) || count < 0) return;
+        try {
+            const cache = readSidebarCountCache();
+            cache[String(countKey || "").trim()] = {
+                count: Math.max(0, Math.floor(count)),
+                updatedAt: new Date().toISOString(),
+            };
+            localStorage.setItem(sidebarCountCacheStorageKey, JSON.stringify(cache));
+        } catch (error) {
+            /* ignore storage errors */
+        }
+    }
+
+    function readCachedSidebarCount(countKey) {
+        const key = String(countKey || "").trim();
+        if (!key) return null;
+        const cache = readSidebarCountCache();
+        const entry = cache[key];
+        const value = Number(entry && entry.count);
+        if (!Number.isFinite(value) || value < 0) return null;
+        return Math.floor(value);
+    }
+
     function paintSidebarCount(countKey, count, labels) {
         const badge = getSidebarCountBadge(countKey);
         if (!badge) return;
@@ -245,11 +282,19 @@
         const plural = String(labels && labels.plural ? labels.plural : `${singular}s`);
         badge.title = `${count} ${count === 1 ? singular : plural}`;
         badge.setAttribute("aria-label", badge.title);
+        writeSidebarCountCache(countKey, count);
     }
 
     async function refreshSidebarLeadsCount() {
         const badge = getSidebarCountBadge("leads");
         if (!badge) return;
+
+        const quickCountData = await fetchJsonNoStore("/api/agenda/confirmation-tasks?quick=1&countOnly=1");
+        const quickTotal = Number(quickCountData && quickCountData.count);
+        if (Number.isFinite(quickTotal) && quickTotal >= 0) {
+            paintSidebarCount("leads", quickTotal, { singular: "open lead", plural: "open leads" });
+            return;
+        }
 
         const tasksData = await fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400");
         if (!tasksData) {
@@ -420,6 +465,10 @@
     function initSidebarNotificationCounts() {
         if (!isPremiumPersonnelContext) return;
         if (!document.querySelector("[data-sidebar-count-key]")) return;
+        const cachedLeadCount = readCachedSidebarCount("leads");
+        if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
+            paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
+        }
         refreshSidebarNotificationCounts();
         window.setInterval(refreshSidebarNotificationCounts, 45000);
     }
