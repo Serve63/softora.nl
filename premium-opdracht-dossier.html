@@ -144,8 +144,10 @@
         .page-body {
             padding: 0.8rem 0.9rem;
             display: grid;
+            grid-template-rows: auto auto auto 1fr;
             gap: 0.42rem;
-            align-content: start;
+            align-content: stretch;
+            min-height: 0;
             overflow: hidden;
         }
 
@@ -274,6 +276,12 @@
             padding: 0.34rem 0.44rem;
         }
 
+        .section.section-prompt {
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+        }
+
         .section-head {
             display: flex;
             align-items: center;
@@ -308,8 +316,10 @@
             line-height: 1.28;
             padding: 0.42rem;
             white-space: pre-wrap;
-            overflow: hidden;
-            height: 146px;
+            overflow: auto;
+            height: auto;
+            min-height: 0;
+            max-height: 100%;
         }
 
         .copy-status {
@@ -374,6 +384,10 @@
                 border-radius: 12px;
             }
 
+            .page-body {
+                grid-template-rows: auto auto auto auto;
+            }
+
             .loading,
             .error {
                 width: 100%;
@@ -393,6 +407,7 @@
 
             .prompt-box {
                 height: auto;
+                overflow: visible;
             }
         }
 
@@ -463,6 +478,7 @@
 
             .prompt-box {
                 height: auto;
+                overflow: visible;
             }
         }
     </style>
@@ -612,7 +628,7 @@
                     merged = 'Er zijn nog geen uitgebreide wensen vastgelegd. Gebruik dit dossier als startpunt en vul de klantwensen aan na direct klantcontact.';
                 }
 
-                return truncateText(merged, 420);
+                return truncateText(merged, 340);
             }
 
             function buildOpusPrompt(data) {
@@ -621,29 +637,29 @@
                 const title = String(data.title || 'Website opdracht').trim() || 'Website opdracht';
                 const domainName = String(data.domainName || '').trim();
                 const deliveryTime = String(data.deliveryTime || '').trim();
-                const wishesText = truncateText(String(data.wishesText || '').trim(), 150);
+                const wishesText = truncateText(String(data.wishesText || '').trim(), 120);
 
                 const lines = [
                     'Je bent senior webbouwer bij Softora. Werk deze opdracht uit in Claude Opus 4.6.',
                     '',
-                    'Context:',
-                    `- Bedrijf: ${company}`,
-                    `- Contactpersoon: ${contact}`,
-                    `- Opdracht: ${title}`,
-                    `- Domein: ${domainName || 'nog niet bekend'}`,
-                    `- Oplevertijd: ${deliveryTime || 'niet opgegeven'}`,
-                    `- Klantwens: ${wishesText || 'nog niet volledig ingevuld'}`,
+                    'Projectgegevens:',
+                    `Bedrijf: ${company}`,
+                    `Contactpersoon: ${contact}`,
+                    `Opdracht: ${title}`,
+                    `Domein: ${domainName || 'nog niet bekend'}`,
+                    `Oplevertijd: ${deliveryTime || 'niet opgegeven'}`,
+                    `Klantwens: ${wishesText || 'nog niet volledig ingevuld'}`,
                     '',
-                    'Lever exact dit op:',
-                    '1) Uitvoerplan in duidelijke stappen (volgorde + prioriteit).',
-                    '2) Volledige pagina- en sectiestructuur voor de website.',
-                    '3) Direct bruikbare Nederlandse copy per sectie.',
-                    '4) Korte lijst met ontbrekende info die nog bij klant opgehaald moet worden.',
+                    'Lever op:',
+                    '- Een concreet stappenplan.',
+                    '- Volledige pagina- en sectiestructuur.',
+                    '- Direct bruikbare Nederlandse copy per sectie.',
+                    '- Korte lijst met ontbrekende klantinformatie als vragen.',
                     '',
                     'Schrijf praktisch en concreet, zonder vage tekst.'
                 ];
 
-                return truncateText(lines.join('\n'), 720);
+                return truncateText(lines.join('\n'), 520);
             }
 
             async function copyText(value) {
@@ -743,7 +759,7 @@
                                 <p class="wishes-text">${esc(wishesText)}</p>
                             </section>
 
-                            <section class="section">
+                            <section class="section section-prompt">
                                 <div class="section-head">
                                     <h2 class="section-title">Prompt voor Claude Opus 4.6</h2>
                                     <button type="button" class="btn screen-only" id="copyPromptBtn">Kopieer prompt</button>
