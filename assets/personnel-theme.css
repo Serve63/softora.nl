@@ -428,6 +428,45 @@ button,
         width: 280px !important;
         height: 100vh !important;
         min-height: 100vh !important;
+        padding-top: 1.7rem !important;
+    }
+
+    .sidebar-logo {
+        display: block !important;
+        padding: 0 1.6rem !important;
+        margin-bottom: 1.15rem !important;
+        font-size: 1.35rem !important;
+    }
+
+    .sidebar-section {
+        margin-bottom: 1rem !important;
+    }
+
+    .sidebar-section-label {
+        padding: 0 1.6rem !important;
+        margin-bottom: 0.45rem !important;
+        font-size: 0.62rem !important;
+        letter-spacing: 0.16em !important;
+    }
+
+    .sidebar-link {
+        gap: 0.62rem !important;
+        padding: 0.56rem 1.6rem !important;
+        font-size: 0.84rem !important;
+    }
+
+    .sidebar-flow-section .sidebar-link {
+        padding-left: 2.35rem !important;
+    }
+
+    .sidebar-link svg {
+        width: 16px !important;
+        height: 16px !important;
+    }
+
+    .sidebar-link[href="/premium-ai-coldmailing"] svg {
+        width: 18px !important;
+        height: 18px !important;
     }
 
     .sidebar-nav {
@@ -439,6 +478,41 @@ button,
     .sidebar-footer {
         flex-shrink: 0 !important;
         margin-top: 0 !important;
+        padding: 1.15rem 1.4rem !important;
+    }
+
+    .sidebar-user {
+        gap: 0.62rem !important;
+    }
+
+    .sidebar-avatar {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 0.76rem !important;
+    }
+
+    .sidebar-user-name {
+        font-size: 0.78rem !important;
+        line-height: 1.15 !important;
+    }
+
+    .sidebar-footer .sidebar-user .sidebar-user-role {
+        font-size: 0.68rem !important;
+        line-height: 1.15 !important;
+    }
+
+    .sidebar-footer .sidebar-user .logout-btn {
+        padding: 0.2rem !important;
+    }
+
+    .sidebar-footer .sidebar-user .logout-btn svg {
+        width: 16px !important;
+        height: 16px !important;
+    }
+
+    .sidebar-flow-section::before {
+        top: 4.86rem !important;
+        bottom: 0.62rem !important;
     }
 
     .main,
