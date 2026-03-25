@@ -528,6 +528,20 @@
             white-space: pre-line;
         }
 
+        .lead-modal-audio-player {
+            width: 100%;
+            min-height: 36px;
+            border-radius: 9px;
+            margin-top: 0.08rem;
+        }
+
+        .lead-modal-audio-empty {
+            margin-top: 0.2rem;
+            color: var(--text-tertiary);
+            font-size: 0.8rem;
+            line-height: 1.35;
+        }
+
         .lead-modal-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -838,6 +852,11 @@
                         <div class="lead-modal-info-label">Gesprek samenvatting</div>
                         <div class="lead-modal-info-text" id="leadModalSummary">Nog geen samenvatting beschikbaar.</div>
                     </div>
+                    <div class="lead-modal-info">
+                        <div class="lead-modal-info-label">Gespreksopname</div>
+                        <audio class="lead-modal-audio-player" id="leadModalAudioPlayer" controls preload="none" hidden></audio>
+                        <div class="lead-modal-audio-empty" id="leadModalAudioEmpty">Nog geen audio-opname beschikbaar voor deze lead.</div>
+                    </div>
                 </div>
 
                 <div class="lead-modal-grid">
@@ -885,6 +904,8 @@
             const modalOverlay = document.getElementById('leadModalOverlay');
             const modalSub = document.getElementById('leadModalSub');
             const modalSummary = document.getElementById('leadModalSummary');
+            const modalAudioPlayer = document.getElementById('leadModalAudioPlayer');
+            const modalAudioEmpty = document.getElementById('leadModalAudioEmpty');
             const modalDate = document.getElementById('leadModalDate');
             const modalTime = document.getElementById('leadModalTime');
             const modalLocation = document.getElementById('leadModalLocation');
@@ -903,6 +924,8 @@
                 !modalOverlay ||
                 !modalSub ||
                 !modalSummary ||
+                !modalAudioPlayer ||
+                !modalAudioEmpty ||
                 !modalDate ||
                 !modalTime ||
                 !modalLocation ||
@@ -939,6 +962,23 @@
                     .normalize('NFD')
                     .replace(/[\u0300-\u036f]/g, '')
                     .trim();
+            }
+
+            function normalizeAudioUrl(value) {
+                const raw = String(value || '').trim();
+                if (!raw) return '';
+                if (/^https?:\/\//i.test(raw)) return raw;
+                if (/^\/[^/]/.test(raw)) return raw;
+                if (/^data:audio\//i.test(raw)) return raw;
+                return '';
+            }
+
+            function pickRecordingUrl(...candidates) {
+                for (const candidate of candidates) {
+                    const normalizedUrl = normalizeAudioUrl(candidate);
+                    if (normalizedUrl) return normalizedUrl;
+                }
+                return '';
             }
 
             function formatDateTime(item) {
@@ -1131,6 +1171,8 @@
 
             function closeLeadModal() {
                 activeTaskId = 0;
+                modalAudioPlayer.pause();
+                modalAudioPlayer.currentTime = 0;
                 setModalBusy(false);
                 setModalStatus('');
                 modalOverlay.classList.remove('show');
@@ -1166,6 +1208,37 @@
 
                 modalSummary.textContent =
                     String(aiCopy?.summaryText || '').trim() || fallbackCombined;
+
+                const recordingUrl = pickRecordingUrl(
+                    detail?.recordingUrl,
+                    detail?.recording_url,
+                    detail?.recordingUrlProxy,
+                    detail?.audioUrl,
+                    detail?.audio_url,
+                    lead?.recordingUrl,
+                    lead?.recording_url,
+                    lead?.recordingUrlProxy,
+                    lead?.audioUrl,
+                    lead?.audio_url
+                );
+                const activeSrc = String(modalAudioPlayer.getAttribute('src') || '').trim();
+                if (recordingUrl) {
+                    if (activeSrc !== recordingUrl) {
+                        modalAudioPlayer.pause();
+                        modalAudioPlayer.setAttribute('src', recordingUrl);
+                        modalAudioPlayer.load();
+                    }
+                    modalAudioPlayer.hidden = false;
+                    modalAudioEmpty.hidden = true;
+                } else {
+                    if (activeSrc) {
+                        modalAudioPlayer.pause();
+                        modalAudioPlayer.removeAttribute('src');
+                        modalAudioPlayer.load();
+                    }
+                    modalAudioPlayer.hidden = true;
+                    modalAudioEmpty.hidden = false;
+                }
             }
 
             async function openLeadModal(taskId) {
@@ -1472,6 +1545,14 @@
                     summary: String(item?.summary || '').trim(),
                     location: String(item?.location || item?.appointmentLocation || '').trim(),
                     whatsappInfo: String(item?.whatsappInfo || item?.whatsappNotes || item?.whatsapp || '').trim(),
+                    recordingUrl: String(
+                        item?.recordingUrl ||
+                            item?.recording_url ||
+                            item?.recordingUrlProxy ||
+                            item?.audioUrl ||
+                            item?.audio_url ||
+                            ''
+                    ).trim(),
                     leadType: String(
                         item?.leadType ||
                             item?.lead_type ||
@@ -1515,6 +1596,7 @@
                     if (!existing.summary && row.summary) existing.summary = row.summary;
                     if (!existing.location && row.location) existing.location = row.location;
                     if (!existing.whatsappInfo && row.whatsappInfo) existing.whatsappInfo = row.whatsappInfo;
+                    if (!existing.recordingUrl && row.recordingUrl) existing.recordingUrl = row.recordingUrl;
                     if (!existing.leadType && row.leadType) existing.leadType = row.leadType;
                     map.set(key, existing);
                 });

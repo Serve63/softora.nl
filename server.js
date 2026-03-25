@@ -3547,6 +3547,17 @@ function buildConfirmationTaskDetail(appointment) {
   const callUpdate = getLatestCallUpdateByCallId(task.callId);
   const aiInsight = task.callId ? aiCallInsightsByCallId.get(task.callId) || null : null;
   const transcript = getAppointmentTranscriptText(appointment) || '';
+  const recordingUrl = normalizeString(
+    callUpdate?.recordingUrl ||
+      callUpdate?.recording_url ||
+      callUpdate?.recordingUrlProxy ||
+      callUpdate?.audioUrl ||
+      appointment?.recordingUrl ||
+      appointment?.recording_url ||
+      appointment?.recordingUrlProxy ||
+      appointment?.audioUrl ||
+      ''
+  );
 
   return {
     ...task,
@@ -3557,6 +3568,8 @@ function buildConfirmationTaskDetail(appointment) {
     ),
     transcript,
     transcriptAvailable: Boolean(transcript),
+    recordingUrl,
+    recordingUrlAvailable: Boolean(recordingUrl),
     callSummary: normalizeString(callUpdate?.summary || ''),
     transcriptSnippet: normalizeString(callUpdate?.transcriptSnippet || ''),
     aiSummary: normalizeString(aiInsight?.summary || ''),
