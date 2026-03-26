@@ -1217,7 +1217,7 @@
 
         function buildHerinnering() {
             const htype = v('h-type') || '1';
-            const colors = { '1': '#16733c', '2': '#b45a00', '3': '#b41e1e' };
+            const colors = { '1': 'var(--accent)', '2': '#8b2252', '3': '#6f1a42' };
             const labels = { '1': '1e Betalingsherinnering', '2': '2e Betalingsherinnering – Dringend', '3': 'Aanmaning' };
             const col = colors[htype];
             const contact = v('h-contact') || 'relatie';
@@ -1337,7 +1337,7 @@
                 }
             } else {
                 const htype = v('h-type') || '1';
-                const hcolors = { '1': [22, 115, 60], '2': [180, 90, 0], '3': [176, 30, 30] };
+                const hcolors = { '1': [155, 35, 85], '2': [139, 34, 82], '3': [111, 26, 66] };
                 const hlabels = { '1': '1E BETALINGSHERINNERING', '2': '2E BETALINGSHERINNERING – DRINGEND', '3': 'AANMANING' };
                 const hc = hcolors[htype];
                 addrBox(PL, 80, 'VAN', ['Softora.nl', 'info@softora.nl', 'www.softora.nl']);
