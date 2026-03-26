@@ -386,7 +386,7 @@
         const countBadgeHtml = hasCountBadge
             ? `<span class="sidebar-notification-badge" data-sidebar-count-key="${link.key}" hidden>0</span>`
             : "";
-        return `<a href="${link.href}" class="${classes}">${link.icon}${labelHtml}${countBadgeHtml}</a>`;
+        return `<a href="${link.href}" class="${classes}" data-sidebar-key="${link.key}">${link.icon}${labelHtml}${countBadgeHtml}</a>`;
     }
 
     function buildUnifiedPremiumSidebarHtml(activeKey) {
@@ -508,7 +508,18 @@
         if (!sidebar) return;
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
         const activeKey = getSidebarActiveKey(pathname);
+
+        // If sidebar HTML was pre-built in the template, only update the active class.
+        if (sidebar.dataset.sidebarReady === "true") {
+            sidebar.querySelectorAll(".sidebar-link[data-sidebar-key]").forEach(function (link) {
+                link.classList.toggle("active", link.dataset.sidebarKey === activeKey);
+            });
+            return;
+        }
+
+        // Fallback: full rebuild (for pages without pre-built sidebar HTML).
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
+        sidebar.dataset.sidebarReady = "true";
     }
 
     function normalizeLeadFieldForCount(value) {

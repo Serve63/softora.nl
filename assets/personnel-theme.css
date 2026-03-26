@@ -45,11 +45,6 @@
     transition-delay: 0ms !important;
 }
 
-/* Hide sidebar until JS has built the unified version, then reveal instantly
-   (transitions are already suppressed above, so there is no fade flash). */
-:root[data-personnel-loading="true"] .sidebar {
-    opacity: 0 !important;
-}
 
 .sidebar-theme {
     display: none !important;
