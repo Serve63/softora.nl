@@ -606,12 +606,12 @@
         }
 
         .topbar-right .site-select--pill {
-            min-width: 16.8rem;
-            max-width: 22rem;
+            flex: 0 0 auto;
+            width: auto;
         }
 
         .topbar-right .site-select--pill .site-select-trigger {
-            padding: 0.49rem 0.95rem;
+            padding: 0.49rem 0.85rem;
             border-width: 1px;
             font-family: 'Oswald', sans-serif;
             font-size: 0.78rem;
@@ -619,7 +619,9 @@
             text-transform: uppercase;
             letter-spacing: 0.1em;
             background: transparent;
-            min-height: 2.35rem;
+            min-height: 2.2rem;
+            min-width: 10.5rem;
+            max-width: 15.5rem;
             line-height: 1;
             cursor: none;
         }
@@ -645,7 +647,7 @@
             left: auto;
             width: max-content;
             min-width: 100%;
-            max-width: min(28rem, calc(100vw - 2rem));
+            max-width: min(22rem, calc(100vw - 2rem));
         }
 
         .topbar-right .site-select--pill .site-select-option {
@@ -1551,7 +1553,10 @@
             .stats-bar { grid-template-columns: 1fr; }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
             .topbar-right { width: 100%; justify-content: flex-start; }
-            .topbar-right .site-select--pill { min-width: min(100%, 22rem); }
+            .topbar-right .site-select--pill .site-select-trigger {
+                min-width: min(100%, 18rem);
+                max-width: min(100%, 18rem);
+            }
             .log-task-section { padding: 1rem 1.2rem 1.2rem; }
             .log-task-top { flex-direction: column; }
             .log-task-side { align-items: flex-start; width: 100%; }
