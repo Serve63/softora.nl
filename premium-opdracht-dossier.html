@@ -73,34 +73,31 @@
             width: calc(100% - 280px);
             height: 100vh;
             padding: 0.95rem;
-            overflow: hidden;
+            overflow: auto;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
         }
 
         .dossier-wrap {
             width: 100%;
-            height: 100%;
+            min-height: 100%;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             position: relative;
         }
 
         .dossier-page {
-            width: min(100%, calc((100vh - 1.9rem) * 0.707));
+            width: min(100%, 794px);
             max-width: 794px;
-            height: calc(100vh - 1.9rem);
-            max-height: 1123px;
-            min-height: 610px;
+            min-height: 1123px;
             background: var(--paper-bg);
             border: 1px solid rgba(26, 31, 52, 0.16);
             border-radius: 12px;
             box-shadow: 0 18px 48px rgba(16, 19, 34, 0.14);
-            overflow: hidden;
-            display: grid;
-            grid-template-rows: auto 1fr;
+            overflow: visible;
+            display: block;
         }
 
         .brand-bar {
@@ -143,17 +140,15 @@
 
         .page-body {
             padding: 0.8rem 0.9rem;
-            display: grid;
-            grid-template-rows: auto auto auto 1fr;
+            display: flex;
+            flex-direction: column;
             gap: 0.42rem;
             align-content: stretch;
-            min-height: 0;
-            overflow: hidden;
         }
 
         .loading,
         .error {
-            width: min(100%, calc((100vh - 1.9rem) * 0.707));
+            width: min(100%, 794px);
             max-width: 794px;
             min-height: 220px;
             background: #fff;
@@ -208,6 +203,20 @@
             font-size: 0.64rem;
             line-height: 1.38;
             max-width: 58ch;
+        }
+
+        .source-chip {
+            margin-top: 0.26rem;
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 0.16rem 0.42rem;
+            font-size: 0.52rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #7d8499;
+            background: #fbfcff;
         }
 
         .actions {
@@ -269,20 +278,14 @@
             word-break: break-word;
         }
 
-        .section {
+        .layout-block {
             border: 1px solid var(--line);
             background: #fafbff;
             border-radius: 8px;
             padding: 0.34rem 0.44rem;
         }
 
-        .section.section-prompt {
-            min-height: 0;
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-        }
-
-        .section-head {
+        .layout-block-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -298,13 +301,24 @@
             color: #7d8499;
         }
 
-        .wishes-text {
+        .block-text {
             font-size: 0.66rem;
             line-height: 1.34;
             color: #1f243a;
             word-break: break-word;
-            max-height: 88px;
-            overflow: hidden;
+            white-space: pre-wrap;
+        }
+
+        .block-list {
+            margin: 0;
+            padding-left: 1.05rem;
+            font-size: 0.64rem;
+            line-height: 1.36;
+            color: #1f243a;
+        }
+
+        .block-list li + li {
+            margin-top: 0.12rem;
         }
 
         .prompt-box {
@@ -316,10 +330,10 @@
             line-height: 1.28;
             padding: 0.42rem;
             white-space: pre-wrap;
-            overflow: auto;
+            overflow: visible;
             height: auto;
             min-height: 0;
-            max-height: 100%;
+            max-height: none;
         }
 
         .copy-status {
@@ -327,6 +341,16 @@
             font-size: 0.55rem;
             color: var(--muted);
             min-height: 1em;
+        }
+
+        .warning-note {
+            border: 1px solid rgba(139, 34, 82, 0.26);
+            border-radius: 8px;
+            padding: 0.34rem 0.42rem;
+            background: rgba(139, 34, 82, 0.06);
+            color: #7a2d4a;
+            font-size: 0.58rem;
+            line-height: 1.34;
         }
 
         @media (max-width: 1200px) {
@@ -338,7 +362,8 @@
                 font-size: 0.6rem;
             }
 
-            .wishes-text,
+            .block-text,
+            .block-list,
             .prompt-box {
                 font-size: 0.59rem;
             }
@@ -384,10 +409,6 @@
                 border-radius: 12px;
             }
 
-            .page-body {
-                grid-template-rows: auto auto auto auto;
-            }
-
             .loading,
             .error {
                 width: 100%;
@@ -399,10 +420,6 @@
 
             .actions {
                 flex-wrap: wrap;
-            }
-
-            .wishes-text {
-                max-height: none;
             }
 
             .prompt-box {
@@ -467,13 +484,9 @@
             }
 
             .meta-item,
-            .section,
+            .layout-block,
             .prompt-box {
                 break-inside: avoid;
-            }
-
-            .wishes-text {
-                max-height: none;
             }
 
             .prompt-box {
@@ -521,32 +534,16 @@
             function normalizeText(value) {
                 return String(value || '')
                     .replace(/\r/g, '\n')
-                    .replace(/\s*\|\s*/g, '. ')
-                    .replace(/\s*·\s*/g, '. ')
-                    .replace(/[\t ]+/g, ' ')
-                    .replace(/\n+/g, ' ')
-                    .replace(/\s+/g, ' ')
+                    .replace(/[ \t]+/g, ' ')
+                    .replace(/\n{3,}/g, '\n\n')
                     .trim();
             }
 
-            function truncateText(value, maxChars) {
+            function clipText(value, maxChars) {
                 const text = String(value || '').trim();
                 if (!text || !Number.isFinite(maxChars) || maxChars <= 0) return '';
                 if (text.length <= maxChars) return text;
-                const slice = text.slice(0, Math.max(0, maxChars)).trim();
-                if (!slice) return '';
-                const minUseful = Math.max(24, Math.floor(maxChars * 0.55));
-                const punctMatches = [...slice.matchAll(/[.!?](?=\s|$)/g)];
-                let end = -1;
-                if (punctMatches.length > 0) {
-                    end = punctMatches[punctMatches.length - 1].index;
-                }
-                if (Number.isFinite(end) && end >= minUseful) {
-                    return slice.slice(0, end + 1).trim();
-                }
-                const lastSpace = slice.lastIndexOf(' ');
-                const base = lastSpace >= minUseful ? slice.slice(0, lastSpace).trim() : slice;
-                return /[.!?]$/.test(base) ? base : `${base}.`;
+                return text.slice(0, Math.max(0, maxChars)).trim();
             }
 
             function formatDateTime(value) {
@@ -610,56 +607,214 @@
                 root.innerHTML = `<div class="error">${esc(message || 'Uitvoerdossier niet gevonden.')}</div>`;
             }
 
-            function buildWishesText(order) {
-                const description = normalizeText(order?.description || '');
-                const transcript = normalizeText(order?.transcript || '');
-                let merged = description;
-
-                if (transcript) {
-                    const transcriptPart = truncateText(transcript, 420);
-                    if (merged) {
-                        merged = `${merged} Aanvullend uit gesprek: ${transcriptPart}`;
-                    } else {
-                        merged = transcriptPart;
-                    }
-                }
-
-                if (!merged) {
-                    merged = 'Er zijn nog geen uitgebreide wensen vastgelegd. Gebruik dit dossier als startpunt en vul de klantwensen aan na direct klantcontact.';
-                }
-
-                return truncateText(merged, 340);
+            function buildBaseOrderData(orderId, customOrder, runtimeOrder) {
+                const order = customOrder || {};
+                const runtime = runtimeOrder || {};
+                return {
+                    orderId,
+                    title: String(order?.title || runtime?.type || `Opdracht #${orderId}`).trim(),
+                    company: String(order?.clientName || runtime?.name || 'Onbekend').trim(),
+                    contact: String(order?.location || '').trim(),
+                    domainName: String(order?.domainName || '').trim(),
+                    deliveryTime: String(order?.deliveryTime || '').trim(),
+                    claimedBy: String(order?.claimedBy || runtime?.claimedBy || '').trim(),
+                    claimedAt: String(order?.claimedAt || runtime?.claimedAt || '').trim(),
+                    description: normalizeText(order?.description || runtime?.description || ''),
+                    transcript: normalizeText(order?.transcript || runtime?.transcript || ''),
+                    sourceAppointmentLabel: String(order?.sourceAppointmentLabel || runtime?.sourceAppointmentLabel || '').trim(),
+                };
             }
 
-            function buildOpusPrompt(data) {
-                const company = String(data.company || 'Onbekend').trim() || 'Onbekend';
-                const contact = String(data.contact || 'Onbekend').trim() || 'Onbekend';
-                const title = String(data.title || 'Website opdracht').trim() || 'Website opdracht';
-                const domainName = String(data.domainName || '').trim();
-                const deliveryTime = String(data.deliveryTime || '').trim();
-                const wishesText = truncateText(String(data.wishesText || '').trim(), 120);
+            function buildFallbackNarrative(baseData) {
+                const chunks = [];
+                if (baseData.description) chunks.push(baseData.description);
+                if (baseData.transcript) {
+                    chunks.push(baseData.description ? `Aanvullende gespreksnotities: ${baseData.transcript}` : baseData.transcript);
+                }
+                const narrative = normalizeText(chunks.join('\n\n'));
+                if (narrative) return clipText(narrative, 5000);
+                return 'Nog geen uitgebreide klantwensen vastgelegd. Neem direct contact op met de klant om ontbrekende details te verzamelen.';
+            }
 
-                const lines = [
+            function buildFallbackLayout(baseData) {
+                const narrative = buildFallbackNarrative(baseData);
+                const prompt = [
                     'Je bent senior webbouwer bij Softora. Werk deze opdracht uit in Claude Opus 4.6.',
                     '',
                     'Projectgegevens:',
-                    `Bedrijf: ${company}`,
-                    `Contactpersoon: ${contact}`,
-                    `Opdracht: ${title}`,
-                    `Domein: ${domainName || 'nog niet bekend'}`,
-                    `Oplevertijd: ${deliveryTime || 'niet opgegeven'}`,
-                    `Klantwens: ${wishesText || 'nog niet volledig ingevuld'}`,
+                    `- Bedrijf: ${baseData.company || 'Onbekend'}`,
+                    `- Contactpersoon: ${baseData.contact || 'Onbekend'}`,
+                    `- Opdracht: ${baseData.title || `Opdracht #${baseData.orderId}`}`,
+                    `- Domein: ${baseData.domainName || 'Nog niet bekend'}`,
+                    `- Gewenste oplevertijd: ${baseData.deliveryTime || 'Niet opgegeven'}`,
+                    baseData.sourceAppointmentLabel ? `- Bronafspraak: ${baseData.sourceAppointmentLabel}` : '',
+                    '',
+                    'Klantwensen (bron):',
+                    narrative,
                     '',
                     'Lever op:',
-                    '- Een concreet stappenplan.',
-                    '- Volledige pagina- en sectiestructuur.',
-                    '- Direct bruikbare Nederlandse copy per sectie.',
-                    '- Korte lijst met ontbrekende klantinformatie als vragen.',
+                    '1) Concreet uitvoerplan in stappen (volgorde + prioriteit).',
+                    '2) Volledige pagina-/sectiestructuur met doel per sectie.',
+                    '3) Direct bruikbare Nederlandse copy per sectie.',
+                    '4) Korte lijst met ontbrekende klantinformatie als vragen.',
                     '',
-                    'Schrijf praktisch en concreet, zonder vage tekst.'
-                ];
+                    'Werk praktisch en concreet, zonder vage algemeenheden.',
+                ]
+                    .filter(Boolean)
+                    .join('\n');
 
-                return truncateText(lines.join('\n'), 520);
+                return {
+                    documentTitle: baseData.title || `Opdracht #${baseData.orderId}`,
+                    subtitle: 'Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie en klantwensen.',
+                    opusPrompt: clipText(prompt, 22000),
+                    blocks: [
+                        {
+                            kind: 'meta',
+                            title: 'Projectkern',
+                            pairs: [
+                                { label: 'Bedrijf', value: baseData.company || '—' },
+                                { label: 'Contactpersoon', value: baseData.contact || '—' },
+                                { label: 'Domein', value: baseData.domainName || '—' },
+                                { label: 'Oplevertijd', value: baseData.deliveryTime || '—' },
+                                { label: 'Geclaimd door', value: baseData.claimedBy || '—' },
+                                { label: 'Geclaimd op', value: formatDateTime(baseData.claimedAt) },
+                            ],
+                        },
+                        {
+                            kind: 'text',
+                            title: 'Klantwensen',
+                            text: narrative,
+                        },
+                        {
+                            kind: 'bullets',
+                            title: 'Uitvoerfocus',
+                            items: [
+                                'Start met een concreet stappenplan en prioriteiten.',
+                                'Werk met duidelijke pagina- en sectiestructuur.',
+                                'Schrijf copy direct inzetbaar voor productie.',
+                                'Markeer ontbrekende klantinformatie als gerichte vragen.',
+                            ],
+                        },
+                    ],
+                };
+            }
+
+            function normalizePairs(pairs) {
+                if (!Array.isArray(pairs)) return [];
+                return pairs
+                    .map((pair) => ({
+                        label: clipText(String(pair?.label || '').trim(), 80),
+                        value: clipText(String(pair?.value || '').trim(), 260),
+                    }))
+                    .filter((pair) => pair.label && pair.value)
+                    .slice(0, 12);
+            }
+
+            function normalizeItems(items, maxItems = 12) {
+                if (!Array.isArray(items)) return [];
+                return items
+                    .map((item) => clipText(String(item || '').trim(), 380))
+                    .filter(Boolean)
+                    .slice(0, Math.max(1, Math.min(20, Number(maxItems) || 12)));
+            }
+
+            function normalizeLayoutPayload(rawLayout, baseData) {
+                const fallback = buildFallbackLayout(baseData);
+                if (!rawLayout || typeof rawLayout !== 'object') return fallback;
+
+                const documentTitle =
+                    clipText(String(rawLayout.documentTitle || rawLayout.title || fallback.documentTitle).trim(), 220) ||
+                    fallback.documentTitle;
+                const subtitle =
+                    clipText(String(rawLayout.subtitle || rawLayout.lead || fallback.subtitle).trim(), 320) ||
+                    fallback.subtitle;
+                const opusPrompt =
+                    clipText(String(rawLayout.opusPrompt || rawLayout.prompt || fallback.opusPrompt).trim(), 22000) ||
+                    fallback.opusPrompt;
+
+                const blocks = (Array.isArray(rawLayout.blocks) ? rawLayout.blocks : [])
+                    .map((block) => {
+                        const kind = String(block?.kind || block?.type || '').trim().toLowerCase();
+                        const title = clipText(String(block?.title || '').trim(), 120) || 'Sectie';
+
+                        if (kind === 'meta') {
+                            const pairs = normalizePairs(block?.pairs || block?.items || []);
+                            if (!pairs.length) return null;
+                            return { kind: 'meta', title, pairs };
+                        }
+
+                        if (kind === 'bullets' || kind === 'checklist') {
+                            const items = normalizeItems(block?.items || [], 12);
+                            if (!items.length) return null;
+                            return { kind: 'bullets', title, items };
+                        }
+
+                        if (kind === 'steps' || kind === 'timeline') {
+                            const items = normalizeItems(block?.items || block?.steps || [], 12);
+                            if (!items.length) return null;
+                            return { kind: 'steps', title, items };
+                        }
+
+                        const text = clipText(String(block?.text || block?.content || '').trim(), 5500);
+                        if (!text) return null;
+                        return { kind: 'text', title, text };
+                    })
+                    .filter(Boolean)
+                    .slice(0, 10);
+
+                return {
+                    documentTitle,
+                    subtitle,
+                    opusPrompt,
+                    blocks: blocks.length ? blocks : fallback.blocks,
+                };
+            }
+
+            async function fetchDynamicLayoutFromAi(baseData) {
+                const payload = {
+                    orderId: baseData.orderId,
+                    title: baseData.title,
+                    company: baseData.company,
+                    contact: baseData.contact,
+                    domainName: baseData.domainName,
+                    deliveryTime: baseData.deliveryTime,
+                    claimedBy: baseData.claimedBy,
+                    claimedAt: baseData.claimedAt,
+                    description: baseData.description,
+                    transcript: baseData.transcript,
+                    sourceAppointmentLabel: baseData.sourceAppointmentLabel,
+                    language: 'nl',
+                };
+
+                const endpoints = ['/api/ai/order-dossier', '/api/ai-order-dossier'];
+                let lastError = '';
+
+                for (const endpoint of endpoints) {
+                    const controller = new AbortController();
+                    const timeoutId = window.setTimeout(() => controller.abort(), 90000);
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload),
+                            signal: controller.signal,
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || data?.ok === false) {
+                            lastError = String(data?.detail || data?.error || `Serverfout (${response.status})`);
+                            continue;
+                        }
+                        return data || {};
+                    } catch (error) {
+                        lastError = error?.name === 'AbortError'
+                            ? 'AI dossier generatie duurde te lang.'
+                            : String(error?.message || 'AI dossier generatie mislukt.');
+                    } finally {
+                        window.clearTimeout(timeoutId);
+                    }
+                }
+
+                throw new Error(lastError || 'AI dossier generatie mislukt.');
             }
 
             async function copyText(value) {
@@ -692,28 +847,65 @@
                 }
             }
 
-            function renderDossier(orderId, customOrder, runtimeOrder) {
-                const order = customOrder || {};
-                const runtime = runtimeOrder || {};
+            function renderLayoutBlock(block) {
+                if (!block || typeof block !== 'object') return '';
+                const title = esc(block.title || 'Sectie');
 
-                const title = String(order?.title || runtime?.type || `Opdracht #${orderId}`).trim();
-                const company = String(order?.clientName || runtime?.name || 'Onbekend').trim();
-                const contact = String(order?.location || '').trim();
-                const domainName = String(order?.domainName || '').trim();
-                const deliveryTime = String(order?.deliveryTime || '').trim();
-                const claimedBy = String(order?.claimedBy || runtime?.claimedBy || '').trim();
-                const claimedAt = String(order?.claimedAt || runtime?.claimedAt || '').trim();
-                const orderDateLabel = formatDateOnly(claimedAt || Date.now());
+                if (block.kind === 'meta') {
+                    const pairs = Array.isArray(block.pairs) ? block.pairs : [];
+                    if (!pairs.length) return '';
+                    const pairHtml = pairs
+                        .map((pair) => {
+                            const label = esc(pair?.label || '');
+                            const value = esc(pair?.value || '');
+                            if (!label || !value) return '';
+                            return `<div class="meta-item"><div class="meta-label">${label}</div><div class="meta-value">${value}</div></div>`;
+                        })
+                        .filter(Boolean)
+                        .join('');
+                    if (!pairHtml) return '';
+                    return `
+                        <section class="layout-block">
+                            <div class="layout-block-head"><h2 class="section-title">${title}</h2></div>
+                            <div class="meta-grid">${pairHtml}</div>
+                        </section>
+                    `;
+                }
 
-                const wishesText = buildWishesText(order);
-                const opusPrompt = buildOpusPrompt({
-                    company,
-                    contact,
-                    title,
-                    domainName,
-                    deliveryTime,
-                    wishesText
-                });
+                if (block.kind === 'bullets' || block.kind === 'steps') {
+                    const items = Array.isArray(block.items) ? block.items : [];
+                    if (!items.length) return '';
+                    const listTag = block.kind === 'steps' ? 'ol' : 'ul';
+                    const listHtml = items.map((item) => `<li>${esc(item)}</li>`).join('');
+                    return `
+                        <section class="layout-block">
+                            <div class="layout-block-head"><h2 class="section-title">${title}</h2></div>
+                            <${listTag} class="block-list">${listHtml}</${listTag}>
+                        </section>
+                    `;
+                }
+
+                const text = esc(block.text || '');
+                if (!text) return '';
+                return `
+                    <section class="layout-block">
+                        <div class="layout-block-head"><h2 class="section-title">${title}</h2></div>
+                        <p class="block-text">${text}</p>
+                    </section>
+                `;
+            }
+
+            function renderDossier(baseData, layoutResponse) {
+                const orderId = Number(baseData.orderId) || 0;
+                const orderDateLabel = formatDateOnly(baseData.claimedAt || Date.now());
+                const layout = normalizeLayoutPayload(layoutResponse?.layout || layoutResponse || {}, baseData);
+                const source = String(layoutResponse?.source || '').trim();
+                const model = String(layoutResponse?.model || '').trim();
+                const warning = String(layoutResponse?.warning || '').trim();
+                const opusPrompt = String(layout.opusPrompt || '').trim();
+                const blocksHtml = (Array.isArray(layout.blocks) ? layout.blocks : [])
+                    .map((block) => renderLayoutBlock(block))
+                    .join('');
 
                 document.title = `Softora | Uitvoerdossier #${orderId}`;
 
@@ -734,8 +926,9 @@
                             <div class="top-row">
                                 <div>
                                     <div class="eyebrow">Uitvoerdossier</div>
-                                    <h1 class="title">${esc(title || `Opdracht #${orderId}`)}</h1>
-                                    <p class="subtitle">Compact 1-pagina dossier in Softora stijl met klantwensen en directe Claude Opus 4.6 prompt.</p>
+                                    <h1 class="title">${esc(layout.documentTitle || `Opdracht #${orderId}`)}</h1>
+                                    <p class="subtitle">${esc(layout.subtitle || 'Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie.')}</p>
+                                    ${source ? `<div class="source-chip">Dynamisch via ${esc(model || source)}</div>` : ''}
                                 </div>
                                 <div class="actions screen-only">
                                     <button type="button" class="btn btn-primary" id="printBtn">Download PDF</button>
@@ -743,24 +936,11 @@
                                 </div>
                             </div>
 
-                            <section class="meta-grid">
-                                <div class="meta-item"><div class="meta-label">Bedrijf</div><div class="meta-value">${esc(company || '—')}</div></div>
-                                <div class="meta-item"><div class="meta-label">Contactpersoon</div><div class="meta-value">${esc(contact || '—')}</div></div>
-                                <div class="meta-item"><div class="meta-label">Domein</div><div class="meta-value">${esc(domainName || '—')}</div></div>
-                                <div class="meta-item"><div class="meta-label">Oplevertijd</div><div class="meta-value">${esc(deliveryTime || '—')}</div></div>
-                                <div class="meta-item"><div class="meta-label">Geclaimd door</div><div class="meta-value">${esc(claimedBy || '—')}</div></div>
-                                <div class="meta-item"><div class="meta-label">Geclaimd op</div><div class="meta-value">${esc(formatDateTime(claimedAt))}</div></div>
-                            </section>
+                            ${warning ? `<div class="warning-note">${esc(warning)}</div>` : ''}
+                            ${blocksHtml}
 
-                            <section class="section">
-                                <div class="section-head">
-                                    <h2 class="section-title">Wensen van de klant</h2>
-                                </div>
-                                <p class="wishes-text">${esc(wishesText)}</p>
-                            </section>
-
-                            <section class="section section-prompt">
-                                <div class="section-head">
+                            <section class="layout-block">
+                                <div class="layout-block-head">
                                     <h2 class="section-title">Prompt voor Claude Opus 4.6</h2>
                                     <button type="button" class="btn screen-only" id="copyPromptBtn">Kopieer prompt</button>
                                 </div>
@@ -782,7 +962,7 @@
                 const copyStatus = document.getElementById('copyStatus');
                 if (copyBtn && copyStatus) {
                     copyBtn.addEventListener('click', async () => {
-                        const ok = await copyText(opusPrompt);
+                        const ok = await copyText(opusPrompt || '');
                         copyStatus.textContent = ok
                             ? 'Prompt gekopieerd. Direct plakken in Claude Opus 4.6.'
                             : 'Kopiëren mislukt. Kopieer handmatig uit het promptblok.';
@@ -812,12 +992,26 @@
                     return;
                 }
 
-                renderDossier(orderId, customOrder, runtimeOrder);
+                const baseData = buildBaseOrderData(orderId, customOrder, runtimeOrder);
+                root.innerHTML = '<div class="loading">Dynamisch uitvoerdossier genereren met Claude Opus 4.6...</div>';
+
+                let layoutResponse = null;
+                try {
+                    layoutResponse = await fetchDynamicLayoutFromAi(baseData);
+                } catch (error) {
+                    layoutResponse = {
+                        source: 'template-fallback',
+                        warning: `Claude niet bereikbaar, fallback gebruikt: ${String(error?.message || 'onbekende fout')}`,
+                        layout: buildFallbackLayout(baseData),
+                    };
+                }
+
+                renderDossier(baseData, layoutResponse);
 
                 if (shouldAutoPrint()) {
                     window.setTimeout(() => {
                         window.print();
-                    }, 340);
+                    }, 420);
                 }
             }
 

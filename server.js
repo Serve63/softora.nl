@@ -22,6 +22,11 @@ const WEBSITE_ANTHROPIC_MODEL =
   process.env.WEBSITE_ANTHROPIC_MODEL ||
   process.env.ANTHROPIC_WEBSITE_MODEL ||
   'claude-opus-4-6';
+const DOSSIER_ANTHROPIC_MODEL =
+  process.env.DOSSIER_ANTHROPIC_MODEL ||
+  process.env.ANTHROPIC_DOSSIER_MODEL ||
+  process.env.CLAUDE_DOSSIER_MODEL ||
+  'claude-opus-4-6';
 const WEBSITE_GENERATION_PROVIDER = String(
   process.env.WEBSITE_GENERATION_PROVIDER || process.env.SITE_GENERATION_PROVIDER || ''
 )
@@ -1953,6 +1958,28 @@ function getWebsiteGenerationProvider() {
   return getAnthropicApiKey() ? 'anthropic' : 'openai';
 }
 
+function getDossierAnthropicModel() {
+  const candidates = [
+    normalizeString(process.env.DOSSIER_ANTHROPIC_MODEL || ''),
+    normalizeString(process.env.ANTHROPIC_DOSSIER_MODEL || ''),
+    normalizeString(process.env.CLAUDE_DOSSIER_MODEL || ''),
+    normalizeString(DOSSIER_ANTHROPIC_MODEL || ''),
+    normalizeString(process.env.ANTHROPIC_MODEL || ''),
+    normalizeString(process.env.CLAUDE_MODEL || ''),
+    normalizeString(ANTHROPIC_MODEL || ''),
+    'claude-opus-4-6',
+  ];
+  return candidates.find((value) => Boolean(value)) || 'claude-opus-4-6';
+}
+
+function getAnthropicDossierMaxTokens() {
+  const fallback = 6000;
+  return Math.max(
+    2000,
+    Math.min(24000, Number(process.env.ANTHROPIC_DOSSIER_MAX_TOKENS || fallback) || fallback)
+  );
+}
+
 function extractAnthropicTextContent(content) {
   if (typeof content === 'string') {
     return content;
@@ -2351,6 +2378,299 @@ function buildWebsitePromptFallback(options = {}) {
   }
 
   return headerNl.join('\n');
+}
+
+function buildOrderDossierInput(options = {}) {
+  const orderIdRaw = parseIntSafe(options.orderId, 0);
+  const orderId = Number.isFinite(orderIdRaw) && orderIdRaw > 0 ? orderIdRaw : 0;
+  const language = normalizeString(options.language || 'nl') || 'nl';
+  const title = clipText(normalizeString(options.title || ''), 180);
+  const company = clipText(normalizeString(options.company || ''), 180);
+  const contact = clipText(normalizeString(options.contact || ''), 180);
+  const domainName = clipText(normalizeString(options.domainName || ''), 180);
+  const deliveryTime = clipText(normalizeString(options.deliveryTime || ''), 180);
+  const claimedBy = clipText(normalizeString(options.claimedBy || ''), 120);
+  const claimedAt = clipText(normalizeString(options.claimedAt || ''), 120);
+  const description = clipText(normalizeString(options.description || ''), 7000);
+  const transcript = clipText(normalizeString(options.transcript || ''), 7000);
+  const sourceAppointmentLabel = clipText(normalizeString(options.sourceAppointmentLabel || ''), 260);
+
+  return {
+    orderId,
+    language,
+    title: title || (orderId ? `Opdracht #${orderId}` : 'Opdracht'),
+    company: company || 'Onbekend',
+    contact,
+    domainName,
+    deliveryTime,
+    claimedBy,
+    claimedAt,
+    description,
+    transcript,
+    sourceAppointmentLabel,
+  };
+}
+
+function buildOrderDossierNarrative(input) {
+  const description = normalizeString(input?.description || '');
+  const transcript = normalizeString(input?.transcript || '');
+  const chunks = [description];
+
+  if (transcript) {
+    if (description) {
+      chunks.push(`Aanvullende gespreksnotities: ${transcript}`);
+    } else {
+      chunks.push(transcript);
+    }
+  }
+
+  const merged = chunks
+    .filter(Boolean)
+    .join('\n\n')
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (merged) return clipText(merged, 5000);
+  return 'Nog geen uitgebreide klantwensen vastgelegd. Neem direct contact op met de klant om ontbrekende details te verzamelen.';
+}
+
+function buildOrderDossierFallbackLayout(options = {}) {
+  const input = buildOrderDossierInput(options);
+  const narrative = buildOrderDossierNarrative(input);
+  const promptLines = [
+    'Je bent senior webbouwer bij Softora. Werk deze opdracht uit in Claude Opus 4.6.',
+    '',
+    'Projectgegevens:',
+    `- Bedrijf: ${input.company || 'Onbekend'}`,
+    `- Contactpersoon: ${input.contact || 'Onbekend'}`,
+    `- Opdracht: ${input.title || 'Opdracht'}`,
+    `- Domein: ${input.domainName || 'Nog niet bekend'}`,
+    `- Gewenste oplevertijd: ${input.deliveryTime || 'Niet opgegeven'}`,
+    input.sourceAppointmentLabel ? `- Bronafspraak: ${input.sourceAppointmentLabel}` : '',
+    '',
+    'Klantwensen (bron):',
+    narrative,
+    '',
+    'Lever op:',
+    '1) Concreet uitvoerplan in stappen (volgorde + prioriteit).',
+    '2) Volledige pagina-/sectiestructuur met doel per sectie.',
+    '3) Direct bruikbare Nederlandse copy per sectie.',
+    '4) Korte lijst met ontbrekende klantinformatie als vragen.',
+    '',
+    'Werk praktisch en concreet, zonder vage algemeenheden.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    documentTitle: input.title || (input.orderId ? `Opdracht #${input.orderId}` : 'Opdracht'),
+    subtitle: 'Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie en klantwensen.',
+    opusPrompt: clipText(promptLines, 20000),
+    blocks: [
+      {
+        kind: 'meta',
+        title: 'Projectkern',
+        pairs: [
+          { label: 'Bedrijf', value: input.company || '—' },
+          { label: 'Contactpersoon', value: input.contact || '—' },
+          { label: 'Domein', value: input.domainName || '—' },
+          { label: 'Oplevertijd', value: input.deliveryTime || '—' },
+          { label: 'Geclaimd door', value: input.claimedBy || '—' },
+          { label: 'Geclaimd op', value: input.claimedAt || '—' },
+        ],
+      },
+      {
+        kind: 'text',
+        title: 'Klantwensen',
+        text: narrative,
+      },
+      {
+        kind: 'bullets',
+        title: 'Uitvoerfocus',
+        items: [
+          'Start met een concreet stappenplan en prioriteiten.',
+          'Werk met duidelijke pagina- en sectiestructuur.',
+          'Schrijf copy direct inzetbaar voor productie.',
+          'Markeer ontbrekende klantinformatie als gerichte vragen.',
+        ],
+      },
+    ],
+  };
+}
+
+function normalizeOrderDossierPairs(pairs) {
+  if (!Array.isArray(pairs)) return [];
+  return pairs
+    .map((pair) => {
+      const label = clipText(normalizeString(pair?.label || ''), 80);
+      const value = clipText(normalizeString(pair?.value || ''), 250);
+      if (!label || !value) return null;
+      return { label, value };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function normalizeOrderDossierItems(items, maxItems = 10) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => clipText(normalizeString(item || ''), 380))
+    .filter(Boolean)
+    .slice(0, Math.max(1, Math.min(20, Number(maxItems) || 10)));
+}
+
+function normalizeOrderDossierLayout(rawLayout, fallbackOptions = {}) {
+  const fallback = buildOrderDossierFallbackLayout(fallbackOptions);
+  if (!rawLayout || typeof rawLayout !== 'object') return fallback;
+
+  const documentTitle = clipText(
+    normalizeString(rawLayout.documentTitle || rawLayout.title || fallback.documentTitle),
+    220
+  ) || fallback.documentTitle;
+  const subtitle = clipText(
+    normalizeString(rawLayout.subtitle || rawLayout.lead || fallback.subtitle),
+    320
+  ) || fallback.subtitle;
+  const opusPrompt = clipText(
+    normalizeString(rawLayout.opusPrompt || rawLayout.prompt || fallback.opusPrompt),
+    22000
+  ) || fallback.opusPrompt;
+
+  const sourceBlocks = Array.isArray(rawLayout.blocks) ? rawLayout.blocks : [];
+  const blocks = sourceBlocks
+    .map((block) => {
+      const kind = normalizeString(block?.kind || block?.type || '').toLowerCase();
+      const title = clipText(normalizeString(block?.title || ''), 120) || 'Sectie';
+
+      if (kind === 'meta') {
+        const pairs = normalizeOrderDossierPairs(block?.pairs || block?.items || []);
+        if (!pairs.length) return null;
+        return { kind: 'meta', title, pairs };
+      }
+
+      if (kind === 'bullets' || kind === 'checklist') {
+        const items = normalizeOrderDossierItems(block?.items || [], 12);
+        if (!items.length) return null;
+        return { kind: 'bullets', title, items };
+      }
+
+      if (kind === 'steps' || kind === 'timeline') {
+        const items = normalizeOrderDossierItems(block?.items || block?.steps || [], 12);
+        if (!items.length) return null;
+        return { kind: 'steps', title, items };
+      }
+
+      const text = clipText(normalizeString(block?.text || block?.content || ''), 5500);
+      if (!text) return null;
+      return { kind: 'text', title, text };
+    })
+    .filter(Boolean)
+    .slice(0, 10);
+
+  return {
+    documentTitle,
+    subtitle,
+    opusPrompt,
+    blocks: blocks.length ? blocks : fallback.blocks,
+  };
+}
+
+function buildAnthropicOrderDossierPrompts(options = {}) {
+  const input = buildOrderDossierInput(options);
+  const fallback = buildOrderDossierFallbackLayout(input);
+
+  const systemPrompt = [
+    'Je bent een senior delivery writer voor Softora.',
+    'Taak: maak een dynamisch uitvoerdossier in JSON voor een PDF-weergave.',
+    'Belangrijk:',
+    '- Schrijf in helder Nederlands.',
+    '- Verzin geen feiten die niet in de input staan.',
+    '- Gebruik een indeling die past bij de hoeveelheid inhoud (dynamisch, niet template-achtig).',
+    '- Lever een direct copy-paste prompt voor Claude Opus 4.6.',
+    '- Gebruik NOOIT ellipsis zoals "...".',
+    '- Geef ALLEEN geldig JSON terug, zonder markdown of extra tekst.',
+    '',
+    'JSON schema:',
+    '{',
+    '  "documentTitle": "string",',
+    '  "subtitle": "string",',
+    '  "opusPrompt": "string",',
+    '  "blocks": [',
+    '    {',
+    '      "kind": "meta|text|bullets|steps",',
+    '      "title": "string",',
+    '      "pairs": [{"label":"string","value":"string"}],',
+    '      "text": "string",',
+    '      "items": ["string"]',
+    '    }',
+    '  ]',
+    '}',
+  ].join('\n');
+
+  const userPrompt = [
+    '<order_dossier_request>',
+    `<order_id>${input.orderId || ''}</order_id>`,
+    `<company>${escapeHtml(input.company || '')}</company>`,
+    `<contact>${escapeHtml(input.contact || '')}</contact>`,
+    `<title>${escapeHtml(input.title || '')}</title>`,
+    `<domain>${escapeHtml(input.domainName || '')}</domain>`,
+    `<delivery_time>${escapeHtml(input.deliveryTime || '')}</delivery_time>`,
+    `<claimed_by>${escapeHtml(input.claimedBy || '')}</claimed_by>`,
+    `<claimed_at>${escapeHtml(input.claimedAt || '')}</claimed_at>`,
+    input.sourceAppointmentLabel
+      ? `<source_appointment>${escapeHtml(input.sourceAppointmentLabel)}</source_appointment>`
+      : '',
+    '<customer_description>',
+    input.description || '',
+    '</customer_description>',
+    '<customer_transcript>',
+    input.transcript || '',
+    '</customer_transcript>',
+    '<required_output>',
+    '- Maak een dynamische sectie-indeling op basis van de beschikbare content.',
+    '- Zorg dat er altijd minimaal 1 meta-block en 1 inhoudsblock aanwezig is.',
+    '- opusPrompt moet direct bruikbaar zijn voor Claude Opus 4.6.',
+    '- Zorg dat de prompt praktisch uitvoerbaar is voor een personeelslid.',
+    '</required_output>',
+    '<fallback_reference>',
+    JSON.stringify(fallback),
+    '</fallback_reference>',
+    '</order_dossier_request>',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return { input, fallback, systemPrompt, userPrompt };
+}
+
+async function generateDynamicOrderDossierWithAnthropic(options = {}) {
+  const promptPack = buildAnthropicOrderDossierPrompts(options);
+  const model = normalizeString(options.model || getDossierAnthropicModel()) || 'claude-opus-4-6';
+  const data = await sendAnthropicMessage({
+    model,
+    systemPrompt: promptPack.systemPrompt,
+    userPrompt: promptPack.userPrompt,
+    maxTokens: getAnthropicDossierMaxTokens(),
+    stage: 'build',
+  });
+
+  const rawText = normalizeString(extractAnthropicTextContent(data?.content));
+  const parsed = parseJsonLoose(rawText);
+  if (!parsed || typeof parsed !== 'object') {
+    const err = new Error('Claude gaf geen geldig JSON-layout terug.');
+    err.status = 502;
+    throw err;
+  }
+
+  const layout = normalizeOrderDossierLayout(parsed, promptPack.input);
+  return {
+    layout,
+    source: 'anthropic',
+    model: normalizeString(data?.model || model) || model,
+    usage: data?.usage || null,
+  };
 }
 
 function stripHtmlCodeFence(text) {
@@ -6385,6 +6705,80 @@ app.post('/api/ai/summarize', async (req, res) => {
       openAiEnabled: Boolean(getOpenAiApiKey()),
     });
   }
+});
+
+async function sendAiOrderDossierResponse(req, res) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const input = buildOrderDossierInput({
+    orderId: body.orderId,
+    title: body.title,
+    company: body.company,
+    contact: body.contact,
+    domainName: body.domainName,
+    deliveryTime: body.deliveryTime,
+    claimedBy: body.claimedBy,
+    claimedAt: body.claimedAt,
+    description: body.description,
+    transcript: body.transcript,
+    sourceAppointmentLabel: body.sourceAppointmentLabel,
+    language: body.language || 'nl',
+  });
+
+  if (!input.orderId && !normalizeString(input.title) && !normalizeString(input.company)) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Onvoldoende dossierinformatie',
+      detail: 'Stuur minimaal orderId en basisprojectdata mee.',
+    });
+  }
+
+  try {
+    const result = await generateDynamicOrderDossierWithAnthropic(input);
+    return res.status(200).json({
+      ok: true,
+      layout: result.layout,
+      source: result.source,
+      model: result.model,
+      usage: result.usage,
+      anthropicEnabled: true,
+    });
+  } catch (error) {
+    const fallbackLayout = buildOrderDossierFallbackLayout(input);
+    console.error(
+      '[AI][OrderDossier][Fallback]',
+      JSON.stringify(
+        {
+          reason: String(error?.message || 'Onbekende fout'),
+          status: Number(error?.status || 0) || null,
+          anthropicEnabled: Boolean(getAnthropicApiKey()),
+          model: getDossierAnthropicModel(),
+          orderId: input.orderId || null,
+        },
+        null,
+        2
+      )
+    );
+
+    return res.status(200).json({
+      ok: true,
+      layout: fallbackLayout,
+      source: 'template-fallback',
+      model: null,
+      usage: null,
+      warning: 'Claude dossier generatie faalde, template-fallback gebruikt.',
+      detail: String(error?.message || 'Onbekende fout'),
+      anthropicEnabled: Boolean(getAnthropicApiKey()),
+    });
+  }
+}
+
+app.post('/api/ai/order-dossier', async (req, res) => {
+  return sendAiOrderDossierResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ai-order-dossier', async (req, res) => {
+  return sendAiOrderDossierResponse(req, res);
 });
 
 async function sendAiTranscriptToPromptResponse(req, res) {

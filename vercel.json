@@ -58,6 +58,10 @@
     {
       "source": "/api/ai/notes-image-to-text",
       "destination": "/api/ai-notes-image-to-text"
+    },
+    {
+      "source": "/api/ai/order-dossier",
+      "destination": "/api/ai-order-dossier"
     }
   ]
 }
