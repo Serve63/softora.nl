@@ -511,13 +511,14 @@
         queueSidebarFitLayout();
     }
 
-    function sidebarFitsViewport(sidebarEl) {
-        if (!sidebarEl) return true;
-        const nav = sidebarEl.querySelector(".sidebar-nav");
-        if (nav && nav.scrollHeight > nav.clientHeight + 1) {
-            return false;
+    function getSidebarViewportFitClass() {
+        if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
+            return "";
         }
-        return sidebarEl.scrollHeight <= sidebarEl.clientHeight + 2;
+        const viewportHeight = Math.max(0, Number(window.innerHeight) || 0);
+        if (viewportHeight > 0 && viewportHeight <= 820) return "sidebar-fit-tight";
+        if (viewportHeight > 0 && viewportHeight <= 980) return "sidebar-fit-compact";
+        return "";
     }
 
     function applySidebarFitLayout() {
@@ -526,16 +527,9 @@
         if (!sidebar) return;
 
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
-        if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
-            return;
-        }
-
-        if (sidebarFitsViewport(sidebar)) return;
-        sidebar.classList.add("sidebar-fit-compact");
-        if (sidebarFitsViewport(sidebar)) return;
-
-        sidebar.classList.remove("sidebar-fit-compact");
-        sidebar.classList.add("sidebar-fit-tight");
+        const fitClass = getSidebarViewportFitClass();
+        if (!fitClass) return;
+        sidebar.classList.add(fitClass);
     }
 
     let sidebarFitRaf = 0;
