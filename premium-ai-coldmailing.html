@@ -403,6 +403,11 @@
             line-height: 1.45;
         }
 
+        .lead-meta-label {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
         .lead-chip {
             flex-shrink: 0;
             font-family: 'Oswald', sans-serif;
@@ -1738,6 +1743,25 @@
                 return inferLeadTypeFromText(hintText) || 'Website';
             }
 
+            function resolveLeadOrigin(item) {
+                const sourceText = normalize(
+                    [
+                        item?.source,
+                        item?.summary,
+                        item?.whatsappInfo,
+                        item?.location,
+                    ].join(' ')
+                );
+                if (
+                    /(coldmail|cold mail|coldmailing|mailing|email|e-mail|imap|mailbox|inbox|bevestigingsmail|confirmation[_\s-]?mail)/.test(
+                        sourceText
+                    )
+                ) {
+                    return 'Coldmailing';
+                }
+                return 'Coldcalling';
+            }
+
             function renderList() {
                 if (!allLeads.length) {
                     listEl.innerHTML = '<div class="lead-empty">Nog geen leads gevonden.</div>';
@@ -1747,8 +1771,8 @@
                 listEl.innerHTML = allLeads.map((item) => {
                     const companyRaw = String(item.company || 'Onbekende lead').trim() || 'Onbekende lead';
                     const company = esc(companyRaw);
-                    const moment = esc(formatDateTime(item));
                     const leadType = esc(resolveLeadType(item));
+                    const leadOrigin = esc(resolveLeadOrigin(item));
                     const chipClass = 'pending';
                     const chipLabel = 'LEAD';
                     const taskId = Number(item.id) || 0;
@@ -1760,8 +1784,8 @@
                         <article${openAttrs}>
                             <div>
                                 <div class="lead-name">${company}</div>
-                                <div class="lead-meta">Type: ${leadType}</div>
-                                <div class="lead-meta">${moment}</div>
+                                <div class="lead-meta"><span class="lead-meta-label">Type:</span> ${leadType}</div>
+                                <div class="lead-meta"><span class="lead-meta-label">Bron:</span> ${leadOrigin}</div>
                             </div>
                             <span class="lead-chip ${chipClass}">${chipLabel}</span>
                         </article>
