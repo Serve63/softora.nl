@@ -608,6 +608,7 @@
         .topbar-right .site-select--pill {
             flex: 0 0 auto;
             width: auto;
+            display: inline-flex;
         }
 
         .topbar-right .site-select--pill .site-select-trigger {
@@ -620,8 +621,9 @@
             letter-spacing: 0.1em;
             background: transparent;
             min-height: 2.2rem;
-            min-width: 10.5rem;
-            max-width: 15.5rem;
+            width: 13.4rem !important;
+            min-width: 13.4rem;
+            max-width: 13.4rem;
             line-height: 1;
             cursor: none;
         }
@@ -646,7 +648,7 @@
             right: 0;
             left: auto;
             width: max-content;
-            min-width: 100%;
+            min-width: 13.4rem;
             max-width: min(22rem, calc(100vw - 2rem));
         }
 
@@ -1554,8 +1556,9 @@
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
             .topbar-right { width: 100%; justify-content: flex-start; }
             .topbar-right .site-select--pill .site-select-trigger {
-                min-width: min(100%, 18rem);
-                max-width: min(100%, 18rem);
+                width: min(100%, 16rem) !important;
+                min-width: min(100%, 16rem);
+                max-width: min(100%, 16rem);
             }
             .log-task-section { padding: 1rem 1.2rem 1.2rem; }
             .log-task-top { flex-direction: column; }
