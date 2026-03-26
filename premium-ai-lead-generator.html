@@ -302,6 +302,14 @@
             margin-bottom: 3rem;
         }
 
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.7rem;
+            flex-wrap: wrap;
+        }
+
         .topbar-left h1 {
             font-size: 2rem;
             font-weight: 700;
@@ -595,6 +603,57 @@
         .site-select-option.is-selected {
             color: var(--accent-light);
             background: rgba(139, 34, 82, 0.12);
+        }
+
+        .topbar-right .site-select--pill {
+            min-width: 16.8rem;
+            max-width: 22rem;
+        }
+
+        .topbar-right .site-select--pill .site-select-trigger {
+            padding: 0.49rem 0.95rem;
+            border-width: 1px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            background: transparent;
+            min-height: 2.35rem;
+            line-height: 1;
+            cursor: none;
+        }
+
+        .topbar-right .site-select--pill .site-select-trigger::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-light);
+            box-shadow: 0 0 10px rgba(139, 34, 82, 0.35);
+            flex: 0 0 8px;
+        }
+
+        .topbar-right .site-select--pill .site-select-value {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .topbar-right .site-select--pill .site-select-menu {
+            right: 0;
+            left: auto;
+            width: max-content;
+            min-width: 100%;
+            max-width: min(28rem, calc(100vw - 2rem));
+        }
+
+        .topbar-right .site-select--pill .site-select-option {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.76rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
         }
 
         .site-dialog-backdrop {
@@ -1491,6 +1550,8 @@
             .main-content { padding: 1.5rem; }
             .stats-bar { grid-template-columns: 1fr; }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
+            .topbar-right { width: 100%; justify-content: flex-start; }
+            .topbar-right .site-select--pill { min-width: min(100%, 22rem); }
             .log-task-section { padding: 1rem 1.2rem 1.2rem; }
             .log-task-top { flex-direction: column; }
             .log-task-side { align-items: flex-start; width: 100%; }
@@ -1553,9 +1614,16 @@
                     <h1>Website's</h1>
                     <p>Website-campagne configureren & starten</p>
                 </div>
-                <div class="status-pill active" id="statusPill">
-                    <span class="dot"></span>
-                    Website's
+                <div class="topbar-right">
+                    <div class="status-pill active" id="statusPill">
+                        <span class="dot"></span>
+                        Website's
+                    </div>
+                    <select class="form-select magnetic" id="coldcallingStack" data-select-variant="pill" aria-label="Coldcalling stack">
+                        <option value="retell_ai" selected>Retell AI (huidige stack)</option>
+                        <option value="gemini_flash_3_1_live">Gemini Flash 3.1 Live</option>
+                        <option value="openai_realtime_1_5">OpenAI Realtime 1.5</option>
+                    </select>
                 </div>
             </div>
 
@@ -1687,6 +1755,10 @@
 
             const wrapper = document.createElement('div');
             wrapper.className = 'site-select';
+            const selectVariant = String(select.dataset.selectVariant || '').trim().toLowerCase();
+            if (selectVariant === 'pill') {
+                wrapper.classList.add('site-select--pill');
+            }
 
             select.parentNode.insertBefore(wrapper, select);
             wrapper.appendChild(select);

@@ -34,6 +34,7 @@
   const CAMPAIGN_MIN_PRICE_STORAGE_KEY = 'softora_campaign_min_price';
   const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
   const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
+  const CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY = 'softora_campaign_coldcalling_stack';
   const STATUS_PILL_MODE_STORAGE_KEY = 'softora_status_pill_mode';
   const REMOTE_UI_STATE_SCOPE_BASE = 'coldcalling';
   const BUSINESS_MODE_ORDER = ['websites', 'voice_software', 'business_software'];
@@ -101,6 +102,40 @@
       return 'business_software';
     }
     return 'websites';
+  }
+
+  function normalizeColdcallingStack(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (
+      raw === 'gemini_flash_3_1_live' ||
+      raw === 'gemini flash 3.1 live' ||
+      raw === 'gemini_3_1_live' ||
+      raw === 'gemini'
+    ) {
+      return 'gemini_flash_3_1_live';
+    }
+    if (
+      raw === 'openai_realtime_1_5' ||
+      raw === 'openai realtime 1.5' ||
+      raw === 'openai_realtime' ||
+      raw === 'openai'
+    ) {
+      return 'openai_realtime_1_5';
+    }
+    return 'retell_ai';
+  }
+
+  function getColdcallingStackLabel(value) {
+    const normalized = normalizeColdcallingStack(value);
+    if (normalized === 'gemini_flash_3_1_live') return 'Gemini Flash 3.1 Live';
+    if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
+    return 'Retell AI';
+  }
+
+  function syncCustomSelectUi(selectEl) {
+    if (selectEl && typeof selectEl.__softoraSyncCustomFormSelect === 'function') {
+      selectEl.__softoraSyncCustomFormSelect();
+    }
   }
 
   function getCurrentBusinessMode() {
@@ -364,6 +399,7 @@
     const minPriceEl = byId('minPrice');
     const maxDiscountEl = byId('maxDiscount');
     const instructionsEl = byId('instructions');
+    const stackEl = byId('coldcallingStack');
 
     const savedBranche = readStorage(CAMPAIGN_BRANCHE_STORAGE_KEY).trim();
     if (brancheEl && savedBranche && Array.from(brancheEl.options || []).some((opt) => String(opt.value) === savedBranche)) {
@@ -388,6 +424,17 @@
     const savedInstructions = readStorage(CAMPAIGN_INSTRUCTIONS_STORAGE_KEY);
     if (instructionsEl && savedInstructions !== '') {
       instructionsEl.value = savedInstructions;
+    }
+
+    if (stackEl) {
+      const savedStackRaw = readStorage(CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY).trim();
+      const savedStack = normalizeColdcallingStack(savedStackRaw || stackEl.value);
+      if (Array.from(stackEl.options || []).some((opt) => String(opt.value) === savedStack)) {
+        stackEl.value = savedStack;
+      } else {
+        stackEl.value = 'retell_ai';
+      }
+      syncCustomSelectUi(stackEl);
     }
 
     renderLeadAmountDisplay();
@@ -417,6 +464,7 @@
     const minPriceEl = byId('minPrice');
     const maxDiscountEl = byId('maxDiscount');
     const instructionsEl = byId('instructions');
+    const stackEl = byId('coldcallingStack');
     const leadValueEl = byId('leadValue');
 
     leadSlider.addEventListener('input', () => {
@@ -462,6 +510,16 @@
       instructionsEl.addEventListener('input', () =>
         writeStorage(CAMPAIGN_INSTRUCTIONS_STORAGE_KEY, instructionsEl.value)
       );
+    }
+    if (stackEl) {
+      stackEl.addEventListener('change', () => {
+        const normalizedStack = normalizeColdcallingStack(stackEl.value);
+        if (stackEl.value !== normalizedStack) {
+          stackEl.value = normalizedStack;
+        }
+        writeStorage(CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY, normalizedStack);
+        syncCustomSelectUi(stackEl);
+      });
     }
   }
 
@@ -4814,6 +4872,7 @@
     const extraInstructions = String(byId('instructions')?.value || '').trim();
     const dispatchMode = String(byId('callDispatchMode')?.value || 'sequential');
     const dispatchDelaySeconds = Math.max(0, parseNumber(byId('callDispatchDelaySeconds')?.value, 5));
+    const coldcallingStack = normalizeColdcallingStack(byId('coldcallingStack')?.value || 'retell_ai');
 
     return {
       amount,
@@ -4824,6 +4883,8 @@
       extraInstructions,
       dispatchMode,
       dispatchDelaySeconds,
+      coldcallingStack,
+      coldcallingStackLabel: getColdcallingStackLabel(coldcallingStack),
     };
   }
 
@@ -4866,6 +4927,7 @@
 
     try {
       const campaign = collectCampaignFormData();
+      const stackLabel = campaign.coldcallingStackLabel || getColdcallingStackLabel(campaign.coldcallingStack);
       const leadSelection = getManualLeadsFromDashboard(campaign.amount);
       const leads = leadSelection.leads;
       campaign.amount = leads.length;
@@ -4873,7 +4935,7 @@
       isSubmitting = true;
       setButtonLoading(true);
       setStatusPill('loading', 'Bezig met starten');
-      setStatusMessage('loading', 'Campagne wordt gestart...');
+      setStatusMessage('loading', `Campagne wordt gestart via ${stackLabel}...`);
       if (leadSelection.parsed.errors.length > 0) {
         addUiLog(
           'skip',
@@ -4906,7 +4968,7 @@
             : campaign.dispatchMode === 'delay'
               ? `${campaign.dispatchDelaySeconds}s tussen calls`
               : '1 voor 1'
-        )}).`
+        )}) via ${escapeHtml(stackLabel)}.`
       );
 
       if (campaign.dispatchMode === 'sequential' && leads.length > 1) {

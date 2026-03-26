@@ -1831,6 +1831,34 @@ function getMissingEnvVars(provider = getColdcallingProvider()) {
   return getRequiredRetellEnv().filter((key) => !process.env[key]);
 }
 
+function normalizeColdcallingStack(value) {
+  const raw = normalizeString(value).toLowerCase();
+  if (
+    raw === 'gemini_flash_3_1_live' ||
+    raw === 'gemini flash 3.1 live' ||
+    raw === 'gemini_3_1_live' ||
+    raw === 'gemini'
+  ) {
+    return 'gemini_flash_3_1_live';
+  }
+  if (
+    raw === 'openai_realtime_1_5' ||
+    raw === 'openai realtime 1.5' ||
+    raw === 'openai_realtime' ||
+    raw === 'openai'
+  ) {
+    return 'openai_realtime_1_5';
+  }
+  return 'retell_ai';
+}
+
+function getColdcallingStackLabel(stack) {
+  const normalized = normalizeColdcallingStack(stack);
+  if (normalized === 'gemini_flash_3_1_live') return 'Gemini Flash 3.1 Live';
+  if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
+  return 'Retell AI';
+}
+
 function toBooleanSafe(value, fallback = false) {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
@@ -5425,7 +5453,11 @@ function validateStartPayload(body) {
     extraInstructions: normalizeString(campaign.extraInstructions),
     dispatchMode,
     dispatchDelaySeconds,
+    coldcallingStack: normalizeColdcallingStack(
+      campaign.coldcallingStack || campaign.callingEngine || campaign.callingStack
+    ),
   };
+  normalizedCampaign.coldcallingStackLabel = getColdcallingStackLabel(normalizedCampaign.coldcallingStack);
 
   return {
     campaign: normalizedCampaign,
@@ -5887,7 +5919,7 @@ app.post('/api/coldcalling/start', async (req, res) => {
   const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
 
   console.log(
-    `[Coldcalling] Start campagne ontvangen via ${provider}: ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
+    `[Coldcalling] Start campagne ontvangen via ${provider} (stack=${campaign.coldcallingStack}): ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
   );
 
   let results = [];
@@ -5917,6 +5949,8 @@ app.post('/api/coldcalling/start', async (req, res) => {
         started: startedNow,
         failed: failedNow,
         provider,
+        coldcallingStack: campaign.coldcallingStack,
+        coldcallingStackLabel: campaign.coldcallingStackLabel,
         dispatchMode: campaign.dispatchMode,
         dispatchDelaySeconds: 0,
         sequentialWaitForCallEnd: true,
@@ -5956,6 +5990,8 @@ app.post('/api/coldcalling/start', async (req, res) => {
       started,
       failed,
       provider,
+      coldcallingStack: campaign.coldcallingStack,
+      coldcallingStackLabel: campaign.coldcallingStackLabel,
       dispatchMode: campaign.dispatchMode,
       dispatchDelaySeconds: campaign.dispatchMode === 'delay' ? campaign.dispatchDelaySeconds : 0,
     },
