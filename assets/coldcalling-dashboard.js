@@ -122,6 +122,14 @@
     ) {
       return 'openai_realtime_1_5';
     }
+    if (
+      raw === 'hume_evi_3' ||
+      raw === 'hume evi 3' ||
+      raw === 'hume_evi' ||
+      raw === 'hume'
+    ) {
+      return 'hume_evi_3';
+    }
     return 'retell_ai';
   }
 
@@ -129,6 +137,7 @@
     const normalized = normalizeColdcallingStack(value);
     if (normalized === 'gemini_flash_3_1_live') return 'Gemini Flash 3.1 Live';
     if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
+    if (normalized === 'hume_evi_3') return 'Hume Evi 3';
     return 'Retell AI';
   }
 
@@ -931,6 +940,11 @@
   function setStatusPill(kind, text) {
     const pill = byId('statusPill');
     if (!pill) return;
+    if (pill instanceof HTMLSelectElement) {
+      pill.dataset.runtimeStatus = String(kind || '');
+      pill.dataset.runtimeText = String(text || '');
+      return;
+    }
     if (pill.dataset.modeToggle === '1') {
       pill.classList.add('active');
       return;
@@ -978,6 +992,17 @@
 
     const normalizedMode = normalizeBusinessMode(mode);
     activeBusinessMode = normalizedMode;
+    if (pill instanceof HTMLSelectElement) {
+      if (Array.from(pill.options || []).some((opt) => String(opt.value) === normalizedMode)) {
+        pill.value = normalizedMode;
+      } else {
+        pill.value = 'websites';
+      }
+      pill.dataset.modeToggle = '1';
+      pill.dataset.mode = normalizedMode;
+      syncCustomSelectUi(pill);
+      return;
+    }
     pill.dataset.modeToggle = '1';
     pill.dataset.mode = normalizedMode;
     pill.classList.add('active');
@@ -991,6 +1016,16 @@
   function setupStatusPillModeToggle() {
     const pill = byId('statusPill');
     if (!pill) return;
+
+    if (pill instanceof HTMLSelectElement) {
+      applyStatusPillMode(getCurrentBusinessMode());
+      if (pill.dataset.modeBound === '1') return;
+      pill.dataset.modeBound = '1';
+      pill.addEventListener('change', () => {
+        void switchBusinessMode(pill.value);
+      });
+      return;
+    }
 
     const toggleMode = async () => {
       const currentMode = normalizeBusinessMode(pill.dataset.mode || getCurrentBusinessMode());

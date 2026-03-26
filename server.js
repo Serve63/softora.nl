@@ -1849,6 +1849,14 @@ function normalizeColdcallingStack(value) {
   ) {
     return 'openai_realtime_1_5';
   }
+  if (
+    raw === 'hume_evi_3' ||
+    raw === 'hume evi 3' ||
+    raw === 'hume_evi' ||
+    raw === 'hume'
+  ) {
+    return 'hume_evi_3';
+  }
   return 'retell_ai';
 }
 
@@ -1856,6 +1864,7 @@ function getColdcallingStackLabel(stack) {
   const normalized = normalizeColdcallingStack(stack);
   if (normalized === 'gemini_flash_3_1_live') return 'Gemini Flash 3.1 Live';
   if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
+  if (normalized === 'hume_evi_3') return 'Hume Evi 3';
   return 'Retell AI';
 }
 

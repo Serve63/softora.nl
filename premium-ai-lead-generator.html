@@ -629,8 +629,8 @@
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: var(--accent-light);
-            box-shadow: 0 0 10px rgba(139, 34, 82, 0.35);
+            background: var(--green);
+            box-shadow: 0 0 10px var(--green-glow);
             flex: 0 0 8px;
         }
 
@@ -1615,14 +1615,16 @@
                     <p>Website-campagne configureren & starten</p>
                 </div>
                 <div class="topbar-right">
-                    <div class="status-pill active" id="statusPill">
-                        <span class="dot"></span>
-                        Website's
-                    </div>
+                    <select class="form-select magnetic" id="statusPill" data-select-variant="pill" aria-label="Business modus">
+                        <option value="websites" selected>Website's</option>
+                        <option value="voice_software">Voice software</option>
+                        <option value="business_software">Bedrijfssoftware</option>
+                    </select>
                     <select class="form-select magnetic" id="coldcallingStack" data-select-variant="pill" aria-label="Coldcalling stack">
-                        <option value="retell_ai" selected>Retell AI (huidige stack)</option>
+                        <option value="retell_ai" selected>Retell AI</option>
                         <option value="gemini_flash_3_1_live">Gemini Flash 3.1 Live</option>
                         <option value="openai_realtime_1_5">OpenAI Realtime 1.5</option>
+                        <option value="hume_evi_3">Hume Evi 3</option>
                     </select>
                 </div>
             </div>
@@ -1758,6 +1760,10 @@
             const selectVariant = String(select.dataset.selectVariant || '').trim().toLowerCase();
             if (selectVariant === 'pill') {
                 wrapper.classList.add('site-select--pill');
+            }
+            const selectDotColor = String(select.dataset.dotColor || '').trim().toLowerCase();
+            if (selectDotColor) {
+                wrapper.dataset.dotColor = selectDotColor;
             }
 
             select.parentNode.insertBefore(wrapper, select);
@@ -2187,6 +2193,7 @@
         function toggleCampaign() {
             const btn = document.getElementById('launchBtn');
             const pill = document.getElementById('statusPill');
+            const isPillSelect = pill instanceof HTMLSelectElement;
 
             if (!isRunning) {
                 isRunning = true;
@@ -2195,8 +2202,10 @@
                     Campagne Actief — Pauzeren
                 `;
                 btn.classList.add('running');
-                pill.classList.add('active');
-                pill.innerHTML = '<span class="dot"></span> Actief';
+                if (!isPillSelect && pill) {
+                    pill.classList.add('active');
+                    pill.innerHTML = '<span class="dot"></span> Actief';
+                }
 
                 simulateCall();
                 callInterval = setInterval(simulateCall, 3000 + Math.random() * 2000);
@@ -2208,8 +2217,10 @@
                     Hervat Campagne
                 `;
                 btn.classList.remove('running');
-                pill.classList.remove('active');
-                pill.innerHTML = '<span class="dot"></span> Gepauzeerd';
+                if (!isPillSelect && pill) {
+                    pill.classList.remove('active');
+                    pill.innerHTML = '<span class="dot"></span> Gepauzeerd';
+                }
             }
         }
 
