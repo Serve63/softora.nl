@@ -1115,7 +1115,12 @@
             updateAppointmentPostCallFields(result?.appointment || payload);
             closeModal();
         } catch (error) {
-            window.alert(`Geen deal opslaan mislukt: ${String(error?.message || 'onbekende fout')}`);
+            if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+                await window.SoftoraDialogs.alert(
+                    `Geen deal opslaan mislukt: ${String(error?.message || 'onbekende fout')}`,
+                    { title: 'Agenda', confirmText: 'Sluiten' }
+                );
+            }
         } finally {
             workspaceBusy = false;
             refreshWorkspacePrimaryButtonLabel();

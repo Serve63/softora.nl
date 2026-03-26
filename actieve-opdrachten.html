@@ -1419,7 +1419,12 @@
 
             const w = window.open(resolvePreviewUrl(meta), '_blank');
             if (!w) {
-                alert('Pop-up geblokkeerd. Sta pop-ups toe om de preview te openen.');
+                if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+                    void window.SoftoraDialogs.alert(
+                        'Pop-up geblokkeerd. Sta pop-ups toe om de preview te openen.',
+                        { title: 'Preview openen', confirmText: 'Sluiten' }
+                    );
+                }
             }
         }
 

@@ -8520,8 +8520,8 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-response-received', (req, res)
   });
 });
 
-app.post('/api/agenda/confirmation-tasks/:id/mark-cancelled', (req, res) => {
-  const idx = getGeneratedAppointmentIndexById(req.params.id);
+function markLeadTaskCancelledById(req, res, taskIdRaw) {
+  const idx = getGeneratedAppointmentIndexById(taskIdRaw);
   if (idx < 0) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
   }
@@ -8570,6 +8570,15 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-cancelled', (req, res) => {
     cancelled: true,
     appointment: updatedAppointment,
   });
+}
+
+app.post('/api/agenda/confirmation-tasks/:id/mark-cancelled', (req, res) => {
+  return markLeadTaskCancelledById(req, res, req.params.id);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/agenda/confirmation-task-mark-cancelled', (req, res) => {
+  return markLeadTaskCancelledById(req, res, req.query.taskId);
 });
 
 app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {

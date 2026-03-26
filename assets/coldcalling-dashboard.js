@@ -4744,16 +4744,24 @@
     }, 1500);
   }
 
-  function getOrAskTestLeadPhone() {
+  async function getOrAskTestLeadPhone() {
     const existing = readStorage(TEST_LEAD_STORAGE_KEY).trim();
 
     if (existing) {
       return existing;
     }
 
-    const input = window.prompt(
-      'Voer je eigen testnummer in (NL formaat, bijv. 0612345678 of +31612345678). Er wordt tijdelijk exact 1 testlead gebruikt.'
-    );
+    const input = window.SoftoraDialogs && typeof window.SoftoraDialogs.prompt === 'function'
+      ? await window.SoftoraDialogs.prompt(
+        'Voer je eigen testnummer in (NL formaat, bijv. 0612345678 of +31612345678). Er wordt tijdelijk exact 1 testlead gebruikt.',
+        '',
+        {
+          title: 'Testnummer invoeren',
+          confirmText: 'Opslaan',
+          cancelText: 'Annuleren',
+        }
+      )
+      : null;
     const phone = String(input || '').trim();
 
     if (!phone) {
@@ -4764,8 +4772,8 @@
     return phone;
   }
 
-  function buildTestLeads() {
-    const phone = getOrAskTestLeadPhone();
+  async function buildTestLeads() {
+    const phone = await getOrAskTestLeadPhone();
 
     if (!phone) {
       throw new Error('Geen testnummer ingevuld. Campagne geannuleerd.');

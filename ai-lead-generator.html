@@ -1016,14 +1016,26 @@
             renderSliderValue();
         });
 
-        function promptCustomSliderValue() {
+        async function promptCustomSliderValue() {
             const currentAmount = getSliderDisplayAmount();
-            const input = window.prompt('Hoeveel mensen wil je bellen?', String(currentAmount));
+            const input =
+                window.SoftoraDialogs && typeof window.SoftoraDialogs.prompt === 'function'
+                    ? await window.SoftoraDialogs.prompt(
+                        'Hoeveel mensen wil je bellen?',
+                        String(currentAmount),
+                        { title: 'Aantal leads', confirmText: 'Opslaan', cancelText: 'Annuleren' }
+                    )
+                    : null;
             if (input === null) return;
 
             const parsed = Math.round(Number(String(input).trim().replace(',', '.')));
             if (!Number.isFinite(parsed) || parsed < 1) {
-                window.alert('Voer een geldig aantal in (minimaal 1).');
+                if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+                    await window.SoftoraDialogs.alert('Voer een geldig aantal in (minimaal 1).', {
+                        title: 'Ongeldige invoer',
+                        confirmText: 'Sluiten',
+                    });
+                }
                 return;
             }
 

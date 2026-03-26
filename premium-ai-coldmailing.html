@@ -1478,14 +1478,27 @@
                 if (!taskId || modalBusy) return;
                 const lead = getLeadById(taskId);
                 const company = String(lead?.company || 'deze lead');
-                const confirmed = window.confirm(`Weet je zeker dat je ${company} wilt verwijderen?`);
+                const confirmed =
+                    window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
+                        ? await window.SoftoraDialogs.confirm(
+                            `Weet je zeker dat je ${company} wilt verwijderen?`,
+                            {
+                                title: 'Lead verwijderen',
+                                confirmText: 'Verwijderen',
+                                cancelText: 'Annuleren',
+                            }
+                        )
+                        : false;
                 if (!confirmed) return;
 
                 setModalBusy(true);
                 setModalStatus('Lead wordt verwijderd...', '');
                 try {
                     await postJsonWithFallback(
-                        [`/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/mark-cancelled`],
+                        [
+                            `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/mark-cancelled`,
+                            `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(taskId))}`,
+                        ],
                         {
                             actor: 'Leads pagina',
                             reason: 'Handmatig verwijderd via lead-popup',

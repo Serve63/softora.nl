@@ -1810,7 +1810,14 @@
             });
             if (!customer) return;
 
-            const confirmed = window.confirm("Klant \"" + customer.naam + "\" verwijderen?");
+            const confirmed =
+                window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === "function"
+                    ? await window.SoftoraDialogs.confirm("Klant \"" + customer.naam + "\" verwijderen?", {
+                        title: "Klant verwijderen",
+                        confirmText: "Verwijderen",
+                        cancelText: "Annuleren",
+                    })
+                    : false;
             if (!confirmed) return;
 
             state.klanten = state.klanten.filter(function (item) {

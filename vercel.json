@@ -44,6 +44,10 @@
       "destination": "/api/agenda/lead-to-agenda?taskId=:taskId"
     },
     {
+      "source": "/api/agenda/confirmation-tasks/:taskId/mark-cancelled",
+      "destination": "/api/agenda/confirmation-task-mark-cancelled?taskId=:taskId"
+    },
+    {
       "source": "/api/active-orders/generate-site",
       "destination": "/api/active-order-generate-site"
     },

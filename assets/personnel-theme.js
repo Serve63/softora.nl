@@ -61,6 +61,299 @@
 
     window.addEventListener("load", scheduleLoadingStateRelease, { once: true });
 
+    function initSoftoraDialogs() {
+        if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === "function") {
+            return;
+        }
+
+        let dialogQueue = Promise.resolve();
+        const dialogRootId = "softora-dialog-root";
+        const dialogStyleId = "softora-dialog-style";
+
+        function ensureDialogStyles() {
+            if (document.getElementById(dialogStyleId)) return;
+            const styleEl = document.createElement("style");
+            styleEl.id = dialogStyleId;
+            styleEl.textContent = `
+.softora-dialog-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 14000;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+}
+
+.softora-dialog-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 12, 20, 0.58);
+    backdrop-filter: blur(2px);
+}
+
+.softora-dialog-card {
+    position: relative;
+    width: min(480px, 100%);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    box-shadow: 0 22px 70px rgba(0, 0, 0, 0.3);
+    padding: 1rem;
+    display: grid;
+    gap: 0.85rem;
+}
+
+.softora-dialog-title {
+    margin: 0;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.12rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.1;
+}
+
+.softora-dialog-message {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.98rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+}
+
+.softora-dialog-input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 0.7rem 0.78rem;
+    font-size: 0.98rem;
+    line-height: 1.2;
+    outline: none;
+}
+
+.softora-dialog-input:focus {
+    border-color: rgba(139, 34, 82, 0.5);
+    box-shadow: 0 0 0 2px rgba(139, 34, 82, 0.18);
+}
+
+.softora-dialog-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.softora-dialog-btn {
+    appearance: none;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 40px;
+    padding: 0.55rem 0.9rem;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.softora-dialog-btn:hover {
+    border-color: rgba(139, 34, 82, 0.4);
+    color: var(--text-primary);
+}
+
+.softora-dialog-btn.primary {
+    border-color: transparent;
+    background: var(--accent);
+    color: #fff;
+}
+
+.softora-dialog-btn.primary:hover {
+    background: var(--accent-dark);
+}
+`;
+            document.head.appendChild(styleEl);
+        }
+
+        function ensureDialogRoot() {
+            let rootEl = document.getElementById(dialogRootId);
+            if (rootEl) return rootEl;
+            rootEl = document.createElement("div");
+            rootEl.id = dialogRootId;
+            document.body.appendChild(rootEl);
+            return rootEl;
+        }
+
+        function runDialogInQueue(run) {
+            const next = dialogQueue
+                .catch(function () {
+                    /* ignore previous dialog errors */
+                })
+                .then(run);
+            dialogQueue = next;
+            return next;
+        }
+
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function openDialog(config) {
+            const mode = String(config && config.mode ? config.mode : "alert");
+            const title = String(config && config.title ? config.title : "Melding");
+            const message = String(config && config.message ? config.message : "");
+            const confirmText = String(config && config.confirmText ? config.confirmText : "OK");
+            const cancelText = String(config && config.cancelText ? config.cancelText : "Annuleren");
+            const defaultValue = String(config && config.defaultValue ? config.defaultValue : "");
+            const canCancel = mode !== "alert";
+            const isPrompt = mode === "prompt";
+
+            return runDialogInQueue(function () {
+                return new Promise(function (resolve) {
+                    ensureDialogStyles();
+                    const rootEl = ensureDialogRoot();
+                    const layer = document.createElement("div");
+                    layer.className = "softora-dialog-layer";
+                    const safeTitle = escapeHtml(title);
+                    const safeMessage = escapeHtml(message);
+                    const safeDefaultValue = escapeHtml(defaultValue);
+                    const safeConfirmText = escapeHtml(confirmText);
+                    const safeCancelText = escapeHtml(cancelText);
+                    layer.innerHTML = [
+                        '<div class="softora-dialog-backdrop"></div>',
+                        `<div class="softora-dialog-card" role="dialog" aria-modal="true" aria-label="${safeTitle}">`,
+                        `  <h3 class="softora-dialog-title">${safeTitle}</h3>`,
+                        `  <p class="softora-dialog-message">${safeMessage}</p>`,
+                        isPrompt ? `  <input class="softora-dialog-input" type="text" value="${safeDefaultValue}">` : "",
+                        '  <div class="softora-dialog-actions">',
+                        canCancel ? `    <button type="button" class="softora-dialog-btn" data-dialog-cancel>${safeCancelText}</button>` : "",
+                        `    <button type="button" class="softora-dialog-btn primary" data-dialog-confirm>${safeConfirmText}</button>`,
+                        "  </div>",
+                        "</div>",
+                    ].join("");
+                    rootEl.appendChild(layer);
+
+                    const backdrop = layer.querySelector(".softora-dialog-backdrop");
+                    const confirmBtn = layer.querySelector("[data-dialog-confirm]");
+                    const cancelBtn = layer.querySelector("[data-dialog-cancel]");
+                    const inputEl = layer.querySelector(".softora-dialog-input");
+                    const previouslyFocused = document.activeElement;
+                    let closed = false;
+
+                    function cleanup() {
+                        document.removeEventListener("keydown", onKeyDown, true);
+                        if (layer.parentNode) {
+                            layer.parentNode.removeChild(layer);
+                        }
+                        if (previouslyFocused && typeof previouslyFocused.focus === "function") {
+                            previouslyFocused.focus();
+                        }
+                    }
+
+                    function closeWith(result) {
+                        if (closed) return;
+                        closed = true;
+                        cleanup();
+                        resolve(result);
+                    }
+
+                    function onKeyDown(event) {
+                        if (event.key === "Escape" && canCancel) {
+                            event.preventDefault();
+                            closeWith(isPrompt ? null : false);
+                            return;
+                        }
+                        if (event.key === "Enter" && isPrompt && document.activeElement === inputEl) {
+                            event.preventDefault();
+                            closeWith(String(inputEl.value || ""));
+                        }
+                    }
+
+                    document.addEventListener("keydown", onKeyDown, true);
+                    if (backdrop && canCancel) {
+                        backdrop.addEventListener("click", function () {
+                            closeWith(isPrompt ? null : false);
+                        });
+                    }
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener("click", function () {
+                            closeWith(isPrompt ? null : false);
+                        });
+                    }
+                    if (confirmBtn) {
+                        confirmBtn.addEventListener("click", function () {
+                            if (isPrompt) {
+                                closeWith(String(inputEl ? inputEl.value : ""));
+                                return;
+                            }
+                            closeWith(true);
+                        });
+                    }
+
+                    if (isPrompt && inputEl) {
+                        requestAnimationFrame(function () {
+                            inputEl.focus();
+                            inputEl.select();
+                        });
+                    } else if (confirmBtn) {
+                        requestAnimationFrame(function () {
+                            confirmBtn.focus();
+                        });
+                    }
+                });
+            });
+        }
+
+        window.SoftoraDialogs = {
+            alert: function alertDialog(message, options) {
+                const opts = options && typeof options === "object" ? options : {};
+                return openDialog({
+                    mode: "alert",
+                    title: opts.title || "Melding",
+                    message: String(message || ""),
+                    confirmText: opts.confirmText || "Sluiten",
+                }).then(function () {
+                    return undefined;
+                });
+            },
+            confirm: function confirmDialog(message, options) {
+                const opts = options && typeof options === "object" ? options : {};
+                return openDialog({
+                    mode: "confirm",
+                    title: opts.title || "Bevestigen",
+                    message: String(message || ""),
+                    confirmText: opts.confirmText || "Ja",
+                    cancelText: opts.cancelText || "Annuleren",
+                }).then(function (result) {
+                    return Boolean(result);
+                });
+            },
+            prompt: function promptDialog(message, defaultValue, options) {
+                const opts = options && typeof options === "object" ? options : {};
+                return openDialog({
+                    mode: "prompt",
+                    title: opts.title || "Invoer",
+                    message: String(message || ""),
+                    defaultValue: String(defaultValue || ""),
+                    confirmText: opts.confirmText || "Opslaan",
+                    cancelText: opts.cancelText || "Annuleren",
+                }).then(function (result) {
+                    if (result === null) return null;
+                    return String(result);
+                });
+            },
+        };
+    }
+
     function getSidebarActiveKey(path) {
         const p = String(path || "").toLowerCase();
         if (
@@ -612,6 +905,7 @@
     window.SoftoraPersonnelTheme.refreshSidebarActiveOrdersCount = refreshSidebarActiveOrdersCount;
     window.SoftoraPersonnelTheme.refreshSidebarCounts = refreshSidebarNotificationCounts;
 
+    initSoftoraDialogs();
     applyUnifiedPremiumSidebar();
     queueSidebarFitLayout();
     window.addEventListener("resize", queueSidebarFitLayout);

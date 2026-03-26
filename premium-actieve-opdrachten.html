@@ -4328,12 +4328,27 @@
             const numericId = Number(id);
             const record = getCustomOrderById(numericId);
             if (!record) {
-                alert('Dit project kan hier niet verwijderd worden.');
+                if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+                    await window.SoftoraDialogs.alert('Dit project kan hier niet verwijderd worden.', {
+                        title: 'Actieve opdrachten',
+                        confirmText: 'Sluiten',
+                    });
+                }
                 return;
             }
 
             const projectLabel = String(record.title || record.clientName || 'dit project').trim();
-            const confirmed = window.confirm(`Project "${projectLabel}" volledig uit het systeem halen? Dit verwijdert het ook uit het klantenbestand en dashboard.`);
+            const confirmed =
+                window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
+                    ? await window.SoftoraDialogs.confirm(
+                        `Project "${projectLabel}" volledig uit het systeem halen? Dit verwijdert het ook uit het klantenbestand en dashboard.`,
+                        {
+                            title: 'Project verwijderen',
+                            confirmText: 'Verwijderen',
+                            cancelText: 'Annuleren',
+                        }
+                    )
+                    : false;
             if (!confirmed) return;
 
             const previousCustomOrders = customOrders.slice();
@@ -4396,7 +4411,12 @@
                 await flushRemoteUiStateSave();
                 if (previousOrder) applyOrderUiStateToCard(numericId);
                 setModalDeleteButtonState('Project uit systeem halen', false);
-                alert('Project verwijderen mislukt. Probeer het opnieuw.');
+                if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+                    await window.SoftoraDialogs.alert('Project verwijderen mislukt. Probeer het opnieuw.', {
+                        title: 'Fout bij verwijderen',
+                        confirmText: 'Sluiten',
+                    });
+                }
             }
         }
 
