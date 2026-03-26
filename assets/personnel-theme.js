@@ -341,6 +341,15 @@
             badge.hidden = true;
             return;
         }
+        const hideWhenZero = !labels || labels.showZero !== true;
+        if (count === 0 && hideWhenZero) {
+            badge.hidden = true;
+            badge.dataset.countZero = "1";
+            badge.textContent = "0";
+            writeSidebarCountCache(countKey, 0);
+            queueSidebarFitLayout();
+            return;
+        }
         badge.hidden = false;
         badge.dataset.countZero = count === 0 ? "1" : "0";
         badge.textContent = count > 99 ? "99+" : String(count);
@@ -355,16 +364,21 @@
     async function refreshSidebarLeadsCount() {
         const badge = getSidebarCountBadge("leads");
         if (!badge) return;
+        const cachedLeadCount = readCachedSidebarCount("leads");
 
         const quickCountData = await fetchJsonNoStore("/api/agenda/confirmation-tasks?quick=1&countOnly=1");
         const quickTotal = Number(quickCountData && quickCountData.count);
-        if (Number.isFinite(quickTotal) && quickTotal >= 0) {
+        if (Number.isFinite(quickTotal) && quickTotal > 0) {
             paintSidebarCount("leads", quickTotal, { singular: "open lead", plural: "open leads" });
             return;
         }
 
         const tasksData = await fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400");
         if (!tasksData) {
+            if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
+                paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
+                return;
+            }
             paintSidebarCount("leads", null);
             return;
         }
