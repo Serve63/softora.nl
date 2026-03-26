@@ -3608,8 +3608,8 @@
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
             <input type="search" id="leadDatabaseSearchInput" class="form-input magnetic" placeholder="Zoek bedrijf of nummer..." style="max-width:420px; height:34px;">
             <button type="button" id="leadDatabaseImportBtn" style="height:34px; padding:0 11px; border-radius:6px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Upload</button>
+            <button type="button" id="leadDatabaseTemplateBtn" style="height:34px; padding:0 11px; border-radius:6px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Template download</button>
             <input type="file" id="leadDatabaseImportInput" accept=".csv,.tsv,.txt,.json,.xls,.xlsx" style="display:none;">
-            <div id="leadDatabaseRefreshLabel" style="font-size:11px; opacity:0.8;"></div>
           </div>
           <div id="leadDatabaseSummaryCards" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; margin-bottom:10px;"></div>
           <div id="leadDatabaseTableWrap" style="border:1px solid rgba(255,255,255,0.08); border-radius:8px; overflow:auto; min-height:180px;"></div>
@@ -3653,6 +3653,7 @@
       const hint = byId('leadDatabaseHeaderHint');
       const refreshBtn = byId('leadDatabaseRefreshBtn');
       const importBtn = byId('leadDatabaseImportBtn');
+      const templateBtn = byId('leadDatabaseTemplateBtn');
       const cancelBtn = byId('leadDatabaseCancelBtn');
       const statusBar = byId('leadDatabaseStatusBar');
       const detailOverlay = byId('leadDatabaseCallDetailOverlay');
@@ -3679,12 +3680,17 @@
         footer.style.color = theme.accent;
       }
       if (hint) hint.style.color = theme.textMuted;
-      [refreshBtn, importBtn, cancelBtn].forEach((button, index) => {
+      [refreshBtn, importBtn, templateBtn].forEach((button) => {
         if (!button) return;
         button.style.border = `1px solid ${theme.buttonBorder}`;
-        button.style.background = index <= 1 ? theme.buttonBg : 'transparent';
-        button.style.color = index <= 1 ? theme.buttonText : theme.buttonMutedText;
+        button.style.background = theme.buttonBg;
+        button.style.color = theme.buttonText;
       });
+      if (cancelBtn) {
+        cancelBtn.style.border = `1px solid ${theme.buttonBorder}`;
+        cancelBtn.style.background = 'transparent';
+        cancelBtn.style.color = theme.buttonMutedText;
+      }
       if (statusBar) {
         statusBar.style.border = `1px solid ${theme.border}`;
         statusBar.style.background = theme.blockBg;
@@ -3838,7 +3844,6 @@
       const tableWrap = byId('leadDatabaseTableWrap');
       const statusBar = byId('leadDatabaseStatusBar');
       const summaryCards = byId('leadDatabaseSummaryCards');
-      const refreshLabel = byId('leadDatabaseRefreshLabel');
       const refreshBtn = byId('leadDatabaseRefreshBtn');
       const importBtn = byId('leadDatabaseImportBtn');
       if (!tableWrap || !summaryCards || !statusBar) return;
@@ -3915,13 +3920,6 @@
       } else {
         statusBar.style.display = 'none';
         statusBar.textContent = '';
-      }
-
-      if (refreshLabel) {
-        refreshLabel.style.color = theme.textMuted;
-        refreshLabel.textContent = state.lastRefreshedAt
-          ? `Laatst ververst: ${formatConversationTimestamp(state.lastRefreshedAt)}`
-          : '';
       }
 
       if (state.loading && state.records.length === 0) {
@@ -4093,6 +4091,24 @@
       });
     }
 
+    function downloadLeadDatabaseTemplate() {
+      const lines = [
+        'bedrijf;telefoonnummer;regio;contactpersoon;branche;provincie;adres;website',
+        'Voorbeeld BV;0612345678;Utrecht;Jan Jansen;Installatie;Utrecht;Voorbeeldstraat 12 Utrecht;voorbeeld.nl',
+      ];
+      const csv = `\uFEFF${lines.join('\n')}`;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = 'bedrijvenregister_template.csv';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    }
+
     async function importLeadDocumentFile(file) {
       if (!file) return;
       const fileName = String(file.name || 'document').trim();
@@ -4204,6 +4220,9 @@
     byId('leadDatabaseImportBtn')?.addEventListener('click', () => {
       if (state.importing || state.loading) return;
       byId('leadDatabaseImportInput')?.click();
+    });
+    byId('leadDatabaseTemplateBtn')?.addEventListener('click', () => {
+      downloadLeadDatabaseTemplate();
     });
     byId('leadDatabaseImportInput')?.addEventListener('change', async (event) => {
       const input = event.target;

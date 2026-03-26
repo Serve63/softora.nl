@@ -45,6 +45,12 @@
     transition-delay: 0ms !important;
 }
 
+/* Hide sidebar until JS has built the unified version, then reveal instantly
+   (transitions are already suppressed above, so there is no fade flash). */
+:root[data-personnel-loading="true"] .sidebar {
+    opacity: 0 !important;
+}
+
 .sidebar-theme {
     display: none !important;
 }
@@ -180,9 +186,10 @@
 
 .sidebar-link .sidebar-notification-badge {
     margin-left: auto !important;
-    min-width: 20px !important;
+    width: 32px !important;
+    min-width: 32px !important;
     height: 20px !important;
-    padding: 0 6px !important;
+    padding: 0 !important;
     border-radius: 999px !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -203,7 +210,10 @@
 }
 
 .sidebar-link .sidebar-notification-badge[hidden] {
-    display: none !important;
+    display: inline-flex !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 .sidebar-link::before {
@@ -485,132 +495,6 @@ button,
         flex: 1 !important;
         min-height: 0 !important;
         overflow-y: hidden !important;
-    }
-
-    .sidebar.sidebar-fit-compact {
-        padding-top: 2.08rem !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-logo {
-        margin-bottom: 1.35rem !important;
-        font-size: 1.5rem !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-section {
-        margin-bottom: 1.18rem !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-section-label {
-        margin-bottom: 0.52rem !important;
-        font-size: 0.7rem !important;
-        letter-spacing: 0.17em !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-link {
-        gap: 0.76rem !important;
-        padding: 0.64rem 1.75rem !important;
-        font-size: 0.92rem !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-flow-section .sidebar-link {
-        padding-left: 2.5rem !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-flow-section::before {
-        top: 5.3rem !important;
-        bottom: 0.7rem !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-footer {
-        padding: 1.3rem 1.68rem !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-avatar {
-        width: 34px !important;
-        height: 34px !important;
-        font-size: 0.8rem !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-user-name {
-        font-size: 0.83rem !important;
-    }
-
-    .sidebar.sidebar-fit-compact .sidebar-footer .sidebar-user .sidebar-user-role {
-        font-size: 0.71rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight {
-        padding-top: 1.8rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-logo {
-        margin-bottom: 1.2rem !important;
-        font-size: 1.38rem !important;
-        padding: 0 1.7rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-section {
-        margin-bottom: 0.96rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-section-label {
-        margin-bottom: 0.4rem !important;
-        font-size: 0.63rem !important;
-        letter-spacing: 0.15em !important;
-        padding: 0 1.7rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-link {
-        gap: 0.66rem !important;
-        padding: 0.52rem 1.7rem !important;
-        font-size: 0.87rem !important;
-        line-height: 1.22 !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-flow-section .sidebar-link {
-        padding-left: 2.34rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-link svg {
-        width: 18px !important;
-        height: 18px !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-link[href="/premium-ai-coldmailing"] svg {
-        width: 20px !important;
-        height: 20px !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-flow-section::before {
-        top: 4.9rem !important;
-        bottom: 0.62rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-footer {
-        padding: 1.06rem 1.6rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-user {
-        gap: 0.64rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-avatar {
-        width: 32px !important;
-        height: 32px !important;
-        font-size: 0.75rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-user-name {
-        font-size: 0.78rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-footer .sidebar-user .sidebar-user-role {
-        font-size: 0.68rem !important;
-    }
-
-    .sidebar.sidebar-fit-tight .sidebar-footer .sidebar-user .logout-btn svg {
-        width: 15px !important;
-        height: 15px !important;
     }
 
     .sidebar-footer {

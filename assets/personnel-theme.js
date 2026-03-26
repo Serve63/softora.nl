@@ -506,41 +506,9 @@
         if (!isPremiumPersonnelContext) return;
         const sidebar = document.querySelector(".sidebar");
         if (!sidebar) return;
+        sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
         const activeKey = getSidebarActiveKey(pathname);
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
-        queueSidebarFitLayout();
-    }
-
-    function getSidebarViewportFitClass() {
-        if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
-            return "";
-        }
-        const viewportHeight = Math.max(0, Number(window.innerHeight) || 0);
-        if (viewportHeight > 0 && viewportHeight <= 820) return "sidebar-fit-tight";
-        if (viewportHeight > 0 && viewportHeight <= 980) return "sidebar-fit-compact";
-        return "";
-    }
-
-    function applySidebarFitLayout() {
-        if (!isPremiumPersonnelContext) return;
-        const sidebar = document.querySelector(".sidebar");
-        if (!sidebar) return;
-
-        sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
-        const fitClass = getSidebarViewportFitClass();
-        if (!fitClass) return;
-        sidebar.classList.add(fitClass);
-    }
-
-    let sidebarFitRaf = 0;
-    function queueSidebarFitLayout() {
-        if (sidebarFitRaf) {
-            cancelAnimationFrame(sidebarFitRaf);
-        }
-        sidebarFitRaf = requestAnimationFrame(function () {
-            sidebarFitRaf = 0;
-            applySidebarFitLayout();
-        });
     }
 
     function normalizeLeadFieldForCount(value) {
@@ -641,7 +609,6 @@
             badge.dataset.countZero = "1";
             badge.textContent = "0";
             writeSidebarCountCache(countKey, 0);
-            queueSidebarFitLayout();
             return;
         }
         badge.hidden = false;
@@ -652,7 +619,6 @@
         badge.title = `${count} ${count === 1 ? singular : plural}`;
         badge.setAttribute("aria-label", badge.title);
         writeSidebarCountCache(countKey, count);
-        queueSidebarFitLayout();
     }
 
     async function refreshSidebarLeadsCount() {
@@ -901,18 +867,6 @@
 
     initSoftoraDialogs();
     applyUnifiedPremiumSidebar();
-    queueSidebarFitLayout();
-    window.addEventListener("resize", queueSidebarFitLayout);
-    window.addEventListener("load", queueSidebarFitLayout, { once: true });
-    if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === "function") {
-        document.fonts.ready
-            .then(function () {
-                queueSidebarFitLayout();
-            })
-            .catch(function () {
-                /* ignore font ready errors */
-            });
-    }
     initSidebarNotificationCounts();
     forceLightTheme();
     syncThemeButtonsToLight();
