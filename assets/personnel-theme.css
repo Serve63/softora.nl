@@ -143,6 +143,7 @@
     font-weight: 500 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.2em !important;
+    line-height: 1.6 !important;
     color: var(--text-tertiary) !important;
     padding: 0 2rem !important;
     margin-bottom: 0.8rem !important;
