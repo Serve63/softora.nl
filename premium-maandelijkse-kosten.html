@@ -89,13 +89,6 @@
             color: var(--text-secondary);
         }
 
-        .save-indicator {
-            font-size: 0.86rem;
-            color: var(--text-tertiary);
-            white-space: nowrap;
-            font-variant-numeric: tabular-nums;
-        }
-
         .editor-sheet {
             background: #fff;
             border: 1px solid var(--border);
@@ -122,11 +115,6 @@
             font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: var(--text-tertiary);
-        }
-
-        .editor-tip {
-            font-size: 0.84rem;
             color: var(--text-tertiary);
         }
 
@@ -224,14 +212,12 @@
                 <header class="costs-head">
                     <div>
                         <h1 class="costs-title">Maandelijkse kosten</h1>
-                        <p class="costs-subtitle">Typ hier direct je kostenoverzicht. Alles wordt lokaal opgeslagen.</p>
+                        <p class="costs-subtitle">Typ hier direct je kostenoverzicht.</p>
                     </div>
-                    <div class="save-indicator" id="saveIndicator">Nog niet opgeslagen</div>
                 </header>
                 <article class="editor-sheet">
                     <div class="editor-toolbar">
                         <h2>Kosten notities</h2>
-                        <div class="editor-tip">Gebruik deze pagina als vrij schrijfvlak, zoals een simpel Word-document.</div>
                     </div>
                     <div
                         id="costEditor"
@@ -249,28 +235,13 @@
         (function () {
             const storageKey = 'softora_premium_monthly_costs_notes_v1';
             const editor = document.getElementById('costEditor');
-            const saveIndicator = document.getElementById('saveIndicator');
-            if (!editor || !saveIndicator) return;
-
-            const updateSaveIndicator = (text) => {
-                saveIndicator.textContent = String(text || '');
-            };
-
-            const formatSavedAt = () => {
-                const now = new Date();
-                return now.toLocaleTimeString('nl-NL', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                });
-            };
+            if (!editor) return;
 
             const save = () => {
                 try {
                     localStorage.setItem(storageKey, editor.innerHTML);
-                    updateSaveIndicator(`Lokaal opgeslagen om ${formatSavedAt()}`);
                 } catch (error) {
-                    updateSaveIndicator('Opslaan mislukt');
+                    /* ignore storage errors */
                 }
             };
 
@@ -278,17 +249,13 @@
                 const cached = localStorage.getItem(storageKey);
                 if (cached) {
                     editor.innerHTML = cached;
-                    updateSaveIndicator('Lokaal bestand geladen');
-                } else {
-                    updateSaveIndicator('Klaar om te typen');
                 }
             } catch (error) {
-                updateSaveIndicator('Klaar om te typen');
+                /* ignore storage errors */
             }
 
             let saveTimer = 0;
             editor.addEventListener('input', () => {
-                updateSaveIndicator('Opslaan...');
                 window.clearTimeout(saveTimer);
                 saveTimer = window.setTimeout(save, 280);
             });
