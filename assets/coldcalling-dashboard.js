@@ -124,8 +124,8 @@
       return {
         title: 'Voice Software',
         subtitle: 'Voice-agent campagne configureren & starten',
-        leadListLabel: 'Voice Database',
-        leadListGroup: 'Voice Lijsten',
+        leadListLabel: 'Bedrijvenregister',
+        leadListGroup: 'Database',
         dbHint: 'Voice-agent bellijst met AI-status per bedrijf.',
       };
     }
@@ -133,8 +133,8 @@
       return {
         title: 'Bedrijfssoftware',
         subtitle: 'AI coldcalling campagne voor bedrijfssoftware projecten',
-        leadListLabel: 'Bedrijfssoftware Database',
-        leadListGroup: 'Telefoonlijsten',
+        leadListLabel: 'Bedrijvenregister',
+        leadListGroup: 'Database',
         dbHint: 'Bellijst voor bedrijfssoftware leads met AI-status per bedrijf.',
       };
     }
@@ -142,8 +142,8 @@
     return {
       title: defaultTopbarTitleText || "Website's",
       subtitle: defaultTopbarSubtitleText || 'Website-campagne configureren & starten',
-      leadListLabel: 'Database',
-      leadListGroup: 'Telefoonlijsten',
+      leadListLabel: 'Bedrijvenregister',
+      leadListGroup: 'Database',
       dbHint: 'Zakelijke bellijst met AI-status per bedrijf.',
     };
   }
