@@ -481,13 +481,7 @@ button,
     .sidebar-nav {
         flex: 1 !important;
         min-height: 0 !important;
-        overflow-y: auto !important;
-        scrollbar-width: none !important;
-        -ms-overflow-style: none !important;
-    }
-
-    .sidebar-nav::-webkit-scrollbar {
-        display: none !important;
+        overflow: hidden !important;
     }
 
     .sidebar-footer {
