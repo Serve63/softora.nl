@@ -46,13 +46,20 @@
         root.removeAttribute("data-personnel-loading");
     }
 
-    if (document.readyState === "complete") {
+    let loadingStateReleased = false;
+    function scheduleLoadingStateRelease() {
+        if (loadingStateReleased) return;
+        loadingStateReleased = true;
         requestAnimationFrame(releaseLoadingState);
-    } else {
-        window.addEventListener("load", function () {
-            requestAnimationFrame(releaseLoadingState);
-        }, { once: true });
     }
+
+    if (document.readyState === "interactive" || document.readyState === "complete") {
+        scheduleLoadingStateRelease();
+    } else {
+        document.addEventListener("DOMContentLoaded", scheduleLoadingStateRelease, { once: true });
+    }
+
+    window.addEventListener("load", scheduleLoadingStateRelease, { once: true });
 
     function getSidebarActiveKey(path) {
         const p = String(path || "").toLowerCase();

@@ -1293,6 +1293,14 @@
                 }
             }
 
+            function showLeadModal() {
+                modalOverlay.classList.add('show');
+                modalOverlay.setAttribute('aria-hidden', 'false');
+                window.setTimeout(() => {
+                    if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
+                }, 20);
+            }
+
             async function openLeadModal(taskId) {
                 const normalizedTaskId = Number(taskId) || 0;
                 if (!normalizedTaskId) return;
@@ -1300,49 +1308,70 @@
                 if (!lead) return;
 
                 const openSeq = ++modalOpenSequence;
+                activeTaskId = normalizedTaskId;
+                const leadType = resolveLeadType(lead);
+                const leadDateValue = String(lead.date || '').slice(0, 10);
+                const leadTimeValue = normalizeTimeValue(lead.time || '09:00') || '09:00';
+                const leadLocationValue = String(lead.location || '').trim();
+                const leadWhatsappInfoValue = String(lead.whatsappInfo || '').trim();
+
+                modalSub.textContent = `${String(lead.company || 'Onbekende lead')} · ${leadType}`;
+                modalDate.value = leadDateValue;
+                modalTime.value = leadTimeValue;
+                modalLocation.value = leadLocationValue;
+                modalWhatsappInfo.value = leadWhatsappInfoValue;
+                modalWhatsappConfirm.checked = false;
+                renderLeadDetailsInModal(lead, null, normalizedTaskId);
+                setModalBusy(false);
                 setModalStatus('Lead details laden...', '');
+                showLeadModal();
+
                 try {
                     const detail = await ensureTaskDetailLoaded(normalizedTaskId);
                     if (openSeq !== modalOpenSequence) return;
 
+                    const detailDateValue = String(detail?.date || '').slice(0, 10);
+                    const detailTimeValue = normalizeTimeValue(detail?.time || '') || '';
+                    const detailLocationValue = String(detail?.location || '').trim();
+                    const detailWhatsappInfoValue = String(detail?.whatsappInfo || '').trim();
+
+                    if (!String(modalDate.value || '').trim() || String(modalDate.value || '') === leadDateValue) {
+                        modalDate.value = detailDateValue || leadDateValue;
+                    }
+                    if (
+                        !String(modalTime.value || '').trim() ||
+                        normalizeTimeValue(modalTime.value || '') === leadTimeValue
+                    ) {
+                        modalTime.value = detailTimeValue || leadTimeValue;
+                    }
+                    if (
+                        !String(modalLocation.value || '').trim() ||
+                        String(modalLocation.value || '').trim() === leadLocationValue
+                    ) {
+                        modalLocation.value = detailLocationValue || leadLocationValue;
+                    }
+                    if (
+                        !String(modalWhatsappInfo.value || '').trim() ||
+                        String(modalWhatsappInfo.value || '').trim() === leadWhatsappInfoValue
+                    ) {
+                        modalWhatsappInfo.value = detailWhatsappInfoValue || leadWhatsappInfoValue;
+                    }
+
+                    renderLeadDetailsInModal(lead, detail, normalizedTaskId);
+                    setModalStatus('Samenvatting opbouwen...', '');
+
                     const summaryText = await ensureModalCopyWithAi(normalizedTaskId, lead, detail);
                     if (openSeq !== modalOpenSequence) return;
 
-                    activeTaskId = normalizedTaskId;
-                    const leadType = resolveLeadType(lead);
-                    modalSub.textContent = `${String(lead.company || 'Onbekende lead')} · ${leadType}`;
-                    modalDate.value = String(detail?.date || lead.date || '').slice(0, 10);
-                    modalTime.value = normalizeTimeValue(detail?.time || lead.time || '09:00') || '09:00';
-                    modalLocation.value = String(detail?.location || lead.location || '').trim();
-                    modalWhatsappInfo.value = String(detail?.whatsappInfo || lead.whatsappInfo || '').trim();
-                    modalWhatsappConfirm.checked = false;
                     renderLeadDetailsInModal(lead, detail, normalizedTaskId, { summaryText });
                     setModalBusy(false);
                     setModalStatus('');
-                    modalOverlay.classList.add('show');
-                    modalOverlay.setAttribute('aria-hidden', 'false');
-                    window.setTimeout(() => {
-                        if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
-                    }, 20);
                 } catch (error) {
                     if (openSeq !== modalOpenSequence) return;
 
-                    activeTaskId = normalizedTaskId;
-                    const leadType = resolveLeadType(lead);
-                    modalSub.textContent = `${String(lead.company || 'Onbekende lead')} · ${leadType}`;
-                    modalDate.value = String(lead.date || '').slice(0, 10);
-                    modalTime.value = normalizeTimeValue(lead.time || '09:00') || '09:00';
-                    modalLocation.value = String(lead.location || '').trim();
-                    modalWhatsappInfo.value = String(lead.whatsappInfo || '').trim();
-                    modalWhatsappConfirm.checked = false;
                     renderLeadDetailsInModal(lead, null, normalizedTaskId);
                     setModalBusy(false);
                     setModalStatus(String(error?.message || 'Details laden mislukt.'), 'error');
-                    modalOverlay.classList.add('show');
-                    modalOverlay.setAttribute('aria-hidden', 'false');
-                    window.setTimeout(() => {
-                        if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
-                    }, 20);
                 }
             }
 
