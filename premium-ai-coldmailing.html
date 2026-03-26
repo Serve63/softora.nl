@@ -531,6 +531,87 @@
             overflow-y: auto;
         }
 
+        .lead-modal-contact-meta {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.4rem;
+            margin-bottom: 0.56rem;
+        }
+
+        .lead-modal-meta-item {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            padding: 0.38rem 0.5rem;
+            min-width: 0;
+        }
+
+        .lead-modal-meta-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.56rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.16rem;
+        }
+
+        .lead-modal-meta-value {
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .lead-modal-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.62rem;
+        }
+
+        .lead-modal-loading {
+            display: none;
+            min-height: 430px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--bg-primary);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+
+        .lead-modal-loading-spinner {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 2px solid rgba(139, 34, 82, 0.2);
+            border-top-color: var(--accent);
+            animation: leadSpin 0.9s linear infinite;
+        }
+
+        .lead-modal-loading-text {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.8rem;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .lead-modal.loading .lead-modal-content {
+            display: none;
+        }
+
+        .lead-modal.loading .lead-modal-loading {
+            display: flex;
+        }
+
+        @keyframes leadSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
         .lead-modal-audio-info {
             display: flex;
             align-items: center;
@@ -764,6 +845,10 @@
             .lead-modal-grid {
                 grid-template-columns: 1fr;
             }
+
+            .lead-modal-contact-meta {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -837,49 +922,57 @@
                     <button class="lead-modal-close" id="leadModalClose" type="button" aria-label="Sluiten">×</button>
                 </div>
 
-                <div class="lead-modal-info-grid">
-                    <div class="lead-modal-info">
-                        <div class="lead-modal-info-label">Gesprek samenvatting</div>
-                        <div class="lead-modal-info-text" id="leadModalSummary">Nog geen samenvatting beschikbaar.</div>
-                    </div>
-                    <div class="lead-modal-info lead-modal-audio-info">
-                        <div class="lead-modal-info-label">Gespreksopname</div>
-                        <audio class="lead-modal-audio-player" id="leadModalAudioPlayer" controls preload="none" hidden></audio>
-                        <div class="lead-modal-audio-empty" id="leadModalAudioEmpty">Nog geen audio-opname beschikbaar voor deze lead.</div>
-                    </div>
+                <div class="lead-modal-loading" id="leadModalLoading">
+                    <div class="lead-modal-loading-spinner" aria-hidden="true"></div>
+                    <div class="lead-modal-loading-text" id="leadModalLoadingText">Lead details laden...</div>
                 </div>
 
-                <div class="lead-modal-grid">
-                    <div class="lead-modal-field">
-                        <label class="lead-modal-label" for="leadModalDate">Datum</label>
-                        <input class="lead-modal-input" id="leadModalDate" type="date">
-                    </div>
-                    <div class="lead-modal-field">
-                        <label class="lead-modal-label" for="leadModalTime">Tijd</label>
-                        <input class="lead-modal-input" id="leadModalTime" type="time" step="60">
-                    </div>
-                    <div class="lead-modal-field lead-modal-field-full">
-                        <label class="lead-modal-label" for="leadModalLocation">Locatie</label>
-                        <input class="lead-modal-input" id="leadModalLocation" type="text" placeholder="Medialaan 65 6087DE Amersfoort">
-                    </div>
-                    <div class="lead-modal-field lead-modal-field-full">
-                        <label class="lead-modal-label" for="leadModalWhatsappInfo">Overige info uit WhatsApp</label>
-                        <textarea class="lead-modal-textarea" id="leadModalWhatsappInfo" placeholder="Bijv. contactvoorkeur, aandachtspunten, extra vragen..."></textarea>
-                    </div>
-                </div>
-
-                <div class="lead-modal-status" id="leadModalStatus"></div>
-                <div class="lead-modal-actions">
-                    <div class="lead-modal-left-actions">
-                        <div class="lead-modal-confirm-wrap">
-                            <input id="leadModalWhatsappConfirm" type="checkbox">
-                            <label for="leadModalWhatsappConfirm">Bevestigd via Whatsapp</label>
+                <div class="lead-modal-content" id="leadModalContent">
+                    <div class="lead-modal-info-grid">
+                        <div class="lead-modal-info">
+                            <div class="lead-modal-info-label">Gesprek samenvatting</div>
+                            <div class="lead-modal-contact-meta" id="leadModalContactMeta"></div>
+                            <div class="lead-modal-info-text" id="leadModalSummary">Nog geen samenvatting beschikbaar.</div>
+                        </div>
+                        <div class="lead-modal-info lead-modal-audio-info">
+                            <div class="lead-modal-info-label">Gespreksopname</div>
+                            <audio class="lead-modal-audio-player" id="leadModalAudioPlayer" controls preload="none" hidden></audio>
+                            <div class="lead-modal-audio-empty" id="leadModalAudioEmpty">Nog geen audio-opname beschikbaar voor deze lead.</div>
                         </div>
                     </div>
-                    <div class="lead-modal-actions-right">
-                        <button class="lead-modal-delete-btn" id="leadModalDeleteBtn" type="button">Lead verwijderen</button>
-                        <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
-                        <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
+
+                    <div class="lead-modal-grid">
+                        <div class="lead-modal-field">
+                            <label class="lead-modal-label" for="leadModalDate">Datum</label>
+                            <input class="lead-modal-input" id="leadModalDate" type="date">
+                        </div>
+                        <div class="lead-modal-field">
+                            <label class="lead-modal-label" for="leadModalTime">Tijd</label>
+                            <input class="lead-modal-input" id="leadModalTime" type="time" step="60">
+                        </div>
+                        <div class="lead-modal-field lead-modal-field-full">
+                            <label class="lead-modal-label" for="leadModalLocation">Locatie</label>
+                            <input class="lead-modal-input" id="leadModalLocation" type="text" placeholder="Medialaan 65 6087DE Amersfoort">
+                        </div>
+                        <div class="lead-modal-field lead-modal-field-full">
+                            <label class="lead-modal-label" for="leadModalWhatsappInfo">Overige info uit WhatsApp</label>
+                            <textarea class="lead-modal-textarea" id="leadModalWhatsappInfo" placeholder="Bijv. contactvoorkeur, aandachtspunten, extra vragen..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="lead-modal-status" id="leadModalStatus"></div>
+                    <div class="lead-modal-actions">
+                        <div class="lead-modal-left-actions">
+                            <div class="lead-modal-confirm-wrap">
+                                <input id="leadModalWhatsappConfirm" type="checkbox">
+                                <label for="leadModalWhatsappConfirm">Bevestigd via Whatsapp</label>
+                            </div>
+                        </div>
+                        <div class="lead-modal-actions-right">
+                            <button class="lead-modal-delete-btn" id="leadModalDeleteBtn" type="button">Lead verwijderen</button>
+                            <button class="lead-modal-btn" id="leadModalCancelBtn" type="button">Annuleren</button>
+                            <button class="lead-modal-btn primary" id="leadModalSubmitBtn" type="button">In agenda zetten</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -892,7 +985,12 @@
             const statusEl = document.getElementById('leadStatus');
             const reloadBtn = document.getElementById('reloadLeadsBtn');
             const modalOverlay = document.getElementById('leadModalOverlay');
+            const modalContainer = modalOverlay ? modalOverlay.querySelector('.lead-modal') : null;
+            const modalLoading = document.getElementById('leadModalLoading');
+            const modalLoadingText = document.getElementById('leadModalLoadingText');
+            const modalContent = document.getElementById('leadModalContent');
             const modalSub = document.getElementById('leadModalSub');
+            const modalContactMeta = document.getElementById('leadModalContactMeta');
             const modalSummary = document.getElementById('leadModalSummary');
             const modalAudioPlayer = document.getElementById('leadModalAudioPlayer');
             const modalAudioEmpty = document.getElementById('leadModalAudioEmpty');
@@ -912,7 +1010,12 @@
                 !statusEl ||
                 !reloadBtn ||
                 !modalOverlay ||
+                !modalContainer ||
+                !modalLoading ||
+                !modalLoadingText ||
+                !modalContent ||
                 !modalSub ||
+                !modalContactMeta ||
                 !modalSummary ||
                 !modalAudioPlayer ||
                 !modalAudioEmpty ||
@@ -1165,6 +1268,79 @@
                 modalDeleteBtn.disabled = modalBusy;
             }
 
+            function pickLeadMetaValue(...values) {
+                for (const value of values) {
+                    const raw = String(value || '').trim();
+                    if (raw) return raw;
+                }
+                return '';
+            }
+
+            function resolveLeadContactPerson(lead, detail) {
+                return pickLeadMetaValue(
+                    detail?.contact,
+                    detail?.contactName,
+                    detail?.contact_person,
+                    detail?.contactpersoon,
+                    lead?.contact,
+                    lead?.contactName,
+                    lead?.contact_person,
+                    lead?.contactpersoon
+                );
+            }
+
+            function resolveLeadCompanyName(lead, detail) {
+                return pickLeadMetaValue(detail?.company, detail?.companyName, lead?.company, lead?.companyName);
+            }
+
+            function resolveLeadPhoneNumber(lead, detail) {
+                return pickLeadMetaValue(
+                    detail?.phone,
+                    detail?.phoneNumber,
+                    detail?.phone_number,
+                    detail?.mobile,
+                    lead?.phone,
+                    lead?.phoneNumber,
+                    lead?.phone_number,
+                    lead?.mobile
+                );
+            }
+
+            function renderLeadContactMeta(lead, detail) {
+                const person = resolveLeadContactPerson(lead, detail) || 'Onbekend';
+                const company = resolveLeadCompanyName(lead, detail) || 'Onbekend';
+                const phone = resolveLeadPhoneNumber(lead, detail) || 'Niet ingevuld';
+                modalContactMeta.innerHTML = `
+                    <div class="lead-modal-meta-item">
+                        <div class="lead-modal-meta-label">Naam</div>
+                        <div class="lead-modal-meta-value">${esc(person)}</div>
+                    </div>
+                    <div class="lead-modal-meta-item">
+                        <div class="lead-modal-meta-label">Bedrijf</div>
+                        <div class="lead-modal-meta-value">${esc(company)}</div>
+                    </div>
+                    <div class="lead-modal-meta-item">
+                        <div class="lead-modal-meta-label">Telefoon</div>
+                        <div class="lead-modal-meta-value">${esc(phone)}</div>
+                    </div>
+                `;
+            }
+
+            function setModalLoading(nextLoading, message) {
+                const isLoading = Boolean(nextLoading);
+                modalContainer.classList.toggle('loading', isLoading);
+                modalLoading.hidden = !isLoading;
+                modalContent.hidden = isLoading;
+                if (message) {
+                    modalLoadingText.textContent = String(message);
+                }
+                if (!isLoading && modalOverlay.classList.contains('show')) {
+                    window.setTimeout(() => {
+                        if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
+                    }, 20);
+                }
+            }
+
             function setModalStatus(message, variant) {
                 modalStatus.textContent = String(message || '');
                 modalStatus.className = `lead-modal-status${variant ? ` ${variant}` : ''}`;
@@ -1177,6 +1353,8 @@
                 modalAudioPlayer.currentTime = 0;
                 setModalBusy(false);
                 setModalStatus('');
+                setModalLoading(false);
+                modalContactMeta.innerHTML = '';
                 modalOverlay.classList.remove('show');
                 modalOverlay.setAttribute('aria-hidden', 'true');
             }
@@ -1222,12 +1400,13 @@
                     detail?.summary,
                     lead?.summary
                 );
-                const fallbackSummary = readableSummary || 'Samenvatting wordt nu opgebouwd...';
+                const fallbackSummary = readableSummary || 'Samenvatting volgt na verwerking van het gesprek.';
                 const fallbackAgreements = buildFallbackAgreementsText(lead, detail);
                 const fallbackCombined = [fallbackSummary, fallbackAgreements]
                     .filter(Boolean)
                     .join(' ');
 
+                renderLeadContactMeta(lead, detail);
                 modalSummary.textContent =
                     preferredSummary || String(aiCopy?.summaryText || '').trim() || fallbackCombined;
 
@@ -1266,9 +1445,6 @@
             function showLeadModal() {
                 modalOverlay.classList.add('show');
                 modalOverlay.setAttribute('aria-hidden', 'false');
-                window.setTimeout(() => {
-                    if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
-                }, 20);
             }
 
             async function openLeadModal(taskId) {
@@ -1291,10 +1467,18 @@
                 modalLocation.value = leadLocationValue;
                 modalWhatsappInfo.value = leadWhatsappInfoValue;
                 modalWhatsappConfirm.checked = false;
-                renderLeadDetailsInModal(lead, null, normalizedTaskId);
-                setModalBusy(false);
-                setModalStatus('Lead details laden...', '');
+                setModalStatus('');
+                setModalBusy(true);
+                setModalLoading(true, 'Lead details laden...');
                 showLeadModal();
+                const loaderStartedAt = Date.now();
+                const ensureMinimumLoader = async (minimumMs) => {
+                    const elapsed = Date.now() - loaderStartedAt;
+                    const waitMs = Math.max(0, Number(minimumMs) - elapsed);
+                    if (waitMs > 0) {
+                        await new Promise((resolve) => window.setTimeout(resolve, waitMs));
+                    }
+                };
 
                 try {
                     const detail = await ensureTaskDetailLoaded(normalizedTaskId);
@@ -1327,19 +1511,22 @@
                         modalWhatsappInfo.value = detailWhatsappInfoValue || leadWhatsappInfoValue;
                     }
 
-                    renderLeadDetailsInModal(lead, detail, normalizedTaskId);
-                    setModalStatus('Samenvatting opbouwen...', '');
-
                     const summaryText = await ensureModalCopyWithAi(normalizedTaskId, lead, detail);
                     if (openSeq !== modalOpenSequence) return;
 
                     renderLeadDetailsInModal(lead, detail, normalizedTaskId, { summaryText });
+                    await ensureMinimumLoader(700);
+                    if (openSeq !== modalOpenSequence) return;
+                    setModalLoading(false);
                     setModalBusy(false);
                     setModalStatus('');
                 } catch (error) {
                     if (openSeq !== modalOpenSequence) return;
 
                     renderLeadDetailsInModal(lead, null, normalizedTaskId);
+                    await ensureMinimumLoader(500);
+                    if (openSeq !== modalOpenSequence) return;
+                    setModalLoading(false);
                     setModalBusy(false);
                     setModalStatus(String(error?.message || 'Details laden mislukt.'), 'error');
                 }
