@@ -564,23 +564,42 @@ button,
 }
 
 /* Canonical page heading scale across all premium sidebar pages */
+:root {
+    --sidebar-page-title-size: 2rem;
+    --sidebar-page-title-spacing: 0.02em;
+    --sidebar-page-subtitle-size: 0.9rem;
+    --sidebar-page-subtitle-line: 1.4;
+}
+
 .main-content .topbar h1,
-.main-content .topbar-left h1 {
+.main-content .topbar-left h1,
+.main-content .costs-head .costs-title,
+.main-content .coming-card > h1,
+.page-shell .hero .hero-title,
+.main .page-header > div > .page-title,
+.main > .topbar .topbar-copy > .page-title,
+.main > .screen > .page-title {
     font-family: 'Oswald', sans-serif !important;
-    font-size: 2rem !important;
+    font-size: var(--sidebar-page-title-size) !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.02em !important;
+    letter-spacing: var(--sidebar-page-title-spacing) !important;
     line-height: 1 !important;
     margin-bottom: 0.3rem !important;
     color: var(--text-primary) !important;
 }
 
 .main-content .topbar p,
-.main-content .topbar-left p {
+.main-content .topbar-left p,
+.main-content .costs-head .costs-subtitle,
+.page-shell .hero .hero-text,
+.main .page-header > div > .page-subtitle,
+.main > .topbar .topbar-copy > .page-subtitle,
+.main > .screen > .page-subtitle,
+.main-content .coming-card > .lead {
     color: var(--text-tertiary) !important;
-    font-size: 0.9rem !important;
+    font-size: var(--sidebar-page-subtitle-size) !important;
     font-weight: 300 !important;
-    line-height: 1.4 !important;
+    line-height: var(--sidebar-page-subtitle-line) !important;
     margin: 0 !important;
 }
