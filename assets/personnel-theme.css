@@ -178,6 +178,11 @@
 
 .sidebar-link .sidebar-link-text {
     min-width: 0 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: inherit !important;
+    font-weight: 400 !important;
+    line-height: 1.32 !important;
+    letter-spacing: 0 !important;
 }
 
 .sidebar-link .sidebar-notification-badge {
@@ -556,4 +561,26 @@ button,
     .main-content {
         margin-left: 0 !important;
     }
+}
+
+/* Canonical page heading scale across all premium sidebar pages */
+.main-content .topbar h1,
+.main-content .topbar-left h1 {
+    font-family: 'Oswald', sans-serif !important;
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.02em !important;
+    line-height: 1 !important;
+    margin-bottom: 0.3rem !important;
+    color: var(--text-primary) !important;
+}
+
+.main-content .topbar p,
+.main-content .topbar-left p {
+    color: var(--text-tertiary) !important;
+    font-size: 0.9rem !important;
+    font-weight: 300 !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
 }
