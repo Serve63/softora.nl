@@ -19,6 +19,9 @@
     "api/retell/[...path].js": {
       "maxDuration": 800
     },
+    "api/twilio/[...path].js": {
+      "maxDuration": 800
+    },
     "api/debug/[...path].js": {
       "maxDuration": 800
     },
