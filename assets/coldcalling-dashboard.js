@@ -2237,11 +2237,15 @@
     hint.style.display = 'none';
   }
 
-  function getManualLeadsFromDashboard(requestedAmount) {
-    const parsed = parseLeadRows(getSavedLeadRows());
+  async function getManualLeadsFromDashboard(requestedAmount) {
+    let parsed = parseLeadRows(getSavedLeadRows());
 
     if (!parsed.hasInput) {
-      throw new Error('Geen leadlijst opgeslagen. Open Database, upload je lijst en probeer opnieuw.');
+      const manualInsert = await promptAndSaveSingleManualLead();
+      if (!manualInsert?.ok) {
+        throw new Error('Geen leadlijst opgeslagen en geen handmatige lead toegevoegd.');
+      }
+      parsed = parseLeadRows(getSavedLeadRows());
     }
 
     if (parsed.leads.length === 0) {
@@ -2269,6 +2273,82 @@
         ...parsed,
         excludedDoNotCall,
       },
+    };
+  }
+
+  async function promptManualLeadInput(message, initialValue = '', dialogOptions = {}) {
+    if (window.SoftoraDialogs && typeof window.SoftoraDialogs.prompt === 'function') {
+      const value = await window.SoftoraDialogs.prompt(
+        message,
+        initialValue,
+        {
+          title: dialogOptions.title || 'Lead handmatig toevoegen',
+          confirmText: dialogOptions.confirmText || 'Opslaan',
+          cancelText: dialogOptions.cancelText || 'Annuleren',
+        }
+      );
+      return normalizeFreeText(value);
+    }
+    const fallbackValue = window.prompt(message, initialValue);
+    return normalizeFreeText(fallbackValue);
+  }
+
+  async function promptAndSaveSingleManualLead(defaults = {}) {
+    const phone = await promptManualLeadInput(
+      'Voer telefoonnummer in (NL formaat, bijv. 0612345678 of +31612345678).',
+      normalizeFreeText(defaults.phone || ''),
+      {
+        title: 'Lead handmatig toevoegen',
+        confirmText: 'Volgende',
+      }
+    );
+
+    if (!phone) {
+      return {
+        ok: false,
+        cancelled: true,
+      };
+    }
+
+    if (!looksLikePhoneNumber(phone)) {
+      throw new Error('Telefoonnummer lijkt ongeldig. Gebruik bijv. 0612345678 of +31612345678.');
+    }
+
+    const company = await promptManualLeadInput(
+      'Bedrijfsnaam (optioneel).',
+      normalizeFreeText(defaults.company || ''),
+      {
+        title: 'Lead handmatig toevoegen',
+        confirmText: 'Volgende',
+      }
+    );
+
+    const selectedRegion = getSelectedText('regio');
+    const region = await promptManualLeadInput(
+      'Regio (optioneel).',
+      normalizeFreeText(defaults.region || selectedRegion),
+      {
+        title: 'Lead handmatig toevoegen',
+        confirmText: 'Opslaan',
+      }
+    );
+
+    const singleLead = {
+      company: company || 'Handmatige lead',
+      phone,
+      region,
+    };
+
+    const merged = mergeLeadRows(getSavedLeadRows(), [singleLead]);
+    saveLeadRows(merged.rows);
+    updateLeadListHint();
+    const saveResult = await persistRemoteUiStateNow().catch(() => ({ ok: false }));
+
+    return {
+      ok: true,
+      lead: normalizeLeadRow(singleLead),
+      merged,
+      remoteSaved: Boolean(saveResult?.ok),
     };
   }
 
@@ -3701,6 +3781,7 @@
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
             <input type="search" id="leadDatabaseSearchInput" class="form-input magnetic" placeholder="Zoek bedrijf of nummer..." style="max-width:420px; height:34px;">
             <button type="button" id="leadDatabaseImportBtn" style="height:34px; padding:0 11px; border-radius:6px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Upload</button>
+            <button type="button" id="leadDatabaseAddManualBtn" style="height:34px; padding:0 11px; border-radius:6px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Handmatig toevoegen</button>
             <button type="button" id="leadDatabaseTemplateBtn" style="height:34px; padding:0 11px; border-radius:6px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Template download</button>
             <input type="file" id="leadDatabaseImportInput" accept=".csv,.tsv,.txt,.json,.xls,.xlsx" style="display:none;">
           </div>
@@ -3746,6 +3827,7 @@
       const hint = byId('leadDatabaseHeaderHint');
       const refreshBtn = byId('leadDatabaseRefreshBtn');
       const importBtn = byId('leadDatabaseImportBtn');
+      const addManualBtn = byId('leadDatabaseAddManualBtn');
       const templateBtn = byId('leadDatabaseTemplateBtn');
       const cancelBtn = byId('leadDatabaseCancelBtn');
       const statusBar = byId('leadDatabaseStatusBar');
@@ -3773,7 +3855,7 @@
         footer.style.color = theme.accent;
       }
       if (hint) hint.style.color = theme.textMuted;
-      [refreshBtn, importBtn, templateBtn].forEach((button) => {
+      [refreshBtn, importBtn, addManualBtn, templateBtn].forEach((button) => {
         if (!button) return;
         button.style.border = `1px solid ${theme.buttonBorder}`;
         button.style.background = theme.buttonBg;
@@ -3939,6 +4021,7 @@
       const summaryCards = byId('leadDatabaseSummaryCards');
       const refreshBtn = byId('leadDatabaseRefreshBtn');
       const importBtn = byId('leadDatabaseImportBtn');
+      const addManualBtn = byId('leadDatabaseAddManualBtn');
       if (!tableWrap || !summaryCards || !statusBar) return;
 
       if (refreshBtn) {
@@ -3950,6 +4033,12 @@
         importBtn.disabled = busy;
         importBtn.style.opacity = busy ? '0.7' : '1';
         importBtn.style.cursor = busy ? 'progress' : 'pointer';
+      }
+      if (addManualBtn) {
+        const busy = state.importing || state.loading;
+        addManualBtn.disabled = busy;
+        addManualBtn.style.opacity = busy ? '0.7' : '1';
+        addManualBtn.style.cursor = busy ? 'progress' : 'pointer';
       }
 
       const cards = getLeadDatabaseFilterCards(state.records, state.calls);
@@ -4100,7 +4189,7 @@
       if (filtered.length === 0) {
         tableWrap.innerHTML = `<div style="padding:18px; color:${theme.textMuted};">${
           state.records.length === 0
-            ? 'Nog geen leads met telefoonnummer in de database. Upload een document in Database.'
+            ? 'Nog geen leads met telefoonnummer in de database. Upload een document of gebruik "Handmatig toevoegen".'
             : 'Geen resultaten voor je zoekopdracht.'
         }</div>`;
         return;
@@ -4313,6 +4402,29 @@
     byId('leadDatabaseImportBtn')?.addEventListener('click', () => {
       if (state.importing || state.loading) return;
       byId('leadDatabaseImportInput')?.click();
+    });
+    byId('leadDatabaseAddManualBtn')?.addEventListener('click', async () => {
+      if (state.importing || state.loading) return;
+      state.importing = true;
+      state.error = '';
+      state.info = '';
+      render();
+      try {
+        const result = await promptAndSaveSingleManualLead();
+        if (!result?.ok) {
+          state.info = 'Geen handmatige lead toegevoegd.';
+        } else if (result.remoteSaved === false) {
+          state.info = 'Lead lokaal toegevoegd. Opslaan naar Supabase volgt zodra verbinding beschikbaar is.';
+        } else {
+          state.info = 'Handmatige lead toegevoegd.';
+        }
+        await loadData(false);
+      } catch (error) {
+        state.error = normalizeFreeText(error?.message || '') || 'Handmatige lead toevoegen mislukt.';
+      } finally {
+        state.importing = false;
+        render();
+      }
     });
     byId('leadDatabaseTemplateBtn')?.addEventListener('click', () => {
       downloadLeadDatabaseTemplate();
@@ -4963,7 +5075,7 @@
     try {
       const campaign = collectCampaignFormData();
       const stackLabel = campaign.coldcallingStackLabel || getColdcallingStackLabel(campaign.coldcallingStack);
-      const leadSelection = getManualLeadsFromDashboard(campaign.amount);
+      const leadSelection = await getManualLeadsFromDashboard(campaign.amount);
       const leads = leadSelection.leads;
       campaign.amount = leads.length;
 

@@ -13,6 +13,8 @@ require('dotenv').config();
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const RETELL_API_BASE_URL = process.env.RETELL_API_BASE_URL || 'https://api.retellai.com';
+const TWILIO_API_BASE_URL = process.env.TWILIO_API_BASE_URL || 'https://api.twilio.com';
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || '').trim();
 const OPENAI_API_BASE_URL = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const ANTHROPIC_API_BASE_URL = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com/v1';
@@ -281,6 +283,53 @@ function appendOriginalQuery(pathname, originalUrl) {
   if (queryIndex < 0) return basePath;
   const query = original.slice(queryIndex);
   return `${basePath}${query}`;
+}
+
+function normalizeAbsoluteHttpUrl(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    if (!/^https?:$/i.test(parsed.protocol)) return '';
+    parsed.hash = '';
+    const normalizedPath = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = normalizedPath || '';
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+function getPublicBaseUrlFromRequest(req) {
+  const forwardedProto = normalizeString(req?.get('x-forwarded-proto')).split(',')[0].trim();
+  const forwardedHost = normalizeString(req?.get('x-forwarded-host')).split(',')[0].trim();
+  const host = forwardedHost || normalizeString(req?.get('host'));
+  const proto = forwardedProto || (req?.secure ? 'https' : 'http');
+  if (!host || !proto) return '';
+  return normalizeAbsoluteHttpUrl(`${proto}://${host}`);
+}
+
+function getEffectivePublicBaseUrl(req = null, overrideValue = '') {
+  const explicit = normalizeAbsoluteHttpUrl(overrideValue || PUBLIC_BASE_URL);
+  if (explicit) return explicit;
+  if (req) return getPublicBaseUrlFromRequest(req);
+  return '';
+}
+
+function appendQueryParamsToUrl(rawUrl, params = {}) {
+  const raw = normalizeString(rawUrl);
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    Object.entries(params || {}).forEach(([key, value]) => {
+      const normalizedValue = normalizeString(value);
+      if (!normalizeString(key) || !normalizedValue) return;
+      parsed.searchParams.set(key, normalizedValue);
+    });
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
 }
 
 app.disable('x-powered-by');
@@ -1674,6 +1723,74 @@ function extractCallUpdateFromRetellCallStatusResponse(callId, data) {
   };
 }
 
+function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
+  if (!payload || typeof payload !== 'object') return null;
+  const fallbackStack = normalizeColdcallingStack(options.stack);
+  const callId = normalizeString(payload?.CallSid || payload?.sid || options.callId || '');
+  const status = normalizeString(payload?.CallStatus || payload?.status || '').toLowerCase();
+  const phone = normalizeString(payload?.To || payload?.to || payload?.Called || '');
+  const startedAt =
+    parseDateToIso(payload?.StartTime || payload?.start_time || payload?.date_created || payload?.Timestamp) || '';
+  const endedAt =
+    parseDateToIso(payload?.EndTime || payload?.end_time) ||
+    (isTerminalColdcallingStatus(status, '') ? new Date().toISOString() : '');
+  const endedReason = normalizeString(
+    payload?.CallStatusReason || payload?.ErrorMessage || payload?.DialCallStatus || payload?.SipResponseCode || ''
+  );
+  const durationSeconds = parseNumberSafe(payload?.CallDuration || payload?.duration, null);
+  const recordingUrl = normalizeString(payload?.RecordingUrl || payload?.recording_url || '');
+  const updatedAtMs = Date.now();
+  const stackLabel = getColdcallingStackLabel(fallbackStack);
+
+  if (!callId && !status && !phone) return null;
+
+  return {
+    callId: callId || `twilio-anon-${updatedAtMs}`,
+    phone,
+    company: normalizeString(payload?.Company || payload?.company || ''),
+    name: normalizeString(payload?.LeadName || payload?.name || ''),
+    status,
+    messageType: `twilio.status.${status || 'unknown'}`,
+    summary: normalizeString(payload?.summary || ''),
+    transcriptSnippet: '',
+    transcriptFull: '',
+    endedReason,
+    startedAt: startedAt || '',
+    endedAt: endedAt || '',
+    durationSeconds:
+      Number.isFinite(Number(durationSeconds)) && Number(durationSeconds) >= 0 ? Math.round(Number(durationSeconds)) : null,
+    recordingUrl,
+    updatedAt: new Date(updatedAtMs).toISOString(),
+    updatedAtMs,
+    provider: 'twilio',
+    stack: fallbackStack,
+    stackLabel,
+  };
+}
+
+function extractCallUpdateFromTwilioCallStatusResponse(callId, data, options = {}) {
+  if (!data || typeof data !== 'object') return null;
+  const update = extractCallUpdateFromTwilioPayload(
+    {
+      CallSid: normalizeString(data?.sid || callId),
+      CallStatus: normalizeString(data?.status || ''),
+      To: normalizeString(data?.to || ''),
+      From: normalizeString(data?.from || ''),
+      StartTime: normalizeString(data?.start_time || data?.date_created || ''),
+      EndTime: normalizeString(data?.end_time || ''),
+      CallDuration: normalizeString(data?.duration || ''),
+      RecordingUrl: normalizeString(data?.recording_url || ''),
+      ErrorMessage: normalizeString(data?.subresource_uris?.events || ''),
+    },
+    options
+  );
+  if (!update) return null;
+  return {
+    ...update,
+    messageType: 'twilio.call_status_fetch',
+  };
+}
+
 async function refreshCallUpdateFromRetellStatusApi(callId) {
   const normalizedCallId = normalizeString(callId);
   if (!normalizedCallId) return null;
@@ -1687,6 +1804,33 @@ async function refreshCallUpdateFromRetellStatusApi(callId) {
   } catch (error) {
     console.warn(
       '[Retell Call Status Refresh Failed]',
+      JSON.stringify(
+        {
+          callId: normalizedCallId,
+          message: error?.message || 'Onbekende fout',
+          status: error?.status || null,
+        },
+        null,
+        2
+      )
+    );
+    return null;
+  }
+}
+
+async function refreshCallUpdateFromTwilioStatusApi(callId, options = {}) {
+  const normalizedCallId = normalizeString(callId);
+  if (!normalizedCallId) return null;
+  if (!isTwilioStatusApiConfigured()) return null;
+
+  try {
+    const { data } = await fetchTwilioCallStatusById(normalizedCallId);
+    const update = extractCallUpdateFromTwilioCallStatusResponse(normalizedCallId, data, options);
+    if (!update) return null;
+    return upsertRecentCallUpdate(update);
+  } catch (error) {
+    console.warn(
+      '[Twilio Call Status Refresh Failed]',
       JSON.stringify(
         {
           callId: normalizedCallId,
@@ -1847,18 +1991,37 @@ function isRetellColdcallingConfigured() {
   return getRequiredRetellEnv().every((key) => normalizeString(process.env[key]));
 }
 
+function getRequiredTwilioEnv() {
+  return ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM_NUMBER'];
+}
+
+function isTwilioColdcallingConfigured() {
+  return getRequiredTwilioEnv().every((key) => normalizeString(process.env[key]));
+}
+
+function isTwilioStatusApiConfigured() {
+  return Boolean(normalizeString(process.env.TWILIO_ACCOUNT_SID) && normalizeString(process.env.TWILIO_AUTH_TOKEN));
+}
+
 function getColdcallingProvider() {
   const configured = normalizeString(process.env.COLDCALLING_PROVIDER).toLowerCase();
+  if (configured === 'twilio' || configured === 'twilio_media' || configured === 'twilio_media_stream') {
+    return 'twilio';
+  }
   if (configured === 'retell') return 'retell';
   if (isRetellColdcallingConfigured()) return 'retell';
+  if (isTwilioColdcallingConfigured()) return 'twilio';
   return 'retell';
 }
 
 function getMissingEnvVars(provider = getColdcallingProvider()) {
-  if (provider === 'retell') {
-    return getRequiredRetellEnv().filter((key) => !process.env[key]);
+  if (provider === 'twilio') {
+    return getRequiredTwilioEnv().filter((key) => !normalizeString(process.env[key]));
   }
-  return getRequiredRetellEnv().filter((key) => !process.env[key]);
+  if (provider === 'retell') {
+    return getRequiredRetellEnv().filter((key) => !normalizeString(process.env[key]));
+  }
+  return getRequiredRetellEnv().filter((key) => !normalizeString(process.env[key]));
 }
 
 function normalizeColdcallingStack(value) {
@@ -1896,6 +2059,24 @@ function getColdcallingStackLabel(stack) {
   if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
   if (normalized === 'hume_evi_3') return 'Hume Evi 3';
   return 'Retell AI';
+}
+
+function resolveColdcallingProviderForCampaign(campaign = {}) {
+  const stack = normalizeColdcallingStack(
+    campaign?.coldcallingStack || campaign?.callingEngine || campaign?.callingStack
+  );
+  if (stack === 'retell_ai') return 'retell';
+  if (stack === 'gemini_flash_3_1_live' || stack === 'openai_realtime_1_5' || stack === 'hume_evi_3') {
+    return 'twilio';
+  }
+  return getColdcallingProvider();
+}
+
+function inferCallProvider(callId, fallbackProvider = 'retell') {
+  const normalizedCallId = normalizeString(callId);
+  if (/^call_/i.test(normalizedCallId)) return 'retell';
+  if (/^CA[0-9a-f]{32}$/i.test(normalizedCallId)) return 'twilio';
+  return fallbackProvider;
 }
 
 function toBooleanSafe(value, fallback = false) {
@@ -5177,6 +5358,89 @@ async function fetchRetellCallStatusById(callId) {
   return { endpoint, data };
 }
 
+async function createTwilioOutboundCall(payload) {
+  const accountSid = normalizeString(process.env.TWILIO_ACCOUNT_SID);
+  const endpoint = `/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Calls.json`;
+  const form = new URLSearchParams();
+  Object.entries(payload || {}).forEach(([key, value]) => {
+    if (!normalizeString(key)) return;
+    if (Array.isArray(value)) {
+      value.forEach((entry) => {
+        const normalizedEntry = normalizeString(entry);
+        if (!normalizedEntry) return;
+        form.append(key, normalizedEntry);
+      });
+      return;
+    }
+    const normalizedValue = normalizeString(value);
+    if (!normalizedValue) return;
+    form.set(key, normalizedValue);
+  });
+
+  const { response, data } = await fetchJsonWithTimeout(
+    buildTwilioApiUrl(endpoint),
+    {
+      method: 'POST',
+      headers: {
+        Authorization: getTwilioBasicAuthorizationHeader(),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    },
+    15000
+  );
+
+  if (!response.ok) {
+    const statusError = new Error(
+      data?.message ||
+        data?.error ||
+        data?.detail ||
+        data?.raw ||
+        `Twilio API fout (${response.status})`
+    );
+    statusError.status = response.status;
+    statusError.endpoint = endpoint;
+    statusError.data = data;
+    throw statusError;
+  }
+
+  return { endpoint, data };
+}
+
+async function fetchTwilioCallStatusById(callId) {
+  const normalizedCallId = normalizeString(callId);
+  if (!normalizedCallId) {
+    throw new Error('callId ontbreekt');
+  }
+  const accountSid = normalizeString(process.env.TWILIO_ACCOUNT_SID);
+  const endpoint = `/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Calls/${encodeURIComponent(
+    normalizedCallId
+  )}.json`;
+  const { response, data } = await fetchJsonWithTimeout(
+    buildTwilioApiUrl(endpoint),
+    {
+      method: 'GET',
+      headers: {
+        Authorization: getTwilioBasicAuthorizationHeader(),
+        'Content-Type': 'application/json',
+      },
+    },
+    10000
+  );
+
+  if (!response.ok) {
+    const statusError = new Error(
+      data?.message || data?.error || data?.detail || data?.raw || `Twilio call status fout (${response.status})`
+    );
+    statusError.status = response.status;
+    statusError.endpoint = endpoint;
+    statusError.data = data;
+    throw statusError;
+  }
+
+  return { endpoint, data };
+}
+
 function classifyRetellFailure(error) {
   const message = String(error?.message || '').toLowerCase();
   const detailText = JSON.stringify(error?.data || {}).toLowerCase();
@@ -5244,6 +5508,53 @@ function classifyRetellFailure(error) {
   };
 }
 
+function classifyTwilioFailure(error) {
+  const message = String(error?.message || '').toLowerCase();
+  const detailText = JSON.stringify(error?.data || {}).toLowerCase();
+  const combined = `${message} ${detailText}`;
+  const status = Number(error?.status || 0);
+
+  if (status === 401 || status === 403 || /auth|token|credential|account sid|permission/i.test(combined)) {
+    return {
+      cause: 'wrong twilio credentials',
+      explanation: 'TWILIO_ACCOUNT_SID of TWILIO_AUTH_TOKEN lijkt ongeldig.',
+    };
+  }
+
+  if (/from|callerid|caller id|owned|verified|not a valid phone/i.test(combined)) {
+    return {
+      cause: 'invalid twilio from number',
+      explanation: 'TWILIO_FROM_NUMBER is ongeldig of niet beschikbaar in het Twilio account.',
+    };
+  }
+
+  if (/to|destination|e\\.164|invalid phone|phone number/i.test(combined)) {
+    return {
+      cause: 'invalid number',
+      explanation: 'Het doelnummer is ongeldig of door Twilio/carrier geweigerd.',
+    };
+  }
+
+  if (status === 429 || /rate limit|too many|throttle/i.test(combined)) {
+    return {
+      cause: 'rate limit',
+      explanation: 'Twilio rate limit bereikt; probeer later opnieuw.',
+    };
+  }
+
+  if (status >= 500 || /temporar|timeout|unavailable|carrier|provider/i.test(combined)) {
+    return {
+      cause: 'provider issue',
+      explanation: 'Waarschijnlijk een tijdelijk probleem bij Twilio of de carrier.',
+    };
+  }
+
+  return {
+    cause: 'unknown',
+    explanation: 'Controleer de exacte Twilio response body voor de foutoorzaak.',
+  };
+}
+
 function buildVariableValues(lead, campaign) {
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
   const minProjectValue = parseNumberSafe(campaign.minProjectValue, null);
@@ -5278,6 +5589,78 @@ function buildRetellApiUrl(relativePath, searchParams = null) {
   }
 
   return url;
+}
+
+function buildTwilioApiUrl(relativePath) {
+  const normalizedBase = `${normalizeString(TWILIO_API_BASE_URL).replace(/\/+$/, '')}/`;
+  return new URL(String(relativePath || '').replace(/^\/+/, ''), normalizedBase);
+}
+
+function getTwilioBasicAuthorizationHeader() {
+  const accountSid = normalizeString(process.env.TWILIO_ACCOUNT_SID);
+  const authToken = normalizeString(process.env.TWILIO_AUTH_TOKEN);
+  const basic = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+  return `Basic ${basic}`;
+}
+
+function parseDateToIso(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  const ms = Date.parse(raw);
+  if (!Number.isFinite(ms) || ms <= 0) return '';
+  return new Date(ms).toISOString();
+}
+
+function getTwilioStackEnvSuffixes(stack) {
+  const normalized = normalizeColdcallingStack(stack);
+  if (normalized === 'gemini_flash_3_1_live') return ['GEMINI_FLASH_3_1_LIVE', 'GEMINI'];
+  if (normalized === 'openai_realtime_1_5') return ['OPENAI_REALTIME_1_5', 'OPENAI_REALTIME', 'OPENAI'];
+  if (normalized === 'hume_evi_3') return ['HUME_EVI_3', 'HUME_EVI', 'HUME'];
+  return ['RETELL_AI', 'RETELL'];
+}
+
+function getTwilioMediaWsUrlForStack(stack) {
+  const suffixes = getTwilioStackEnvSuffixes(stack);
+  for (const suffix of suffixes) {
+    const candidate = normalizeString(process.env[`TWILIO_MEDIA_WS_URL_${suffix}`]);
+    if (candidate) return candidate;
+  }
+  return normalizeString(process.env.TWILIO_MEDIA_WS_URL || DEFAULT_TWILIO_MEDIA_WS_URL);
+}
+
+function getTwilioFromNumberForStack(stack) {
+  const suffixes = getTwilioStackEnvSuffixes(stack);
+  for (const suffix of suffixes) {
+    const candidate = normalizeString(process.env[`TWILIO_FROM_NUMBER_${suffix}`]);
+    if (candidate) return candidate;
+  }
+  return normalizeString(process.env.TWILIO_FROM_NUMBER);
+}
+
+function buildTwilioOutboundTwimlUrl(stack, campaign = {}) {
+  const configuredUrl = normalizeString(process.env.TWILIO_OUTBOUND_TWIML_URL || process.env.TWILIO_TWIML_URL);
+  const fallbackBaseUrl = getEffectivePublicBaseUrl(null, campaign?.publicBaseUrl);
+  const baseUrl = configuredUrl || (fallbackBaseUrl ? `${fallbackBaseUrl}/api/twilio/voice` : '');
+  const normalizedBase = normalizeAbsoluteHttpUrl(baseUrl);
+  if (!normalizedBase) {
+    throw new Error('TWILIO_OUTBOUND_TWIML_URL of PUBLIC_BASE_URL ontbreekt/ongeldig voor Twilio outbound calling.');
+  }
+  return appendQueryParamsToUrl(normalizedBase, { stack: normalizeColdcallingStack(stack) });
+}
+
+function buildTwilioStatusCallbackUrl(stack, campaign = {}) {
+  const configuredUrl = normalizeString(process.env.TWILIO_STATUS_CALLBACK_URL);
+  const fallbackBaseUrl = getEffectivePublicBaseUrl(null, campaign?.publicBaseUrl);
+  const baseUrl = configuredUrl || (fallbackBaseUrl ? `${fallbackBaseUrl}/api/twilio/status` : '');
+  const normalizedBase = normalizeAbsoluteHttpUrl(baseUrl);
+  if (!normalizedBase) {
+    throw new Error('TWILIO_STATUS_CALLBACK_URL of PUBLIC_BASE_URL ontbreekt/ongeldig voor Twilio status callbacks.');
+  }
+  const secret = normalizeString(process.env.TWILIO_WEBHOOK_SECRET);
+  return appendQueryParamsToUrl(normalizedBase, {
+    stack: normalizeColdcallingStack(stack),
+    ...(secret ? { secret } : {}),
+  });
 }
 
 function toIsoFromUnixMilliseconds(value) {
@@ -5322,6 +5705,28 @@ function buildRetellPayload(lead, campaign) {
       sector: normalizeString(campaign.sector),
       region: effectiveRegion,
     },
+  };
+}
+
+function buildTwilioOutboundPayload(lead, campaign) {
+  const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
+  const stack = normalizeColdcallingStack(campaign?.coldcallingStack);
+  const twimlUrl = buildTwilioOutboundTwimlUrl(stack, campaign);
+  const statusCallbackUrl = buildTwilioStatusCallbackUrl(stack, campaign);
+  const fromNumber = getTwilioFromNumberForStack(stack);
+  if (!fromNumber) {
+    throw new Error('TWILIO_FROM_NUMBER ontbreekt voor geselecteerde stack.');
+  }
+
+  return {
+    To: normalizedPhone,
+    From: fromNumber,
+    Url: twimlUrl,
+    Method: 'POST',
+    StatusCallback: statusCallbackUrl,
+    StatusCallbackMethod: 'POST',
+    StatusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+    Timeout: String(Math.max(15, Math.min(90, parseIntSafe(process.env.TWILIO_DIAL_TIMEOUT_SECONDS, 30)))),
   };
 }
 
@@ -5458,7 +5863,130 @@ async function processRetellColdcallingLead(lead, campaign, index) {
   }
 }
 
+async function processTwilioColdcallingLead(lead, campaign, index) {
+  try {
+    const payload = buildTwilioOutboundPayload(lead, campaign);
+    const normalizedPhone = normalizeString(payload.To);
+    const { endpoint, data } = await createTwilioOutboundCall(payload);
+    const callId = normalizeString(data?.sid || data?.call_sid || data?.callSid || '');
+    const callStatus = normalizeString(data?.status || 'queued').toLowerCase();
+    const startedAt =
+      parseDateToIso(data?.start_time || data?.date_created) || new Date().toISOString();
+    let latestUpdate = null;
+
+    if (callId) {
+      latestUpdate = upsertRecentCallUpdate({
+        callId,
+        phone: normalizedPhone,
+        company: normalizeString(lead.company),
+        name: normalizeString(lead.name),
+        status: callStatus,
+        messageType: 'twilio.start.response',
+        summary: '',
+        transcriptSnippet: '',
+        endedReason: '',
+        startedAt,
+        endedAt: '',
+        durationSeconds: null,
+        recordingUrl: '',
+        updatedAt: new Date().toISOString(),
+        updatedAtMs: Date.now(),
+        provider: 'twilio',
+      });
+    }
+
+    const effectiveStatus = normalizeString(latestUpdate?.status || callStatus).toLowerCase();
+    const effectiveEndedReason = normalizeString(latestUpdate?.endedReason || '');
+    const terminalFailureStatuses = new Set(['failed', 'busy', 'no-answer', 'canceled', 'cancelled']);
+
+    if (terminalFailureStatuses.has(effectiveStatus)) {
+      return {
+        index,
+        success: false,
+        lead: {
+          name: normalizeString(lead.name),
+          company: normalizeString(lead.company),
+          phone: normalizeString(lead.phone),
+          region: normalizeString(lead.region),
+          phoneE164: normalizedPhone,
+        },
+        error: `Call kon niet verbinden (${effectiveEndedReason || effectiveStatus || 'onbekende reden'}).`,
+        statusCode: null,
+        cause: 'dial failed',
+        causeExplanation: 'Twilio kon het gesprek niet opzetten. Controleer nummer/call config in Twilio.',
+        details: {
+          endpoint,
+          callId,
+          status: effectiveStatus,
+          endedReason: effectiveEndedReason,
+          startedAt,
+        },
+      };
+    }
+
+    return {
+      index,
+      success: true,
+      lead: {
+        name: normalizeString(lead.name),
+        company: normalizeString(lead.company),
+        phone: normalizeString(lead.phone),
+        region: normalizeString(lead.region),
+        phoneE164: normalizedPhone,
+      },
+      call: {
+        endpoint,
+        callId,
+        status: effectiveStatus || callStatus,
+        endedReason: effectiveEndedReason,
+      },
+    };
+  } catch (error) {
+    const failure = classifyTwilioFailure(error);
+    console.error(
+      '[Coldcalling][Lead Error]',
+      JSON.stringify(
+        {
+          provider: 'twilio',
+          lead: {
+            name: normalizeString(lead?.name),
+            company: normalizeString(lead?.company),
+            phone: normalizeString(lead?.phone),
+          },
+          error: error.message || 'Onbekende fout',
+          statusCode: error.status || null,
+          cause: failure.cause,
+          explanation: failure.explanation,
+          responseBody: error.data || null,
+        },
+        null,
+        2
+      )
+    );
+
+    return {
+      index,
+      success: false,
+      lead: {
+        name: normalizeString(lead?.name),
+        company: normalizeString(lead?.company),
+        phone: normalizeString(lead?.phone),
+        region: normalizeString(lead?.region),
+      },
+      error: error.message || 'Onbekende fout',
+      statusCode: error.status || null,
+      cause: failure.cause,
+      causeExplanation: failure.explanation,
+      details: error.data || null,
+    };
+  }
+}
+
 async function processColdcallingLead(lead, campaign, index) {
+  const provider = resolveColdcallingProviderForCampaign(campaign);
+  if (provider === 'twilio') {
+    return processTwilioColdcallingLead(lead, campaign, index);
+  }
   return processRetellColdcallingLead(lead, campaign, index);
 }
 
@@ -5803,30 +6331,33 @@ function isRetellWebhookAuthorized(req) {
 
 async function sendColdcallingStatusResponse(res, callId) {
   const cached = callUpdatesById.get(callId) || null;
-  const provider = 'retell';
+  const provider = normalizeString(cached?.provider || inferCallProvider(callId, getColdcallingProvider())).toLowerCase();
 
-  if (provider === 'retell') {
-    if (!normalizeString(process.env.RETELL_API_KEY)) {
-      if (cached) {
-        return res.status(200).json({
-          ok: true,
-          source: 'cache',
-          provider: 'retell',
-          callId: normalizeString(cached.callId || callId),
-          status: normalizeString(cached.status || ''),
-          endedReason: normalizeString(cached.endedReason || ''),
-          startedAt: normalizeString(cached.startedAt || ''),
-          endedAt: normalizeString(cached.endedAt || ''),
-          durationSeconds: parseNumberSafe(cached.durationSeconds, null),
-          recordingUrl: normalizeString(cached.recordingUrl || ''),
-        });
-      }
-      return res.status(500).json({ ok: false, error: 'RETELL_API_KEY ontbreekt op server.' });
+  const sendCached = (providerName) =>
+    res.status(200).json({
+      ok: true,
+      source: 'cache',
+      provider: providerName,
+      callId: normalizeString(cached?.callId || callId),
+      status: normalizeString(cached?.status || ''),
+      endedReason: normalizeString(cached?.endedReason || ''),
+      startedAt: normalizeString(cached?.startedAt || ''),
+      endedAt: normalizeString(cached?.endedAt || ''),
+      durationSeconds: parseNumberSafe(cached?.durationSeconds, null),
+      recordingUrl: normalizeString(cached?.recordingUrl || ''),
+    });
+
+  if (provider === 'twilio') {
+    if (!isTwilioStatusApiConfigured()) {
+      if (cached) return sendCached('twilio');
+      return res.status(500).json({ ok: false, error: 'TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN ontbreken op server.' });
     }
 
     try {
-      const { endpoint, data } = await fetchRetellCallStatusById(callId);
-      const update = extractCallUpdateFromRetellCallStatusResponse(callId, data);
+      const { endpoint, data } = await fetchTwilioCallStatusById(callId);
+      const update = extractCallUpdateFromTwilioCallStatusResponse(callId, data, {
+        stack: cached?.stack || '',
+      });
       if (update) {
         upsertRecentCallUpdate(update);
         triggerPostCallAutomation(update);
@@ -5835,34 +6366,65 @@ async function sendColdcallingStatusResponse(res, callId) {
       return res.status(200).json({
         ok: true,
         endpoint,
-        source: 'retell',
-        provider: 'retell',
-        callId: normalizeString(update?.callId || data?.call_id || callId),
-        status: normalizeString(update?.status || data?.call_status || ''),
-        endedReason: normalizeString(update?.endedReason || data?.disconnection_reason || ''),
-        startedAt: normalizeString(update?.startedAt || toIsoFromUnixMilliseconds(data?.start_timestamp)),
-        endedAt: normalizeString(update?.endedAt || toIsoFromUnixMilliseconds(data?.end_timestamp)),
-        durationSeconds:
-          parseNumberSafe(update?.durationSeconds, null) ||
-          (Number.isFinite(Number(data?.duration_ms)) && Number(data.duration_ms) > 0
-            ? Math.max(1, Math.round(Number(data.duration_ms) / 1000))
-            : null),
-        recordingUrl: normalizeString(
-          update?.recordingUrl ||
-            data?.recording_url ||
-            data?.recording_multi_channel_url ||
-            data?.scrubbed_recording_url ||
-            ''
-        ),
+        source: 'twilio',
+        provider: 'twilio',
+        callId: normalizeString(update?.callId || data?.sid || callId),
+        status: normalizeString(update?.status || data?.status || ''),
+        endedReason: normalizeString(update?.endedReason || ''),
+        startedAt: normalizeString(update?.startedAt || parseDateToIso(data?.start_time || data?.date_created)),
+        endedAt: normalizeString(update?.endedAt || parseDateToIso(data?.end_time)),
+        durationSeconds: parseNumberSafe(update?.durationSeconds || data?.duration, null),
+        recordingUrl: normalizeString(update?.recordingUrl || data?.recording_url || ''),
       });
     } catch (error) {
       return res.status(Number(error?.status || 500)).json({
         ok: false,
-        error: error?.message || 'Kon Retell call status niet ophalen.',
+        error: error?.message || 'Kon Twilio call status niet ophalen.',
         endpoint: error?.endpoint || null,
         details: error?.data || null,
       });
     }
+  }
+
+  if (!normalizeString(process.env.RETELL_API_KEY)) {
+    if (cached) return sendCached('retell');
+    return res.status(500).json({ ok: false, error: 'RETELL_API_KEY ontbreekt op server.' });
+  }
+
+  try {
+    const { endpoint, data } = await fetchRetellCallStatusById(callId);
+    const update = extractCallUpdateFromRetellCallStatusResponse(callId, data);
+    if (update) {
+      upsertRecentCallUpdate(update);
+      triggerPostCallAutomation(update);
+    }
+
+    return res.status(200).json({
+      ok: true,
+      endpoint,
+      source: 'retell',
+      provider: 'retell',
+      callId: normalizeString(update?.callId || data?.call_id || callId),
+      status: normalizeString(update?.status || data?.call_status || ''),
+      endedReason: normalizeString(update?.endedReason || data?.disconnection_reason || ''),
+      startedAt: normalizeString(update?.startedAt || toIsoFromUnixMilliseconds(data?.start_timestamp)),
+      endedAt: normalizeString(update?.endedAt || toIsoFromUnixMilliseconds(data?.end_timestamp)),
+      durationSeconds:
+        parseNumberSafe(update?.durationSeconds, null) ||
+        (Number.isFinite(Number(data?.duration_ms)) && Number(data.duration_ms) > 0
+          ? Math.max(1, Math.round(Number(data.duration_ms) / 1000))
+          : null),
+      recordingUrl: normalizeString(
+        update?.recordingUrl || data?.recording_url || data?.recording_multi_channel_url || data?.scrubbed_recording_url || ''
+      ),
+    });
+  } catch (error) {
+    return res.status(Number(error?.status || 500)).json({
+      ok: false,
+      error: error?.message || 'Kon Retell call status niet ophalen.',
+      endpoint: error?.endpoint || null,
+      details: error?.data || null,
+    });
   }
 }
 
@@ -5902,6 +6464,11 @@ function sendTwimlXml(res, xml) {
 
 function handleTwilioInboundVoice(req, res) {
   const caller = normalizeString(req.body?.From || req.query?.From || '');
+  const rawStack = normalizeString(req.query?.stack || req.body?.stack || 'retell_ai');
+  const stack = normalizeColdcallingStack(rawStack);
+  const callSid = normalizeString(req.body?.CallSid || req.query?.CallSid || '');
+  const to = normalizeString(req.body?.To || req.query?.To || '');
+  const from = normalizeString(req.body?.From || req.query?.From || '');
 
   if (!isTwilioInboundCallerAllowed(caller)) {
     return sendTwimlXml(
@@ -5913,12 +6480,19 @@ function handleTwilioInboundVoice(req, res) {
     );
   }
 
-  const mediaWsUrl = normalizeString(process.env.TWILIO_MEDIA_WS_URL || DEFAULT_TWILIO_MEDIA_WS_URL);
+  const mediaWsBaseUrl = getTwilioMediaWsUrlForStack(stack);
+  const mediaWsUrl = appendQueryParamsToUrl(mediaWsBaseUrl, {
+    stack,
+    callSid,
+    to,
+    from,
+  });
   if (!/^wss?:\/\//i.test(mediaWsUrl)) {
     return res.status(500).json({
       ok: false,
       error: 'TWILIO_MEDIA_WS_URL ontbreekt of is ongeldig (verwacht ws:// of wss:// URL).',
-      value: mediaWsUrl || null,
+      value: mediaWsBaseUrl || null,
+      stack,
     });
   }
 
@@ -5933,28 +6507,71 @@ function handleTwilioInboundVoice(req, res) {
   );
 }
 
-app.get('/api/twilio/voice', handleTwilioInboundVoice);
-app.post('/api/twilio/voice', express.urlencoded({ extended: false }), handleTwilioInboundVoice);
+function isTwilioStatusWebhookAuthorized(req) {
+  const secret = normalizeString(process.env.TWILIO_WEBHOOK_SECRET);
+  if (!secret) return true;
+  const headerSecret = normalizeString(req.get('x-webhook-secret'));
+  const querySecret = normalizeString(req.query?.secret || req.body?.secret || '');
+  const authorizationHeader = normalizeString(req.get('authorization'));
+  const bearerSecret = /^bearer\s+/i.test(authorizationHeader)
+    ? normalizeString(authorizationHeader.replace(/^bearer\s+/i, ''))
+    : '';
+  return secret === headerSecret || secret === querySecret || secret === bearerSecret;
+}
 
-app.post('/api/coldcalling/start', async (req, res) => {
-  const provider = getColdcallingProvider();
-  const missingEnv = getMissingEnvVars(provider);
-
-  if (missingEnv.length > 0) {
-    return res.status(500).json({
-      ok: false,
-      error: 'Server mist vereiste environment variables voor Retell outbound calling.',
-      missingEnv,
-      provider,
-    });
+function handleTwilioStatusWebhook(req, res) {
+  if (!isTwilioStatusWebhookAuthorized(req)) {
+    return res.status(401).json({ ok: false, error: 'Twilio webhook secret ongeldig.' });
   }
 
+  const stack = normalizeColdcallingStack(req.query?.stack || req.body?.stack || 'retell_ai');
+  const payload = req.body && typeof req.body === 'object' ? req.body : {};
+  const callUpdate = upsertRecentCallUpdate(extractCallUpdateFromTwilioPayload(payload, { stack }));
+
+  recentWebhookEvents.unshift({
+    receivedAt: new Date().toISOString(),
+    messageType: `twilio.${normalizeString(payload?.CallStatus || 'status').toLowerCase() || 'status'}`,
+    callId: normalizeString(payload?.CallSid || ''),
+    callStatus: normalizeString(payload?.CallStatus || ''),
+    payload,
+  });
+  if (recentWebhookEvents.length > 200) {
+    recentWebhookEvents.pop();
+  }
+
+  if (callUpdate) {
+    triggerPostCallAutomation(callUpdate);
+  }
+
+  return res.status(200).json({ ok: true });
+}
+
+app.get('/api/twilio/voice', handleTwilioInboundVoice);
+app.post('/api/twilio/voice', express.urlencoded({ extended: false }), handleTwilioInboundVoice);
+app.post('/api/twilio/status', express.urlencoded({ extended: false }), handleTwilioStatusWebhook);
+
+
+app.post('/api/coldcalling/start', async (req, res) => {
   const validated = validateStartPayload(req.body);
   if (validated.error) {
     return res.status(400).json({ ok: false, error: validated.error });
   }
 
   const { campaign, leads } = validated;
+  campaign.publicBaseUrl = getEffectivePublicBaseUrl(req);
+  const provider = resolveColdcallingProviderForCampaign(campaign);
+  const missingEnv = getMissingEnvVars(provider);
+
+  if (missingEnv.length > 0) {
+    const providerLabel = provider === 'twilio' ? 'Twilio' : 'Retell';
+    return res.status(500).json({
+      ok: false,
+      error: `Server mist vereiste environment variables voor ${providerLabel} outbound calling.`,
+      missingEnv,
+      provider,
+    });
+  }
+
   const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
 
   console.log(

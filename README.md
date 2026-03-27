@@ -1,21 +1,31 @@
 # Softora AI Coldcalling Dashboard
 
-Retell-only coldcalling backend + statische dashboardpagina's.
+Coldcalling backend + statische dashboardpagina's met stack-routing:
+- `Retell AI` stack -> Retell outbound
+- `Gemini Flash 3.1 Live` / `OpenAI Realtime 1.5` / `Hume Evi 3` -> Twilio outbound + media stream
 
 ## Stack
 
 - Backend: Node.js + Express (`server.js`)
 - Frontend: statische HTML/CSS/JS
-- Provider: Retell (outbound + webhook)
+- Providers: Retell + Twilio
 
 ## Vereiste env vars
 
 ```env
 PORT=3000
 COLDCALLING_PROVIDER=retell
+PUBLIC_BASE_URL=https://jouwdomein.nl
+
+# Retell
 RETELL_API_KEY=your_retell_api_key
 RETELL_FROM_NUMBER=+31xxxxxxxxx
 RETELL_AGENT_ID=agent_xxxxxxxxxxxxxxxxx
+
+# Twilio (voor Gemini/OpenAI realtime/Hume stacks)
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_FROM_NUMBER=+31xxxxxxxxx
 ```
 
 Optioneel:
@@ -26,6 +36,14 @@ RETELL_API_BASE_URL=https://api.retellai.com
 WEBHOOK_SECRET=your_optional_webhook_secret
 OPENAI_API_KEY=your_openai_api_key
 VERBOSE_CALL_WEBHOOK_LOGS=true
+
+# Twilio routing/security
+TWILIO_OUTBOUND_TWIML_URL=https://jouwdomein.nl/api/twilio/voice
+TWILIO_STATUS_CALLBACK_URL=https://jouwdomein.nl/api/twilio/status
+TWILIO_WEBHOOK_SECRET=your_twilio_webhook_secret
+TWILIO_MEDIA_WS_URL=wss://twilio-media-bridge-pjzd.onrender.com/twilio-media
+TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE=wss://example.com/twilio-media
+TWILIO_FROM_NUMBER_GEMINI_FLASH_3_1_LIVE=+31xxxxxxxxx
 ```
 
 ### Extra env vars voor `Voer opdracht uit` automation (Actieve Opdrachten)
@@ -96,6 +114,8 @@ De backend ondersteunt zowel:
 - `GET /api/coldcalling/call-status/:callId`
 - `GET /api/coldcalling/call-updates?limit=200&sinceMs=...`
 - `POST /api/retell/webhook`
+- `POST /api/twilio/voice`
+- `POST /api/twilio/status`
 - `POST /api/active-orders/launch-site`
 - `GET /healthz`
 
