@@ -1,0 +1,419 @@
+/*
+ * Global iPhone/mobile hardening layer.
+ * Scope: all pages (dashboard, premium pages, public pages, generated output pages).
+ */
+
+:root {
+    --iphone-page-gutter: 0.92rem;
+    --iphone-card-radius: 14px;
+    --iphone-touch-target: 44px;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+img,
+video,
+canvas,
+svg,
+iframe {
+    max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+@supports (padding: max(0px)) {
+    body {
+        padding-left: max(0px, env(safe-area-inset-left));
+        padding-right: max(0px, env(safe-area-inset-right));
+    }
+}
+
+@media (max-width: 900px) {
+    :root {
+        --sidebar-page-title-size: clamp(1.46rem, 7.2vw, 1.86rem);
+        --sidebar-page-subtitle-size: 0.97rem;
+    }
+
+    html,
+    body {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .dashboard-layout,
+    .page-shell,
+    .main,
+    .main-content,
+    .screen,
+    .container,
+    .content,
+    .topbar,
+    .topbar-left,
+    .topbar-right,
+    .section,
+    .card,
+    .panel,
+    .module-section,
+    .module-tab,
+    .hero,
+    .hero-ctas,
+    .row-actions,
+    .stats-bar,
+    .pricing-header,
+    .about-layout,
+    .contact-layout,
+    .feature-grid,
+    .card-grid,
+    .footer-grid,
+    .seo-grid,
+    .form-row {
+        min-width: 0 !important;
+    }
+
+    .main,
+    .page-shell,
+    .main-content,
+    .screen {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        padding-left: var(--iphone-page-gutter) !important;
+        padding-right: var(--iphone-page-gutter) !important;
+    }
+
+    .main-content,
+    .main,
+    .screen,
+    .page-shell {
+        padding-top: 1rem !important;
+        padding-bottom: calc(1.25rem + env(safe-area-inset-bottom)) !important;
+    }
+
+    .topbar,
+    .section-head,
+    .section-header,
+    .hero,
+    .hero-ctas,
+    .row-actions,
+    .stats-bar,
+    .topbar-right,
+    .topbar-left,
+    .footer-grid,
+    .about-layout,
+    .contact-layout,
+    .form-row,
+    .nav-wrap,
+    .site-header {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 0.7rem !important;
+    }
+
+    .topbar-right,
+    .hero-ctas,
+    .row-actions {
+        width: 100% !important;
+        justify-content: flex-start !important;
+    }
+
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .action-btn,
+    .modal-btn,
+    .accent-btn,
+    .magnetic-btn,
+    .execute-btn,
+    .view-btn,
+    .nav-cta,
+    button[type="submit"] {
+        min-height: var(--iphone-touch-target) !important;
+    }
+
+    input,
+    select,
+    textarea,
+    .form-input,
+    .form-select,
+    .create-order-input,
+    .field-input {
+        min-height: var(--iphone-touch-target) !important;
+    }
+
+    textarea,
+    .form-textarea {
+        min-height: 120px !important;
+    }
+
+    .card,
+    .panel,
+    .modal,
+    .modal-content,
+    .kpi-card,
+    .stat-card,
+    .summary-card,
+    .contact-card,
+    .feature-card,
+    .pricing-card,
+    .order-card,
+    .cta-card,
+    .about-card,
+    .benefit-card,
+    .case-card,
+    .signature-card {
+        border-radius: var(--iphone-card-radius) !important;
+    }
+
+    .decision-grid,
+    .feature-grid,
+    .card-grid,
+    .footer-grid,
+    .seo-grid,
+    .pricing-features,
+    .stats-grid,
+    .kpi-grid,
+    .summary-grid,
+    .benefit-grid,
+    .faq-list,
+    .process-list,
+    .process,
+    .sessions {
+        grid-template-columns: 1fr !important;
+    }
+
+    .sidebar {
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+        border-right: 0 !important;
+        border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08)) !important;
+        padding: calc(0.72rem + env(safe-area-inset-top)) 0 0 !important;
+        z-index: 20 !important;
+        backdrop-filter: blur(8px);
+    }
+
+    .sidebar-logo {
+        font-size: 1.45rem !important;
+        margin-bottom: 0.75rem !important;
+        padding: 0 var(--iphone-page-gutter) !important;
+    }
+
+    .sidebar-nav {
+        width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        white-space: nowrap !important;
+        padding: 0 0.62rem 0.78rem !important;
+        scrollbar-width: thin;
+    }
+
+    .sidebar-section,
+    .sidebar-flow-section {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        margin: 0 0.35rem 0 0 !important;
+        vertical-align: top;
+    }
+
+    .sidebar-flow-section::before,
+    .sidebar-section-label {
+        display: none !important;
+        content: none !important;
+    }
+
+    .sidebar-link {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.46rem !important;
+        min-height: 40px !important;
+        padding: 0.52rem 0.76rem !important;
+        border: 1px solid var(--border, rgba(0, 0, 0, 0.08)) !important;
+        border-radius: 999px !important;
+        background: var(--bg-secondary, #ffffff) !important;
+        white-space: nowrap !important;
+        line-height: 1.2 !important;
+    }
+
+    .sidebar-flow-section .sidebar-link {
+        padding-left: 0.76rem !important;
+    }
+
+    .sidebar-link svg {
+        width: 16px !important;
+        height: 16px !important;
+    }
+
+    .sidebar-link .sidebar-link-text {
+        white-space: nowrap !important;
+        line-height: 1.2 !important;
+    }
+
+    .sidebar-footer {
+        width: 100% !important;
+        padding: 0.45rem var(--iphone-page-gutter) calc(0.9rem + env(safe-area-inset-bottom)) !important;
+        border-top: 0 !important;
+    }
+
+    nav {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: calc(0.72rem + env(safe-area-inset-top)) 1rem 0.72rem !important;
+        gap: 0.72rem !important;
+        flex-wrap: wrap !important;
+    }
+
+    nav.scrolled {
+        padding: calc(0.6rem + env(safe-area-inset-top)) 1rem 0.6rem !important;
+    }
+
+    .logo {
+        font-size: 1.58rem !important;
+    }
+
+    .nav-links,
+    .site-nav,
+    .nav-wrap {
+        width: 100% !important;
+        max-width: 100% !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        gap: 0.88rem !important;
+        padding-bottom: 0.2rem;
+    }
+
+    .nav-link {
+        white-space: nowrap !important;
+        font-size: 0.86rem !important;
+    }
+
+    .decision-wrapper,
+    .hero,
+    .section,
+    .container {
+        padding-left: var(--iphone-page-gutter) !important;
+        padding-right: var(--iphone-page-gutter) !important;
+    }
+
+    .decision-wrapper {
+        padding-top: calc(5rem + env(safe-area-inset-top)) !important;
+    }
+
+    .decision-header h1,
+    .hero h1,
+    h1 {
+        font-size: clamp(1.58rem, 8vw, 2.3rem) !important;
+        line-height: 1.02 !important;
+        white-space: normal !important;
+    }
+
+    .decision-header p,
+    .hero p {
+        white-space: normal !important;
+    }
+
+    .modal-overlay {
+        align-items: flex-end !important;
+        padding: 0.7rem !important;
+    }
+
+    .modal,
+    .modal-content,
+    [role="dialog"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: calc(88dvh - env(safe-area-inset-bottom)) !important;
+        overflow-y: auto !important;
+    }
+
+    table {
+        display: block;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    th,
+    td {
+        white-space: nowrap;
+    }
+
+    .legend {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 0.52rem !important;
+    }
+
+    .legend-item {
+        font-size: 0.84rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --iphone-page-gutter: 0.8rem;
+    }
+
+    .topbar h1,
+    .main-content .topbar h1,
+    .main-content .topbar-left h1,
+    .main-content .costs-head .costs-title,
+    .main-content .coming-card > h1,
+    .page-shell .hero .hero-title {
+        font-size: clamp(1.34rem, 8.6vw, 1.78rem) !important;
+    }
+
+    .topbar p,
+    .main-content .topbar p,
+    .main-content .topbar-left p,
+    .main-content .costs-head .costs-subtitle,
+    .page-shell .hero .hero-text,
+    .main-content .coming-card > .lead {
+        font-size: 0.92rem !important;
+    }
+
+    .sidebar-link {
+        font-size: 0.8rem !important;
+    }
+
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .action-btn,
+    .modal-btn {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+
+    .hero-ctas > * {
+        width: 100% !important;
+    }
+
+    .form-row {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+    }
+}
