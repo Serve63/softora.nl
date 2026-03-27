@@ -415,7 +415,7 @@
                 key: "leads",
                 href: "/premium-ai-coldmailing",
                 label: "Leads",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2.8c.2 2.3-1 3.6-2.2 4.9-1.1 1.2-2.2 2.5-2.2 4.6a4.4 4.4 0 1 0 8.8 0c0-2.4-1.4-3.8-2.7-5.1-1.1-1.1-2.1-2.1-1.7-4.4Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 9.6c.1 1.2-.5 1.9-1.1 2.5-.5.6-1 1.1-1 2a2.1 2.1 0 1 0 4.2 0c0-1-.6-1.7-1.2-2.3-.5-.5-.9-1-.9-2.2Z"></path></svg>',
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>',
             },
             {
                 key: "coldcalling",
