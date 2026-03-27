@@ -12,6 +12,8 @@ const GEMINI_MODEL = GEMINI_MODEL_RAW.startsWith('models/')
   ? GEMINI_MODEL_RAW
   : `models/${GEMINI_MODEL_RAW}`;
 const GEMINI_VOICE = String(process.env.GEMINI_VOICE || 'Puck').trim();
+const BRIDGE_DEBUG_TOKEN = String(process.env.BRIDGE_DEBUG_TOKEN || '').trim();
+const BRIDGE_VERBOSE_LOGS = /^(1|true|yes)$/i.test(String(process.env.BRIDGE_VERBOSE_LOGS || ''));
 const SYSTEM_PROMPT = String(
   process.env.GEMINI_SYSTEM_PROMPT ||
     'Je bent een vriendelijke Nederlandse sales assistent. Praat kort, helder en natuurlijk.'
@@ -60,6 +62,29 @@ function buildGeminiWsUrl() {
   )}`;
 }
 
+function buildGeminiSetupPayload() {
+  return {
+    setup: {
+      model: GEMINI_MODEL,
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: GEMINI_VOICE,
+            },
+          },
+        },
+      },
+      systemInstruction: SYSTEM_PROMPT
+        ? {
+            parts: [{ text: SYSTEM_PROMPT }],
+          }
+        : undefined,
+    },
+  };
+}
+
 function extractInlineAudioParts(payload) {
   const out = [];
   const root = payload && typeof payload === 'object' ? payload : {};
@@ -88,6 +113,85 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 
+function isDebugRequestAuthorized(req) {
+  if (!BRIDGE_DEBUG_TOKEN) return true;
+  const queryToken = String(req.query?.token || '').trim();
+  const headerToken = String(req.get('x-bridge-debug-token') || '').trim();
+  return queryToken === BRIDGE_DEBUG_TOKEN || headerToken === BRIDGE_DEBUG_TOKEN;
+}
+
+function probeGeminiSetup(timeoutMs = 9000) {
+  return new Promise((resolve) => {
+    if (!GEMINI_API_KEY) {
+      resolve({ ok: false, stage: 'config', error: 'GEMINI_API_KEY/GOOGLE_API_KEY ontbreekt' });
+      return;
+    }
+
+    const ws = new WebSocket(buildGeminiWsUrl());
+    let done = false;
+    const timer = setTimeout(() => {
+      finish({
+        ok: false,
+        stage: 'timeout',
+        error: `Geen setupComplete binnen ${timeoutMs}ms`,
+      });
+    }, timeoutMs);
+
+    function finish(payload) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
+      } catch {}
+      resolve(payload);
+    }
+
+    ws.on('open', () => {
+      ws.send(JSON.stringify(buildGeminiSetupPayload()));
+    });
+
+    ws.on('message', (chunk) => {
+      const msg = safeJsonParse(chunk.toString('utf8'));
+      if (!msg || typeof msg !== 'object') return;
+      if (msg.setupComplete) {
+        finish({
+          ok: true,
+          stage: 'setupComplete',
+          model: GEMINI_MODEL,
+          voice: GEMINI_VOICE,
+        });
+        return;
+      }
+      if (msg.error) {
+        finish({
+          ok: false,
+          stage: 'server-error',
+          error: msg.error?.message || 'Onbekende Gemini server error',
+          details: msg.error || null,
+        });
+      }
+    });
+
+    ws.on('error', (error) => {
+      finish({
+        ok: false,
+        stage: 'socket-error',
+        error: error?.message || String(error),
+      });
+    });
+
+    ws.on('close', (code, reasonBuffer) => {
+      finish({
+        ok: false,
+        stage: 'socket-close',
+        code,
+        reason: Buffer.isBuffer(reasonBuffer) ? reasonBuffer.toString('utf8') : String(reasonBuffer || ''),
+      });
+    });
+  });
+}
+
 app.get('/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
@@ -100,6 +204,18 @@ app.get('/healthz', (_req, res) => {
 
 app.get('/', (_req, res) => {
   res.status(200).send('twilio-media-bridge up');
+});
+
+app.get('/debug/gemini-setup', async (req, res) => {
+  if (!isDebugRequestAuthorized(req)) {
+    return res.status(403).json({ ok: false, error: 'Forbidden' });
+  }
+  const timeoutMs = Math.max(3000, Math.min(20000, Number(req.query?.timeoutMs || 9000) || 9000));
+  const result = await probeGeminiSetup(timeoutMs);
+  return res.status(result.ok ? 200 : 500).json({
+    ...result,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 server.on('upgrade', (request, socket, head) => {
@@ -119,6 +235,8 @@ wss.on('connection', (twilioWs, _request, url) => {
   let closed = false;
   let geminiReady = false;
   let sentConfigError = false;
+  let twilioMediaInCount = 0;
+  let geminiAudioOutCount = 0;
 
   if (!GEMINI_API_KEY) {
     console.error('[Bridge] GEMINI_API_KEY/GOOGLE_API_KEY ontbreekt');
@@ -128,6 +246,7 @@ wss.on('connection', (twilioWs, _request, url) => {
 
   const stack = String(url.searchParams.get('stack') || '').trim() || 'gemini_flash_3_1_live';
   const geminiWs = new WebSocket(buildGeminiWsUrl());
+  const connectionStartedAtMs = Date.now();
 
   function closeBoth(reason = 'unknown') {
     if (closed) return;
@@ -141,27 +260,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   }
 
   geminiWs.on('open', () => {
-    const setupPayload = {
-      setup: {
-        model: GEMINI_MODEL,
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: GEMINI_VOICE,
-              },
-            },
-          },
-        },
-        systemInstruction: SYSTEM_PROMPT
-          ? {
-              parts: [{ text: SYSTEM_PROMPT }],
-            }
-          : undefined,
-      },
-    };
-    geminiWs.send(JSON.stringify(setupPayload));
+    geminiWs.send(JSON.stringify(buildGeminiSetupPayload()));
   });
 
   geminiWs.on('message', (chunk) => {
@@ -170,6 +269,14 @@ wss.on('connection', (twilioWs, _request, url) => {
 
     if (msg.setupComplete) {
       geminiReady = true;
+      if (BRIDGE_VERBOSE_LOGS) {
+        console.log(`[Bridge] setupComplete stack=${stack}`);
+      }
+      return;
+    }
+
+    if (msg.error) {
+      console.error('[Bridge] Gemini server error:', JSON.stringify(msg.error));
       return;
     }
 
@@ -192,6 +299,7 @@ wss.on('connection', (twilioWs, _request, url) => {
             media: { payload },
           })
         );
+        geminiAudioOutCount += 1;
       } catch (error) {
         console.error('[Bridge] Audio render fout:', error?.message || error);
       }
@@ -203,7 +311,11 @@ wss.on('connection', (twilioWs, _request, url) => {
     closeBoth('gemini-ws-error');
   });
 
-  geminiWs.on('close', () => {
+  geminiWs.on('close', (code, reasonBuffer) => {
+    const reason = Buffer.isBuffer(reasonBuffer) ? reasonBuffer.toString('utf8') : String(reasonBuffer || '');
+    console.warn(
+      `[Bridge] Gemini WS close code=${code} reason="${reason}" upMs=${Date.now() - connectionStartedAtMs} in=${twilioMediaInCount} out=${geminiAudioOutCount}`
+    );
     closeBoth('gemini-ws-close');
   });
 
@@ -212,6 +324,9 @@ wss.on('connection', (twilioWs, _request, url) => {
     if (!msg || typeof msg !== 'object') return;
 
     const event = String(msg.event || '').toLowerCase();
+    if (BRIDGE_VERBOSE_LOGS && event && event !== 'media') {
+      console.log(`[Bridge] Twilio event=${event}`);
+    }
     if (event === 'start') {
       streamSid = String(msg.start?.streamSid || '');
       return;
@@ -225,6 +340,7 @@ wss.on('connection', (twilioWs, _request, url) => {
     if (!geminiReady || geminiWs.readyState !== WebSocket.OPEN) return;
     const payload = String(msg.media?.payload || '');
     if (!payload) return;
+    twilioMediaInCount += 1;
 
     try {
       const ulaw = Uint8Array.from(Buffer.from(payload, 'base64'));
@@ -232,12 +348,10 @@ wss.on('connection', (twilioWs, _request, url) => {
       const pcmBuffer = int16ArrayToBuffer(pcm16);
       const realtimePayload = {
         realtimeInput: {
-          mediaChunks: [
-            {
-              mimeType: 'audio/pcm;rate=8000',
-              data: pcmBuffer.toString('base64'),
-            },
-          ],
+          audio: {
+            mimeType: 'audio/pcm;rate=8000',
+            data: pcmBuffer.toString('base64'),
+          },
         },
       };
       geminiWs.send(JSON.stringify(realtimePayload));
@@ -249,7 +363,11 @@ wss.on('connection', (twilioWs, _request, url) => {
     }
   });
 
-  twilioWs.on('close', () => {
+  twilioWs.on('close', (code, reasonBuffer) => {
+    const reason = Buffer.isBuffer(reasonBuffer) ? reasonBuffer.toString('utf8') : String(reasonBuffer || '');
+    console.warn(
+      `[Bridge] Twilio WS close code=${code} reason="${reason}" upMs=${Date.now() - connectionStartedAtMs} stream=${streamSid || '-'} in=${twilioMediaInCount} out=${geminiAudioOutCount}`
+    );
     closeBoth('twilio-close');
   });
 
