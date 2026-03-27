@@ -247,10 +247,40 @@ const knownPrettyPageSlugToFile = new Map(
     .map((file) => [file.replace(/\.html$/i, ''), file])
 );
 
+// Alleen premium personeelservaring blijft actief. Legacy/dubbele routes
+// sturen we hard door naar de premium varianten.
+const legacyPrettyPageRedirects = new Map([
+  ['personeel-dashboard', 'premium-personeel-dashboard'],
+  ['personeel-agenda', 'premium-personeel-agenda'],
+  ['personeel-login', 'premium-personeel-login'],
+  ['actieve-opdrachten', 'premium-actieve-opdrachten'],
+  ['ai-coldmailing', 'premium-ai-coldmailing'],
+  ['ai-lead-generator', 'premium-ai-lead-generator'],
+  ['seo-crm-system', 'premium-seo-crm-system'],
+  ['opdracht-preview', 'premium-opdracht-preview'],
+]);
+
 function toPrettyPagePathFromHtmlFile(fileName) {
   const base = String(fileName || '').replace(/\.html$/i, '');
   if (!base || base === 'index') return '/';
   return `/${base}`;
+}
+
+function resolveLegacyPrettyPageRedirect(slug) {
+  const normalizedSlug = String(slug || '')
+    .trim()
+    .toLowerCase();
+  if (!normalizedSlug) return '';
+  return legacyPrettyPageRedirects.get(normalizedSlug) || '';
+}
+
+function appendOriginalQuery(pathname, originalUrl) {
+  const basePath = String(pathname || '').trim() || '/';
+  const original = String(originalUrl || '');
+  const queryIndex = original.indexOf('?');
+  if (queryIndex < 0) return basePath;
+  const query = original.slice(queryIndex);
+  return `${basePath}${query}`;
 }
 
 app.disable('x-powered-by');
@@ -743,7 +773,7 @@ function createDashboardActivityEntry(input) {
     title: truncateText(normalizeString(input?.title || ''), 200) || 'Dashboard actie',
     detail: truncateText(normalizeString(input?.detail || input?.description || ''), 500),
     company: truncateText(normalizeString(input?.company || ''), 120),
-    source: truncateText(normalizeString(input?.source || 'personeel-dashboard'), 80),
+    source: truncateText(normalizeString(input?.source || 'premium-personeel-dashboard'), 80),
     actor: truncateText(normalizeString(input?.actor || ''), 120),
     taskId: Number.isFinite(Number(input?.taskId)) ? Number(input.taskId) : null,
     callId: truncateText(normalizeString(input?.callId || ''), 120),
@@ -7429,7 +7459,7 @@ app.post('/api/dashboard/activity', (req, res) => {
   const entry = appendDashboardActivity(
     {
       ...req.body,
-      source: normalizeString(req.body?.source || 'personeel-dashboard'),
+      source: normalizeString(req.body?.source || 'premium-personeel-dashboard'),
       actor: normalizeString(req.body?.actor || ''),
     },
     'dashboard_activity_manual'
@@ -9060,7 +9090,7 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
       actor,
       taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
       callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
-      source: 'personeel-dashboard',
+      source: 'premium-personeel-dashboard',
     },
     'dashboard_activity_complete_task'
   );
@@ -9279,14 +9309,18 @@ app.get('/:page', (req, res, next) => {
     return next();
   }
 
+  const slug = String(page || '').replace(/\.html$/i, '');
+  const legacyTarget = resolveLegacyPrettyPageRedirect(slug);
+  if (legacyTarget) {
+    return res.redirect(301, appendOriginalQuery(`/${legacyTarget}`, req.originalUrl));
+  }
+
   if (!knownHtmlPageFiles.has(page)) {
     return next();
   }
 
   const destination = toPrettyPagePathFromHtmlFile(page);
-  const queryIndex = req.originalUrl.indexOf('?');
-  const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
-  return res.redirect(301, `${destination}${query}`);
+  return res.redirect(301, appendOriginalQuery(destination, req.originalUrl));
 });
 
 app.get('/:slug', async (req, res, next) => {
@@ -9298,6 +9332,11 @@ app.get('/:slug', async (req, res, next) => {
 
   if (slug === 'index') {
     return res.redirect(301, '/');
+  }
+
+  const legacyTarget = resolveLegacyPrettyPageRedirect(slug);
+  if (legacyTarget) {
+    return res.redirect(301, appendOriginalQuery(`/${legacyTarget}`, req.originalUrl));
   }
 
   const fileName = knownPrettyPageSlugToFile.get(slug);
