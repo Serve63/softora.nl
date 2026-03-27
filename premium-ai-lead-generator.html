@@ -313,7 +313,7 @@
         .topbar-select-group {
             display: flex;
             flex-direction: column;
-            align-items: flex-start;
+            align-items: center;
             gap: 0.28rem;
         }
 
@@ -325,7 +325,8 @@
             letter-spacing: 0.16em;
             color: var(--text-tertiary);
             line-height: 1;
-            padding-left: 0.08rem;
+            width: 100%;
+            text-align: center;
         }
 
         .topbar-left h1 {
@@ -1656,7 +1657,7 @@
                 </div>
                 <div class="topbar-right">
                     <div class="topbar-select-group">
-                        <span class="topbar-select-label">Provider</span>
+                        <span class="topbar-select-label">Service</span>
                         <select class="form-select magnetic" id="statusPill" data-select-variant="pill" aria-label="Business modus">
                             <option value="websites" selected>Website's</option>
                             <option value="voice_software" disabled>🔒 Voicesoftware</option>
@@ -1664,7 +1665,7 @@
                         </select>
                     </div>
                     <div class="topbar-select-group">
-                        <span class="topbar-select-label">Service</span>
+                        <span class="topbar-select-label">Provider</span>
                         <select class="form-select magnetic" id="coldcallingStack" data-select-variant="pill" aria-label="Coldcalling stack">
                             <option value="retell_ai" selected>Retell AI</option>
                             <option value="gemini_flash_3_1_live">Gemini 3.1 Live</option>
