@@ -166,7 +166,7 @@
     const normalized = normalizeBusinessMode(mode);
     if (normalized === 'voice_software') {
       return {
-        title: 'Voice Software',
+        title: 'Voicesoftware',
         subtitle: 'Voice-agent campagne configureren & starten',
         leadListLabel: 'Bedrijvenregister',
         leadListGroup: 'Database',
@@ -961,7 +961,7 @@
 
   function getStatusPillModeLabel(mode) {
     const normalized = normalizeBusinessMode(mode);
-    if (normalized === 'voice_software') return 'Voice Software';
+    if (normalized === 'voice_software') return 'Voicesoftware';
     if (normalized === 'business_software') return 'Bedrijfssoftware';
     return "Website's";
   }
