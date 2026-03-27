@@ -605,6 +605,19 @@
             background: rgba(139, 34, 82, 0.12);
         }
 
+        .site-select-option:disabled {
+            color: var(--text-secondary);
+            opacity: 0.78;
+            cursor: not-allowed;
+        }
+
+        .site-select-option:disabled:hover,
+        .site-select-option:disabled:focus-visible {
+            background: transparent;
+            color: var(--text-secondary);
+            outline: none;
+        }
+
         .topbar-right .site-select--pill {
             flex: 0 0 auto;
             width: auto;
@@ -1632,8 +1645,8 @@
                     <select class="form-select magnetic" id="coldcallingStack" data-select-variant="pill" aria-label="Coldcalling stack">
                         <option value="retell_ai" selected>Retell AI</option>
                         <option value="gemini_flash_3_1_live">Gemini 3.1 Live</option>
-                        <option value="openai_realtime_1_5">OpenAI Realtime 1.5</option>
-                        <option value="hume_evi_3">Hume Evi 3</option>
+                        <option value="openai_realtime_1_5" disabled>🔒 OpenAI Realtime 1.5</option>
+                        <option value="hume_evi_3" disabled>🔒 Hume Evi 3</option>
                     </select>
                 </div>
             </div>
