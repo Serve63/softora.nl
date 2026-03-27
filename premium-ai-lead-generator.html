@@ -310,6 +310,24 @@
             flex-wrap: wrap;
         }
 
+        .topbar-select-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.28rem;
+        }
+
+        .topbar-select-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.56rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            color: var(--text-tertiary);
+            line-height: 1;
+            padding-left: 0.08rem;
+        }
+
         .topbar-left h1 {
             font-size: 2rem;
             font-weight: 700;
@@ -1637,17 +1655,23 @@
                     <p>Website-campagne configureren & starten</p>
                 </div>
                 <div class="topbar-right">
-                    <select class="form-select magnetic" id="statusPill" data-select-variant="pill" aria-label="Business modus">
-                        <option value="websites" selected>Website's</option>
-                        <option value="voice_software" disabled>🔒 Voicesoftware</option>
-                        <option value="business_software" disabled>🔒 Bedrijfssoftware</option>
-                    </select>
-                    <select class="form-select magnetic" id="coldcallingStack" data-select-variant="pill" aria-label="Coldcalling stack">
-                        <option value="retell_ai" selected>Retell AI</option>
-                        <option value="gemini_flash_3_1_live">Gemini 3.1 Live</option>
-                        <option value="openai_realtime_1_5" disabled>🔒 OpenAI Realtime 1.5</option>
-                        <option value="hume_evi_3" disabled>🔒 Hume Evi 3</option>
-                    </select>
+                    <div class="topbar-select-group">
+                        <span class="topbar-select-label">Provider</span>
+                        <select class="form-select magnetic" id="statusPill" data-select-variant="pill" aria-label="Business modus">
+                            <option value="websites" selected>Website's</option>
+                            <option value="voice_software" disabled>🔒 Voicesoftware</option>
+                            <option value="business_software" disabled>🔒 Bedrijfssoftware</option>
+                        </select>
+                    </div>
+                    <div class="topbar-select-group">
+                        <span class="topbar-select-label">Service</span>
+                        <select class="form-select magnetic" id="coldcallingStack" data-select-variant="pill" aria-label="Coldcalling stack">
+                            <option value="retell_ai" selected>Retell AI</option>
+                            <option value="gemini_flash_3_1_live">Gemini 3.1 Live</option>
+                            <option value="openai_realtime_1_5" disabled>🔒 OpenAI Realtime 1.5</option>
+                            <option value="hume_evi_3" disabled>🔒 Hume Evi 3</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
