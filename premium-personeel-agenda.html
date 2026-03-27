@@ -263,6 +263,9 @@
         .legend-dot {
             width: 8px; height: 8px; border-radius: 1px;
         }
+        .legend-dot.website { background: var(--accent); }
+        .legend-dot.business { background: var(--blue); }
+        .legend-dot.voice { background: var(--green); }
 
         /* Modal */
         .modal-overlay {
@@ -585,7 +588,7 @@
     <div class="modal">
         <div class="modal-top">
             <div>
-                <div class="modal-type-badge" id="modalBadge">Meeting</div>
+                <div class="modal-type-badge" id="modalBadge">Website Meeting</div>
                 <div class="modal-company" id="modalCompany">Bedrijf</div>
                 <div class="modal-contact" id="modalContact">Contact</div>
             </div>
@@ -734,7 +737,9 @@
             </div>
             <div class="calendar-grid" id="calendarGrid"></div>
             <div class="calendar-legend">
-                <div class="legend-item"><div class="legend-dot" style="background: var(--accent);"></div> Meeting</div>
+                <div class="legend-item"><div class="legend-dot website"></div> Website Meeting</div>
+                <div class="legend-item"><div class="legend-dot business"></div> Bedrijfssoftware Meeting</div>
+                <div class="legend-item"><div class="legend-dot voice"></div> Voice Software Meeting</div>
             </div>
         </div>
 
@@ -1635,7 +1640,7 @@
             // Zonder actieve opdrachten index blijven we op afspraakdata draaien.
         }
 
-        document.getElementById('modalBadge').textContent = 'Meeting';
+        document.getElementById('modalBadge').textContent = 'Website Meeting';
         document.getElementById('modalBadge').className = 'modal-type-badge meeting';
         document.getElementById('modalCompany').textContent = apt.company;
         document.getElementById('modalContact').textContent = `${apt.contact}  ·  ${apt.phone}`;

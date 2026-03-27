@@ -243,6 +243,9 @@
             letter-spacing: 0.1em; font-weight: 500;
         }
         .legend-dot { width: 8px; height: 8px; border-radius: 1px; }
+        .legend-dot.website { background: var(--accent-color); }
+        .legend-dot.business { background: #2563eb; }
+        .legend-dot.voice { background: #1f9b5a; }
 
         /* Modal */
         .modal-overlay {
@@ -356,7 +359,7 @@
     <div class="modal">
         <div class="modal-top">
             <div>
-                <div class="modal-type-badge" id="modalBadge">Meeting</div>
+                <div class="modal-type-badge" id="modalBadge">Website Meeting</div>
                 <div class="modal-company" id="modalCompany">Bedrijf</div>
                 <div class="modal-contact" id="modalContact">Contact</div>
             </div>
@@ -478,7 +481,9 @@
             </div>
             <div class="calendar-grid" id="calendarGrid"></div>
             <div class="calendar-legend">
-                <div class="legend-item"><div class="legend-dot" style="background: var(--accent-color);"></div> Meeting</div>
+                <div class="legend-item"><div class="legend-dot website"></div> Website Meeting</div>
+                <div class="legend-item"><div class="legend-dot business"></div> Bedrijfssoftware Meeting</div>
+                <div class="legend-item"><div class="legend-dot voice"></div> Voice Software Meeting</div>
             </div>
         </div>
 
@@ -607,7 +612,7 @@
     function openAppointment(id) {
         const apt = appointments.find((a) => a.id === id);
         if (!apt) return;
-        document.getElementById('modalBadge').textContent = 'Meeting';
+        document.getElementById('modalBadge').textContent = 'Website Meeting';
         document.getElementById('modalBadge').className = 'modal-type-badge meeting';
         document.getElementById('modalCompany').textContent = apt.company;
         document.getElementById('modalContact').textContent = `${apt.contact}  ·  ${apt.phone}`;
