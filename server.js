@@ -4020,6 +4020,43 @@ function mapAppointmentToConfirmationTask(appointment) {
   );
   if (!needsConfirmation || alreadyDone) return null;
 
+  const callId = normalizeString(appointment.callId || '');
+  const callUpdate = callId ? getLatestCallUpdateByCallId(callId) : null;
+  const rawProvider = normalizeString(callUpdate?.provider || appointment?.provider || '').toLowerCase();
+  const normalizedStack = normalizeColdcallingStack(
+    callUpdate?.stack || appointment?.coldcallingStack || appointment?.callingStack || appointment?.callingEngine || ''
+  );
+  const stackLabel = normalizeString(
+    callUpdate?.stackLabel || appointment?.coldcallingStackLabel || getColdcallingStackLabel(normalizedStack)
+  );
+  const providerText = normalizeString(
+    [
+      stackLabel,
+      normalizedStack,
+      appointment?.coldcallingStackLabel,
+      appointment?.coldcallingStack,
+      appointment?.source,
+      appointment?.summary,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  ).toLowerCase();
+
+  let providerLabel = '';
+  if (stackLabel) {
+    providerLabel = stackLabel;
+  } else if (/gemini/.test(providerText)) {
+    providerLabel = 'Gemini 3.1 Live';
+  } else if (/openai|realtime/.test(providerText)) {
+    providerLabel = 'OpenAI Realtime 1.5';
+  } else if (/hume/.test(providerText)) {
+    providerLabel = 'Hume Evi 3';
+  } else if (/retell/.test(providerText) || rawProvider === 'retell') {
+    providerLabel = 'Retell AI';
+  } else if (/twilio/.test(providerText) || rawProvider === 'twilio') {
+    providerLabel = 'Twilio';
+  }
+
   return {
     id: Number(appointment.id) || 0,
     type: 'send_confirmation_email',
@@ -4057,6 +4094,10 @@ function mapAppointmentToConfirmationTask(appointment) {
       normalizeString(appointment.confirmationAppointmentCancelledAt || '') || null,
     appointmentCancelledBy:
       normalizeString(appointment.confirmationAppointmentCancelledBy || '') || null,
+    provider: rawProvider || '',
+    providerLabel: providerLabel || '',
+    coldcallingStack: normalizedStack || '',
+    coldcallingStackLabel: stackLabel || '',
   };
 }
 

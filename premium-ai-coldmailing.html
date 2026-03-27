@@ -1130,7 +1130,7 @@
             let pollTimer = null;
             let activeTaskId = 0;
             let modalBusy = false;
-            const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v1';
+            const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v2';
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
@@ -1859,6 +1859,51 @@
                 return 'Coldcalling';
             }
 
+            function resolveLeadProvider(item) {
+                const directLabel = String(
+                    item?.providerLabel || item?.coldcallingStackLabel || item?.stackLabel || ''
+                ).trim();
+                if (directLabel) {
+                    return directLabel;
+                }
+
+                const stackRaw = normalize(
+                    item?.coldcallingStack || item?.stack || item?.callingStack || item?.callingEngine
+                ).replace(/[\s-]+/g, '_');
+                if (stackRaw === 'retell_ai') return 'Retell AI';
+                if (stackRaw === 'gemini_flash_3_1_live' || stackRaw === 'gemini_3_1_live' || stackRaw === 'gemini') {
+                    return 'Gemini 3.1 Live';
+                }
+                if (stackRaw === 'openai_realtime_1_5' || stackRaw === 'openai_realtime' || stackRaw === 'openai') {
+                    return 'OpenAI Realtime 1.5';
+                }
+                if (stackRaw === 'hume_evi_3' || stackRaw === 'hume_evi' || stackRaw === 'hume') {
+                    return 'Hume Evi 3';
+                }
+
+                const providerRaw = normalize(item?.provider || '');
+                if (providerRaw === 'retell') return 'Retell AI';
+                if (providerRaw === 'twilio') return 'Twilio';
+
+                const sourceText = normalize(
+                    [
+                        item?.source,
+                        item?.summary,
+                        item?.whatsappInfo,
+                        item?.location,
+                        item?.coldcallingStackLabel,
+                        item?.coldcallingStack,
+                    ].join(' ')
+                );
+                if (/gemini/.test(sourceText)) return 'Gemini 3.1 Live';
+                if (/openai|realtime/.test(sourceText)) return 'OpenAI Realtime 1.5';
+                if (/hume/.test(sourceText)) return 'Hume Evi 3';
+                if (/retell/.test(sourceText)) return 'Retell AI';
+                if (/twilio/.test(sourceText)) return 'Twilio';
+
+                return 'Onbekend';
+            }
+
             function renderList() {
                 if (!allLeads.length) {
                     listEl.innerHTML = '<div class="lead-empty">Nog geen leads gevonden.</div>';
@@ -1870,6 +1915,7 @@
                     const company = esc(companyRaw);
                     const leadTypeClass = leadTypeToClass(resolveLeadType(item));
                     const leadOrigin = esc(resolveLeadOrigin(item));
+                    const leadProvider = esc(resolveLeadProvider(item));
                     const chipClass = 'pending';
                     const chipLabel = 'LEAD';
                     const taskId = Number(item.id) || 0;
@@ -1882,6 +1928,7 @@
                             <div>
                                 <div class="lead-name">${company}</div>
                                 <div class="lead-meta"><span class="lead-meta-label">Bron:</span> ${leadOrigin}</div>
+                                <div class="lead-meta"><span class="lead-meta-label">Provider:</span> ${leadProvider}</div>
                             </div>
                             <span class="lead-chip ${chipClass}">${chipLabel}</span>
                         </article>
@@ -1929,6 +1976,12 @@
                             item?.audio_url ||
                             ''
                     ).trim(),
+                    provider: String(item?.provider || '').trim().toLowerCase(),
+                    providerLabel: String(item?.providerLabel || '').trim(),
+                    coldcallingStack: String(
+                        item?.coldcallingStack || item?.callingStack || item?.callingEngine || item?.stack || ''
+                    ).trim().toLowerCase(),
+                    coldcallingStackLabel: String(item?.coldcallingStackLabel || item?.stackLabel || '').trim(),
                     leadType: String(
                         item?.leadType ||
                             item?.lead_type ||
@@ -1973,6 +2026,12 @@
                     if (!existing.location && row.location) existing.location = row.location;
                     if (!existing.whatsappInfo && row.whatsappInfo) existing.whatsappInfo = row.whatsappInfo;
                     if (!existing.recordingUrl && row.recordingUrl) existing.recordingUrl = row.recordingUrl;
+                    if (!existing.provider && row.provider) existing.provider = row.provider;
+                    if (!existing.providerLabel && row.providerLabel) existing.providerLabel = row.providerLabel;
+                    if (!existing.coldcallingStack && row.coldcallingStack) existing.coldcallingStack = row.coldcallingStack;
+                    if (!existing.coldcallingStackLabel && row.coldcallingStackLabel) {
+                        existing.coldcallingStackLabel = row.coldcallingStackLabel;
+                    }
                     if (!existing.leadType && row.leadType) existing.leadType = row.leadType;
                     map.set(key, existing);
                 });
