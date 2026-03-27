@@ -366,11 +366,13 @@
         if (p.indexOf("/premium-personeel-agenda") === 0) return "agenda";
         if (p.indexOf("/premium-ai-coldmailing") === 0) return "leads";
         if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldcalling";
+        if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
         if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
         if (p.indexOf("/premium-pakketten") === 0) return "packages";
         if (p.indexOf("/premium-pdfs") === 0) return "pdfs";
         if (p.indexOf("/premium-instellingen") === 0) return "settings";
+        if (p.indexOf("/premium-kladblok") === 0) return "notepad";
         if (p.indexOf("/premium-financiele-kosten") === 0 || p.indexOf("/premium-maandelijkse-kosten") === 0) {
             return "monthly_costs";
         }
@@ -421,6 +423,12 @@
                 label: "Coldcalling",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg>',
             },
+            {
+                key: "coldmailing",
+                href: "/premium-bevestigingsmails",
+                label: "Coldmailing",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
+            },
         ];
 
         const managementLinks = [
@@ -452,16 +460,22 @@
 
         const extraLinks = [
             {
-                key: "monthly_costs",
-                href: "/premium-maandelijkse-kosten",
+                key: "notepad",
+                href: "/premium-kladblok",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg>',
-                label: "Maandelijkse kosten",
+                label: "Kladblok",
             },
             {
                 key: "analytics",
                 href: "/premium-analytics",
                 label: "Google analytics",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg>',
+            },
+            {
+                key: "monthly_costs",
+                href: "/premium-maandelijkse-kosten",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg>',
+                label: "Maandelijkse kosten",
             },
             {
                 key: "settings",
@@ -508,16 +522,7 @@
         if (!sidebar) return;
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
         const activeKey = getSidebarActiveKey(pathname);
-
-        // If sidebar HTML was pre-built in the template, only update the active class.
-        if (sidebar.dataset.sidebarReady === "true") {
-            sidebar.querySelectorAll(".sidebar-link[data-sidebar-key]").forEach(function (link) {
-                link.classList.toggle("active", link.dataset.sidebarKey === activeKey);
-            });
-            return;
-        }
-
-        // Fallback: full rebuild (for pages without pre-built sidebar HTML).
+        // Rebuild altijd zodat de sidebar op elke pagina exact dezelfde structuur/labels heeft.
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
         sidebar.dataset.sidebarReady = "true";
     }

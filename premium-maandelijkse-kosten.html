@@ -23,11 +23,7 @@
     </script>
     <script src="assets/personnel-theme.js" defer></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Inter', sans-serif;
@@ -43,7 +39,7 @@
         }
 
         .sidebar {
-            width: 280px;
+            width: 320px;
             position: fixed;
             top: 0;
             left: 0;
@@ -54,14 +50,14 @@
         }
 
         .main-content {
-            margin-left: 280px;
-            width: calc(100% - 280px);
+            margin-left: 320px;
+            width: calc(100% - 320px);
             min-height: 100vh;
             padding: clamp(1.2rem, 2.4vw, 2rem);
         }
 
         .costs-shell {
-            width: min(1160px, 100%);
+            width: min(1280px, 100%);
             margin: 0 auto;
             display: grid;
             gap: 1rem;
@@ -72,72 +68,145 @@
             align-items: flex-end;
             justify-content: space-between;
             gap: 1rem;
-            padding-bottom: 0.25rem;
         }
 
         .costs-title {
             font-family: 'Oswald', sans-serif;
-            font-size: clamp(2rem, 4vw, 3rem);
+            font-size: clamp(2.45rem, 3vw, 3.2rem);
             text-transform: uppercase;
             letter-spacing: 0.03em;
             line-height: 1;
         }
 
         .costs-subtitle {
-            margin-top: 0.35rem;
-            font-size: 1.02rem;
+            margin-top: 0.4rem;
             color: var(--text-secondary);
+            font-size: 1.02rem;
         }
 
-        .editor-sheet {
+        .add-row-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text-primary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.02rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            border-radius: 12px;
+            padding: 0.7rem 1.05rem;
+            cursor: pointer;
+            transition: border-color 0.2s ease, background 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .add-row-btn:hover {
+            border-color: rgba(143, 35, 96, 0.35);
+            background: rgba(143, 35, 96, 0.05);
+        }
+
+        .costs-table-card {
             background: #fff;
             border: 1px solid var(--border);
             border-radius: 14px;
             box-shadow: 0 14px 40px rgba(20, 18, 34, 0.05);
-            display: flex;
-            flex-direction: column;
-            min-height: calc(100vh - 7.6rem);
-            padding: 1rem 1.1rem 1.2rem;
+            overflow: hidden;
         }
 
-        .editor-toolbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 0.8rem;
-            padding: 0.25rem 0.25rem 0.85rem;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 0.85rem;
-        }
-
-        .editor-toolbar h2 {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-tertiary);
-        }
-
-        .cost-editor {
-            flex: 1;
+        .table-scroll {
+            overflow-x: auto;
             width: 100%;
-            min-height: 540px;
-            padding: 0.4rem 0.45rem;
-            outline: none;
-            border: 0;
-            background: transparent;
-            color: var(--text-primary);
-            font-size: 1rem;
-            line-height: 1.7;
-            white-space: pre-wrap;
-            word-break: break-word;
-            overflow-wrap: anywhere;
-            cursor: text;
         }
 
-        .cost-editor:empty::before {
-            content: attr(data-placeholder);
+        .costs-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 980px;
+        }
+
+        .costs-table thead th {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
             color: var(--text-tertiary);
+            text-align: left;
+            padding: 1rem 1rem 0.8rem;
+            border-bottom: 1px solid var(--border);
+            background: rgba(248, 248, 251, 0.88);
+            white-space: nowrap;
+        }
+
+        .costs-table tbody td {
+            padding: 0.55rem 1rem;
+            border-bottom: 1px solid rgba(180, 182, 195, 0.32);
+            vertical-align: middle;
+        }
+
+        .costs-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .cost-input {
+            width: 100%;
+            min-height: 45px;
+            padding: 0.7rem 0.75rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            font-size: 1rem;
+            color: var(--text-primary);
+            background: #fff;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .cost-input:focus {
+            border-color: rgba(143, 35, 96, 0.42);
+            box-shadow: 0 0 0 3px rgba(143, 35, 96, 0.1);
+        }
+
+        .remove-row-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: #8f2360;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.6rem 0.8rem;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .remove-row-btn:hover {
+            border-color: rgba(143, 35, 96, 0.4);
+            background: rgba(143, 35, 96, 0.08);
+        }
+
+        .table-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.8rem;
+            padding: 0.95rem 1rem 1rem;
+            border-top: 1px solid var(--border);
+            background: rgba(248, 248, 251, 0.7);
+        }
+
+        .total-monthly {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.55rem;
+            font-family: 'Oswald', sans-serif;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-size: 0.93rem;
+            color: var(--text-secondary);
+        }
+
+        .total-monthly strong {
+            color: var(--text-primary);
+            font-size: 1.4rem;
+            letter-spacing: 0.02em;
         }
 
         @media (max-width: 900px) {
@@ -158,113 +227,254 @@
                 align-items: flex-start;
             }
 
-            .editor-sheet {
-                min-height: 76vh;
-            }
-
-            .editor-toolbar {
-                flex-direction: column;
-                align-items: flex-start;
+            .table-footer {
+                flex-wrap: wrap;
             }
         }
     </style>
 </head>
 <body>
     <div class="dashboard-layout">
-        <aside class="sidebar" data-sidebar-ready="true">
-<a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
-<nav class="sidebar-nav">
-  <div class="sidebar-section sidebar-flow-section">
-    <div class="sidebar-section-label">Overzicht</div>
-    <a href="/premium-personeel-dashboard" class="sidebar-link magnetic" data-sidebar-key="dashboard"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span class="sidebar-link-text">Dashboard</span></a>
-    <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic" data-sidebar-key="active_orders"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="sidebar-link-text">Actieve Opdrachten</span></a>
-    <a href="/premium-personeel-agenda" class="sidebar-link magnetic" data-sidebar-key="agenda"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg><span class="sidebar-link-text">Agenda</span></a>
-    <a href="/premium-ai-coldmailing" class="sidebar-link magnetic" data-sidebar-key="leads"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2.8c.2 2.3-1 3.6-2.2 4.9-1.1 1.2-2.2 2.5-2.2 4.6a4.4 4.4 0 1 0 8.8 0c0-2.4-1.4-3.8-2.7-5.1-1.1-1.1-2.1-2.1-1.7-4.4Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 9.6c.1 1.2-.5 1.9-1.1 2.5-.5.6-1 1.1-1 2a2.1 2.1 0 1 0 4.2 0c0-1-.6-1.7-1.2-2.3-.5-.5-.9-1-.9-2.2Z"></path></svg><span class="sidebar-link-text">Leads</span><span class="sidebar-notification-badge" data-sidebar-count-key="leads" hidden>0</span></a>
-    <a href="/premium-ai-lead-generator" class="sidebar-link magnetic" data-sidebar-key="coldcalling"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg><span class="sidebar-link-text">Coldcalling</span></a>
-    <a href="/premium-bevestigingsmails" class="sidebar-link magnetic" data-sidebar-key="coldmailing"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Coldmailing</span></a>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-section-label">Beheer</div>
-    <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
-    <a href="/premium-seo" class="sidebar-link magnetic" data-sidebar-key="seo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span class="sidebar-link-text">SEO</span></a>
-    <a href="/premium-pakketten" class="sidebar-link magnetic" data-sidebar-key="packages"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg><span class="sidebar-link-text">Pakketten</span></a>
-    <a href="/premium-pdfs" class="sidebar-link magnetic" data-sidebar-key="pdfs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span class="sidebar-link-text">PDF'S</span></a>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-section-label">Extra</div>
-    <a href="/premium-maandelijkse-kosten" class="sidebar-link magnetic active" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Maandelijkse kosten</span></a>
-    <a href="/premium-analytics" class="sidebar-link magnetic" data-sidebar-key="analytics"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg><span class="sidebar-link-text">Google analytics</span></a>
-    <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
-  </div>
-</nav>
-<div class="sidebar-footer">
-  <div class="sidebar-user">
-    <div class="sidebar-avatar">SP</div>
-    <div class="sidebar-user-info">
-      <div class="sidebar-user-name">Softora Premium</div>
-      <div class="sidebar-user-role">Administrator</div>
-    </div>
-    <a href="/premium-personeel-login" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg></a>
-  </div>
-</div>
-</aside>
+        <aside class="sidebar"></aside>
         <main class="main-content">
             <section class="costs-shell">
                 <header class="costs-head">
                     <div>
                         <h1 class="costs-title">Maandelijkse kosten</h1>
-                        <p class="costs-subtitle">Typ hier direct je kostenoverzicht.</p>
+                        <p class="costs-subtitle">Vul hier je producten en vaste maandelijkse kosten in rijen in.</p>
                     </div>
+                    <button id="addRowTop" class="add-row-btn" type="button">+ Regel toevoegen</button>
                 </header>
-                <article class="editor-sheet">
-                    <div class="editor-toolbar">
-                        <h2>Kosten notities</h2>
+
+                <article class="costs-table-card">
+                    <div class="table-scroll">
+                        <table class="costs-table" aria-label="Maandelijkse kosten overzicht">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30%">Product / dienst</th>
+                                    <th style="width: 22%">Categorie</th>
+                                    <th style="width: 18%">Kosten p/m (EUR)</th>
+                                    <th style="width: 25%">Notitie</th>
+                                    <th style="width: 5%"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="monthlyCostsRows"></tbody>
+                        </table>
                     </div>
-                    <div
-                        id="costEditor"
-                        class="cost-editor"
-                        contenteditable="true"
-                        spellcheck="true"
-                        data-placeholder="Typ hier je volledige maandelijkse kostenoverzicht..."
-                        aria-label="Maandelijkse kosten notities"
-                    ></div>
+                    <footer class="table-footer">
+                        <button id="addRowBottom" class="add-row-btn" type="button">+ Regel toevoegen</button>
+                        <div class="total-monthly">
+                            <span>Totaal per maand</span>
+                            <strong id="monthlyTotal">EUR 0,00</strong>
+                        </div>
+                    </footer>
                 </article>
             </section>
         </main>
     </div>
+
     <script>
         (function () {
-            const storageKey = 'softora_premium_monthly_costs_notes_v1';
-            const editor = document.getElementById('costEditor');
-            if (!editor) return;
+            const storageKey = 'softora_premium_monthly_cost_rows_v1';
+            const tbody = document.getElementById('monthlyCostsRows');
+            const totalEl = document.getElementById('monthlyTotal');
+            const addRowTop = document.getElementById('addRowTop');
+            const addRowBottom = document.getElementById('addRowBottom');
 
-            const save = () => {
+            if (!tbody || !totalEl || !addRowTop || !addRowBottom) return;
+
+            const euroFormatter = new Intl.NumberFormat('nl-NL', {
+                style: 'currency',
+                currency: 'EUR',
+            });
+
+            function newRow(overrides) {
+                const input = overrides && typeof overrides === 'object' ? overrides : {};
+                return {
+                    id: String(input.id || ('row_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9))),
+                    product: String(input.product || ''),
+                    category: String(input.category || ''),
+                    amount: String(input.amount || ''),
+                    note: String(input.note || ''),
+                };
+            }
+
+            function loadRows() {
                 try {
-                    localStorage.setItem(storageKey, editor.innerHTML);
+                    const raw = localStorage.getItem(storageKey);
+                    if (!raw) return [newRow()];
+                    const parsed = JSON.parse(raw);
+                    if (!Array.isArray(parsed)) return [newRow()];
+                    const cleaned = parsed
+                        .filter(function (row) { return row && typeof row === 'object'; })
+                        .map(function (row) { return newRow(row); })
+                        .slice(0, 200);
+                    return cleaned.length ? cleaned : [newRow()];
+                } catch (error) {
+                    return [newRow()];
+                }
+            }
+
+            let rows = loadRows();
+            let saveTimer = 0;
+
+            function saveRows() {
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify(rows));
                 } catch (error) {
                     /* ignore storage errors */
                 }
-            };
-
-            try {
-                const cached = localStorage.getItem(storageKey);
-                if (cached) {
-                    editor.innerHTML = cached;
-                }
-            } catch (error) {
-                /* ignore storage errors */
             }
 
-            let saveTimer = 0;
-            editor.addEventListener('input', () => {
+            function scheduleSave() {
                 window.clearTimeout(saveTimer);
-                saveTimer = window.setTimeout(save, 280);
+                saveTimer = window.setTimeout(saveRows, 240);
+            }
+
+            function normalizeAmount(value) {
+                const normalized = String(value || '')
+                    .replace(/\s+/g, '')
+                    .replace(',', '.')
+                    .replace(/[^0-9.-]/g, '');
+                const parsed = Number.parseFloat(normalized);
+                if (!Number.isFinite(parsed)) return 0;
+                return Math.max(parsed, 0);
+            }
+
+            function buildInput(field, value, placeholder) {
+                const input = document.createElement('input');
+                input.className = 'cost-input';
+                input.type = 'text';
+                input.dataset.field = field;
+                input.value = value;
+                input.placeholder = placeholder;
+                input.autocomplete = 'off';
+                return input;
+            }
+
+            function render() {
+                tbody.innerHTML = '';
+
+                rows.forEach(function (row) {
+                    const tr = document.createElement('tr');
+                    tr.dataset.rowId = row.id;
+
+                    const productCell = document.createElement('td');
+                    productCell.appendChild(buildInput('product', row.product, 'Bijv. Retell AI licentie'));
+                    tr.appendChild(productCell);
+
+                    const categoryCell = document.createElement('td');
+                    categoryCell.appendChild(buildInput('category', row.category, 'Bijv. Software'));
+                    tr.appendChild(categoryCell);
+
+                    const amountCell = document.createElement('td');
+                    amountCell.appendChild(buildInput('amount', row.amount, '0,00'));
+                    tr.appendChild(amountCell);
+
+                    const noteCell = document.createElement('td');
+                    noteCell.appendChild(buildInput('note', row.note, 'Optioneel'));
+                    tr.appendChild(noteCell);
+
+                    const removeCell = document.createElement('td');
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'remove-row-btn';
+                    removeButton.textContent = 'X';
+                    removeButton.dataset.removeRow = row.id;
+                    removeButton.setAttribute('aria-label', 'Verwijder regel');
+                    removeCell.appendChild(removeButton);
+                    tr.appendChild(removeCell);
+
+                    tbody.appendChild(tr);
+                });
+
+                const total = rows.reduce(function (sum, row) {
+                    return sum + normalizeAmount(row.amount);
+                }, 0);
+                totalEl.textContent = euroFormatter.format(total);
+            }
+
+            function addRow() {
+                rows.push(newRow());
+                render();
+                scheduleSave();
+                const lastProductInput = tbody.querySelector('tr:last-child input[data-field="product"]');
+                if (lastProductInput) lastProductInput.focus();
+            }
+
+            async function removeRow(rowId) {
+                if (!rowId) return;
+
+                let approved = true;
+                if (window.SoftoraDialog && typeof window.SoftoraDialog.confirm === 'function') {
+                    approved = await window.SoftoraDialog.confirm('Weet je zeker dat je deze kostenregel wilt verwijderen?', {
+                        title: 'Regel verwijderen',
+                        confirmText: 'Verwijderen',
+                        cancelText: 'Annuleren',
+                    });
+                }
+                if (!approved) return;
+
+                rows = rows.filter(function (row) {
+                    return row.id !== rowId;
+                });
+
+                if (!rows.length) {
+                    rows = [newRow()];
+                }
+
+                render();
+                scheduleSave();
+            }
+
+            tbody.addEventListener('input', function (event) {
+                const target = event.target;
+                if (!(target instanceof HTMLInputElement)) return;
+
+                const field = String(target.dataset.field || '');
+                if (!field) return;
+
+                const rowElement = target.closest('tr[data-row-id]');
+                const rowId = rowElement ? String(rowElement.dataset.rowId || '') : '';
+                if (!rowId) return;
+
+                const row = rows.find(function (item) {
+                    return item.id === rowId;
+                });
+                if (!row) return;
+
+                row[field] = target.value;
+                const total = rows.reduce(function (sum, item) {
+                    return sum + normalizeAmount(item.amount);
+                }, 0);
+                totalEl.textContent = euroFormatter.format(total);
+                scheduleSave();
             });
 
-            window.addEventListener('beforeunload', () => {
-                window.clearTimeout(saveTimer);
-                save();
+            tbody.addEventListener('click', function (event) {
+                const target = event.target;
+                if (!(target instanceof Element)) return;
+                const btn = target.closest('[data-remove-row]');
+                if (!btn) return;
+                event.preventDefault();
+                const rowId = String(btn.getAttribute('data-remove-row') || '');
+                removeRow(rowId);
             });
+
+            addRowTop.addEventListener('click', function () {
+                addRow();
+            });
+
+            addRowBottom.addEventListener('click', function () {
+                addRow();
+            });
+
+            window.addEventListener('beforeunload', function () {
+                window.clearTimeout(saveTimer);
+                saveRows();
+            });
+
+            render();
         })();
     </script>
 </body>
