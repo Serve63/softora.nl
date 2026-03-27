@@ -2055,7 +2055,7 @@ function normalizeColdcallingStack(value) {
 
 function getColdcallingStackLabel(stack) {
   const normalized = normalizeColdcallingStack(stack);
-  if (normalized === 'gemini_flash_3_1_live') return 'Gemini Flash 3.1 Live';
+  if (normalized === 'gemini_flash_3_1_live') return 'Gemini 3.1 Live';
   if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
   if (normalized === 'hume_evi_3') return 'Hume Evi 3';
   return 'Retell AI';
