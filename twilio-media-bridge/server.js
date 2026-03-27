@@ -15,6 +15,10 @@ const GEMINI_MODEL = GEMINI_MODEL_RAW.startsWith('models/')
 const GEMINI_VOICE = String(process.env.GEMINI_VOICE || 'Puck').trim();
 const BRIDGE_DEBUG_TOKEN = String(process.env.BRIDGE_DEBUG_TOKEN || '').trim();
 const BRIDGE_VERBOSE_LOGS = /^(1|true|yes)$/i.test(String(process.env.BRIDGE_VERBOSE_LOGS || ''));
+const GEMINI_WS_HANDSHAKE_TIMEOUT_MS = Math.max(
+  3000,
+  Math.min(20000, Number(process.env.GEMINI_WS_HANDSHAKE_TIMEOUT_MS || 10000) || 10000)
+);
 const GEMINI_SYSTEM_PROMPT_LOCKED = !/^(0|false|no)$/i.test(
   String(process.env.GEMINI_SYSTEM_PROMPT_LOCKED || 'true')
 );
@@ -137,7 +141,10 @@ function safeJsonParse(text) {
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ noServer: true });
+const wss = new WebSocket.Server({
+  noServer: true,
+  perMessageDeflate: false,
+});
 
 function isDebugRequestAuthorized(req) {
   if (!BRIDGE_DEBUG_TOKEN) return true;
@@ -224,6 +231,11 @@ app.get('/healthz', (_req, res) => {
     service: 'twilio-media-bridge',
     geminiConfigured: Boolean(GEMINI_API_KEY),
     model: GEMINI_MODEL,
+    voice: GEMINI_VOICE,
+    latencyTuning: {
+      wsPerMessageDeflate: false,
+      geminiHandshakeTimeoutMs: GEMINI_WS_HANDSHAKE_TIMEOUT_MS,
+    },
     prompt: {
       source: SYSTEM_PROMPT_SOURCE,
       customConfigured: Boolean(CUSTOM_SYSTEM_PROMPT),
@@ -259,6 +271,9 @@ server.on('upgrade', (request, socket, head) => {
     socket.destroy();
     return;
   }
+  try {
+    socket.setNoDelay(true);
+  } catch {}
   wss.handleUpgrade(request, socket, head, (ws) => {
     wss.emit('connection', ws, request, url);
   });
@@ -287,8 +302,16 @@ wss.on('connection', (twilioWs, _request, url) => {
   }
 
   const stack = String(url.searchParams.get('stack') || '').trim() || 'gemini_flash_3_1_live';
-  const geminiWs = new WebSocket(buildGeminiWsUrl());
+  const geminiWs = new WebSocket(buildGeminiWsUrl(), {
+    perMessageDeflate: false,
+    handshakeTimeout: GEMINI_WS_HANDSHAKE_TIMEOUT_MS,
+  });
   const connectionStartedAtMs = Date.now();
+  try {
+    if (twilioWs?._socket && typeof twilioWs._socket.setNoDelay === 'function') {
+      twilioWs._socket.setNoDelay(true);
+    }
+  } catch {}
 
   function closeBoth(reason = 'unknown') {
     if (closed) return;
@@ -302,6 +325,11 @@ wss.on('connection', (twilioWs, _request, url) => {
   }
 
   geminiWs.on('open', () => {
+    try {
+      if (geminiWs?._socket && typeof geminiWs._socket.setNoDelay === 'function') {
+        geminiWs._socket.setNoDelay(true);
+      }
+    } catch {}
     geminiWs.send(JSON.stringify(buildGeminiSetupPayload()));
   });
 
