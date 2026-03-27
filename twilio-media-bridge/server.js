@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const crypto = require('crypto');
 const http = require('http');
 const express = require('express');
 const WebSocket = require('ws');
@@ -14,10 +15,35 @@ const GEMINI_MODEL = GEMINI_MODEL_RAW.startsWith('models/')
 const GEMINI_VOICE = String(process.env.GEMINI_VOICE || 'Puck').trim();
 const BRIDGE_DEBUG_TOKEN = String(process.env.BRIDGE_DEBUG_TOKEN || '').trim();
 const BRIDGE_VERBOSE_LOGS = /^(1|true|yes)$/i.test(String(process.env.BRIDGE_VERBOSE_LOGS || ''));
-const SYSTEM_PROMPT = String(
-  process.env.GEMINI_SYSTEM_PROMPT ||
-    'Je bent een vriendelijke Nederlandse sales assistent. Praat kort, helder en natuurlijk.'
-).trim();
+const GEMINI_SYSTEM_PROMPT_LOCKED = !/^(0|false|no)$/i.test(
+  String(process.env.GEMINI_SYSTEM_PROMPT_LOCKED || 'true')
+);
+const GEMINI_REQUIRE_CUSTOM_PROMPT = /^(1|true|yes)$/i.test(
+  String(process.env.GEMINI_REQUIRE_CUSTOM_PROMPT || 'true')
+);
+const DEFAULT_SYSTEM_PROMPT = 'Je bent een vriendelijke Nederlandse sales assistent. Praat kort, helder en natuurlijk.';
+const CUSTOM_SYSTEM_PROMPT = String(process.env.GEMINI_SYSTEM_PROMPT || '').replace(/\r/g, '').trim();
+const SYSTEM_PROMPT = (CUSTOM_SYSTEM_PROMPT || DEFAULT_SYSTEM_PROMPT).trim();
+const SYSTEM_PROMPT_SOURCE = CUSTOM_SYSTEM_PROMPT ? 'env:GEMINI_SYSTEM_PROMPT' : 'fallback:default';
+const SYSTEM_PROMPT_FINGERPRINT = crypto
+  .createHash('sha256')
+  .update(SYSTEM_PROMPT)
+  .digest('hex')
+  .slice(0, 16);
+
+const PROMPT_OVERRIDE_QUERY_KEYS = [
+  'prompt',
+  'system_prompt',
+  'systemPrompt',
+  'system_instruction',
+  'systemInstruction',
+  'instructions',
+];
+
+function hasPromptOverrideHints(searchParams) {
+  if (!searchParams || typeof searchParams.get !== 'function') return false;
+  return PROMPT_OVERRIDE_QUERY_KEYS.some((key) => String(searchParams.get(key) || '').trim().length > 0);
+}
 
 function int16ArrayToBuffer(pcm) {
   const out = Buffer.allocUnsafe(pcm.length * 2);
@@ -198,6 +224,14 @@ app.get('/healthz', (_req, res) => {
     service: 'twilio-media-bridge',
     geminiConfigured: Boolean(GEMINI_API_KEY),
     model: GEMINI_MODEL,
+    prompt: {
+      source: SYSTEM_PROMPT_SOURCE,
+      customConfigured: Boolean(CUSTOM_SYSTEM_PROMPT),
+      locked: GEMINI_SYSTEM_PROMPT_LOCKED,
+      requireCustom: GEMINI_REQUIRE_CUSTOM_PROMPT,
+      length: SYSTEM_PROMPT.length,
+      fingerprint: SYSTEM_PROMPT_FINGERPRINT,
+    },
     timestamp: new Date().toISOString(),
   });
 });
@@ -242,6 +276,14 @@ wss.on('connection', (twilioWs, _request, url) => {
     console.error('[Bridge] GEMINI_API_KEY/GOOGLE_API_KEY ontbreekt');
     twilioWs.close(1011, 'GEMINI_API_KEY ontbreekt');
     return;
+  }
+  if (GEMINI_REQUIRE_CUSTOM_PROMPT && !CUSTOM_SYSTEM_PROMPT) {
+    console.error('[Bridge] GEMINI_SYSTEM_PROMPT ontbreekt terwijl GEMINI_REQUIRE_CUSTOM_PROMPT=true');
+    twilioWs.close(1011, 'GEMINI_SYSTEM_PROMPT ontbreekt');
+    return;
+  }
+  if (GEMINI_SYSTEM_PROMPT_LOCKED && hasPromptOverrideHints(url.searchParams)) {
+    console.warn('[Bridge] Prompt override hints in query gedetecteerd en genegeerd (prompt lock actief).');
   }
 
   const stack = String(url.searchParams.get('stack') || '').trim() || 'gemini_flash_3_1_live';
