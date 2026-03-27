@@ -6503,10 +6503,26 @@ function sendTwimlXml(res, xml) {
   return res.status(200).send(xml);
 }
 
+function mapTwilioInboundDigitToStack(digitValue) {
+  const digit = normalizeString(digitValue);
+  if (digit === '1') return 'retell_ai';
+  if (digit === '2') return 'gemini_flash_3_1_live';
+  return '';
+}
+
+function buildTwilioInboundSelectionActionUrl(req) {
+  const base = getEffectivePublicBaseUrl(req);
+  const candidate = base ? `${base}/api/twilio/voice` : '';
+  return normalizeAbsoluteHttpUrl(candidate) || '/api/twilio/voice';
+}
+
 function handleTwilioInboundVoice(req, res) {
   const caller = normalizeString(req.body?.From || req.query?.From || '');
-  const rawStack = normalizeString(req.query?.stack || req.body?.stack || 'retell_ai');
-  const stack = normalizeColdcallingStack(rawStack);
+  const rawStack = normalizeString(req.query?.stack || req.body?.stack || '');
+  const explicitStack = rawStack ? normalizeColdcallingStack(rawStack) : '';
+  const rawDigits = normalizeString(req.body?.Digits || req.query?.Digits || '');
+  const stackFromDigit = mapTwilioInboundDigitToStack(rawDigits);
+  const stack = normalizeColdcallingStack(explicitStack || stackFromDigit || 'retell_ai');
   const callSid = normalizeString(req.body?.CallSid || req.query?.CallSid || '');
   const to = normalizeString(req.body?.To || req.query?.To || '');
   const from = normalizeString(req.body?.From || req.query?.From || '');
@@ -6521,6 +6537,34 @@ function handleTwilioInboundVoice(req, res) {
     );
   }
 
+  if (!explicitStack) {
+    if (!rawDigits) {
+      const actionUrl = buildTwilioInboundSelectionActionUrl(req);
+      return sendTwimlXml(
+        res,
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather input="dtmf" numDigits="1" timeout="7" action="${escapeHtml(actionUrl)}" method="POST">
+    <Say language="nl-NL" voice="alice">Maak een keuze. Toets 1 voor Retell A I. Toets 2 voor Gemini 3 punt 1 Live.</Say>
+  </Gather>
+  <Say language="nl-NL" voice="alice">Geen keuze ontvangen. Het gesprek wordt nu beeindigd.</Say>
+  <Hangup />
+</Response>`
+      );
+    }
+
+    if (!stackFromDigit) {
+      return sendTwimlXml(
+        res,
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="nl-NL" voice="alice">Ongeldige keuze. Het gesprek wordt nu beeindigd.</Say>
+  <Hangup />
+</Response>`
+      );
+    }
+  }
+
   const mediaWsBaseUrl = getTwilioMediaWsUrlForStack(stack);
   const mediaWsUrl = appendQueryParamsToUrl(mediaWsBaseUrl, {
     stack,
@@ -6529,12 +6573,18 @@ function handleTwilioInboundVoice(req, res) {
     from,
   });
   if (!/^wss?:\/\//i.test(mediaWsUrl)) {
-    return res.status(500).json({
-      ok: false,
-      error: 'TWILIO_MEDIA_WS_URL ontbreekt of is ongeldig (verwacht ws:// of wss:// URL).',
-      value: mediaWsBaseUrl || null,
-      stack,
-    });
+    console.error(
+      '[Twilio Voice] Ongeldige media WS URL',
+      JSON.stringify({ stack, value: mediaWsBaseUrl || null }, null, 2)
+    );
+    return sendTwimlXml(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="nl-NL" voice="alice">De provider is tijdelijk niet beschikbaar. Probeer het later opnieuw.</Say>
+  <Hangup />
+</Response>`
+    );
   }
 
   return sendTwimlXml(
