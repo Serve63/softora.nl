@@ -3677,6 +3677,19 @@
 
   function isQualifiedPhoneConversation(call) {
     const statusText = normalizeSearchText(`${call?.status || ''} ${call?.endedReason || ''}`);
+    const messageType = normalizeSearchText(String(call?.messageType || ''));
+    const hasConversationContent = Boolean(
+      String(call?.summary || '').trim() ||
+      String(call?.transcriptSnippet || '').trim() ||
+      String(call?.transcriptFull || '').trim()
+    );
+    const hasRecording = Boolean(getCallRecordingUrl(call));
+    const hasKnownDuration = Number.isFinite(Number(call?.durationSeconds)) && Number(call.durationSeconds) > 0;
+    const looksLikeInboundStreamCall =
+      /twilio\.(inbound\.selected|stream\.stream-started|stream\.stream-stopped|stream\.stream-error)/.test(
+        messageType
+      );
+
     if (
       /(not[_ -]?connected|no[_ -]?answer|unanswered|failed|dial[_ -]?failed|busy|voicemail|initiated|queued|ringing|cancelled|canceled|rejected|error)/.test(
         statusText
@@ -3688,7 +3701,9 @@
     const answered = inferConversationAnswered(call);
     if (answered === false) return false;
 
-    return Boolean(getCallRecordingUrl(call));
+    if (hasRecording || hasConversationContent || hasKnownDuration) return true;
+    if (looksLikeInboundStreamCall) return true;
+    return false;
   }
 
   function getLeadDatabaseFilterBucket(record) {

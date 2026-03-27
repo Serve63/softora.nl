@@ -1727,30 +1727,49 @@ function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
   if (!payload || typeof payload !== 'object') return null;
   const fallbackStack = normalizeColdcallingStack(options.stack);
   const callId = normalizeString(payload?.CallSid || payload?.sid || options.callId || '');
-  const status = normalizeString(payload?.CallStatus || payload?.status || '').toLowerCase();
-  const phone = normalizeString(payload?.To || payload?.to || payload?.Called || '');
+  const streamEvent = normalizeString(payload?.StreamEvent || payload?.stream_event || '').toLowerCase();
+  const direction = normalizeString(
+    payload?.Direction || payload?.direction || payload?.CallDirection || payload?.call_direction || options.direction || ''
+  ).toLowerCase();
+  let status = normalizeString(payload?.CallStatus || payload?.status || '').toLowerCase();
+  if (!status && streamEvent) {
+    if (streamEvent === 'stream-started') status = 'in_progress';
+    else if (streamEvent === 'stream-stopped') status = 'completed';
+    else if (streamEvent === 'stream-error') status = 'failed';
+  }
+  const toNumber = normalizeString(payload?.To || payload?.to || payload?.Called || '');
+  const fromNumber = normalizeString(payload?.From || payload?.from || payload?.Caller || '');
+  const phone = direction.includes('inbound') ? fromNumber || toNumber : toNumber || fromNumber;
   const startedAt =
     parseDateToIso(payload?.StartTime || payload?.start_time || payload?.date_created || payload?.Timestamp) || '';
   const endedAt =
     parseDateToIso(payload?.EndTime || payload?.end_time) ||
-    (isTerminalColdcallingStatus(status, '') ? new Date().toISOString() : '');
+    (isTerminalColdcallingStatus(status, '') || streamEvent === 'stream-stopped' ? new Date().toISOString() : '');
   const endedReason = normalizeString(
-    payload?.CallStatusReason || payload?.ErrorMessage || payload?.DialCallStatus || payload?.SipResponseCode || ''
+    payload?.CallStatusReason ||
+      payload?.ErrorMessage ||
+      payload?.DialCallStatus ||
+      payload?.SipResponseCode ||
+      payload?.StreamError ||
+      ''
   );
   const durationSeconds = parseNumberSafe(payload?.CallDuration || payload?.duration, null);
   const recordingUrl = normalizeString(payload?.RecordingUrl || payload?.recording_url || '');
   const updatedAtMs = Date.now();
   const stackLabel = getColdcallingStackLabel(fallbackStack);
+  const messageType = streamEvent ? `twilio.stream.${streamEvent}` : `twilio.status.${status || 'unknown'}`;
 
   if (!callId && !status && !phone) return null;
 
   return {
     callId: callId || `twilio-anon-${updatedAtMs}`,
     phone,
-    company: normalizeString(payload?.Company || payload?.company || ''),
-    name: normalizeString(payload?.LeadName || payload?.name || ''),
+    company: normalizeString(payload?.Company || payload?.company || payload?.LeadCompany || payload?.leadCompany || ''),
+    name: normalizeString(
+      payload?.LeadName || payload?.name || payload?.CallerName || payload?.callerName || ''
+    ),
     status,
-    messageType: `twilio.status.${status || 'unknown'}`,
+    messageType,
     summary: normalizeString(payload?.summary || ''),
     transcriptSnippet: '',
     transcriptFull: '',
@@ -6572,6 +6591,31 @@ function handleTwilioInboundVoice(req, res) {
     to,
     from,
   });
+  const inboundStartedAt = new Date().toISOString();
+  if (callSid) {
+    upsertRecentCallUpdate({
+      callId: callSid,
+      phone: caller || from,
+      company: normalizeString(req.body?.CallerName || req.query?.CallerName || caller || ''),
+      name: normalizeString(req.body?.CallerName || req.query?.CallerName || ''),
+      status: 'in_progress',
+      messageType: 'twilio.inbound.selected',
+      summary: `Inkomende call gestart via ${getColdcallingStackLabel(stack)}.`,
+      transcriptSnippet: '',
+      transcriptFull: '',
+      endedReason: '',
+      startedAt: inboundStartedAt,
+      endedAt: '',
+      durationSeconds: null,
+      recordingUrl: '',
+      updatedAt: inboundStartedAt,
+      updatedAtMs: Date.now(),
+      provider: 'twilio',
+      stack,
+      stackLabel: getColdcallingStackLabel(stack),
+    });
+  }
+
   if (!/^wss?:\/\//i.test(mediaWsUrl)) {
     console.error(
       '[Twilio Voice] Ongeldige media WS URL',
@@ -6587,12 +6631,24 @@ function handleTwilioInboundVoice(req, res) {
     );
   }
 
+  let streamStatusCallbackUrl = '';
+  try {
+    streamStatusCallbackUrl = buildTwilioStatusCallbackUrl(stack, {
+      publicBaseUrl: getEffectivePublicBaseUrl(req),
+    });
+  } catch (_) {
+    streamStatusCallbackUrl = '';
+  }
+  const streamStatusAttributes = streamStatusCallbackUrl
+    ? ` statusCallback="${escapeHtml(streamStatusCallbackUrl)}" statusCallbackMethod="POST"`
+    : '';
+
   return sendTwimlXml(
     res,
     `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="${escapeHtml(mediaWsUrl)}" />
+    <Stream url="${escapeHtml(mediaWsUrl)}"${streamStatusAttributes} />
   </Connect>
 </Response>`
   );
