@@ -4180,7 +4180,7 @@
                   const intent = inferPhoneConversationIntent(call, decisionByPhoneKey);
                   const isNegative = intent === 'geen_interesse';
                   const isPositive = intent === 'interesse';
-                  const status = isNegative ? 'Geen interesse' : isPositive ? 'Interesse' : 'Onbekend';
+                  const status = isNegative ? 'Geen interesse' : isPositive ? 'Interesse' : 'Geen duidelijke interesse';
                   const statusBg = isNegative
                     ? getConversationThemeMode() === 'light'
                       ? '#ffe9ed'
