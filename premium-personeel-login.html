@@ -557,12 +557,12 @@
             <form class="login-form" id="loginForm" onsubmit="return handleLogin(event)">
                 <div class="form-group">
                     <label class="form-label" for="email">E-mailadres</label>
-                    <input type="email" id="email" class="form-input magnetic" placeholder="naam@softora.nl" autocomplete="email">
+                    <input type="email" id="email" name="email" class="form-input magnetic" placeholder="naam@softora.nl" autocomplete="email" required>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="password">Wachtwoord</label>
-                    <input type="password" id="password" class="form-input magnetic" placeholder="••••••••" autocomplete="current-password">
+                    <input type="password" id="password" name="password" class="form-input magnetic" placeholder="••••••••" autocomplete="current-password" required>
                 </div>
 
                 <div class="form-row">
@@ -570,7 +570,7 @@
                         <input type="checkbox" id="remember" class="magnetic">
                         <label for="remember">Onthoud mij</label>
                     </div>
-                    <a href="#" class="forgot-link magnetic">Wachtwoord vergeten?</a>
+                    <a href="mailto:info@softora.nl?subject=Wachtwoord%20reset%20Softora%20Premium" class="forgot-link magnetic">Wachtwoord vergeten?</a>
                 </div>
 
                 <button type="submit" class="login-btn magnetic">Inloggen</button>
@@ -648,26 +648,117 @@
             });
         }
 
-        function handleLogin(e) {
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMsg');
+            errorMsg.querySelector('span').textContent = message;
+            errorMsg.classList.add('show');
+        }
+
+        function hideError() {
+            const errorMsg = document.getElementById('errorMsg');
+            errorMsg.classList.remove('show');
+        }
+
+        function getNextPath() {
+            const params = new URLSearchParams(window.location.search);
+            const next = params.get('next') || '';
+            if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('://')) {
+                return '/premium-personeel-dashboard';
+            }
+            return next;
+        }
+
+        async function syncLoginState() {
+            const params = new URLSearchParams(window.location.search);
+            try {
+                const response = await fetch('/api/auth/session', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                });
+
+                if (!response.ok) return;
+                const payload = await response.json();
+                if (payload && payload.authenticated && !params.has('logout')) {
+                    window.location.replace(getNextPath());
+                    return;
+                }
+
+                if (params.get('setup') === '1' || payload.configured === false) {
+                    showError('Premium login is nog niet geconfigureerd op de server.');
+                }
+            } catch (_) {
+                if (params.get('setup') === '1') {
+                    showError('Premium login is nog niet geconfigureerd op de server.');
+                }
+            }
+        }
+
+        async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('email');
             const password = document.getElementById('password');
-            const errorMsg = document.getElementById('errorMsg');
             const btn = document.querySelector('.login-btn');
+            const remember = document.getElementById('remember');
+            const originalBtnText = btn.textContent;
 
             email.classList.remove('error');
             password.classList.remove('error');
-            errorMsg.classList.remove('show');
+            hideError();
             btn.textContent = 'Bezig...';
             btn.style.opacity = '0.7';
             btn.disabled = true;
 
-            window.setTimeout(() => {
-                window.location.href = '/premium-personeel-dashboard';
-            }, 450);
+            if (!email.value.trim()) email.classList.add('error');
+            if (!password.value.trim()) password.classList.add('error');
+
+            if (!email.value.trim() || !password.value.trim()) {
+                showError('Vul je e-mailadres en wachtwoord in.');
+                btn.textContent = originalBtnText;
+                btn.style.opacity = '1';
+                btn.disabled = false;
+                return false;
+            }
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        email: email.value.trim(),
+                        password: password.value,
+                        remember: remember.checked,
+                        next: getNextPath()
+                    })
+                });
+
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.ok) {
+                    const errorMessage = (payload && payload.error) || 'Inloggen mislukt.';
+                    email.classList.add('error');
+                    password.classList.add('error');
+                    showError(errorMessage);
+                    return false;
+                }
+
+                window.location.assign(payload.next || getNextPath());
+                return false;
+            } catch (_) {
+                showError('De server reageert niet. Probeer het opnieuw.');
+                return false;
+            } finally {
+                btn.textContent = originalBtnText;
+                btn.style.opacity = '1';
+                btn.disabled = false;
+            }
 
             return false;
         }
+
+        syncLoginState();
     </script>
 </body>
 </html>

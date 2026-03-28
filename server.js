@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
@@ -11,7 +13,9 @@ const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT) || 3000;
+const IS_PRODUCTION = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
 const RETELL_API_BASE_URL = process.env.RETELL_API_BASE_URL || 'https://api.retellai.com';
 const TWILIO_API_BASE_URL = process.env.TWILIO_API_BASE_URL || 'https://api.twilio.com';
 const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || '').trim();
@@ -96,6 +100,20 @@ const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY |
 const SUPABASE_STATE_TABLE = String(process.env.SUPABASE_STATE_TABLE || 'softora_runtime_state').trim();
 const SUPABASE_STATE_KEY = String(process.env.SUPABASE_STATE_KEY || 'core').trim();
 const DEFAULT_TWILIO_MEDIA_WS_URL = 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media';
+const PREMIUM_LOGIN_EMAIL = String(process.env.PREMIUM_LOGIN_EMAIL || '').trim().toLowerCase();
+const PREMIUM_LOGIN_PASSWORD = String(process.env.PREMIUM_LOGIN_PASSWORD || '').trim();
+const PREMIUM_LOGIN_PASSWORD_HASH = String(process.env.PREMIUM_LOGIN_PASSWORD_HASH || '').trim();
+const PREMIUM_SESSION_SECRET = String(process.env.PREMIUM_SESSION_SECRET || '').trim();
+const PREMIUM_SESSION_TTL_HOURS = Math.max(
+  1,
+  Math.min(24 * 30, Number(process.env.PREMIUM_SESSION_TTL_HOURS || 12) || 12)
+);
+const PREMIUM_SESSION_REMEMBER_TTL_DAYS = Math.max(
+  1,
+  Math.min(365, Number(process.env.PREMIUM_SESSION_REMEMBER_TTL_DAYS || 30) || 30)
+);
+const PREMIUM_SESSION_COOKIE_NAME = 'softora_premium_session';
+const PREMIUM_PUBLIC_HTML_FILES = new Set(['premium-website.html', 'premium-personeel-login.html']);
 const MAIL_SMTP_HOST = String(
   process.env.MAIL_SMTP_HOST || process.env.SMTP_HOST || process.env.STRATO_SMTP_HOST || ''
 ).trim();
@@ -335,6 +353,39 @@ function appendQueryParamsToUrl(rawUrl, params = {}) {
 app.disable('x-powered-by');
 
 app.use(
+  helmet({
+    frameguard: { action: 'deny' },
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        objectSrc: ["'none'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+        scriptSrcAttr: ["'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+        connectSrc: ["'self'", 'https:'],
+        mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        upgradeInsecureRequests: IS_PRODUCTION ? [] : null,
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    hsts: IS_PRODUCTION
+      ? {
+          maxAge: 31536000,
+          includeSubDomains: true,
+          preload: true,
+        }
+      : false,
+  })
+);
+
+app.use(
   express.json({
     limit: '8mb',
     verify: (req, _res, buf) => {
@@ -342,6 +393,33 @@ app.use(
     },
   })
 );
+
+const generalApiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: (req) => isPremiumPublicApiRequest(req),
+  handler: (_req, res) =>
+    res.status(429).json({
+      ok: false,
+      error: 'Te veel verzoeken. Probeer het over enkele minuten opnieuw.',
+    }),
+});
+
+const premiumLoginRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 8,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: (_req, res) =>
+    res.status(429).json({
+      ok: false,
+      error: 'Te veel inlogpogingen. Wacht 10 minuten en probeer opnieuw.',
+    }),
+});
+
+app.use('/api', generalApiRateLimiter);
 
 app.use((req, _res, next) => {
   const requestPath = String(req.path || '');
@@ -370,6 +448,291 @@ function parseNumberSafe(value, fallback = null) {
 function normalizeString(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
   return String(value).trim();
+}
+
+function getRequestPathname(req) {
+  const rawUrl = normalizeString(req?.originalUrl || req?.url || req?.path || '/');
+  const questionMarkIndex = rawUrl.indexOf('?');
+  return questionMarkIndex >= 0 ? rawUrl.slice(0, questionMarkIndex) : rawUrl;
+}
+
+function toBase64Url(value) {
+  return Buffer.from(String(value || ''), 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function fromBase64Url(value) {
+  const normalized = normalizeString(value);
+  if (!normalized) return '';
+  const padded = normalized.replace(/-/g, '+').replace(/_/g, '/');
+  const remainder = padded.length % 4;
+  const suffix = remainder === 0 ? '' : '='.repeat(4 - remainder);
+  return Buffer.from(`${padded}${suffix}`, 'base64').toString('utf8');
+}
+
+function createHmacSha256Base64Url(value, secret) {
+  return crypto
+    .createHmac('sha256', String(secret || ''))
+    .update(String(value || ''))
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function timingSafeEqualStrings(left, right) {
+  const leftValue = String(left || '');
+  const rightValue = String(right || '');
+  const leftBuffer = Buffer.from(leftValue, 'utf8');
+  const rightBuffer = Buffer.from(rightValue, 'utf8');
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function buildCookieMap(req) {
+  const headerValue = normalizeString(req?.headers?.cookie || '');
+  const map = new Map();
+  if (!headerValue) return map;
+
+  headerValue.split(/;\s*/).forEach((entry) => {
+    const separatorIndex = entry.indexOf('=');
+    if (separatorIndex <= 0) return;
+    const key = normalizeString(entry.slice(0, separatorIndex));
+    if (!key) return;
+    const rawValue = entry.slice(separatorIndex + 1);
+    try {
+      map.set(key, decodeURIComponent(rawValue));
+    } catch {
+      map.set(key, rawValue);
+    }
+  });
+
+  return map;
+}
+
+function isSecureHttpRequest(req) {
+  if (req?.secure) return true;
+  const forwardedProto = normalizeString(req?.get?.('x-forwarded-proto') || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  return forwardedProto === 'https';
+}
+
+function buildSetCookieHeader(name, value, options = {}) {
+  const parts = [`${name}=${encodeURIComponent(normalizeString(value))}`];
+  const pathValue = normalizeString(options.path || '/');
+  if (pathValue) parts.push(`Path=${pathValue}`);
+  parts.push('HttpOnly');
+  parts.push(`SameSite=${normalizeString(options.sameSite || 'Lax') || 'Lax'}`);
+
+  if (options.secure) parts.push('Secure');
+
+  if (Number.isFinite(Number(options.maxAgeSeconds))) {
+    const maxAgeSeconds = Math.max(0, Math.floor(Number(options.maxAgeSeconds)));
+    parts.push(`Max-Age=${maxAgeSeconds}`);
+    const expiresAt = new Date(Date.now() + maxAgeSeconds * 1000);
+    parts.push(`Expires=${expiresAt.toUTCString()}`);
+  }
+
+  return parts.join('; ');
+}
+
+function isPremiumAuthConfigured() {
+  return Boolean(
+    PREMIUM_LOGIN_EMAIL &&
+      PREMIUM_SESSION_SECRET &&
+      (PREMIUM_LOGIN_PASSWORD || PREMIUM_LOGIN_PASSWORD_HASH)
+  );
+}
+
+function normalizePremiumSessionEmail(value) {
+  return normalizeString(value).toLowerCase();
+}
+
+function createPremiumSessionToken({ email, maxAgeMs }) {
+  if (!isPremiumAuthConfigured()) return '';
+  const ttlMs = Math.max(60_000, Number(maxAgeMs) || PREMIUM_SESSION_TTL_HOURS * 60 * 60 * 1000);
+  const payload = {
+    email: normalizePremiumSessionEmail(email),
+    iat: Date.now(),
+    exp: Date.now() + ttlMs,
+  };
+  const encodedPayload = toBase64Url(JSON.stringify(payload));
+  const signature = createHmacSha256Base64Url(encodedPayload, PREMIUM_SESSION_SECRET);
+  return `${encodedPayload}.${signature}`;
+}
+
+function readPremiumSessionTokenFromRequest(req) {
+  const cookies = buildCookieMap(req);
+  return normalizeString(cookies.get(PREMIUM_SESSION_COOKIE_NAME) || '');
+}
+
+function verifyPremiumSessionToken(token) {
+  const rawToken = normalizeString(token);
+  if (!rawToken || !PREMIUM_SESSION_SECRET) {
+    return {
+      ok: false,
+      expired: false,
+      payload: null,
+    };
+  }
+
+  const separatorIndex = rawToken.lastIndexOf('.');
+  if (separatorIndex <= 0) {
+    return { ok: false, expired: false, payload: null };
+  }
+
+  const encodedPayload = rawToken.slice(0, separatorIndex);
+  const signature = rawToken.slice(separatorIndex + 1);
+  const expectedSignature = createHmacSha256Base64Url(encodedPayload, PREMIUM_SESSION_SECRET);
+  if (!timingSafeEqualStrings(signature, expectedSignature)) {
+    return { ok: false, expired: false, payload: null };
+  }
+
+  try {
+    const payload = JSON.parse(fromBase64Url(encodedPayload));
+    const email = normalizePremiumSessionEmail(payload?.email);
+    const expiresAtMs = Number(payload?.exp || 0);
+    if (!email || email !== PREMIUM_LOGIN_EMAIL || !Number.isFinite(expiresAtMs)) {
+      return { ok: false, expired: false, payload: null };
+    }
+    if (expiresAtMs <= Date.now()) {
+      return { ok: false, expired: true, payload: payload || null };
+    }
+    return {
+      ok: true,
+      expired: false,
+      payload,
+    };
+  } catch {
+    return { ok: false, expired: false, payload: null };
+  }
+}
+
+function getPremiumAuthState(req) {
+  const configured = isPremiumAuthConfigured();
+  if (!configured) {
+    return {
+      configured: false,
+      authenticated: false,
+      expired: false,
+      email: '',
+      expiresAt: null,
+      token: '',
+    };
+  }
+
+  const token = readPremiumSessionTokenFromRequest(req);
+  const verification = verifyPremiumSessionToken(token);
+  return {
+    configured: true,
+    authenticated: Boolean(verification.ok),
+    expired: Boolean(verification.expired),
+    email: normalizePremiumSessionEmail(verification?.payload?.email || ''),
+    expiresAt: Number(verification?.payload?.exp || 0) || null,
+    token,
+  };
+}
+
+function buildPremiumSessionCookieHeader(req, token, maxAgeMs) {
+  return buildSetCookieHeader(PREMIUM_SESSION_COOKIE_NAME, token, {
+    path: '/',
+    sameSite: 'Lax',
+    secure: isSecureHttpRequest(req) || IS_PRODUCTION,
+    maxAgeSeconds: Math.max(1, Math.floor(Number(maxAgeMs || 0) / 1000)),
+  });
+}
+
+function setPremiumSessionCookie(req, res, token, maxAgeMs) {
+  res.append('Set-Cookie', buildPremiumSessionCookieHeader(req, token, maxAgeMs));
+}
+
+function clearPremiumSessionCookie(req, res) {
+  res.append(
+    'Set-Cookie',
+    buildSetCookieHeader(PREMIUM_SESSION_COOKIE_NAME, '', {
+      path: '/',
+      sameSite: 'Lax',
+      secure: isSecureHttpRequest(req) || IS_PRODUCTION,
+      maxAgeSeconds: 0,
+    })
+  );
+}
+
+function verifyPremiumPasswordHash(password, passwordHash) {
+  const rawPassword = String(password || '');
+  const rawHash = normalizeString(passwordHash);
+  if (!rawPassword || !rawHash) return false;
+
+  if (/^sha256:/i.test(rawHash)) {
+    const expectedHex = rawHash.replace(/^sha256:/i, '').trim().toLowerCase();
+    const digestHex = crypto.createHash('sha256').update(rawPassword).digest('hex').toLowerCase();
+    return timingSafeEqualStrings(digestHex, expectedHex);
+  }
+
+  if (/^scrypt:/i.test(rawHash)) {
+    const [, saltBase64 = '', derivedKeyBase64 = ''] = rawHash.split(':');
+    if (!saltBase64 || !derivedKeyBase64) return false;
+    try {
+      const salt = Buffer.from(saltBase64, 'base64');
+      const expectedBuffer = Buffer.from(derivedKeyBase64, 'base64');
+      const derivedBuffer = crypto.scryptSync(rawPassword, salt, expectedBuffer.length);
+      return crypto.timingSafeEqual(derivedBuffer, expectedBuffer);
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+function isPremiumPasswordValid(password) {
+  const rawPassword = String(password || '');
+  if (!rawPassword) return false;
+  if (PREMIUM_LOGIN_PASSWORD_HASH) {
+    return verifyPremiumPasswordHash(rawPassword, PREMIUM_LOGIN_PASSWORD_HASH);
+  }
+  if (!PREMIUM_LOGIN_PASSWORD) return false;
+  return timingSafeEqualStrings(rawPassword, PREMIUM_LOGIN_PASSWORD);
+}
+
+function getSafePremiumRedirectPath(rawTarget, fallback = '/premium-personeel-dashboard') {
+  const target = normalizeString(rawTarget);
+  if (!target) return fallback;
+  if (!target.startsWith('/')) return fallback;
+  if (target.startsWith('//')) return fallback;
+  if (target.includes('://')) return fallback;
+  return target;
+}
+
+function isPremiumProtectedHtmlFile(fileNameRaw) {
+  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
+  if (!fileName) return false;
+  return /^premium-/i.test(fileName) && !PREMIUM_PUBLIC_HTML_FILES.has(fileName);
+}
+
+function isPremiumPublicApiRequest(req) {
+  const method = normalizeString(req?.method || 'GET').toUpperCase();
+  const requestPath = normalizeString(getRequestPathname(req) || '');
+  if (!requestPath.startsWith('/')) return false;
+
+  const publicExactMatches = new Set([
+    '/api/healthz',
+    '/api/auth/login',
+    '/api/auth/logout',
+    '/api/auth/session',
+    '/api/twilio/voice',
+    '/api/twilio/status',
+    '/api/retell/webhook',
+  ]);
+
+  if (publicExactMatches.has(requestPath)) return true;
+  if (requestPath === '/api/twilio/voice' && (method === 'GET' || method === 'POST')) return true;
+  return false;
 }
 
 function escapeHtml(value) {
@@ -1429,6 +1792,41 @@ async function sendSeoManagedHtmlPageResponse(req, res, next, fileNameRaw) {
   const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
   if (!fileName) return next();
 
+  const isLoginPage = fileName === 'premium-personeel-login.html';
+  const isProtectedPremiumPage = isPremiumProtectedHtmlFile(fileName);
+  const authState = getPremiumAuthState(req);
+  const logoutRequested = isLoginPage && /^(1|true|yes)$/i.test(String(req.query?.logout || ''));
+  const requestedPath = getSafePremiumRedirectPath(req.originalUrl || req.url || req.path || '/');
+
+  if (logoutRequested) {
+    clearPremiumSessionCookie(req, res);
+  }
+
+  if (isLoginPage) {
+    res.setHeader('Cache-Control', 'no-store, private');
+    if (!logoutRequested && authState.authenticated) {
+      const nextPath = getSafePremiumRedirectPath(req.query?.next || '', '/premium-personeel-dashboard');
+      return res.redirect(302, nextPath);
+    }
+  }
+
+  if (isProtectedPremiumPage) {
+    res.setHeader('Cache-Control', 'no-store, private');
+
+    if (!authState.configured) {
+      const setupRedirect = `/premium-personeel-login?setup=1&next=${encodeURIComponent(requestedPath)}`;
+      return res.redirect(302, setupRedirect);
+    }
+
+    if (!authState.authenticated) {
+      if (authState.expired) {
+        clearPremiumSessionCookie(req, res);
+      }
+      const loginRedirect = `/premium-personeel-login?next=${encodeURIComponent(requestedPath)}`;
+      return res.redirect(302, loginRedirect);
+    }
+  }
+
   try {
     const html = await readHtmlPageContent(fileName);
     if (!html) return next();
@@ -1438,6 +1836,9 @@ async function sendSeoManagedHtmlPageResponse(req, res, next, fileNameRaw) {
     return res.status(200).send(rendered);
   } catch (error) {
     console.error('[SEO][RenderPageError]', fileName, error?.message || error);
+    if (isLoginPage || isProtectedPremiumPage) {
+      res.setHeader('Cache-Control', 'no-store, private');
+    }
     return res.sendFile(path.join(__dirname, fileName), (sendErr) => {
       if (sendErr) next();
     });
@@ -6824,7 +7225,75 @@ function buildTwilioInboundSelectionActionUrl(req) {
   return normalizeAbsoluteHttpUrl(candidate) || '/api/twilio/voice';
 }
 
+function buildAbsoluteRequestUrl(req) {
+  const originalUrl = normalizeString(req?.originalUrl || req?.url || req?.path || '');
+  const publicBaseUrl = normalizeAbsoluteHttpUrl(getEffectivePublicBaseUrl(req));
+  if (publicBaseUrl) {
+    try {
+      return new URL(originalUrl || '/', publicBaseUrl).toString();
+    } catch {
+      return `${publicBaseUrl.replace(/\/+$/, '')}${originalUrl || '/'}`;
+    }
+  }
+
+  const protocol = isSecureHttpRequest(req) ? 'https' : 'http';
+  const host = normalizeString(req?.get?.('host') || '');
+  if (!host) return originalUrl || '/';
+  return `${protocol}://${host}${originalUrl || '/'}`;
+}
+
+function isTwilioSignatureValid(req) {
+  const twilioAuthToken = normalizeString(process.env.TWILIO_AUTH_TOKEN);
+  const signatureHeader = normalizeString(req.get('x-twilio-signature'));
+  if (!twilioAuthToken || !signatureHeader) return false;
+
+  const absoluteUrl = buildAbsoluteRequestUrl(req);
+  const params =
+    req && req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const sortedKeys = Object.keys(params).sort();
+  const signaturePayload = sortedKeys.reduce((accumulator, key) => {
+    const rawValue = params[key];
+    if (Array.isArray(rawValue)) {
+      return accumulator + rawValue.map((item) => `${key}${String(item ?? '')}`).join('');
+    }
+    return accumulator + key + String(rawValue ?? '');
+  }, absoluteUrl);
+
+  const expectedSignature = crypto
+    .createHmac('sha1', twilioAuthToken)
+    .update(signaturePayload, 'utf8')
+    .digest('base64');
+
+  return timingSafeEqualStrings(signatureHeader, expectedSignature);
+}
+
+function isTwilioWebhookAuthorized(req) {
+  if (isTwilioSignatureValid(req)) return true;
+
+  const secret = normalizeString(process.env.TWILIO_WEBHOOK_SECRET);
+  if (!secret) return false;
+
+  const headerSecret = normalizeString(req.get('x-webhook-secret'));
+  const querySecret = normalizeString(req.query?.secret || req.body?.secret || '');
+  const authorizationHeader = normalizeString(req.get('authorization'));
+  const bearerSecret = /^bearer\s+/i.test(authorizationHeader)
+    ? normalizeString(authorizationHeader.replace(/^bearer\s+/i, ''))
+    : '';
+  return secret === headerSecret || secret === querySecret || secret === bearerSecret;
+}
+
 function handleTwilioInboundVoice(req, res) {
+  if (!isTwilioWebhookAuthorized(req)) {
+    return sendTwimlXml(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="nl-NL" voice="alice">Verzoek niet toegestaan.</Say>
+  <Hangup />
+</Response>`
+    );
+  }
+
   const caller = normalizeString(req.body?.From || req.query?.From || '');
   const rawStack = normalizeString(req.query?.stack || req.body?.stack || '');
   const explicitStack = rawStack ? normalizeColdcallingStack(rawStack) : '';
@@ -6944,21 +7413,9 @@ function handleTwilioInboundVoice(req, res) {
   );
 }
 
-function isTwilioStatusWebhookAuthorized(req) {
-  const secret = normalizeString(process.env.TWILIO_WEBHOOK_SECRET);
-  if (!secret) return true;
-  const headerSecret = normalizeString(req.get('x-webhook-secret'));
-  const querySecret = normalizeString(req.query?.secret || req.body?.secret || '');
-  const authorizationHeader = normalizeString(req.get('authorization'));
-  const bearerSecret = /^bearer\s+/i.test(authorizationHeader)
-    ? normalizeString(authorizationHeader.replace(/^bearer\s+/i, ''))
-    : '';
-  return secret === headerSecret || secret === querySecret || secret === bearerSecret;
-}
-
 function handleTwilioStatusWebhook(req, res) {
-  if (!isTwilioStatusWebhookAuthorized(req)) {
-    return res.status(401).json({ ok: false, error: 'Twilio webhook secret ongeldig.' });
+  if (!isTwilioWebhookAuthorized(req)) {
+    return res.status(401).json({ ok: false, error: 'Twilio webhook signature/secret ongeldig.' });
   }
 
   const stack = normalizeColdcallingStack(req.query?.stack || req.body?.stack || 'retell_ai');
@@ -6986,6 +7443,100 @@ function handleTwilioStatusWebhook(req, res) {
 app.get('/api/twilio/voice', handleTwilioInboundVoice);
 app.post('/api/twilio/voice', express.urlencoded({ extended: false }), handleTwilioInboundVoice);
 app.post('/api/twilio/status', express.urlencoded({ extended: false }), handleTwilioStatusWebhook);
+
+app.use('/api/auth/login', premiumLoginRateLimiter);
+
+app.get('/api/auth/session', (req, res) => {
+  const authState = getPremiumAuthState(req);
+  res.setHeader('Cache-Control', 'no-store, private');
+  return res.status(200).json({
+    ok: true,
+    configured: authState.configured,
+    authenticated: authState.authenticated,
+    email: authState.authenticated ? authState.email : '',
+    expiresAt: authState.authenticated ? authState.expiresAt : null,
+  });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const email = normalizePremiumSessionEmail(req.body?.email || '');
+  const password = String(req.body?.password || '');
+  const remember = /^(1|true|yes|on)$/i.test(String(req.body?.remember || ''));
+  const nextPath = getSafePremiumRedirectPath(req.body?.next || req.query?.next || '');
+
+  res.setHeader('Cache-Control', 'no-store, private');
+
+  if (!isPremiumAuthConfigured()) {
+    return res.status(503).json({
+      ok: false,
+      error:
+        'Premium login is nog niet geconfigureerd op de server. Zet PREMIUM_LOGIN_EMAIL, PREMIUM_LOGIN_PASSWORD of PREMIUM_LOGIN_PASSWORD_HASH, en PREMIUM_SESSION_SECRET.',
+    });
+  }
+
+  if (!email || !password) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Vul je e-mailadres en wachtwoord in.',
+    });
+  }
+
+  const isEmailValid = timingSafeEqualStrings(email, PREMIUM_LOGIN_EMAIL);
+  const isPasswordValid = isPremiumPasswordValid(password);
+  if (!isEmailValid || !isPasswordValid) {
+    return res.status(401).json({
+      ok: false,
+      error: 'Ongeldige inloggegevens.',
+    });
+  }
+
+  const sessionMaxAgeMs = remember
+    ? PREMIUM_SESSION_REMEMBER_TTL_DAYS * 24 * 60 * 60 * 1000
+    : PREMIUM_SESSION_TTL_HOURS * 60 * 60 * 1000;
+  const sessionToken = createPremiumSessionToken({
+    email,
+    maxAgeMs: sessionMaxAgeMs,
+  });
+  setPremiumSessionCookie(req, res, sessionToken, sessionMaxAgeMs);
+
+  return res.status(200).json({
+    ok: true,
+    authenticated: true,
+    next: nextPath,
+  });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, private');
+  clearPremiumSessionCookie(req, res);
+  return res.status(200).json({ ok: true, authenticated: false });
+});
+
+app.use('/api', (req, res, next) => {
+  if (isPremiumPublicApiRequest(req)) return next();
+
+  const authState = getPremiumAuthState(req);
+  res.setHeader('Cache-Control', 'no-store, private');
+
+  if (!authState.configured) {
+    return res.status(503).json({
+      ok: false,
+      error:
+        'Premium auth is nog niet geconfigureerd op de server. Zet PREMIUM_LOGIN_EMAIL, PREMIUM_LOGIN_PASSWORD of PREMIUM_LOGIN_PASSWORD_HASH, en PREMIUM_SESSION_SECRET.',
+    });
+  }
+
+  if (authState.authenticated) return next();
+
+  if (authState.expired) {
+    clearPremiumSessionCookie(req, res);
+  }
+
+  return res.status(401).json({
+    ok: false,
+    error: 'Niet ingelogd.',
+  });
+});
 
 
 app.post('/api/coldcalling/start', async (req, res) => {
@@ -10443,7 +10994,6 @@ app.post('/api/runtime-sync-now', async (_req, res) => {
 // API routes eerst, daarna statische frontend assets/html serveren.
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/output', express.static(path.join(__dirname, 'output')));
-app.use('/scripts', express.static(path.join(__dirname, 'scripts')));
 
 app.get('/', async (req, res, next) => {
   return sendSeoManagedHtmlPageResponse(req, res, next, 'premium-website.html');
