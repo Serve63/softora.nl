@@ -607,6 +607,20 @@
             align-items: center;
         }
 
+        .werkwijze-grid {
+            justify-items: center;
+        }
+
+        .werkwijze-copy {
+            width: min(100%, 720px);
+        }
+
+        .werkwijze-stats {
+            width: min(100%, 420px);
+            display: grid;
+            gap: 0;
+        }
+
         .stat-item {
             padding: 2rem;
             border-left: 4px solid var(--border);
@@ -1064,6 +1078,7 @@
             .hero-content { padding: 10rem 2rem; max-width: 100%; }
             .grid-3, .pricing-grid { grid-template-columns: 1fr; flex-direction: column; }
             .grid-2, .image-text-section { grid-template-columns: 1fr; }
+            .werkwijze-copy, .werkwijze-stats { width: 100%; }
             .image-side { clip-path: none; height: 400px; }
             .image-text-section { --content-overlap: 0px; }
             .content-side { padding: 4rem 2rem; }
@@ -1198,8 +1213,8 @@
     <!-- WERKWIJZE -->
     <section id="werkwijze" style="background: var(--bg-primary); padding: 0.5rem 4rem 8rem;">
         <div style="max-width: 1200px; margin: 0 auto;">
-            <div class="grid-2">
-                <div class="fade-up">
+            <div class="grid-2 werkwijze-grid">
+                <div class="fade-up werkwijze-copy">
                     <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">Werkwijze</span>
                     <h2 style="margin: 1rem 0 2rem; font-size: clamp(3rem, 5vw, 4.4rem); line-height: 0.95;">Van Idee<br><span style="white-space: nowrap;">Naar Lancering</span></h2>
                     <p style="color: var(--text-secondary); font-size: 1.1rem; line-height: 1.9; margin-bottom: 2rem; font-weight: 300;">
@@ -1218,7 +1233,7 @@
                     </ul>
                 </div>
                 
-                <div style="display: grid; gap: 0;">
+                <div class="werkwijze-stats">
                     <div class="stat-item fade-up">
                         <span class="stat-number">100+</span>
                         <span class="stat-label">Projecten Opgeleverd</span>
