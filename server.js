@@ -1642,6 +1642,10 @@ function extractCallUpdateFromRetellPayload(payload) {
   const company =
     normalizeString(call?.metadata?.leadCompany) ||
     normalizeString(call?.metadata?.company);
+  const branche =
+    normalizeString(call?.metadata?.leadBranche) ||
+    normalizeString(call?.metadata?.branche) ||
+    normalizeString(call?.metadata?.sector);
   const name =
     normalizeString(call?.metadata?.leadName) ||
     normalizeString(call?.metadata?.lead_name);
@@ -1680,6 +1684,7 @@ function extractCallUpdateFromRetellPayload(payload) {
     callId: callId || `retell-anon-${Date.now()}`,
     phone,
     company,
+    branche,
     name,
     status,
     messageType: `retell.${event || 'webhook'}`,
@@ -1775,6 +1780,9 @@ function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
     callId: callId || `twilio-anon-${updatedAtMs}`,
     phone,
     company: normalizeString(payload?.Company || payload?.company || payload?.LeadCompany || payload?.leadCompany || ''),
+    branche: normalizeString(
+      payload?.Branche || payload?.branche || payload?.Sector || payload?.sector || payload?.LeadBranche || ''
+    ),
     name: normalizeString(
       payload?.LeadName || payload?.name || payload?.CallerName || payload?.callerName || ''
     ),
@@ -1916,6 +1924,7 @@ function upsertRecentCallUpdate(update) {
         ...update,
         phone: update.phone || existing.phone || '',
         company: update.company || existing.company || '',
+        branche: update.branche || existing.branche || '',
         name: update.name || existing.name || '',
         status: update.status || existing.status || '',
         summary: update.summary || existing.summary || '',
@@ -3982,7 +3991,7 @@ function buildGeneratedLeadFollowUpFromCall(callUpdate, insight = null) {
     date,
     time,
     value: formatEuroLabel(insight?.estimatedValueEur || insight?.estimated_value_eur),
-    branche: normalizeString(insight?.branche || insight?.sector || '') || 'Onbekend',
+    branche: normalizeString(insight?.branche || insight?.sector || callUpdate?.branche || '') || 'Onbekend',
     source: 'AI Cold Calling (Lead opvolging)',
     summary: summary || 'Lead toonde interesse tijdens het gesprek.',
     aiGenerated: true,
@@ -4031,7 +4040,7 @@ function createRuleBasedInsightFromCallUpdate(callUpdate) {
     company: normalizeString(callUpdate.company || ''),
     contactName: normalizeString(callUpdate.name || ''),
     phone: normalizeString(callUpdate.phone || ''),
-    branche: '',
+    branche: normalizeString(callUpdate.branche || ''),
     summary: ruleSummary,
     appointmentBooked: Boolean(appointmentBooked && appointmentDate),
     appointmentDate: appointmentBooked ? appointmentDate : '',
@@ -4089,6 +4098,10 @@ function ensureRuleBasedInsightAndAppointment(callUpdate) {
       callId: callUpdate.callId,
       leadCompany: callUpdate.company,
       leadName: callUpdate.name,
+      leadBranche: callUpdate.branche,
+      provider: callUpdate.provider,
+      coldcallingStack: callUpdate.stack,
+      coldcallingStackLabel: callUpdate.stackLabel,
     });
 
     if (agendaAppointment) {
@@ -4543,7 +4556,12 @@ function buildGeneratedAgendaAppointmentFromAiInsight(insight) {
   const company = normalizeString(insight.company || insight.leadCompany || '') || 'Onbekende lead';
   const contact = normalizeString(insight.contactName || insight.leadName || '') || 'Onbekend';
   const phone = normalizeString(insight.phone || '');
-  const branche = normalizeString(insight.branche || insight.sector || '') || 'Onbekend';
+  const branche = normalizeString(insight.branche || insight.sector || insight.leadBranche || '') || 'Onbekend';
+  const provider = normalizeString(insight.provider || '');
+  const coldcallingStack = normalizeColdcallingStack(insight.coldcallingStack || insight.stack || '');
+  const coldcallingStackLabel = normalizeString(
+    insight.coldcallingStackLabel || insight.stackLabel || getColdcallingStackLabel(coldcallingStack)
+  );
   const summaryCore = truncateText(
     normalizeString(insight.summary || insight.shortSummary || insight.short_summary || ''),
     900
@@ -4568,6 +4586,9 @@ function buildGeneratedAgendaAppointmentFromAiInsight(insight) {
     callId: normalizeString(insight.callId),
     createdAt: new Date().toISOString(),
     confirmationTaskType: 'send_confirmation_email',
+    provider: provider || '',
+    coldcallingStack: coldcallingStack || '',
+    coldcallingStackLabel: coldcallingStackLabel || '',
   };
 }
 
@@ -4600,6 +4621,7 @@ async function createAiInsightFromCallUpdate(callUpdate) {
       messageType: callUpdate.messageType,
       endedReason: callUpdate.endedReason,
       company: callUpdate.company,
+      branche: callUpdate.branche,
       name: callUpdate.name,
       phone: callUpdate.phone,
       callSummary: callUpdate.summary,
@@ -4652,7 +4674,7 @@ async function createAiInsightFromCallUpdate(callUpdate) {
     company: normalizeString(parsed.company || callUpdate.company),
     contactName: normalizeString(parsed.contactName || parsed.contact_name || callUpdate.name),
     phone: normalizeString(parsed.phone || callUpdate.phone),
-    branche: normalizeString(parsed.branche || parsed.branch || ''),
+    branche: normalizeString(parsed.branche || parsed.branch || callUpdate.branche || ''),
     summary: truncateText(
       normalizeString(parsed.summary || parsed.shortSummary || parsed.short_summary || callUpdate.summary),
       900
@@ -4780,6 +4802,10 @@ async function maybeAnalyzeCallUpdateWithAi(callUpdate) {
       callId: callUpdate.callId,
       leadCompany: callUpdate.company,
       leadName: callUpdate.name,
+      leadBranche: callUpdate.branche,
+      provider: callUpdate.provider,
+      coldcallingStack: callUpdate.stack,
+      coldcallingStackLabel: callUpdate.stackLabel,
     });
     if (agendaAppointment) {
       const savedAppointment = upsertGeneratedAgendaAppointment(agendaAppointment, callUpdate.callId);
@@ -5808,6 +5834,7 @@ function buildVariableValues(lead, campaign) {
   const rawValues = {
     name: normalizeString(lead.name),
     company: normalizeString(lead.company),
+    branche: normalizeString(lead.branche || lead.branch || lead.sector || ''),
     sector: normalizeString(campaign.sector),
     region: effectiveRegion,
     minProjectValue: Number.isFinite(minProjectValue) ? String(minProjectValue) : '',
@@ -6013,6 +6040,7 @@ function buildRetellPayload(lead, campaign) {
       source: 'softora-coldcalling-dashboard',
       leadCompany: normalizeString(lead.company),
       leadName: normalizeString(lead.name),
+      leadBranche: normalizeString(lead.branche || lead.branch || lead.sector || ''),
       leadPhoneE164: normalizedPhone,
       sector: normalizeString(campaign.sector),
       region: effectiveRegion,
@@ -6061,6 +6089,7 @@ async function processRetellColdcallingLead(lead, campaign, index) {
         callId,
         phone: normalizedPhone,
         company: normalizeString(lead.company),
+        branche: normalizeString(lead.branche || lead.branch || lead.sector || campaign.sector || ''),
         name: normalizeString(lead.name),
         status: callStatus,
         messageType: 'coldcalling.start.response',
@@ -6197,6 +6226,7 @@ async function processTwilioColdcallingLead(lead, campaign, index) {
         callId,
         phone: normalizedPhone,
         company: normalizeString(lead.company),
+        branche: normalizeString(lead.branche || lead.branch || lead.sector || campaign.sector || ''),
         name: normalizeString(lead.name),
         status: callStatus,
         messageType: 'twilio.start.response',

@@ -605,10 +605,6 @@
                         <div class="modal-detail-value" id="modalDate">-</div>
                     </div>
                     <div class="modal-detail-item">
-                        <div class="modal-detail-label">Geschatte Waarde</div>
-                        <div class="modal-detail-value" id="modalValue">-</div>
-                    </div>
-                    <div class="modal-detail-item">
                         <div class="modal-detail-label">Branche</div>
                         <div class="modal-detail-value" id="modalBranche">-</div>
                     </div>
@@ -617,12 +613,12 @@
                         <div class="modal-detail-value" id="modalSource">-</div>
                     </div>
                     <div class="modal-detail-item">
-                        <div class="modal-detail-label">Locatie</div>
-                        <div class="modal-detail-value" id="modalLocation">Nog niet ingevuld</div>
+                        <div class="modal-detail-label">Provider</div>
+                        <div class="modal-detail-value" id="modalProvider">-</div>
                     </div>
                     <div class="modal-detail-item">
-                        <div class="modal-detail-label">Domein</div>
-                        <div class="modal-detail-value" id="modalDomain">Nog niet ingevuld</div>
+                        <div class="modal-detail-label">Locatie</div>
+                        <div class="modal-detail-value" id="modalLocation">Nog niet ingevuld</div>
                     </div>
                 </div>
                 <div class="modal-summary-label">AI Samenvatting van Lead</div>
@@ -921,6 +917,52 @@
         return { ids: nextIds, byAppointment: nextByAppointment };
     }
 
+    function resolveAppointmentProviderLabel(item) {
+        const directLabel = String(
+            item?.providerLabel || item?.coldcallingStackLabel || item?.stackLabel || ''
+        ).trim();
+        if (directLabel) return directLabel;
+
+        const stackRaw = String(
+            item?.coldcallingStack || item?.stack || item?.callingStack || item?.callingEngine || ''
+        )
+            .trim()
+            .toLowerCase()
+            .replace(/[\s-]+/g, '_');
+        if (stackRaw === 'retell_ai') return 'Retell AI';
+        if (stackRaw === 'gemini_flash_3_1_live' || stackRaw === 'gemini_3_1_live' || stackRaw === 'gemini') {
+            return 'Gemini 3.1 Live';
+        }
+        if (stackRaw === 'openai_realtime_1_5' || stackRaw === 'openai_realtime' || stackRaw === 'openai') {
+            return 'OpenAI Realtime 1.5';
+        }
+        if (stackRaw === 'hume_evi_3' || stackRaw === 'hume_evi' || stackRaw === 'hume') {
+            return 'Hume Evi 3';
+        }
+
+        const providerRaw = String(item?.provider || '').trim().toLowerCase();
+        if (providerRaw === 'retell') return 'Retell AI';
+        if (providerRaw === 'twilio') return 'Twilio';
+
+        const hint = `${String(item?.source || '')} ${String(item?.summary || '')}`.toLowerCase();
+        if (/gemini/.test(hint)) return 'Gemini 3.1 Live';
+        if (/openai|realtime/.test(hint)) return 'OpenAI Realtime 1.5';
+        if (/hume/.test(hint)) return 'Hume Evi 3';
+        if (/retell/.test(hint)) return 'Retell AI';
+        if (/twilio/.test(hint)) return 'Twilio';
+        return 'Onbekend';
+    }
+
+    function resolveAppointmentSourceLabel(item) {
+        const raw = String(item?.source || '').trim();
+        if (!raw) return 'Coldcalling';
+        const lower = raw.toLowerCase();
+        if (/coldmail|mailing|bevestigingsmail|email|e-mail/.test(lower)) return 'Coldmailing';
+        if (/coldcalling|ai cold calling|vapi/.test(lower)) return 'Coldcalling';
+        const cleaned = raw.replace(/\s*\((?:retell|gemini|openai|hume|twilio)[^)]*\)\s*/gi, '').trim();
+        return cleaned || raw;
+    }
+
     function normalizeServerAppointment(item) {
         if (!item || typeof item !== 'object') return null;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || ''))) return null;
@@ -935,7 +977,8 @@
             time: /^\d{2}:\d{2}$/.test(String(item.time || '')) ? String(item.time) : '09:00',
             value: String(item.value || 'Onbekend'),
             branche: String(item.branche || 'Onbekend'),
-            source: String(item.source || 'AI Cold Calling'),
+            source: resolveAppointmentSourceLabel(item),
+            providerLabel: resolveAppointmentProviderLabel(item),
             summary: String(item.summary || 'AI-samenvatting niet beschikbaar.'),
             location: String(item.location || item.appointmentLocation || ''),
             whatsappInfo: String(item.whatsappInfo || item.whatsappNotes || ''),
@@ -1141,11 +1184,6 @@
             activeOrderAddedAt: String(update?.activeOrderAddedAt || appointments[idx].activeOrderAddedAt || ''),
             referenceImages: normalizeReferenceImageList(update?.referenceImages || appointments[idx].referenceImages || []),
         };
-
-        if (Number(activeAppointmentId) === appointmentId && document.getElementById('modalDomain')) {
-            document.getElementById('modalDomain').textContent =
-                String(appointments[idx]?.postCallDomainName || '').trim() || 'Nog niet ingevuld';
-        }
 
         const appointmentIdResolved = Number(appointments[idx]?.id || 0);
         const linkedOrderId = Number(appointments[idx]?.activeOrderId || 0);
@@ -1646,11 +1684,10 @@
         document.getElementById('modalCompany').textContent = apt.company;
         document.getElementById('modalContact').textContent = `${apt.contact}  ·  ${apt.phone}`;
         document.getElementById('modalDate').textContent = `${apt.date.split('-').reverse().join('-')}  om  ${apt.time}`;
-        document.getElementById('modalValue').textContent = apt.value;
         document.getElementById('modalBranche').textContent = apt.branche;
         document.getElementById('modalSource').textContent = apt.source;
+        document.getElementById('modalProvider').textContent = apt.providerLabel || 'Onbekend';
         document.getElementById('modalLocation').textContent = String(apt.location || '').trim() || 'Nog niet ingevuld';
-        document.getElementById('modalDomain').textContent = String(apt.postCallDomainName || '').trim() || 'Nog niet ingevuld';
         const summaryParts = [String(apt.summary || '').trim()].filter(Boolean);
         if (String(apt.whatsappInfo || '').trim()) {
             summaryParts.push(`Overige info uit WhatsApp:\n${String(apt.whatsappInfo || '').trim()}`);
