@@ -3844,6 +3844,158 @@ function extractLikelyAppointmentTimeFromText(text) {
   return normalizeTimeHhMm(`${String(hour).padStart(2, '0')}:00`);
 }
 
+function isOutboundOrUnknownCall(callUpdate) {
+  const direction = normalizeString(callUpdate?.direction || '').toLowerCase();
+  if (direction.includes('inbound')) return false;
+
+  const messageType = normalizeString(callUpdate?.messageType || '').toLowerCase();
+  if (/twilio\.inbound\./.test(messageType)) return false;
+
+  return true;
+}
+
+function buildCallInterestSignalText(callUpdate, insight = null) {
+  return normalizeString(
+    [
+      callUpdate?.summary,
+      callUpdate?.transcriptSnippet,
+      callUpdate?.transcriptFull,
+      callUpdate?.status,
+      callUpdate?.endedReason,
+      insight?.summary,
+      insight?.followUpReason,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  ).toLowerCase();
+}
+
+function hasNegativeInterestSignal(text) {
+  const source = normalizeString(text).toLowerCase();
+  if (!source) return false;
+  return /(geen duidelijke interesse|geen interesse|niet geinteresseerd|niet geïnteresseerd|geen behoefte|niet relevant|niet passend|niet meer bellen|bel( me)? niet|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst)/.test(
+    source
+  );
+}
+
+function hasPositiveInterestSignal(text) {
+  const source = normalizeString(text).toLowerCase();
+  if (!source) return false;
+  return /(wel interesse|geinteresseerd|geïnteresseerd|interesse|afspraak|demo|offerte|stuur (de )?(mail|info)|mail .* (offerte|informatie)|terugbellen|callback|terugbel)/.test(
+    source
+  );
+}
+
+function resolveLeadFollowUpDateAndTime(callUpdate) {
+  const candidates = [callUpdate?.endedAt, callUpdate?.updatedAt, callUpdate?.startedAt];
+  let reference = null;
+  for (const value of candidates) {
+    const iso = normalizeString(value || '');
+    const ts = Date.parse(iso);
+    if (Number.isFinite(ts)) {
+      reference = new Date(ts);
+      break;
+    }
+  }
+  if (!reference) reference = new Date();
+
+  let date = '';
+  let time = '';
+  try {
+    date = normalizeDateYyyyMmDd(
+      new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Amsterdam',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(reference)
+    );
+    time = normalizeTimeHhMm(
+      new Intl.DateTimeFormat('nl-NL', {
+        timeZone: 'Europe/Amsterdam',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(reference)
+    );
+  } catch (_) {
+    date = normalizeDateYyyyMmDd(reference.toISOString());
+    time = normalizeTimeHhMm(reference.toISOString().slice(11, 16));
+  }
+
+  return {
+    date: date || normalizeDateYyyyMmDd(new Date().toISOString()) || '',
+    time: time || '09:00',
+  };
+}
+
+function shouldCreateLeadFollowUpFromCall(callUpdate, insight = null) {
+  if (!callUpdate || !normalizeString(callUpdate.callId || '')) return false;
+  if (!isOutboundOrUnknownCall(callUpdate)) return false;
+
+  const status = normalizeString(callUpdate.status || '').toLowerCase();
+  const endedReason = normalizeString(callUpdate.endedReason || '');
+  if (!isTerminalColdcallingStatus(status, endedReason)) return false;
+
+  const signalText = buildCallInterestSignalText(callUpdate, insight);
+  if (!signalText) return false;
+  if (hasNegativeInterestSignal(signalText)) return false;
+
+  if (toBooleanSafe(insight?.appointmentBooked, false)) return true;
+  if (toBooleanSafe(insight?.followUpRequired, false)) return true;
+  return hasPositiveInterestSignal(signalText);
+}
+
+function buildGeneratedLeadFollowUpFromCall(callUpdate, insight = null) {
+  if (!shouldCreateLeadFollowUpFromCall(callUpdate, insight)) return null;
+  const callId = normalizeString(callUpdate?.callId || '');
+  if (!callId) return null;
+
+  const company =
+    normalizeString(callUpdate?.company || insight?.company || insight?.leadCompany || '') || 'Onbekende lead';
+  const contact =
+    normalizeString(callUpdate?.name || insight?.contactName || insight?.leadName || '') || 'Onbekend';
+  const phone = normalizeString(callUpdate?.phone || insight?.phone || '');
+  const { date, time } = resolveLeadFollowUpDateAndTime(callUpdate);
+  const summary = truncateText(
+    normalizeString(
+      insight?.summary ||
+        callUpdate?.summary ||
+        callUpdate?.transcriptSnippet ||
+        insight?.followUpReason ||
+        'Lead toonde interesse tijdens het gesprek.'
+    ),
+    900
+  );
+  const normalizedStack = normalizeColdcallingStack(callUpdate?.stack || insight?.coldcallingStack || '');
+  const stackLabel = getColdcallingStackLabel(normalizedStack);
+  const createdAt =
+    normalizeString(callUpdate?.endedAt || callUpdate?.updatedAt || callUpdate?.startedAt || '') ||
+    new Date().toISOString();
+
+  return {
+    company,
+    contact,
+    phone,
+    contactEmail: normalizeEmailAddress(insight?.contactEmail || insight?.email || insight?.leadEmail || ''),
+    type: 'lead_follow_up',
+    date,
+    time,
+    value: formatEuroLabel(insight?.estimatedValueEur || insight?.estimated_value_eur),
+    branche: normalizeString(insight?.branche || insight?.sector || '') || 'Onbekend',
+    source: 'AI Cold Calling (Lead opvolging)',
+    summary: summary || 'Lead toonde interesse tijdens het gesprek.',
+    aiGenerated: true,
+    callId,
+    createdAt,
+    needsConfirmationEmail: true,
+    confirmationTaskType: 'lead_follow_up',
+    provider: normalizeString(callUpdate?.provider || ''),
+    coldcallingStack: normalizedStack || '',
+    coldcallingStackLabel: stackLabel || '',
+  };
+}
+
 function createRuleBasedInsightFromCallUpdate(callUpdate) {
   if (!callUpdate?.callId) return null;
 
@@ -3931,13 +4083,7 @@ function ensureRuleBasedInsightAndAppointment(callUpdate) {
     }
   }
 
-  if (!nextInsight) return null;
-
-  const existingAppointmentId = agendaAppointmentIdByCallId.get(callUpdate.callId);
-  if (
-    !existingAppointmentId &&
-    toBooleanSafe(nextInsight.appointmentBooked, false)
-  ) {
+  if (nextInsight && toBooleanSafe(nextInsight.appointmentBooked, false)) {
     const agendaAppointment = buildGeneratedAgendaAppointmentFromAiInsight({
       ...nextInsight,
       callId: callUpdate.callId,
@@ -3948,9 +4094,25 @@ function ensureRuleBasedInsightAndAppointment(callUpdate) {
     if (agendaAppointment) {
       const savedAppointment = upsertGeneratedAgendaAppointment(agendaAppointment, callUpdate.callId);
       if (savedAppointment) {
+        if (nextInsight) {
+          nextInsight = upsertAiCallInsight({
+            ...nextInsight,
+            agendaAppointmentId: savedAppointment.id,
+          });
+        }
+      }
+    }
+  }
+
+  const existingAppointmentId = agendaAppointmentIdByCallId.get(callUpdate.callId);
+  if (!existingAppointmentId) {
+    const followUpLeadAppointment = buildGeneratedLeadFollowUpFromCall(callUpdate, nextInsight);
+    if (followUpLeadAppointment) {
+      const savedLeadAppointment = upsertGeneratedAgendaAppointment(followUpLeadAppointment, callUpdate.callId);
+      if (savedLeadAppointment && nextInsight) {
         nextInsight = upsertAiCallInsight({
           ...nextInsight,
-          agendaAppointmentId: savedAppointment.id,
+          agendaAppointmentId: savedLeadAppointment.id,
         });
       }
     }
@@ -4046,6 +4208,10 @@ function buildLeadToAgendaSummary(baseSummary, location, whatsappInfo) {
 
 function mapAppointmentToConfirmationTask(appointment) {
   if (!appointment || typeof appointment !== 'object') return null;
+  const confirmationTaskTypeRaw = normalizeString(
+    appointment.confirmationTaskType || appointment.taskType || ''
+  ).toLowerCase();
+  const isLeadFollowUpTask = confirmationTaskTypeRaw === 'lead_follow_up';
   const needsConfirmation = toBooleanSafe(
     appointment.needsConfirmationEmail,
     toBooleanSafe(appointment.aiGenerated, false)
@@ -4056,7 +4222,7 @@ function mapAppointmentToConfirmationTask(appointment) {
       appointment.confirmationAppointmentCancelled ||
       appointment.confirmationAppointmentCancelledAt
   );
-  if (!needsConfirmation || alreadyDone) return null;
+  if ((!needsConfirmation && !isLeadFollowUpTask) || alreadyDone) return null;
 
   const callId = normalizeString(appointment.callId || '');
   const callUpdate = callId ? getLatestCallUpdateByCallId(callId) : null;
@@ -4097,8 +4263,8 @@ function mapAppointmentToConfirmationTask(appointment) {
 
   return {
     id: Number(appointment.id) || 0,
-    type: 'send_confirmation_email',
-    title: 'Bevestigingsmail sturen',
+    type: isLeadFollowUpTask ? 'lead_follow_up' : 'send_confirmation_email',
+    title: isLeadFollowUpTask ? 'Lead opvolgen' : 'Bevestigingsmail sturen',
     company: normalizeString(appointment.company || 'Onbekende lead'),
     contact: normalizeString(appointment.contact || 'Onbekend'),
     phone: normalizeString(appointment.phone || ''),
@@ -4401,6 +4567,7 @@ function buildGeneratedAgendaAppointmentFromAiInsight(insight) {
     aiGenerated: true,
     callId: normalizeString(insight.callId),
     createdAt: new Date().toISOString(),
+    confirmationTaskType: 'send_confirmation_email',
   };
 }
 
