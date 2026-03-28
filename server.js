@@ -1728,6 +1728,7 @@ function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
   const fallbackStack = normalizeColdcallingStack(options.stack);
   const callId = normalizeString(payload?.CallSid || payload?.sid || options.callId || '');
   const streamEvent = normalizeString(payload?.StreamEvent || payload?.stream_event || '').toLowerCase();
+  const recordingStatus = normalizeString(payload?.RecordingStatus || payload?.recording_status || '').toLowerCase();
   const direction = normalizeString(
     payload?.Direction || payload?.direction || payload?.CallDirection || payload?.call_direction || options.direction || ''
   ).toLowerCase();
@@ -1754,10 +1755,19 @@ function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
       ''
   );
   const durationSeconds = parseNumberSafe(payload?.CallDuration || payload?.duration, null);
-  const recordingUrl = normalizeString(payload?.RecordingUrl || payload?.recording_url || '');
+  const recordingSid = normalizeString(
+    payload?.RecordingSid || payload?.recording_sid || extractTwilioRecordingSidFromUrl(payload?.RecordingUrl || '')
+  );
+  const recordingUrlRaw = normalizeString(payload?.RecordingUrl || payload?.recording_url || '');
+  const recordingUrlProxy = buildTwilioRecordingProxyUrl(callId, recordingSid);
+  const recordingUrl = recordingUrlProxy || recordingUrlRaw;
   const updatedAtMs = Date.now();
   const stackLabel = getColdcallingStackLabel(fallbackStack);
-  const messageType = streamEvent ? `twilio.stream.${streamEvent}` : `twilio.status.${status || 'unknown'}`;
+  const messageType = streamEvent
+    ? `twilio.stream.${streamEvent}`
+    : recordingStatus
+      ? `twilio.recording.${recordingStatus}`
+      : `twilio.status.${status || 'unknown'}`;
 
   if (!callId && !status && !phone) return null;
 
@@ -1779,9 +1789,12 @@ function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
     durationSeconds:
       Number.isFinite(Number(durationSeconds)) && Number(durationSeconds) >= 0 ? Math.round(Number(durationSeconds)) : null,
     recordingUrl,
+    recordingSid,
+    recordingUrlProxy,
     updatedAt: new Date(updatedAtMs).toISOString(),
     updatedAtMs,
     provider: 'twilio',
+    direction,
     stack: fallbackStack,
     stackLabel,
   };
@@ -1793,6 +1806,7 @@ function extractCallUpdateFromTwilioCallStatusResponse(callId, data, options = {
     {
       CallSid: normalizeString(data?.sid || callId),
       CallStatus: normalizeString(data?.status || ''),
+      Direction: normalizeString(data?.direction || options?.direction || ''),
       To: normalizeString(data?.to || ''),
       From: normalizeString(data?.from || ''),
       StartTime: normalizeString(data?.start_time || data?.date_created || ''),
@@ -1917,7 +1931,12 @@ function upsertRecentCallUpdate(update) {
               ? Math.round(Number(existing.durationSeconds))
               : null,
         recordingUrl: update.recordingUrl || existing.recordingUrl || '',
+        recordingSid: update.recordingSid || existing.recordingSid || '',
+        recordingUrlProxy: update.recordingUrlProxy || existing.recordingUrlProxy || '',
         provider: update.provider || existing.provider || '',
+        direction: update.direction || existing.direction || '',
+        stack: update.stack || existing.stack || '',
+        stackLabel: update.stackLabel || existing.stackLabel || '',
         messageType: update.messageType || existing.messageType || '',
         updatedAt: update.updatedAt,
         updatedAtMs: update.updatedAtMs,
@@ -5663,6 +5682,72 @@ function getTwilioBasicAuthorizationHeader() {
   return `Basic ${basic}`;
 }
 
+function buildTwilioRecordingProxyUrl(callId, recordingSid = '') {
+  const normalizedCallId = normalizeString(callId);
+  const normalizedRecordingSid = normalizeString(recordingSid);
+  if (!normalizedCallId && !normalizedRecordingSid) return '';
+  const params = new URLSearchParams();
+  if (normalizedCallId) params.set('callId', normalizedCallId);
+  if (normalizedRecordingSid) params.set('recordingSid', normalizedRecordingSid);
+  const qs = params.toString();
+  return qs ? `/api/coldcalling/recording-proxy?${qs}` : '/api/coldcalling/recording-proxy';
+}
+
+function buildTwilioRecordingMediaUrl(recordingSid) {
+  const accountSid = normalizeString(process.env.TWILIO_ACCOUNT_SID);
+  const normalizedRecordingSid = normalizeString(recordingSid);
+  if (!accountSid || !normalizedRecordingSid) return null;
+  return buildTwilioApiUrl(
+    `/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Recordings/${encodeURIComponent(
+      normalizedRecordingSid
+    )}.mp3`
+  );
+}
+
+async function fetchTwilioRecordingsByCallId(callId) {
+  const accountSid = normalizeString(process.env.TWILIO_ACCOUNT_SID);
+  const normalizedCallId = normalizeString(callId);
+  if (!accountSid || !normalizedCallId) {
+    throw new Error('TWILIO_ACCOUNT_SID of callId ontbreekt.');
+  }
+
+  const endpoint =
+    `/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Recordings.json` +
+    `?CallSid=${encodeURIComponent(normalizedCallId)}&PageSize=20`;
+
+  const { response, data } = await fetchJsonWithTimeout(
+    buildTwilioApiUrl(endpoint),
+    {
+      method: 'GET',
+      headers: {
+        Authorization: getTwilioBasicAuthorizationHeader(),
+        'Content-Type': 'application/json',
+      },
+    },
+    10000
+  );
+
+  if (!response.ok) {
+    const statusError = new Error(
+      data?.message || data?.error || data?.detail || data?.raw || `Twilio recordings fout (${response.status})`
+    );
+    statusError.status = response.status;
+    statusError.endpoint = endpoint;
+    statusError.data = data;
+    throw statusError;
+  }
+
+  const recordings = Array.isArray(data?.recordings) ? data.recordings : [];
+  return { endpoint, data, recordings };
+}
+
+function extractTwilioRecordingSidFromUrl(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  const match = raw.match(/\/Recordings\/(RE[0-9a-f]{32})/i);
+  return normalizeString(match?.[1] || '');
+}
+
 function parseDateToIso(value) {
   const raw = normalizeString(value);
   if (!raw) return '';
@@ -5786,6 +5871,11 @@ function buildTwilioOutboundPayload(lead, campaign) {
     StatusCallback: statusCallbackUrl,
     StatusCallbackMethod: 'POST',
     StatusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+    Record: 'true',
+    RecordingChannels: 'dual',
+    RecordingStatusCallback: statusCallbackUrl,
+    RecordingStatusCallbackMethod: 'POST',
+    RecordingStatusCallbackEvent: ['in-progress', 'completed', 'absent'],
     Timeout: String(Math.max(15, Math.min(90, parseIntSafe(process.env.TWILIO_DIAL_TIMEOUT_SECONDS, 30)))),
   };
 }
@@ -5817,6 +5907,7 @@ async function processRetellColdcallingLead(lead, campaign, index) {
         updatedAt: new Date().toISOString(),
         updatedAtMs: Date.now(),
         provider: 'retell',
+        direction: 'outbound',
       });
 
       // Bij sommige providerfouten (zoals dial_failed) wordt de call vrijwel direct terminal.
@@ -5952,6 +6043,7 @@ async function processTwilioColdcallingLead(lead, campaign, index) {
         updatedAt: new Date().toISOString(),
         updatedAtMs: Date.now(),
         provider: 'twilio',
+        direction: 'outbound',
       });
     }
 
@@ -6611,6 +6703,7 @@ function handleTwilioInboundVoice(req, res) {
       updatedAt: inboundStartedAt,
       updatedAtMs: Date.now(),
       provider: 'twilio',
+      direction: 'inbound',
       stack,
       stackLabel: getColdcallingStackLabel(stack),
     });
@@ -6818,6 +6911,99 @@ app.get('/api/coldcalling/status', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
   }
   return sendColdcallingStatusResponse(res, callId);
+});
+
+app.get('/api/coldcalling/recording-proxy', async (req, res) => {
+  if (!isTwilioStatusApiConfigured()) {
+    return res.status(500).json({ ok: false, error: 'TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN ontbreken op server.' });
+  }
+
+  const callId = normalizeString(req.query?.callId || '');
+  let recordingSid = normalizeString(req.query?.recordingSid || '');
+  if (!callId && !recordingSid) {
+    return res.status(400).json({ ok: false, error: 'callId of recordingSid ontbreekt.' });
+  }
+
+  const cached = callId ? callUpdatesById.get(callId) || null : null;
+  if (!recordingSid) {
+    recordingSid = normalizeString(cached?.recordingSid || '');
+  }
+  if (!recordingSid) {
+    recordingSid = extractTwilioRecordingSidFromUrl(cached?.recordingUrl || cached?.recording_url || '');
+  }
+
+  if (!recordingSid && callId) {
+    try {
+      const { recordings } = await fetchTwilioRecordingsByCallId(callId);
+      const preferred =
+        recordings.find((item) => /completed/i.test(normalizeString(item?.status || ''))) ||
+        recordings[0] ||
+        null;
+      recordingSid = normalizeString(preferred?.sid || '');
+    } catch (error) {
+      return res.status(Number(error?.status || 502)).json({
+        ok: false,
+        error: error?.message || 'Kon Twilio recordinglijst niet ophalen.',
+        endpoint: error?.endpoint || null,
+        details: error?.data || null,
+      });
+    }
+  }
+
+  if (!recordingSid) {
+    return res.status(404).json({ ok: false, error: 'Nog geen opname beschikbaar voor deze call.' });
+  }
+
+  const mediaUrl = buildTwilioRecordingMediaUrl(recordingSid);
+  if (!mediaUrl) {
+    return res.status(500).json({ ok: false, error: 'Kon Twilio recording URL niet opbouwen.' });
+  }
+
+  try {
+    const upstream = await fetch(mediaUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: getTwilioBasicAuthorizationHeader(),
+      },
+    });
+
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => '');
+      return res.status(upstream.status).json({
+        ok: false,
+        error: `Twilio opname ophalen mislukt (${upstream.status}).`,
+        details: text || null,
+      });
+    }
+
+    const bytes = Buffer.from(await upstream.arrayBuffer());
+    const contentType = normalizeString(upstream.headers.get('content-type') || '');
+    res.set('Content-Type', contentType && /audio/i.test(contentType) ? contentType : 'audio/mpeg');
+    res.set('Cache-Control', 'private, max-age=120');
+
+    if (callId) {
+      const proxyUrl = buildTwilioRecordingProxyUrl(callId, recordingSid);
+      const existing = callUpdatesById.get(callId) || {};
+      upsertRecentCallUpdate({
+        ...existing,
+        callId,
+        recordingSid,
+        recordingUrl: proxyUrl,
+        recordingUrlProxy: proxyUrl,
+        messageType: normalizeString(existing?.messageType || 'twilio.recording.resolved'),
+        updatedAt: new Date().toISOString(),
+        updatedAtMs: Date.now(),
+        provider: 'twilio',
+      });
+    }
+
+    return res.status(200).send(bytes);
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      error: error?.message || 'Kon Twilio opname niet proxien.',
+    });
+  }
 });
 
 app.post('/api/retell/webhook', (req, res) => {

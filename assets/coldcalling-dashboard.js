@@ -3646,10 +3646,21 @@
   }
 
   function getCallRecordingUrl(call) {
-    const raw = normalizeFreeText(call?.recordingUrl || '');
-    if (!raw) return '';
-    if (!/^https?:\/\//i.test(raw)) return '';
-    return raw;
+    const raw = normalizeFreeText(
+      call?.recordingUrl || call?.recording_url || call?.recordingUrlProxy || call?.audioUrl || ''
+    );
+    if (raw) {
+      if (/^https?:\/\//i.test(raw)) return raw;
+      if (raw.startsWith('/')) return raw;
+      return '';
+    }
+
+    const callId = normalizeFreeText(call?.callId || '');
+    const recordingSid = normalizeFreeText(call?.recordingSid || call?.recording_sid || '');
+    if (!callId || !recordingSid) return '';
+    return `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}&recordingSid=${encodeURIComponent(
+      recordingSid
+    )}`;
   }
 
   function inferPhoneConversationIntent(call, decisionByPhoneKey) {
@@ -3678,6 +3689,7 @@
   function isQualifiedPhoneConversation(call) {
     const statusText = normalizeSearchText(`${call?.status || ''} ${call?.endedReason || ''}`);
     const messageType = normalizeSearchText(String(call?.messageType || ''));
+    const directionText = normalizeSearchText(String(call?.direction || ''));
     const hasConversationContent = Boolean(
       String(call?.summary || '').trim() ||
       String(call?.transcriptSnippet || '').trim() ||
@@ -3689,6 +3701,11 @@
       /twilio\.(inbound\.selected|stream\.stream-started|stream\.stream-stopped|stream\.stream-error)/.test(
         messageType
       );
+
+    // De Database view is alleen voor outbound campagne-calls.
+    if (directionText.includes('inbound') || /twilio\.inbound\./.test(messageType)) {
+      return false;
+    }
 
     if (
       /(not[_ -]?connected|no[_ -]?answer|unanswered|failed|dial[_ -]?failed|busy|voicemail|initiated|queued|ringing|cancelled|canceled|rejected|error)/.test(
@@ -4538,7 +4555,13 @@
   }
 
   function phoneKey(value) {
-    return String(value || '').replace(/\D/g, '');
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('0031')) return `31${digits.slice(4)}`;
+    if (digits.startsWith('31')) return digits;
+    if (digits.startsWith('0') && digits.length >= 10) return `31${digits.slice(1)}`;
+    if (digits.startsWith('6') && digits.length === 9) return `31${digits}`;
+    return digits;
   }
 
   function upsertAiNotebookRowsFromCallResults(results) {
