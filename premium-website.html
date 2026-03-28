@@ -843,9 +843,9 @@
 
         .faq-question {
             width: 100%;
-            padding: 1.35rem 0;
+            padding: 1.35rem 48px;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
             background: none;
             border: none;
@@ -853,11 +853,12 @@
             font-family: 'Oswald', sans-serif;
             font-size: 1.05rem;
             font-weight: 500;
-            text-align: left;
+            text-align: center;
             cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 0.02em;
             transition: color 0.3s;
+            position: relative;
         }
 
         .faq-question:hover {
@@ -871,10 +872,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
+            position: absolute;
+            right: 0;
+            top: calc(50% - 15px);
             transition: all 0.4s var(--ease-out-expo);
             flex-shrink: 0;
-            margin-left: 1rem;
+            margin-left: 0;
         }
 
         .faq-icon::before,
