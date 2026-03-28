@@ -304,29 +304,22 @@ body {
   }
 
   .tabs {
-    display: flex;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
     margin-bottom: 32px;
     border-bottom: 2px solid var(--border);
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    justify-content: space-between;
-  }
-
-  .tabs::-webkit-scrollbar {
-    display: none;
+    overflow: hidden;
   }
 
   .tab {
     font-family: 'Oswald', sans-serif;
-    font-size: clamp(11px, 0.74vw, 13px);
+    font-size: clamp(12px, 0.9vw, 15px);
     font-weight: 700;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.6px;
     text-transform: uppercase;
     color: var(--text-light);
-    padding: 10px 10px;
+    padding: 10px 16px;
     cursor: pointer;
     position: relative;
     transition: color 0.15s ease;
@@ -334,7 +327,7 @@ body {
     background: none;
     --tab-accent: var(--crimson);
     white-space: nowrap;
-    flex: 0 0 auto;
+    min-width: 0;
     text-align: center;
     line-height: 1.1;
   }
@@ -757,6 +750,7 @@ body {
 
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
+  .tab-panel.active + .tab-panel.active { margin-top: 26px; }
 
   @media (max-width: 1280px) {
     .cards-grid,
@@ -802,11 +796,17 @@ body {
 
   @media (max-width: 720px) {
     .tabs {
+      display: flex;
       overflow-x: auto;
       padding-bottom: 2px;
       overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
       justify-content: flex-start;
+      scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar {
+      display: none;
     }
 
     .tab {
@@ -1416,12 +1416,9 @@ body {
   </div>
 
   <div class="tabs">
-    <button class="tab theme-website active" type="button" onclick="switchTab('bouwen', this)">Website Bouwen</button>
-    <button class="tab theme-website" type="button" onclick="switchTab('onderhoud', this)">Website Onderhoud</button>
+    <button class="tab theme-website active" type="button" onclick="switchTab('website', this)">Website</button>
     <button class="tab theme-business" type="button" onclick="switchTab('bedrijfssoftware', this)">Bedrijfssoftware</button>
-    <button class="tab theme-business" type="button" onclick="switchTab('bedrijfssoftware-onderhoud', this)">Bedrijfssoftware Onderhoud</button>
-    <button class="tab theme-voice" type="button" onclick="switchTab('voice-software', this)">Voicesoftware</button>
-    <button class="tab theme-voice" type="button" onclick="switchTab('voice-software-onderhoud', this)">Voicesoftware Onderhoud</button>
+    <button class="tab theme-voice" type="button" onclick="switchTab('voicesoftware', this)">Voicesoftware</button>
   </div>
 
   <div id="tab-bouwen" class="tab-panel theme-website active">
@@ -1499,7 +1496,7 @@ body {
 
   </div>
 
-  <div id="tab-onderhoud" class="tab-panel theme-website">
+  <div id="tab-onderhoud" class="tab-panel theme-website active">
     <div class="section-title">Website Onderhoud Abonnementen</div>
 
     <div class="onderhoud-grid">
@@ -1876,8 +1873,22 @@ body {
   function switchTab(name, el) {
     document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
     document.querySelectorAll('.tab').forEach((tab) => tab.classList.remove('active'));
-    document.getElementById('tab-' + name).classList.add('active');
-    el.classList.add('active');
+
+    const groups = {
+      website: ['bouwen', 'onderhoud'],
+      bedrijfssoftware: ['bedrijfssoftware', 'bedrijfssoftware-onderhoud'],
+      voicesoftware: ['voice-software', 'voice-software-onderhoud'],
+    };
+
+    const panelIds = Array.isArray(groups[name]) ? groups[name] : [name];
+    panelIds.forEach((panelId) => {
+      const panelEl = document.getElementById('tab-' + panelId);
+      if (panelEl) panelEl.classList.add('active');
+    });
+
+    if (el && el.classList) {
+      el.classList.add('active');
+    }
   }
 </script>
 </body>
