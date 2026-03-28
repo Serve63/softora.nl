@@ -3671,7 +3671,7 @@
     const linkedDecision = callPhoneKey ? normalizeLeadDatabaseDecision(decisionByPhoneKey?.get(callPhoneKey) || '') : '';
 
     if (linkedDecision === 'do_not_call') return 'geen_interesse';
-    if (linkedDecision === 'appointment' || linkedDecision === 'customer' || linkedDecision === 'called' || linkedDecision === 'callback') {
+    if (linkedDecision === 'appointment' || linkedDecision === 'customer') {
       return 'interesse';
     }
 
@@ -3683,7 +3683,15 @@
       return 'geen_interesse';
     }
 
-    return 'interesse';
+    if (
+      /(interesse|geinteresseerd|geïnteresseerd|afspraak|demo|offerte|stuur (de )?(mail|info)|mail .* (offerte|informatie)|terugbellen|callback)/.test(
+        text
+      )
+    ) {
+      return 'interesse';
+    }
+
+    return 'onbekend';
   }
 
   function isQualifiedPhoneConversation(call) {
@@ -4171,7 +4179,19 @@
                   const phone = formatLeadDatabasePhone(normalizeFreeText(call?.phone || ''));
                   const intent = inferPhoneConversationIntent(call, decisionByPhoneKey);
                   const isNegative = intent === 'geen_interesse';
-                  const status = isNegative ? 'Geen interesse' : 'Interesse';
+                  const isPositive = intent === 'interesse';
+                  const status = isNegative ? 'Geen interesse' : isPositive ? 'Interesse' : 'Onbekend';
+                  const statusBg = isNegative
+                    ? getConversationThemeMode() === 'light'
+                      ? '#ffe9ed'
+                      : 'rgba(255,99,99,0.14)'
+                    : isPositive
+                      ? getConversationThemeMode() === 'light'
+                        ? '#e3f6ea'
+                        : 'rgba(44,207,125,0.14)'
+                      : getConversationThemeMode() === 'light'
+                        ? '#eef1f6'
+                        : 'rgba(150,166,188,0.2)';
                   const duration = formatConversationDuration(call?.durationSeconds);
                   const updatedAt = normalizeFreeText(call?.updatedAt || '');
                   const callId = normalizeFreeText(call?.callId || '');
@@ -4186,7 +4206,7 @@
                         phone || '-'
                       )}</td>
                       <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; white-space:nowrap;">
-                        <span style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; font-size:11px; background:${isNegative ? (getConversationThemeMode() === 'light' ? '#ffe9ed' : 'rgba(255,99,99,0.14)') : (getConversationThemeMode() === 'light' ? '#e3f6ea' : 'rgba(44,207,125,0.14)')}; color:${theme.text};">${status}</span>
+                        <span style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; font-size:11px; background:${statusBg}; color:${theme.text};">${status}</span>
                       </td>
                       <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; font-size:12px; color:${theme.textMuted}; white-space:nowrap;">${escapeHtml(
                         duration
