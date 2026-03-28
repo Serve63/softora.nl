@@ -3560,7 +3560,9 @@
       });
   }
 
-  async function fetchLeadDatabaseRecords() {
+  async function fetchLeadDatabaseRecords(options = {}) {
+    const cacheBust = normalizeFreeText(options?.cacheBust || '');
+    const cacheSuffix = cacheBust ? `&ts=${encodeURIComponent(cacheBust)}` : '';
     const parsed = parseLeadRows(getSavedLeadRows());
     const allowedPhoneKeys = new Set(
       (Array.isArray(parsed?.leads) ? parsed.leads : [])
@@ -3571,7 +3573,11 @@
 
     let updates = [];
     try {
-      const response = await fetchWithTimeout('/api/coldcalling/call-updates?limit=500', { method: 'GET', cache: 'no-store' }, 15000);
+      const response = await fetchWithTimeout(
+        `/api/coldcalling/call-updates?limit=500${cacheSuffix}`,
+        { method: 'GET', cache: 'no-store' },
+        15000
+      );
       const data = await parseApiResponse(response);
       if (response.ok && data?.ok) {
         updates = Array.isArray(data.updates) ? data.updates : [];
@@ -3584,7 +3590,11 @@
 
     let insights = [];
     try {
-      const response = await fetchWithTimeout('/api/ai/call-insights?limit=500', { method: 'GET', cache: 'no-store' }, 15000);
+      const response = await fetchWithTimeout(
+        `/api/ai/call-insights?limit=500${cacheSuffix}`,
+        { method: 'GET', cache: 'no-store' },
+        15000
+      );
       const data = await parseApiResponse(response);
       if (response.ok && data?.ok) {
         insights = Array.isArray(data.insights) ? data.insights : [];
@@ -3791,6 +3801,7 @@
       pollTimer: null,
       lastRefreshedAt: '',
       detailCallId: '',
+      forceReloadAfterLoad: false,
     };
 
     modal = document.createElement('div');
@@ -4395,24 +4406,42 @@
       await loadData(false);
     }
 
-    async function loadData(showLoader = true) {
-      if (state.loading) return;
+    async function loadData(showLoader = true, options = {}) {
+      const force = Boolean(options && options.force);
+      if (state.loading) {
+        if (force) {
+          state.forceReloadAfterLoad = true;
+          state.info = 'Verversen ingepland...';
+          render();
+        }
+        return;
+      }
       if (showLoader) {
         state.loading = true;
         render();
       }
       state.error = '';
       try {
-        const data = await fetchLeadDatabaseRecords();
+        const data = await fetchLeadDatabaseRecords({
+          cacheBust: force ? String(Date.now()) : '',
+        });
         state.records = Array.isArray(data.records) ? data.records : [];
         state.calls = Array.isArray(data.calls) ? data.calls : Array.isArray(data.updates) ? data.updates : [];
         state.sourceErrors = Array.isArray(data.sourceErrors) ? data.sourceErrors : [];
         state.lastRefreshedAt = new Date().toISOString();
+        if (force) {
+          state.info = `Verversd om ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}.`;
+        }
       } catch (error) {
         state.error = normalizeFreeText(error?.message || '') || 'Database kon niet geladen worden.';
       } finally {
         state.loading = false;
+        const shouldForceReloadAgain = state.forceReloadAfterLoad;
+        state.forceReloadAfterLoad = false;
         render();
+        if (shouldForceReloadAgain) {
+          void loadData(true, { force: true });
+        }
       }
     }
 
@@ -4449,7 +4478,8 @@
     byId('leadDatabaseCallDetailCloseBtn')?.addEventListener('click', closeCallDetail);
     byId('leadDatabaseRefreshBtn')?.addEventListener('click', () => {
       state.info = '';
-      void loadData(true);
+      state.error = '';
+      void loadData(true, { force: true });
     });
     byId('leadDatabaseImportBtn')?.addEventListener('click', () => {
       if (state.importing || state.loading) return;
