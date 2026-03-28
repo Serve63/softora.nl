@@ -308,6 +308,9 @@ body {
     gap: 0;
     margin-bottom: 32px;
     border-bottom: 2px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .tab {
@@ -324,6 +327,8 @@ body {
     border: none;
     background: none;
     --tab-accent: var(--crimson);
+    white-space: nowrap;
+    flex: 0 0 auto;
   }
 
   .tab:hover {
