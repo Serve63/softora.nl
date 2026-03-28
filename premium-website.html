@@ -837,7 +837,6 @@
         }
 
         .faq-item {
-            border-bottom: 1px solid var(--border);
             overflow: hidden;
         }
 
@@ -863,6 +862,12 @@
 
         .faq-question:hover {
             color: var(--accent-light);
+        }
+
+        .faq-question-label {
+            display: inline-block;
+            padding-bottom: 0.35rem;
+            border-bottom: 1px solid var(--border);
         }
 
         .faq-icon {
@@ -1311,7 +1316,7 @@
             <div class="faq-container" style="margin-top: 2rem;">
                 <div class="faq-item fade-up">
                     <button class="faq-question magnetic">
-                        Hoe lang duurt het om een website te bouwen?
+                        <span class="faq-question-label">Hoe lang duurt het om een website te bouwen?</span>
                         <span class="faq-icon"></span>
                     </button>
                     <div class="faq-answer">
@@ -1321,7 +1326,7 @@
 
                 <div class="faq-item fade-up" style="transition-delay: 0.1s">
                     <button class="faq-question magnetic">
-                        Werken jullie met WordPress of custom code?
+                        <span class="faq-question-label">Werken jullie met WordPress of custom code?</span>
                         <span class="faq-icon"></span>
                     </button>
                     <div class="faq-answer">
@@ -1331,7 +1336,7 @@
 
                 <div class="faq-item fade-up" style="transition-delay: 0.2s">
                     <button class="faq-question magnetic">
-                        Wat als ik al een website heb die beter moet?
+                        <span class="faq-question-label">Wat als ik al een website heb die beter moet?</span>
                         <span class="faq-icon"></span>
                     </button>
                     <div class="faq-answer">
@@ -1341,7 +1346,7 @@
 
                 <div class="faq-item fade-up" style="transition-delay: 0.3s">
                     <button class="faq-question magnetic">
-                        Bieden jullie ook hosting en onderhoud aan?
+                        <span class="faq-question-label">Bieden jullie ook hosting en onderhoud aan?</span>
                         <span class="faq-icon"></span>
                     </button>
                     <div class="faq-answer">
