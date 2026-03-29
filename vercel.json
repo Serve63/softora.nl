@@ -10,10 +10,16 @@
     "api/agenda/[...path].js": {
       "maxDuration": 800
     },
+    "api/auth/[...path].js": {
+      "maxDuration": 800
+    },
     "api/ai/[...path].js": {
       "maxDuration": 800
     },
     "api/coldcalling/[...path].js": {
+      "maxDuration": 800
+    },
+    "api/dashboard/[...path].js": {
       "maxDuration": 800
     },
     "api/retell/[...path].js": {
@@ -26,6 +32,9 @@
       "maxDuration": 800
     },
     "api/seo/[...path].js": {
+      "maxDuration": 800
+    },
+    "api/ui-state/[...path].js": {
       "maxDuration": 800
     }
   },
