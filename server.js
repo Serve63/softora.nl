@@ -10,6 +10,7 @@ const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-js');
+const { createPremiumUsersStore } = require('./lib/premium-users-store');
 require('dotenv').config();
 
 function normalizeLoginEmailValue(value) {
@@ -112,8 +113,6 @@ const PREMIUM_LOGIN_EMAILS = Array.from(
       .filter(Boolean)
   )
 );
-const PREMIUM_PRIMARY_LOGIN_EMAIL = PREMIUM_LOGIN_EMAILS[0] || '';
-const premiumLoginEmailSet = new Set(PREMIUM_LOGIN_EMAILS);
 const PREMIUM_LOGIN_PASSWORD = String(process.env.PREMIUM_LOGIN_PASSWORD || '').trim();
 const PREMIUM_LOGIN_PASSWORD_HASH = String(process.env.PREMIUM_LOGIN_PASSWORD_HASH || '').trim();
 const PREMIUM_SESSION_SECRET = String(process.env.PREMIUM_SESSION_SECRET || '').trim();
@@ -213,7 +212,6 @@ const recentAiCallInsights = [];
 const recentDashboardActivities = [];
 const recentSecurityAuditEvents = [];
 const inMemoryUiStateByScope = new Map();
-const inMemoryPremiumUsers = [];
 const aiCallInsightsByCallId = new Map();
 const aiAnalysisFingerprintByCallId = new Map();
 const aiAnalysisInFlightCallIds = new Set();
@@ -234,9 +232,6 @@ let supabasePersistChain = Promise.resolve();
 let supabaseHydrateRetryNotBeforeMs = 0;
 let supabaseLastHydrateError = '';
 let supabaseLastPersistError = '';
-let premiumUsersHydrated = false;
-let premiumUsersHydrationPromise = null;
-let premiumUsersUpdatedAt = '';
 const UI_STATE_SCOPE_PREFIX = 'ui_state:';
 const PREMIUM_ACTIVE_ORDERS_SCOPE = 'premium_active_orders';
 const PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
@@ -792,19 +787,34 @@ function buildSetCookieHeader(name, value, options = {}) {
 }
 
 function isPremiumAuthConfigured() {
-  const hasBootstrapCredentials = Boolean(
-    PREMIUM_PRIMARY_LOGIN_EMAIL &&
-      (PREMIUM_LOGIN_PASSWORD || PREMIUM_LOGIN_PASSWORD_HASH)
-  );
-  return Boolean(
-    PREMIUM_SESSION_SECRET &&
-      (inMemoryPremiumUsers.length > 0 || hasBootstrapCredentials)
-  );
+  return premiumUsersStore.hasConfiguredUsers();
 }
 
 function normalizePremiumSessionEmail(value) {
   return normalizeString(value).toLowerCase();
 }
+
+const premiumUsersStore = createPremiumUsersStore({
+  config: {
+    premiumLoginEmails: PREMIUM_LOGIN_EMAILS,
+    premiumLoginPassword: PREMIUM_LOGIN_PASSWORD,
+    premiumLoginPasswordHash: PREMIUM_LOGIN_PASSWORD_HASH,
+    premiumSessionSecret: PREMIUM_SESSION_SECRET,
+    premiumAuthUsersRowKey: PREMIUM_AUTH_USERS_ROW_KEY,
+    premiumAuthUsersVersion: PREMIUM_AUTH_USERS_VERSION,
+    supabaseStateTable: SUPABASE_STATE_TABLE,
+  },
+  deps: {
+    normalizeString,
+    truncateText,
+    timingSafeEqualStrings,
+    normalizePremiumSessionEmail,
+    isSupabaseConfigured,
+    getSupabaseClient,
+    fetchSupabaseRowByKeyViaRest,
+    upsertSupabaseRowViaRest,
+  },
+});
 
 function createPremiumSessionToken({ email, maxAgeMs, userId = '', role = '' }) {
   if (!isPremiumAuthConfigured()) return '';
@@ -929,302 +939,10 @@ function clearPremiumSessionCookie(req, res) {
   );
 }
 
-function verifyPremiumPasswordHash(password, passwordHash) {
-  const rawPassword = String(password || '');
-  const rawHash = normalizeString(passwordHash);
-  if (!rawPassword || !rawHash) return false;
-
-  if (/^sha256:/i.test(rawHash)) {
-    const expectedHex = rawHash.replace(/^sha256:/i, '').trim().toLowerCase();
-    const digestHex = crypto.createHash('sha256').update(rawPassword).digest('hex').toLowerCase();
-    return timingSafeEqualStrings(digestHex, expectedHex);
-  }
-
-  if (/^scrypt:/i.test(rawHash)) {
-    const [, saltBase64 = '', derivedKeyBase64 = ''] = rawHash.split(':');
-    if (!saltBase64 || !derivedKeyBase64) return false;
-    try {
-      const salt = Buffer.from(saltBase64, 'base64');
-      const expectedBuffer = Buffer.from(derivedKeyBase64, 'base64');
-      const derivedBuffer = crypto.scryptSync(rawPassword, salt, expectedBuffer.length);
-      return crypto.timingSafeEqual(derivedBuffer, expectedBuffer);
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
-}
-
-function createPremiumPasswordHash(password) {
-  const rawPassword = String(password || '');
-  if (!rawPassword) return '';
-  const saltBuffer = crypto.randomBytes(16);
-  const derivedBuffer = crypto.scryptSync(rawPassword, saltBuffer, 64);
-  return `scrypt:${saltBuffer.toString('base64')}:${derivedBuffer.toString('base64')}`;
-}
-
-function isPremiumPasswordValid(password) {
-  const rawPassword = String(password || '');
-  if (!rawPassword) return false;
-  if (PREMIUM_LOGIN_PASSWORD_HASH) {
-    return verifyPremiumPasswordHash(rawPassword, PREMIUM_LOGIN_PASSWORD_HASH);
-  }
-  if (!PREMIUM_LOGIN_PASSWORD) return false;
-  return timingSafeEqualStrings(rawPassword, PREMIUM_LOGIN_PASSWORD);
-}
-
-function normalizePremiumUserRole(value) {
-  return normalizeString(value || '').toLowerCase() === 'admin' ? 'admin' : 'medewerker';
-}
-
-function normalizePremiumUserStatus(value) {
-  return normalizeString(value || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
-}
-
-function isPremiumAdminRole(value) {
-  return normalizePremiumUserRole(value) === 'admin';
-}
-
-function createPremiumUserId() {
-  return `usr_${crypto.randomBytes(8).toString('hex')}`;
-}
-
-function derivePremiumUserFirstNameFromEmail(email) {
-  const normalizedEmail = normalizePremiumSessionEmail(email);
-  const localPart = normalizedEmail.split('@')[0] || '';
-  const firstToken = localPart.split(/[._-]+/).find(Boolean) || localPart || 'Gebruiker';
-  const cleaned = firstToken.replace(/[^a-z0-9]+/gi, '');
-  if (!cleaned) return 'Gebruiker';
-  return `${cleaned.charAt(0).toUpperCase()}${cleaned.slice(1)}`;
-}
-
-function sanitizePremiumUserRecord(raw, options = {}) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const email = normalizePremiumSessionEmail(raw.email || raw.mail || '');
-  const passwordHash = normalizeString(raw.passwordHash || '');
-  if (!email || !passwordHash) return null;
-
-  const nowIso = new Date().toISOString();
-  const firstName = truncateText(
-    normalizeString(raw.firstName || raw.voornaam || ''),
-    80
-  ) || derivePremiumUserFirstNameFromEmail(email);
-  const lastName = truncateText(normalizeString(raw.lastName || raw.achternaam || ''), 80);
-
-  return {
-    id: truncateText(normalizeString(raw.id || createPremiumUserId()), 120) || createPremiumUserId(),
-    firstName,
-    lastName,
-    email,
-    role: normalizePremiumUserRole(raw.role || options.role || 'medewerker'),
-    status: normalizePremiumUserStatus(raw.status || options.status || 'active'),
-    passwordHash,
-    source: truncateText(normalizeString(raw.source || options.source || 'managed'), 60) || 'managed',
-    createdAt: normalizeString(raw.createdAt || nowIso) || nowIso,
-    updatedAt: normalizeString(raw.updatedAt || nowIso) || nowIso,
-  };
-}
-
-function sanitizePremiumUsersCollection(list) {
-  if (!Array.isArray(list)) return [];
-  const normalized = [];
-  const seenEmails = new Set();
-  for (const rawItem of list) {
-    const item = sanitizePremiumUserRecord(rawItem);
-    if (!item) continue;
-    if (seenEmails.has(item.email)) continue;
-    seenEmails.add(item.email);
-    normalized.push(item);
-  }
-  return normalized;
-}
-
-function setPremiumUsersCache(users, updatedAt = new Date().toISOString()) {
-  const sanitizedUsers = sanitizePremiumUsersCollection(users);
-  inMemoryPremiumUsers.splice(0, inMemoryPremiumUsers.length, ...sanitizedUsers);
-  premiumUsersUpdatedAt = normalizeString(updatedAt || '') || new Date().toISOString();
-  premiumUsersHydrated = true;
-  return inMemoryPremiumUsers;
-}
-
-function buildBootstrapPremiumUsers() {
-  const passwordHash = PREMIUM_LOGIN_PASSWORD_HASH || createPremiumPasswordHash(PREMIUM_LOGIN_PASSWORD);
-  if (!PREMIUM_LOGIN_EMAILS.length || !passwordHash) return [];
-  const nowIso = new Date().toISOString();
-  return sanitizePremiumUsersCollection(
-    PREMIUM_LOGIN_EMAILS.map((email) => ({
-      id: createPremiumUserId(),
-      firstName: derivePremiumUserFirstNameFromEmail(email),
-      lastName: '',
-      email,
-      role: 'admin',
-      status: 'active',
-      passwordHash,
-      source: 'bootstrap_env',
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    }))
-  );
-}
-
-function findPremiumUserByEmail(users, email) {
-  const normalizedEmail = normalizePremiumSessionEmail(email);
-  if (!normalizedEmail || !Array.isArray(users)) return null;
-  return users.find((item) => item && item.email === normalizedEmail) || null;
-}
-
-function findPremiumUserById(users, userId) {
-  const normalizedId = truncateText(normalizeString(userId || ''), 120);
-  if (!normalizedId || !Array.isArray(users)) return null;
-  return users.find((item) => item && item.id === normalizedId) || null;
-}
-
-function countActivePremiumAdmins(users) {
-  if (!Array.isArray(users)) return 0;
-  return users.filter(
-    (item) =>
-      item &&
-      normalizePremiumUserStatus(item.status) === 'active' &&
-      isPremiumAdminRole(item.role)
-  ).length;
-}
-
-function buildPremiumUserDisplayName(user) {
-  const firstName = truncateText(normalizeString(user?.firstName || ''), 80);
-  const lastName = truncateText(normalizeString(user?.lastName || ''), 80);
-  const fullName = `${firstName} ${lastName}`.trim();
-  return fullName || normalizePremiumSessionEmail(user?.email || '') || 'Onbekende gebruiker';
-}
-
-function sanitizePremiumUserForClient(user) {
-  if (!user || typeof user !== 'object') return null;
-  return {
-    id: truncateText(normalizeString(user.id || ''), 120),
-    voornaam: truncateText(normalizeString(user.firstName || ''), 80),
-    achternaam: truncateText(normalizeString(user.lastName || ''), 80),
-    email: normalizePremiumSessionEmail(user.email || ''),
-    rol: normalizePremiumUserRole(user.role),
-    status: normalizePremiumUserStatus(user.status),
-    displayName: buildPremiumUserDisplayName(user),
-    createdAt: normalizeString(user.createdAt || ''),
-    updatedAt: normalizeString(user.updatedAt || ''),
-  };
-}
-
-async function persistPremiumUsersCollection(users, meta = {}) {
-  const sanitizedUsers = sanitizePremiumUsersCollection(users);
-  const updatedAt = new Date().toISOString();
-  setPremiumUsersCache(sanitizedUsers, updatedAt);
-
-  if (!isSupabaseConfigured()) {
-    return { users: inMemoryPremiumUsers.slice(), source: 'memory', updatedAt };
-  }
-
-  const row = {
-    state_key: PREMIUM_AUTH_USERS_ROW_KEY,
-    payload: {
-      version: PREMIUM_AUTH_USERS_VERSION,
-      users: sanitizedUsers,
-    },
-    meta: {
-      type: 'premium_auth_users',
-      source: truncateText(normalizeString(meta.source || 'server'), 80),
-      reason: truncateText(normalizeString(meta.reason || ''), 200),
-      actorEmail: normalizePremiumSessionEmail(meta.actorEmail || ''),
-    },
-    updated_at: updatedAt,
-  };
-
-  try {
-    const client = getSupabaseClient();
-    if (!client) {
-      return { users: inMemoryPremiumUsers.slice(), source: 'memory', updatedAt };
-    }
-    const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
-      onConflict: 'state_key',
-    });
-    if (error) {
-      const fallback = await upsertSupabaseRowViaRest(row);
-      if (!fallback.ok) {
-        console.error('[PremiumUsers][PersistError]', error.message || error);
-        return { users: inMemoryPremiumUsers.slice(), source: 'memory', updatedAt };
-      }
-    }
-    return { users: inMemoryPremiumUsers.slice(), source: 'supabase', updatedAt };
-  } catch (error) {
-    console.error('[PremiumUsers][PersistCrash]', error?.message || error);
-    return { users: inMemoryPremiumUsers.slice(), source: 'memory', updatedAt };
-  }
-}
-
-async function ensurePremiumUsersHydrated(options = {}) {
-  const force = Boolean(options && options.force);
-  if (premiumUsersHydrated && !force) {
-    return { users: inMemoryPremiumUsers.slice(), updatedAt: premiumUsersUpdatedAt, source: 'memory' };
-  }
-  if (premiumUsersHydrationPromise) return premiumUsersHydrationPromise;
-
-  premiumUsersHydrationPromise = (async () => {
-    const bootstrapUsers = buildBootstrapPremiumUsers();
-
-    if (!isSupabaseConfigured()) {
-      setPremiumUsersCache(bootstrapUsers, new Date().toISOString());
-      return { users: inMemoryPremiumUsers.slice(), updatedAt: premiumUsersUpdatedAt, source: 'memory' };
-    }
-
-    try {
-      const client = getSupabaseClient();
-      let row = null;
-
-      if (client) {
-        const { data, error } = await client
-          .from(SUPABASE_STATE_TABLE)
-          .select('payload, updated_at')
-          .eq('state_key', PREMIUM_AUTH_USERS_ROW_KEY)
-          .maybeSingle();
-
-        if (!error) {
-          row = data || null;
-        } else {
-          const fallback = await fetchSupabaseRowByKeyViaRest(PREMIUM_AUTH_USERS_ROW_KEY, 'payload,updated_at');
-          if (fallback.ok) {
-            row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
-          }
-        }
-      }
-
-      const storedUsers = sanitizePremiumUsersCollection(row?.payload?.users || []);
-      if (storedUsers.length > 0) {
-        setPremiumUsersCache(storedUsers, row?.updated_at || new Date().toISOString());
-        return { users: inMemoryPremiumUsers.slice(), updatedAt: premiumUsersUpdatedAt, source: 'supabase' };
-      }
-
-      setPremiumUsersCache(bootstrapUsers, new Date().toISOString());
-      if (bootstrapUsers.length > 0) {
-        return persistPremiumUsersCollection(bootstrapUsers, {
-          source: 'bootstrap_env',
-          reason: 'premium_users_bootstrap',
-        });
-      }
-
-      return { users: inMemoryPremiumUsers.slice(), updatedAt: premiumUsersUpdatedAt, source: 'memory' };
-    } catch (error) {
-      console.error('[PremiumUsers][HydrateCrash]', error?.message || error);
-      setPremiumUsersCache(bootstrapUsers, new Date().toISOString());
-      return { users: inMemoryPremiumUsers.slice(), updatedAt: premiumUsersUpdatedAt, source: 'memory' };
-    } finally {
-      premiumUsersHydrationPromise = null;
-    }
-  })();
-
-  return premiumUsersHydrationPromise;
-}
-
 async function getResolvedPremiumAuthState(req) {
   const basicAuthState = getPremiumAuthState(req);
-  const hydrated = await ensurePremiumUsersHydrated();
-  const users = Array.isArray(hydrated?.users) ? hydrated.users : inMemoryPremiumUsers.slice();
+  const hydrated = await premiumUsersStore.ensureUsersHydrated();
+  const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
   const configured = Boolean(PREMIUM_SESSION_SECRET && users.length > 0);
 
   if (!configured) {
@@ -1257,10 +975,10 @@ async function getResolvedPremiumAuthState(req) {
   }
 
   const user =
-    findPremiumUserById(users, basicAuthState.userId) ||
-    findPremiumUserByEmail(users, basicAuthState.email);
+    premiumUsersStore.findUserById(users, basicAuthState.userId) ||
+    premiumUsersStore.findUserByEmail(users, basicAuthState.email);
 
-  if (!user || normalizePremiumUserStatus(user.status) !== 'active') {
+  if (!user || premiumUsersStore.normalizeUserStatus(user.status) !== 'active') {
     return {
       ...basicAuthState,
       configured: true,
@@ -1280,10 +998,10 @@ async function getResolvedPremiumAuthState(req) {
     email: user.email,
     userId: user.id,
     role: user.role,
-    isAdmin: isPremiumAdminRole(user.role),
+    isAdmin: premiumUsersStore.isAdminRole(user.role),
     revoked: false,
     user,
-    displayName: buildPremiumUserDisplayName(user),
+    displayName: premiumUsersStore.buildUserDisplayName(user),
   };
 }
 
@@ -8218,8 +7936,8 @@ app.post('/api/auth/login', async (req, res) => {
 
   res.setHeader('Cache-Control', 'no-store, private');
 
-  const hydrated = await ensurePremiumUsersHydrated();
-  const users = Array.isArray(hydrated?.users) ? hydrated.users : inMemoryPremiumUsers.slice();
+  const hydrated = await premiumUsersStore.ensureUsersHydrated();
+  const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
 
   if (!PREMIUM_SESSION_SECRET || users.length === 0) {
     appendSecurityAuditEvent(
@@ -8285,8 +8003,10 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
-  const matchedUser = findPremiumUserByEmail(users, email);
-  const isPasswordValid = matchedUser ? verifyPremiumPasswordHash(password, matchedUser.passwordHash) : false;
+  const matchedUser = premiumUsersStore.findUserByEmail(users, email);
+  const isPasswordValid = matchedUser
+    ? premiumUsersStore.verifyPasswordHash(password, matchedUser.passwordHash)
+    : false;
   if (!matchedUser || !isPasswordValid) {
     appendSecurityAuditEvent(
       {
@@ -8308,7 +8028,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
-  if (normalizePremiumUserStatus(matchedUser.status) !== 'active') {
+  if (premiumUsersStore.normalizeUserStatus(matchedUser.status) !== 'active') {
     appendSecurityAuditEvent(
       {
         type: 'login_failed',
@@ -8457,18 +8177,6 @@ app.use('/api', async (req, res, next) => {
   });
 });
 
-function validatePremiumUserEmail(value) {
-  const email = normalizePremiumSessionEmail(value);
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
-}
-
-function normalizePremiumUserInputNames(input) {
-  return {
-    firstName: truncateText(normalizeString(input?.voornaam || input?.firstName || ''), 80),
-    lastName: truncateText(normalizeString(input?.achternaam || input?.lastName || ''), 80),
-  };
-}
-
 function requirePremiumAdminApiAccess(req, res, next) {
   const authState = req.premiumAuth || null;
   if (!authState || !authState.authenticated) {
@@ -8481,22 +8189,24 @@ function requirePremiumAdminApiAccess(req, res, next) {
 }
 
 app.get('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) => {
-  const hydrated = await ensurePremiumUsersHydrated({ force: true });
-  const users = Array.isArray(hydrated?.users) ? hydrated.users : inMemoryPremiumUsers.slice();
+  const hydrated = await premiumUsersStore.ensureUsersHydrated({ force: true });
+  const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
   return res.status(200).json({
     ok: true,
-    users: users.map((user) => sanitizePremiumUserForClient(user)),
-    updatedAt: hydrated?.updatedAt || premiumUsersUpdatedAt || null,
+    users: users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
+    updatedAt: hydrated?.updatedAt || premiumUsersStore.getUsersUpdatedAt() || null,
   });
 });
 
 app.post('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) => {
   const authState = req.premiumAuth;
-  const users = (await ensurePremiumUsersHydrated({ force: true }))?.users || inMemoryPremiumUsers.slice();
-  const email = validatePremiumUserEmail(req.body?.email || '');
+  const users =
+    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
+    premiumUsersStore.getCachedUsers();
+  const email = premiumUsersStore.validateUserEmail(req.body?.email || '');
   const password = String(req.body?.password || '');
-  const { firstName, lastName } = normalizePremiumUserInputNames(req.body || {});
-  const role = normalizePremiumUserRole(req.body?.rol || req.body?.role || 'medewerker');
+  const { firstName, lastName } = premiumUsersStore.normalizeUserInputNames(req.body || {});
+  const role = premiumUsersStore.normalizeUserRole(req.body?.rol || req.body?.role || 'medewerker');
 
   if (!email || !password) {
     return res.status(400).json({ ok: false, error: 'E-mail en wachtwoord zijn verplicht.' });
@@ -8504,32 +8214,31 @@ app.post('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) =>
   if (password.length < 8) {
     return res.status(400).json({ ok: false, error: 'Wachtwoord moet minimaal 8 tekens bevatten.' });
   }
-  if (findPremiumUserByEmail(users, email)) {
+  if (premiumUsersStore.findUserByEmail(users, email)) {
     return res.status(409).json({ ok: false, error: 'Dit e-mailadres bestaat al.' });
   }
 
   const nowIso = new Date().toISOString();
   const nextUsers = users.concat([
-    sanitizePremiumUserRecord({
-      id: createPremiumUserId(),
+    premiumUsersStore.sanitizeUserRecord({
       firstName,
       lastName,
       email,
       role,
       status: 'active',
-      passwordHash: createPremiumPasswordHash(password),
+      passwordHash: premiumUsersStore.createPasswordHash(password),
       source: 'managed_ui',
       createdAt: nowIso,
       updatedAt: nowIso,
     }),
   ]);
 
-  const saved = await persistPremiumUsersCollection(nextUsers, {
+  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
     source: 'premium_users_api_create',
     reason: 'premium_user_created',
     actorEmail: authState.email,
   });
-  const createdUser = findPremiumUserByEmail(saved.users, email);
+  const createdUser = premiumUsersStore.findUserByEmail(saved.users, email);
   appendSecurityAuditEvent(
     {
       type: 'premium_user_created',
@@ -8547,26 +8256,29 @@ app.post('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) =>
 
   return res.status(201).json({
     ok: true,
-    user: sanitizePremiumUserForClient(createdUser),
-    users: saved.users.map((user) => sanitizePremiumUserForClient(user)),
+    user: premiumUsersStore.sanitizeUserForClient(createdUser),
+    users: saved.users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
   });
 });
 
 app.patch('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, res) => {
   const authState = req.premiumAuth;
   const userId = truncateText(normalizeString(req.params?.id || ''), 120);
-  const users = (await ensurePremiumUsersHydrated({ force: true }))?.users || inMemoryPremiumUsers.slice();
-  const existingUser = findPremiumUserById(users, userId);
+  const users =
+    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
+    premiumUsersStore.getCachedUsers();
+  const existingUser = premiumUsersStore.findUserById(users, userId);
   if (!existingUser) {
     return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
   }
 
   const emailRaw = req.body?.email;
   const password = String(req.body?.password || '');
-  const role = normalizePremiumUserRole(req.body?.rol || req.body?.role || existingUser.role);
-  const status = normalizePremiumUserStatus(req.body?.status || existingUser.status);
-  const nextEmail = emailRaw === undefined ? existingUser.email : validatePremiumUserEmail(emailRaw);
-  const { firstName, lastName } = normalizePremiumUserInputNames({
+  const role = premiumUsersStore.normalizeUserRole(req.body?.rol || req.body?.role || existingUser.role);
+  const status = premiumUsersStore.normalizeUserStatus(req.body?.status || existingUser.status);
+  const nextEmail =
+    emailRaw === undefined ? existingUser.email : premiumUsersStore.validateUserEmail(emailRaw);
+  const { firstName, lastName } = premiumUsersStore.normalizeUserInputNames({
     firstName: req.body?.firstName === undefined ? existingUser.firstName : req.body?.firstName,
     lastName: req.body?.lastName === undefined ? existingUser.lastName : req.body?.lastName,
     voornaam: req.body?.voornaam,
@@ -8585,32 +8297,32 @@ app.patch('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, re
 
   const nextUsers = users.map((user) => {
     if (user.id !== userId) return user;
-    return sanitizePremiumUserRecord({
+    return premiumUsersStore.sanitizeUserRecord({
       ...user,
       firstName,
       lastName,
       email: nextEmail,
       role,
       status,
-      passwordHash: password ? createPremiumPasswordHash(password) : user.passwordHash,
+      passwordHash: password ? premiumUsersStore.createPasswordHash(password) : user.passwordHash,
       source: 'managed_ui',
       updatedAt: new Date().toISOString(),
     });
   });
 
-  if (countActivePremiumAdmins(nextUsers) < 1) {
+  if (premiumUsersStore.countActiveAdmins(nextUsers) < 1) {
     return res.status(400).json({
       ok: false,
       error: 'Er moet altijd minimaal één actieve administrator overblijven.',
     });
   }
 
-  const saved = await persistPremiumUsersCollection(nextUsers, {
+  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
     source: 'premium_users_api_update',
     reason: 'premium_user_updated',
     actorEmail: authState.email,
   });
-  const updatedUser = findPremiumUserById(saved.users, userId);
+  const updatedUser = premiumUsersStore.findUserById(saved.users, userId);
 
   appendSecurityAuditEvent(
     {
@@ -8629,29 +8341,31 @@ app.patch('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, re
 
   return res.status(200).json({
     ok: true,
-    user: sanitizePremiumUserForClient(updatedUser),
-    users: saved.users.map((user) => sanitizePremiumUserForClient(user)),
+    user: premiumUsersStore.sanitizeUserForClient(updatedUser),
+    users: saved.users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
   });
 });
 
 app.delete('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, res) => {
   const authState = req.premiumAuth;
   const userId = truncateText(normalizeString(req.params?.id || ''), 120);
-  const users = (await ensurePremiumUsersHydrated({ force: true }))?.users || inMemoryPremiumUsers.slice();
-  const existingUser = findPremiumUserById(users, userId);
+  const users =
+    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
+    premiumUsersStore.getCachedUsers();
+  const existingUser = premiumUsersStore.findUserById(users, userId);
   if (!existingUser) {
     return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
   }
 
   const nextUsers = users.filter((user) => user.id !== userId);
-  if (countActivePremiumAdmins(nextUsers) < 1) {
+  if (premiumUsersStore.countActiveAdmins(nextUsers) < 1) {
     return res.status(400).json({
       ok: false,
       error: 'Er moet altijd minimaal één actieve administrator overblijven.',
     });
   }
 
-  const saved = await persistPremiumUsersCollection(nextUsers, {
+  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
     source: 'premium_users_api_delete',
     reason: 'premium_user_deleted',
     actorEmail: authState.email,
@@ -8674,7 +8388,7 @@ app.delete('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, r
 
   return res.status(200).json({
     ok: true,
-    users: saved.users.map((user) => sanitizePremiumUserForClient(user)),
+    users: saved.users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
   });
 });
 
