@@ -36,6 +36,9 @@
     },
     "api/ui-state/[...path].js": {
       "maxDuration": 800
+    },
+    "api/premium-users/[...path].js": {
+      "maxDuration": 800
     }
   },
   "rewrites": [
