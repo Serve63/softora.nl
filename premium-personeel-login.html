@@ -554,7 +554,7 @@
                 <span>Vul je e-mailadres en wachtwoord in.</span>
             </div>
 
-            <form class="login-form" id="loginForm" onsubmit="return handleLogin(event)">
+            <form class="login-form" id="loginForm">
                 <div class="form-group">
                     <label class="form-label" for="email">E-mailadres</label>
                     <input type="email" id="email" name="email" class="form-input magnetic" placeholder="naam@softora.nl" autocomplete="email" required>
@@ -563,6 +563,11 @@
                 <div class="form-group">
                     <label class="form-label" for="password">Wachtwoord</label>
                     <input type="password" id="password" name="password" class="form-input magnetic" placeholder="••••••••" autocomplete="current-password" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="otp">2FA-code <span style="font-weight:400; opacity:0.7;">(indien actief)</span></label>
+                    <input type="text" id="otp" name="otp" class="form-input magnetic" placeholder="123456" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6">
                 </div>
 
                 <div class="form-row">
@@ -686,10 +691,14 @@
 
                 if (params.get('setup') === '1' || payload.configured === false) {
                     showError('Premium login is nog niet geconfigureerd op de server.');
+                } else if (params.get('blocked') === '1') {
+                    showError('Toegang geweigerd vanaf dit IP-adres.');
                 }
             } catch (_) {
                 if (params.get('setup') === '1') {
                     showError('Premium login is nog niet geconfigureerd op de server.');
+                } else if (params.get('blocked') === '1') {
+                    showError('Toegang geweigerd vanaf dit IP-adres.');
                 }
             }
         }
@@ -698,12 +707,14 @@
             e.preventDefault();
             const email = document.getElementById('email');
             const password = document.getElementById('password');
+            const otp = document.getElementById('otp');
             const btn = document.querySelector('.login-btn');
             const remember = document.getElementById('remember');
             const originalBtnText = btn.textContent;
 
             email.classList.remove('error');
             password.classList.remove('error');
+            otp.classList.remove('error');
             hideError();
             btn.textContent = 'Bezig...';
             btn.style.opacity = '0.7';
@@ -730,6 +741,7 @@
                     body: JSON.stringify({
                         email: email.value.trim(),
                         password: password.value,
+                        otp: otp.value.trim(),
                         remember: remember.checked,
                         next: getNextPath()
                     })
@@ -740,6 +752,7 @@
                     const errorMessage = (payload && payload.error) || 'Inloggen mislukt.';
                     email.classList.add('error');
                     password.classList.add('error');
+                    if (payload && payload.mfaRequired) otp.classList.add('error');
                     showError(errorMessage);
                     return false;
                 }
@@ -758,6 +771,7 @@
             return false;
         }
 
+        document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
         syncLoginState();
     </script>
 </body>

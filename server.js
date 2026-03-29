@@ -113,7 +113,16 @@ const PREMIUM_SESSION_REMEMBER_TTL_DAYS = Math.max(
   Math.min(365, Number(process.env.PREMIUM_SESSION_REMEMBER_TTL_DAYS || 30) || 30)
 );
 const PREMIUM_SESSION_COOKIE_NAME = 'softora_premium_session';
+const PREMIUM_MFA_TOTP_SECRET = String(process.env.PREMIUM_MFA_TOTP_SECRET || '').trim();
+const PREMIUM_ADMIN_IP_ALLOWLIST = String(process.env.PREMIUM_ADMIN_IP_ALLOWLIST || '').trim();
+const PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS = !/^(0|false|no)$/i.test(
+  String(process.env.PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS || 'true')
+);
+const PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES = /^(1|true|yes)$/i.test(
+  String(process.env.PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES || '')
+);
 const PREMIUM_PUBLIC_HTML_FILES = new Set(['premium-website.html', 'premium-personeel-login.html']);
+const NOINDEX_HEADER_VALUE = 'noindex, nofollow, noarchive, nosnippet';
 const MAIL_SMTP_HOST = String(
   process.env.MAIL_SMTP_HOST || process.env.SMTP_HOST || process.env.STRATO_SMTP_HOST || ''
 ).trim();
@@ -186,6 +195,7 @@ const retellCallStatusRefreshByCallId = new Map();
 const RETELL_STATUS_REFRESH_COOLDOWN_MS = 8000;
 const recentAiCallInsights = [];
 const recentDashboardActivities = [];
+const recentSecurityAuditEvents = [];
 const inMemoryUiStateByScope = new Map();
 const aiCallInsightsByCallId = new Map();
 const aiAnalysisFingerprintByCallId = new Map();
@@ -355,6 +365,19 @@ app.disable('x-powered-by');
 app.use(
   helmet({
     frameguard: { action: 'deny' },
+    permissionsPolicy: {
+      features: {
+        accelerometer: [],
+        autoplay: ['self'],
+        camera: [],
+        geolocation: [],
+        gyroscope: [],
+        magnetometer: [],
+        microphone: [],
+        payment: [],
+        usb: [],
+      },
+    },
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
@@ -400,11 +423,26 @@ const generalApiRateLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   skip: (req) => isPremiumPublicApiRequest(req),
-  handler: (_req, res) =>
-    res.status(429).json({
+  handler: (req, res) => {
+    appendSecurityAuditEvent(
+      {
+        type: 'rate_limit_hit',
+        severity: 'warning',
+        success: false,
+        email: getPremiumAuthState(req)?.email || '',
+        ip: getClientIpFromRequest(req),
+        path: getRequestPathname(req),
+        origin: getRequestOriginFromHeaders(req),
+        userAgent: req.get('user-agent'),
+        detail: 'Algemene API rate limit geraakt.',
+      },
+      'security_rate_limit_hit'
+    );
+    return res.status(429).json({
       ok: false,
       error: 'Te veel verzoeken. Probeer het over enkele minuten opnieuw.',
-    }),
+    });
+  },
 });
 
 const premiumLoginRateLimiter = rateLimit({
@@ -412,14 +450,58 @@ const premiumLoginRateLimiter = rateLimit({
   max: 8,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  handler: (_req, res) =>
-    res.status(429).json({
+  handler: (req, res) => {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_rate_limit_hit',
+        severity: 'warning',
+        success: false,
+        email: normalizePremiumSessionEmail(req.body?.email || ''),
+        ip: getClientIpFromRequest(req),
+        path: getRequestPathname(req),
+        origin: getRequestOriginFromHeaders(req),
+        userAgent: req.get('user-agent'),
+        detail: 'Te veel premium loginpogingen.',
+      },
+      'security_login_rate_limit_hit'
+    );
+    return res.status(429).json({
       ok: false,
       error: 'Te veel inlogpogingen. Wacht 10 minuten en probeer opnieuw.',
-    }),
+    });
+  },
 });
 
 app.use('/api', generalApiRateLimiter);
+
+app.use('/api', (req, res, next) => {
+  res.setHeader('X-Robots-Tag', NOINDEX_HEADER_VALUE);
+  return next();
+});
+
+app.use('/api', (req, res, next) => {
+  if (isSameOriginApiRequest(req)) return next();
+
+  appendSecurityAuditEvent(
+    {
+      type: 'csrf_origin_blocked',
+      severity: 'warning',
+      success: false,
+      email: getPremiumAuthState(req)?.email || '',
+      ip: getClientIpFromRequest(req),
+      path: getRequestPathname(req),
+      origin: getRequestOriginFromHeaders(req),
+      userAgent: req.get('user-agent'),
+      detail: 'State-changing API request geweigerd door same-origin bescherming.',
+    },
+    'security_same_origin_blocked'
+  );
+
+  return res.status(403).json({
+    ok: false,
+    error: 'Verzoek geweigerd door same-origin beveiliging.',
+  });
+});
 
 app.use((req, _res, next) => {
   const requestPath = String(req.path || '');
@@ -456,6 +538,75 @@ function getRequestPathname(req) {
   return questionMarkIndex >= 0 ? rawUrl.slice(0, questionMarkIndex) : rawUrl;
 }
 
+function normalizeIpAddress(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  const noZone = raw.replace(/%.+$/, '');
+  const ipv4Mapped = noZone.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (ipv4Mapped) return ipv4Mapped[1];
+  if (noZone === '::1') return '127.0.0.1';
+  return noZone;
+}
+
+const premiumAdminAllowedIpSet = new Set(
+  PREMIUM_ADMIN_IP_ALLOWLIST.split(/[\s,]+/)
+    .map((value) => normalizeIpAddress(value))
+    .filter(Boolean)
+);
+
+function getClientIpFromRequest(req) {
+  const forwardedFor = normalizeString(req?.get?.('x-forwarded-for') || '');
+  if (forwardedFor) {
+    const first = forwardedFor.split(',')[0];
+    const normalized = normalizeIpAddress(first);
+    if (normalized) return normalized;
+  }
+
+  return normalizeIpAddress(req?.ip || req?.socket?.remoteAddress || '');
+}
+
+function isPremiumAdminIpAllowed(req) {
+  if (premiumAdminAllowedIpSet.size === 0) return true;
+  const clientIp = getClientIpFromRequest(req);
+  return clientIp ? premiumAdminAllowedIpSet.has(clientIp) : false;
+}
+
+function normalizeOrigin(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  try {
+    return new URL(raw).origin.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function getAllowedSameOriginSet(req) {
+  const allowed = new Set();
+  const publicBaseUrl = normalizeAbsoluteHttpUrl(getEffectivePublicBaseUrl(req));
+  if (publicBaseUrl) {
+    try {
+      allowed.add(new URL(publicBaseUrl).origin.toLowerCase());
+    } catch {}
+  }
+
+  const host = normalizeString(req?.get?.('host') || '');
+  const protocol = isSecureHttpRequest(req) ? 'https' : 'http';
+  if (host) {
+    allowed.add(`${protocol}://${host}`.toLowerCase());
+  }
+
+  return allowed;
+}
+
+function getRequestOriginFromHeaders(req) {
+  const originHeader = normalizeOrigin(req?.get?.('origin') || '');
+  if (originHeader) return originHeader;
+  const refererHeader = normalizeOrigin(req?.get?.('referer') || '');
+  if (refererHeader) return refererHeader;
+  return '';
+}
+
 function toBase64Url(value) {
   return Buffer.from(String(value || ''), 'utf8')
     .toString('base64')
@@ -490,6 +641,85 @@ function timingSafeEqualStrings(left, right) {
   const rightBuffer = Buffer.from(rightValue, 'utf8');
   if (leftBuffer.length !== rightBuffer.length) return false;
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function decodeBase32Secret(value) {
+  const normalized = normalizeString(value)
+    .toUpperCase()
+    .replace(/[^A-Z2-7]/g, '');
+  if (!normalized) return null;
+
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const char of normalized) {
+    const index = alphabet.indexOf(char);
+    if (index < 0) return null;
+    bits += index.toString(2).padStart(5, '0');
+  }
+
+  const bytes = [];
+  for (let offset = 0; offset + 8 <= bits.length; offset += 8) {
+    bytes.push(Number.parseInt(bits.slice(offset, offset + 8), 2));
+  }
+  return bytes.length > 0 ? Buffer.from(bytes) : null;
+}
+
+let premiumMfaSecretBufferCache = undefined;
+
+function getPremiumMfaSecretBuffer() {
+  if (premiumMfaSecretBufferCache !== undefined) {
+    return premiumMfaSecretBufferCache;
+  }
+
+  if (!PREMIUM_MFA_TOTP_SECRET) {
+    premiumMfaSecretBufferCache = null;
+    return premiumMfaSecretBufferCache;
+  }
+
+  const base32Decoded = decodeBase32Secret(PREMIUM_MFA_TOTP_SECRET);
+  premiumMfaSecretBufferCache =
+    base32Decoded && base32Decoded.length > 0
+      ? base32Decoded
+      : Buffer.from(PREMIUM_MFA_TOTP_SECRET, 'utf8');
+  return premiumMfaSecretBufferCache;
+}
+
+function isPremiumMfaConfigured() {
+  const buffer = getPremiumMfaSecretBuffer();
+  return Boolean(buffer && buffer.length > 0);
+}
+
+function generateTotpCodeForTime(secretBuffer, timestampMs = Date.now(), digits = 6, stepSeconds = 30) {
+  if (!secretBuffer || !secretBuffer.length) return '';
+  const counter = Math.floor(Number(timestampMs) / 1000 / stepSeconds);
+  const counterBuffer = Buffer.alloc(8);
+  counterBuffer.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+  counterBuffer.writeUInt32BE(counter >>> 0, 4);
+  const digest = crypto.createHmac('sha1', secretBuffer).update(counterBuffer).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binary =
+    ((digest[offset] & 0x7f) << 24) |
+    ((digest[offset + 1] & 0xff) << 16) |
+    ((digest[offset + 2] & 0xff) << 8) |
+    (digest[offset + 3] & 0xff);
+  const modulo = 10 ** digits;
+  return String(binary % modulo).padStart(digits, '0');
+}
+
+function isPremiumMfaCodeValid(codeRaw) {
+  if (!isPremiumMfaConfigured()) return true;
+  const normalizedCode = normalizeString(codeRaw).replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(normalizedCode)) return false;
+
+  const secretBuffer = getPremiumMfaSecretBuffer();
+  const nowMs = Date.now();
+  for (const offset of [-1, 0, 1]) {
+    const candidate = generateTotpCodeForTime(secretBuffer, nowMs + offset * 30_000);
+    if (candidate && timingSafeEqualStrings(candidate, normalizedCode)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function buildCookieMap(req) {
@@ -735,6 +965,77 @@ function isPremiumPublicApiRequest(req) {
   return false;
 }
 
+function isSameOriginProtectionExemptRequest(req) {
+  const requestPath = normalizeString(getRequestPathname(req) || '');
+  return (
+    requestPath === '/api/healthz' ||
+    requestPath === '/api/twilio/voice' ||
+    requestPath === '/api/twilio/status' ||
+    requestPath === '/api/retell/webhook'
+  );
+}
+
+function isSafeHttpMethod(methodRaw) {
+  const method = normalizeString(methodRaw || '').toUpperCase();
+  return method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+}
+
+function isSameOriginApiRequest(req) {
+  if (!PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS) return true;
+  if (isSafeHttpMethod(req?.method)) return true;
+  if (isSameOriginProtectionExemptRequest(req)) return true;
+
+  const requestOrigin = getRequestOriginFromHeaders(req);
+  if (!requestOrigin) return false;
+
+  const allowedOrigins = getAllowedSameOriginSet(req);
+  return allowedOrigins.has(requestOrigin);
+}
+
+function isRuntimeDebugRouteEnabled() {
+  return !IS_PRODUCTION || PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES;
+}
+
+function requireRuntimeDebugAccess(req, res, next) {
+  if (!isRuntimeDebugRouteEnabled()) {
+    appendSecurityAuditEvent(
+      {
+        type: 'debug_route_blocked',
+        severity: 'warning',
+        success: false,
+        email: getPremiumAuthState(req)?.email || '',
+        ip: getClientIpFromRequest(req),
+        path: getRequestPathname(req),
+        origin: getRequestOriginFromHeaders(req),
+        userAgent: req.get('user-agent'),
+        detail: 'Runtime debug route geblokkeerd in productie.',
+      },
+      'security_debug_route_blocked'
+    );
+    return res.status(404).json({ ok: false, error: 'Niet gevonden' });
+  }
+
+  if (!isPremiumAdminIpAllowed(req)) {
+    appendSecurityAuditEvent(
+      {
+        type: 'admin_ip_blocked',
+        severity: 'warning',
+        success: false,
+        email: getPremiumAuthState(req)?.email || '',
+        ip: getClientIpFromRequest(req),
+        path: getRequestPathname(req),
+        origin: getRequestOriginFromHeaders(req),
+        userAgent: req.get('user-agent'),
+        detail: 'Runtime debug route geweigerd door admin IP allowlist.',
+      },
+      'security_admin_ip_blocked'
+    );
+    return res.status(403).json({ ok: false, error: 'Toegang geweigerd.' });
+  }
+
+  return next();
+}
+
 function escapeHtml(value) {
   return normalizeString(value)
     .replace(/&/g, '&amp;')
@@ -964,6 +1265,7 @@ function buildRuntimeStateSnapshotPayload() {
     recentCallUpdates: recentCallUpdates.slice(0, 500),
     recentAiCallInsights: recentAiCallInsights.slice(0, 500),
     recentDashboardActivities: recentDashboardActivities.slice(0, 500),
+    recentSecurityAuditEvents: recentSecurityAuditEvents.slice(0, 500),
     generatedAgendaAppointments: generatedAgendaAppointments.slice(),
     nextGeneratedAgendaAppointmentId,
   };
@@ -977,6 +1279,9 @@ function applyRuntimeStateSnapshotPayload(payload) {
   const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights) ? payload.recentAiCallInsights.slice(0, 500) : [];
   const nextDashboardActivities = Array.isArray(payload.recentDashboardActivities)
     ? payload.recentDashboardActivities.slice(0, 500)
+    : [];
+  const nextSecurityAuditEvents = Array.isArray(payload.recentSecurityAuditEvents)
+    ? payload.recentSecurityAuditEvents.slice(0, 500)
     : [];
   const nextAppointments = Array.isArray(payload.generatedAgendaAppointments)
     ? payload.generatedAgendaAppointments.slice()
@@ -1001,6 +1306,7 @@ function applyRuntimeStateSnapshotPayload(payload) {
   });
 
   recentDashboardActivities.splice(0, recentDashboardActivities.length, ...nextDashboardActivities);
+  recentSecurityAuditEvents.splice(0, recentSecurityAuditEvents.length, ...nextSecurityAuditEvents);
 
   generatedAgendaAppointments.splice(0, generatedAgendaAppointments.length, ...nextAppointments);
   agendaAppointmentIdByCallId.clear();
@@ -1130,6 +1436,7 @@ async function persistRuntimeStateToSupabase(reason = 'unknown') {
           callUpdates: recentCallUpdates.length,
           aiCallInsights: recentAiCallInsights.length,
           dashboardActivities: recentDashboardActivities.length,
+          securityAuditEvents: recentSecurityAuditEvents.length,
           appointments: generatedAgendaAppointments.length,
         },
       },
@@ -1174,6 +1481,34 @@ function queueRuntimeStatePersist(reason = 'unknown') {
       console.error('[Supabase][PersistQueueError]', error?.message || error);
       return false;
     });
+}
+
+function createSecurityAuditEvent(input) {
+  const nowIso = new Date().toISOString();
+  const entryId = `sec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    id: normalizeString(input?.id || entryId),
+    type: truncateText(normalizeString(input?.type || 'security_event'), 120) || 'security_event',
+    severity: truncateText(normalizeString(input?.severity || 'info'), 20) || 'info',
+    success: Boolean(input?.success),
+    email: truncateText(normalizePremiumSessionEmail(input?.email || ''), 180),
+    ip: truncateText(normalizeIpAddress(input?.ip || ''), 80),
+    path: truncateText(normalizeString(input?.path || ''), 200),
+    origin: truncateText(normalizeOrigin(input?.origin || ''), 200),
+    detail: truncateText(normalizeString(input?.detail || input?.message || ''), 500),
+    userAgent: truncateText(normalizeString(input?.userAgent || ''), 280),
+    createdAt: normalizeString(input?.createdAt || nowIso) || nowIso,
+  };
+}
+
+function appendSecurityAuditEvent(input, reason = 'security_audit') {
+  const entry = createSecurityAuditEvent(input);
+  recentSecurityAuditEvents.unshift(entry);
+  if (recentSecurityAuditEvents.length > 500) {
+    recentSecurityAuditEvents.length = 500;
+  }
+  queueRuntimeStatePersist(reason);
+  return entry;
 }
 
 function createDashboardActivityEntry(input) {
@@ -1804,6 +2139,7 @@ async function sendSeoManagedHtmlPageResponse(req, res, next, fileNameRaw) {
 
   if (isLoginPage) {
     res.setHeader('Cache-Control', 'no-store, private');
+    res.setHeader('X-Robots-Tag', NOINDEX_HEADER_VALUE);
     if (!logoutRequested && authState.authenticated) {
       const nextPath = getSafePremiumRedirectPath(req.query?.next || '', '/premium-personeel-dashboard');
       return res.redirect(302, nextPath);
@@ -1812,6 +2148,7 @@ async function sendSeoManagedHtmlPageResponse(req, res, next, fileNameRaw) {
 
   if (isProtectedPremiumPage) {
     res.setHeader('Cache-Control', 'no-store, private');
+    res.setHeader('X-Robots-Tag', NOINDEX_HEADER_VALUE);
 
     if (!authState.configured) {
       const setupRedirect = `/premium-personeel-login?setup=1&next=${encodeURIComponent(requestedPath)}`;
@@ -1824,6 +2161,25 @@ async function sendSeoManagedHtmlPageResponse(req, res, next, fileNameRaw) {
       }
       const loginRedirect = `/premium-personeel-login?next=${encodeURIComponent(requestedPath)}`;
       return res.redirect(302, loginRedirect);
+    }
+
+    if (!isPremiumAdminIpAllowed(req)) {
+      appendSecurityAuditEvent(
+        {
+          type: 'admin_ip_blocked',
+          severity: 'warning',
+          success: false,
+          email: authState.email || '',
+          ip: getClientIpFromRequest(req),
+          path: requestedPath,
+          origin: getRequestOriginFromHeaders(req),
+          userAgent: req.get('user-agent'),
+          detail: 'Protected premium pagina geweigerd door admin IP allowlist.',
+        },
+        'security_admin_ip_blocked'
+      );
+      clearPremiumSessionCookie(req, res);
+      return res.redirect(302, '/premium-personeel-login?blocked=1');
     }
   }
 
@@ -7284,6 +7640,19 @@ function isTwilioWebhookAuthorized(req) {
 
 function handleTwilioInboundVoice(req, res) {
   if (!isTwilioWebhookAuthorized(req)) {
+    appendSecurityAuditEvent(
+      {
+        type: 'twilio_webhook_rejected',
+        severity: 'warning',
+        success: false,
+        ip: getClientIpFromRequest(req),
+        path: getRequestPathname(req),
+        origin: getRequestOriginFromHeaders(req),
+        userAgent: req.get('user-agent'),
+        detail: 'Twilio inbound voice webhook geweigerd door signature/secret check.',
+      },
+      'security_twilio_webhook_rejected'
+    );
     return sendTwimlXml(
       res,
       `<?xml version="1.0" encoding="UTF-8"?>
@@ -7415,6 +7784,19 @@ function handleTwilioInboundVoice(req, res) {
 
 function handleTwilioStatusWebhook(req, res) {
   if (!isTwilioWebhookAuthorized(req)) {
+    appendSecurityAuditEvent(
+      {
+        type: 'twilio_webhook_rejected',
+        severity: 'warning',
+        success: false,
+        ip: getClientIpFromRequest(req),
+        path: getRequestPathname(req),
+        origin: getRequestOriginFromHeaders(req),
+        userAgent: req.get('user-agent'),
+        detail: 'Twilio status webhook geweigerd door signature/secret check.',
+      },
+      'security_twilio_webhook_rejected'
+    );
     return res.status(401).json({ ok: false, error: 'Twilio webhook signature/secret ongeldig.' });
   }
 
@@ -7453,6 +7835,7 @@ app.get('/api/auth/session', (req, res) => {
     ok: true,
     configured: authState.configured,
     authenticated: authState.authenticated,
+    mfaEnabled: isPremiumMfaConfigured(),
     email: authState.authenticated ? authState.email : '',
     expiresAt: authState.authenticated ? authState.expiresAt : null,
   });
@@ -7461,12 +7844,31 @@ app.get('/api/auth/session', (req, res) => {
 app.post('/api/auth/login', (req, res) => {
   const email = normalizePremiumSessionEmail(req.body?.email || '');
   const password = String(req.body?.password || '');
+  const otp = normalizeString(req.body?.otp || '').replace(/\s+/g, '');
   const remember = /^(1|true|yes|on)$/i.test(String(req.body?.remember || ''));
   const nextPath = getSafePremiumRedirectPath(req.body?.next || req.query?.next || '');
+  const clientIp = getClientIpFromRequest(req);
+  const requestPath = getRequestPathname(req);
+  const requestOrigin = getRequestOriginFromHeaders(req);
+  const userAgent = normalizeString(req.get('user-agent') || '');
 
   res.setHeader('Cache-Control', 'no-store, private');
 
   if (!isPremiumAuthConfigured()) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_rejected',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: 'Premium login niet geconfigureerd op de server.',
+      },
+      'security_login_rejected'
+    );
     return res.status(503).json({
       ok: false,
       error:
@@ -7474,7 +7876,42 @@ app.post('/api/auth/login', (req, res) => {
     });
   }
 
+  if (!isPremiumAdminIpAllowed(req)) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_ip_blocked',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: 'Login geweigerd door admin IP allowlist.',
+      },
+      'security_login_ip_blocked'
+    );
+    return res.status(403).json({
+      ok: false,
+      error: 'Inloggen is vanaf dit IP-adres niet toegestaan.',
+    });
+  }
+
   if (!email || !password) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_failed',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: 'E-mailadres of wachtwoord ontbreekt.',
+      },
+      'security_login_failed'
+    );
     return res.status(400).json({
       ok: false,
       error: 'Vul je e-mailadres en wachtwoord in.',
@@ -7484,9 +7921,45 @@ app.post('/api/auth/login', (req, res) => {
   const isEmailValid = timingSafeEqualStrings(email, PREMIUM_LOGIN_EMAIL);
   const isPasswordValid = isPremiumPasswordValid(password);
   if (!isEmailValid || !isPasswordValid) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_failed',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: 'Ongeldige inloggegevens.',
+      },
+      'security_login_failed'
+    );
     return res.status(401).json({
       ok: false,
       error: 'Ongeldige inloggegevens.',
+    });
+  }
+
+  if (isPremiumMfaConfigured() && !isPremiumMfaCodeValid(otp)) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_mfa_failed',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: '2FA-code ongeldig of ontbreekt.',
+      },
+      'security_login_mfa_failed'
+    );
+    return res.status(401).json({
+      ok: false,
+      error: 'Ongeldige of ontbrekende 2FA-code.',
+      mfaRequired: true,
     });
   }
 
@@ -7498,6 +7971,22 @@ app.post('/api/auth/login', (req, res) => {
     maxAgeMs: sessionMaxAgeMs,
   });
   setPremiumSessionCookie(req, res, sessionToken, sessionMaxAgeMs);
+  appendSecurityAuditEvent(
+    {
+      type: 'login_success',
+      severity: 'info',
+      success: true,
+      email,
+      ip: clientIp,
+      path: requestPath,
+      origin: requestOrigin,
+      userAgent,
+      detail: remember
+        ? 'Premium login succesvol met verlengde sessie.'
+        : 'Premium login succesvol.',
+    },
+    'security_login_success'
+  );
 
   return res.status(200).json({
     ok: true,
@@ -7507,8 +7996,23 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
+  const authState = getPremiumAuthState(req);
   res.setHeader('Cache-Control', 'no-store, private');
   clearPremiumSessionCookie(req, res);
+  appendSecurityAuditEvent(
+    {
+      type: 'logout',
+      severity: 'info',
+      success: true,
+      email: authState.email || '',
+      ip: getClientIpFromRequest(req),
+      path: getRequestPathname(req),
+      origin: getRequestOriginFromHeaders(req),
+      userAgent: req.get('user-agent'),
+      detail: 'Premium sessie uitgelogd.',
+    },
+    'security_logout'
+  );
   return res.status(200).json({ ok: true, authenticated: false });
 });
 
@@ -7526,7 +8030,30 @@ app.use('/api', (req, res, next) => {
     });
   }
 
-  if (authState.authenticated) return next();
+  if (authState.authenticated) {
+    if (!isPremiumAdminIpAllowed(req)) {
+      appendSecurityAuditEvent(
+        {
+          type: 'admin_ip_blocked',
+          severity: 'warning',
+          success: false,
+          email: authState.email || '',
+          ip: getClientIpFromRequest(req),
+          path: getRequestPathname(req),
+          origin: getRequestOriginFromHeaders(req),
+          userAgent: req.get('user-agent'),
+          detail: 'Ingelogde API-request geweigerd door admin IP allowlist.',
+        },
+        'security_admin_ip_blocked'
+      );
+      clearPremiumSessionCookie(req, res);
+      return res.status(403).json({
+        ok: false,
+        error: 'Toegang vanaf dit IP-adres is niet toegestaan.',
+      });
+    }
+    return next();
+  }
 
   if (authState.expired) {
     clearPremiumSessionCookie(req, res);
@@ -7756,6 +8283,19 @@ app.get('/api/coldcalling/recording-proxy', async (req, res) => {
 
 app.post('/api/retell/webhook', (req, res) => {
   if (!isRetellWebhookAuthorized(req)) {
+    appendSecurityAuditEvent(
+      {
+        type: 'retell_webhook_rejected',
+        severity: 'warning',
+        success: false,
+        ip: getClientIpFromRequest(req),
+        path: getRequestPathname(req),
+        origin: getRequestOriginFromHeaders(req),
+        userAgent: req.get('user-agent'),
+        detail: 'Retell webhook geweigerd door signature/secret check.',
+      },
+      'security_retell_webhook_rejected'
+    );
     return res.status(401).json({ ok: false, error: 'Retell webhook signature/secret ongeldig.' });
   }
 
@@ -7846,7 +8386,7 @@ app.get('/api/coldcalling/call-updates', async (req, res) => {
   });
 });
 
-app.get('/api/coldcalling/webhook-debug', (req, res) => {
+app.get('/api/coldcalling/webhook-debug', requireRuntimeDebugAccess, (req, res) => {
   const limit = Math.max(1, Math.min(100, parseIntSafe(req.query.limit, 20)));
   const demoCallIdPrefix = 'demo-';
 
@@ -8895,6 +9435,15 @@ app.get('/api/dashboard/activity', (req, res) => {
     ok: true,
     count: Math.min(limit, recentDashboardActivities.length),
     activities: recentDashboardActivities.slice(0, limit),
+  });
+});
+
+app.get('/api/security/audit-log', requireRuntimeDebugAccess, (req, res) => {
+  const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
+  return res.status(200).json({
+    ok: true,
+    count: Math.min(limit, recentSecurityAuditEvents.length),
+    events: recentSecurityAuditEvents.slice(0, limit),
   });
 });
 
@@ -10831,6 +11380,38 @@ app.get('/api/healthz', (_req, res) => {
   });
 });
 
+app.get('/robots.txt', (_req, res) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  return res.status(200).send(
+    [
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /api/',
+      'Disallow: /premium-',
+      'Disallow: /personeel-',
+      'Disallow: /actieve-opdrachten',
+      'Disallow: /ai-coldmailing',
+      'Disallow: /ai-lead-generator',
+      'Disallow: /seo-crm-system',
+      '',
+    ].join('\n')
+  );
+});
+
+app.get('/.well-known/security.txt', (req, res) => {
+  const publicBaseUrl = getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  return res.status(200).send(
+    [
+      `Contact: mailto:${PREMIUM_LOGIN_EMAIL || 'info@softora.nl'}`,
+      `Expires: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()}`,
+      `Canonical: ${publicBaseUrl}/.well-known/security.txt`,
+      `Preferred-Languages: nl, en`,
+      '',
+    ].join('\n')
+  );
+});
+
 function sendRuntimeHealthDebug(_req, res) {
   return res.status(200).json({
     ok: true,
@@ -10839,6 +11420,7 @@ function sendRuntimeHealthDebug(_req, res) {
       webhookEvents: recentWebhookEvents.length,
       callUpdates: recentCallUpdates.length,
       aiCallInsights: recentAiCallInsights.length,
+      securityAuditEvents: recentSecurityAuditEvents.length,
       appointments: generatedAgendaAppointments.length,
       realCallUpdates: recentCallUpdates.filter((item) => {
         const callId = normalizeString(item?.callId || '');
@@ -10867,8 +11449,8 @@ function sendRuntimeHealthDebug(_req, res) {
   });
 }
 
-app.get('/api/debug/runtime-health', sendRuntimeHealthDebug);
-app.get('/api/runtime-health', sendRuntimeHealthDebug);
+app.get('/api/debug/runtime-health', requireRuntimeDebugAccess, sendRuntimeHealthDebug);
+app.get('/api/runtime-health', requireRuntimeDebugAccess, sendRuntimeHealthDebug);
 
 /* app.get('/api/debug/runtime-health', (_req, res) => {
   res.status(200).json({
@@ -10898,7 +11480,7 @@ app.get('/api/runtime-health', sendRuntimeHealthDebug);
   });
 }); */
 
-app.get('/api/supabase-probe', async (_req, res) => {
+app.get('/api/supabase-probe', requireRuntimeDebugAccess, async (_req, res) => {
   if (!isSupabaseConfigured()) {
     return res.status(200).json({
       ok: false,
@@ -10952,7 +11534,7 @@ app.get('/api/supabase-probe', async (_req, res) => {
   }
 });
 
-app.post('/api/runtime-sync-now', async (_req, res) => {
+app.post('/api/runtime-sync-now', requireRuntimeDebugAccess, async (_req, res) => {
   const before = {
     hydrated: supabaseStateHydrated,
     lastHydrateError: supabaseLastHydrateError || null,
