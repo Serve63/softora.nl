@@ -618,8 +618,8 @@
                     <input type="password" id="password" name="password" class="form-input magnetic" placeholder="••••••••" autocomplete="current-password" required>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="otp">2FA-code <span style="font-weight:400; opacity:0.7;">(indien actief)</span></label>
+                <div class="form-group" id="otpGroup" hidden>
+                    <label class="form-label" for="otp">2FA-code</label>
                     <input type="text" id="otp" name="otp" class="form-input magnetic" placeholder="123456" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6">
                 </div>
 
@@ -726,6 +726,19 @@
             return next;
         }
 
+        function setOtpVisibility(isVisible) {
+            const otpGroup = document.getElementById('otpGroup');
+            const otp = document.getElementById('otp');
+            const shouldShow = Boolean(isVisible);
+            otpGroup.hidden = !shouldShow;
+            otp.disabled = !shouldShow;
+            otp.required = shouldShow;
+            if (!shouldShow) {
+                otp.value = '';
+                otp.classList.remove('error');
+            }
+        }
+
         async function syncLoginState() {
             const params = new URLSearchParams(window.location.search);
             try {
@@ -737,6 +750,7 @@
 
                 if (!response.ok) return;
                 const payload = await response.json();
+                setOtpVisibility(Boolean(payload && payload.mfaEnabled));
                 if (payload && payload.authenticated && !params.has('logout')) {
                     window.location.replace(getNextPath());
                     return;
@@ -794,7 +808,7 @@
                     body: JSON.stringify({
                         email: email.value.trim(),
                         password: password.value,
-                        otp: otp.value.trim(),
+                        otp: otp.disabled ? '' : otp.value.trim(),
                         remember: remember.checked,
                         next: getNextPath()
                     })
@@ -805,7 +819,10 @@
                     const errorMessage = (payload && payload.error) || 'Inloggen mislukt.';
                     email.classList.add('error');
                     password.classList.add('error');
-                    if (payload && payload.mfaRequired) otp.classList.add('error');
+                    if (payload && payload.mfaRequired) {
+                        setOtpVisibility(true);
+                        otp.classList.add('error');
+                    }
                     showError(errorMessage);
                     return false;
                 }
@@ -825,6 +842,7 @@
         }
 
         document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
+        setOtpVisibility(false);
         syncLoginState();
     </script>
 </body>

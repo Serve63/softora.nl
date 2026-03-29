@@ -12,6 +12,10 @@ const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
+function normalizeLoginEmailValue(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 const app = express();
 app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT) || 3000;
@@ -100,7 +104,16 @@ const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY |
 const SUPABASE_STATE_TABLE = String(process.env.SUPABASE_STATE_TABLE || 'softora_runtime_state').trim();
 const SUPABASE_STATE_KEY = String(process.env.SUPABASE_STATE_KEY || 'core').trim();
 const DEFAULT_TWILIO_MEDIA_WS_URL = 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media';
-const PREMIUM_LOGIN_EMAIL = String(process.env.PREMIUM_LOGIN_EMAIL || '').trim().toLowerCase();
+const PREMIUM_LOGIN_EMAILS = Array.from(
+  new Set(
+    String(process.env.PREMIUM_LOGIN_EMAILS || process.env.PREMIUM_LOGIN_EMAIL || '')
+      .split(/[\s,;]+/)
+      .map((value) => normalizeLoginEmailValue(value))
+      .filter(Boolean)
+  )
+);
+const PREMIUM_PRIMARY_LOGIN_EMAIL = PREMIUM_LOGIN_EMAILS[0] || '';
+const premiumLoginEmailSet = new Set(PREMIUM_LOGIN_EMAILS);
 const PREMIUM_LOGIN_PASSWORD = String(process.env.PREMIUM_LOGIN_PASSWORD || '').trim();
 const PREMIUM_LOGIN_PASSWORD_HASH = String(process.env.PREMIUM_LOGIN_PASSWORD_HASH || '').trim();
 const PREMIUM_SESSION_SECRET = String(process.env.PREMIUM_SESSION_SECRET || '').trim();
@@ -123,6 +136,7 @@ const PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES = /^(1|true|yes)$/i.test(
 );
 const PREMIUM_PUBLIC_HTML_FILES = new Set(['premium-website.html', 'premium-personeel-login.html']);
 const NOINDEX_HEADER_VALUE = 'noindex, nofollow, noarchive, nosnippet';
+const SECURITY_CONTACT_EMAIL = String(process.env.SECURITY_CONTACT_EMAIL || 'info@softora.nl').trim();
 const MAIL_SMTP_HOST = String(
   process.env.MAIL_SMTP_HOST || process.env.SMTP_HOST || process.env.STRATO_SMTP_HOST || ''
 ).trim();
@@ -773,7 +787,7 @@ function buildSetCookieHeader(name, value, options = {}) {
 
 function isPremiumAuthConfigured() {
   return Boolean(
-    PREMIUM_LOGIN_EMAIL &&
+    PREMIUM_PRIMARY_LOGIN_EMAIL &&
       PREMIUM_SESSION_SECRET &&
       (PREMIUM_LOGIN_PASSWORD || PREMIUM_LOGIN_PASSWORD_HASH)
   );
@@ -827,7 +841,7 @@ function verifyPremiumSessionToken(token) {
     const payload = JSON.parse(fromBase64Url(encodedPayload));
     const email = normalizePremiumSessionEmail(payload?.email);
     const expiresAtMs = Number(payload?.exp || 0);
-    if (!email || email !== PREMIUM_LOGIN_EMAIL || !Number.isFinite(expiresAtMs)) {
+    if (!email || !premiumLoginEmailSet.has(email) || !Number.isFinite(expiresAtMs)) {
       return { ok: false, expired: false, payload: null };
     }
     if (expiresAtMs <= Date.now()) {
@@ -7872,7 +7886,7 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(503).json({
       ok: false,
       error:
-        'Premium login is nog niet geconfigureerd op de server. Zet PREMIUM_LOGIN_EMAIL, PREMIUM_LOGIN_PASSWORD of PREMIUM_LOGIN_PASSWORD_HASH, en PREMIUM_SESSION_SECRET.',
+        'Premium login is nog niet geconfigureerd op de server. Zet PREMIUM_LOGIN_EMAIL of PREMIUM_LOGIN_EMAILS, PREMIUM_LOGIN_PASSWORD of PREMIUM_LOGIN_PASSWORD_HASH, en PREMIUM_SESSION_SECRET.',
     });
   }
 
@@ -7918,7 +7932,7 @@ app.post('/api/auth/login', (req, res) => {
     });
   }
 
-  const isEmailValid = timingSafeEqualStrings(email, PREMIUM_LOGIN_EMAIL);
+  const isEmailValid = premiumLoginEmailSet.has(email);
   const isPasswordValid = isPremiumPasswordValid(password);
   if (!isEmailValid || !isPasswordValid) {
     appendSecurityAuditEvent(
@@ -8026,7 +8040,7 @@ app.use('/api', (req, res, next) => {
     return res.status(503).json({
       ok: false,
       error:
-        'Premium auth is nog niet geconfigureerd op de server. Zet PREMIUM_LOGIN_EMAIL, PREMIUM_LOGIN_PASSWORD of PREMIUM_LOGIN_PASSWORD_HASH, en PREMIUM_SESSION_SECRET.',
+        'Premium auth is nog niet geconfigureerd op de server. Zet PREMIUM_LOGIN_EMAIL of PREMIUM_LOGIN_EMAILS, PREMIUM_LOGIN_PASSWORD of PREMIUM_LOGIN_PASSWORD_HASH, en PREMIUM_SESSION_SECRET.',
     });
   }
 
@@ -11403,7 +11417,7 @@ app.get('/.well-known/security.txt', (req, res) => {
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   return res.status(200).send(
     [
-      `Contact: mailto:${PREMIUM_LOGIN_EMAIL || 'info@softora.nl'}`,
+      `Contact: mailto:${SECURITY_CONTACT_EMAIL || 'info@softora.nl'}`,
       `Expires: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()}`,
       `Canonical: ${publicBaseUrl}/.well-known/security.txt`,
       `Preferred-Languages: nl, en`,
