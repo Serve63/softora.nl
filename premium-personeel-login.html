@@ -38,7 +38,7 @@
         }
 
         html, body {
-            height: 100%;
+            min-height: 100%;
         }
 
         body {
@@ -47,6 +47,7 @@
             color: var(--text-primary);
             line-height: 1.6;
             overflow-x: hidden;
+            min-height: 100svh;
             cursor: none;
             display: flex;
         }
@@ -110,7 +111,7 @@
         .login-image {
             position: relative;
             width: 50%;
-            height: 100vh;
+            min-height: 100svh;
             overflow: hidden;
         }
 
@@ -159,20 +160,23 @@
 
         .login-panel {
             width: 50%;
-            height: 100vh;
+            min-height: 100svh;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
-            padding: 4rem;
+            padding: clamp(1.75rem, 3vw, 3.5rem);
             position: relative;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
             background: linear-gradient(180deg, rgba(255,255,255,0.88), var(--bg-secondary));
         }
 
         .login-panel-inner {
             width: 100%;
             max-width: 420px;
+            margin: auto 0;
+            padding-block: clamp(1rem, 2vh, 2rem);
             opacity: 0;
             transform: translateY(30px);
             animation: fadeInUp 0.8s var(--ease-out-expo) 0.2s forwards;
@@ -193,7 +197,7 @@
             text-decoration: none;
             letter-spacing: -0.02em;
             display: inline-block;
-            margin-bottom: 3rem;
+            margin-bottom: clamp(1.5rem, 2.5vh, 2.5rem);
         }
 
         .login-logo span {
@@ -201,7 +205,7 @@
         }
 
         .login-header {
-            margin-bottom: 3rem;
+            margin-bottom: clamp(1.5rem, 2.5vh, 2.5rem);
         }
 
         .login-header .eyebrow {
@@ -230,7 +234,7 @@
         .login-form {
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
+            gap: 1.15rem;
         }
 
         .form-group {
@@ -432,7 +436,7 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            margin-top: 2rem;
+            margin-top: 1.35rem;
             font-family: 'Oswald', sans-serif;
             font-size: 0.8rem;
             text-transform: uppercase;
@@ -477,12 +481,13 @@
             body {
                 flex-direction: column;
                 cursor: auto;
+                min-height: auto;
             }
             .cursor, .cursor-dot { display: none; }
 
             .login-image {
                 width: 100%;
-                height: 35vh;
+                min-height: 32vh;
                 min-height: 250px;
             }
 
@@ -502,15 +507,63 @@
 
             .login-panel {
                 width: 100%;
-                height: auto;
-                min-height: 65vh;
+                min-height: auto;
                 padding: 2rem;
+            }
+
+            .login-panel-inner {
+                margin: 0 auto;
+                padding-block: 0;
+            }
+        }
+
+        @media (max-height: 860px) and (min-width: 1025px) {
+            .login-panel {
+                padding-top: 1.5rem;
+                padding-bottom: 1.5rem;
+            }
+
+            .login-panel-inner {
+                max-width: 430px;
+                padding-block: 0.5rem;
+            }
+
+            .image-text {
+                bottom: 2.5rem;
+                left: 2.5rem;
+            }
+
+            .image-text h2 {
+                font-size: clamp(1.7rem, 3vw, 3rem);
+                margin-bottom: 0.75rem;
+            }
+
+            .image-text p {
+                font-size: 0.95rem;
             }
         }
 
         @media (max-width: 480px) {
+            .login-panel {
+                padding: 1.35rem;
+            }
+
+            .login-header {
+                margin-bottom: 1.25rem;
+            }
+
             .login-header h1 {
                 font-size: 2rem;
+            }
+
+            .login-form {
+                gap: 1rem;
+            }
+
+            .form-input,
+            .login-btn {
+                padding-left: 1rem;
+                padding-right: 1rem;
             }
 
             .form-row {
