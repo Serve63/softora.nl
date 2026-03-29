@@ -2,3 +2,6 @@
 node_modules/
 .DS_Store
 .vercel
+*.bak
+output/generated-sites/
+output/.order-state-*.json
