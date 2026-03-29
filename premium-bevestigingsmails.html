@@ -1,2371 +1,386 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="/assets/iphone-optimizations.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | Bevestigingsmails</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css">
-    <script>
-        (function () {
-            document.documentElement.setAttribute("data-personnel-loading", "true");
-            try {
-                var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
-                var storageKey = isPremiumPersonnel
-                    ? "softora_premium_personnel_theme_mode"
-                    : "softora_software_personnel_theme_mode";
-                localStorage.setItem(storageKey, "light");
-                document.documentElement.setAttribute("data-theme-mode", "light");
-                document.documentElement.setAttribute("data-theme", "light");
-            } catch (error) {
-                /* ignore storage errors */
-            }
-        })();
-    </script>
-    <script src="assets/personnel-theme.js" defer></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --bg-primary: #080808;
-            --bg-secondary: #0d0d0d;
-            --bg-tertiary: #111;
-            --bg-card: rgba(255, 255, 255, 0.02);
-            --accent: #8B2252;
-            --accent-dark: #6B1A3F;
-            --accent-glow: rgba(139, 34, 82, 0.4);
-            --accent-light: #A62D65;
-            --text-primary: #f5f5f5;
-            --text-secondary: #888;
-            --text-tertiary: #555;
-            --border: rgba(255, 255, 255, 0.06);
-            --green: #2ecc71;
-            --green-glow: rgba(46, 204, 113, 0.15);
-            --red: #e74c3c;
-            --yellow: #f39c12;
-
-            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
-            overflow-x: hidden;
-            cursor: none;
-        }
-
-        h1, h2, h3, h4 {
-            font-family: 'Oswald', sans-serif;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-            line-height: 1;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            * {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-                scroll-behavior: auto !important;
-            }
-        }
-
-        /* Noise */
-        .noise-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 9999;
-            opacity: 0.03;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-        }
-
-        /* Cursor */
-        .cursor {
-            width: 24px;
-            height: 24px;
-            border: 2px solid var(--accent-light);
-            border-radius: 50%;
-            position: fixed;
-            pointer-events: none;
-            z-index: 10000;
-            transition: transform 0.1s var(--ease-out-expo),
-                        background 0.2s ease,
-                        width 0.3s var(--ease-out-expo),
-                        height 0.3s var(--ease-out-expo);
-            transform: translate(-50%, -50%);
-            mix-blend-mode: difference;
-        }
-
-        .cursor.hover {
-            width: 80px;
-            height: 80px;
-            background: var(--accent-light);
-            border-color: transparent;
-        }
-
-        .cursor-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--accent-light);
-            border-radius: 50%;
-            position: fixed;
-            pointer-events: none;
-            z-index: 10001;
-            transform: translate(-50%, -50%);
-        }
-
-        /* Layout */
-        .dashboard-layout {
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            width: 280px;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border);
-            padding: 2.5rem 0 0 0;
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            z-index: 100;
-        }
-
-        .sidebar-logo {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            text-decoration: none;
-            padding: 0 2rem;
-            margin-bottom: 2rem;
-            display: block;
-        }
-
-        .sidebar-logo span {
-            color: var(--accent-light);
-        }
-
-        .sidebar-nav {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-        }
-
-        .sidebar-section {
-            margin-bottom: 1.2rem;
-        }
-
-        .sidebar-flow-section {
-            position: relative;
-        }
-
-        .sidebar-flow-section::before {
-            content: '';
-            position: absolute;
-            left: 0.82rem;
-            top: 6.45rem;
-            bottom: 1.35rem;
-            width: 0.7rem;
-            background: rgba(139, 34, 82, 0.72);
-            clip-path: polygon(50% 0, 100% 0.46rem, 66% 0.46rem, 66% 100%, 34% 100%, 34% 0.46rem, 0 0.46rem);
-            pointer-events: none;
-        }
-
-        .sidebar-flow-section .sidebar-link {
-            padding-left: 2.8rem;
-        }
-
-        .sidebar-section-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            color: var(--text-tertiary);
-            padding: 0 2rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .sidebar-link {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            padding: 0.6rem 2rem;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.9rem;
-            font-weight: 400;
-            transition: all 0.2s;
-            cursor: none;
-            position: relative;
-        }
-
-        .sidebar-link::before {
-            content: none;
-        }
-
-        .sidebar-link:hover {
-            color: var(--text-primary);
-            background: rgba(255,255,255,0.02);
-        }
-
-        .sidebar-link.active {
-            color: var(--text-primary);
-            background: rgba(139, 34, 82, 0.06);
-        }
-
-        .sidebar-link svg {
-            width: 18px;
-            height: 18px;
-            opacity: 0.5;
-            flex-shrink: 0;
-        }
-
-        .sidebar-link.active svg,
-        .sidebar-link:hover svg {
-            opacity: 1;
-        }
-
-        .sidebar-footer {
-            flex-shrink: 0;
-            padding: 1.5rem 2rem;
-        }
-
-        .sidebar-user {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-
-        .sidebar-avatar {
-            width: 36px;
-            height: 36px;
-            background: var(--accent);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: white;
-            flex-shrink: 0;
-        }
-
-        .sidebar-user-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .sidebar-user-name {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .sidebar-user-role {
-            font-size: 0.75rem;
-            color: var(--text-tertiary);
-        }
-
-        .logout-btn {
-            background: none;
-            border: none;
-            color: var(--text-tertiary);
-            cursor: none;
-            padding: 0.3rem;
-            transition: color 0.2s;
-        }
-
-        .logout-btn:hover {
-            color: var(--red);
-        }
-
-        .logout-btn svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        /* Main */
-        .main-content {
-            flex: 1;
-            margin-left: 280px;
-            padding: 3rem;
-        }
-
-        /* Top bar */
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 3rem;
-        }
-
-        .topbar-left h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.3rem;
-        }
-
-        .topbar-left p {
-            color: var(--text-tertiary);
-            font-size: 0.9rem;
-            font-weight: 300;
-        }
-
-        .topbar-right {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .topbar-action {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--accent-light);
-            padding: 0.6rem 1.2rem;
-            border: 1px solid rgba(139, 34, 82, 0.28);
-            text-decoration: none;
-            cursor: none;
-            transition: background 0.2s var(--ease-out-expo), border-color 0.2s var(--ease-out-expo), color 0.2s var(--ease-out-expo);
-        }
-
-        .topbar-action:hover {
-            background: rgba(139, 34, 82, 0.10);
-            border-color: rgba(166, 45, 101, 0.55);
-            color: var(--text-primary);
-        }
-
-        .topbar-date {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-tertiary);
-            padding: 0.6rem 1.2rem;
-            border: 1px solid var(--border);
-        }
-
-        /* KPI Cards */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-
-        .kpi-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            padding: 2rem;
-            position: relative;
-            transition: all 0.3s var(--ease-out-expo);
-            clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeUp 0.6s var(--ease-out-expo) forwards;
-        }
-
-        .kpi-card:nth-child(1) { animation-delay: 0.1s; }
-        .kpi-card:nth-child(2) { animation-delay: 0.2s; }
-        .kpi-card:nth-child(3) { animation-delay: 0.3s; }
-        .kpi-card:nth-child(4) { animation-delay: 0.4s; }
-
-        @keyframes fadeUp {
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .kpi-card:hover {
-            border-color: var(--accent);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 40px rgba(139,34,82,0.05);
-            transform: translateY(-3px);
-        }
-
-        .kpi-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            color: var(--text-tertiary);
-            margin-bottom: 1rem;
-        }
-
-        .kpi-value {
-            font-family: 'Oswald', sans-serif;
-            font-size: 2.8rem;
-            font-weight: 700;
-            line-height: 1;
-            margin-bottom: 0.8rem;
-        }
-
-        .kpi-change {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.3rem;
-            font-size: 0.8rem;
-            font-weight: 500;
-            padding: 0.2rem 0.6rem;
-        }
-
-        .kpi-change.up {
-            color: var(--green);
-            background: var(--green-glow);
-        }
-
-        .kpi-change.down {
-            color: var(--red);
-            background: rgba(231, 76, 60, 0.15);
-        }
-
-        /* Content grid */
-        .content-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-
-        .panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            padding: 2rem;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeUp 0.6s var(--ease-out-expo) 0.5s forwards;
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .panel-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .panel-badge {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--accent-light);
-            padding: 0.3rem 0.8rem;
-            border: 1px solid rgba(139,34,82,0.3);
-        }
-
-        /* Chart placeholder */
-        .chart-area {
-            height: 240px;
-            position: relative;
-            display: flex;
-            align-items: flex-end;
-            gap: 6px;
-            padding-top: 2rem;
-        }
-
-        .chart-bar-group {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .chart-bar {
-            width: 100%;
-            background: linear-gradient(to top, var(--accent), var(--accent-light));
-            border-radius: 2px 2px 0 0;
-            transition: all 0.3s var(--ease-out-expo);
-            position: relative;
-            min-height: 4px;
-            opacity: 0;
-            animation: growBar 0.8s var(--ease-out-expo) forwards;
-        }
-
-        .chart-bar:hover {
-            background: linear-gradient(to top, var(--accent-light), #c43a78);
-            box-shadow: 0 0 20px var(--accent-glow);
-        }
-
-        @keyframes growBar {
-            from { height: 0; opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .chart-bar-group:nth-child(1) .chart-bar { animation-delay: 0.6s; }
-        .chart-bar-group:nth-child(2) .chart-bar { animation-delay: 0.65s; }
-        .chart-bar-group:nth-child(3) .chart-bar { animation-delay: 0.7s; }
-        .chart-bar-group:nth-child(4) .chart-bar { animation-delay: 0.75s; }
-        .chart-bar-group:nth-child(5) .chart-bar { animation-delay: 0.8s; }
-        .chart-bar-group:nth-child(6) .chart-bar { animation-delay: 0.85s; }
-        .chart-bar-group:nth-child(7) .chart-bar { animation-delay: 0.9s; }
-        .chart-bar-group:nth-child(8) .chart-bar { animation-delay: 0.95s; }
-        .chart-bar-group:nth-child(9) .chart-bar { animation-delay: 1s; }
-        .chart-bar-group:nth-child(10) .chart-bar { animation-delay: 1.05s; }
-        .chart-bar-group:nth-child(11) .chart-bar { animation-delay: 1.1s; }
-        .chart-bar-group:nth-child(12) .chart-bar { animation-delay: 1.15s; }
-
-        .chart-label {
-            font-size: 0.65rem;
-            color: var(--text-tertiary);
-            font-family: 'Oswald', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        /* Recent projects */
-        .project-list {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .project-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1.2rem 0;
-            border-bottom: 1px solid var(--border);
-            transition: all 0.2s;
-        }
-
-        .project-item:last-child {
-            border-bottom: none;
-        }
-
-        .project-item:hover {
-            padding-left: 0.5rem;
-        }
-
-        .project-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.2rem;
-        }
-
-        .project-name {
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .project-client {
-            font-size: 0.8rem;
-            color: var(--text-tertiary);
-            font-weight: 300;
-        }
-
-        .project-status {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            padding: 0.3rem 0.8rem;
-        }
-
-        .status-active {
-            color: var(--green);
-            background: var(--green-glow);
-        }
-
-        .status-review {
-            color: var(--yellow);
-            background: rgba(243, 156, 18, 0.15);
-        }
-
-        .status-done {
-            color: var(--text-tertiary);
-            background: rgba(255,255,255,0.03);
-        }
-
-        /* Activity */
-        .activity-item {
-            display: flex;
-            gap: 1rem;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--accent);
-            margin-top: 0.5rem;
-            flex-shrink: 0;
-        }
-
-        .activity-text {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            font-weight: 300;
-            line-height: 1.5;
-        }
-
-        .activity-text strong {
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        .activity-time {
-            font-size: 0.75rem;
-            color: var(--text-tertiary);
-            margin-top: 0.3rem;
-        }
-
-        .confirm-task-section {
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--border);
-        }
-
-        .confirm-task-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            margin-bottom: 0.8rem;
-        }
-
-        .confirm-task-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 500;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: var(--text-tertiary);
-        }
-
-        .confirm-task-count {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--accent-light);
-            background: rgba(139,34,82,0.08);
-            border: 1px solid rgba(139,34,82,0.18);
-            padding: 0.25rem 0.55rem;
-        }
-
-        .confirm-task-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.6rem;
-        }
-
-        .confirm-task-empty {
-            font-size: 0.82rem;
-            color: var(--text-tertiary);
-            font-weight: 300;
-            line-height: 1.5;
-            padding: 0.4rem 0 0.2rem;
-        }
-
-        .confirm-task-item {
-            border: 1px solid var(--border);
-            background: rgba(255,255,255,0.02);
-            padding: 0.85rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .confirm-task-company {
-            font-size: 0.86rem;
-            color: var(--text-primary);
-            font-weight: 500;
-            line-height: 1.35;
-        }
-
-        .confirm-task-company strong {
-            color: var(--accent-light);
-            font-weight: 600;
-        }
-
-        .confirm-task-company-btn {
-            border: none;
-            background: transparent;
-            padding: 0;
-            margin: 0;
-            cursor: none;
-            text-align: left;
-            width: 100%;
-        }
-
-        .confirm-task-company-btn:hover .confirm-task-company strong {
-            text-decoration: underline;
-            text-underline-offset: 2px;
-        }
-
-        .confirm-task-top {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 0.85rem;
-        }
-
-        .confirm-task-side {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.45rem;
-            flex-shrink: 0;
-        }
-
-        .confirm-task-statuses {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.35rem;
-            justify-content: flex-end;
-        }
-
-        .confirm-task-badge {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.66rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.28rem 0.5rem;
-            border: 1px solid rgba(255,255,255,0.08);
-            color: var(--text-tertiary);
-            background: rgba(255,255,255,0.02);
-        }
-
-        .confirm-task-badge.done {
-            color: var(--green);
-            border-color: rgba(46, 204, 113, 0.2);
-            background: rgba(46, 204, 113, 0.08);
-        }
-
-        .confirm-task-badge.pending {
-            color: var(--yellow);
-            border-color: rgba(243, 156, 18, 0.2);
-            background: rgba(243, 156, 18, 0.08);
-        }
-
-        .confirm-task-meta {
-            font-size: 0.75rem;
-            color: var(--text-tertiary);
-            margin-top: 0.25rem;
-            line-height: 1.45;
-        }
-
-        .confirm-task-action {
-            border: 1px solid rgba(46, 204, 113, 0.28);
-            background: rgba(46, 204, 113, 0.08);
-            color: var(--green);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.55rem 0.75rem;
-            cursor: none;
-            transition: all 0.2s;
-            flex-shrink: 0;
-        }
-
-        .confirm-task-action:hover:not(:disabled) {
-            background: rgba(46, 204, 113, 0.14);
-            border-color: rgba(46, 204, 113, 0.45);
-            box-shadow: 0 0 24px rgba(46, 204, 113, 0.12);
-        }
-
-        .confirm-task-action:disabled {
-            opacity: 0.65;
-            cursor: default;
-        }
-
-        .confirm-task-note {
-            margin-top: 0.35rem;
-            font-size: 0.74rem;
-            color: var(--text-secondary);
-            font-weight: 300;
-            line-height: 1.45;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .confirm-task-detail {
-            border-top: 1px solid var(--border);
-            padding-top: 0.75rem;
-            display: none;
-        }
-
-        .confirm-task-detail.show {
-            display: block;
-        }
-
-        .confirm-task-detail-grid {
-            display: grid;
-            grid-template-columns: 1.05fr 0.95fr;
-            gap: 0.75rem;
-        }
-
-        .confirm-task-detail-block {
-            border: 1px solid var(--border);
-            background: rgba(0,0,0,0.16);
-            padding: 0.75rem;
-        }
-
-        .confirm-task-detail-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.66rem;
-            font-weight: 500;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: var(--text-tertiary);
-            margin-bottom: 0.5rem;
-        }
-
-        .confirm-task-transcript {
-            white-space: pre-wrap;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            font-size: 0.72rem;
-            line-height: 1.5;
-            color: var(--text-secondary);
-            max-height: 220px;
-            overflow: auto;
-        }
-
-        .confirm-task-transcript.empty {
-            font-family: inherit;
-            font-size: 0.8rem;
-            color: var(--text-tertiary);
-        }
-
-        .confirm-task-draft {
-            width: 100%;
-            min-height: 220px;
-            resize: vertical;
-            border: 1px solid var(--border);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            padding: 0.7rem;
-            font-size: 0.8rem;
-            line-height: 1.45;
-            outline: none;
-        }
-
-        .confirm-task-ai-summary {
-            width: 100%;
-            min-height: 128px;
-            resize: vertical;
-            border: 1px solid var(--border);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            padding: 0.7rem;
-            font-size: 0.8rem;
-            line-height: 1.45;
-            outline: none;
-            margin-bottom: 0.55rem;
-        }
-
-        .confirm-task-email-input {
-            width: 100%;
-            border: 1px solid var(--border);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            padding: 0.7rem;
-            font-size: 0.8rem;
-            line-height: 1.2;
-            outline: none;
-            margin-bottom: 0.55rem;
-        }
-
-        .confirm-task-detail-actions {
-            margin-top: 0.75rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-
-        .confirm-task-detail-btn {
-            border: 1px solid rgba(139,34,82,0.22);
-            background: rgba(139,34,82,0.06);
-            color: var(--accent-light);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.5rem 0.65rem;
-            cursor: none;
-            transition: all 0.2s;
-        }
-
-        .confirm-task-detail-btn:hover:not(:disabled) {
-            border-color: rgba(139,34,82,0.4);
-            background: rgba(139,34,82,0.11);
-        }
-
-        .confirm-task-detail-btn.success {
-            border-color: rgba(46, 204, 113, 0.25);
-            background: rgba(46, 204, 113, 0.08);
-            color: var(--green);
-        }
-
-        .confirm-task-detail-btn.warning {
-            border-color: rgba(243, 156, 18, 0.2);
-            background: rgba(243, 156, 18, 0.08);
-            color: var(--yellow);
-        }
-
-        .confirm-task-detail-btn:disabled {
-            opacity: 0.55;
-            cursor: default;
-        }
-
-        .confirm-task-detail-info {
-            margin-top: 0.55rem;
-            font-size: 0.72rem;
-            color: var(--text-tertiary);
-            line-height: 1.45;
-        }
-
-        .confirm-task-detail-info.error {
-            color: #ff9ba6;
-        }
-
-        .confirm-task-flow {
-            margin-top: 0.9rem;
-            border: none;
-            background: transparent;
-            padding: 0;
-        }
-
-        .confirm-task-flow-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
-            font-weight: 600;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: var(--text-tertiary);
-            margin-bottom: 0.7rem;
-        }
-
-        .confirm-task-stepper {
-            display: flex;
-            align-items: center;
-            gap: 0.45rem;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            padding-bottom: 0.1rem;
-        }
-
-        .confirm-task-step-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            border: 1px solid rgba(139,34,82,0.15);
-            background: rgba(139,34,82,0.03);
-            padding: 0.28rem 0.45rem;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-
-        .confirm-task-step-chip.active {
-            border-color: rgba(139,34,82,0.24);
-            background: rgba(139,34,82,0.07);
-        }
-
-        .confirm-task-step-chip.done {
-            border-color: rgba(139,34,82,0.26);
-            background: rgba(139,34,82,0.09);
-        }
-
-        .confirm-task-step-chip.pending {
-            border-color: rgba(139,34,82,0.12);
-            background: rgba(139,34,82,0.02);
-        }
-
-        .confirm-task-step-chip-index {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            border: 1px solid rgba(139,34,82,0.22);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.58rem;
-            font-weight: 600;
-            color: var(--accent-light);
-            line-height: 1;
-            background: rgba(139,34,82,0.03);
-            flex-shrink: 0;
-        }
-
-        .confirm-task-step-chip.done .confirm-task-step-chip-index {
-            background: rgba(139,34,82,0.1);
-            border-color: rgba(139,34,82,0.28);
-        }
-
-        .confirm-task-step-chip-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.62rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--text-primary);
-        }
-
-        .confirm-task-step-chip-state {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.58rem;
-            font-weight: 500;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            color: rgba(166,45,101,0.9);
-            opacity: 0.95;
-        }
-
-        .confirm-task-stepper-connector {
-            width: 18px;
-            height: 2px;
-            background: rgba(139,34,82,0.12);
-            flex-shrink: 0;
-        }
-
-        .confirm-task-stepper-connector.done {
-            background: rgba(139,34,82,0.24);
-        }
-
-        .confirm-task-flow-actions {
-            margin-top: 0.6rem;
-            display: flex;
-            gap: 0.4rem;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            padding-bottom: 0.1rem;
-        }
-
-        .confirm-task-flow-actions .confirm-task-detail-btn {
-            margin: 0;
-            flex-shrink: 0;
-            font-size: 0.62rem;
-            padding: 0.42rem 0.55rem;
-            letter-spacing: 0.07em;
-            border-color: rgba(139,34,82,0.22);
-            background: rgba(139,34,82,0.05);
-            color: var(--accent-light);
-        }
-
-        .confirm-task-flow-actions .confirm-task-detail-btn:hover:not(:disabled) {
-            border-color: rgba(139,34,82,0.36);
-            background: rgba(139,34,82,0.1);
-        }
-
-        .confirm-task-step {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 0.7rem;
-            align-items: flex-start;
-            position: relative;
-        }
-
-        .confirm-task-step + .confirm-task-step {
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid var(--border);
-        }
-
-        .confirm-task-step-rail {
-            width: 26px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.35rem;
-            padding-top: 0.05rem;
-        }
-
-        .confirm-task-step-dot {
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            border: 1px solid rgba(139,34,82,0.22);
-            background: rgba(139,34,82,0.03);
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
-            font-weight: 600;
-            letter-spacing: 0.02em;
-            color: var(--accent-light);
-            line-height: 1;
-        }
-
-        .confirm-task-step-dot.done {
-            background: rgba(139,34,82,0.12);
-            border-color: rgba(139,34,82,0.32);
-            box-shadow: 0 0 0 3px rgba(139,34,82,0.06);
-        }
-
-        .confirm-task-step-dot.active {
-            background: rgba(139,34,82,0.16);
-            border-color: rgba(139,34,82,0.32);
-            box-shadow: 0 0 0 3px rgba(139,34,82,0.07);
-        }
-
-        .confirm-task-step-dot.warning {
-            background: rgba(139,34,82,0.09);
-            border-color: rgba(139,34,82,0.24);
-            box-shadow: 0 0 0 3px rgba(139,34,82,0.04);
-        }
-
-        .confirm-task-step-dot.pending,
-        .confirm-task-step-dot.muted {
-            color: rgba(166,45,101,0.7);
-            background: rgba(139,34,82,0.02);
-            border-color: rgba(139,34,82,0.14);
-        }
-
-        .confirm-task-step-line {
-            width: 2px;
-            flex: 1;
-            min-height: 42px;
-            background: rgba(139,34,82,0.12);
-        }
-
-        .confirm-task-step-line.active,
-        .confirm-task-step-line.done {
-            background: rgba(139,34,82,0.22);
-        }
-
-        .confirm-task-step:last-child .confirm-task-step-line {
-            display: none;
-        }
-
-        .confirm-task-step-content {
-            min-width: 0;
-        }
-
-        .confirm-task-step-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.6rem;
-            flex-wrap: wrap;
-        }
-
-        .confirm-task-step-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.76rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--text-primary);
-        }
-
-        .confirm-task-step-status {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.64rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.2rem 0.45rem;
-            border: 1px solid rgba(255,255,255,0.08);
-            color: var(--text-tertiary);
-            background: rgba(255,255,255,0.02);
-        }
-
-        .confirm-task-step-status.done {
-            color: var(--accent-light);
-            border-color: rgba(139,34,82,0.2);
-            background: rgba(139,34,82,0.07);
-        }
-
-        .confirm-task-step-status.active {
-            color: var(--accent-light);
-            border-color: rgba(139,34,82,0.2);
-            background: rgba(139,34,82,0.06);
-        }
-
-        .confirm-task-step-status.warning {
-            color: var(--accent-light);
-            border-color: rgba(139,34,82,0.18);
-            background: rgba(139,34,82,0.04);
-        }
-
-        .confirm-task-step-status.muted {
-            color: rgba(166,45,101,0.75);
-            border-color: rgba(139,34,82,0.12);
-            background: rgba(139,34,82,0.02);
-        }
-
-        .confirm-task-step-text {
-            margin-top: 0.32rem;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            line-height: 1.45;
-        }
-
-        .confirm-task-step-actions {
-            margin-top: 0.55rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-
-        .confirm-task-step-actions .confirm-task-detail-btn {
-            margin: 0;
-        }
-
-        .confirm-task-step-actions .confirm-task-detail-btn.success,
-        .confirm-task-step-actions .confirm-task-detail-btn.warning {
-            border-color: rgba(139,34,82,0.22);
-            background: rgba(139,34,82,0.06);
-            color: var(--accent-light);
-        }
-
-        .confirm-task-step-actions .confirm-task-detail-btn.success:hover:not(:disabled),
-        .confirm-task-step-actions .confirm-task-detail-btn.warning:hover:not(:disabled) {
-            border-color: rgba(139,34,82,0.4);
-            background: rgba(139,34,82,0.11);
-        }
-
-        .confirm-task-modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(8, 8, 8, 0.28);
-            backdrop-filter: blur(2px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-            z-index: 1400;
-        }
-
-        .confirm-task-modal.show {
-            display: flex;
-        }
-
-        .confirm-task-modal-panel {
-            width: min(1040px, 100%);
-            max-height: min(88vh, 900px);
-            overflow: auto;
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-            box-shadow: 0 18px 50px rgba(0,0,0,0.22);
-        }
-
-        .confirm-task-modal-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 1rem;
-            padding: 1rem 1rem 0.85rem;
-            border-bottom: 1px solid var(--border);
-            background: transparent;
-        }
-
-        .confirm-task-modal-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-primary);
-            line-height: 1.15;
-        }
-
-        .confirm-task-modal-subtitle {
-            margin-top: 0.35rem;
-            font-size: 0.78rem;
-            color: var(--text-tertiary);
-            line-height: 1.4;
-        }
-
-        .confirm-task-modal-actions {
-            display: flex;
-            align-items: center;
-            gap: 0.55rem;
-            flex-shrink: 0;
-        }
-
-        .confirm-task-modal-send {
-            border: 1px solid rgba(139,34,82,0.22);
-            background: rgba(139,34,82,0.08);
-            color: var(--accent-light);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.55rem 0.7rem;
-            cursor: none;
-            transition: all 0.2s;
-        }
-
-        .confirm-task-modal-send:hover:not(:disabled) {
-            border-color: rgba(139,34,82,0.34);
-            background: rgba(139,34,82,0.12);
-            color: var(--accent);
-        }
-
-        .confirm-task-modal-send:disabled {
-            opacity: 0.65;
-        }
-
-        .confirm-task-modal-send.is-done {
-            border-color: rgba(46,204,113,0.24);
-            background: rgba(46,204,113,0.08);
-            color: var(--green);
-        }
-
-        .confirm-task-modal-close {
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text-secondary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.55rem 0.7rem;
-            cursor: none;
-            flex-shrink: 0;
-            transition: all 0.2s;
-        }
-
-        .confirm-task-modal-close:hover {
-            border-color: rgba(139,34,82,0.26);
-            background: rgba(139,34,82,0.08);
-            color: var(--accent-light);
-        }
-
-        .confirm-task-modal-body {
-            padding: 1rem;
-            background: var(--bg-secondary);
-        }
-
-        .confirm-task-modal-empty {
-            font-size: 0.85rem;
-            color: var(--text-tertiary);
-            border: 1px solid var(--border);
-            background: var(--bg-card);
-            padding: 1rem;
-        }
-
-        .confirm-task-modal-body .confirm-task-detail {
-            border-top: none;
-            padding-top: 0;
-            display: block;
-        }
-
-        .confirm-task-modal-body .confirm-task-detail-block {
-            background: var(--bg-card);
-            border-color: var(--border);
-        }
-
-        .confirm-task-modal-body .confirm-task-transcript {
-            background: transparent;
-            border: 0;
-            padding: 0;
-        }
-
-        /* Responsive */
-        @media (max-width: 1200px) {
-            .kpi-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .content-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 1024px) {
-            body { cursor: auto; }
-            .cursor, .cursor-dot { display: none; }
-            .sidebar { display: none; }
-            .main-content { margin-left: 0; }
-        }
-
-        @media (max-width: 768px) {
-            .main-content { padding: 1.5rem; }
-            .kpi-grid { grid-template-columns: 1fr; }
-            .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
-            .confirm-task-top { flex-direction: column; }
-            .confirm-task-side { align-items: flex-start; width: 100%; }
-            .confirm-task-statuses { justify-content: flex-start; }
-            .confirm-task-detail-grid { grid-template-columns: 1fr; }
-            .confirm-task-detail-actions { flex-direction: column; }
-            .confirm-task-step-actions { flex-direction: column; }
-            .confirm-task-modal { padding: 0.6rem; }
-            .confirm-task-modal-header { padding: 0.85rem 0.85rem 0.75rem; }
-            .confirm-task-modal-actions { width: 100%; justify-content: flex-end; }
-            .confirm-task-modal-title { font-size: 0.92rem; }
-            .confirm-task-modal-body { padding: 0.85rem; }
-            .confirm-task-flow-actions { gap: 0.35rem; }
-        }
-    </style>
+<link rel="stylesheet" href="assets/personnel-theme.css">
+<script>
+    (function () {
+        document.documentElement.setAttribute("data-personnel-loading", "true");
+        try {
+            var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
+            var storageKey = isPremiumPersonnel
+                ? "softora_premium_personnel_theme_mode"
+                : "softora_software_personnel_theme_mode";
+            localStorage.setItem(storageKey, "light");
+            document.documentElement.setAttribute("data-theme-mode", "light");
+            document.documentElement.setAttribute("data-theme", "light");
+        } catch (error) {
+            /* ignore storage errors */
+        }
+    })();
+</script>
+<script src="assets/personnel-theme.js" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f6f2ec;
+  --sidebar-bg: #fcfaf7;
+  --crimson: #8b2252;
+  --crimson-light: #a62d65;
+  --crimson-soft: rgba(139, 34, 82, 0.08);
+  --text-dark: #1a1a2e;
+  --text-mid: #606272;
+  --text-light: #9a9cac;
+  --border: rgba(20, 24, 35, 0.09);
+  --white: #ffffff;
+  --shadow: 0 18px 40px rgba(26, 26, 46, 0.08);
+}
+
+html, body {
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: radial-gradient(circle at top left, rgba(166, 45, 101, 0.06), transparent 28%), var(--bg);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+.dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 280px;
+  min-height: 100vh;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+.sidebar-logo {
+  padding: 30px 28px 22px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+}
+
+.sidebar-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-light);
+  padding: 22px 28px 8px;
+  text-transform: uppercase;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 28px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  position: relative;
+}
+
+.nav-item:hover {
+  color: var(--text-dark);
+  background: rgba(0, 0, 0, 0.025);
+}
+
+.nav-item.active {
+  color: var(--text-dark);
+  background: rgba(139, 34, 82, 0.06);
+  font-weight: 600;
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--crimson);
+  border-radius: 0 2px 2px 0;
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.62;
+  flex-shrink: 0;
+}
+
+.nav-item.active .nav-icon,
+.nav-item:hover .nav-icon {
+  opacity: 1;
+}
+
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 1.5rem 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.sidebar-avatar {
+  width: 38px;
+  height: 38px;
+  background: var(--crimson);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.sidebar-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-user-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.sidebar-user-role {
+  font-size: 0.78rem;
+  color: var(--text-light);
+}
+
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  text-decoration: none;
+}
+
+.logout-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 280px;
+  padding: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coming-shell {
+  width: 100%;
+  max-width: 980px;
+  min-height: calc(100vh - 6rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coming-card {
+  width: 100%;
+  max-width: 720px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(20, 24, 35, 0.08);
+  box-shadow: var(--shadow);
+  padding: 4rem 3rem;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.coming-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.95rem;
+  margin-bottom: 1.3rem;
+  border: 1px solid rgba(139, 34, 82, 0.18);
+  background: rgba(139, 34, 82, 0.06);
+  color: var(--crimson);
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.coming-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(2.8rem, 7vw, 5.6rem);
+  font-weight: 700;
+  line-height: 0.96;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
+}
+
+.coming-title span {
+  color: var(--crimson-light);
+}
+
+.coming-copy {
+  max-width: 520px;
+  margin: 0 auto;
+  font-size: 1.06rem;
+  line-height: 1.75;
+  color: var(--text-mid);
+}
+
+.coming-meta {
+  margin-top: 2rem;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+@media (max-width: 1100px) {
+  .coming-card {
+    max-width: 640px;
+  }
+}
+
+@media (max-width: 920px) {
+  .sidebar {
+    position: static;
+    width: 100%;
+    min-height: auto;
+  }
+
+  .dashboard-layout {
+    flex-direction: column;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 1.5rem;
+  }
+
+  .coming-shell {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .coming-card {
+    padding: 2.5rem 1.5rem;
+  }
+
+  .coming-copy {
+    font-size: 0.98rem;
+    line-height: 1.65;
+  }
+}
+</style>
 </head>
 <body>
-
-    <div class="noise-overlay"></div>
-    <div class="cursor"></div>
-    <div class="cursor-dot"></div>
-
-    <div class="dashboard-layout">
-
-        <aside class="sidebar" data-sidebar-ready="true">
-<a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
-<nav class="sidebar-nav">
-  <div class="sidebar-section sidebar-flow-section">
-    <div class="sidebar-section-label">Overzicht</div>
-    <a href="/premium-personeel-dashboard" class="sidebar-link magnetic active" data-sidebar-key="dashboard"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span class="sidebar-link-text">Dashboard</span></a>
-    <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic" data-sidebar-key="active_orders"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="sidebar-link-text">Actieve Opdrachten</span></a>
-    <a href="/premium-personeel-agenda" class="sidebar-link magnetic" data-sidebar-key="agenda"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg><span class="sidebar-link-text">Agenda</span></a>
-    <a href="/premium-ai-coldmailing" class="sidebar-link magnetic" data-sidebar-key="leads"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg><span class="sidebar-link-text">Leads</span><span class="sidebar-notification-badge" data-sidebar-count-key="leads" hidden>0</span></a>
-    <a href="/premium-ai-lead-generator" class="sidebar-link magnetic" data-sidebar-key="coldcalling"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg><span class="sidebar-link-text">Coldcalling</span></a>
-    <a href="/premium-bevestigingsmails" class="sidebar-link magnetic active" data-sidebar-key="coldmailing"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Coldmailing</span></a>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-section-label">Beheer</div>
-    <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
-    <a href="/premium-seo" class="sidebar-link magnetic" data-sidebar-key="seo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span class="sidebar-link-text">SEO</span></a>
-    <a href="/premium-pakketten" class="sidebar-link magnetic" data-sidebar-key="packages"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg><span class="sidebar-link-text">Pakketten</span></a>
-    <a href="/premium-pdfs" class="sidebar-link magnetic" data-sidebar-key="pdfs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span class="sidebar-link-text">PDF'S</span></a>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-section-label">Extra</div>
-    <a href="/premium-maandelijkse-kosten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Maandelijkse kosten</span></a>
-    <a href="/premium-analytics" class="sidebar-link magnetic" data-sidebar-key="analytics"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg><span class="sidebar-link-text">Google analytics</span></a>
-    <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
-  </div>
-</nav>
-<div class="sidebar-footer">
-  <div class="sidebar-user">
-    <div class="sidebar-avatar">SP</div>
-    <div class="sidebar-user-info">
-      <div class="sidebar-user-name">Softora Premium</div>
-      <div class="sidebar-user-role">Administrator</div>
-    </div>
-    <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg></a>
-  </div>
-</div>
-</aside>
-
-        <main class="main-content">
-
-            <div class="topbar">
-                <div class="topbar-left">
-                    <h1>Bevestigingsmails</h1>
-                    <p>Opvolgtaken voor ingeplande afspraken: transcript, mailconcept en bevestiging.</p>
-                </div>
-                <div class="topbar-right">
-                    <div class="topbar-date">
-                        <span id="currentDate"></span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="content-grid">
-                <div class="panel" style="grid-column: 1 / -1;">
-                    <div class="panel-header">
-                        <span class="panel-title">Bevestigingsmail Taken</span>
-                        <span class="panel-badge">Opvolging</span>
-                    </div>
-                    <div class="confirm-task-section" style="margin-top: 0; padding-top: 0; border-top: none;">
-                        <div class="confirm-task-header">
-                            <div class="confirm-task-title">Bevestigingsmail sturen</div>
-                        </div>
-                        <div class="confirm-task-list" id="confirmTaskList">
-                            <div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-        </main>
-    </div>
-
-    <div class="confirm-task-modal" id="confirmTaskModal" aria-hidden="true">
-        <div class="confirm-task-modal-panel" role="dialog" aria-modal="true" aria-labelledby="confirmTaskModalTitle">
-            <div class="confirm-task-modal-header">
-                <div>
-                    <div class="confirm-task-modal-title" id="confirmTaskModalTitle">Taakdetails</div>
-                    <div class="confirm-task-modal-subtitle" id="confirmTaskModalSubtitle">Selecteer een taak om transcriptie en bevestigingsmail te bekijken.</div>
-                </div>
-                <div class="confirm-task-modal-actions">
-                    <button type="button" class="confirm-task-modal-close magnetic" id="confirmTaskModalClose">Sluiten</button>
-                </div>
-            </div>
-            <div class="confirm-task-modal-body" id="confirmTaskModalBody">
-                <div class="confirm-task-modal-empty">Selecteer een taak om transcriptie en bevestigingsmail te bekijken.</div>
-            </div>
+<div class="noise-overlay"></div>
+<div class="dashboard-layout">
+  <aside class="sidebar">
+    <a href="/premium-website" class="sidebar-logo">Softora.nl</a>
+    <nav class="sidebar-nav">
+      <div>
+        <div class="sidebar-section-label">Overzicht</div>
+        <a href="/premium-personeel-dashboard" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span>Dashboard</span></a>
+        <a href="/premium-actieve-opdrachten" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span>Actieve Opdrachten</span></a>
+        <a href="/premium-personeel-agenda" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg><span>Agenda</span></a>
+        <a href="/premium-ai-coldmailing" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg><span>Leads</span></a>
+        <a href="/premium-ai-lead-generator" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg><span>Coldcalling</span></a>
+        <a href="/premium-bevestigingsmails" class="nav-item active"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span>Coldmailing</span></a>
+      </div>
+      <div>
+        <div class="sidebar-section-label">Beheer</div>
+        <a href="/premium-klanten" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span>Klanten</span></a>
+        <a href="/premium-seo" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span>SEO</span></a>
+        <a href="/premium-pakketten" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg><span>Pakketten</span></a>
+        <a href="/premium-pdfs" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span>PDF'S</span></a>
+      </div>
+      <div>
+        <div class="sidebar-section-label">Extra</div>
+        <a href="/premium-maandelijkse-kosten" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span>Maandelijkse kosten</span></a>
+        <a href="/premium-analytics" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg><span>Google analytics</span></a>
+        <a href="/premium-instellingen" class="nav-item"><svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span>Instellingen</span></a>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">SP</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Softora Premium</div>
+          <div class="sidebar-user-role">Administrator</div>
         </div>
+        <a href="/premium-personeel-login?logout=1" class="logout-btn" title="Uitloggen" aria-label="Uitloggen"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg></a>
+      </div>
     </div>
-
-    <script>
-        const now = new Date();
-        const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-        document.getElementById('currentDate').textContent = now.toLocaleDateString('nl-NL', options);
-
-        const confirmationTaskState = {
-            loading: false,
-            tasks: [],
-            expandedTaskId: null,
-            detailLoadingId: null,
-            detailsById: {},
-            actionBusyById: {},
-            transcriptSummaryBusyByTaskId: {},
-            transcriptSummaryErrorByTaskId: {},
-            sendMailErrorByTaskId: {},
-            pollTimer: null,
-        };
-
-        function escapeHtml(str) {
-            return String(str || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
-
-        function formatTaskDateTimeLabel(task) {
-            if (task?.datetimeLabel) return String(task.datetimeLabel);
-            const date = String(task?.date || '');
-            const time = String(task?.time || '09:00');
-            if (!date) return time;
-            const d = new Date(`${date}T${time}:00`);
-            if (Number.isNaN(d.getTime())) return `${date} ${time}`;
-            return d.toLocaleString('nl-NL', {
-                weekday: 'short',
-                day: '2-digit',
-                month: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-
-        function addRecentActivityEntry(labelHtml, company) {
-            const activityList = document.getElementById('recentActivityList');
-            if (!activityList) return;
-            const item = document.createElement('div');
-            item.className = 'activity-item';
-            item.innerHTML = `
-                <div class="activity-dot" style="background: var(--green);"></div>
-                <div>
-                    <div class="activity-text">${labelHtml} naar ${escapeHtml(company || 'lead')}</div>
-                    <div class="activity-time">Zojuist</div>
-                </div>
-            `;
-            activityList.prepend(item);
-            while (activityList.children.length > 6) {
-                activityList.removeChild(activityList.lastElementChild);
-            }
-        }
-
-        function getTaskById(taskId) {
-            return confirmationTaskState.tasks.find((task) => Number(task.id) === Number(taskId)) || null;
-        }
-
-        function mergeTaskIntoState(task) {
-            if (!task || !task.id) return;
-            const idx = confirmationTaskState.tasks.findIndex((item) => Number(item.id) === Number(task.id));
-            if (idx >= 0) confirmationTaskState.tasks[idx] = { ...confirmationTaskState.tasks[idx], ...task };
-        }
-
-        function setTaskActionBusy(taskId, value) {
-            confirmationTaskState.actionBusyById[String(taskId)] = Boolean(value);
-        }
-
-        function isTaskActionBusy(taskId) {
-            return Boolean(confirmationTaskState.actionBusyById[String(taskId)]);
-        }
-
-        function setTranscriptSummaryBusy(taskId, value) {
-            confirmationTaskState.transcriptSummaryBusyByTaskId[String(taskId)] = Boolean(value);
-        }
-
-        function isTranscriptSummaryBusy(taskId) {
-            return Boolean(confirmationTaskState.transcriptSummaryBusyByTaskId[String(taskId)]);
-        }
-
-        function getConfirmationRecipientEmailInputValue(taskId) {
-            const el = document.querySelector(`[data-confirmation-recipient-email-id="${String(taskId)}"]`);
-            return el ? String(el.value || '').trim() : '';
-        }
-
-        function normalizeDisplayedCallTranscript(value) {
-            const raw = String(value || '').replace(/\r\n?/g, '\n').trim();
-            if (!raw) return '';
-
-            const lines = raw.split('\n');
-            const filtered = lines.filter((line) => {
-                const trimmed = String(line || '').trim();
-                if (!trimmed) return false;
-                return !/^(system|developer|tool|function)\s*:/i.test(trimmed);
-            });
-
-            return filtered.join('\n').trim();
-        }
-
-        async function requestTranscriptSummaryWithAi(payload) {
-            if (window.SoftoraAI && typeof window.SoftoraAI.summarizeText === 'function') {
-                return window.SoftoraAI.summarizeText(payload);
-            }
-            const res = await fetch('/api/ai/summarize', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data?.ok) {
-                throw new Error(String(data?.detail || data?.error || 'AI samenvatting mislukt'));
-            }
-            return data;
-        }
-
-        async function generateTranscriptSummaryForConfirmationTask(taskId) {
-            const key = String(taskId);
-            let detail = confirmationTaskState.detailsById[key] || null;
-            if (!detail) {
-                await loadConfirmationTaskDetail(taskId);
-                detail = confirmationTaskState.detailsById[key] || null;
-            }
-
-            const transcript = normalizeDisplayedCallTranscript(detail?.transcript);
-            if (!transcript) {
-                confirmationTaskState.transcriptSummaryErrorByTaskId[key] = 'Geen transcriptie beschikbaar voor deze taak.';
-                renderConfirmationTasks();
-                return false;
-            }
-
-            try {
-                const result = await requestTranscriptSummaryWithAi({
-                    text: transcript,
-                    style: 'short',
-                    language: 'nl',
-                    maxSentences: 4,
-                    extraInstructions:
-                        'Vat dit salesgesprek samen voor een bevestigingsmail-workflow. Benoem kort de context, de afspraak (datum/tijd indien genoemd) en eventuele vervolgstap.'
-                });
-
-                const currentDetail = confirmationTaskState.detailsById[key] || detail || {};
-                confirmationTaskState.detailsById[key] = {
-                    ...currentDetail,
-                    transcriptAiSummary: String(result?.summary || '').trim(),
-                    transcriptAiSummaryGeneratedAt: new Date().toISOString(),
-                    transcriptAiSummarySource: 'openai',
-                    transcriptAiSummaryModel: String(result?.model || '')
-                };
-                delete confirmationTaskState.transcriptSummaryErrorByTaskId[key];
-                renderConfirmationTasks();
-                return true;
-            } catch (error) {
-                confirmationTaskState.transcriptSummaryErrorByTaskId[key] = String(error?.message || 'AI samenvatting mislukt.');
-                renderConfirmationTasks();
-                return false;
-            }
-        }
-
-        function renderConfirmationTaskDetail(task) {
-            const taskId = Number(task?.id) || 0;
-            if (!taskId) return '';
-
-            const isLoading = confirmationTaskState.detailLoadingId === taskId;
-            const detail = confirmationTaskState.detailsById[String(taskId)] || null;
-            const isDemoTask = /testbedrijf demo/i.test(String(task?.company || '')) || /testdata/i.test(String(task?.source || ''));
-            const demoTranscript = [
-                'assistant: Goedemiddag, u spreekt met de AI assistent van Softora. Dit is een fictieve testtranscriptie.',
-                'klant: Goedemiddag, prima.',
-                'assistant: Ik bel kort over het automatiseren van intake-opvolging en afspraken in jullie salesproces.',
-                'klant: Interessant, waar helpt dat ons concreet mee?',
-                'assistant: Minder handmatig nabellen, sneller kwalificeren en direct een intake inplannen wanneer er interesse is.',
-                'klant: Klinkt goed. We willen dit wel bekijken.',
-                'assistant: Zal ik een korte intake plannen voor donderdag om 14:00?',
-                'klant: Ja, graag. Stuur eerst even een bevestigingsmail, dan bevestig ik per mail terug.',
-                'assistant: Helemaal goed, dan zet ik de afspraak als concept en volgt de bevestigingsmail direct.',
-            ].join('\n');
-            const transcript = normalizeDisplayedCallTranscript(
-                detail?.transcript
-                    ? String(detail.transcript)
-                    : (isDemoTask ? demoTranscript : '')
-            );
-            const transcriptHtml = transcript
-                ? `<div class="confirm-task-transcript">${escapeHtml(transcript)}</div>`
-                : `<div class="confirm-task-transcript empty">Nog geen transcript beschikbaar vanuit call webhook voor deze call.</div>`;
-
-            const demoDraft = [
-                'Onderwerp: Bevestiging intakeafspraak Testbedrijf Demo BV - donderdag 14:00',
-                '',
-                'Beste Servé,',
-                '',
-                'Dank voor het gesprek van zojuist.',
-                'Hierbij stuur ik de bevestiging van onze intakeafspraak op donderdag om 14:00.',
-                '',
-                'Tijdens de intake nemen we kort de huidige leadopvolging door en laten we zien hoe AI coldcalling + opvolging in jullie workflow past.',
-                '',
-                'Wil je deze afspraak per mail bevestigen? Na jouw reply zetten we de afspraak definitief in de agenda.',
-                '',
-                'Met vriendelijke groet,',
-                'Team Softora',
-            ].join('\n');
-            const draft = detail?.confirmationEmailDraft
-                ? String(detail.confirmationEmailDraft)
-                : (isDemoTask ? demoDraft : '');
-
-            const transcriptAiSummary = detail?.transcriptAiSummary
-                ? String(detail.transcriptAiSummary)
-                : '';
-            const backendAiSummary = detail?.aiSummary
-                ? String(detail.aiSummary)
-                : '';
-            const displayedTranscriptSummary = transcriptAiSummary || backendAiSummary;
-            const transcriptSummaryBusy = isTranscriptSummaryBusy(taskId);
-            const transcriptSummaryError = String(
-                confirmationTaskState.transcriptSummaryErrorByTaskId[String(taskId)] || ''
-            );
-            const transcriptSummaryMeta = [];
-            if (detail?.transcriptAiSummaryGeneratedAt) {
-                try {
-                    transcriptSummaryMeta.push(
-                        `Samenvatting gemaakt: ${new Date(detail.transcriptAiSummaryGeneratedAt).toLocaleString('nl-NL')}`
-                    );
-                } catch (_) {}
-            }
-            if (detail?.transcriptAiSummaryModel) {
-                transcriptSummaryMeta.push(`Model: ${String(detail.transcriptAiSummaryModel)}`);
-            }
-            if (detail?.transcriptAiSummarySource) {
-                transcriptSummaryMeta.push(`Bron: ${String(detail.transcriptAiSummarySource)} (op transcriptie)`);
-            } else if (backendAiSummary) {
-                transcriptSummaryMeta.push('Bron: bestaande AI call-analyse');
-            }
-            const draftMeta = [];
-            if (detail?.confirmationEmailDraftGeneratedAt) {
-                try {
-                    draftMeta.push(`Concept gegenereerd: ${new Date(detail.confirmationEmailDraftGeneratedAt).toLocaleString('nl-NL')}`);
-                } catch (_) {}
-            }
-            if (detail?.confirmationEmailDraftSource) {
-                draftMeta.push(`Bron: ${String(detail.confirmationEmailDraftSource)}`);
-            }
-            const recipientEmail = String(
-                detail?.contactEmail || task?.contactEmail || ''
-            ).trim();
-            const sendMailError = String(
-                confirmationTaskState.sendMailErrorByTaskId[String(taskId)] ||
-                detail?.confirmationEmailLastError ||
-                ''
-            ).trim();
-
-            const mailSent = Boolean(task.mailSent);
-            const mailSendBusy = isTaskActionBusy(taskId);
-            const step1ChipClass = mailSent ? 'done' : 'active';
-            const step1DotText = mailSent ? '✓' : '1';
-            const step2ChipClass = mailSent ? 'active' : 'pending';
-            const step2DotText = '2';
-
-            return `
-                <div class="confirm-task-detail show" data-task-detail-id="${taskId}">
-                    ${isLoading ? '<div class="confirm-task-detail-info">Details laden...</div>' : ''}
-                    <div class="confirm-task-detail-grid">
-                        <div class="confirm-task-detail-block">
-                            <div class="confirm-task-detail-label">Transcriptie gesprek</div>
-                            ${transcriptHtml}
-                        </div>
-                        <div class="confirm-task-detail-block">
-                            <div class="confirm-task-detail-label">AI samenvatting transcriptie</div>
-                            <textarea class="confirm-task-ai-summary" readonly placeholder="Klik op &quot;Samenvatting maken&quot; om AI de transcriptie kort samen te laten vatten.">${escapeHtml(displayedTranscriptSummary)}</textarea>
-                            <div class="confirm-task-detail-info${transcriptSummaryError ? ' error' : ''}">
-                                ${transcriptSummaryError
-                                    ? escapeHtml(transcriptSummaryError)
-                                    : (transcriptSummaryMeta.length
-                                        ? escapeHtml(transcriptSummaryMeta.join(' • '))
-                                        : '')}
-                            </div>
-                            <div class="confirm-task-detail-actions" style="margin-top:0.55rem; margin-bottom:0.75rem;">
-                                <button
-                                    type="button"
-                                    class="confirm-task-detail-btn"
-                                    data-generate-transcript-summary-id="${taskId}"
-                                    ${transcript ? '' : 'disabled'}
-                                >
-                                    ${transcriptSummaryBusy
-                                        ? 'Samenvatting maken...'
-                                        : (displayedTranscriptSummary ? 'Opnieuw samenvatten' : 'Samenvatting maken')}
-                                </button>
-                            </div>
-                            <div class="confirm-task-detail-label">Bevestigingsmail concept</div>
-                            <textarea class="confirm-task-draft" readonly placeholder="Klik op &quot;Schrijf bevestigingsmail&quot; om AI een concept te laten maken.">${escapeHtml(draft)}</textarea>
-                            <div class="confirm-task-detail-info">
-                                ${draftMeta.length ? escapeHtml(draftMeta.join(' • ')) : (draft ? '' : 'Nog geen concept gegenereerd.')}
-                            </div>
-                            <div class="confirm-task-detail-label" style="margin-top:0.65rem;">Ontvanger e-mail</div>
-                            <input
-                                type="email"
-                                class="confirm-task-email-input"
-                                data-confirmation-recipient-email-id="${taskId}"
-                                value="${escapeHtml(recipientEmail)}"
-                                placeholder="klant@bedrijf.nl"
-                                ${mailSent ? 'disabled' : ''}
-                            />
-                            <div class="confirm-task-detail-info${sendMailError ? ' error' : ''}" style="margin-top:-0.15rem;">
-                                ${sendMailError ? escapeHtml(sendMailError) : 'De knop verstuurt via server-side SMTP (bijv. Strato).'}
-                            </div>
-                            <div class="confirm-task-detail-actions" style="margin-top:0.55rem;">
-                                <button
-                                    type="button"
-                                    class="confirm-task-detail-btn ${mailSent ? 'success' : ''}"
-                                    data-send-confirmation-mail-id="${taskId}"
-                                    ${(taskId && !mailSent && !mailSendBusy) ? '' : 'disabled'}
-                                >
-                                    ${mailSendBusy ? 'Bezig...' : (mailSent ? 'Bevestigingsmail verstuurd' : 'Bevestigingsmail sturen')}
-                                </button>
-                            </div>
-                            ${mailSent ? `
-                                <div class="confirm-task-detail-actions" style="margin-top:0.35rem;">
-                                    <button
-                                        type="button"
-                                        class="confirm-task-detail-btn"
-                                        data-resend-confirmation-mail-id="${taskId}"
-                                        ${mailSendBusy ? 'disabled' : ''}
-                                    >
-                                        ${mailSendBusy ? 'Bezig...' : 'Nog een keer versturen'}
-                                    </button>
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                    <div class="confirm-task-flow">
-                        <div class="confirm-task-flow-title">Tijdlijn opvolging</div>
-                        <div class="confirm-task-stepper" role="list" aria-label="Tijdlijn opvolging">
-                            <div class="confirm-task-step-chip ${step1ChipClass}" role="listitem">
-                                <span class="confirm-task-step-chip-index">${step1DotText}</span>
-                                <span class="confirm-task-step-chip-label">Bevestigingsmail</span>
-                            </div>
-                            <div class="confirm-task-stepper-connector ${mailSent ? 'done' : ''}" aria-hidden="true"></div>
-                            <div class="confirm-task-step-chip ${step2ChipClass}" role="listitem">
-                                <span class="confirm-task-step-chip-index">${step2DotText}</span>
-                                <span class="confirm-task-step-chip-label">Afspraak bevestigd</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function getSelectedConfirmationTask() {
-            if (!confirmationTaskState.expandedTaskId) return null;
-            return getTaskById(confirmationTaskState.expandedTaskId);
-        }
-
-        function closeConfirmationTaskModal() {
-            confirmationTaskState.expandedTaskId = null;
-            renderConfirmationTasks();
-        }
-
-        async function openConfirmationTaskModal(taskId) {
-            const normalizedTaskId = Number(taskId) || 0;
-            if (!normalizedTaskId) return;
-            confirmationTaskState.expandedTaskId = normalizedTaskId;
-            renderConfirmationTasks();
-            if (!confirmationTaskState.detailsById[String(normalizedTaskId)]) {
-                await loadConfirmationTaskDetail(normalizedTaskId);
-            }
-        }
-
-        function renderConfirmationTaskModal() {
-            const modalEl = document.getElementById('confirmTaskModal');
-            const bodyEl = document.getElementById('confirmTaskModalBody');
-            const titleEl = document.getElementById('confirmTaskModalTitle');
-            const subtitleEl = document.getElementById('confirmTaskModalSubtitle');
-            const sendBtnEl = document.getElementById('confirmTaskModalSendBtn');
-            if (!modalEl || !bodyEl || !titleEl || !subtitleEl) return;
-
-            const selectedTask = getSelectedConfirmationTask();
-            const hasSelection = Boolean(selectedTask);
-            modalEl.classList.toggle('show', hasSelection);
-            modalEl.setAttribute('aria-hidden', hasSelection ? 'false' : 'true');
-
-            if (!selectedTask) {
-                titleEl.textContent = 'Taakdetails';
-                subtitleEl.textContent = 'Selecteer een taak om transcriptie en bevestigingsmail te bekijken.';
-                if (sendBtnEl) {
-                    sendBtnEl.hidden = true;
-                    sendBtnEl.disabled = true;
-                    sendBtnEl.classList.remove('is-done');
-                    sendBtnEl.textContent = 'Bevestigingsmail sturen';
-                    sendBtnEl.removeAttribute('data-task-id');
-                }
-                bodyEl.innerHTML = '<div class="confirm-task-modal-empty">Selecteer een taak om transcriptie en bevestigingsmail te bekijken.</div>';
-                return;
-            }
-
-            const company = selectedTask.company || 'Onbekende lead';
-            const contact = selectedTask.contact || 'Onbekend';
-            const timeLabel = formatTaskDateTimeLabel(selectedTask);
-            const taskId = Number(selectedTask.id) || 0;
-            const taskBusy = taskId ? isTaskActionBusy(taskId) : false;
-            const mailSent = Boolean(selectedTask.mailSent);
-            titleEl.textContent = company;
-            subtitleEl.textContent = `Afspraak ${timeLabel} · Contact: ${contact}`;
-            if (sendBtnEl) {
-                sendBtnEl.hidden = false;
-                sendBtnEl.setAttribute('data-task-id', String(taskId || ''));
-                sendBtnEl.classList.toggle('is-done', mailSent);
-                sendBtnEl.disabled = !taskId || taskBusy || mailSent;
-                sendBtnEl.textContent = taskBusy
-                    ? 'Bezig...'
-                    : (mailSent ? 'Bevestigingsmail verstuurd' : 'Bevestigingsmail sturen');
-            }
-            bodyEl.innerHTML = renderConfirmationTaskDetail(selectedTask);
-
-            bodyEl.querySelectorAll('[data-generate-draft-id]').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = Number(btn.getAttribute('data-generate-draft-id'));
-                    if (!taskId || isTaskActionBusy(taskId)) return;
-                    setTaskActionBusy(taskId, true);
-                    renderConfirmationTasks();
-                    await generateConfirmationEmailDraft(taskId);
-                    setTaskActionBusy(taskId, false);
-                    renderConfirmationTasks();
-                });
-            });
-
-            bodyEl.querySelectorAll('[data-generate-transcript-summary-id]').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = Number(btn.getAttribute('data-generate-transcript-summary-id'));
-                    if (!taskId || isTranscriptSummaryBusy(taskId)) return;
-                    setTranscriptSummaryBusy(taskId, true);
-                    delete confirmationTaskState.transcriptSummaryErrorByTaskId[String(taskId)];
-                    renderConfirmationTasks();
-                    await generateTranscriptSummaryForConfirmationTask(taskId);
-                    setTranscriptSummaryBusy(taskId, false);
-                    renderConfirmationTasks();
-                });
-            });
-
-            bodyEl.querySelectorAll('[data-mark-sent-id]').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = Number(btn.getAttribute('data-mark-sent-id'));
-                    if (!taskId || isTaskActionBusy(taskId)) return;
-                    setTaskActionBusy(taskId, true);
-                    renderConfirmationTasks();
-                    const ok = await markConfirmationMailSent(taskId);
-                    setTaskActionBusy(taskId, false);
-                    if (!ok) renderConfirmationTasks();
-                });
-            });
-
-            bodyEl.querySelectorAll('[data-send-confirmation-mail-id]').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = Number(btn.getAttribute('data-send-confirmation-mail-id'));
-                    if (!taskId || isTaskActionBusy(taskId)) return;
-                    if (getTaskById(taskId)?.mailSent) return;
-                    const recipientEmail = getConfirmationRecipientEmailInputValue(taskId);
-                    setTaskActionBusy(taskId, true);
-                    delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
-                    renderConfirmationTasks();
-                    const ok = await markConfirmationMailSent(taskId, recipientEmail);
-                    setTaskActionBusy(taskId, false);
-                    if (!ok) renderConfirmationTasks();
-                });
-            });
-
-            bodyEl.querySelectorAll('[data-resend-confirmation-mail-id]').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = Number(btn.getAttribute('data-resend-confirmation-mail-id'));
-                    if (!taskId || isTaskActionBusy(taskId)) return;
-                    const recipientEmail = getConfirmationRecipientEmailInputValue(taskId);
-                    setTaskActionBusy(taskId, true);
-                    delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
-                    renderConfirmationTasks();
-                    const ok = await markConfirmationMailSent(taskId, recipientEmail);
-                    setTaskActionBusy(taskId, false);
-                    if (!ok) renderConfirmationTasks();
-                });
-            });
-
-            bodyEl.querySelectorAll('[data-mark-confirmed-id]').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = Number(btn.getAttribute('data-mark-confirmed-id'));
-                    if (!taskId || isTaskActionBusy(taskId)) return;
-                    setTaskActionBusy(taskId, true);
-                    renderConfirmationTasks();
-                    const ok = await markConfirmationReceived(taskId);
-                    setTaskActionBusy(taskId, false);
-                    if (!ok) renderConfirmationTasks();
-                });
-            });
-
-            bodyEl.querySelectorAll('[data-mark-cancelled-id]').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = Number(btn.getAttribute('data-mark-cancelled-id'));
-                    if (!taskId || isTaskActionBusy(taskId)) return;
-                    setTaskActionBusy(taskId, true);
-                    renderConfirmationTasks();
-                    const ok = await markConfirmationCancelled(taskId);
-                    setTaskActionBusy(taskId, false);
-                    if (!ok) renderConfirmationTasks();
-                });
-            });
-        }
-
-        function renderConfirmationTasks() {
-            const listEl = document.getElementById('confirmTaskList');
-            const countEl = document.getElementById('confirmTaskCount');
-            if (!listEl) return;
-
-            const tasks = Array.isArray(confirmationTaskState.tasks) ? confirmationTaskState.tasks : [];
-            if (countEl) {
-                countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
-            }
-
-            if (!tasks.length) {
-                listEl.innerHTML = '<div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>';
-                confirmationTaskState.expandedTaskId = null;
-                renderConfirmationTaskModal();
-                return;
-            }
-
-            listEl.innerHTML = tasks.map((task) => {
-                const taskId = Number(task.id) || 0;
-                const company = escapeHtml(task.company || 'Onbekende lead');
-                const contact = escapeHtml(task.contact || 'Onbekend');
-                const timeLabel = escapeHtml(formatTaskDateTimeLabel(task));
-                const note = task.summary ? `<div class="confirm-task-note">${escapeHtml(task.summary)}</div>` : '';
-                return `
-                    <div class="confirm-task-item" data-task-id="${taskId}">
-                        <div class="confirm-task-top">
-                            <div style="min-width:0;">
-                                <button type="button" class="confirm-task-company-btn magnetic" data-open-task-id="${taskId}">
-                                    <div class="confirm-task-company"><strong>${company}</strong> · ${contact}</div>
-                                </button>
-                                <div class="confirm-task-meta">Stuur bevestigingsmail voor afspraak op ${timeLabel}</div>
-                                ${note}
-                            </div>
-                            <div class="confirm-task-side">
-                                <button type="button" class="confirm-task-detail-btn magnetic" data-open-task-id="${taskId}">Open details</button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            listEl.querySelectorAll('[data-open-task-id]').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = Number(btn.getAttribute('data-open-task-id'));
-                    if (!taskId) return;
-                    await openConfirmationTaskModal(taskId);
-                });
-            });
-
-            renderConfirmationTaskModal();
-        }
-
-        async function loadConfirmationTaskDetail(taskId) {
-            confirmationTaskState.detailLoadingId = taskId;
-            renderConfirmationTasks();
-            try {
-                const res = await fetch(`/api/agenda/confirmation-task?taskId=${encodeURIComponent(taskId)}`, { cache: 'no-store' });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data?.ok || !data.task) return false;
-                confirmationTaskState.detailsById[String(taskId)] = data.task;
-                delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
-                mergeTaskIntoState(data.task);
-                renderConfirmationTasks();
-                return true;
-            } catch (_) {
-                return false;
-            } finally {
-                if (confirmationTaskState.detailLoadingId === taskId) {
-                    confirmationTaskState.detailLoadingId = null;
-                    renderConfirmationTasks();
-                }
-            }
-        }
-
-        async function generateConfirmationEmailDraft(taskId) {
-            try {
-                const res = await fetch(`/api/agenda/confirmation-task-draft-email?taskId=${encodeURIComponent(taskId)}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ actor: 'Premium dashboard gebruiker' })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data?.ok || !data.task) return false;
-                confirmationTaskState.detailsById[String(taskId)] = data.task;
-                delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
-                mergeTaskIntoState(data.task);
-                renderConfirmationTasks();
-                return true;
-            } catch (_) {
-                return false;
-            }
-        }
-
-        async function loadConfirmationTasks() {
-            if (confirmationTaskState.loading) return;
-            confirmationTaskState.loading = true;
-            try {
-                const res = await fetch('/api/agenda/confirmation-tasks?limit=50', { cache: 'no-store' });
-                const data = await res.json();
-                if (!res.ok || !data?.ok || !Array.isArray(data.tasks)) return;
-                confirmationTaskState.tasks = data.tasks;
-                if (
-                    confirmationTaskState.expandedTaskId &&
-                    !confirmationTaskState.tasks.some((task) => Number(task.id) === Number(confirmationTaskState.expandedTaskId))
-                ) {
-                    confirmationTaskState.expandedTaskId = null;
-                }
-                renderConfirmationTasks();
-            } catch (_) {
-                // Laat de statische dashboard-content staan als backend niet bereikbaar is.
-            } finally {
-                confirmationTaskState.loading = false;
-            }
-        }
-
-        async function markConfirmationMailSent(taskId, recipientEmailOverride = '') {
-            try {
-                const recipientEmail = String(
-                    recipientEmailOverride || getConfirmationRecipientEmailInputValue(taskId) || ''
-                ).trim();
-                const res = await fetch(`/api/agenda/confirmation-task-send-email?taskId=${encodeURIComponent(taskId)}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        actor: 'Premium dashboard gebruiker',
-                        recipientEmail
-                    })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data?.ok || !data.task) {
-                    confirmationTaskState.sendMailErrorByTaskId[String(taskId)] = String(
-                        data?.detail || data?.error || 'Bevestigingsmail verzenden mislukt.'
-                    );
-                    if (data?.task) {
-                        confirmationTaskState.detailsById[String(taskId)] = data.task;
-                        mergeTaskIntoState(data.task);
-                    }
-                    return false;
-                }
-                delete confirmationTaskState.sendMailErrorByTaskId[String(taskId)];
-                confirmationTaskState.detailsById[String(taskId)] = data.task;
-                mergeTaskIntoState(data.task);
-                renderConfirmationTasks();
-                addRecentActivityEntry('<strong>Bevestigingsmail verstuurd</strong>', data.task.company || getTaskById(taskId)?.company);
-                return true;
-            } catch (_) {
-                confirmationTaskState.sendMailErrorByTaskId[String(taskId)] = 'Netwerkfout bij verzenden.';
-                return false;
-            }
-        }
-
-        async function markConfirmationReceived(taskId) {
-            const task = getTaskById(taskId);
-            if (!task?.mailSent) return false;
-            try {
-                const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/mark-response-received`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ actor: 'Premium dashboard gebruiker' })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data?.ok) return false;
-
-                confirmationTaskState.tasks = confirmationTaskState.tasks.filter((item) => Number(item.id) !== Number(taskId));
-                delete confirmationTaskState.detailsById[String(taskId)];
-                delete confirmationTaskState.actionBusyById[String(taskId)];
-                if (Number(confirmationTaskState.expandedTaskId) === Number(taskId)) {
-                    confirmationTaskState.expandedTaskId = null;
-                }
-                renderConfirmationTasks();
-                addRecentActivityEntry('<strong>Afspraak bevestigd per mail</strong>', data.appointment?.company || task.company);
-                return true;
-            } catch (_) {
-                return false;
-            }
-        }
-
-        async function markConfirmationCancelled(taskId) {
-            const task = getTaskById(taskId);
-            if (!task?.mailSent) return false;
-            try {
-                const res = await fetch(`/api/agenda/confirmation-tasks/${taskId}/mark-cancelled`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ actor: 'Premium dashboard gebruiker' })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data?.ok) return false;
-
-                confirmationTaskState.tasks = confirmationTaskState.tasks.filter((item) => Number(item.id) !== Number(taskId));
-                delete confirmationTaskState.detailsById[String(taskId)];
-                delete confirmationTaskState.actionBusyById[String(taskId)];
-                if (Number(confirmationTaskState.expandedTaskId) === Number(taskId)) {
-                    confirmationTaskState.expandedTaskId = null;
-                }
-                renderConfirmationTasks();
-                addRecentActivityEntry('<strong>Afspraak geannuleerd</strong>', data.appointment?.company || task.company);
-                return true;
-            } catch (_) {
-                return false;
-            }
-        }
-
-        const confirmTaskModalEl = document.getElementById('confirmTaskModal');
-        const confirmTaskModalCloseEl = document.getElementById('confirmTaskModalClose');
-        const confirmTaskModalSendEl = document.getElementById('confirmTaskModalSendBtn');
-        if (confirmTaskModalEl) {
-            confirmTaskModalEl.addEventListener('click', (e) => {
-                if (e.target === confirmTaskModalEl) {
-                    closeConfirmationTaskModal();
-                }
-            });
-        }
-        if (confirmTaskModalCloseEl) {
-            confirmTaskModalCloseEl.addEventListener('click', (e) => {
-                e.preventDefault();
-                closeConfirmationTaskModal();
-            });
-        }
-        if (confirmTaskModalSendEl) {
-            confirmTaskModalSendEl.addEventListener('click', async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const selectedTask = getSelectedConfirmationTask();
-                const taskId = Number(confirmTaskModalSendEl.getAttribute('data-task-id')) || Number(selectedTask?.id) || 0;
-                if (!taskId || isTaskActionBusy(taskId)) return;
-                if (getTaskById(taskId)?.mailSent) return;
-                setTaskActionBusy(taskId, true);
-                renderConfirmationTasks();
-                await markConfirmationMailSent(taskId);
-                setTaskActionBusy(taskId, false);
-                renderConfirmationTasks();
-            });
-        }
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && confirmationTaskState.expandedTaskId) {
-                closeConfirmationTaskModal();
-            }
-        });
-
-        renderConfirmationTasks();
-        loadConfirmationTasks();
-        confirmationTaskState.pollTimer = window.setInterval(loadConfirmationTasks, 15000);
-
-        const cursor = document.querySelector('.cursor');
-        const cursorDot = document.querySelector('.cursor-dot');
-        const magneticElements = document.querySelectorAll('.magnetic');
-        const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const enablePointerFx = hasFinePointer && !prefersReducedMotion;
-
-        if (enablePointerFx) {
-            let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0, dotX = 0, dotY = 0;
-            let cursorRafId = null;
-
-            document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; }, { passive: true });
-
-            function animateCursor() {
-                cursorX += (mouseX - cursorX) * 1;
-                cursorY += (mouseY - cursorY) * 1;
-                cursor.style.left = cursorX + 'px';
-                cursor.style.top = cursorY + 'px';
-                dotX += (mouseX - dotX) * 1;
-                dotY += (mouseY - dotY) * 1;
-                cursorDot.style.left = dotX + 'px';
-                cursorDot.style.top = dotY + 'px';
-                cursorRafId = requestAnimationFrame(animateCursor);
-            }
-
-            function startCursorLoop() {
-                if (cursorRafId === null) {
-                    cursorRafId = requestAnimationFrame(animateCursor);
-                }
-            }
-
-            function stopCursorLoop() {
-                if (cursorRafId !== null) {
-                    cancelAnimationFrame(cursorRafId);
-                    cursorRafId = null;
-                }
-            }
-
-            startCursorLoop();
-
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) stopCursorLoop();
-                else startCursorLoop();
-            });
-
-            magneticElements.forEach((elem) => {
-                elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
-                elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
-            });
-        } else {
-            cursor.style.display = 'none';
-            cursorDot.style.display = 'none';
-            document.body.style.cursor = 'auto';
-            magneticElements.forEach((elem) => {
-                elem.style.cursor = 'pointer';
-            });
-        }
-    </script>
+  </aside>
+
+  <main class="main-content">
+    <section class="coming-shell">
+      <div class="coming-card">
+        <div class="coming-label">Binnenkort</div>
+        <h1 class="coming-title">Coming <span>Soon</span></h1>
+        <p class="coming-copy">
+          Deze premium pagina wordt opnieuw opgebouwd. Hier komt straks een strakke omgeving voor bevestigingsmails en opvolging.
+        </p>
+        <div class="coming-meta">Bevestigingsmails module in voorbereiding</div>
+      </div>
+    </section>
+  </main>
+</div>
 </body>
 </html>
