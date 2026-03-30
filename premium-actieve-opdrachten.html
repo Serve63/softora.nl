@@ -596,10 +596,7 @@
         .order-card.delivered .order-desc,
         .order-card.delivered .order-price-label,
         .order-card.delivered .order-price-value,
-        .order-card.delivered .order-api-cost,
-        .order-card.delivered .order-api-cost .label,
-        .order-card.delivered .order-price-value .currency,
-        .order-card.delivered .order-api-cost .value {
+        .order-card.delivered .order-price-value .currency {
             color: var(--text-secondary);
         }
 
@@ -616,10 +613,7 @@
         .order-card.paid .order-desc,
         .order-card.paid .order-price-label,
         .order-card.paid .order-price-value,
-        .order-card.paid .order-api-cost,
-        .order-card.paid .order-api-cost .label,
-        .order-card.paid .order-price-value .currency,
-        .order-card.paid .order-api-cost .value {
+        .order-card.paid .order-price-value .currency {
             color: var(--text-secondary);
         }
 
@@ -733,24 +727,6 @@
             font-size: 0.84rem;
             color: var(--accent-light);
             vertical-align: top;
-        }
-
-        .order-api-cost {
-            margin-top: 0.45rem;
-            font-size: 0.73rem;
-            color: var(--text-tertiary);
-            font-weight: 400;
-            line-height: 1.35;
-        }
-
-        .order-api-cost .label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.62rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: var(--text-tertiary);
-            margin-right: 0.35rem;
         }
 
         .order-status { display: none !important; }
@@ -2185,29 +2161,7 @@
         }
 
         function updateApiCostLabel(id, record) {
-            const el = document.getElementById(`api-cost-${id}`);
-            if (!el) return;
-            const resolvedRecord = resolveApiCostRecord(record);
-            const text = formatApiCostLabel(resolvedRecord);
-            const useEstimated = !hasActualApiCost(resolvedRecord) && hasEstimatedApiCost(resolvedRecord);
-            const promptTokens = parseNullableNumber(
-                useEstimated ? resolvedRecord?.estimatedApiTokensInput : resolvedRecord?.apiTokensInput
-            );
-            const completionTokens = parseNullableNumber(
-                useEstimated ? resolvedRecord?.estimatedApiTokensOutput : resolvedRecord?.apiTokensOutput
-            );
-            const modelName = String(
-                useEstimated
-                    ? resolvedRecord?.estimatedApiModel || resolvedRecord?.apiModel || ''
-                    : resolvedRecord?.apiModel || ''
-            ).trim();
-            const meta = [
-                useEstimated && modelName ? `schatting via ${modelName}` : modelName,
-                Number.isFinite(promptTokens) && promptTokens > 0 && Number.isFinite(completionTokens) && completionTokens > 0
-                    ? `${promptTokens} in / ${completionTokens} out`
-                    : ''
-            ].filter(Boolean).join(' · ');
-            el.innerHTML = `<span class="label">API kosten</span><span class="value"${meta ? ` title="${escapeHtml(meta)}"` : ''}>${escapeHtml(text)}</span>`;
+            return;
         }
 
         function renderOrdersEmptyState() {
@@ -2733,7 +2687,6 @@
             const clientLine = [record.clientName, record.location].filter(Boolean).join(' — ');
             const deliveryTime = String(record.deliveryTime || '').trim();
             const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
-            const apiCostText = formatApiCostLabel(record);
             const deliveryLabel = deliveryTime || 'Nog niet opgegeven';
             const title = String(record.title || 'Opdracht').trim() || 'Opdracht';
             const description = String(record.description || 'Geen extra omschrijving.').trim() || 'Geen extra omschrijving.';
@@ -2751,7 +2704,6 @@
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
                             <div class="order-price-value"><span class="currency">€</span>${amountText}</div>
-                            <div class="order-api-cost" id="api-cost-${id}"><span class="label">API kosten</span><span class="value">${escapeHtml(apiCostText)}</span></div>
                         </div>
                         <div class="order-actions">
                             <button class="execute-btn magnetic" id="btn-${id}" type="button" data-order="${id}">
@@ -2827,10 +2779,6 @@
 
             grid.appendChild(card);
             bindDynamicOrderCard(card);
-            updateApiCostLabel(id, record);
-            if (!hasActualApiCost(record)) {
-                void refreshEstimatedApiCost(id);
-            }
             refreshOrderSummaryCards();
 
             if (options.scrollIntoView) {
@@ -3201,7 +3149,6 @@
             customOrders.push(record);
             persistCustomOrders();
             appendCustomOrderCard(record, { scrollIntoView: true });
-            void refreshEstimatedApiCost(record.id);
             persistOrdersRuntime();
             form.reset();
             closeCreateOrderModal();
@@ -3558,11 +3505,7 @@
         }
 
         function refreshEstimatedApiCostsForOrders() {
-            customOrders.forEach((record) => {
-                if (!record) return;
-                if (hasActualApiCost(record)) return;
-                void refreshEstimatedApiCost(record.id);
-            });
+            return;
         }
 
         function getProgressStepForPct(pct) {
