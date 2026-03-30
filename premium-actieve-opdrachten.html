@@ -716,6 +716,11 @@
             margin-right: 0.4rem;
         }
 
+        .order-claim-name {
+            font-weight: 700;
+            color: var(--accent-light);
+        }
+
         .order-price { text-align: right; min-width: 120px; }
 
         .order-price-label {
@@ -2704,7 +2709,7 @@
             const title = String(record.title || 'Opdracht').trim() || 'Opdracht';
             const description = String(record.description || 'Geen extra omschrijving.').trim() || 'Geen extra omschrijving.';
             const deliveryHtml = `<div class="order-delivery"><strong>Oplevertijd</strong>${escapeHtml(deliveryLabel)}</div>`;
-            const claimHtml = `<div class="order-claim"><strong>Geclaimd door</strong>${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</div>`;
+            const claimHtml = `<div class="order-claim"><strong>Geclaimd door</strong><span class="order-claim-name">${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</span></div>`;
 
             return `
                 <div class="order-card ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
