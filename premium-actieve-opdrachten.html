@@ -970,6 +970,10 @@
             border: 1px solid var(--border);
         }
 
+        .modal-overview[hidden] {
+            display: none !important;
+        }
+
         .modal-overview-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1340,7 +1344,7 @@
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="modal-overview" id="modalOverview"></div>
+            <div class="modal-overview" id="modalOverview" hidden></div>
             <button class="modal-btn primary magnetic" id="modalBtn" type="button" style="display: none;">Bekijk website</button>
             <button class="modal-btn danger magnetic" id="modalDeleteBtn" type="button" style="display: none;">Project uit systeem halen</button>
             <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
@@ -4072,8 +4076,9 @@
             title.textContent = orders[id]?.type || 'Opdracht';
             subtitle.textContent = orders[id]?.name || '';
             if (overview) {
-                overview.innerHTML = renderModalOverviewHtml(id);
+                overview.innerHTML = '';
                 overview.scrollTop = 0;
+                overview.hidden = true;
             }
 
             const pctValue = Number(orders[id]?.progressPct) || 0;
