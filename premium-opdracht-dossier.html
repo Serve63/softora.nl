@@ -94,8 +94,17 @@
             position: relative;
         }
 
+        .paper-shell {
+            --paper-scale: 1;
+            width: calc(var(--paper-width) * var(--paper-scale));
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 1rem;
+        }
+
         .page-toolbar {
-            width: min(100%, var(--paper-width));
+            width: 100%;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -132,20 +141,34 @@
             align-items: center;
             gap: 0.45rem;
             flex-wrap: wrap;
-            justify-content: flex-end;
+            justify-content: flex-start;
             flex: 0 0 auto;
         }
 
+        .paper-stage {
+            position: relative;
+            width: 100%;
+            height: calc(var(--paper-min-height) * var(--paper-scale));
+        }
+
         .dossier-page {
-            width: min(100%, var(--paper-width));
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: var(--paper-width);
+            min-width: var(--paper-width);
             max-width: var(--paper-width);
+            height: var(--paper-min-height);
             min-height: var(--paper-min-height);
             background: var(--paper-bg);
             border: 1px solid rgba(26, 31, 52, 0.08);
             border-radius: 0;
             box-shadow: 0 28px 54px rgba(16, 19, 34, 0.14), 0 2px 8px rgba(16, 19, 34, 0.06);
             overflow: hidden;
-            display: block;
+            display: flex;
+            flex-direction: column;
+            transform: scale(var(--paper-scale));
+            transform-origin: top left;
         }
 
         .brand-bar {
@@ -192,6 +215,9 @@
             flex-direction: column;
             gap: 0.95rem;
             align-content: stretch;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: auto;
         }
 
         .loading,
@@ -449,8 +475,7 @@
                 padding: 1rem 1.1rem 1.5rem;
             }
 
-            .page-toolbar,
-            .dossier-page,
+            .paper-shell,
             .loading,
             .error {
                 width: min(100%, var(--paper-width));
@@ -500,7 +525,9 @@
                 align-items: stretch;
             }
 
+            .paper-shell,
             .page-toolbar,
+            .paper-stage,
             .dossier-page {
                 width: 100%;
                 height: auto;
@@ -512,6 +539,11 @@
             .loading,
             .error {
                 width: 100%;
+            }
+
+            .paper-shell {
+                --paper-scale: 1;
+                gap: 0.75rem;
             }
 
             .page-toolbar {
@@ -528,8 +560,25 @@
                 justify-content: flex-start;
             }
 
+            .paper-stage {
+                position: static;
+            }
+
+            .dossier-page {
+                position: static;
+                width: 100%;
+                min-width: 0;
+                max-width: none;
+                transform: none;
+                box-shadow: none;
+            }
+
             .meta-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .page-body {
+                overflow: visible;
             }
 
             .prompt-box {
@@ -577,7 +626,12 @@
                 display: block !important;
             }
 
+            .paper-shell {
+                width: 100% !important;
+            }
+
             .page-toolbar,
+            .paper-stage,
             .dossier-page {
                 width: 100% !important;
                 max-width: none !important;
@@ -587,6 +641,11 @@
                 border: 1px solid #d8dbe5;
                 border-radius: 0;
                 box-shadow: none !important;
+            }
+
+            .dossier-page {
+                position: static;
+                transform: none !important;
             }
 
             .brand-bar {
@@ -1014,6 +1073,28 @@
                 }
             }
 
+            function syncPaperScale() {
+                const paperShell = document.getElementById('paperShell');
+                const pageToolbar = document.getElementById('pageToolbar');
+                const mainContent = document.querySelector('.main-content');
+                if (!paperShell || !mainContent) return;
+
+                if (window.innerWidth <= 900) {
+                    paperShell.style.setProperty('--paper-scale', '1');
+                    return;
+                }
+
+                const paperWidth = 794;
+                const paperHeight = 1123;
+                const wrapWidth = Math.max(320, root.clientWidth || mainContent.clientWidth || paperWidth);
+                const toolbarHeight = pageToolbar ? pageToolbar.offsetHeight : 0;
+                const availableWidth = Math.max(320, wrapWidth - 8);
+                const availableHeight = Math.max(320, mainContent.clientHeight - toolbarHeight - 24);
+                const scale = Math.min(1, availableWidth / paperWidth, availableHeight / paperHeight);
+
+                paperShell.style.setProperty('--paper-scale', String(Math.max(0.62, scale)));
+            }
+
             function renderLayoutBlock(block) {
                 if (!block || typeof block !== 'object') return '';
                 const title = esc(block.title || 'Sectie');
@@ -1077,18 +1158,18 @@
                 document.title = `Softora | Uitvoerdossier #${orderId}`;
 
                 root.innerHTML = `
-                    <div class="page-toolbar screen-only">
+                    <div class="paper-shell" id="paperShell">
+                    <div class="page-toolbar screen-only" id="pageToolbar">
                         <div class="toolbar-meta">
                             <div class="toolbar-title">Uitvoerdossier gereed</div>
-                            <div class="toolbar-status" id="copyStatus" aria-live="polite"></div>
                         </div>
                         <div class="toolbar-actions">
-                            <button type="button" class="btn" id="copyPromptBtn">Kopieer prompt</button>
                             <button type="button" class="btn btn-primary" id="printBtn">Download PDF</button>
                             <a class="btn" href="/premium-actieve-opdrachten">Terug</a>
                         </div>
                     </div>
 
+                    <div class="paper-stage">
                     <article class="dossier-page">
                         <header class="brand-bar">
                             <div>
@@ -1120,6 +1201,8 @@
                             </section>
                         </div>
                     </article>
+                    </div>
+                    </div>
                 `;
 
                 const printBtn = document.getElementById('printBtn');
@@ -1129,16 +1212,7 @@
                     });
                 }
 
-                const copyBtn = document.getElementById('copyPromptBtn');
-                const copyStatus = document.getElementById('copyStatus');
-                if (copyBtn && copyStatus) {
-                    copyBtn.addEventListener('click', async () => {
-                        const ok = await copyText(opusPrompt || '');
-                        copyStatus.textContent = ok
-                            ? 'Prompt gekopieerd. Direct plakken in Claude Opus 4.6.'
-                            : 'Kopiëren mislukt. Kopieer handmatig uit het promptblok.';
-                    });
-                }
+                syncPaperScale();
             }
 
             async function start() {
@@ -1190,6 +1264,7 @@
                 }
             }
 
+            window.addEventListener('resize', syncPaperScale);
             void start();
         })();
     </script>
