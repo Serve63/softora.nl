@@ -904,6 +904,8 @@
             display: none;
             align-items: center;
             justify-content: center;
+            padding: 1.25rem;
+            overflow-y: auto;
             opacity: 0;
             transition: opacity 0.3s;
         }
@@ -919,6 +921,9 @@
             box-shadow: 0 30px 80px rgba(0,0,0,0.5);
             transform: translateY(20px);
             transition: transform 0.4s var(--ease-out-expo);
+            max-height: calc(100vh - 2.5rem);
+            overflow-y: auto;
+            margin: auto 0;
         }
 
         .modal-overlay.show .modal { transform: translateY(0); }
@@ -1316,8 +1321,10 @@
             .mode-btn { flex: 1; justify-content: center; }
             .build-mode-hint { display: none; }
             .modal-overview-grid { grid-template-columns: 1fr; }
-            .modal.create-order-dialog { width: 94%; padding: 1.25rem; }
-            .modal.claim-order-dialog { width: 94%; padding: 1.25rem; }
+            .modal-overlay { padding: 0.8rem; align-items: flex-start; }
+            .modal { width: 100%; max-height: calc(100vh - 1.6rem); padding: 1.25rem; margin: 0; }
+            .modal.create-order-dialog { width: 100%; padding: 1.25rem; }
+            .modal.claim-order-dialog { width: 100%; padding: 1.25rem; }
             .create-order-grid { grid-template-columns: 1fr; }
             .create-order-actions { flex-direction: column; }
             .create-order-actions .modal-btn { width: 100%; min-width: 0; }
