@@ -827,7 +827,7 @@
                             <div class="loader-spinner" aria-hidden="true"></div>
                             <div class="loading-eyebrow">Claude Opus 4.6</div>
                             <div class="loading-title">${esc(title || 'Even geduld')}</div>
-                            <p class="loading-copy">${esc(description || 'Het uitvoerdossier wordt opgebouwd.')}</p>
+                            ${description ? `<p class="loading-copy">${esc(description)}</p>` : ''}
                         </div>
                     </div>
                 `;
@@ -1241,7 +1241,7 @@
                 const baseData = buildBaseOrderData(orderId, customOrder, runtimeOrder);
                 renderLoading(
                     'Opus bouwt het dossier',
-                    'Claude Opus 4.6 zet de actuele opdrachtinformatie nu om naar een direct bruikbaar uitvoerdossier.'
+                    ''
                 );
 
                 let layoutResponse = null;
