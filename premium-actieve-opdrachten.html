@@ -1407,15 +1407,6 @@
             <form class="create-order-form" id="createOrderForm">
                 <div class="create-order-grid">
                     <div class="create-order-field full">
-                        <label class="create-order-label" for="newOrderAgendaLeadId">Koppel aan agenda-lead (optioneel)</label>
-                        <div class="create-order-select-wrap">
-                            <select class="create-order-select" id="newOrderAgendaLeadId" name="agendaLeadId">
-                                <option value="">Geen koppeling</option>
-                            </select>
-                        </div>
-                        <div class="create-order-hint" id="newOrderAgendaLeadHint"></div>
-                    </div>
-                    <div class="create-order-field full">
                         <label class="create-order-label" for="newOrderIncludeSampleDesign">Voorbeelddesign meenemen als basis</label>
                         <div class="create-order-select-wrap">
                             <select class="create-order-select" id="newOrderIncludeSampleDesign" name="includeSampleDesign">
@@ -4339,7 +4330,6 @@
         document.getElementById('createOrderCloseBtn')?.addEventListener('click', closeCreateOrderModal);
         document.getElementById('createOrderCancelBtn')?.addEventListener('click', closeCreateOrderModal);
         document.getElementById('createOrderForm')?.addEventListener('submit', handleCreateOrderSubmit);
-        document.getElementById('newOrderAgendaLeadId')?.addEventListener('change', handleCreateOrderAgendaLeadChange);
         document.getElementById('createOrderModal')?.addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeCreateOrderModal();
         });
