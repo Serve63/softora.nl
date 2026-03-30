@@ -3255,6 +3255,20 @@
         function openOrderDossier(id, options = {}) {
             const url = getOrderDossierUrl(id, options);
             if (options && options.newTab) {
+                try {
+                    const anchor = document.createElement('a');
+                    anchor.href = url;
+                    anchor.target = '_blank';
+                    anchor.rel = 'noopener noreferrer';
+                    anchor.style.display = 'none';
+                    document.body.appendChild(anchor);
+                    anchor.click();
+                    anchor.remove();
+                    return true;
+                } catch (_) {
+                    // Fall through to window.open if the anchor strategy fails.
+                }
+
                 const opened = window.open(url, '_blank', 'noopener,noreferrer');
                 if (opened) {
                     try {
@@ -3264,6 +3278,8 @@
                     }
                     return true;
                 }
+
+                return false;
             }
             window.location.assign(url);
             return true;
