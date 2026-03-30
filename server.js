@@ -11901,8 +11901,24 @@ app.post('/api/runtime-sync-now', requireRuntimeDebugAccess, async (_req, res) =
 });
 
 // API routes eerst, daarna statische frontend assets/html serveren.
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
-app.use('/output', express.static(path.join(__dirname, 'output')));
+app.use(
+  '/assets',
+  express.static(path.join(__dirname, 'assets'), {
+    maxAge: '7d',
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+    },
+  })
+);
+app.use(
+  '/output',
+  express.static(path.join(__dirname, 'output'), {
+    maxAge: '1h',
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    },
+  })
+);
 
 app.get('/', async (req, res, next) => {
   return sendSeoManagedHtmlPageResponse(req, res, next, 'premium-website.html');

@@ -2749,7 +2749,7 @@
 	        const cursorDot = document.querySelector('.cursor-dot');
 	        const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
 	        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-	        const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+	        const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
 
 	        if (enablePointerFx) {
 	            let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0, dotX = 0, dotY = 0;

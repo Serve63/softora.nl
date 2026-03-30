@@ -1615,7 +1615,7 @@
             const cursorDot = document.querySelector('.cursor-dot');
             const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
             const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            const enablePointerFx = hasFinePointer && !prefersReducedMotion;
+            const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
 
             function disable() {
                 document.body.style.cursor = 'auto';
