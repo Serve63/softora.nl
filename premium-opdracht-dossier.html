@@ -73,7 +73,7 @@
             margin-left: 280px;
             width: calc(100% - 280px);
             height: 100vh;
-            padding: 0.95rem;
+            padding: 1.1rem 1.2rem 1.35rem;
             overflow: auto;
             display: flex;
             align-items: flex-start;
@@ -84,18 +84,63 @@
             width: 100%;
             min-height: 100%;
             display: flex;
-            align-items: flex-start;
-            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.75rem;
             position: relative;
         }
 
+        .page-toolbar {
+            width: min(100%, 980px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            padding: 0.1rem 0 0.35rem;
+            background: linear-gradient(180deg, rgba(246, 246, 248, 0.98), rgba(246, 246, 248, 0.92));
+            backdrop-filter: blur(12px);
+        }
+
+        .toolbar-meta {
+            min-width: 0;
+        }
+
+        .toolbar-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.84rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #7d8499;
+        }
+
+        .toolbar-status {
+            margin-top: 0.18rem;
+            font-size: 0.74rem;
+            color: var(--muted);
+            min-height: 1em;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            flex: 0 0 auto;
+        }
+
         .dossier-page {
-            width: min(100%, 794px);
-            max-width: 794px;
-            min-height: 1123px;
+            width: min(100%, 980px);
+            max-width: 980px;
+            min-height: auto;
             background: var(--paper-bg);
             border: 1px solid rgba(26, 31, 52, 0.16);
-            border-radius: 12px;
+            border-radius: 16px;
             box-shadow: 0 18px 48px rgba(16, 19, 34, 0.14);
             overflow: visible;
             display: block;
@@ -140,22 +185,22 @@
         }
 
         .page-body {
-            padding: 0.8rem 0.9rem;
+            padding: 1.15rem 1.35rem 1.4rem;
             display: flex;
             flex-direction: column;
-            gap: 0.42rem;
+            gap: 0.9rem;
             align-content: stretch;
         }
 
         .loading,
         .error {
-            width: min(100%, 794px);
-            max-width: 794px;
-            min-height: 220px;
-            background: #fff;
+            width: min(100%, 980px);
+            max-width: 980px;
+            min-height: 320px;
+            background: linear-gradient(180deg, #ffffff, #fbfbfd);
             border: 1px solid var(--line);
-            border-radius: 12px;
-            padding: 1rem;
+            border-radius: 16px;
+            padding: 1.5rem;
             color: var(--muted);
             line-height: 1.55;
         }
@@ -166,10 +211,62 @@
             background: rgba(139, 34, 82, 0.06);
         }
 
+        .loading-shell {
+            display: grid;
+            place-items: center;
+            text-align: center;
+        }
+
+        .loading-inner {
+            width: min(100%, 520px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.7rem;
+        }
+
+        .loader-spinner {
+            width: 56px;
+            height: 56px;
+            border-radius: 999px;
+            border: 4px solid rgba(139, 34, 82, 0.12);
+            border-top-color: var(--accent);
+            animation: dossierSpin 0.9s linear infinite;
+        }
+
+        .loading-eyebrow {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #8a91a6;
+        }
+
+        .loading-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(1.9rem, 4vw, 3rem);
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            line-height: 0.98;
+            text-transform: uppercase;
+            color: #171b2f;
+        }
+
+        .loading-copy {
+            max-width: 42ch;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--muted);
+        }
+
+        @keyframes dossierSpin {
+            to { transform: rotate(360deg); }
+        }
+
         .top-row {
             display: flex;
             align-items: flex-start;
-            justify-content: space-between;
             gap: 0.5rem;
         }
 
@@ -188,52 +285,44 @@
         }
 
         .title {
-            margin-top: 0.18rem;
+            margin-top: 0.24rem;
             font-family: 'Oswald', sans-serif;
-            font-size: clamp(0.98rem, 2vw, 1.46rem);
+            font-size: clamp(1.8rem, 3.2vw, 2.9rem);
             line-height: 1.04;
             letter-spacing: 0.02em;
             text-transform: uppercase;
             color: #171b2f;
-            max-width: 32ch;
+            max-width: 26ch;
         }
 
         .subtitle {
-            margin-top: 0.24rem;
+            margin-top: 0.45rem;
             color: var(--muted);
-            font-size: 0.64rem;
-            line-height: 1.38;
-            max-width: 58ch;
+            font-size: 1rem;
+            line-height: 1.62;
+            max-width: 64ch;
         }
 
         .source-chip {
-            margin-top: 0.26rem;
+            margin-top: 0.65rem;
             display: inline-flex;
             align-items: center;
             border: 1px solid var(--line);
             border-radius: 999px;
-            padding: 0.16rem 0.42rem;
-            font-size: 0.52rem;
+            padding: 0.24rem 0.58rem;
+            font-size: 0.67rem;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: #7d8499;
             background: #fbfcff;
         }
 
-        .actions {
-            display: flex;
-            gap: 0.34rem;
-            flex-wrap: nowrap;
-            justify-content: flex-end;
-            flex: 0 0 auto;
-        }
-
         .btn {
             appearance: none;
             border: 1px solid var(--line);
             border-radius: 8px;
-            padding: 0.36rem 0.5rem;
-            font-size: 0.53rem;
+            padding: 0.52rem 0.78rem;
+            font-size: 0.68rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -251,20 +340,18 @@
 
         .meta-grid {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.35rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.8rem 1.2rem;
         }
 
         .meta-item {
-            border: 1px solid var(--line);
-            background: #fbfcff;
-            border-radius: 8px;
-            padding: 0.36rem 0.44rem;
-            min-height: 50px;
+            padding: 0 0 0.55rem;
+            border-bottom: 1px solid rgba(26, 31, 52, 0.08);
+            min-height: 0;
         }
 
         .meta-label {
-            font-size: 0.53rem;
+            font-size: 0.7rem;
             font-weight: 700;
             letter-spacing: 0.08em;
             text-transform: uppercase;
@@ -272,39 +359,39 @@
         }
 
         .meta-value {
-            margin-top: 0.14rem;
-            font-size: 0.71rem;
-            line-height: 1.28;
+            margin-top: 0.2rem;
+            font-size: 1rem;
+            line-height: 1.45;
             color: #1f2438;
             word-break: break-word;
         }
 
         .layout-block {
-            border: 1px solid var(--line);
-            background: #fafbff;
-            border-radius: 8px;
-            padding: 0.34rem 0.44rem;
+            border-top: 1px solid var(--line);
+            background: transparent;
+            border-radius: 0;
+            padding: 0.95rem 0 0;
         }
 
         .layout-block-head {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start;
             gap: 0.48rem;
-            margin-bottom: 0.18rem;
+            margin-bottom: 0.45rem;
         }
 
         .section-title {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.64rem;
+            font-size: 0.84rem;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             color: #7d8499;
         }
 
         .block-text {
-            font-size: 0.66rem;
-            line-height: 1.34;
+            font-size: 0.98rem;
+            line-height: 1.68;
             color: #1f243a;
             word-break: break-word;
             white-space: pre-wrap;
@@ -312,24 +399,24 @@
 
         .block-list {
             margin: 0;
-            padding-left: 1.05rem;
-            font-size: 0.64rem;
-            line-height: 1.36;
+            padding-left: 1.35rem;
+            font-size: 0.96rem;
+            line-height: 1.72;
             color: #1f243a;
         }
 
         .block-list li + li {
-            margin-top: 0.12rem;
+            margin-top: 0.2rem;
         }
 
         .prompt-box {
-            border: 1px solid rgba(26, 31, 52, 0.16);
-            border-radius: 8px;
-            background: #fff;
+            border: none;
+            border-radius: 0;
+            background: transparent;
             color: #1f243a;
-            font-size: 0.62rem;
-            line-height: 1.28;
-            padding: 0.42rem;
+            font-size: 0.86rem;
+            line-height: 1.6;
+            padding: 0;
             white-space: pre-wrap;
             overflow: visible;
             height: auto;
@@ -337,36 +424,32 @@
             max-height: none;
         }
 
-        .copy-status {
-            margin-top: 0.2rem;
-            font-size: 0.55rem;
-            color: var(--muted);
-            min-height: 1em;
-        }
-
         .warning-note {
-            border: 1px solid rgba(139, 34, 82, 0.26);
-            border-radius: 8px;
-            padding: 0.34rem 0.42rem;
-            background: rgba(139, 34, 82, 0.06);
+            border-left: 4px solid rgba(139, 34, 82, 0.6);
+            border-radius: 0;
+            padding: 0.2rem 0 0.2rem 0.85rem;
+            background: transparent;
             color: #7a2d4a;
-            font-size: 0.58rem;
-            line-height: 1.34;
+            font-size: 0.92rem;
+            line-height: 1.58;
         }
 
         @media (max-width: 1200px) {
-            .title {
-                font-size: clamp(0.92rem, 1.95vw, 1.32rem);
+            .page-toolbar,
+            .dossier-page,
+            .loading,
+            .error {
+                width: min(100%, 920px);
             }
 
-            .subtitle {
-                font-size: 0.6rem;
+            .meta-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
             .block-text,
             .block-list,
             .prompt-box {
-                font-size: 0.59rem;
+                font-size: 0.9rem;
             }
         }
 
@@ -399,9 +482,11 @@
 
             .dossier-wrap {
                 height: auto;
-                display: block;
+                display: flex;
+                align-items: stretch;
             }
 
+            .page-toolbar,
             .dossier-page {
                 width: 100%;
                 height: auto;
@@ -415,12 +500,22 @@
                 width: 100%;
             }
 
-            .meta-grid {
-                grid-template-columns: 1fr;
+            .page-toolbar {
+                position: static;
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 0;
+                background: transparent;
+                backdrop-filter: none;
             }
 
-            .actions {
-                flex-wrap: wrap;
+            .toolbar-actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .meta-grid {
+                grid-template-columns: 1fr;
             }
 
             .prompt-box {
@@ -468,6 +563,7 @@
                 display: block !important;
             }
 
+            .page-toolbar,
             .dossier-page {
                 width: 100% !important;
                 max-width: none !important;
@@ -538,7 +634,14 @@
 </aside>
         <main class="main-content">
             <div class="dossier-wrap" id="dossierRoot">
-                <div class="loading">Uitvoerdossier laden...</div>
+                <div class="loading loading-shell">
+                    <div class="loading-inner">
+                        <div class="loader-spinner" aria-hidden="true"></div>
+                        <div class="loading-eyebrow">Uitvoerdossier</div>
+                        <div class="loading-title">Even Geduld</div>
+                        <p class="loading-copy">Opdrachtgegevens worden geladen en verwerkt.</p>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -642,6 +745,19 @@
 
             function renderError(message) {
                 root.innerHTML = `<div class="error">${esc(message || 'Uitvoerdossier niet gevonden.')}</div>`;
+            }
+
+            function renderLoading(title, description) {
+                root.innerHTML = `
+                    <div class="loading loading-shell">
+                        <div class="loading-inner">
+                            <div class="loader-spinner" aria-hidden="true"></div>
+                            <div class="loading-eyebrow">Claude Opus 4.6</div>
+                            <div class="loading-title">${esc(title || 'Even geduld')}</div>
+                            <p class="loading-copy">${esc(description || 'Het uitvoerdossier wordt opgebouwd.')}</p>
+                        </div>
+                    </div>
+                `;
             }
 
             function buildBaseOrderData(orderId, customOrder, runtimeOrder) {
@@ -947,6 +1063,18 @@
                 document.title = `Softora | Uitvoerdossier #${orderId}`;
 
                 root.innerHTML = `
+                    <div class="page-toolbar screen-only">
+                        <div class="toolbar-meta">
+                            <div class="toolbar-title">Uitvoerdossier gereed</div>
+                            <div class="toolbar-status" id="copyStatus" aria-live="polite"></div>
+                        </div>
+                        <div class="toolbar-actions">
+                            <button type="button" class="btn" id="copyPromptBtn">Kopieer prompt</button>
+                            <button type="button" class="btn btn-primary" id="printBtn">Download PDF</button>
+                            <a class="btn" href="/premium-actieve-opdrachten">Terug</a>
+                        </div>
+                    </div>
+
                     <article class="dossier-page">
                         <header class="brand-bar">
                             <div>
@@ -967,22 +1095,14 @@
                                     <p class="subtitle">${esc(layout.subtitle || 'Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie.')}</p>
                                     ${source ? `<div class="source-chip">Dynamisch via ${esc(model || source)}</div>` : ''}
                                 </div>
-                                <div class="actions screen-only">
-                                    <button type="button" class="btn btn-primary" id="printBtn">Download PDF</button>
-                                    <a class="btn" href="/premium-actieve-opdrachten">Terug</a>
-                                </div>
                             </div>
 
                             ${warning ? `<div class="warning-note">${esc(warning)}</div>` : ''}
                             ${blocksHtml}
 
                             <section class="layout-block">
-                                <div class="layout-block-head">
-                                    <h2 class="section-title">Prompt voor Claude Opus 4.6</h2>
-                                    <button type="button" class="btn screen-only" id="copyPromptBtn">Kopieer prompt</button>
-                                </div>
+                                <div class="layout-block-head"><h2 class="section-title">Prompt voor Claude Opus 4.6</h2></div>
                                 <pre class="prompt-box" id="opusPromptDisplay">${esc(opusPrompt)}</pre>
-                                <div class="copy-status screen-only" id="copyStatus" aria-live="polite"></div>
                             </section>
                         </div>
                     </article>
@@ -1014,6 +1134,7 @@
                     return;
                 }
 
+                renderLoading('Uitvoerdossier laden', 'Opdrachtgegevens worden opgehaald.');
                 const values = await fetchUiStateValues(REMOTE_SCOPE);
                 const customOrders = safeJsonParse(values?.[CUSTOM_ORDERS_KEY], []);
                 const runtimeMap = safeJsonParse(values?.[ORDER_RUNTIME_KEY], {});
@@ -1030,7 +1151,10 @@
                 }
 
                 const baseData = buildBaseOrderData(orderId, customOrder, runtimeOrder);
-                root.innerHTML = '<div class="loading">Dynamisch uitvoerdossier genereren met Claude Opus 4.6...</div>';
+                renderLoading(
+                    'Opus bouwt het dossier',
+                    'Claude Opus 4.6 zet de actuele opdrachtinformatie nu om naar een direct bruikbaar uitvoerdossier.'
+                );
 
                 let layoutResponse = null;
                 try {
