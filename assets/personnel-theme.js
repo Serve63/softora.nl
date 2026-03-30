@@ -9,6 +9,9 @@
     const sidebarCountCacheStorageKey = "softora_sidebar_count_cache_v1";
     const root = document.documentElement;
     const themeButtons = document.querySelectorAll(".theme-switch-btn[data-theme-value]");
+    let premiumSessionSnapshot = null;
+    let premiumSessionPromise = null;
+    let premiumProfileModalRef = null;
 
     window.SoftoraAI = window.SoftoraAI || {};
 
@@ -503,11 +506,13 @@
             "</nav>",
             '<div class="sidebar-footer">',
             '  <div class="sidebar-user">',
-            '    <div class="sidebar-avatar">SP</div>',
-            '    <div class="sidebar-user-info">',
-            '      <div class="sidebar-user-name">Softora Premium</div>',
-            '      <div class="sidebar-user-role">Administrator</div>',
-            "    </div>",
+            '    <button type="button" class="sidebar-user-trigger" data-sidebar-profile-trigger="1" aria-label="Profiel bewerken">',
+            '      <div class="sidebar-avatar" data-sidebar-avatar>SP</div>',
+            '      <div class="sidebar-user-info">',
+            '        <div class="sidebar-user-name" data-sidebar-user-name>Softora Premium</div>',
+            '        <div class="sidebar-user-role" data-sidebar-user-role>Administrator</div>',
+            "      </div>",
+            "    </button>",
             '    <a href="/premium-personeel-login" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">',
             '      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>',
             "    </a>",
@@ -525,6 +530,381 @@
         // Rebuild altijd zodat de sidebar op elke pagina exact dezelfde structuur/labels heeft.
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
         sidebar.dataset.sidebarReady = "true";
+    }
+
+    function buildSidebarRoleLabel(role) {
+        return String(role || "").toLowerCase() === "admin" ? "Administrator" : "Medewerker";
+    }
+
+    function buildSidebarInitialsFromSession(session) {
+        const displayName = String((session && (session.displayName || session.firstName || session.email)) || "").trim();
+        if (!displayName) return "SP";
+        const parts = displayName.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) {
+            return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+        }
+        const compact = displayName.replace(/[^a-z0-9]+/gi, "");
+        return (compact.slice(0, 2) || "SP").toUpperCase();
+    }
+
+    function paintSidebarAvatar(avatarEl, session) {
+        if (!avatarEl) return;
+        const avatarDataUrl = String((session && session.avatarDataUrl) || "").trim();
+        avatarEl.innerHTML = "";
+        if (avatarDataUrl) {
+            const img = document.createElement("img");
+            img.src = avatarDataUrl;
+            img.alt = String((session && session.displayName) || "Profielfoto");
+            img.loading = "lazy";
+            avatarEl.appendChild(img);
+            return;
+        }
+        avatarEl.textContent = buildSidebarInitialsFromSession(session);
+    }
+
+    function applyPremiumSidebarProfile(session) {
+        const nameEl = document.querySelector("[data-sidebar-user-name]");
+        const roleEl = document.querySelector("[data-sidebar-user-role]");
+        const avatarEl = document.querySelector("[data-sidebar-avatar]");
+        const triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
+
+        if (!nameEl || !roleEl || !avatarEl || !triggerEl) return;
+
+        const resolvedSession = session && session.authenticated
+            ? session
+            : {
+                displayName: "Softora Premium",
+                role: "admin",
+                avatarDataUrl: "",
+                email: "",
+            };
+
+        nameEl.textContent = String(resolvedSession.displayName || "Softora Premium");
+        roleEl.textContent = buildSidebarRoleLabel(resolvedSession.role);
+        triggerEl.setAttribute(
+            "aria-label",
+            `Profiel bewerken van ${String(resolvedSession.displayName || "Softora Premium")}`
+        );
+        paintSidebarAvatar(avatarEl, resolvedSession);
+    }
+
+    async function requestJson(url, options) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            ...options,
+            headers: {
+                "Content-Type": "application/json",
+                ...(options && options.headers ? options.headers : {}),
+            },
+        });
+        const payload = await response.json().catch(function () {
+            return {};
+        });
+        if (!response.ok || !payload || payload.ok === false) {
+            throw new Error(String((payload && (payload.error || payload.detail)) || "Request mislukt"));
+        }
+        return payload;
+    }
+
+    async function loadPremiumSession(options) {
+        if (!isPremiumPersonnelContext) return null;
+        const force = Boolean(options && options.force);
+        if (premiumSessionSnapshot && !force) {
+            applyPremiumSidebarProfile(premiumSessionSnapshot);
+            return premiumSessionSnapshot;
+        }
+        if (premiumSessionPromise && !force) return premiumSessionPromise;
+        premiumSessionPromise = (async function () {
+            const payload = await fetchJsonNoStore("/api/auth/session");
+            premiumSessionSnapshot = payload && payload.authenticated ? payload : null;
+            applyPremiumSidebarProfile(premiumSessionSnapshot);
+            return premiumSessionSnapshot;
+        })().catch(function () {
+            premiumSessionSnapshot = null;
+            applyPremiumSidebarProfile(null);
+            return null;
+        }).finally(function () {
+            premiumSessionPromise = null;
+        });
+        return premiumSessionPromise;
+    }
+
+    function setPremiumProfileFeedback(message, tone) {
+        if (!premiumProfileModalRef || !premiumProfileModalRef.feedback) return;
+        const feedbackEl = premiumProfileModalRef.feedback;
+        const hasMessage = Boolean(String(message || "").trim());
+        feedbackEl.hidden = !hasMessage;
+        feedbackEl.textContent = hasMessage ? String(message) : "";
+        feedbackEl.dataset.tone = hasMessage ? String(tone || "neutral") : "";
+    }
+
+    function paintPremiumProfilePreview(sessionLike) {
+        if (!premiumProfileModalRef || !premiumProfileModalRef.preview) return;
+        const previewEl = premiumProfileModalRef.preview;
+        previewEl.innerHTML = "";
+        const avatarDataUrl = String(
+            (premiumProfileModalRef.pendingAvatarDataUrl !== null && premiumProfileModalRef.pendingAvatarDataUrl !== undefined)
+                ? premiumProfileModalRef.pendingAvatarDataUrl
+                : ((sessionLike && sessionLike.avatarDataUrl) || "")
+        ).trim();
+
+        if (avatarDataUrl) {
+            const img = document.createElement("img");
+            img.src = avatarDataUrl;
+            img.alt = String((sessionLike && sessionLike.displayName) || "Profielfoto");
+            previewEl.appendChild(img);
+            return;
+        }
+
+        previewEl.textContent = buildSidebarInitialsFromSession(sessionLike || premiumSessionSnapshot || null);
+    }
+
+    function setPremiumProfileSavingState(isSaving) {
+        if (!premiumProfileModalRef) return;
+        premiumProfileModalRef.dialog.classList.toggle("is-saving", Boolean(isSaving));
+        premiumProfileModalRef.saveBtn.disabled = Boolean(isSaving);
+        premiumProfileModalRef.cancelBtn.disabled = Boolean(isSaving);
+        premiumProfileModalRef.closeBtn.disabled = Boolean(isSaving);
+        premiumProfileModalRef.uploadBtn.disabled = Boolean(isSaving);
+        premiumProfileModalRef.removeBtn.disabled = Boolean(isSaving);
+        premiumProfileModalRef.nameInput.disabled = Boolean(isSaving);
+    }
+
+    function closePremiumProfileModal() {
+        if (!premiumProfileModalRef) return;
+        premiumProfileModalRef.root.hidden = true;
+        document.body.classList.remove("premium-profile-modal-open");
+        setPremiumProfileFeedback("", "");
+    }
+
+    function fileToDataUrl(file) {
+        return new Promise(function (resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function () {
+                resolve(String(reader.result || ""));
+            };
+            reader.onerror = function () {
+                reject(new Error("Bestand lezen mislukt."));
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function loadImageElement(src) {
+        return new Promise(function (resolve, reject) {
+            const img = new Image();
+            img.onload = function () { resolve(img); };
+            img.onerror = function () { reject(new Error("Afbeelding laden mislukt.")); };
+            img.src = src;
+        });
+    }
+
+    async function buildResizedAvatarDataUrl(file) {
+        if (!file) return "";
+        if (!/^image\//i.test(String(file.type || ""))) {
+            throw new Error("Kies een geldig afbeeldingsbestand.");
+        }
+        if (Number(file.size) > 5 * 1024 * 1024) {
+            throw new Error("Profielfoto mag maximaal 5 MB zijn.");
+        }
+
+        const originalDataUrl = await fileToDataUrl(file);
+        const image = await loadImageElement(originalDataUrl);
+        const canvas = document.createElement("canvas");
+        const size = 256;
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+        if (!context) {
+            throw new Error("Canvas initialiseren mislukt.");
+        }
+
+        const sourceWidth = Number(image.naturalWidth || image.width || size);
+        const sourceHeight = Number(image.naturalHeight || image.height || size);
+        const squareSize = Math.min(sourceWidth, sourceHeight);
+        const sourceX = Math.max(0, (sourceWidth - squareSize) / 2);
+        const sourceY = Math.max(0, (sourceHeight - squareSize) / 2);
+
+        context.drawImage(image, sourceX, sourceY, squareSize, squareSize, 0, 0, size, size);
+        return canvas.toDataURL("image/jpeg", 0.86);
+    }
+
+    function populatePremiumProfileModal(session) {
+        if (!premiumProfileModalRef) return;
+        const currentSession = session || premiumSessionSnapshot || null;
+        premiumProfileModalRef.pendingAvatarDataUrl = (currentSession && currentSession.avatarDataUrl) || "";
+        premiumProfileModalRef.nameInput.value = String((currentSession && currentSession.displayName) || "").trim();
+        premiumProfileModalRef.emailText.textContent = String((currentSession && currentSession.email) || "");
+        premiumProfileModalRef.fileInput.value = "";
+        paintPremiumProfilePreview(currentSession);
+        setPremiumProfileFeedback("", "");
+    }
+
+    function ensurePremiumProfileModal() {
+        if (premiumProfileModalRef) return premiumProfileModalRef;
+        const rootEl = document.createElement("div");
+        rootEl.className = "premium-profile-modal";
+        rootEl.hidden = true;
+        rootEl.innerHTML = [
+            '<div class="premium-profile-backdrop" data-profile-close="1"></div>',
+            '<div class="premium-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="premium-profile-title">',
+            '  <button type="button" class="premium-profile-close" data-profile-close="1" aria-label="Sluiten">×</button>',
+            '  <div class="premium-profile-header">',
+            '    <p class="premium-profile-kicker">Profiel</p>',
+            '    <h2 class="premium-profile-title" id="premium-profile-title">Persoonlijke instellingen</h2>',
+            '    <p class="premium-profile-text">Werk je naam en profielfoto bij voor de premium omgeving.</p>',
+            '  </div>',
+            '  <form class="premium-profile-form" novalidate>',
+            '    <div class="premium-profile-identity">',
+            '      <div class="premium-profile-avatar-preview" data-profile-avatar-preview>SP</div>',
+            '      <div class="premium-profile-identity-meta">',
+            '        <div class="premium-profile-email" data-profile-email></div>',
+            '        <div class="premium-profile-avatar-actions">',
+            '          <input type="file" accept="image/*" class="premium-profile-file-input" data-profile-file-input />',
+            '          <button type="button" class="premium-profile-secondary-btn" data-profile-upload-btn>Profielfoto uploaden</button>',
+            '          <button type="button" class="premium-profile-secondary-btn" data-profile-remove-btn>Foto verwijderen</button>',
+            '        </div>',
+            '      </div>',
+            '    </div>',
+            '    <label class="premium-profile-field">',
+            '      <span class="premium-profile-label">Naam</span>',
+            '      <input type="text" class="premium-profile-input" data-profile-name maxlength="160" placeholder="Bijv. Servé Creusen" required />',
+            '    </label>',
+            '    <div class="premium-profile-feedback" data-profile-feedback hidden></div>',
+            '    <div class="premium-profile-actions">',
+            '      <button type="button" class="premium-profile-secondary-btn" data-profile-cancel>Annuleren</button>',
+            '      <button type="submit" class="premium-profile-primary-btn" data-profile-save>Opslaan</button>',
+            '    </div>',
+            '  </form>',
+            '</div>',
+        ].join("");
+        document.body.appendChild(rootEl);
+
+        premiumProfileModalRef = {
+            root: rootEl,
+            dialog: rootEl.querySelector(".premium-profile-dialog"),
+            closeBtn: rootEl.querySelector(".premium-profile-close"),
+            cancelBtn: rootEl.querySelector("[data-profile-cancel]"),
+            saveBtn: rootEl.querySelector("[data-profile-save]"),
+            uploadBtn: rootEl.querySelector("[data-profile-upload-btn]"),
+            removeBtn: rootEl.querySelector("[data-profile-remove-btn]"),
+            fileInput: rootEl.querySelector("[data-profile-file-input]"),
+            nameInput: rootEl.querySelector("[data-profile-name]"),
+            emailText: rootEl.querySelector("[data-profile-email]"),
+            preview: rootEl.querySelector("[data-profile-avatar-preview]"),
+            feedback: rootEl.querySelector("[data-profile-feedback]"),
+            form: rootEl.querySelector(".premium-profile-form"),
+            pendingAvatarDataUrl: "",
+        };
+
+        rootEl.addEventListener("click", function (event) {
+            const target = event.target;
+            if (target && target.closest("[data-profile-close='1']")) {
+                closePremiumProfileModal();
+            }
+        });
+
+        rootEl.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closePremiumProfileModal();
+            }
+        });
+
+        premiumProfileModalRef.uploadBtn.addEventListener("click", function () {
+            premiumProfileModalRef.fileInput.click();
+        });
+
+        premiumProfileModalRef.removeBtn.addEventListener("click", function () {
+            premiumProfileModalRef.pendingAvatarDataUrl = "";
+            premiumProfileModalRef.fileInput.value = "";
+            paintPremiumProfilePreview(premiumSessionSnapshot);
+        });
+
+        premiumProfileModalRef.fileInput.addEventListener("change", async function (event) {
+            const file = event.target && event.target.files ? event.target.files[0] : null;
+            if (!file) return;
+            setPremiumProfileFeedback("", "");
+            try {
+                premiumProfileModalRef.pendingAvatarDataUrl = await buildResizedAvatarDataUrl(file);
+                paintPremiumProfilePreview(premiumSessionSnapshot);
+            } catch (error) {
+                premiumProfileModalRef.fileInput.value = "";
+                setPremiumProfileFeedback(
+                    String((error && error.message) || "Profielfoto verwerken mislukt."),
+                    "error"
+                );
+            }
+        });
+
+        premiumProfileModalRef.form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            const nameValue = String(premiumProfileModalRef.nameInput.value || "").trim();
+            if (!nameValue) {
+                setPremiumProfileFeedback("Voer een geldige naam in.", "error");
+                premiumProfileModalRef.nameInput.focus();
+                return;
+            }
+
+            setPremiumProfileSavingState(true);
+            setPremiumProfileFeedback("", "");
+
+            try {
+                const payload = await requestJson("/api/auth/profile", {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                        displayName: nameValue,
+                        avatarDataUrl: premiumProfileModalRef.pendingAvatarDataUrl || "",
+                        removeAvatar: premiumProfileModalRef.pendingAvatarDataUrl ? false : true,
+                    }),
+                });
+                premiumSessionSnapshot = payload && payload.session ? payload.session : premiumSessionSnapshot;
+                applyPremiumSidebarProfile(premiumSessionSnapshot);
+                closePremiumProfileModal();
+            } catch (error) {
+                setPremiumProfileFeedback(
+                    String((error && error.message) || "Profiel opslaan mislukt."),
+                    "error"
+                );
+            } finally {
+                setPremiumProfileSavingState(false);
+            }
+        });
+
+        return premiumProfileModalRef;
+    }
+
+    async function openPremiumProfileModal() {
+        const session = premiumSessionSnapshot || await loadPremiumSession({ force: true });
+        if (!session || !session.authenticated) {
+            if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === "function") {
+                window.SoftoraDialogs.alert({
+                    title: "Niet ingelogd",
+                    message: "Je sessie is verlopen. Log opnieuw in om je profiel te wijzigen.",
+                });
+            }
+            return;
+        }
+
+        const modal = ensurePremiumProfileModal();
+        populatePremiumProfileModal(session);
+        modal.root.hidden = false;
+        document.body.classList.add("premium-profile-modal-open");
+        window.setTimeout(function () {
+            modal.nameInput.focus();
+            modal.nameInput.select();
+        }, 20);
+    }
+
+    function initPremiumSidebarProfile() {
+        if (!isPremiumPersonnelContext) return;
+        const triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
+        if (!triggerEl || triggerEl.dataset.profileInit === "1") return;
+        triggerEl.dataset.profileInit = "1";
+        triggerEl.addEventListener("click", function () {
+            openPremiumProfileModal();
+        });
+        loadPremiumSession();
     }
 
     function normalizeLeadFieldForCount(value) {
@@ -883,6 +1263,7 @@
 
     initSoftoraDialogs();
     applyUnifiedPremiumSidebar();
+    initPremiumSidebarProfile();
     initSidebarNotificationCounts();
     forceLightTheme();
     syncThemeButtonsToLight();

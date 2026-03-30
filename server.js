@@ -1002,7 +1002,39 @@ async function getResolvedPremiumAuthState(req) {
     revoked: false,
     user,
     displayName: premiumUsersStore.buildUserDisplayName(user),
+    firstName: normalizeString(user.firstName || ''),
+    lastName: normalizeString(user.lastName || ''),
+    avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(user.avatarDataUrl || ''),
   };
+}
+
+function buildPremiumAuthSessionPayload(authState) {
+  return {
+    ok: true,
+    configured: authState.configured,
+    authenticated: authState.authenticated,
+    mfaEnabled: isPremiumMfaConfigured(),
+    email: authState.authenticated ? authState.email : '',
+    userId: authState.authenticated ? authState.userId : '',
+    role: authState.authenticated ? authState.role : '',
+    firstName: authState.authenticated ? normalizeString(authState.firstName || authState.user?.firstName || '') : '',
+    lastName: authState.authenticated ? normalizeString(authState.lastName || authState.user?.lastName || '') : '',
+    displayName: authState.authenticated ? authState.displayName : '',
+    avatarDataUrl: authState.authenticated
+      ? premiumUsersStore.sanitizeAvatarDataUrl(authState.avatarDataUrl || authState.user?.avatarDataUrl || '')
+      : '',
+    canManageUsers: Boolean(authState.authenticated && authState.isAdmin),
+    expiresAt: authState.authenticated ? authState.expiresAt : null,
+  };
+}
+
+function parsePremiumProfileDisplayName(value) {
+  const displayName = truncateText(normalizeString(value || ''), 160);
+  if (!displayName) return { firstName: '', lastName: '' };
+  const parts = displayName.split(/\s+/).filter(Boolean);
+  const firstName = truncateText(parts.shift() || '', 80);
+  const lastName = truncateText(parts.join(' '), 80);
+  return { firstName, lastName };
 }
 
 function getSafePremiumRedirectPath(rawTarget, fallback = '/premium-personeel-dashboard') {
@@ -7909,18 +7941,7 @@ app.get('/api/auth/session', async (req, res) => {
   if (authState.revoked) {
     clearPremiumSessionCookie(req, res);
   }
-  return res.status(200).json({
-    ok: true,
-    configured: authState.configured,
-    authenticated: authState.authenticated,
-    mfaEnabled: isPremiumMfaConfigured(),
-    email: authState.authenticated ? authState.email : '',
-    userId: authState.authenticated ? authState.userId : '',
-    role: authState.authenticated ? authState.role : '',
-    displayName: authState.authenticated ? authState.displayName : '',
-    canManageUsers: Boolean(authState.authenticated && authState.isAdmin),
-    expiresAt: authState.authenticated ? authState.expiresAt : null,
-  });
+  return res.status(200).json(buildPremiumAuthSessionPayload(authState));
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -8187,6 +8208,120 @@ function requirePremiumAdminApiAccess(req, res, next) {
   }
   return next();
 }
+
+app.get('/api/auth/profile', async (req, res) => {
+  const authState = req.premiumAuth || null;
+  if (!authState || !authState.authenticated) {
+    return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    user: premiumUsersStore.sanitizeUserForClient(authState.user),
+    session: buildPremiumAuthSessionPayload(authState),
+  });
+});
+
+app.patch('/api/auth/profile', async (req, res) => {
+  const authState = req.premiumAuth || null;
+  if (!authState || !authState.authenticated) {
+    return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
+  }
+
+  const users =
+    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
+    premiumUsersStore.getCachedUsers();
+  const existingUser =
+    premiumUsersStore.findUserById(users, authState.userId) ||
+    premiumUsersStore.findUserByEmail(users, authState.email);
+
+  if (!existingUser) {
+    return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
+  }
+
+  const hasDisplayNameInput =
+    req.body?.displayName !== undefined || req.body?.naam !== undefined || req.body?.fullName !== undefined;
+  const avatarInputProvided = req.body?.avatarDataUrl !== undefined || req.body?.avatar !== undefined;
+  const removeAvatar = /^(1|true|yes|on)$/i.test(String(req.body?.removeAvatar || ''));
+
+  let nextFirstName = existingUser.firstName;
+  let nextLastName = existingUser.lastName;
+  if (hasDisplayNameInput) {
+    const parsedNames = parsePremiumProfileDisplayName(
+      req.body?.displayName || req.body?.naam || req.body?.fullName || ''
+    );
+    if (!parsedNames.firstName) {
+      return res.status(400).json({ ok: false, error: 'Voer een geldige naam in.' });
+    }
+    nextFirstName = parsedNames.firstName;
+    nextLastName = parsedNames.lastName;
+  }
+
+  let nextAvatarDataUrl = premiumUsersStore.sanitizeAvatarDataUrl(existingUser.avatarDataUrl || '');
+  if (removeAvatar) {
+    nextAvatarDataUrl = '';
+  } else if (avatarInputProvided) {
+    nextAvatarDataUrl = premiumUsersStore.sanitizeAvatarDataUrl(req.body?.avatarDataUrl || req.body?.avatar || '');
+    const providedAvatarValue = normalizeString(req.body?.avatarDataUrl || req.body?.avatar || '');
+    if (providedAvatarValue && !nextAvatarDataUrl) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Profielfoto moet een geldige PNG, JPG, WEBP of GIF data-url zijn.',
+      });
+    }
+  }
+
+  const nextUsers = users.map((user) => {
+    if (user.id !== existingUser.id) return user;
+    return premiumUsersStore.sanitizeUserRecord({
+      ...user,
+      firstName: nextFirstName,
+      lastName: nextLastName,
+      avatarDataUrl: nextAvatarDataUrl,
+      updatedAt: new Date().toISOString(),
+      source: 'self_service_profile',
+    });
+  });
+
+  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
+    source: 'premium_profile_update',
+    reason: 'premium_profile_updated',
+    actorEmail: authState.email,
+  });
+  const updatedUser =
+    premiumUsersStore.findUserById(saved.users, existingUser.id) ||
+    premiumUsersStore.findUserByEmail(saved.users, authState.email);
+
+  appendSecurityAuditEvent(
+    {
+      type: 'premium_profile_updated',
+      severity: 'info',
+      success: true,
+      email: authState.email || '',
+      ip: getClientIpFromRequest(req),
+      path: getRequestPathname(req),
+      origin: getRequestOriginFromHeaders(req),
+      userAgent: req.get('user-agent'),
+      detail: 'Premium gebruiker heeft eigen profiel bijgewerkt.',
+    },
+    'security_premium_profile_updated'
+  );
+
+  const refreshedAuthState = {
+    ...authState,
+    user: updatedUser,
+    firstName: normalizeString(updatedUser?.firstName || ''),
+    lastName: normalizeString(updatedUser?.lastName || ''),
+    displayName: premiumUsersStore.buildUserDisplayName(updatedUser),
+    avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(updatedUser?.avatarDataUrl || ''),
+  };
+
+  return res.status(200).json({
+    ok: true,
+    user: premiumUsersStore.sanitizeUserForClient(updatedUser),
+    session: buildPremiumAuthSessionPayload(refreshedAuthState),
+  });
+});
 
 app.get('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) => {
   const hydrated = await premiumUsersStore.ensureUsersHydrated({ force: true });
