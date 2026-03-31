@@ -435,43 +435,6 @@
             }
         }
 
-        .marquee-container {
-            overflow: hidden;
-            padding: 3rem 0;
-            border-top: none;
-            border-bottom: none;
-            background: var(--bg-primary);
-        }
-
-        .marquee {
-            display: flex;
-            gap: 4rem;
-            animation: marquee 25s linear infinite;
-            white-space: nowrap;
-        }
-
-        .marquee-item {
-            font-family: 'Oswald', sans-serif;
-            font-size: 2.5rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            color: var(--accent);
-            -webkit-text-stroke: 1px var(--accent);
-            flex-shrink: 0;
-            transition: all 0.3s;
-            letter-spacing: 0.05em;
-        }
-
-        .marquee-item:hover {
-            color: var(--accent-light);
-            -webkit-text-stroke: 1px var(--accent-light);
-        }
-
-        @keyframes marquee {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-        }
-
         section {
             position: relative;
             padding: 10rem 4rem;
@@ -694,7 +657,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            border: 2px solid rgba(139, 34, 82, 0.2);
+            border: 3px solid rgba(139, 34, 82, 0.28);
             pointer-events: none;
             z-index: 4;
         }
@@ -1240,25 +1203,6 @@
             <img src="assets/7ABBFB63-F46F-4DE7-A3B0-4879B211BEE2.PNG" alt="Creatieve design-workspace" width="1254" height="1254" loading="eager" decoding="async" fetchpriority="high">
         </div>
     </section>
-
-    <div class="marquee-container">
-        <div class="marquee">
-            <span class="marquee-item">Websites</span>
-            <span class="marquee-item">•</span>
-            <span class="marquee-item">Bedrijfssoftware</span>
-            <span class="marquee-item">•</span>
-            <span class="marquee-item">AI Voiceagents</span>
-            <span class="marquee-item">•</span>
-            <span class="marquee-item">Maatwerk</span>
-            <span class="marquee-item">•</span>
-            <span class="marquee-item">Automatisering</span>
-            <span class="marquee-item">•</span>
-            <span class="marquee-item">Websites</span>
-            <span class="marquee-item">•</span>
-            <span class="marquee-item">Bedrijfssoftware</span>
-            <span class="marquee-item">•</span>
-        </div>
-    </div>
 
     <!-- DIENSTEN -->
     <section id="diensten" style="padding: 3rem 4rem 10rem;">
