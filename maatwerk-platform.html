@@ -981,7 +981,7 @@
 
         /* Footer */
         footer {
-            padding: 4rem 4rem 2rem;
+            padding: 2.6rem 4rem 1.35rem;
             border-top: 1px solid var(--border);
             position: relative;
             overflow: hidden;
@@ -1003,8 +1003,8 @@
             display: grid;
             grid-template-columns: minmax(0, 1.45fr) minmax(260px, 1fr);
             align-items: start;
-            gap: clamp(2.5rem, 5vw, 5rem);
-            margin-bottom: 1rem;
+            gap: clamp(2rem, 4vw, 3.5rem);
+            margin-bottom: 0;
         }
 
         .footer-brand {
@@ -1012,15 +1012,16 @@
         }
 
         .footer-brand .logo {
-            font-size: 2.2rem;
-            margin-bottom: 0.75rem;
+            font-size: 1.8rem;
+            margin-bottom: 0.45rem;
             color: #ffffff;
         }
 
         .footer-brand p {
             color: rgba(255,255,255,0.4);
-            line-height: 1.6;
-            max-width: 300px;
+            line-height: 1.5;
+            max-width: 280px;
+            font-size: 0.92rem;
             font-weight: 300;
         }
 
@@ -1034,10 +1035,10 @@
 
         .footer-links h4 {
             font-family: 'Oswald', sans-serif;
-            font-size: 1rem;
+            font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            margin-bottom: 1.2rem;
+            margin-bottom: 0.7rem;
             color: #ffffff;
             font-weight: 600;
         }
@@ -1046,8 +1047,8 @@
             display: block;
             color: rgba(255,255,255,0.4);
             text-decoration: none;
-            margin-bottom: 0.7rem;
-            font-size: 0.9rem;
+            margin-bottom: 0.42rem;
+            font-size: 0.82rem;
             transition: all 0.3s;
             cursor: none;
             font-weight: 300;
@@ -1116,6 +1117,7 @@
             .footer-contact a:hover {
                 transform: translateX(5px);
             }
+            footer { padding: 2.2rem 2rem 1.2rem; }
             h1 { font-size: 3rem; }
         }
     </style>
