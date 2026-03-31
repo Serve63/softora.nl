@@ -1008,9 +1008,14 @@
 
         .footer-grid {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr;
-            gap: 3.5rem;
+            grid-template-columns: minmax(0, 1.45fr) minmax(260px, 1fr);
+            align-items: start;
+            gap: clamp(2.5rem, 5vw, 5rem);
             margin-bottom: 1rem;
+        }
+
+        .footer-brand {
+            max-width: 34rem;
         }
 
         .footer-brand .logo {
@@ -1023,6 +1028,14 @@
             line-height: 1.6;
             max-width: 300px;
             font-weight: 300;
+        }
+
+        .footer-contact {
+            justify-self: end;
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
         }
 
         .footer-links h4 {
@@ -1052,6 +1065,10 @@
         .footer-links a:hover {
             color: var(--accent-light);
             transform: translateX(5px);
+        }
+
+        .footer-contact a:hover {
+            transform: translateX(-5px);
         }
 
         .whatsapp-widget {
@@ -1136,7 +1153,7 @@
             .image-text-section { --content-overlap: 0px; }
             .content-side { padding: 4rem 2rem; }
             .cta-section { padding: 6rem 2rem; min-height: 40vh; }
-            .footer-grid { grid-template-columns: 1fr 1fr; gap: 3rem; }
+            .footer-grid { grid-template-columns: minmax(0, 1.1fr) minmax(240px, 1fr); gap: 2.5rem; }
             .pricing-card.featured { transform: none; order: -1; }
             nav, section, footer { padding-left: 2rem; padding-right: 2rem; }
             body { cursor: auto; }
@@ -1145,7 +1162,15 @@
 
         @media (max-width: 768px) {
             .nav-links { display: none; }
-            .footer-grid { grid-template-columns: 1fr; }
+            .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
+            .footer-contact {
+                justify-self: start;
+                text-align: left;
+                align-items: flex-start;
+            }
+            .footer-contact a:hover {
+                transform: translateX(5px);
+            }
             h1 { font-size: 3rem; }
             .whatsapp-widget {
                 right: 16px;
@@ -1455,25 +1480,12 @@
                     <a href="#" class="logo">SOFTORA.</a>
                     <p>Premium webdesign & development vanuit Tilburg. Websites die presteren.</p>
                 </div>
-                <div class="footer-links">
-                    <h4>Navigatie</h4>
-                    <a href="#diensten" class="magnetic">Diensten</a>
-                    <a href="#werkwijze" class="magnetic">Werkwijze</a>
-                    <a href="#prijzen" class="magnetic">Prijzen</a>
-                    <a href="#faq" class="magnetic">FAQ</a>
-                </div>
-                <div class="footer-links">
+                <div class="footer-links footer-contact">
                     <h4>Contact</h4>
                     <a href="mailto:info@softora.nl" class="magnetic">info@softora.nl</a>
                     <a href="tel:+31612345678" class="magnetic">06 12 34 56 78</a>
                     <a href="#" class="magnetic">Oisterwijk</a>
                     <a href="/premium-personeel-login" class="magnetic">Personeel inloggen</a>
-                </div>
-                <div class="footer-links">
-                    <h4>Social</h4>
-                    <a href="#" class="magnetic">Instagram</a>
-                    <a href="#" class="magnetic">LinkedIn</a>
-                    <a href="#" class="magnetic">Dribbble</a>
                 </div>
             </div>
         </div>
