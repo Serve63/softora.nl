@@ -35,7 +35,6 @@
   const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
   const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
   const CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY = 'softora_campaign_coldcalling_stack';
-  const STATUS_PILL_MODE_STORAGE_KEY = 'softora_status_pill_mode';
   const REMOTE_UI_STATE_SCOPE_BASE = 'coldcalling';
   const BUSINESS_MODE_ORDER = ['websites', 'voice_software', 'business_software'];
   let activeBusinessMode = 'websites';

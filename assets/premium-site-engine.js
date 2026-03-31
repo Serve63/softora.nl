@@ -23,7 +23,6 @@
     nodePath = null;
   }
 
-  var LOCAL_SIGNATURE_KEY = 'softora-premium-signatures-v2';
   var RECENT_SIGNATURES = [];
 
   var FORBIDDEN_WORDS = [
