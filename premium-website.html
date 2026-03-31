@@ -682,7 +682,18 @@
             align-items: stretch;
             min-height: 70vh;
             overflow: hidden;
+            position: relative;
+            isolation: isolate;
             --content-overlap: clamp(70px, 8vw, 130px);
+        }
+
+        .image-text-section::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 2px solid rgba(139, 34, 82, 0.2);
+            pointer-events: none;
+            z-index: 4;
         }
 
         .image-side {
@@ -712,7 +723,6 @@
             flex-direction: column;
             justify-content: center;
             background: var(--bg-secondary);
-            box-shadow: inset 0 0 0 1px rgba(139, 34, 82, 0.14);
             position: relative;
             z-index: 1;
         }
