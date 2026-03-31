@@ -13,8 +13,6 @@
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
             try {
-                localStorage.setItem("softora_premium_personnel_theme_mode", "light");
-                localStorage.setItem("softora_premium_public_theme_mode", "light");
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
             } catch (error) {
@@ -276,7 +274,8 @@
 
     <script>
         (function () {
-            const storageKey = 'softora_premium_monthly_cost_rows_v1';
+            const REMOTE_SCOPE = 'premium_monthly_costs';
+            const REMOTE_KEY = 'softora_premium_monthly_cost_rows_v1';
             const tbody = document.getElementById('monthlyCostsRows');
             const totalEl = document.getElementById('monthlyTotal');
             const addRowTop = document.getElementById('addRowTop');
@@ -300,36 +299,95 @@
                 };
             }
 
-            function loadRows() {
+            function normalizeRows(rawRows) {
+                if (!Array.isArray(rawRows)) return [newRow()];
+                const cleaned = rawRows
+                    .filter(function (row) { return row && typeof row === 'object'; })
+                    .map(function (row) { return newRow(row); })
+                    .slice(0, 200);
+                return cleaned.length ? cleaned : [newRow()];
+            }
+
+            async function fetchUiStateGet(scope) {
+                const encodedScope = encodeURIComponent(String(scope || ''));
+                const urls = [
+                    `/api/ui-state-get?scope=${encodedScope}`,
+                    `/api/ui-state/${encodedScope}`
+                ];
+                let lastError = null;
+
+                for (const url of urls) {
+                    try {
+                        const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+                        if (!res.ok) throw new Error(`UI-state GET mislukt (${res.status})`);
+                        return await res.json().catch(function () { return {}; });
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+
+                throw lastError || new Error('UI-state GET mislukt');
+            }
+
+            async function fetchUiStateSet(scope, body) {
+                const encodedScope = encodeURIComponent(String(scope || ''));
+                const urls = [
+                    `/api/ui-state-set?scope=${encodedScope}`,
+                    `/api/ui-state/${encodedScope}`
+                ];
+                let lastError = null;
+
+                for (const url of urls) {
+                    try {
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body || {})
+                        });
+                        if (!res.ok) throw new Error(`UI-state POST mislukt (${res.status})`);
+                        return await res.json().catch(function () { return {}; });
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+
+                throw lastError || new Error('UI-state POST mislukt');
+            }
+
+            async function loadRows() {
                 try {
-                    const raw = localStorage.getItem(storageKey);
+                    const state = await fetchUiStateGet(REMOTE_SCOPE);
+                    const raw = String(state && state.values && state.values[REMOTE_KEY] || '');
                     if (!raw) return [newRow()];
-                    const parsed = JSON.parse(raw);
-                    if (!Array.isArray(parsed)) return [newRow()];
-                    const cleaned = parsed
-                        .filter(function (row) { return row && typeof row === 'object'; })
-                        .map(function (row) { return newRow(row); })
-                        .slice(0, 200);
-                    return cleaned.length ? cleaned : [newRow()];
+                    return normalizeRows(JSON.parse(raw));
                 } catch (error) {
+                    console.error('Maandelijkse kosten laden via Supabase mislukt:', error);
                     return [newRow()];
                 }
             }
 
-            let rows = loadRows();
+            let rows = [newRow()];
             let saveTimer = 0;
 
-            function saveRows() {
+            async function saveRows() {
                 try {
-                    localStorage.setItem(storageKey, JSON.stringify(rows));
+                    await fetchUiStateSet(REMOTE_SCOPE, {
+                        patch: {
+                            [REMOTE_KEY]: JSON.stringify(rows)
+                        },
+                        source: 'premium-maandelijkse-kosten',
+                        actor: 'browser'
+                    });
                 } catch (error) {
-                    /* ignore storage errors */
+                    console.error('Maandelijkse kosten opslaan via Supabase mislukt:', error);
                 }
             }
 
             function scheduleSave() {
                 window.clearTimeout(saveTimer);
-                saveTimer = window.setTimeout(saveRows, 240);
+                saveTimer = window.setTimeout(function () {
+                    void saveRows();
+                }, 240);
             }
 
             function normalizeAmount(value) {
@@ -475,7 +533,10 @@
                 saveRows();
             });
 
-            render();
+            (async function bootstrapRows() {
+                rows = await loadRows();
+                render();
+            })();
         })();
     </script>
 </body>

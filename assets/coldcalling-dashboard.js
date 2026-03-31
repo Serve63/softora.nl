@@ -740,7 +740,7 @@
         remoteUiStateLastError = normalizeString(error?.message || '') || 'UI state save failed';
         return {
           ok: false,
-          source: remoteUiStateLastSource || 'memory',
+          source: remoteUiStateLastSource || 'pending',
           error: remoteUiStateLastError,
         };
       } finally {
@@ -967,23 +967,11 @@
   }
 
   function getSavedStatusPillMode() {
-    try {
-      const raw = String(window.localStorage.getItem(STATUS_PILL_MODE_STORAGE_KEY) || '').trim();
-      return normalizeBusinessMode(raw);
-    } catch (error) {
-      return 'websites';
-    }
+    return 'websites';
   }
 
   function saveStatusPillMode(mode) {
-    try {
-      window.localStorage.setItem(
-        STATUS_PILL_MODE_STORAGE_KEY,
-        normalizeBusinessMode(mode)
-      );
-    } catch (error) {
-      // Ignore localStorage failures.
-    }
+    return;
   }
 
   function applyStatusPillMode(mode) {

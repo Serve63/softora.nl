@@ -17,7 +17,6 @@
                 var storageKey = isPremiumPersonnel
                     ? "softora_premium_personnel_theme_mode"
                     : "softora_software_personnel_theme_mode";
-                localStorage.setItem(storageKey, "light");
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
             } catch (error) {
@@ -1596,7 +1595,6 @@
         const REMOTE_UI_STATE_SCOPE = 'premium_active_orders';
         const CUSTOMER_DB_SCOPE = 'premium_customers_database';
         const CUSTOMER_DB_KEY = 'softora_customers_premium_v1';
-        const CUSTOMER_LOCAL_KEY = 'softora_customers_premium_local_v1';
         let remoteUiStateCache = {};
         let remoteUiStateLoaded = false;
         let remoteUiStateLoadPromise = null;
@@ -1957,24 +1955,12 @@
                 const remoteCustomers = parseCustomerDatabase(remoteState?.values?.[CUSTOMER_DB_KEY]);
                 if (remoteCustomers.length) return remoteCustomers;
             } catch (_) {
-                // fall back to local cache
-            }
-
-            try {
-                return parseCustomerDatabase(localStorage.getItem(CUSTOMER_LOCAL_KEY));
-            } catch (_) {
                 return [];
             }
         }
 
         async function persistCustomerDatabase(customers) {
             const serialized = JSON.stringify(Array.isArray(customers) ? customers : []);
-            try {
-                localStorage.setItem(CUSTOMER_LOCAL_KEY, serialized);
-            } catch (_) {
-                // ignore storage errors
-            }
-
             await fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
                 patch: {
                     [CUSTOMER_DB_KEY]: serialized
@@ -1985,11 +1971,7 @@
         }
 
         function removeGeneratedPreviewHtml(orderId) {
-            try {
-                localStorage.removeItem(getPreviewStorageKey(orderId));
-            } catch (_) {
-                // ignore storage errors
-            }
+            writeStateValue(getPreviewStorageKey(orderId), '');
         }
 
         function syncLastActiveOrderAfterRemoval(removedId) {
@@ -2452,7 +2434,6 @@
                         const estimatedApiGeneratedAt = String(item?.estimatedApiGeneratedAt || '').trim();
                         const lastRunAt = String(item?.lastRunAt || '').trim();
                         const paidAt = String(item?.paidAt || '').trim();
-                        const launchLocalDir = String(item?.launchLocalDir || '').trim();
                         const launchRepoUrl = String(item?.launchRepoUrl || '').trim();
                         const launchDeploymentUrl = String(item?.launchDeploymentUrl || '').trim();
                         const launchDomainStatus = String(item?.launchDomainStatus || '').trim();
@@ -2501,7 +2482,6 @@
                             estimatedApiGeneratedAt: estimatedApiGeneratedAt || null,
                             lastRunAt: lastRunAt || null,
                             paidAt: paidAt || null,
-                            launchLocalDir: launchLocalDir || null,
                             launchRepoUrl: launchRepoUrl || null,
                             launchDeploymentUrl: launchDeploymentUrl || null,
                             launchDomainStatus: launchDomainStatus || null,
@@ -3207,7 +3187,6 @@
                 estimatedApiGeneratedAt: null,
                 lastRunAt: null,
                 paidAt: null,
-                launchLocalDir: null,
                 launchRepoUrl: null,
                 launchDeploymentUrl: null,
                 launchDomainStatus: null,
@@ -3266,21 +3245,12 @@
         function saveGeneratedPreviewHtml(orderId, html) {
             const key = getPreviewStorageKey(orderId);
             const content = String(html || '');
-            try {
-                localStorage.setItem(key, content);
-                return true;
-            } catch (_) {
-                return false;
-            }
+            writeStateValue(key, content);
+            return true;
         }
 
         function hasGeneratedPreviewHtml(orderId) {
-            const key = getPreviewStorageKey(orderId);
-            try {
-                return Boolean(localStorage.getItem(key));
-            } catch (_) {
-                return false;
-            }
+            return Boolean(readStateValue(getPreviewStorageKey(orderId)));
         }
 
         function getPreviewUrl(id) {
@@ -4046,7 +4016,6 @@
             const claimInfo = getOrderClaimInfo(id);
             const launchDeploymentUrl = String(customOrder?.launchDeploymentUrl || '').trim();
             const launchRepoUrl = String(customOrder?.launchRepoUrl || '').trim();
-            const launchLocalDir = String(customOrder?.launchLocalDir || '').trim();
             const launchDomainStatus = String(customOrder?.launchDomainStatus || '').trim();
             const launchDomainMessage = String(customOrder?.launchDomainMessage || '').trim();
             const lastRunAt = String(customOrder?.lastRunAt || '').trim();
@@ -4086,7 +4055,6 @@
                         : '—',
                     raw: true
                 },
-                { label: 'Lokale map', value: launchLocalDir || '—' },
                 { label: 'Domeinstatus', value: launchDomainStatus || '—' },
                 { label: 'Domeinmelding', value: launchDomainMessage || '—' }
             ];
@@ -4231,12 +4199,7 @@
                 }
                 : null;
             const previousOrderStateValue = readStateValue(ORDER_STATE_KEY);
-            let previousPreviewHtml = null;
-            try {
-                previousPreviewHtml = localStorage.getItem(getPreviewStorageKey(numericId));
-            } catch (_) {
-                previousPreviewHtml = null;
-            }
+            const previousPreviewHtml = readStateValue(getPreviewStorageKey(numericId));
 
             setModalDeleteButtonState('Project wordt verwijderd...', true);
 
@@ -4274,11 +4237,7 @@
                 persistOrdersRuntime();
                 writeStateValue(ORDER_STATE_KEY, previousOrderStateValue);
                 if (previousPreviewHtml !== null) {
-                    try {
-                        localStorage.setItem(getPreviewStorageKey(numericId), previousPreviewHtml);
-                    } catch (_) {
-                        // ignore restore errors
-                    }
+                    writeStateValue(getPreviewStorageKey(numericId), previousPreviewHtml);
                 }
                 await flushRemoteUiStateSave();
                 if (previousOrder) applyOrderUiStateToCard(numericId);

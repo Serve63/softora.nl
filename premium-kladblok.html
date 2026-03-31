@@ -13,8 +13,6 @@
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
             try {
-                localStorage.setItem("softora_premium_personnel_theme_mode", "light");
-                localStorage.setItem("softora_premium_public_theme_mode", "light");
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
             } catch (error) {
@@ -181,37 +179,95 @@
 
     <script>
         (function () {
-            const storageKey = 'softora_premium_monthly_costs_notes_v1';
+            const REMOTE_SCOPE = 'premium_notepad';
+            const REMOTE_KEY = 'softora_premium_notepad_html_v1';
             const editor = document.getElementById('notepadEditor');
             if (!editor) return;
 
-            function save() {
+            async function fetchUiStateGet(scope) {
+                const encodedScope = encodeURIComponent(String(scope || ''));
+                const urls = [
+                    `/api/ui-state-get?scope=${encodedScope}`,
+                    `/api/ui-state/${encodedScope}`
+                ];
+                let lastError = null;
+
+                for (const url of urls) {
+                    try {
+                        const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+                        if (!res.ok) throw new Error(`UI-state GET mislukt (${res.status})`);
+                        return await res.json().catch(function () { return {}; });
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+
+                throw lastError || new Error('UI-state GET mislukt');
+            }
+
+            async function fetchUiStateSet(scope, body) {
+                const encodedScope = encodeURIComponent(String(scope || ''));
+                const urls = [
+                    `/api/ui-state-set?scope=${encodedScope}`,
+                    `/api/ui-state/${encodedScope}`
+                ];
+                let lastError = null;
+
+                for (const url of urls) {
+                    try {
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body || {})
+                        });
+                        if (!res.ok) throw new Error(`UI-state POST mislukt (${res.status})`);
+                        return await res.json().catch(function () { return {}; });
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+
+                throw lastError || new Error('UI-state POST mislukt');
+            }
+
+            async function loadInitialValue() {
                 try {
-                    localStorage.setItem(storageKey, editor.innerHTML);
+                    const state = await fetchUiStateGet(REMOTE_SCOPE);
+                    const html = String(state && state.values && state.values[REMOTE_KEY] || '');
+                    if (html) editor.innerHTML = html;
                 } catch (error) {
-                    /* ignore storage errors */
+                    console.error('Kladblok laden via Supabase mislukt:', error);
                 }
             }
 
-            try {
-                const cached = localStorage.getItem(storageKey);
-                if (cached) {
-                    editor.innerHTML = cached;
+            async function save() {
+                try {
+                    await fetchUiStateSet(REMOTE_SCOPE, {
+                        patch: {
+                            [REMOTE_KEY]: editor.innerHTML
+                        },
+                        source: 'premium-kladblok',
+                        actor: 'browser'
+                    });
+                } catch (error) {
+                    console.error('Kladblok opslaan via Supabase mislukt:', error);
                 }
-            } catch (error) {
-                /* ignore storage errors */
             }
 
             let saveTimer = 0;
             editor.addEventListener('input', function () {
                 window.clearTimeout(saveTimer);
-                saveTimer = window.setTimeout(save, 240);
+                saveTimer = window.setTimeout(function () {
+                    void save();
+                }, 240);
             });
 
             window.addEventListener('beforeunload', function () {
                 window.clearTimeout(saveTimer);
-                save();
+                void save();
             });
+
+            void loadInitialValue();
         })();
     </script>
 </body>

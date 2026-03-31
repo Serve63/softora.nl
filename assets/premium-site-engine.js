@@ -201,45 +201,11 @@
   }
 
   function loadStoredSignatures() {
-    var out = [];
-
-    if (typeof localStorage !== 'undefined') {
-      var raw = localStorage.getItem(LOCAL_SIGNATURE_KEY);
-      var parsed = safeJsonParse(raw || '[]', []);
-      if (Array.isArray(parsed)) out = out.concat(parsed);
-    }
-
-    if (nodeFs && nodePath && typeof process !== 'undefined' && process.cwd) {
-      var outputRoot = nodePath.resolve(process.cwd(), 'output');
-      if (nodeFs.existsSync(outputRoot)) {
-        try {
-          var dirs = nodeFs.readdirSync(outputRoot, { withFileTypes: true });
-          dirs.forEach(function (entry) {
-            if (!entry.isDirectory()) return;
-            var qaPath = nodePath.join(outputRoot, entry.name, 'qa.json');
-            if (!nodeFs.existsSync(qaPath)) return;
-            var qaRaw = nodeFs.readFileSync(qaPath, 'utf8');
-            var qaParsed = safeJsonParse(qaRaw, null);
-            if (qaParsed && qaParsed.signature && Array.isArray(qaParsed.signature.tokens)) {
-              out.push(qaParsed.signature);
-            }
-          });
-        } catch (err) {
-          // ignore filesystem signature scan failures
-        }
-      }
-    }
-
-    return out;
+    return [];
   }
 
   function persistStoredSignatures(history) {
-    if (typeof localStorage === 'undefined') return;
-    try {
-      localStorage.setItem(LOCAL_SIGNATURE_KEY, JSON.stringify((history || []).slice(-120)));
-    } catch (err) {
-      // ignore storage quota errors
-    }
+    return;
   }
 
   function esc(value) {
@@ -1979,8 +1945,7 @@
         copy: copy,
         qa: qa,
         signature: qa.signature,
-        files: files,
-        output_hint: '/output/' + options.orderId + '/'
+        files: files
       };
 
       lastBundle = bundle;

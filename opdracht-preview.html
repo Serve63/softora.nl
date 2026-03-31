@@ -63,7 +63,7 @@
 <body>
   <div class="card" id="fallback">
     <h1>Preview niet gevonden</h1>
-    <p>Deze preview staat (nog) niet lokaal opgeslagen. Ga terug naar Actieve Opdrachten en voer de opdracht opnieuw uit.</p>
+    <p>Deze preview is hier niet beschikbaar. Ga terug naar Actieve Opdrachten en open het dossier vanuit de premium omgeving.</p>
     <a href="/actieve-opdrachten">Terug naar Actieve Opdrachten</a>
   </div>
 
@@ -74,13 +74,7 @@
       const id = params.get('id');
       if (!id) return;
 
-      let html = null;
-      try {
-        html = localStorage.getItem(PREVIEW_HTML_PREFIX + id);
-      } catch (_) {
-        html = null;
-      }
-
+      const html = null;
       if (!html) return;
 
       // Replace the whole document with the generated preview HTML.

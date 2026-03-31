@@ -17,7 +17,6 @@
                 var storageKey = isPremiumPersonnel
                     ? "softora_premium_personnel_theme_mode"
                     : "softora_software_personnel_theme_mode";
-                localStorage.setItem(storageKey, "light");
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
             } catch (error) {
@@ -1084,7 +1083,6 @@
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
-        const CUSTOMER_LOCAL_KEY = "softora_customers_premium_local_v1";
         const ORDER_SCOPE = "premium_active_orders";
         const ORDER_KEY = "softora_custom_orders_premium_v1";
 
@@ -1432,22 +1430,6 @@
             }
         }
 
-        function readLocalCustomers() {
-            try {
-                return parseCustomers(localStorage.getItem(CUSTOMER_LOCAL_KEY));
-            } catch (error) {
-                return [];
-            }
-        }
-
-        function writeLocalCustomers(customers) {
-            try {
-                localStorage.setItem(CUSTOMER_LOCAL_KEY, JSON.stringify(customers));
-            } catch (error) {
-                /* ignore storage errors */
-            }
-        }
-
         function parseOrders(raw) {
             try {
                 const parsed = JSON.parse(String(raw || "[]"));
@@ -1522,8 +1504,6 @@
             const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
                 return normalizeCustomer(item, "klant-save-" + index);
             }));
-
-            writeLocalCustomers(normalizedCustomers);
 
             try {
                 await fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
@@ -1771,7 +1751,7 @@
             }
 
             setStatusMessage(
-                "Wijziging lokaal opgeslagen, maar server-sync mislukte: " + String(result.error && result.error.message || "onbekende fout"),
+                "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
                 "error"
             );
         }
@@ -1804,7 +1784,7 @@
             }
 
             setStatusMessage(
-                "Verwijderd in deze browser, maar server-sync mislukte: " + String(result.error && result.error.message || "onbekende fout"),
+                "Verwijderen in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
                 "error"
             );
         }
@@ -1818,27 +1798,12 @@
 
                 if (remoteCustomers.length) {
                     state.klanten = remoteCustomers;
-                    writeLocalCustomers(remoteCustomers);
                     renderPage();
                     setStatusMessage("");
                     return;
                 }
             } catch (error) {
-                /* continue with local fallback */
-            }
-
-            const localCustomers = readLocalCustomers();
-            if (localCustomers.length) {
-                state.klanten = localCustomers;
-                renderPage();
-
-                const syncResult = await persistCustomerList(localCustomers);
-                if (syncResult.ok) {
-                    setStatusMessage("Lokale klantenlijst gesynchroniseerd.", "success", true);
-                } else {
-                    setStatusMessage("Lokale klantenlijst geladen. Server-sync mislukte.", "error");
-                }
-                return;
+                console.error("Klanten laden via Supabase mislukt:", error);
             }
 
             try {
@@ -1854,7 +1819,7 @@
                     if (persistResult.ok) {
                         setStatusMessage("Klanten uit actieve opdrachten geimporteerd.", "success", true);
                     } else {
-                        setStatusMessage("Klanten geimporteerd, maar server-sync mislukte.", "error");
+                        setStatusMessage("Klanten geimporteerd, maar Supabase-opslag mislukte.", "error");
                     }
                     return;
                 }

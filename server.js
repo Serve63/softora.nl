@@ -56,12 +56,6 @@ const WEBSITE_GENERATION_TIMEOUT_MS = Math.max(
 const ACTIVE_ORDER_AUTOMATION_ENABLED = /^(1|true|yes)$/i.test(
   String(process.env.ACTIVE_ORDER_AUTOMATION_ENABLED || '')
 );
-const ACTIVE_ORDER_AUTOMATION_OUTPUT_ROOT = path.resolve(
-  String(
-    process.env.ACTIVE_ORDER_AUTOMATION_OUTPUT_ROOT ||
-      path.join(process.cwd(), 'output', 'generated-sites')
-  ).trim()
-);
 const ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN = String(
   process.env.ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN || process.env.GITHUB_TOKEN || ''
 ).trim();
@@ -943,7 +937,11 @@ async function getResolvedPremiumAuthState(req) {
   const basicAuthState = getPremiumAuthState(req);
   const hydrated = await premiumUsersStore.ensureUsersHydrated();
   const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
-  const configured = Boolean(PREMIUM_SESSION_SECRET && users.length > 0);
+  const configured = Boolean(
+    PREMIUM_SESSION_SECRET &&
+    hydrated?.source === 'supabase' &&
+    users.length > 0
+  );
 
   if (!configured) {
     return {
@@ -1677,45 +1675,50 @@ async function getUiStateValues(scope) {
   if (!normalizedScope) return null;
 
   if (!isSupabaseConfigured()) {
-    return { values: { ...(inMemoryUiStateByScope.get(normalizedScope) || {}) }, source: 'memory' };
+    return null;
   }
 
   try {
-    const client = getSupabaseClient();
     const rowKey = getUiStateRowKey(normalizedScope);
-    const { data, error } = await client
-      .from(SUPABASE_STATE_TABLE)
-      .select('payload, updated_at')
-      .eq('state_key', rowKey)
-      .maybeSingle();
+    const client = getSupabaseClient();
+    let row = null;
 
-    if (error) {
+    if (client) {
+      const { data, error } = await client
+        .from(SUPABASE_STATE_TABLE)
+        .select('payload, updated_at')
+        .eq('state_key', rowKey)
+        .maybeSingle();
+
+      if (!error) {
+        row = data || null;
+      } else {
+        const fallback = await fetchSupabaseRowByKeyViaRest(rowKey, 'payload,updated_at');
+        if (!fallback.ok) {
+          console.error('[UI State][Supabase][GetError]', error.message || error);
+          return null;
+        }
+        row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
+      }
+    } else {
       const fallback = await fetchSupabaseRowByKeyViaRest(rowKey, 'payload,updated_at');
       if (!fallback.ok) {
-        console.error('[UI State][Supabase][GetError]', error.message || error);
-        return { values: { ...(inMemoryUiStateByScope.get(normalizedScope) || {}) }, source: 'memory' };
+        console.error('[UI State][Supabase][GetError]', 'Supabase client ontbreekt en REST fallback faalde.');
+        return null;
       }
-
-      const row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
-      const values = sanitizeUiStateValues(row?.payload?.values || {});
-      inMemoryUiStateByScope.set(normalizedScope, values);
-      return {
-        values: { ...values },
-        updatedAt: normalizeString(row?.updated_at || '') || null,
-        source: 'supabase',
-      };
+      row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
     }
 
-    const values = sanitizeUiStateValues(data?.payload?.values || {});
+    const values = sanitizeUiStateValues(row?.payload?.values || {});
     inMemoryUiStateByScope.set(normalizedScope, values);
     return {
       values: { ...values },
-      updatedAt: normalizeString(data?.updated_at || '') || null,
+      updatedAt: normalizeString(row?.updated_at || '') || null,
       source: 'supabase',
     };
   } catch (error) {
     console.error('[UI State][Supabase][GetCrash]', error?.message || error);
-    return { values: { ...(inMemoryUiStateByScope.get(normalizedScope) || {}) }, source: 'memory' };
+    return null;
   }
 }
 
@@ -1725,10 +1728,9 @@ async function setUiStateValues(scope, values, meta = {}) {
 
   const sanitizedValues = sanitizeUiStateValues(values);
   const updatedAt = new Date().toISOString();
-  inMemoryUiStateByScope.set(normalizedScope, sanitizedValues);
 
   if (!isSupabaseConfigured()) {
-    return { values: { ...sanitizedValues }, source: 'memory', updatedAt };
+    return null;
   }
 
   try {
@@ -1749,23 +1751,29 @@ async function setUiStateValues(scope, values, meta = {}) {
       updated_at: updatedAt,
     };
 
-    const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
-      onConflict: 'state_key',
-    });
-
-    if (error) {
-      const fallback = await upsertSupabaseRowViaRest(row);
-      if (!fallback.ok) {
-        console.error('[UI State][Supabase][SetError]', error.message || error);
-        return { values: { ...sanitizedValues }, source: 'memory', updatedAt };
-      }
-      return { values: { ...sanitizedValues }, source: 'supabase', updatedAt };
+    let upsertError = null;
+    if (client) {
+      const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
+        onConflict: 'state_key',
+      });
+      upsertError = error || null;
+    } else {
+      upsertError = new Error('Supabase client ontbreekt.');
     }
 
+    if (upsertError) {
+      const fallback = await upsertSupabaseRowViaRest(row);
+      if (!fallback.ok) {
+        console.error('[UI State][Supabase][SetError]', upsertError.message || upsertError);
+        return null;
+      }
+    }
+
+    inMemoryUiStateByScope.set(normalizedScope, sanitizedValues);
     return { values: { ...sanitizedValues }, source: 'supabase', updatedAt };
   } catch (error) {
     console.error('[UI State][Supabase][SetCrash]', error?.message || error);
-    return { values: { ...sanitizedValues }, source: 'memory', updatedAt };
+    return null;
   }
 }
 
@@ -7960,7 +7968,7 @@ app.post('/api/auth/login', async (req, res) => {
   const hydrated = await premiumUsersStore.ensureUsersHydrated();
   const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
 
-  if (!PREMIUM_SESSION_SECRET || users.length === 0) {
+  if (!PREMIUM_SESSION_SECRET || hydrated?.source !== 'supabase' || users.length === 0) {
     appendSecurityAuditEvent(
       {
         type: 'login_rejected',
@@ -7978,7 +7986,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(503).json({
       ok: false,
       error:
-        'Premium login is nog niet geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe en zet PREMIUM_SESSION_SECRET.',
+        'Premium login is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase en zet PREMIUM_SESSION_SECRET.',
     });
   }
 
@@ -8158,7 +8166,7 @@ app.use('/api', async (req, res, next) => {
     return res.status(503).json({
       ok: false,
       error:
-        'Premium auth is nog niet geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe en zet PREMIUM_SESSION_SECRET.',
+        'Premium auth is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase en zet PREMIUM_SESSION_SECRET.',
     });
   }
 
@@ -8288,6 +8296,12 @@ app.patch('/api/auth/profile', async (req, res) => {
     reason: 'premium_profile_updated',
     actorEmail: authState.email,
   });
+  if (!saved || saved.source !== 'supabase') {
+    return res.status(503).json({
+      ok: false,
+      error: 'Profiel kon niet worden opgeslagen zonder geldige Supabase-opslag.',
+    });
+  }
   const updatedUser =
     premiumUsersStore.findUserById(saved.users, existingUser.id) ||
     premiumUsersStore.findUserByEmail(saved.users, authState.email);
@@ -8373,6 +8387,12 @@ app.post('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) =>
     reason: 'premium_user_created',
     actorEmail: authState.email,
   });
+  if (!saved || saved.source !== 'supabase') {
+    return res.status(503).json({
+      ok: false,
+      error: 'Gebruiker kon niet worden opgeslagen zonder geldige Supabase-opslag.',
+    });
+  }
   const createdUser = premiumUsersStore.findUserByEmail(saved.users, email);
   appendSecurityAuditEvent(
     {
@@ -8457,6 +8477,12 @@ app.patch('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, re
     reason: 'premium_user_updated',
     actorEmail: authState.email,
   });
+  if (!saved || saved.source !== 'supabase') {
+    return res.status(503).json({
+      ok: false,
+      error: 'Gebruiker kon niet worden bijgewerkt zonder geldige Supabase-opslag.',
+    });
+  }
   const updatedUser = premiumUsersStore.findUserById(saved.users, userId);
 
   appendSecurityAuditEvent(
@@ -8505,6 +8531,12 @@ app.delete('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, r
     reason: 'premium_user_deleted',
     actorEmail: authState.email,
   });
+  if (!saved || saved.source !== 'supabase') {
+    return res.status(503).json({
+      ok: false,
+      error: 'Gebruiker kon niet worden verwijderd zonder geldige Supabase-opslag.',
+    });
+  }
 
   appendSecurityAuditEvent(
     {
@@ -9861,7 +9893,7 @@ async function sendActiveOrderLaunchSiteResponse(req, res) {
       {
         type: 'active_order_automation_completed',
         title: 'Case automatisch gelanceerd',
-        detail: `${company || 'Case'} is doorgezet naar lokaal, GitHub en Vercel.`,
+        detail: `${company || 'Case'} is doorgezet naar GitHub en Vercel.`,
         company,
         actor: 'api',
         taskId: Number.isFinite(orderId) ? orderId : null,
@@ -9917,14 +9949,17 @@ async function sendUiStateGetResponse(req, res, scopeRaw) {
 
   const state = await getUiStateValues(scope);
   if (!state) {
-    return res.status(400).json({ ok: false, error: 'Kon UI state niet laden' });
+    return res.status(503).json({
+      ok: false,
+      error: 'Kon UI state niet laden zonder geldige Supabase-opslag.',
+    });
   }
 
   return res.status(200).json({
     ok: true,
     scope,
     values: state.values || {},
-    source: state.source || 'memory',
+    source: state.source || 'supabase',
     updatedAt: state.updatedAt || null,
   });
 }
@@ -9949,6 +9984,12 @@ async function sendUiStateSetResponse(req, res, scopeRaw) {
 
   if (patchProvided) {
     const current = await getUiStateValues(scope);
+    if (!current) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Kon UI state patch niet laden zonder geldige Supabase-opslag.',
+      });
+    }
     const currentValues = current && current.values && typeof current.values === 'object' ? current.values : {};
     const patchValues = sanitizeUiStateValues(req.body.patch);
     valuesToSave = { ...currentValues, ...patchValues };
@@ -9961,14 +10002,17 @@ async function sendUiStateSetResponse(req, res, scopeRaw) {
     actor: normalizeString(req.body?.actor || ''),
   });
   if (!state) {
-    return res.status(500).json({ ok: false, error: 'Kon UI state niet opslaan' });
+    return res.status(503).json({
+      ok: false,
+      error: 'Kon UI state niet opslaan zonder geldige Supabase-opslag.',
+    });
   }
 
   return res.status(200).json({
     ok: true,
     scope,
     values: state.values || {},
-    source: state.source || 'memory',
+    source: state.source || 'supabase',
     updatedAt: state.updatedAt || null,
   });
 }
@@ -10307,27 +10351,6 @@ function sanitizeLaunchDomainName(value) {
   return raw;
 }
 
-async function ensureDirectoryExists(dirPath) {
-  await fs.promises.mkdir(dirPath, { recursive: true });
-}
-
-async function makeUniqueProjectDirectory(baseDir, preferredName) {
-  await ensureDirectoryExists(baseDir);
-  const base = slugifyAutomationText(preferredName || 'project', 'project');
-  for (let i = 0; i < 9999; i += 1) {
-    const suffix = i === 0 ? '' : `-${i + 1}`;
-    const candidate = path.join(baseDir, `${base}${suffix}`);
-    try {
-      await fs.promises.mkdir(candidate, { recursive: false });
-      return candidate;
-    } catch (error) {
-      if (String(error?.code || '') === 'EEXIST') continue;
-      throw error;
-    }
-  }
-  throw new Error('Kon geen unieke projectmap aanmaken.');
-}
-
 async function runCommandWithOutput(command, args = [], options = {}) {
   const cwd = options.cwd || process.cwd();
   const timeoutMs = Math.max(1_000, Math.min(900_000, Number(options.timeoutMs || 300_000)));
@@ -10629,191 +10652,198 @@ async function runActiveOrderLaunchPipeline(input = {}) {
     ? slugifyAutomationText(domainName.replace(/\.[^.]+$/, ''), 'project')
     : slugifyAutomationText(`${company}-${title}`, 'project');
   const projectFolderLabel = orderId ? `${projectBase}-${orderId}` : `${projectBase}-${Date.now()}`;
-  const projectDir = await makeUniqueProjectDirectory(
-    ACTIVE_ORDER_AUTOMATION_OUTPUT_ROOT,
-    projectFolderLabel
+  const projectDir = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), `${slugifyAutomationText(projectFolderLabel, 'softora-case')}-`)
   );
-  outputs.localDir = projectDir;
 
-  const meta = {
-    orderId,
-    company,
-    title,
-    description,
-    deliveryTime,
-    domainName: domainName || null,
-    generatedAt: startedAt
-  };
-  await fs.promises.writeFile(path.join(projectDir, 'index.html'), html, 'utf8');
-  await fs.promises.writeFile(path.join(projectDir, 'softora-case.json'), JSON.stringify(meta, null, 2), 'utf8');
-  await fs.promises.writeFile(
-    path.join(projectDir, 'README.md'),
-    [
-      `# ${title}`,
-      '',
-      `- Bedrijf: ${company}`,
-      `- Order: ${orderId || 'n/a'}`,
-      domainName ? `- Domein: ${domainName}` : '- Domein: niet opgegeven',
-      `- Gegenereerd: ${startedAt}`,
-      '',
-      'Deze map is automatisch aangemaakt door Softora Active Order Automation.'
-    ].join('\n'),
-    'utf8'
-  );
   steps.push({
-    id: 'local_files',
-    label: 'Lokale projectmap',
+    id: 'temporary_workspace',
+    label: 'Tijdelijke build-workspace',
     status: 'ok',
-    message: `Bestanden opgeslagen in ${projectDir}`
+    message: 'Tijdelijke workspace klaargezet voor deploy.'
   });
 
-  const repoName = `${ACTIVE_ORDER_AUTOMATION_GITHUB_REPO_PREFIX}${projectBase}${orderId ? `-${orderId}` : ''}`.slice(0, 95);
-  const repoInfo = await ensureGitHubRepository(ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER, repoName);
-  await upsertGitHubFile(
-    repoInfo.owner,
-    repoInfo.repo,
-    'index.html',
-    html,
-    `Publish case ${orderId || ''}`.trim()
-  );
-  await upsertGitHubFile(
-    repoInfo.owner,
-    repoInfo.repo,
-    'softora-case.json',
-    JSON.stringify(meta, null, 2),
-    `Update case metadata ${orderId || ''}`.trim()
-  );
-  await upsertGitHubFile(
-    repoInfo.owner,
-    repoInfo.repo,
-    'README.md',
-    [
-      `# ${title}`,
-      '',
-      `Automatisch gepubliceerd vanuit Softora Active Opdrachten.`,
-      '',
-      `- Bedrijf: ${company}`,
-      `- Order ID: ${orderId || 'n/a'}`,
-      domainName ? `- Domein: ${domainName}` : '- Domein: niet opgegeven',
-      `- Laatste update: ${new Date().toISOString()}`
-    ].join('\n'),
-    `Update README ${orderId || ''}`.trim()
-  );
-  outputs.githubRepoUrl = repoInfo.htmlUrl;
-  steps.push({
-    id: 'github',
-    label: 'GitHub push',
-    status: 'ok',
-    message: repoInfo.created
-      ? `Repo aangemaakt + bestanden gepusht (${repoInfo.htmlUrl})`
-      : `Bestanden gepusht (${repoInfo.htmlUrl})`
-  });
+  try {
+    const meta = {
+      orderId,
+      company,
+      title,
+      description,
+      deliveryTime,
+      domainName: domainName || null,
+      generatedAt: startedAt
+    };
+    await fs.promises.writeFile(path.join(projectDir, 'index.html'), html, 'utf8');
+    await fs.promises.writeFile(path.join(projectDir, 'softora-case.json'), JSON.stringify(meta, null, 2), 'utf8');
+    await fs.promises.writeFile(
+      path.join(projectDir, 'README.md'),
+      [
+        `# ${title}`,
+        '',
+        `- Bedrijf: ${company}`,
+        `- Order: ${orderId || 'n/a'}`,
+        domainName ? `- Domein: ${domainName}` : '- Domein: niet opgegeven',
+        `- Gegenereerd: ${startedAt}`,
+        '',
+        'Deze tijdelijke workspace is automatisch aangemaakt door Softora Active Order Automation.'
+      ].join('\n'),
+      'utf8'
+    );
 
-  const vercelArgs = [
-    '--yes',
-    'vercel',
-    'deploy',
-    projectDir,
-    '--prod',
-    '--yes',
-    '--token',
-    ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN
-  ];
-  if (ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE) {
-    vercelArgs.push('--scope', ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE);
-  }
-  const vercelResult = await runCommandWithOutput('npx', vercelArgs, {
-    cwd: projectDir,
-    timeoutMs: 600000,
-    env: {
-      HOME: process.env.HOME || os.homedir()
-    }
-  });
-  const deploymentUrl = parseFirstVercelUrl(`${vercelResult.stdout}\n${vercelResult.stderr}`);
-  if (!deploymentUrl) {
-    throw new Error('Vercel deploy uitgevoerd, maar deployment URL niet gevonden in output.');
-  }
-  outputs.deploymentUrl = deploymentUrl;
-  steps.push({
-    id: 'vercel',
-    label: 'Vercel deploy',
-    status: 'ok',
-    message: deploymentUrl
-  });
+    const repoName = `${ACTIVE_ORDER_AUTOMATION_GITHUB_REPO_PREFIX}${projectBase}${orderId ? `-${orderId}` : ''}`.slice(0, 95);
+    const repoInfo = await ensureGitHubRepository(ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER, repoName);
+    await upsertGitHubFile(
+      repoInfo.owner,
+      repoInfo.repo,
+      'index.html',
+      html,
+      `Publish case ${orderId || ''}`.trim()
+    );
+    await upsertGitHubFile(
+      repoInfo.owner,
+      repoInfo.repo,
+      'softora-case.json',
+      JSON.stringify(meta, null, 2),
+      `Update case metadata ${orderId || ''}`.trim()
+    );
+    await upsertGitHubFile(
+      repoInfo.owner,
+      repoInfo.repo,
+      'README.md',
+      [
+        `# ${title}`,
+        '',
+        `Automatisch gepubliceerd vanuit Softora Active Opdrachten.`,
+        '',
+        `- Bedrijf: ${company}`,
+        `- Order ID: ${orderId || 'n/a'}`,
+        domainName ? `- Domein: ${domainName}` : '- Domein: niet opgegeven',
+        `- Laatste update: ${new Date().toISOString()}`
+      ].join('\n'),
+      `Update README ${orderId || ''}`.trim()
+    );
+    outputs.githubRepoUrl = repoInfo.htmlUrl;
+    steps.push({
+      id: 'github',
+      label: 'GitHub push',
+      status: 'ok',
+      message: repoInfo.created
+        ? `Repo aangemaakt + bestanden gepusht (${repoInfo.htmlUrl})`
+        : `Bestanden gepusht (${repoInfo.htmlUrl})`
+    });
 
-  if (domainName) {
-    const stratoResult = await runStratoAutomationHook({
-      domainName,
+    const vercelArgs = [
+      '--yes',
+      'vercel',
+      'deploy',
       projectDir,
-      deploymentUrl
+      '--prod',
+      '--yes',
+      '--token',
+      ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN
+    ];
+    if (ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE) {
+      vercelArgs.push('--scope', ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE);
+    }
+    const vercelResult = await runCommandWithOutput('npx', vercelArgs, {
+      cwd: projectDir,
+      timeoutMs: 600000,
+      env: {
+        HOME: process.env.HOME || os.homedir()
+      }
     });
-    outputs.domainStatus = stratoResult.status;
-    outputs.domainMessage = stratoResult.message || '';
+    const deploymentUrl = parseFirstVercelUrl(`${vercelResult.stdout}\n${vercelResult.stderr}`);
+    if (!deploymentUrl) {
+      throw new Error('Vercel deploy uitgevoerd, maar deployment URL niet gevonden in output.');
+    }
+    outputs.deploymentUrl = deploymentUrl;
     steps.push({
-      id: 'strato',
-      label: 'Strato domein',
-      status: stratoResult.status === 'ok' ? 'ok' : 'skipped',
-      message: stratoResult.message || (stratoResult.status === 'ok' ? 'Domeinstap gereed.' : 'Overgeslagen.')
+      id: 'vercel',
+      label: 'Vercel deploy',
+      status: 'ok',
+      message: deploymentUrl
     });
 
-    try {
-      const aliasArgs = [
-        '--yes',
-        'vercel',
-        'alias',
-        'set',
-        deploymentUrl,
+    if (domainName) {
+      const stratoResult = await runStratoAutomationHook({
         domainName,
-        '--token',
-        ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN
-      ];
-      if (ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE) {
-        aliasArgs.push('--scope', ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE);
-      }
-      await runCommandWithOutput('npx', aliasArgs, {
-        cwd: projectDir,
-        timeoutMs: 180000,
-        env: {
-          HOME: process.env.HOME || os.homedir()
+        projectDir,
+        deploymentUrl
+      });
+      outputs.domainStatus = stratoResult.status;
+      outputs.domainMessage = stratoResult.message || '';
+      steps.push({
+        id: 'strato',
+        label: 'Strato domein',
+        status: stratoResult.status === 'ok' ? 'ok' : 'skipped',
+        message: stratoResult.message || (stratoResult.status === 'ok' ? 'Domeinstap gereed.' : 'Overgeslagen.')
+      });
+
+      try {
+        const aliasArgs = [
+          '--yes',
+          'vercel',
+          'alias',
+          'set',
+          deploymentUrl,
+          domainName,
+          '--token',
+          ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN
+        ];
+        if (ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE) {
+          aliasArgs.push('--scope', ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE);
         }
-      });
-      outputs.domainStatus = 'ok';
-      outputs.domainMessage = `Domein alias gezet op ${domainName}`;
+        await runCommandWithOutput('npx', aliasArgs, {
+          cwd: projectDir,
+          timeoutMs: 180000,
+          env: {
+            HOME: process.env.HOME || os.homedir()
+          }
+        });
+        outputs.domainStatus = 'ok';
+        outputs.domainMessage = `Domein alias gezet op ${domainName}`;
+        steps.push({
+          id: 'vercel_domain_alias',
+          label: 'Vercel domein alias',
+          status: 'ok',
+          message: domainName
+        });
+      } catch (error) {
+        const message = truncateText(normalizeString(error?.stderr || error?.message || ''), 220) || 'Alias mislukt.';
+        outputs.domainStatus = outputs.domainStatus || 'pending';
+        outputs.domainMessage = outputs.domainMessage || message;
+        steps.push({
+          id: 'vercel_domain_alias',
+          label: 'Vercel domein alias',
+          status: 'skipped',
+          message
+        });
+      }
+    } else {
+      outputs.domainStatus = 'skipped';
+      outputs.domainMessage = 'Geen domein opgegeven.';
       steps.push({
-        id: 'vercel_domain_alias',
-        label: 'Vercel domein alias',
-        status: 'ok',
-        message: domainName
-      });
-    } catch (error) {
-      const message = truncateText(normalizeString(error?.stderr || error?.message || ''), 220) || 'Alias mislukt.';
-      outputs.domainStatus = outputs.domainStatus || 'pending';
-      outputs.domainMessage = outputs.domainMessage || message;
-      steps.push({
-        id: 'vercel_domain_alias',
-        label: 'Vercel domein alias',
+        id: 'strato',
+        label: 'Strato domein',
         status: 'skipped',
-        message
+        message: 'Geen domein opgegeven; stap overgeslagen.'
       });
     }
-  } else {
-    outputs.domainStatus = 'skipped';
-    outputs.domainMessage = 'Geen domein opgegeven.';
-    steps.push({
-      id: 'strato',
-      label: 'Strato domein',
-      status: 'skipped',
-      message: 'Geen domein opgegeven; stap overgeslagen.'
-    });
-  }
 
-  return {
-    ok: true,
-    startedAt,
-    finishedAt: new Date().toISOString(),
-    outputs,
-    steps
-  };
+    return {
+      ok: true,
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      outputs,
+      steps
+    };
+  } finally {
+    try {
+      await fs.promises.rm(projectDir, { recursive: true, force: true });
+    } catch (cleanupError) {
+      console.error('[ActiveOrderAutomation][CleanupError]', cleanupError?.message || cleanupError);
+    }
+  }
 }
 
 function buildPostCallPayload(body = {}) {
@@ -12045,16 +12075,6 @@ app.use(
     },
   })
 );
-app.use(
-  '/output',
-  express.static(path.join(__dirname, 'output'), {
-    maxAge: '1h',
-    setHeaders(res) {
-      res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
-    },
-  })
-);
-
 app.get('/', async (req, res, next) => {
   return sendSeoManagedHtmlPageResponse(req, res, next, 'premium-website.html');
 });

@@ -17,7 +17,6 @@
                 var storageKey = isPremiumPersonnel
                     ? "softora_premium_personnel_theme_mode"
                     : "softora_software_personnel_theme_mode";
-                localStorage.setItem(storageKey, "light");
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
             } catch (error) {
@@ -1601,11 +1600,7 @@
         }
 
         function loadDashboardPeriodFilter() {
-            try {
-                return normalizeDashboardPeriodFilter(localStorage.getItem(PREMIUM_DASHBOARD_PERIOD_KEY));
-            } catch (_) {
-                return 'all';
-            }
+            return 'all';
         }
 
         function getDashboardPeriodLabel(value) {
@@ -1642,11 +1637,6 @@
 
         function applyDashboardPeriodFilter(value) {
             dashboardPeriodFilter = normalizeDashboardPeriodFilter(value);
-            try {
-                localStorage.setItem(PREMIUM_DASHBOARD_PERIOD_KEY, dashboardPeriodFilter);
-            } catch (_) {
-                /* ignore storage errors */
-            }
             syncDashboardPeriodUi();
             renderPremiumDashboardOrders();
         }
@@ -1814,14 +1804,6 @@
                         };
                     })
                     .filter((customer) => customer.id);
-            } catch (_) {
-                return [];
-            }
-        }
-
-        function readPremiumCustomersFromLocal() {
-            try {
-                return parsePremiumCustomers(localStorage.getItem(PREMIUM_CUSTOMERS_LOCAL_KEY));
             } catch (_) {
                 return [];
             }
@@ -2182,10 +2164,10 @@
                 const data = await fetchPremiumUiState(PREMIUM_CUSTOMERS_SCOPE);
                 const values = data?.ok && data?.values && typeof data.values === 'object' ? data.values : {};
                 const customers = parsePremiumCustomers(values[PREMIUM_CUSTOMERS_KEY]);
-                premiumDashboardState.customers = customers.length ? customers : readPremiumCustomersFromLocal();
+                premiumDashboardState.customers = customers;
                 return true;
             } catch (_) {
-                premiumDashboardState.customers = readPremiumCustomersFromLocal();
+                premiumDashboardState.customers = [];
                 return false;
             }
         }
@@ -2694,20 +2676,11 @@
             }
 
             function readStoredMessages() {
-                try {
-                    const parsed = JSON.parse(String(sessionStorage.getItem(CHAT_STORAGE_KEY) || '[]'));
-                    return normalizeStoredMessages(parsed);
-                } catch (_) {
-                    return [];
-                }
+                return [];
             }
 
             function writeStoredMessages() {
-                try {
-                    sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(state.messages.slice(-MAX_MESSAGES)));
-                } catch (_) {
-                    /* ignore storage errors */
-                }
+                return;
             }
 
             function formatStatus(text, tone) {

@@ -462,7 +462,7 @@
 <body data-preview-mode="fallback">
   <div class="card" id="fallback">
     <h1>Preview niet gevonden</h1>
-    <p>Deze preview staat (nog) niet lokaal opgeslagen. Ga terug naar Actieve Opdrachten en voer de opdracht opnieuw uit.</p>
+    <p>Deze preview staat nog niet in Supabase opgeslagen. Ga terug naar Actieve Opdrachten en voer de opdracht opnieuw uit.</p>
     <a href="/premium-actieve-opdrachten">Terug naar Actieve Opdrachten</a>
   </div>
 
@@ -1194,7 +1194,13 @@
           const html = String(result && result.html || '');
           if (!html) throw new Error('AI gaf geen HTML terug.');
 
-          localStorage.setItem(getPreviewStorageKey(id), html);
+          await fetchUiStateSetWithFallback(REMOTE_UI_STATE_SCOPE, {
+            patch: {
+              [getPreviewStorageKey(id)]: html
+            },
+            source: 'premium-opdracht-preview',
+            actor: 'browser'
+          });
           await persistVariantMetadata(values, order, result, prompt);
 
           state.hideOverlayOnNextReady = true;
@@ -1223,36 +1229,30 @@
         }
       }
 
-      function loadStoredPreview() {
-        let html = null;
+      async function loadStoredPreview() {
+        if (!id) return '';
         try {
-          html = localStorage.getItem(getPreviewStorageKey(id));
-          if (!html) html = localStorage.getItem(PREVIEW_HTML_PREFIX_OLD + id);
+          const state = await fetchUiStateGetWithFallback(REMOTE_UI_STATE_SCOPE);
+          return String(state?.values?.[getPreviewStorageKey(id)] || '');
         } catch (_) {
-          html = null;
+          return '';
         }
-        return html;
       }
 
-      window.addEventListener('storage', function (event) {
-        if (!id) return;
-        if (event.key !== getPreviewStorageKey(id) && event.key !== PREVIEW_HTML_PREFIX_OLD + id) return;
-        if (!event.newValue || event.newValue === state.currentHtml) return;
-        renderPreview(event.newValue);
-      });
+      void (async function bootstrapStoredPreview() {
+        if (!id) {
+          markPreviewReady();
+          return;
+        }
 
-      if (!id) {
-        markPreviewReady();
-        return;
-      }
+        const html = await loadStoredPreview();
+        if (!html) {
+          markPreviewReady();
+          return;
+        }
 
-      const html = loadStoredPreview();
-      if (!html) {
-        markPreviewReady();
-        return;
-      }
-
-      renderPreview(html);
+        renderPreview(html);
+      })();
     })();
   </script>
 </body>

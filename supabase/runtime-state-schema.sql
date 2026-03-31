@@ -9,4 +9,4 @@ create index if not exists idx_softora_runtime_state_updated_at
   on public.softora_runtime_state (updated_at desc);
 
 comment on table public.softora_runtime_state is
-  'Snapshot-opslag voor Softora runtime state (call updates, AI insights, agenda-afspraken en taken).';
+  'Centrale Supabase-opslag voor Softora runtime state, UI-state en premium auth state.';

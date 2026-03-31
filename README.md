@@ -57,9 +57,6 @@ Zet deze aan als je bij `Voer opdracht uit` direct alles wilt laten lopen:
 ```env
 ACTIVE_ORDER_AUTOMATION_ENABLED=true
 
-# Lokale outputmap op de machine waar server.js draait
-ACTIVE_ORDER_AUTOMATION_OUTPUT_ROOT=/absolute/pad/naar/output/generated-sites
-
 # GitHub
 ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN=ghp_xxx
 ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER=Serve63
@@ -122,5 +119,5 @@ De backend ondersteunt zowel:
 ## Notities
 
 - De `Start Campagne` knop in de dashboardpagina gebruikt `assets/coldcalling-dashboard.js`.
-- Calls en call-updates worden in runtime state opgeslagen; optioneel via Supabase persist gemaakt.
+- Calls en call-updates worden in de centrale Supabase runtime state opgeslagen.
 - Voor productie: zet secrets alleen in je host-omgeving (niet in frontend of publieke repo).

@@ -14,7 +14,6 @@
             document.documentElement.setAttribute('data-personnel-loading', 'true');
             try {
                 var storageKey = 'softora_premium_personnel_theme_mode';
-                localStorage.setItem(storageKey, 'light');
                 document.documentElement.setAttribute('data-theme-mode', 'light');
                 document.documentElement.setAttribute('data-theme', 'light');
             } catch (error) {
@@ -2007,35 +2006,11 @@
             }
 
             function loadCachedLeads() {
-                try {
-                    const raw = window.localStorage.getItem(LEADS_CACHE_KEY);
-                    if (!raw) return { leads: [], savedAt: 0 };
-                    const parsed = JSON.parse(raw);
-                    const savedAt = Number(parsed?.savedAt) || 0;
-                    if (!savedAt || Date.now() - savedAt > LEADS_CACHE_MAX_AGE_MS) {
-                        return { leads: [], savedAt: 0 };
-                    }
-                    const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
-                    const normalized = dedupe(rows.map((item) => normalizeLeadRow(item))).sort(sortByDateDesc);
-                    return { leads: normalized, savedAt };
-                } catch (_) {
-                    return { leads: [], savedAt: 0 };
-                }
+                return { leads: [], savedAt: 0 };
             }
 
             function persistCachedLeads(rows) {
-                if (!Array.isArray(rows)) return;
-                try {
-                    window.localStorage.setItem(
-                        LEADS_CACHE_KEY,
-                        JSON.stringify({
-                            savedAt: Date.now(),
-                            rows: rows.slice(0, 400),
-                        })
-                    );
-                } catch (_) {
-                    // localStorage kan uitstaan; dan slaan we deze stap over.
-                }
+                return;
             }
 
             async function fetchTasksJson(url, timeoutMs) {

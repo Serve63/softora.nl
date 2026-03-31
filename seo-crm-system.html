@@ -17,7 +17,6 @@
                 var storageKey = isPremiumPersonnel
                     ? "softora_premium_personnel_theme_mode"
                     : "softora_software_personnel_theme_mode";
-                localStorage.setItem(storageKey, "light");
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
             } catch (error) {
@@ -1497,12 +1496,14 @@
             try { return JSON.parse(value); } catch { return fallback; }
         }
 
+        const transientStore = Object.create(null);
+
         function loadStore(key, fallback) {
-            return safeJsonParse(localStorage.getItem(key) || '', fallback);
+            return safeJsonParse(transientStore[key] || '', fallback);
         }
 
         function saveStore(key, value) {
-            localStorage.setItem(key, JSON.stringify(value));
+            transientStore[key] = JSON.stringify(value);
         }
 
         function downloadText(filename, text, type = 'application/json') {
@@ -2733,9 +2734,9 @@
         });
 
         document.getElementById('resetAllBtn').addEventListener('click', () => {
-            localStorage.removeItem(STORAGE_KEYS.images);
-            localStorage.removeItem(STORAGE_KEYS.blogs);
-            localStorage.removeItem(STORAGE_KEYS.kb);
+            delete transientStore[STORAGE_KEYS.images];
+            delete transientStore[STORAGE_KEYS.blogs];
+            delete transientStore[STORAGE_KEYS.kb];
             window.location.reload();
         });
 

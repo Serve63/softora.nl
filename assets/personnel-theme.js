@@ -6,7 +6,7 @@
         : "softora_software_personnel_theme_mode";
     const publicStorageKey = "softora_premium_public_theme_mode";
     const publicFallbackStorageKey = "softora_public_theme_mode";
-    const sidebarCountCacheStorageKey = "softora_sidebar_count_cache_v1";
+    const sidebarCountCacheKey = "softora_sidebar_count_cache_v1";
     const root = document.documentElement;
     const themeButtons = document.querySelectorAll(".theme-switch-btn[data-theme-value]");
     let premiumSessionSnapshot = null;
@@ -957,29 +957,12 @@
     }
 
     function readSidebarCountCache() {
-        try {
-            const raw = localStorage.getItem(sidebarCountCacheStorageKey);
-            if (!raw) return {};
-            const parsed = JSON.parse(raw);
-            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-            return parsed;
-        } catch (error) {
-            return {};
-        }
+        void sidebarCountCacheKey;
+        return {};
     }
 
     function writeSidebarCountCache(countKey, count) {
-        if (!Number.isFinite(count) || count < 0) return;
-        try {
-            const cache = readSidebarCountCache();
-            cache[String(countKey || "").trim()] = {
-                count: Math.max(0, Math.floor(count)),
-                updatedAt: new Date().toISOString(),
-            };
-            localStorage.setItem(sidebarCountCacheStorageKey, JSON.stringify(cache));
-        } catch (error) {
-            /* ignore storage errors */
-        }
+        return;
     }
 
     function readCachedSidebarCount(countKey) {
@@ -1169,26 +1152,7 @@
             return;
         }
 
-        let localValues = null;
-        try {
-            localValues = {
-                softora_custom_orders_premium_v1: localStorage.getItem("softora_custom_orders_premium_v1"),
-                softora_order_runtime_premium_v1: localStorage.getItem("softora_order_runtime_premium_v1"),
-            };
-        } catch (error) {
-            localValues = null;
-        }
-
-        if (!localValues) {
-            paintSidebarCount("active_orders", null);
-            return;
-        }
-
-        const total = getActiveOrdersCountFromUiValues(localValues);
-        paintSidebarCount("active_orders", total, {
-            singular: "actieve opdracht",
-            plural: "actieve opdrachten",
-        });
+        paintSidebarCount("active_orders", null);
     }
 
     async function refreshSidebarNotificationCounts() {
@@ -1213,21 +1177,6 @@
     function forceLightTheme() {
         root.setAttribute("data-theme-mode", "light");
         root.setAttribute("data-theme", "light");
-
-        try {
-            localStorage.setItem(personnelStorageKey, "light");
-        } catch (error) {
-            /* ignore storage errors */
-        }
-
-        if (isPremiumPersonnelContext) {
-            try {
-                localStorage.setItem(publicStorageKey, "light");
-                localStorage.setItem(publicFallbackStorageKey, "light");
-            } catch (error) {
-                /* ignore storage errors */
-            }
-        }
     }
 
     function syncThemeButtonsToLight() {

@@ -17,7 +17,6 @@
                 var storageKey = isPremiumPersonnel
                     ? "softora_premium_personnel_theme_mode"
                     : "softora_software_personnel_theme_mode";
-                localStorage.setItem(storageKey, "light");
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
             } catch (error) {
@@ -1163,8 +1162,6 @@
     </div>
     <script>
         const PREVIEW_HTML_PREFIX = 'softora_preview_html_software_v4_';
-        const ORDER_STATE_KEY = 'softora_order_state_software_v1';
-        const BUILD_MODE_KEY = 'softora_build_mode_software_v1';
 
         const orders = {
             1: { name: 'Kapsalon Mooi', type: 'Kapper Website', logs: [], progressPct: 0, previewHtml: null, artifact: null, updatedAt: null },
@@ -1208,28 +1205,19 @@
         ];
 
         let currentModalId = null;
-        let buildMode = loadBuildMode();
+        let buildMode = 'premium';
+        let lastSelectedOrderId = null;
 
         function getTime() {
             return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
         function loadBuildMode() {
-            try {
-                const v = localStorage.getItem(BUILD_MODE_KEY);
-                if (v === 'quick' || v === 'premium') return v;
-                return 'premium';
-            } catch (_) {
-                return 'premium';
-            }
+            return 'premium';
         }
 
         function saveBuildMode(mode) {
-            try {
-                localStorage.setItem(BUILD_MODE_KEY, mode);
-            } catch (_) {
-                // ignore
-            }
+            return;
         }
 
         function getBuildSteps() {
@@ -1369,29 +1357,12 @@
         }
 
         function setLastActiveOrder(orderId) {
-            try {
-                localStorage.setItem(ORDER_STATE_KEY, JSON.stringify({
-                    lastOrderId: String(orderId),
-                    updatedAt: new Date().toISOString()
-                }));
-            } catch (_) {
-                // ignore
-            }
+            lastSelectedOrderId = Number(orderId) || null;
         }
 
         function selectActiveOrderId(explicitId) {
             if (explicitId && orders[explicitId]) return Number(explicitId);
-
-            try {
-                const raw = localStorage.getItem(ORDER_STATE_KEY);
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    const lastId = Number(parsed?.lastOrderId);
-                    if (lastId && orders[lastId]) return lastId;
-                }
-            } catch (_) {
-                // ignore
-            }
+            if (lastSelectedOrderId && orders[lastSelectedOrderId]) return lastSelectedOrderId;
 
             const byUpdated = Object.entries(orders)
                 .map(([id, o]) => ({ id: Number(id), ts: Number(o.updatedAt || 0) }))
