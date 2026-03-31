@@ -41,6 +41,26 @@
       "maxDuration": 800
     }
   },
+  "headers": [
+    {
+      "source": "/assets/personnel-theme.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/assets/personnel-theme.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/agenda/confirmation-tasks/:taskId",
