@@ -958,6 +958,134 @@
         return Array.from(map.values());
     }
 
+    function normalizeLeadPhoneDigitsForCount(value) {
+        return String(value || "").replace(/\D/g, "");
+    }
+
+    function buildLeadMatchKeyForCount(item) {
+        const phoneKey = normalizeLeadPhoneDigitsForCount(item && item.phone);
+        if (phoneKey) return `phone:${phoneKey}`;
+        const companyKey = normalizeLeadFieldForCount(item && item.company);
+        const contactKey = normalizeLeadFieldForCount(item && item.contact);
+        if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
+        return "";
+    }
+
+    function buildLeadInterestSignalTextForCount(update, insight) {
+        return normalizeLeadFieldForCount(
+            [
+                update && update.summary,
+                update && update.transcriptSnippet,
+                update && update.transcriptFull,
+                update && update.status,
+                update && update.endedReason,
+                insight && insight.summary,
+                insight && insight.followUpReason,
+            ]
+                .filter(Boolean)
+                .join(" ")
+        );
+    }
+
+    function hasNegativeInterestSignalForCount(text) {
+        return /(geen duidelijke interesse|geen interesse|niet geinteresseerd|niet geïnteresseerd|geen behoefte|niet relevant|niet passend|niet meer bellen|bel( me)? niet|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst)/.test(
+            normalizeLeadFieldForCount(text)
+        );
+    }
+
+    function hasPositiveInterestSignalForCount(text) {
+        return /(wel interesse|geinteresseerd|geïnteresseerd|interesse|afspraak|demo|offerte|stuur (de )?(mail|info)|mail .* (offerte|informatie)|terugbellen|callback|terugbel)/.test(
+            normalizeLeadFieldForCount(text)
+        );
+    }
+
+    function isInterestedLeadCandidateForCount(update, insight) {
+        const direction = normalizeLeadFieldForCount(update && update.direction);
+        const messageType = normalizeLeadFieldForCount(update && update.messageType);
+        if (direction.indexOf("inbound") >= 0 || /twilio\.inbound\./.test(messageType)) return false;
+
+        const statusText = normalizeLeadFieldForCount(
+            `${(update && update.status) || ""} ${(update && update.endedReason) || ""}`
+        );
+        if (
+            /(not[_ -]?connected|no[_ -]?answer|unanswered|failed|dial[_ -]?failed|busy|voicemail|initiated|queued|ringing|cancelled|canceled|rejected|error)/.test(
+                statusText
+            )
+        ) {
+            return false;
+        }
+
+        const signalText = buildLeadInterestSignalTextForCount(update, insight);
+        if (!signalText || hasNegativeInterestSignalForCount(signalText)) return false;
+        if (
+            Boolean(
+                (insight && (insight.appointmentBooked || insight.appointment_booked)) ||
+                    (insight && (insight.followUpRequired || insight.follow_up_required))
+            )
+        ) {
+            return true;
+        }
+        return hasPositiveInterestSignalForCount(signalText);
+    }
+
+    function buildInterestedLeadRowsForCount(callUpdates, insights, existingRows) {
+        const existingKeys = new Set(
+            dedupeLeadRowsForCount(existingRows).map(buildLeadMatchKeyForCount).filter(Boolean)
+        );
+        const seenKeys = new Set();
+        const seenCallIds = new Set();
+        const insightByCallId = new Map();
+        const insightByPhoneKey = new Map();
+        const insightByCompanyKey = new Map();
+
+        (Array.isArray(insights) ? insights : []).forEach(function (insight) {
+            const callId = String((insight && insight.callId) || "").trim();
+            const phoneKey = normalizeLeadPhoneDigitsForCount(insight && insight.phone);
+            const companyKey = normalizeLeadFieldForCount(
+                (insight && (insight.company || insight.leadCompany)) || ""
+            );
+            if (callId && !insightByCallId.has(callId)) insightByCallId.set(callId, insight);
+            if (phoneKey && !insightByPhoneKey.has(phoneKey)) insightByPhoneKey.set(phoneKey, insight);
+            if (companyKey && !insightByCompanyKey.has(companyKey)) insightByCompanyKey.set(companyKey, insight);
+        });
+
+        const rows = [];
+        (Array.isArray(callUpdates) ? callUpdates : []).forEach(function (update) {
+            const callId = String((update && update.callId) || "").trim();
+            const phoneKey = normalizeLeadPhoneDigitsForCount(update && update.phone);
+            const companyKey = normalizeLeadFieldForCount((update && update.company) || "");
+            const insight =
+                insightByCallId.get(callId) ||
+                insightByPhoneKey.get(phoneKey) ||
+                insightByCompanyKey.get(companyKey) ||
+                null;
+            if (!isInterestedLeadCandidateForCount(update, insight)) return;
+
+            const row = normalizeLeadRowForCount({
+                company:
+                    String(
+                        (update && update.company) ||
+                            (insight && (insight.company || insight.leadCompany)) ||
+                            "Onbekende lead"
+                    ).trim() || "Onbekende lead",
+                contact: String(
+                    (update && update.name) || (insight && (insight.contactName || insight.leadName)) || ""
+                ).trim(),
+                phone: String((update && update.phone) || (insight && insight.phone) || "").trim(),
+            });
+            const matchKey = buildLeadMatchKeyForCount(row);
+            if (matchKey && existingKeys.has(matchKey)) return;
+            if (matchKey && seenKeys.has(matchKey)) return;
+            if (callId && seenCallIds.has(callId)) return;
+
+            if (matchKey) seenKeys.add(matchKey);
+            if (callId) seenCallIds.add(callId);
+            rows.push(row);
+        });
+
+        return rows;
+    }
+
     async function fetchJsonNoStore(url) {
         try {
             const response = await fetch(url, { cache: "no-store" });
@@ -1023,15 +1151,16 @@
         if (!badge) return;
         const cachedLeadCount = readCachedSidebarCount("leads");
 
-        const quickCountData = await fetchJsonNoStore("/api/agenda/confirmation-tasks?quick=1&countOnly=1");
-        const quickTotal = Number(quickCountData && quickCountData.count);
-        if (Number.isFinite(quickTotal) && quickTotal > 0) {
-            paintSidebarCount("leads", quickTotal, { singular: "open lead", plural: "open leads" });
-            return;
-        }
+        const responses = await Promise.all([
+            fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400"),
+            fetchJsonNoStore("/api/coldcalling/call-updates?limit=500"),
+            fetchJsonNoStore("/api/ai/call-insights?limit=500"),
+        ]);
+        const tasksData = responses[0];
+        const callUpdatesData = responses[1];
+        const insightsData = responses[2];
 
-        const tasksData = await fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400");
-        if (!tasksData) {
+        if (!tasksData && !callUpdatesData && !insightsData) {
             if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
                 paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
                 return;
@@ -1043,7 +1172,12 @@
         const pendingRows = Array.isArray(tasksData && tasksData.tasks)
             ? tasksData.tasks.map(normalizeLeadRowForCount)
             : [];
-        const total = dedupeLeadRowsForCount(pendingRows).length;
+        const interestedRows = buildInterestedLeadRowsForCount(
+            callUpdatesData && callUpdatesData.updates,
+            insightsData && insightsData.insights,
+            pendingRows
+        );
+        const total = dedupeLeadRowsForCount(pendingRows.concat(interestedRows)).length;
         paintSidebarCount("leads", total, { singular: "open lead", plural: "open leads" });
     }
 

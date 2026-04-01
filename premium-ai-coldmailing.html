@@ -8,7 +8,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-2">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
     <script>
         (function () {
             document.documentElement.setAttribute('data-personnel-loading', 'true');
@@ -21,7 +21,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260401-2" defer></script>
+    <script src="assets/personnel-theme.js?v=20260401-3" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -1886,8 +1886,8 @@
                     const leadTypeClass = leadTypeToClass(resolveLeadType(item));
                     const leadOrigin = esc(resolveLeadOrigin(item));
                     const leadProvider = esc(resolveLeadProvider(item));
-                    const chipClass = 'pending';
-                    const chipLabel = 'LEAD';
+                    const chipClass = normalize(item?.leadChipClass || '') === 'confirmed' ? 'confirmed' : 'pending';
+                    const chipLabel = esc(String(item?.leadChipLabel || 'LEAD').trim() || 'LEAD');
                     const taskId = Number(item.id) || 0;
                     const openAttrs = taskId
                         ? ` class="lead-item ${leadTypeClass} clickable" data-lead-open="${taskId}" role="button" tabindex="0"`
@@ -1929,6 +1929,7 @@
             function normalizeLeadRow(item) {
                 return {
                     id: Number(item?.id) || 0,
+                    callId: String(item?.callId || '').trim(),
                     company: String(item?.company || 'Onbekende lead').trim() || 'Onbekende lead',
                     contact: String(item?.contact || '').trim(),
                     phone: String(item?.phone || '').trim(),
@@ -1965,7 +1966,216 @@
                             item?.offer_type ||
                             ''
                     ).trim(),
+                    leadChipLabel: String(item?.leadChipLabel || '').trim(),
+                    leadChipClass: String(item?.leadChipClass || '').trim(),
                 };
+            }
+
+            function normalizePhoneDigits(value) {
+                return String(value || '').replace(/\D/g, '');
+            }
+
+            function buildLeadMatchKey(item) {
+                const phoneKey = normalizePhoneDigits(item?.phone || '');
+                if (phoneKey) return `phone:${phoneKey}`;
+                const companyKey = normalize(item?.company || '');
+                const contactKey = normalize(item?.contact || '');
+                if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
+                return '';
+            }
+
+            function buildCallInterestSignalText(update, insight) {
+                return normalize(
+                    [
+                        update?.summary,
+                        update?.transcriptSnippet,
+                        update?.transcriptFull,
+                        update?.status,
+                        update?.endedReason,
+                        insight?.summary,
+                        insight?.followUpReason,
+                    ]
+                        .filter(Boolean)
+                        .join(' ')
+                );
+            }
+
+            function hasNegativeInterestSignal(text) {
+                return /(geen duidelijke interesse|geen interesse|niet geinteresseerd|niet geïnteresseerd|geen behoefte|niet relevant|niet passend|niet meer bellen|bel( me)? niet|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst)/.test(
+                    normalize(text)
+                );
+            }
+
+            function hasPositiveInterestSignal(text) {
+                return /(wel interesse|geinteresseerd|geïnteresseerd|interesse|afspraak|demo|offerte|stuur (de )?(mail|info)|mail .* (offerte|informatie)|terugbellen|callback|terugbel)/.test(
+                    normalize(text)
+                );
+            }
+
+            function isInboundCall(update) {
+                const direction = normalize(update?.direction || '');
+                const messageType = normalize(update?.messageType || '');
+                return direction.includes('inbound') || /twilio\.inbound\./.test(messageType);
+            }
+
+            function isInterestedCall(update, insight) {
+                if (isInboundCall(update)) return false;
+                const statusText = normalize(`${update?.status || ''} ${update?.endedReason || ''}`);
+                if (
+                    /(not[_ -]?connected|no[_ -]?answer|unanswered|failed|dial[_ -]?failed|busy|voicemail|initiated|queued|ringing|cancelled|canceled|rejected|error)/.test(
+                        statusText
+                    )
+                ) {
+                    return false;
+                }
+
+                const signalText = buildCallInterestSignalText(update, insight);
+                if (!signalText || hasNegativeInterestSignal(signalText)) return false;
+                if (
+                    Boolean(
+                        insight?.appointmentBooked ||
+                            insight?.appointment_booked ||
+                            insight?.followUpRequired ||
+                            insight?.follow_up_required
+                    )
+                ) {
+                    return true;
+                }
+
+                return hasPositiveInterestSignal(signalText);
+            }
+
+            function toAmsterdamDateTimeParts(value) {
+                const raw = String(value || '').trim();
+                const timestamp = Date.parse(raw);
+                if (!Number.isFinite(timestamp)) return { date: '', time: '' };
+                const date = new Intl.DateTimeFormat('sv-SE', {
+                    timeZone: 'Europe/Amsterdam',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                }).format(new Date(timestamp));
+                const time = new Intl.DateTimeFormat('nl-NL', {
+                    timeZone: 'Europe/Amsterdam',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                }).format(new Date(timestamp));
+                return {
+                    date: String(date || '').trim(),
+                    time: normalizeTimeValue(time || ''),
+                };
+            }
+
+            function normalizeInterestedLeadRow(update, insight) {
+                const dateTime = toAmsterdamDateTimeParts(
+                    insight?.analyzedAt || update?.updatedAt || update?.endedAt || update?.startedAt || ''
+                );
+                return {
+                    id: 0,
+                    callId: String(update?.callId || insight?.callId || '').trim(),
+                    company:
+                        String(update?.company || insight?.company || insight?.leadCompany || 'Onbekende lead').trim() ||
+                        'Onbekende lead',
+                    contact: String(update?.name || insight?.contactName || insight?.leadName || '').trim(),
+                    phone: String(update?.phone || insight?.phone || '').trim(),
+                    date: dateTime.date,
+                    time: dateTime.time,
+                    source: 'Coldcalling interesse',
+                    summary: String(
+                        insight?.summary || update?.summary || update?.transcriptSnippet || insight?.followUpReason || ''
+                    ).trim(),
+                    location: '',
+                    whatsappInfo: String(insight?.followUpReason || '').trim(),
+                    recordingUrl: String(
+                        update?.recordingUrl ||
+                            update?.recording_url ||
+                            update?.recordingUrlProxy ||
+                            update?.audioUrl ||
+                            update?.audio_url ||
+                            ''
+                    ).trim(),
+                    provider: String(update?.provider || insight?.provider || '').trim().toLowerCase(),
+                    providerLabel: String(
+                        update?.stackLabel || insight?.coldcallingStackLabel || insight?.stackLabel || ''
+                    ).trim(),
+                    coldcallingStack: String(update?.stack || insight?.coldcallingStack || insight?.stack || '')
+                        .trim()
+                        .toLowerCase(),
+                    coldcallingStackLabel: String(
+                        update?.stackLabel || insight?.coldcallingStackLabel || insight?.stackLabel || ''
+                    ).trim(),
+                    leadType: String(
+                        insight?.businessMode ||
+                            insight?.business_mode ||
+                            insight?.serviceType ||
+                            insight?.service_type ||
+                            update?.businessMode ||
+                            update?.business_mode ||
+                            update?.serviceType ||
+                            update?.service_type ||
+                            ''
+                    ).trim(),
+                    leadChipLabel: 'INTERESSE',
+                    leadChipClass: 'confirmed',
+                };
+            }
+
+            async function fetchInterestedCallRows(existingRows) {
+                const responses = await Promise.allSettled([
+                    fetchTasksJson('/api/coldcalling/call-updates?limit=500', 8000),
+                    fetchTasksJson('/api/ai/call-insights?limit=500', 8000),
+                ]);
+                const updatesData = responses[0]?.status === 'fulfilled' ? responses[0].value : null;
+                const insightsData = responses[1]?.status === 'fulfilled' ? responses[1].value : null;
+                const updates = Array.isArray(updatesData?.updates) ? updatesData.updates : [];
+                const insights = Array.isArray(insightsData?.insights) ? insightsData.insights : [];
+                if (!updates.length && responses[0]?.status === 'rejected' && responses[1]?.status === 'rejected') {
+                    throw responses[0].reason || responses[1].reason || new Error('Interesse leads laden mislukt');
+                }
+
+                const existingKeys = new Set(
+                    (Array.isArray(existingRows) ? existingRows : []).map(buildLeadMatchKey).filter(Boolean)
+                );
+                const seenKeys = new Set();
+                const seenCallIds = new Set();
+                const insightByCallId = new Map();
+                const insightByPhoneKey = new Map();
+                const insightByCompanyKey = new Map();
+
+                insights.forEach((insight) => {
+                    const callId = String(insight?.callId || '').trim();
+                    const phoneKey = normalizePhoneDigits(insight?.phone || '');
+                    const companyKey = normalize(insight?.company || insight?.leadCompany || '');
+                    if (callId && !insightByCallId.has(callId)) insightByCallId.set(callId, insight);
+                    if (phoneKey && !insightByPhoneKey.has(phoneKey)) insightByPhoneKey.set(phoneKey, insight);
+                    if (companyKey && !insightByCompanyKey.has(companyKey)) insightByCompanyKey.set(companyKey, insight);
+                });
+
+                const rows = [];
+                updates.forEach((update) => {
+                    const callId = String(update?.callId || '').trim();
+                    const phoneKey = normalizePhoneDigits(update?.phone || '');
+                    const companyKey = normalize(update?.company || '');
+                    const insight =
+                        insightByCallId.get(callId) ||
+                        insightByPhoneKey.get(phoneKey) ||
+                        insightByCompanyKey.get(companyKey) ||
+                        null;
+                    if (!isInterestedCall(update, insight)) return;
+
+                    const row = normalizeInterestedLeadRow(update, insight);
+                    const matchKey = buildLeadMatchKey(row);
+                    if (matchKey && existingKeys.has(matchKey)) return;
+                    if (matchKey && seenKeys.has(matchKey)) return;
+                    if (callId && seenCallIds.has(callId)) return;
+
+                    if (matchKey) seenKeys.add(matchKey);
+                    if (callId) seenCallIds.add(callId);
+                    rows.push(row);
+                });
+
+                return rows.sort(sortByDateDesc);
             }
 
             function dedupe(rows) {
@@ -2047,19 +2257,34 @@
                     { url: '/api/agenda/confirmation-tasks?fast=1&limit=400', timeoutMs: 5000 },
                     { url: '/api/agenda/confirmation-tasks?limit=400', timeoutMs: 9000 },
                 ];
-                let lastError = null;
+                let taskError = null;
+                let pendingRows = [];
                 for (const endpoint of endpoints) {
                     try {
                         const tasksData = await fetchTasksJson(endpoint.url, endpoint.timeoutMs);
-                        const pendingRows = Array.isArray(tasksData?.tasks)
+                        pendingRows = Array.isArray(tasksData?.tasks)
                             ? tasksData.tasks.map((item) => normalizeLeadRow(item))
                             : [];
-                        return dedupe(pendingRows).sort(sortByDateDesc);
+                        break;
                     } catch (error) {
-                        lastError = error;
+                        taskError = error;
                     }
                 }
-                throw lastError || new Error('Leads laden mislukt');
+
+                let interestedRows = [];
+                let interestError = null;
+                try {
+                    interestedRows = await fetchInterestedCallRows(pendingRows);
+                } catch (error) {
+                    interestError = error;
+                }
+
+                const mergedRows = dedupe([].concat(pendingRows || [], interestedRows || [])).sort(sortByDateDesc);
+                if (mergedRows.length > 0 || (!taskError && !interestError)) {
+                    return mergedRows;
+                }
+
+                throw taskError || interestError || new Error('Leads laden mislukt');
             }
 
             async function loadLeads(options = {}) {
