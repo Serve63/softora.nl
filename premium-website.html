@@ -641,6 +641,9 @@
 
         .image-text-section {
             --content-overlap: clamp(70px, 8vw, 130px);
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
         }
 
         .image-text-frame {
@@ -652,13 +655,19 @@
             overflow: hidden;
             position: relative;
             isolation: isolate;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
         }
 
         .image-text-frame::after {
             content: '';
+            display: none;
             position: absolute;
             inset: 0;
-            border: none;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
             pointer-events: none;
             z-index: 4;
         }
@@ -668,6 +677,9 @@
             clip-path: polygon(0 0, 100% 0, 85% 100%, 0% 100%);
             overflow: hidden;
             z-index: 2;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
         }
 
         .image-side img {
@@ -682,6 +694,9 @@
             position: absolute;
             inset: 0;
             background: none;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
         }
 
         .content-side {
@@ -693,6 +708,9 @@
             color: white;
             position: relative;
             z-index: 1;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
         }
 
         .content-side::before {
@@ -704,6 +722,9 @@
             width: var(--content-overlap);
             background: var(--accent);
             pointer-events: none;
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
         }
 
         .content-side h2 {
