@@ -504,10 +504,11 @@
         }
 
         .tilt-card {
-            background: linear-gradient(135deg, var(--accent), var(--accent-light));
-            border: 1px solid var(--accent-dark);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-top: 3px solid var(--card-accent, var(--accent));
             border-radius: 0;
-            padding: 3rem;
+            padding: 2.6rem;
             position: relative;
             transform-style: preserve-3d;
             transform: perspective(1000px);
@@ -520,48 +521,44 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.16), transparent 60%);
+            background: linear-gradient(145deg, rgba(var(--card-accent-rgb, 139,34,82), 0.04) 0%, transparent 60%);
             opacity: 0;
-            transform: translateX(-100%);
-            transition: all 0.6s;
+            transition: opacity 0.4s;
+            pointer-events: none;
         }
 
         .tilt-card:hover::before {
             opacity: 1;
-            transform: translateX(100%);
         }
 
         .tilt-card:hover {
-            border-color: var(--accent-dark);
             transform: translateY(-5px);
-            box-shadow: 0 16px 34px rgba(15, 17, 28, 0.2), 0 0 40px rgba(139,34,82,0.22);
+            border-color: var(--card-accent, var(--accent));
+            box-shadow: 0 16px 34px rgba(15, 17, 28, 0.07), 0 0 0 1px var(--card-accent, var(--accent));
         }
 
         .card-number {
             font-family: 'Oswald', sans-serif;
-            font-size: 5rem;
+            font-size: 4.8rem;
             font-weight: 700;
-            color: rgba(255, 255, 255, 0.44);
-            opacity: 1;
+            color: rgba(var(--card-accent-rgb, 139,34,82), 0.13);
             line-height: 1;
-            margin-bottom: 1rem;
-            transition: all 0.3s;
+            margin-bottom: 0.8rem;
+            transition: color 0.3s;
         }
 
         .tilt-card:hover .card-number {
-            opacity: 1;
-            transform: scale(1.1);
-            text-shadow: 0 0 24px rgba(255, 255, 255, 0.2);
+            color: rgba(var(--card-accent-rgb, 139,34,82), 0.22);
         }
 
         .tilt-card h3 {
             margin-bottom: 1rem;
             font-size: 1.5rem;
-            color: #ffffff;
+            color: var(--text-primary);
         }
 
         .tilt-card p {
-            color: rgba(255, 255, 255, 0.92);
+            color: var(--text-secondary);
             line-height: 1.7;
             font-size: 0.95rem;
         }
@@ -1215,7 +1212,7 @@
             </div>
 
             <div class="grid-3">
-                <div class="tilt-card fade-up" data-tilt>
+                <div class="tilt-card fade-up" data-tilt style="--card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
                     <div class="card-content">
                         <div class="card-number">01</div>
                         <h3>Website</h3>
@@ -1223,7 +1220,7 @@
                     </div>
                 </div>
 
-                <div class="tilt-card fade-up" data-tilt style="transition-delay: 0.1s">
+                <div class="tilt-card fade-up" data-tilt style="transition-delay: 0.1s; --card-accent: #4A5FD7; --card-accent-rgb: 74,95,215;">
                     <div class="card-content">
                         <div class="card-number">02</div>
                         <h3>Bedrijfssoftware</h3>
@@ -1231,7 +1228,7 @@
                     </div>
                 </div>
 
-                <div class="tilt-card fade-up" data-tilt style="transition-delay: 0.2s">
+                <div class="tilt-card fade-up" data-tilt style="transition-delay: 0.2s; --card-accent: #1a7a5e; --card-accent-rgb: 26,122,94;">
                     <div class="card-content">
                         <div class="card-number">03</div>
                         <h3>Voicesoftware</h3>
