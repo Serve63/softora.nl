@@ -1153,14 +1153,12 @@
 
         const responses = await Promise.all([
             fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400"),
-            fetchJsonNoStore("/api/coldcalling/call-updates?limit=500"),
-            fetchJsonNoStore("/api/ai/call-insights?limit=500"),
+            fetchJsonNoStore("/api/agenda/interested-leads?countOnly=1&limit=500"),
         ]);
         const tasksData = responses[0];
-        const callUpdatesData = responses[1];
-        const insightsData = responses[2];
+        const interestedLeadsData = responses[1];
 
-        if (!tasksData && !callUpdatesData && !insightsData) {
+        if (!tasksData && !interestedLeadsData) {
             if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
                 paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
                 return;
@@ -1172,12 +1170,9 @@
         const pendingRows = Array.isArray(tasksData && tasksData.tasks)
             ? tasksData.tasks.map(normalizeLeadRowForCount)
             : [];
-        const interestedRows = buildInterestedLeadRowsForCount(
-            callUpdatesData && callUpdatesData.updates,
-            insightsData && insightsData.insights,
-            pendingRows
-        );
-        const total = dedupeLeadRowsForCount(pendingRows.concat(interestedRows)).length;
+        const pendingCount = dedupeLeadRowsForCount(pendingRows).length;
+        const interestedCount = Math.max(0, Math.floor(Number(interestedLeadsData && interestedLeadsData.count) || 0));
+        const total = pendingCount + interestedCount;
         paintSidebarCount("leads", total, { singular: "open lead", plural: "open leads" });
     }
 

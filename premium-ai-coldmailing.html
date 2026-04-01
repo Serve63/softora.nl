@@ -21,7 +21,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260401-3" defer></script>
+    <script src="assets/personnel-theme.js?v=20260401-4" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -2001,7 +2001,7 @@
             }
 
             function hasNegativeInterestSignal(text) {
-                return /(geen duidelijke interesse|geen interesse|niet geinteresseerd|niet geïnteresseerd|geen behoefte|niet relevant|niet passend|niet meer bellen|bel( me)? niet|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst)/.test(
+                return /(geen interesse|niet geinteresseerd|niet geïnteresseerd|niet meer bellen|bel( me)? niet|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst)/.test(
                     normalize(text)
                 );
             }
@@ -2122,6 +2122,31 @@
             }
 
             async function fetchInterestedCallRows(existingRows) {
+                const existingKeys = new Set(
+                    (Array.isArray(existingRows) ? existingRows : []).map(buildLeadMatchKey).filter(Boolean)
+                );
+                const seenKeys = new Set();
+                const seenCallIds = new Set();
+
+                try {
+                    const data = await fetchTasksJson('/api/agenda/interested-leads?limit=500', 8000);
+                    return (Array.isArray(data?.leads) ? data.leads : [])
+                        .map((item) => normalizeLeadRow(item))
+                        .filter((row) => {
+                            const callId = String(row?.callId || '').trim();
+                            const matchKey = buildLeadMatchKey(row);
+                            if (matchKey && existingKeys.has(matchKey)) return false;
+                            if (matchKey && seenKeys.has(matchKey)) return false;
+                            if (callId && seenCallIds.has(callId)) return false;
+                            if (matchKey) seenKeys.add(matchKey);
+                            if (callId) seenCallIds.add(callId);
+                            return true;
+                        })
+                        .sort(sortByDateDesc);
+                } catch (endpointError) {
+                    // Fallback: leid kandidaten client-side af wanneer de nieuwe serverroute nog niet beschikbaar is.
+                }
+
                 const responses = await Promise.allSettled([
                     fetchTasksJson('/api/coldcalling/call-updates?limit=500', 8000),
                     fetchTasksJson('/api/ai/call-insights?limit=500', 8000),
@@ -2134,11 +2159,6 @@
                     throw responses[0].reason || responses[1].reason || new Error('Interesse leads laden mislukt');
                 }
 
-                const existingKeys = new Set(
-                    (Array.isArray(existingRows) ? existingRows : []).map(buildLeadMatchKey).filter(Boolean)
-                );
-                const seenKeys = new Set();
-                const seenCallIds = new Set();
                 const insightByCallId = new Map();
                 const insightByPhoneKey = new Map();
                 const insightByCompanyKey = new Map();
