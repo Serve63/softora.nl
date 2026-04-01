@@ -505,8 +505,9 @@
 
         .tilt-card {
             background: var(--bg-secondary);
-            border: 1px solid var(--border);
+            border: 1px solid var(--card-accent, var(--accent));
             border-top: 3px solid var(--card-accent, var(--accent));
+            box-shadow: 0 0 0 1px var(--card-accent, var(--accent));
             border-radius: 0;
             padding: 2.6rem;
             position: relative;
@@ -533,7 +534,6 @@
 
         .tilt-card:hover {
             transform: translateY(-5px);
-            border-color: var(--card-accent, var(--accent));
             box-shadow: 0 16px 34px rgba(15, 17, 28, 0.07), 0 0 0 1px var(--card-accent, var(--accent));
         }
 
