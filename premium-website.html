@@ -492,6 +492,25 @@
             transform: translateX(-50%);
         }
 
+        .diensten-title::after {
+            display: none;
+        }
+
+        .diensten-title .title-mark {
+            position: relative;
+            display: inline-block;
+        }
+
+        .diensten-title .title-mark::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -10px;
+            height: 4px;
+            background: var(--accent);
+        }
+
         .section-header.is-centered p {
             margin-left: auto;
             margin-right: auto;
@@ -1207,7 +1226,7 @@
     <section id="diensten" style="padding: 3rem 4rem 10rem;">
         <div style="max-width: 1200px; margin: 0 auto;">
             <div class="section-header is-centered fade-up">
-                <h2>Wat We Bouwen</h2>
+                <h2 class="diensten-title"><span class="title-mark">Wat</span> We Bouwen</h2>
                 <p>Drie losse producten. Of één sterk geheel. Jij kiest waar we beginnen.</p>
             </div>
 
