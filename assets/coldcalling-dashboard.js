@@ -3660,15 +3660,20 @@
     )}`;
   }
 
-  function inferPhoneConversationIntent(call, decisionByPhoneKey) {
+  function inferPhoneConversationIntent(call, decisionByPhoneKey, latestCallIdByPhoneKey) {
     const text = normalizeSearchText(
       `${call?.summary || ''} ${call?.transcriptSnippet || ''} ${call?.transcriptFull || ''} ${call?.status || ''} ${call?.endedReason || ''}`
     );
     const callPhoneKey = phoneKey(call?.phone);
     const linkedDecision = callPhoneKey ? normalizeLeadDatabaseDecision(decisionByPhoneKey?.get(callPhoneKey) || '') : '';
+    const latestCallId = callPhoneKey ? normalizeFreeText(latestCallIdByPhoneKey?.get(callPhoneKey) || '') : '';
+    const callId = normalizeFreeText(call?.callId || '');
 
     if (linkedDecision === 'do_not_call') return 'geen_interesse';
     if (linkedDecision === 'appointment' || linkedDecision === 'customer') {
+      return 'interesse';
+    }
+    if (linkedDecision === 'callback' && callId && latestCallId && callId === latestCallId) {
       return 'interesse';
     }
 
@@ -4154,6 +4159,12 @@
             .filter((record) => record?.phoneKey)
             .map((record) => [record.phoneKey, normalizeLeadDatabaseDecision(record.decision)])
         );
+        const latestCallIdByPhoneKey = new Map();
+        calls.forEach((call) => {
+          const key = phoneKey(call?.phone);
+          if (!key || latestCallIdByPhoneKey.has(key)) return;
+          latestCallIdByPhoneKey.set(key, normalizeFreeText(call?.callId || ''));
+        });
         if (calls.length === 0) {
           tableWrap.innerHTML = `<div style="padding:18px; color:${theme.textMuted};">Geen telefoongesprekken gevonden.</div>`;
           return;
@@ -4175,7 +4186,7 @@
                 .map((call) => {
                   const company = normalizeFreeText(call?.company || call?.name || 'Onbekend');
                   const phone = formatLeadDatabasePhone(normalizeFreeText(call?.phone || ''));
-                  const intent = inferPhoneConversationIntent(call, decisionByPhoneKey);
+                  const intent = inferPhoneConversationIntent(call, decisionByPhoneKey, latestCallIdByPhoneKey);
                   const isNegative = intent === 'geen_interesse';
                   const isPositive = intent === 'interesse';
                   const status = isNegative ? 'Geen interesse' : isPositive ? 'Interesse' : 'Geen duidelijke interesse';
