@@ -658,7 +658,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            border: 3px solid rgba(139, 34, 82, 0.28);
+            border: none;
             pointer-events: none;
             z-index: 4;
         }
@@ -689,7 +689,8 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            background: var(--bg-secondary);
+            background: var(--accent);
+            color: white;
             position: relative;
             z-index: 1;
         }
@@ -701,8 +702,36 @@
             bottom: 0;
             left: calc(-1 * var(--content-overlap));
             width: var(--content-overlap);
-            background: var(--bg-secondary);
+            background: var(--accent);
             pointer-events: none;
+        }
+
+        .content-side h2 {
+            color: white;
+        }
+
+        .content-side p {
+            color: rgba(255, 255, 255, 0.84);
+        }
+
+        .content-side .eyebrow {
+            color: rgba(255, 255, 255, 0.72);
+        }
+
+        .content-side .magnetic-btn {
+            background: transparent;
+            border: 2px solid rgba(255, 255, 255, 0.68);
+            color: white;
+        }
+
+        .content-side .magnetic-btn::before {
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+        }
+
+        .content-side .magnetic-btn:hover {
+            background: rgba(255, 255, 255, 0.96);
+            color: var(--accent);
+            box-shadow: 0 18px 40px rgba(15, 17, 28, 0.18);
         }
 
         .pricing-grid {
@@ -1249,12 +1278,12 @@
                 <img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1000&q=80" srcset="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=480&q=75 480w, https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=768&q=75 768w, https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1000&q=80 1000w, https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1400&q=80 1400w" sizes="(max-width: 980px) 92vw, 46vw" alt="Developer at work" width="1000" height="667" loading="lazy" decoding="async" fetchpriority="low">
             </div>
             <div class="content-side fade-up">
-                <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.85rem; display: inline-block; margin-bottom: 1.4rem;">Over Ons</span>
+                <span class="eyebrow" style="border: none; padding: 0; font-size: 0.85rem; display: inline-block; margin-bottom: 1.4rem;">Over Ons</span>
                 <h2 style="margin-bottom: 1.6rem; font-size: clamp(2.6rem, 4.2vw, 4.2rem); line-height: 0.94;">Geen Standaard<br>Bureau Aanpak.</h2>
-                <p style="color: var(--text-secondary); font-size: 1.04rem; line-height: 1.78; margin-bottom: 1.4rem; font-weight: 300;">
+                <p style="font-size: 1.04rem; line-height: 1.78; margin-bottom: 1.4rem; font-weight: 300;">
                     Wij zijn geen groot bureau met tientallen accounts. Elk project krijgt volledige aandacht. Persoonlijk contact, directe lijnen, en een team dat leeft voor design en techniek.
                 </p>
-                <p style="color: var(--text-secondary); font-size: 1.04rem; line-height: 1.78; margin-bottom: 2rem; font-weight: 300;">
+                <p style="font-size: 1.04rem; line-height: 1.78; margin-bottom: 2rem; font-weight: 300;">
                     Vanuit Tilburg werken wij voor ambitieuze bedrijven door heel Nederland. Van lokale ondernemers tot scale-ups — als je het beste wilt, ben je hier aan het juiste adres.
                 </p>
                 <a href="#contact" class="magnetic-btn magnetic" style="padding: 0.95rem 1.8rem; font-size: 0.92rem;">Neem Contact Op</a>
