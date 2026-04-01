@@ -395,6 +395,8 @@
             --lead-border-color: rgba(139, 34, 82, 0.42);
             --lead-border-color-focus: rgba(139, 34, 82, 0.62);
             --lead-shadow-color: rgba(139, 34, 82, 0.2);
+            --lead-chip-color: var(--accent-light);
+            --lead-chip-border-color: rgba(139, 34, 82, 0.55);
             border: 1px solid var(--lead-border-color);
             border-radius: 12px;
             background: var(--bg-primary);
@@ -409,18 +411,24 @@
             --lead-border-color: rgba(139, 34, 82, 0.42);
             --lead-border-color-focus: rgba(139, 34, 82, 0.62);
             --lead-shadow-color: rgba(139, 34, 82, 0.2);
+            --lead-chip-color: var(--accent-light);
+            --lead-chip-border-color: rgba(139, 34, 82, 0.55);
         }
 
         .lead-item.type-bedrijfssoftware {
             --lead-border-color: rgba(59, 130, 246, 0.48);
             --lead-border-color-focus: rgba(59, 130, 246, 0.7);
             --lead-shadow-color: rgba(59, 130, 246, 0.22);
+            --lead-chip-color: var(--lead-business);
+            --lead-chip-border-color: rgba(59, 130, 246, 0.58);
         }
 
         .lead-item.type-voice-software {
             --lead-border-color: rgba(46, 204, 113, 0.48);
             --lead-border-color-focus: rgba(46, 204, 113, 0.72);
             --lead-shadow-color: rgba(46, 204, 113, 0.24);
+            --lead-chip-color: var(--green);
+            --lead-chip-border-color: rgba(46, 204, 113, 0.56);
         }
 
         .lead-item.clickable {
@@ -476,8 +484,8 @@
         }
 
         .lead-chip.confirmed {
-            border-color: rgba(46, 204, 113, 0.5);
-            color: var(--green);
+            border-color: var(--lead-chip-border-color);
+            color: var(--lead-chip-color);
         }
 
         .lead-empty {
@@ -1331,6 +1339,20 @@
                 modalDeleteBtn.disabled = modalBusy;
             }
 
+            function setModalTaskActionsEnabled(nextEnabled) {
+                const enabled = Boolean(nextEnabled);
+                const confirmWrap = modalWhatsappConfirm.closest('.lead-modal-confirm-wrap');
+                modalDate.disabled = !enabled;
+                modalTime.disabled = !enabled;
+                modalLocation.disabled = !enabled;
+                modalWhatsappInfo.disabled = !enabled;
+                modalWhatsappConfirm.disabled = !enabled;
+                modalDeleteBtn.hidden = !enabled;
+                modalSubmitBtn.hidden = !enabled;
+                if (confirmWrap) confirmWrap.hidden = !enabled;
+                modalCancelBtn.textContent = enabled ? 'Annuleren' : 'Sluiten';
+            }
+
             function pickLeadMetaValue(...values) {
                 for (const value of values) {
                     const raw = String(value || '').trim();
@@ -1417,6 +1439,7 @@
                 setModalBusy(false);
                 setModalStatus('');
                 setModalLoading(false);
+                setModalTaskActionsEnabled(true);
                 modalContactMeta.innerHTML = '';
                 modalOverlay.classList.remove('show');
                 modalOverlay.setAttribute('aria-hidden', 'true');
@@ -1435,7 +1458,7 @@
 
             async function ensureTaskDetailLoaded(taskId) {
                 const id = Number(taskId) || 0;
-                if (!id) return null;
+                if (id <= 0) return null;
                 const cacheKey = String(id);
                 if (leadDetailsById[cacheKey]) return leadDetailsById[cacheKey];
                 if (leadDetailLoadPromiseById[cacheKey]) return leadDetailLoadPromiseById[cacheKey];
@@ -1454,7 +1477,7 @@
 
             function renderLeadDetailsInModal(lead, detail, taskId, options = {}) {
                 const id = Number(taskId || lead?.id || 0) || 0;
-                const aiCopy = id ? leadAiCopyById[String(id)] : null;
+                const aiCopy = id > 0 ? leadAiCopyById[String(id)] : null;
                 const preferredSummary = String(options?.summaryText || '').trim();
 
                 const readableSummary = pickReadableSummary(
@@ -1515,9 +1538,11 @@
                 if (!normalizedTaskId) return;
                 const lead = getLeadById(normalizedTaskId);
                 if (!lead) return;
+                const hasTaskActions = hasPersistedLeadTask(lead);
 
                 const openSeq = ++modalOpenSequence;
                 activeTaskId = normalizedTaskId;
+                setModalTaskActionsEnabled(hasTaskActions);
                 const leadType = resolveLeadType(lead);
                 const leadDateValue = String(lead.date || '').slice(0, 10);
                 const leadTimeValue = normalizeTimeValue(lead.time || '09:00') || '09:00';
@@ -1542,6 +1567,16 @@
                         await new Promise((resolve) => window.setTimeout(resolve, waitMs));
                     }
                 };
+
+                if (!hasTaskActions) {
+                    renderLeadDetailsInModal(lead, null, normalizedTaskId);
+                    await ensureMinimumLoader(250);
+                    if (openSeq !== modalOpenSequence) return;
+                    setModalLoading(false);
+                    setModalBusy(false);
+                    setModalStatus('');
+                    return;
+                }
 
                 try {
                     const detail = await ensureTaskDetailLoaded(normalizedTaskId);
@@ -1622,7 +1657,7 @@
 
             async function submitLeadToAgenda() {
                 const taskId = Number(activeTaskId) || 0;
-                if (!taskId || modalBusy) return;
+                if (taskId <= 0 || modalBusy) return;
 
                 const date = String(modalDate.value || '').trim();
                 const time = normalizeTimeValue(modalTime.value || '');
@@ -1695,7 +1730,7 @@
 
             async function removeLead() {
                 const taskId = Number(activeTaskId) || 0;
-                if (!taskId || modalBusy) return;
+                if (taskId <= 0 || modalBusy) return;
                 const lead = getLeadById(taskId);
                 const company = String(lead?.company || 'deze lead');
                 const confirmed =
@@ -1926,9 +1961,36 @@
                 return bTs - aTs;
             }
 
+            function buildLeadVirtualSeed(item) {
+                const callId = String(item?.callId || '').trim();
+                if (callId) return `call:${callId}`;
+                const phoneDigits = String(item?.phone || '').replace(/\D/g, '');
+                if (phoneDigits) return `phone:${phoneDigits}`;
+                const companyKey = normalize(item?.company || '');
+                const contactKey = normalize(item?.contact || '');
+                if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
+                return '';
+            }
+
+            function resolveLeadListId(item) {
+                const explicitId = Number(item?.id) || 0;
+                if (explicitId > 0) return explicitId;
+                const seed = buildLeadVirtualSeed(item);
+                if (!seed) return 0;
+                let hash = 0;
+                for (let i = 0; i < seed.length; i += 1) {
+                    hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+                }
+                return -(Math.abs(hash || 1));
+            }
+
+            function hasPersistedLeadTask(value) {
+                return (Number(value?.id ?? value) || 0) > 0;
+            }
+
             function normalizeLeadRow(item) {
                 return {
-                    id: Number(item?.id) || 0,
+                    id: resolveLeadListId(item),
                     callId: String(item?.callId || '').trim(),
                     company: String(item?.company || 'Onbekende lead').trim() || 'Onbekende lead',
                     contact: String(item?.contact || '').trim(),
@@ -2071,7 +2133,7 @@
                 const dateTime = toAmsterdamDateTimeParts(
                     insight?.analyzedAt || update?.updatedAt || update?.endedAt || update?.startedAt || ''
                 );
-                return {
+                return normalizeLeadRow({
                     id: 0,
                     callId: String(update?.callId || insight?.callId || '').trim(),
                     company:
@@ -2118,7 +2180,7 @@
                     ).trim(),
                     leadChipLabel: 'INTERESSE',
                     leadChipClass: 'confirmed',
-                };
+                });
             }
 
             async function fetchInterestedCallRows(existingRows) {
