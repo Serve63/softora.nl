@@ -4816,7 +4816,23 @@ function shouldCreateLeadFollowUpFromCall(callUpdate, insight = null) {
 
   const status = normalizeString(callUpdate.status || '').toLowerCase();
   const endedReason = normalizeString(callUpdate.endedReason || '');
-  if (!isTerminalColdcallingStatus(status, endedReason)) return false;
+  const statusText = `${status} ${endedReason}`.trim();
+  const hasConversationContent = Boolean(
+    normalizeString(callUpdate.summary || '') ||
+      normalizeString(callUpdate.transcriptSnippet || '') ||
+      normalizeString(callUpdate.transcriptFull || '')
+  );
+  const hasKnownDuration =
+    Number.isFinite(Number(callUpdate.durationSeconds)) && Number(callUpdate.durationSeconds) >= 15;
+
+  if (
+    /(not[_ -]?connected|no[_ -]?answer|unanswered|failed|dial[_ -]?failed|busy|voicemail|initiated|queued|ringing|cancelled|canceled|rejected|error)/.test(
+      statusText
+    )
+  ) {
+    return false;
+  }
+  if (!hasConversationContent && !hasKnownDuration) return false;
 
   const signalText = buildCallInterestSignalText(callUpdate, insight);
   if (!signalText) return false;
