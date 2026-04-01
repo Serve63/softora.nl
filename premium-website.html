@@ -923,9 +923,12 @@
         .faq-answer {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.6s var(--ease-out-expo), padding 0.6s var(--ease-out-expo);
+            opacity: 0;
+            transition: max-height 0.45s var(--ease-out-expo), opacity 0.28s ease, padding 0.45s var(--ease-out-expo);
             color: var(--text-secondary);
             line-height: 1.6;
+            padding-top: 0;
+            padding-bottom: 0;
             padding-right: 40px;
             font-weight: 300;
             font-size: 0.95rem;
@@ -936,7 +939,7 @@
         }
 
         .faq-item.active .faq-answer {
-            max-height: 240px;
+            opacity: 1;
             padding-bottom: 1.25rem;
         }
 
@@ -1031,11 +1034,11 @@
         }
 
         .footer-contact {
-            justify-self: end;
-            text-align: right;
+            justify-self: start;
+            text-align: left;
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
+            align-items: flex-start;
         }
 
         .footer-links h4 {
@@ -1068,7 +1071,7 @@
         }
 
         .footer-contact a:hover {
-            transform: translateX(-5px);
+            transform: translateX(5px);
         }
 
         .whatsapp-widget {
@@ -1643,14 +1646,32 @@
             element.classList.add("visible");
         });
 
+        function setFaqState(item, open) {
+            if (!item) return;
+            const answer = item.querySelector(".faq-answer");
+            const button = item.querySelector(".faq-question");
+            if (!answer || !button) return;
+
+            item.classList.toggle("active", open);
+            button.setAttribute("aria-expanded", open ? "true" : "false");
+            answer.style.maxHeight = open ? answer.scrollHeight + "px" : "0px";
+        }
+
         faqButtons.forEach(function (button) {
+            button.setAttribute("aria-expanded", "false");
             button.addEventListener("click", function () {
                 const item = button.parentElement;
                 const isActive = item.classList.contains("active");
                 document.querySelectorAll(".faq-item").forEach(function (faqItem) {
-                    faqItem.classList.remove("active");
+                    setFaqState(faqItem, false);
                 });
-                if (!isActive) item.classList.add("active");
+                if (!isActive) setFaqState(item, true);
+            });
+        });
+
+        window.addEventListener("resize", function () {
+            document.querySelectorAll(".faq-item.active").forEach(function (item) {
+                setFaqState(item, true);
             });
         });
 
