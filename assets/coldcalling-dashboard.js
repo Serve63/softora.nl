@@ -3664,7 +3664,7 @@
     return `/api/coldcalling/recording-proxy?recordingSid=${encodeURIComponent(recordingSid)}`;
   }
 
-  function inferPhoneConversationIntent(call, decisionByPhoneKey, latestCallIdByPhoneKey) {
+  function inferPhoneConversationIntent(call, decisionByPhoneKey, latestCallIdByPhoneKey, interestedCallIdSet) {
     const text = normalizeSearchText(
       `${call?.summary || ''} ${call?.transcriptSnippet || ''} ${call?.transcriptFull || ''} ${call?.status || ''} ${call?.endedReason || ''}`
     );
@@ -3673,6 +3673,9 @@
     const latestCallId = callPhoneKey ? normalizeFreeText(latestCallIdByPhoneKey?.get(callPhoneKey) || '') : '';
     const callId = normalizeFreeText(call?.callId || '');
 
+    if (callId && interestedCallIdSet && typeof interestedCallIdSet.has === 'function' && interestedCallIdSet.has(callId)) {
+      return 'interesse';
+    }
     if (linkedDecision === 'do_not_call') return 'geen_interesse';
     if (linkedDecision === 'appointment' || linkedDecision === 'customer') {
       return 'interesse';
@@ -3698,6 +3701,31 @@
     }
 
     return 'onbekend';
+  }
+
+  function buildInterestedCallIdSet(records) {
+    const result = new Set();
+    (Array.isArray(records) ? records : []).forEach((record) => {
+      (Array.isArray(record?.insights) ? record.insights : []).forEach((insight) => {
+        const callId = normalizeFreeText(insight?.callId || '');
+        if (!callId) return;
+        const text = normalizeSearchText(`${insight?.summary || ''} ${insight?.followUpReason || ''}`);
+        const hasPositiveInsight =
+          Boolean(
+            insight?.appointmentBooked ||
+              insight?.appointment_booked ||
+              insight?.followUpRequired ||
+              insight?.follow_up_required
+          ) ||
+          /(interesse|geinteresseerd|geïnteresseerd|afspraak|demo|offerte|stuur (de )?(mail|info)|mail .* (offerte|informatie)|terugbellen|callback)/.test(
+            text
+          );
+        if (hasPositiveInsight) {
+          result.add(callId);
+        }
+      });
+    });
+    return result;
   }
 
   function isQualifiedPhoneConversation(call) {
@@ -4163,6 +4191,7 @@
             .filter((record) => record?.phoneKey)
             .map((record) => [record.phoneKey, normalizeLeadDatabaseDecision(record.decision)])
         );
+        const interestedCallIdSet = buildInterestedCallIdSet(state.records);
         const latestCallIdByPhoneKey = new Map();
         calls.forEach((call) => {
           const key = phoneKey(call?.phone);
@@ -4190,7 +4219,12 @@
                 .map((call) => {
                   const company = normalizeFreeText(call?.company || call?.name || 'Onbekend');
                   const phone = formatLeadDatabasePhone(normalizeFreeText(call?.phone || ''));
-                  const intent = inferPhoneConversationIntent(call, decisionByPhoneKey, latestCallIdByPhoneKey);
+                  const intent = inferPhoneConversationIntent(
+                    call,
+                    decisionByPhoneKey,
+                    latestCallIdByPhoneKey,
+                    interestedCallIdSet
+                  );
                   const isNegative = intent === 'geen_interesse';
                   const isPositive = intent === 'interesse';
                   const status = isNegative ? 'Geen interesse' : isPositive ? 'Interesse' : 'Geen duidelijke interesse';

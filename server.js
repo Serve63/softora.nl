@@ -5086,14 +5086,42 @@ function buildLeadFollowUpCandidateKey(item) {
   return '';
 }
 
+function getLeadLikeRecencyTimestamp(value) {
+  const explicit = Date.parse(
+    normalizeString(
+      value?.confirmationTaskCreatedAt ||
+        value?.createdAt ||
+        value?.updatedAt ||
+        value?.endedAt ||
+        value?.analyzedAt ||
+        value?.startedAt ||
+        ''
+    )
+  );
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  const date = normalizeDateYyyyMmDd(value?.date || '');
+  const time = normalizeTimeHhMm(value?.time || '') || '00:00';
+  if (date) {
+    const parsed = Date.parse(`${date}T${time}:00`);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return 0;
+}
+
 function buildInterestedLeadCandidateRows(existingTasks = []) {
   const existingCallIds = new Set();
-  const existingKeys = new Set();
+  const existingLatestTsByKey = new Map();
   (Array.isArray(existingTasks) ? existingTasks : []).forEach((task) => {
     const callId = normalizeString(task?.callId || '');
     if (callId) existingCallIds.add(callId);
     const key = buildLeadFollowUpCandidateKey(task);
-    if (key) existingKeys.add(key);
+    if (key) {
+      existingLatestTsByKey.set(
+        key,
+        Math.max(Number(existingLatestTsByKey.get(key) || 0), getLeadLikeRecencyTimestamp(task))
+      );
+    }
   });
 
   const insightByCallId = new Map();
@@ -5192,7 +5220,9 @@ function buildInterestedLeadCandidateRows(existingTasks = []) {
           new Date().toISOString(),
       };
       const key = buildLeadFollowUpCandidateKey(row);
-      if (key && (existingKeys.has(key) || seenKeys.has(key))) return null;
+      const rowTs = getLeadLikeRecencyTimestamp(row);
+      if (key && Number(existingLatestTsByKey.get(key) || 0) >= rowTs) return null;
+      if (key && seenKeys.has(key)) return null;
 
       seenCallIds.add(callId);
       if (key) seenKeys.add(key);
@@ -5292,13 +5322,19 @@ function getCallLikeUpdatedAtMsServer(item) {
 
 function buildGroupedColdcallingLeadRows(existingTasks = []) {
   const existingCallIds = new Set();
-  const existingKeys = new Set();
+  const existingLatestTsByKey = new Map();
   (Array.isArray(existingTasks) ? existingTasks : []).forEach((task) => {
     const callId = normalizeString(task?.callId || '');
     if (callId) existingCallIds.add(callId);
     const key = buildLeadFollowUpCandidateKey(task);
-    if (key) existingKeys.add(key);
+    if (key) {
+      existingLatestTsByKey.set(
+        key,
+        Math.max(Number(existingLatestTsByKey.get(key) || 0), getLeadLikeRecencyTimestamp(task))
+      );
+    }
   });
+  const seenKeys = new Set();
 
   const groups = new Map();
   function ensureGroup(key, seed = {}) {
@@ -5438,9 +5474,10 @@ function buildGroupedColdcallingLeadRows(existingTasks = []) {
     const key = buildLeadFollowUpCandidateKey(row);
     if (callId && isInterestedLeadDismissed(callId)) return;
     if (callId && existingCallIds.has(callId)) return;
-    if (key && existingKeys.has(key)) return;
+    if (key && Number(existingLatestTsByKey.get(key) || 0) >= getLeadLikeRecencyTimestamp(row)) return;
+    if (key && seenKeys.has(key)) return;
     existingCallIds.add(callId);
-    if (key) existingKeys.add(key);
+    if (key) seenKeys.add(key);
     rows.push(row);
   });
 

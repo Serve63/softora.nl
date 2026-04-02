@@ -2077,6 +2077,7 @@
                     summary: String(item?.summary || '').trim(),
                     location: String(item?.location || item?.appointmentLocation || '').trim(),
                     whatsappInfo: String(item?.whatsappInfo || item?.whatsappNotes || item?.whatsapp || '').trim(),
+                    createdAt: String(item?.createdAt || item?.confirmationTaskCreatedAt || item?.updatedAt || '').trim(),
                     recordingUrl: normalizeLeadRecordingUrl(item),
                     provider: String(item?.provider || '').trim().toLowerCase(),
                     providerLabel: String(item?.providerLabel || '').trim(),
@@ -2113,6 +2114,57 @@
                 const contactKey = normalize(item?.contact || '');
                 if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
                 return '';
+            }
+
+            function buildLeadRecencyTimestamp(item) {
+                const explicit = Date.parse(String(item?.createdAt || item?.updatedAt || '').trim());
+                if (Number.isFinite(explicit) && explicit > 0) return explicit;
+                const date = String(item?.date || '').trim().slice(0, 10);
+                const time = normalizeTimeValue(item?.time || '') || '00:00';
+                if (!date) return 0;
+                const parsed = Date.parse(`${date}T${time}:00`);
+                return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+            }
+
+            function isLeadRowPreferred(candidate, existing) {
+                const candidateTs = buildLeadRecencyTimestamp(candidate);
+                const existingTs = buildLeadRecencyTimestamp(existing);
+                if (candidateTs !== existingTs) return candidateTs > existingTs;
+
+                const candidateConfirmed = normalize(candidate?.leadChipClass || '') === 'confirmed';
+                const existingConfirmed = normalize(existing?.leadChipClass || '') === 'confirmed';
+                if (candidateConfirmed !== existingConfirmed) return candidateConfirmed;
+
+                const candidateHasCall = Boolean(String(candidate?.callId || '').trim());
+                const existingHasCall = Boolean(String(existing?.callId || '').trim());
+                if (candidateHasCall !== existingHasCall) return candidateHasCall;
+
+                const candidateHasRecording = Boolean(String(candidate?.recordingUrl || '').trim());
+                const existingHasRecording = Boolean(String(existing?.recordingUrl || '').trim());
+                if (candidateHasRecording !== existingHasRecording) return candidateHasRecording;
+
+                return false;
+            }
+
+            function mergeLeadRows(preferred, secondary) {
+                return {
+                    ...preferred,
+                    company: String(preferred?.company || secondary?.company || 'Onbekende lead').trim() || 'Onbekende lead',
+                    contact: String(preferred?.contact || secondary?.contact || '').trim(),
+                    phone: String(preferred?.phone || secondary?.phone || '').trim(),
+                    source: String(preferred?.source || secondary?.source || '').trim(),
+                    summary: String(preferred?.summary || secondary?.summary || '').trim(),
+                    whatsappInfo: String(preferred?.whatsappInfo || secondary?.whatsappInfo || '').trim(),
+                    createdAt: String(preferred?.createdAt || secondary?.createdAt || '').trim(),
+                    recordingUrl: String(preferred?.recordingUrl || secondary?.recordingUrl || '').trim(),
+                    provider: String(preferred?.provider || secondary?.provider || '').trim().toLowerCase(),
+                    providerLabel: String(preferred?.providerLabel || secondary?.providerLabel || '').trim(),
+                    coldcallingStack: String(preferred?.coldcallingStack || secondary?.coldcallingStack || '').trim().toLowerCase(),
+                    coldcallingStackLabel: String(preferred?.coldcallingStackLabel || secondary?.coldcallingStackLabel || '').trim(),
+                    leadType: String(preferred?.leadType || secondary?.leadType || '').trim(),
+                    leadChipLabel: String(preferred?.leadChipLabel || secondary?.leadChipLabel || '').trim(),
+                    leadChipClass: String(preferred?.leadChipClass || secondary?.leadChipClass || '').trim(),
+                };
             }
 
             function buildCallInterestSignalText(update, insight) {
@@ -2246,9 +2298,15 @@
             }
 
             async function fetchInterestedCallRows(existingRows) {
-                const existingKeys = new Set(
-                    (Array.isArray(existingRows) ? existingRows : []).map(buildLeadMatchKey).filter(Boolean)
-                );
+                const existingLatestTsByKey = new Map();
+                (Array.isArray(existingRows) ? existingRows : []).forEach((row) => {
+                    const key = buildLeadMatchKey(row);
+                    if (!key) return;
+                    existingLatestTsByKey.set(
+                        key,
+                        Math.max(Number(existingLatestTsByKey.get(key) || 0), buildLeadRecencyTimestamp(row))
+                    );
+                });
                 const seenKeys = new Set();
                 const seenCallIds = new Set();
 
@@ -2259,7 +2317,7 @@
                         .filter((row) => {
                             const callId = String(row?.callId || '').trim();
                             const matchKey = buildLeadMatchKey(row);
-                            if (matchKey && existingKeys.has(matchKey)) return false;
+                            if (matchKey && Number(existingLatestTsByKey.get(matchKey) || 0) >= buildLeadRecencyTimestamp(row)) return false;
                             if (matchKey && seenKeys.has(matchKey)) return false;
                             if (callId && seenCallIds.has(callId)) return false;
                             if (matchKey) seenKeys.add(matchKey);
@@ -2310,7 +2368,7 @@
 
                     const row = normalizeInterestedLeadRow(update, insight);
                     const matchKey = buildLeadMatchKey(row);
-                    if (matchKey && existingKeys.has(matchKey)) return;
+                    if (matchKey && Number(existingLatestTsByKey.get(matchKey) || 0) >= buildLeadRecencyTimestamp(row)) return;
                     if (matchKey && seenKeys.has(matchKey)) return;
                     if (callId && seenCallIds.has(callId)) return;
 
@@ -2326,38 +2384,27 @@
                 const map = new Map();
                 rows.forEach((row) => {
                     const rowId = Number(row?.id) || 0;
-                    if (rowId > 0) {
-                        const idKey = `id:${rowId}`;
-                        if (!map.has(idKey)) {
-                            map.set(idKey, row);
-                            return;
-                        }
-                    }
-                    const key = [
-                        normalize(row.company),
-                        normalize(row.contact),
-                        normalize(row.phone),
-                        normalize(row.date),
-                        normalize(row.time),
-                    ].join('|');
+                    const key =
+                        buildLeadMatchKey(row) ||
+                        (String(row?.callId || '').trim()
+                            ? `call:${String(row?.callId || '').trim()}`
+                            : rowId > 0
+                              ? `id:${rowId}`
+                              : [
+                                  normalize(row.company),
+                                  normalize(row.contact),
+                                  normalize(row.phone),
+                                  normalize(row.date),
+                                  normalize(row.time),
+                              ].join('|'));
                     if (!map.has(key)) {
                         map.set(key, row);
                         return;
                     }
                     const existing = map.get(key) || {};
-                    if (!existing.source && row.source) existing.source = row.source;
-                    if (!existing.summary && row.summary) existing.summary = row.summary;
-                    if (!existing.location && row.location) existing.location = row.location;
-                    if (!existing.whatsappInfo && row.whatsappInfo) existing.whatsappInfo = row.whatsappInfo;
-                    if (!existing.recordingUrl && row.recordingUrl) existing.recordingUrl = row.recordingUrl;
-                    if (!existing.provider && row.provider) existing.provider = row.provider;
-                    if (!existing.providerLabel && row.providerLabel) existing.providerLabel = row.providerLabel;
-                    if (!existing.coldcallingStack && row.coldcallingStack) existing.coldcallingStack = row.coldcallingStack;
-                    if (!existing.coldcallingStackLabel && row.coldcallingStackLabel) {
-                        existing.coldcallingStackLabel = row.coldcallingStackLabel;
-                    }
-                    if (!existing.leadType && row.leadType) existing.leadType = row.leadType;
-                    map.set(key, existing);
+                    const preferred = isLeadRowPreferred(row, existing) ? row : existing;
+                    const secondary = preferred === row ? existing : row;
+                    map.set(key, mergeLeadRows(preferred, secondary));
                 });
                 return Array.from(map.values());
             }
