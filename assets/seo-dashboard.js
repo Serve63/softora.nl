@@ -1,49 +1,73 @@
 (() => {
   'use strict';
 
-  const FIELD_BINDINGS = [
-    ['title', 'fieldTitle'],
-    ['metaDescription', 'fieldMetaDescription'],
-    ['metaKeywords', 'fieldMetaKeywords'],
-    ['canonical', 'fieldCanonical'],
-    ['robots', 'fieldRobots'],
-    ['ogTitle', 'fieldOgTitle'],
-    ['ogDescription', 'fieldOgDescription'],
-    ['ogImage', 'fieldOgImage'],
-    ['twitterTitle', 'fieldTwitterTitle'],
-    ['twitterDescription', 'fieldTwitterDescription'],
-    ['twitterImage', 'fieldTwitterImage'],
-    ['h1', 'fieldH1'],
+  const FIELD_LABELS = {
+    title: 'Meta title',
+    metaDescription: 'Meta description',
+    metaKeywords: 'Meta keywords',
+    canonical: 'Canonical URL',
+    robots: 'Robots',
+    ogTitle: 'OG title',
+    ogDescription: 'OG description',
+    ogImage: 'OG image URL',
+    twitterTitle: 'Twitter title',
+    twitterDescription: 'Twitter description',
+    twitterImage: 'Twitter image URL',
+    h1: 'H1',
+  };
+
+  const CADENCE_OPTIONS = [
+    { value: 'daily', label: 'Dagelijks' },
+    { value: 'weekdays', label: 'Werkdagen' },
+    { value: 'three_per_week', label: '3x per week' },
+    { value: 'weekly', label: 'Wekelijks' },
+    { value: 'manual', label: 'Handmatig' },
   ];
 
   const elements = {
     status: document.getElementById('statusMessage'),
-    pageSearchInput: document.getElementById('pageSearchInput'),
-    pageSelect: document.getElementById('pageSelect'),
-    pageList: document.getElementById('pageList'),
-    form: document.getElementById('seoForm'),
-    resetButton: document.getElementById('resetSeoBtn'),
-    saveButton: document.getElementById('saveSeoBtn'),
-    imageRows: document.getElementById('imageRows'),
+    preferredModelSelect: document.getElementById('preferredModelSelect'),
+    runAuditBtn: document.getElementById('runAuditBtn'),
+    optimizeBtn: document.getElementById('optimizeBtn'),
+    overallScoreValue: document.getElementById('overallScoreValue'),
+    pageCountValue: document.getElementById('pageCountValue'),
+    attentionCountValue: document.getElementById('attentionCountValue'),
+    altCoverageValue: document.getElementById('altCoverageValue'),
+    auditTimestamp: document.getElementById('auditTimestamp'),
+    strengthList: document.getElementById('strengthList'),
+    improvementList: document.getElementById('improvementList'),
+    healthBreakdown: document.getElementById('healthBreakdown'),
+    auditList: document.getElementById('auditList'),
+    selectedPageTitle: document.getElementById('selectedPageTitle'),
+    selectedPageMeta: document.getElementById('selectedPageMeta'),
+    selectedPageScore: document.getElementById('selectedPageScore'),
+    pageStrengthList: document.getElementById('pageStrengthList'),
+    pageImprovementList: document.getElementById('pageImprovementList'),
+    pageChangeList: document.getElementById('pageChangeList'),
+    pageCurrentList: document.getElementById('pageCurrentList'),
+    searchConsoleStatus: document.getElementById('searchConsoleStatus'),
+    analyticsStatus: document.getElementById('analyticsStatus'),
+    analyticsDataState: document.getElementById('analyticsDataState'),
+    scoreChart: document.getElementById('scoreChart'),
+    blogAutomationToggle: document.getElementById('blogAutomationToggle'),
+    blogCadenceSelect: document.getElementById('blogCadenceSelect'),
+    blogModelSelect: document.getElementById('blogModelSelect'),
+    blogAutoImagesToggle: document.getElementById('blogAutoImagesToggle'),
+    saveAutomationBtn: document.getElementById('saveAutomationBtn'),
+    automationUpdated: document.getElementById('automationUpdated'),
+    recentChangesList: document.getElementById('recentChangesList'),
   };
 
-  for (const [, id] of FIELD_BINDINGS) {
-    elements[id] = document.getElementById(id);
-  }
-
-  if (!elements.status || !elements.pageSearchInput || !elements.pageSelect || !elements.pageList || !elements.form || !elements.resetButton || !elements.saveButton || !elements.imageRows) {
-    return;
-  }
+  const requiredIds = Object.entries(elements).filter(([, value]) => !value);
+  if (requiredIds.length) return;
 
   const state = {
-    pages: [],
-    filteredPages: [],
+    audit: null,
     selectedFile: '',
-    selectedPage: null,
-    selectedDetail: null,
-    loadingPages: false,
-    loadingPage: false,
-    saving: false,
+    loadingAudit: false,
+    optimizing: false,
+    savingAutomation: false,
+    lastOptimization: null,
   };
 
   function normalizeText(value) {
@@ -51,28 +75,8 @@
     return String(value).trim();
   }
 
-  function setStatus(kind, text) {
-    const message = normalizeText(text);
-    const cssKind = kind === 'success' || kind === 'error' ? kind : 'info';
-    elements.status.textContent = message || '';
-    elements.status.className = `status-message ${cssKind}${message ? ' visible' : ''}`;
-  }
-
-  function updateBusyState() {
-    const busy = state.loadingPages || state.loadingPage || state.saving;
-    elements.pageSearchInput.disabled = state.loadingPages || state.saving;
-    elements.pageSelect.disabled = state.loadingPages || state.saving;
-    elements.saveButton.disabled = busy || !state.selectedFile;
-    elements.resetButton.disabled = busy || !state.selectedFile;
-
-    for (const [, id] of FIELD_BINDINGS) {
-      if (elements[id]) elements[id].disabled = busy || !state.selectedFile;
-    }
-
-    const imageInputs = elements.imageRows.querySelectorAll('input[data-role="image-alt"]');
-    for (const input of imageInputs) {
-      input.disabled = busy || !state.selectedFile;
-    }
+  function toArray(value) {
+    return Array.isArray(value) ? value : [];
   }
 
   function getSelectedFileFromUrl() {
@@ -81,207 +85,53 @@
   }
 
   function syncSelectedFileToUrl(fileName) {
-    const cleanFile = normalizeText(fileName);
+    const value = normalizeText(fileName);
     const url = new URL(window.location.href);
-    if (cleanFile) {
-      url.searchParams.set('file', cleanFile);
-    } else {
-      url.searchParams.delete('file');
-    }
+    if (value) url.searchParams.set('file', value);
+    else url.searchParams.delete('file');
     window.history.replaceState({}, '', `${url.pathname}${url.search}`);
   }
 
-  function renderPageSelect() {
-    elements.pageSelect.innerHTML = '';
-
-    if (state.filteredPages.length === 0) {
-      const emptyOption = document.createElement('option');
-      emptyOption.value = '';
-      emptyOption.textContent = 'Geen pagina\'s gevonden';
-      elements.pageSelect.appendChild(emptyOption);
-      elements.pageSelect.value = '';
-      return;
-    }
-
-    for (const page of state.filteredPages) {
-      const option = document.createElement('option');
-      option.value = page.file;
-      option.textContent = `${page.path} - ${page.title || page.file}`;
-      elements.pageSelect.appendChild(option);
-    }
-
-    if (state.selectedFile && state.filteredPages.some((page) => page.file === state.selectedFile)) {
-      elements.pageSelect.value = state.selectedFile;
-    } else {
-      elements.pageSelect.value = state.filteredPages[0].file;
-    }
+  function formatDateTime(valueRaw) {
+    const value = normalizeText(valueRaw);
+    if (!value) return 'Nog niet gedraaid';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('nl-NL', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date);
   }
 
-  function renderPageList() {
-    elements.pageList.innerHTML = '';
-
-    if (state.filteredPages.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'page-meta';
-      empty.style.padding = '0.75rem';
-      empty.textContent = 'Geen pagina\'s die voldoen aan de zoekfilter.';
-      elements.pageList.appendChild(empty);
-      return;
-    }
-
-    const fragment = document.createDocumentFragment();
-    for (const page of state.filteredPages) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `page-list-item${page.file === state.selectedFile ? ' active' : ''}`;
-      button.dataset.file = page.file;
-
-      const title = document.createElement('div');
-      title.className = 'page-title';
-      title.textContent = `${page.path} - ${page.title || page.file}`;
-      button.appendChild(title);
-
-      const meta = document.createElement('div');
-      meta.className = 'page-meta';
-      const pageOverrideCount = Number(page.pageOverrideCount || 0);
-      const imageOverrideCount = Number(page.imageOverrideCount || 0);
-      const imageCount = Number(page.imageCount || 0);
-      meta.textContent = `${pageOverrideCount} meta overrides, ${imageOverrideCount} alt overrides, ${imageCount} afbeeldingen`;
-      button.appendChild(meta);
-
-      button.addEventListener('click', () => {
-        void selectPage(page.file, { load: true, fromUser: true });
-      });
-
-      fragment.appendChild(button);
-    }
-
-    elements.pageList.appendChild(fragment);
+  function scoreTone(scoreRaw) {
+    const score = Number(scoreRaw || 0);
+    if (score >= 85) return 'good';
+    if (score >= 70) return 'okay';
+    return 'bad';
   }
 
-  function applyFilter() {
-    const query = normalizeText(elements.pageSearchInput.value).toLowerCase();
-    if (!query) {
-      state.filteredPages = state.pages.slice();
-      return;
-    }
-
-    state.filteredPages = state.pages.filter((page) => {
-      const haystack = `${normalizeText(page.file)} ${normalizeText(page.path)} ${normalizeText(page.title)} ${normalizeText(page.metaDescription)}`.toLowerCase();
-      return haystack.includes(query);
-    });
+  function setStatus(kind, text) {
+    const message = normalizeText(text);
+    const tone = kind === 'success' || kind === 'error' ? kind : 'info';
+    elements.status.textContent = message;
+    elements.status.className = `status-message ${tone}${message ? ' visible' : ''}`;
   }
 
-  function clearSeoFields() {
-    for (const [, id] of FIELD_BINDINGS) {
-      if (!elements[id]) continue;
-      elements[id].value = '';
-      elements[id].placeholder = '';
-    }
-  }
-
-  function fillSeoFields(detail) {
-    const source = detail?.seo?.source || {};
-    const overrides = detail?.seo?.overrides || {};
-
-    for (const [key, id] of FIELD_BINDINGS) {
-      const input = elements[id];
-      if (!input) continue;
-      input.value = normalizeText(overrides[key] || '');
-      input.placeholder = normalizeText(source[key] || '');
-    }
-  }
-
-  function renderImageRows(detail) {
-    elements.imageRows.innerHTML = '';
-
-    const images = Array.isArray(detail?.images) ? detail.images : [];
-    if (images.length === 0) {
-      const row = document.createElement('tr');
-      const cell = document.createElement('td');
-      cell.colSpan = 3;
-      cell.className = 'page-meta';
-      cell.style.padding = '0.8rem';
-      cell.textContent = 'Geen afbeeldingen gevonden op deze pagina.';
-      row.appendChild(cell);
-      elements.imageRows.appendChild(row);
-      return;
-    }
-
-    const fragment = document.createDocumentFragment();
-    for (const image of images) {
-      const src = normalizeText(image?.src);
-      if (!src) continue;
-
-      const sourceAlt = normalizeText(image?.sourceAlt || '');
-      const overrideAlt = normalizeText(image?.overrideAlt || '');
-
-      const row = document.createElement('tr');
-      row.dataset.src = src;
-
-      const srcCell = document.createElement('td');
-      const srcCode = document.createElement('code');
-      srcCode.className = 'src-code';
-      srcCode.textContent = src;
-      srcCell.appendChild(srcCode);
-      row.appendChild(srcCell);
-
-      const sourceCell = document.createElement('td');
-      sourceCell.textContent = sourceAlt || '-';
-      row.appendChild(sourceCell);
-
-      const overrideCell = document.createElement('td');
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'cell-input';
-      input.dataset.role = 'image-alt';
-      input.dataset.src = src;
-      input.value = overrideAlt;
-      input.placeholder = sourceAlt || 'Geen alt in bron';
-      overrideCell.appendChild(input);
-      row.appendChild(overrideCell);
-
-      fragment.appendChild(row);
-    }
-
-    if (!fragment.childNodes.length) {
-      const row = document.createElement('tr');
-      const cell = document.createElement('td');
-      cell.colSpan = 3;
-      cell.className = 'page-meta';
-      cell.style.padding = '0.8rem';
-      cell.textContent = 'Geen bruikbare afbeeldingen gevonden op deze pagina.';
-      row.appendChild(cell);
-      elements.imageRows.appendChild(row);
-      return;
-    }
-
-    elements.imageRows.appendChild(fragment);
-  }
-
-  function readPageOverridesFromForm() {
-    const out = {};
-    for (const [key, id] of FIELD_BINDINGS) {
-      const input = elements[id];
-      if (!input) continue;
-      out[key] = normalizeText(input.value);
-    }
-    return out;
-  }
-
-  function readImageOverridesFromForm() {
-    const out = {};
-    const imageInputs = elements.imageRows.querySelectorAll('input[data-role="image-alt"]');
-    for (const input of imageInputs) {
-      const src = normalizeText(input.getAttribute('data-src'));
-      if (!src) continue;
-      out[src] = normalizeText(input.value);
-    }
-    return out;
+  function setBusyState() {
+    const busy = state.loadingAudit || state.optimizing || state.savingAutomation;
+    elements.preferredModelSelect.disabled = busy;
+    elements.runAuditBtn.disabled = busy;
+    elements.optimizeBtn.disabled = busy || !state.audit;
+    elements.blogAutomationToggle.disabled = busy;
+    elements.blogCadenceSelect.disabled = busy;
+    elements.blogModelSelect.disabled = busy;
+    elements.blogAutoImagesToggle.disabled = busy;
+    elements.saveAutomationBtn.disabled = busy || !state.audit;
   }
 
   async function fetchJson(url, options = {}) {
     const response = await fetch(url, {
+      cache: 'no-store',
       ...options,
       headers: {
         Accept: 'application/json',
@@ -296,214 +146,493 @@
       data = null;
     }
 
-    if (!response.ok) {
-      const errorText = normalizeText(data?.error || data?.message || `Request mislukt (${response.status})`);
-      throw new Error(errorText || 'Request mislukt');
+    if (!response.ok || data?.ok === false) {
+      throw new Error(normalizeText(data?.error || data?.message || `Request mislukt (${response.status})`) || 'Request mislukt');
     }
 
     return data || {};
   }
 
-  async function loadPages(options = {}) {
-    const preserveSelection = normalizeText(options.preserveSelection || state.selectedFile || '');
-    const silent = !!options.silent;
+  function buildEmptyMessage(text) {
+    const row = document.createElement('div');
+    row.className = 'empty-state';
+    row.textContent = text;
+    return row;
+  }
 
-    state.loadingPages = true;
-    updateBusyState();
-    if (!silent) setStatus('info', 'SEO-pagina\'s laden...');
+  function renderBulletList(target, items, emptyText) {
+    target.innerHTML = '';
+    const values = toArray(items).map(normalizeText).filter(Boolean);
+    if (!values.length) {
+      target.appendChild(buildEmptyMessage(emptyText));
+      return;
+    }
 
-    try {
-      const data = await fetchJson('/api/seo/pages');
-      state.pages = Array.isArray(data.pages) ? data.pages : [];
+    const list = document.createElement('ul');
+    list.className = 'bullet-list';
+    values.forEach((item) => {
+      const li = document.createElement('li');
+      li.textContent = item;
+      list.appendChild(li);
+    });
+    target.appendChild(list);
+  }
 
-      applyFilter();
-      renderPageSelect();
+  function renderSelectOptions(select, options, selectedValue) {
+    const currentValue = normalizeText(selectedValue);
+    select.innerHTML = '';
+    toArray(options).forEach((optionDef) => {
+      const option = document.createElement('option');
+      option.value = normalizeText(optionDef?.value);
+      option.textContent = normalizeText(optionDef?.label || optionDef?.value);
+      select.appendChild(option);
+    });
 
-      if (preserveSelection && state.filteredPages.some((page) => page.file === preserveSelection)) {
-        state.selectedFile = preserveSelection;
-      } else {
-        state.selectedFile = state.filteredPages[0] ? state.filteredPages[0].file : '';
-      }
-
-      state.selectedPage = state.filteredPages.find((page) => page.file === state.selectedFile) || null;
-      renderPageSelect();
-      renderPageList();
-
-      if (!state.selectedFile) {
-        state.selectedDetail = null;
-        clearSeoFields();
-        renderImageRows(null);
-        setStatus('info', 'Geen pagina\'s gevonden om SEO te beheren.');
-        return;
-      }
-
-      if (!options.skipSelectedPageLoad) {
-        await loadPage(state.selectedFile, { silent: true });
-      }
-
-      if (!silent) {
-        setStatus('success', `${state.pages.length} pagina\'s geladen. Kies een pagina om SEO te bewerken.`);
-      }
-    } catch (error) {
-      setStatus('error', normalizeText(error?.message || 'Kon SEO-pagina\'s niet laden.'));
-    } finally {
-      state.loadingPages = false;
-      updateBusyState();
+    if (currentValue && toArray(options).some((optionDef) => normalizeText(optionDef?.value) === currentValue)) {
+      select.value = currentValue;
     }
   }
 
-  async function loadPage(fileName, options = {}) {
-    const targetFile = normalizeText(fileName);
-    if (!targetFile) return;
+  function renderHealthBreakdown(metrics) {
+    elements.healthBreakdown.innerHTML = '';
+    const values = toArray(metrics);
+    if (!values.length) {
+      elements.healthBreakdown.appendChild(buildEmptyMessage('Nog geen scanresultaten beschikbaar.'));
+      return;
+    }
 
-    state.loadingPage = true;
-    updateBusyState();
-    if (!options.silent) setStatus('info', `SEO-data laden voor ${targetFile}...`);
+    const fragment = document.createDocumentFragment();
+    values.forEach((metric) => {
+      const row = document.createElement('div');
+      row.className = 'health-row';
+
+      const label = document.createElement('div');
+      label.className = 'health-row-label';
+      label.textContent = normalizeText(metric?.label || metric?.key || 'SEO');
+      row.appendChild(label);
+
+      const bar = document.createElement('div');
+      bar.className = 'health-row-bar';
+      const fill = document.createElement('div');
+      fill.className = 'health-row-fill';
+      fill.style.width = `${Math.max(0, Math.min(100, Number(metric?.percent || 0)))}%`;
+      bar.appendChild(fill);
+      row.appendChild(bar);
+
+      const value = document.createElement('div');
+      value.className = 'health-row-value';
+      const count = Number(metric?.count || 0);
+      const total = Number(metric?.total || 0);
+      value.textContent = total > 0 ? `${count}/${total}` : `${Math.max(0, Math.min(100, Number(metric?.percent || 0)))}%`;
+      row.appendChild(value);
+
+      fragment.appendChild(row);
+    });
+
+    elements.healthBreakdown.appendChild(fragment);
+  }
+
+  function renderScoreChart(pages) {
+    elements.scoreChart.innerHTML = '';
+    const values = toArray(pages).slice().sort((a, b) => Number(a.score || 0) - Number(b.score || 0)).slice(0, 8);
+    if (!values.length) {
+      elements.scoreChart.appendChild(buildEmptyMessage('Nog geen paginaresultaten beschikbaar.'));
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    values.forEach((page) => {
+      const row = document.createElement('div');
+      row.className = 'score-chart-row';
+
+      const label = document.createElement('div');
+      label.className = 'score-chart-label';
+      label.textContent = normalizeText(page?.path || page?.file || 'Pagina');
+      row.appendChild(label);
+
+      const bar = document.createElement('div');
+      bar.className = 'score-chart-bar';
+      const fill = document.createElement('div');
+      fill.className = `score-chart-fill tone-${scoreTone(page?.score)}`;
+      fill.style.width = `${Math.max(6, Math.min(100, Number(page?.score || 0)))}%`;
+      bar.appendChild(fill);
+      row.appendChild(bar);
+
+      const value = document.createElement('div');
+      value.className = 'score-chart-value';
+      value.textContent = `${Math.max(0, Math.min(100, Number(page?.score || 0)))}`;
+      row.appendChild(value);
+
+      fragment.appendChild(row);
+    });
+
+    elements.scoreChart.appendChild(fragment);
+  }
+
+  function ensureSelectedPage() {
+    const pages = toArray(state.audit?.pages);
+    if (!pages.length) {
+      state.selectedFile = '';
+      syncSelectedFileToUrl('');
+      return null;
+    }
+
+    const preferred = normalizeText(state.selectedFile || getSelectedFileFromUrl());
+    const selected =
+      pages.find((page) => normalizeText(page?.file) === preferred) ||
+      pages[0];
+
+    state.selectedFile = normalizeText(selected?.file);
+    syncSelectedFileToUrl(state.selectedFile);
+    return selected;
+  }
+
+  function renderAuditList() {
+    elements.auditList.innerHTML = '';
+    const pages = toArray(state.audit?.pages);
+    if (!pages.length) {
+      elements.auditList.appendChild(buildEmptyMessage('Nog geen paginaresultaten beschikbaar.'));
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    pages.forEach((page) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `audit-list-item${normalizeText(page?.file) === state.selectedFile ? ' active' : ''}`;
+      button.dataset.file = normalizeText(page?.file);
+
+      const header = document.createElement('div');
+      header.className = 'audit-item-header';
+
+      const titleWrap = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'audit-item-title';
+      title.textContent = normalizeText(page?.path || page?.file || 'Pagina');
+      titleWrap.appendChild(title);
+
+      const subtitle = document.createElement('div');
+      subtitle.className = 'audit-item-subtitle';
+      subtitle.textContent = normalizeText(page?.title || page?.topic || '');
+      titleWrap.appendChild(subtitle);
+      header.appendChild(titleWrap);
+
+      const score = document.createElement('div');
+      score.className = `score-pill tone-${scoreTone(page?.score)}`;
+      score.textContent = `${Math.max(0, Math.min(100, Number(page?.score || 0)))}`;
+      header.appendChild(score);
+      button.appendChild(header);
+
+      const meta = document.createElement('div');
+      meta.className = 'audit-item-meta';
+      const changeCount = Number(page?.changeCount || 0);
+      const missingAltCount = Number(page?.missingAltCount || 0);
+      meta.textContent = `${changeCount} AI-wijzigingen • ${missingAltCount} ontbrekende alt-teksten`;
+      button.appendChild(meta);
+
+      const note = document.createElement('div');
+      note.className = 'audit-item-note';
+      note.textContent = normalizeText(toArray(page?.improvements)[0] || toArray(page?.strengths)[0] || 'Geen extra notitie.');
+      button.appendChild(note);
+
+      button.addEventListener('click', () => {
+        state.selectedFile = normalizeText(page?.file);
+        renderAuditList();
+        renderSelectedPage();
+      });
+
+      fragment.appendChild(button);
+    });
+
+    elements.auditList.appendChild(fragment);
+  }
+
+  function renderChangeList(target, page) {
+    target.innerHTML = '';
+    const changeFragment = document.createDocumentFragment();
+    const pageOverrides = page?.suggestedPageOverrides && typeof page.suggestedPageOverrides === 'object' ? page.suggestedPageOverrides : {};
+    Object.entries(pageOverrides).forEach(([key, value]) => {
+      const row = document.createElement('div');
+      row.className = 'change-row';
+
+      const label = document.createElement('div');
+      label.className = 'change-row-label';
+      label.textContent = FIELD_LABELS[key] || key;
+      row.appendChild(label);
+
+      const body = document.createElement('div');
+      body.className = 'change-row-body';
+      body.textContent = normalizeText(value);
+      row.appendChild(body);
+
+      changeFragment.appendChild(row);
+    });
+
+    const imageChanges = page?.suggestedImageOverrides && typeof page.suggestedImageOverrides === 'object'
+      ? Object.keys(page.suggestedImageOverrides).length
+      : 0;
+
+    if (imageChanges > 0) {
+      const row = document.createElement('div');
+      row.className = 'change-row';
+      const label = document.createElement('div');
+      label.className = 'change-row-label';
+      label.textContent = 'Afbeelding alt-teksten';
+      row.appendChild(label);
+      const body = document.createElement('div');
+      body.className = 'change-row-body';
+      body.textContent = `${imageChanges} afbeelding${imageChanges === 1 ? '' : 'en'} krijgen een SEO alt-tekst.`;
+      row.appendChild(body);
+      changeFragment.appendChild(row);
+    }
+
+    if (!changeFragment.childNodes.length) {
+      target.appendChild(buildEmptyMessage('Deze pagina staat al sterk. AI hoeft hier nu niets te wijzigen.'));
+      return;
+    }
+
+    target.appendChild(changeFragment);
+  }
+
+  function renderCurrentSnapshot(target, page) {
+    target.innerHTML = '';
+    const current = page?.current && typeof page.current === 'object' ? page.current : {};
+    const rows = [
+      ['Meta title', current.title],
+      ['Meta description', current.metaDescription],
+      ['Canonical URL', current.canonical],
+      ['H1', current.h1],
+      ['Afbeeldingen', `${Number(page?.imageCount || 0)} totaal • ${Number(page?.missingAltCount || 0)} zonder alt-tekst`],
+    ].filter(([, value]) => normalizeText(value));
+
+    if (!rows.length) {
+      target.appendChild(buildEmptyMessage('Nog geen SEO-basis gevonden op deze pagina.'));
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    rows.forEach(([labelText, valueText]) => {
+      const row = document.createElement('div');
+      row.className = 'snapshot-row';
+
+      const label = document.createElement('div');
+      label.className = 'snapshot-row-label';
+      label.textContent = labelText;
+      row.appendChild(label);
+
+      const value = document.createElement('div');
+      value.className = 'snapshot-row-value';
+      value.textContent = normalizeText(valueText);
+      row.appendChild(value);
+
+      fragment.appendChild(row);
+    });
+
+    target.appendChild(fragment);
+  }
+
+  function renderSelectedPage() {
+    const selected = ensureSelectedPage();
+    if (!selected) {
+      elements.selectedPageTitle.textContent = 'Geen pagina geselecteerd';
+      elements.selectedPageMeta.textContent = 'Draai eerst een scan om paginaresultaten te zien.';
+      elements.selectedPageScore.textContent = '--';
+      elements.selectedPageScore.className = 'score-pill tone-bad';
+      renderBulletList(elements.pageStrengthList, [], 'Nog geen sterke punten.');
+      renderBulletList(elements.pageImprovementList, [], 'Nog geen verbeterpunten.');
+      renderChangeList(elements.pageChangeList, null);
+      renderCurrentSnapshot(elements.pageCurrentList, null);
+      return;
+    }
+
+    elements.selectedPageTitle.textContent = normalizeText(selected.path || selected.file || 'Pagina');
+    elements.selectedPageMeta.textContent = normalizeText(selected.title || selected.topic || '');
+    elements.selectedPageScore.textContent = `${Math.max(0, Math.min(100, Number(selected.score || 0)))}/100`;
+    elements.selectedPageScore.className = `score-pill tone-${scoreTone(selected.score)}`;
+
+    renderBulletList(elements.pageStrengthList, selected.strengths, 'Nog geen sterke punten gevonden.');
+    renderBulletList(elements.pageImprovementList, selected.improvements, 'Geen directe aandachtspunten.');
+    renderChangeList(elements.pageChangeList, selected);
+    renderCurrentSnapshot(elements.pageCurrentList, selected);
+  }
+
+  function renderAutomation(automation, modelOptions) {
+    const safeAutomation = automation && typeof automation === 'object' ? automation : {};
+    renderSelectOptions(elements.preferredModelSelect, modelOptions, normalizeText(safeAutomation.preferredModel || 'gpt-5.1'));
+    renderSelectOptions(elements.blogModelSelect, modelOptions, normalizeText(safeAutomation.blogModel || safeAutomation.preferredModel || 'gpt-5.1'));
+    renderSelectOptions(elements.blogCadenceSelect, CADENCE_OPTIONS, normalizeText(safeAutomation.blogCadence || 'weekly'));
+    elements.blogAutomationToggle.checked = Boolean(safeAutomation.blogAutomationEnabled);
+    elements.blogAutoImagesToggle.checked = Boolean(safeAutomation.blogAutoImages);
+
+    elements.searchConsoleStatus.textContent = safeAutomation.searchConsoleConnected ? 'Gekoppeld' : 'Klaar voor koppeling';
+    elements.searchConsoleStatus.dataset.tone = safeAutomation.searchConsoleConnected ? 'good' : 'muted';
+    elements.analyticsStatus.textContent = safeAutomation.analyticsConnected ? 'Gekoppeld' : 'Klaar voor koppeling';
+    elements.analyticsStatus.dataset.tone = safeAutomation.analyticsConnected ? 'good' : 'muted';
+    elements.analyticsDataState.textContent = safeAutomation.analyticsConnected
+      ? 'Analytics-koppeling actief. Gebruik deze ruimte voor sessies, top-pagina’s en trends.'
+      : 'Live Search Console- en Analytics-grafieken verschijnen hier zodra de koppeling is geactiveerd.';
+    elements.automationUpdated.textContent = `Laatste opslag: ${formatDateTime(safeAutomation.updatedAt || '')}`;
+  }
+
+  function renderRecentChanges() {
+    elements.recentChangesList.innerHTML = '';
+    const pages = toArray(state.lastOptimization?.changedPages);
+    if (!pages.length) {
+      elements.recentChangesList.appendChild(buildEmptyMessage('Nog geen sitebrede AI-optimalisatie uitgevoerd in deze sessie.'));
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    pages.forEach((page) => {
+      const row = document.createElement('div');
+      row.className = 'change-row';
+
+      const label = document.createElement('div');
+      label.className = 'change-row-label';
+      label.textContent = normalizeText(page?.path || page?.file || 'Pagina');
+      row.appendChild(label);
+
+      const body = document.createElement('div');
+      body.className = 'change-row-body';
+      body.textContent = `${Number(page?.appliedPageFieldCount || 0)} meta-velden en ${Number(page?.appliedImageAltCount || 0)} alt-teksten bijgewerkt.`;
+      row.appendChild(body);
+
+      fragment.appendChild(row);
+    });
+
+    elements.recentChangesList.appendChild(fragment);
+  }
+
+  function renderOverview(audit) {
+    const totals = audit?.totals || {};
+    const metrics = toArray(audit?.metrics);
+    const altMetric = metrics.find((item) => normalizeText(item?.key) === 'image_alt') || {};
+
+    elements.overallScoreValue.textContent = `${Math.max(0, Math.min(100, Number(audit?.overallScore || 0)))}`;
+    elements.pageCountValue.textContent = `${Number(totals.pages || 0)}`;
+    elements.attentionCountValue.textContent = `${Number(totals.pagesNeedingAttention || 0)}`;
+    elements.altCoverageValue.textContent = `${Math.max(0, Math.min(100, Number(altMetric?.percent || 0)))}%`;
+    elements.auditTimestamp.textContent = `Laatst gescand: ${formatDateTime(audit?.auditedAt || '')}`;
+
+    renderBulletList(elements.strengthList, audit?.strengths, 'Nog geen duidelijke pluspunten gevonden.');
+    renderBulletList(elements.improvementList, audit?.improvements, 'Geen concrete verbeterpunten.');
+    renderHealthBreakdown(metrics);
+    renderScoreChart(audit?.pages);
+  }
+
+  async function loadAudit(options = {}) {
+    state.loadingAudit = true;
+    setBusyState();
+    if (!options.silent) setStatus('info', 'Volledige SEO-scan laden...');
 
     try {
-      const params = new URLSearchParams();
-      params.set('file', targetFile);
-      const data = await fetchJson(`/api/seo/page?${params.toString()}`);
-
-      state.selectedFile = normalizeText(data.file || targetFile);
-      state.selectedPage = state.pages.find((page) => page.file === state.selectedFile) || null;
-      state.selectedDetail = data;
-
-      fillSeoFields(data);
-      renderImageRows(data);
-      renderPageSelect();
-      renderPageList();
-      syncSelectedFileToUrl(state.selectedFile);
-
-      const imageCount = Number(data.imageCount || 0);
+      const audit = await fetchJson('/api/seo/site-audit');
+      state.audit = audit;
+      if (!state.selectedFile) state.selectedFile = getSelectedFileFromUrl();
+      renderOverview(audit);
+      renderAutomation(audit.automation, audit.modelOptions);
+      renderAuditList();
+      renderSelectedPage();
+      renderRecentChanges();
       if (!options.silent) {
-        setStatus('success', `SEO-data geladen voor ${state.selectedFile}. ${imageCount} afbeeldingen gevonden.`);
+        setStatus('success', `${Number(audit?.totals?.pages || 0)} pagina's gescand. Overzicht is bijgewerkt.`);
       }
     } catch (error) {
-      setStatus('error', normalizeText(error?.message || 'Kon SEO-data van deze pagina niet laden.'));
+      setStatus('error', normalizeText(error?.message || 'Kon de SEO-scan niet laden.'));
     } finally {
-      state.loadingPage = false;
-      updateBusyState();
+      state.loadingAudit = false;
+      setBusyState();
     }
   }
 
-  async function selectPage(fileName, options = {}) {
-    const targetFile = normalizeText(fileName);
-    if (!targetFile || targetFile === state.selectedFile) return;
-
-    state.selectedFile = targetFile;
-    state.selectedPage = state.pages.find((page) => page.file === targetFile) || null;
-    renderPageSelect();
-    renderPageList();
-
-    if (options.load) {
-      await loadPage(targetFile, { silent: false });
-    }
-  }
-
-  function onSearchInput() {
-    const previousSelection = state.selectedFile;
-    applyFilter();
-
-    if (state.selectedFile && !state.filteredPages.some((page) => page.file === state.selectedFile)) {
-      state.selectedFile = state.filteredPages[0] ? state.filteredPages[0].file : '';
-    }
-
-    state.selectedPage = state.filteredPages.find((page) => page.file === state.selectedFile) || null;
-    renderPageSelect();
-    renderPageList();
-
-    if (!state.selectedFile) {
-      clearSeoFields();
-      renderImageRows(null);
-      setStatus('info', 'Geen pagina\'s die voldoen aan je zoekfilter.');
-      return;
-    }
-
-    if (state.selectedFile !== previousSelection) {
-      void loadPage(state.selectedFile, { silent: true });
-    }
-  }
-
-  async function onSave(event) {
-    event.preventDefault();
-    if (!state.selectedFile) {
-      setStatus('error', 'Kies eerst een pagina.');
-      return;
-    }
-
-    state.saving = true;
-    updateBusyState();
-    setStatus('info', `SEO wijzigingen opslaan voor ${state.selectedFile}...`);
+  async function optimizeSite() {
+    state.optimizing = true;
+    setBusyState();
+    setStatus('info', 'AI optimaliseert nu de volledige website...');
 
     try {
-      const payload = {
-        file: state.selectedFile,
-        pageOverrides: readPageOverridesFromForm(),
-        imageAltOverrides: readImageOverridesFromForm(),
-        actor: 'premium-seo-dashboard',
-      };
-
-      await fetchJson('/api/seo/page', {
+      const response = await fetchJson('/api/seo/site-optimize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          model: normalizeText(elements.preferredModelSelect.value || 'gpt-5.1'),
+          actor: 'premium-seo-dashboard',
+        }),
       });
 
-      await loadPage(state.selectedFile, { silent: true });
-      await loadPages({ silent: true, preserveSelection: state.selectedFile, skipSelectedPageLoad: true });
-      renderPageSelect();
-      renderPageList();
+      state.lastOptimization = response;
+      state.audit = response.audit || state.audit;
+      renderOverview(state.audit);
+      renderAutomation(state.audit?.automation, state.audit?.modelOptions);
+      renderAuditList();
+      renderSelectedPage();
+      renderRecentChanges();
 
-      setStatus('success', `SEO wijzigingen opgeslagen voor ${state.selectedFile}.`);
+      const message = normalizeText(response?.message || '') || 'SEO-optimalisatie voltooid.';
+      setStatus('success', message);
     } catch (error) {
-      setStatus('error', normalizeText(error?.message || 'SEO wijzigingen opslaan mislukt.'));
+      setStatus('error', normalizeText(error?.message || 'Kon de AI optimalisatie niet uitvoeren.'));
     } finally {
-      state.saving = false;
-      updateBusyState();
+      state.optimizing = false;
+      setBusyState();
     }
   }
 
-  function onReset() {
-    if (!state.selectedDetail) {
-      clearSeoFields();
-      renderImageRows(null);
-      return;
-    }
+  async function saveAutomation() {
+    state.savingAutomation = true;
+    setBusyState();
+    setStatus('info', 'SEO-automatisering wordt opgeslagen...');
 
-    for (const [, id] of FIELD_BINDINGS) {
-      if (!elements[id]) continue;
-      elements[id].value = '';
-    }
+    try {
+      const response = await fetchJson('/api/seo/automation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          preferredModel: normalizeText(elements.preferredModelSelect.value || 'gpt-5.1'),
+          blogAutomationEnabled: elements.blogAutomationToggle.checked,
+          blogCadence: normalizeText(elements.blogCadenceSelect.value || 'weekly'),
+          blogModel: normalizeText(elements.blogModelSelect.value || 'gpt-5.1'),
+          blogAutoImages: elements.blogAutoImagesToggle.checked,
+          actor: 'premium-seo-dashboard',
+        }),
+      });
 
-    const imageInputs = elements.imageRows.querySelectorAll('input[data-role="image-alt"]');
-    for (const input of imageInputs) {
-      input.value = '';
+      if (state.audit) {
+        state.audit.automation = response.automation || state.audit.automation;
+        state.audit.modelOptions = response.modelOptions || state.audit.modelOptions;
+      }
+      renderAutomation(response.automation, response.modelOptions || state.audit?.modelOptions);
+      setStatus('success', 'SEO-automatisering opgeslagen.');
+    } catch (error) {
+      setStatus('error', normalizeText(error?.message || 'Kon de automatisering niet opslaan.'));
+    } finally {
+      state.savingAutomation = false;
+      setBusyState();
     }
-
-    setStatus('info', 'Overrides leeggemaakt in formulier. Klik op "SEO Opslaan" om dit op te slaan.');
   }
 
   function attachEvents() {
-    elements.pageSearchInput.addEventListener('input', onSearchInput);
-
-    elements.pageSelect.addEventListener('change', (event) => {
-      const targetFile = normalizeText(event.target.value);
-      if (!targetFile) return;
-      void selectPage(targetFile, { load: true, fromUser: true });
+    elements.runAuditBtn.addEventListener('click', () => {
+      void loadAudit();
     });
 
-    elements.form.addEventListener('submit', onSave);
-    elements.resetButton.addEventListener('click', onReset);
+    elements.optimizeBtn.addEventListener('click', () => {
+      void optimizeSite();
+    });
+
+    elements.saveAutomationBtn.addEventListener('click', () => {
+      void saveAutomation();
+    });
   }
 
   async function init() {
     attachEvents();
-    updateBusyState();
-    const initialFile = getSelectedFileFromUrl();
-    await loadPages({ preserveSelection: initialFile });
+    setBusyState();
+    await loadAudit();
   }
 
   void init();

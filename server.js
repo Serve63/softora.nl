@@ -239,6 +239,12 @@ const SEO_UI_STATE_SCOPE = 'seo';
 const SEO_UI_STATE_CONFIG_KEY = 'config_json';
 const SEO_CONFIG_CACHE_TTL_MS = 15_000;
 const SEO_MAX_IMAGES_PER_PAGE = 2000;
+const SEO_DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
+const SEO_MODEL_PRESETS = Object.freeze([
+  { value: 'gpt-5.1', label: 'GPT-5.1' },
+  { value: 'claude-opus-4.6', label: 'Opus 4.6' },
+  { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
+]);
 const SEO_PAGE_FIELD_DEFS = [
   { key: 'title', maxLength: 300 },
   { key: 'metaDescription', maxLength: 1000 },
@@ -256,9 +262,10 @@ const SEO_PAGE_FIELD_DEFS = [
 let seoConfigCache = {
   loadedAtMs: 0,
   config: {
-    version: 1,
+    version: 2,
     pages: {},
     images: {},
+    automation: {},
   },
 };
 const DEMO_CONFIRMATION_TASK_ENABLED = /^(1|true|yes)$/i.test(
@@ -1970,9 +1977,70 @@ async function setUiStateValues(scope, values, meta = {}) {
 
 function getDefaultSeoConfig() {
   return {
-    version: 1,
+    version: 2,
     pages: {},
     images: {},
+    automation: getDefaultSeoAutomationSettings(),
+  };
+}
+
+function normalizeSeoModelPreset(valueRaw) {
+  const raw = normalizeString(valueRaw || '')
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-');
+  if (!raw) return 'gpt-5.1';
+  if (raw === 'gpt-5.1' || raw === 'gpt51' || raw === 'gpt-5') return 'gpt-5.1';
+  if (
+    raw === 'claude-opus-4.6' ||
+    raw === 'opus-4.6' ||
+    raw === 'opus46' ||
+    raw === 'claude-opus-46' ||
+    raw === 'claude-opus'
+  ) {
+    return 'claude-opus-4.6';
+  }
+  if (raw === 'gpt-5-mini' || raw === 'gpt5mini') return 'gpt-5-mini';
+  return SEO_MODEL_PRESETS.some((item) => item.value === raw) ? raw : 'gpt-5.1';
+}
+
+function normalizeSeoBlogCadence(valueRaw) {
+  const raw = normalizeString(valueRaw || '')
+    .toLowerCase()
+    .replace(/[\s_]+/g, '_');
+  if (!raw) return 'weekly';
+  if (raw === 'daily' || raw === 'dagelijks' || raw === 'elke_dag') return 'daily';
+  if (raw === 'weekdays' || raw === 'werkdagen') return 'weekdays';
+  if (raw === 'three_per_week' || raw === 'drie_per_week' || raw === '3x_per_week') return 'three_per_week';
+  if (raw === 'weekly' || raw === 'wekelijks') return 'weekly';
+  if (raw === 'manual' || raw === 'handmatig') return 'manual';
+  return 'weekly';
+}
+
+function getDefaultSeoAutomationSettings() {
+  return {
+    preferredModel: 'gpt-5.1',
+    blogAutomationEnabled: false,
+    blogCadence: 'weekly',
+    blogModel: 'gpt-5.1',
+    blogAutoImages: true,
+    searchConsoleConnected: false,
+    analyticsConnected: false,
+    updatedAt: '',
+  };
+}
+
+function normalizeSeoAutomationSettings(raw) {
+  const defaults = getDefaultSeoAutomationSettings();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return defaults;
+  return {
+    preferredModel: normalizeSeoModelPreset(raw.preferredModel || raw.model || defaults.preferredModel),
+    blogAutomationEnabled: toBooleanSafe(raw.blogAutomationEnabled ?? raw.blogEnabled, defaults.blogAutomationEnabled),
+    blogCadence: normalizeSeoBlogCadence(raw.blogCadence || raw.blogFrequency || defaults.blogCadence),
+    blogModel: normalizeSeoModelPreset(raw.blogModel || raw.blog_model || defaults.blogModel),
+    blogAutoImages: toBooleanSafe(raw.blogAutoImages ?? raw.blogImages, defaults.blogAutoImages),
+    searchConsoleConnected: toBooleanSafe(raw.searchConsoleConnected, defaults.searchConsoleConnected),
+    analyticsConnected: toBooleanSafe(raw.analyticsConnected, defaults.analyticsConnected),
+    updatedAt: normalizeString(raw.updatedAt || ''),
   };
 }
 
@@ -2045,6 +2113,8 @@ function normalizeSeoStoredImageOverrides(raw) {
 function normalizeSeoConfig(raw) {
   const base = getDefaultSeoConfig();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base;
+  base.version = Math.max(2, parseIntSafe(raw.version, 2));
+  base.automation = normalizeSeoAutomationSettings(raw.automation);
 
   const pagesRaw = raw.pages && typeof raw.pages === 'object' ? raw.pages : {};
   for (const [fileNameRaw, pageOverridesRaw] of Object.entries(pagesRaw)) {
@@ -2237,6 +2307,448 @@ function mergeSeoSourceWithOverrides(sourceRaw, overridesRaw) {
     merged[field.key] = overrides[field.key] || source[field.key] || '';
   }
   return merged;
+}
+
+function getSeoModelPresetOptions() {
+  return SEO_MODEL_PRESETS.map((item) => ({ ...item }));
+}
+
+function getSeoPathFromFileName(fileNameRaw) {
+  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
+  if (!fileName) return '/';
+  const slug = fileName.replace(/\.html$/i, '');
+  return slug === 'index' ? '/' : `/${slug}`;
+}
+
+function stripSeoBrandTokens(valueRaw) {
+  return normalizeString(valueRaw || '')
+    .replace(/\bsoftora(?:\.nl)?\b/gi, ' ')
+    .replace(/[|·]+/g, ' ')
+    .replace(/\s+[—-]\s+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function humanizeSeoToken(tokenRaw) {
+  const token = normalizeString(tokenRaw || '').toLowerCase();
+  if (!token) return '';
+  if (token === 'ai') return 'AI';
+  if (token === 'seo') return 'SEO';
+  if (token === 'crm') return 'CRM';
+  if (token === 'pdfs' || token === 'pdf') return "PDF's";
+  if (token === 'ga') return 'GA';
+  return token.charAt(0).toUpperCase() + token.slice(1);
+}
+
+function humanizeSeoPathSegment(segmentRaw) {
+  return normalizeString(segmentRaw || '')
+    .split(/[-_/]+/)
+    .map(humanizeSeoToken)
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
+
+function buildSeoTopicLabel(fileName, effectiveSeoRaw = {}) {
+  const effectiveSeo = effectiveSeoRaw && typeof effectiveSeoRaw === 'object' ? effectiveSeoRaw : {};
+  const candidates = [
+    stripSeoBrandTokens(effectiveSeo.h1 || ''),
+    stripSeoBrandTokens(effectiveSeo.title || ''),
+    humanizeSeoPathSegment(getSeoPathFromFileName(fileName).replace(/^\//, '')),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const cleaned = normalizeString(candidate).replace(/\s+/g, ' ').trim();
+    if (cleaned && cleaned.length >= 3) return cleaned;
+  }
+
+  return 'Softora website';
+}
+
+function buildSeoPathKeywords(pathNameRaw, topicRaw) {
+  const pathName = normalizeString(pathNameRaw || '');
+  const topic = normalizeString(topicRaw || '');
+  const source = `${pathName.replace(/[\/_-]+/g, ' ')} ${topic}`;
+  const parts = source
+    .toLowerCase()
+    .split(/\s+/)
+    .map((item) => item.replace(/[^a-z0-9à-ÿ]/gi, ''))
+    .filter(Boolean)
+    .filter((item) => item.length >= 3);
+  const unique = [];
+  const seen = new Set();
+  parts.forEach((part) => {
+    if (seen.has(part)) return;
+    seen.add(part);
+    unique.push(part);
+  });
+  return unique.slice(0, 6);
+}
+
+function buildSeoSuggestedTitle(fileName, effectiveSeoRaw = {}) {
+  const pathName = getSeoPathFromFileName(fileName);
+  if (pathName === '/') return 'Softora | Websites, Bedrijfssoftware & Voicesoftware';
+  const topic = buildSeoTopicLabel(fileName, effectiveSeoRaw);
+  const withBrand = `${topic} | Softora`;
+  return truncateText(withBrand, 60);
+}
+
+function buildSeoSuggestedMetaDescription(fileName, effectiveSeoRaw = {}) {
+  const pathName = getSeoPathFromFileName(fileName);
+  const topic = buildSeoTopicLabel(fileName, effectiveSeoRaw);
+  const keywordBits = buildSeoPathKeywords(pathName, topic);
+  const keywordTail = keywordBits.length ? ` met focus op ${keywordBits.slice(0, 3).join(', ')}` : '';
+
+  if (pathName === '/') {
+    return truncateText(
+      'Softora bouwt websites, bedrijfssoftware en voicesoftware die direct bijdragen aan groei, conversie en slimmere processen.',
+      160
+    );
+  }
+
+  return truncateText(
+    `${topic} van Softora. Ontdek wat deze pagina oplevert, hoe de oplossing werkt en waarom dit relevant is voor jouw bedrijf${keywordTail}.`,
+    160
+  );
+}
+
+function buildSeoSuggestedMetaKeywords(fileName, effectiveSeoRaw = {}) {
+  const pathName = getSeoPathFromFileName(fileName);
+  const topic = buildSeoTopicLabel(fileName, effectiveSeoRaw);
+  const keywords = ['softora'];
+  const topicWords = topic
+    .toLowerCase()
+    .split(/\s+/)
+    .map((item) => item.replace(/[^a-z0-9à-ÿ]/gi, ''))
+    .filter((item) => item.length >= 3);
+  keywords.push(...topicWords);
+  keywords.push(...buildSeoPathKeywords(pathName, topic));
+  return Array.from(new Set(keywords)).slice(0, 8).join(', ');
+}
+
+function buildSeoSuggestedCanonical(fileName) {
+  const pathName = getSeoPathFromFileName(fileName);
+  return pathName === '/' ? SEO_DEFAULT_SITE_ORIGIN : `${SEO_DEFAULT_SITE_ORIGIN}${pathName}`;
+}
+
+function buildSeoSuggestedH1(fileName, effectiveSeoRaw = {}) {
+  return truncateText(buildSeoTopicLabel(fileName, effectiveSeoRaw), 80);
+}
+
+function buildSeoSuggestedAltText(fileName, imageIndex, effectiveSeoRaw = {}) {
+  const topic = buildSeoTopicLabel(fileName, effectiveSeoRaw);
+  return truncateText(`Visual van ${topic} - Softora`, 120);
+}
+
+function isSeoTitleHealthy(valueRaw) {
+  const length = normalizeString(valueRaw || '').length;
+  return length >= 28 && length <= 65;
+}
+
+function isSeoDescriptionHealthy(valueRaw) {
+  const length = normalizeString(valueRaw || '').length;
+  return length >= 110 && length <= 170;
+}
+
+function isSeoCanonicalHealthy(valueRaw, fileName) {
+  const value = normalizeAbsoluteHttpUrl(valueRaw || '');
+  if (!value) return false;
+  return value === buildSeoSuggestedCanonical(fileName);
+}
+
+function isSeoRobotsHealthy(valueRaw) {
+  const value = normalizeString(valueRaw || '').toLowerCase();
+  if (!value) return true;
+  return /index/.test(value) && /follow/.test(value);
+}
+
+function buildSeoPageAuditEntry(fileName, sourceSeo, pageOverrides, effectiveSeo, images) {
+  const normalizedImages = Array.isArray(images) ? images : [];
+  const imageAltMissing = normalizedImages.filter((image) => !normalizeString(image?.effectiveAlt || image?.alt || '')).length;
+  const totalImages = normalizedImages.length;
+  const altCoverage = totalImages === 0 ? 100 : Math.round(((totalImages - imageAltMissing) / totalImages) * 100);
+
+  const titleHealthy = isSeoTitleHealthy(effectiveSeo?.title || '');
+  const descriptionHealthy = isSeoDescriptionHealthy(effectiveSeo?.metaDescription || '');
+  const h1Healthy = normalizeString(effectiveSeo?.h1 || '').length >= 4;
+  const canonicalHealthy = isSeoCanonicalHealthy(effectiveSeo?.canonical || '', fileName);
+  const robotsHealthy = isSeoRobotsHealthy(effectiveSeo?.robots || '');
+  const ogTitleHealthy = normalizeString(effectiveSeo?.ogTitle || '').length >= 4;
+  const ogDescriptionHealthy = normalizeString(effectiveSeo?.ogDescription || '').length >= 30;
+  const twitterTitleHealthy = normalizeString(effectiveSeo?.twitterTitle || '').length >= 4;
+  const twitterDescriptionHealthy = normalizeString(effectiveSeo?.twitterDescription || '').length >= 30;
+
+  const score =
+    (titleHealthy ? 18 : 0) +
+    (descriptionHealthy ? 18 : 0) +
+    (h1Healthy ? 12 : 0) +
+    (canonicalHealthy ? 12 : 0) +
+    (robotsHealthy ? 8 : 0) +
+    (ogTitleHealthy ? 8 : 0) +
+    (ogDescriptionHealthy ? 8 : 0) +
+    (twitterTitleHealthy ? 5 : 0) +
+    (twitterDescriptionHealthy ? 5 : 0) +
+    Math.round((Math.max(0, Math.min(100, altCoverage)) / 100) * 6);
+
+  const strengths = [];
+  const improvements = [];
+
+  if (titleHealthy) strengths.push('Meta title staat op goede lengte.');
+  else improvements.push('Meta title kan scherper of compacter.');
+  if (descriptionHealthy) strengths.push('Meta description is bruikbaar voor zoekresultaten.');
+  else improvements.push('Meta description mist of kan duidelijker.');
+  if (canonicalHealthy) strengths.push('Canonical URL staat goed.');
+  else improvements.push('Canonical URL ontbreekt of wijst nog niet strak naar deze pagina.');
+  if (altCoverage >= 90) strengths.push('Afbeeldingen zijn grotendeels voorzien van alt-tekst.');
+  else if (totalImages > 0) improvements.push('Niet alle afbeeldingen hebben een goede alt-tekst.');
+  if (ogTitleHealthy && ogDescriptionHealthy) strengths.push('Social sharing basis is aanwezig.');
+  else improvements.push('Open Graph velden kunnen vollediger.');
+  if (twitterTitleHealthy && twitterDescriptionHealthy) strengths.push('Twitter/X velden zijn ingevuld.');
+  else improvements.push('Twitter/X velden kunnen vollediger.');
+
+  const suggestedPageOverrides = {};
+  if (!titleHealthy) suggestedPageOverrides.title = buildSeoSuggestedTitle(fileName, effectiveSeo);
+  if (!descriptionHealthy) suggestedPageOverrides.metaDescription = buildSeoSuggestedMetaDescription(fileName, effectiveSeo);
+  if (!normalizeString(effectiveSeo?.metaKeywords || '')) {
+    suggestedPageOverrides.metaKeywords = buildSeoSuggestedMetaKeywords(fileName, effectiveSeo);
+  }
+  if (!canonicalHealthy) suggestedPageOverrides.canonical = buildSeoSuggestedCanonical(fileName);
+  if (!robotsHealthy) suggestedPageOverrides.robots = 'index, follow';
+  if (!ogTitleHealthy) suggestedPageOverrides.ogTitle = suggestedPageOverrides.title || normalizeString(effectiveSeo?.title || '') || buildSeoSuggestedTitle(fileName, effectiveSeo);
+  if (!ogDescriptionHealthy) {
+    suggestedPageOverrides.ogDescription =
+      suggestedPageOverrides.metaDescription ||
+      normalizeString(effectiveSeo?.metaDescription || '') ||
+      buildSeoSuggestedMetaDescription(fileName, effectiveSeo);
+  }
+  if (!twitterTitleHealthy) {
+    suggestedPageOverrides.twitterTitle =
+      suggestedPageOverrides.ogTitle ||
+      suggestedPageOverrides.title ||
+      normalizeString(effectiveSeo?.title || '') ||
+      buildSeoSuggestedTitle(fileName, effectiveSeo);
+  }
+  if (!twitterDescriptionHealthy) {
+    suggestedPageOverrides.twitterDescription =
+      suggestedPageOverrides.ogDescription ||
+      suggestedPageOverrides.metaDescription ||
+      normalizeString(effectiveSeo?.metaDescription || '') ||
+      buildSeoSuggestedMetaDescription(fileName, effectiveSeo);
+  }
+  if (!h1Healthy) suggestedPageOverrides.h1 = buildSeoSuggestedH1(fileName, effectiveSeo);
+
+  const suggestedImageOverrides = {};
+  normalizedImages.forEach((image, index) => {
+    const currentAlt = normalizeString(image?.effectiveAlt || image?.alt || '');
+    if (currentAlt) return;
+    const src = truncateText(normalizeString(image?.src || ''), 1800);
+    if (!src) return;
+    suggestedImageOverrides[src] = buildSeoSuggestedAltText(fileName, index + 1, effectiveSeo);
+  });
+
+  const changeCount = Object.keys(suggestedPageOverrides).length + Object.keys(suggestedImageOverrides).length;
+  const pathName = getSeoPathFromFileName(fileName);
+
+  return {
+    file: fileName,
+    path: pathName,
+    title: normalizeString(effectiveSeo?.title || sourceSeo?.title || pathName || fileName),
+    topic: buildSeoTopicLabel(fileName, effectiveSeo),
+    score: Math.max(0, Math.min(100, score)),
+    strengths: strengths.slice(0, 3),
+    improvements: improvements.slice(0, 4),
+    imageCount: totalImages,
+    missingAltCount: imageAltMissing,
+    pageOverrideCount: Object.keys(pageOverrides || {}).length,
+    imageOverrideCount: Object.keys(suggestedImageOverrides || {}).length,
+    current: effectiveSeo,
+    suggestedPageOverrides,
+    suggestedImageOverrides,
+    changeCount,
+    health: {
+      titleHealthy,
+      descriptionHealthy,
+      h1Healthy,
+      canonicalHealthy,
+      robotsHealthy,
+      ogTitleHealthy,
+      ogDescriptionHealthy,
+      twitterTitleHealthy,
+      twitterDescriptionHealthy,
+      altCoverage,
+    },
+  };
+}
+
+async function buildSeoSiteAudit(configRaw = null) {
+  const config = normalizeSeoConfig(configRaw || (await getSeoConfigCached()));
+  const pages = [];
+  const files = getSeoEditableHtmlFiles();
+
+  for (const fileName of files) {
+    const html = await readHtmlPageContent(fileName);
+    if (!html) continue;
+    const sourceSeo = extractSeoSourceFromHtml(html);
+    const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
+    const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
+    const effectiveSeo = mergeSeoSourceWithOverrides(sourceSeo, pageOverrides);
+    const images = extractImageEntriesFromHtml(html).map((entry) => ({
+      ...entry,
+      effectiveAlt: normalizeString(imageOverrides[entry.src] || entry.alt || ''),
+    }));
+    pages.push(buildSeoPageAuditEntry(fileName, sourceSeo, pageOverrides, effectiveSeo, images));
+  }
+
+  const sortedPages = pages.slice().sort((a, b) => a.score - b.score || a.path.localeCompare(b.path));
+  const pageCount = sortedPages.length;
+  const totalImages = sortedPages.reduce((sum, page) => sum + Number(page.imageCount || 0), 0);
+  const totalMissingAltImages = sortedPages.reduce((sum, page) => sum + Number(page.missingAltCount || 0), 0);
+  const titleHealthyCount = sortedPages.filter((page) => page.health.titleHealthy).length;
+  const descriptionHealthyCount = sortedPages.filter((page) => page.health.descriptionHealthy).length;
+  const canonicalHealthyCount = sortedPages.filter((page) => page.health.canonicalHealthy).length;
+  const socialHealthyCount = sortedPages.filter(
+    (page) => page.health.ogTitleHealthy && page.health.ogDescriptionHealthy && page.health.twitterTitleHealthy && page.health.twitterDescriptionHealthy
+  ).length;
+  const pagesNeedingAttention = sortedPages.filter((page) => page.score < 80).length;
+  const overallScore =
+    pageCount > 0
+      ? Math.round(sortedPages.reduce((sum, page) => sum + Number(page.score || 0), 0) / pageCount)
+      : 0;
+
+  const metrics = [
+    {
+      key: 'titles',
+      label: 'Meta titles',
+      count: titleHealthyCount,
+      total: pageCount,
+      percent: pageCount > 0 ? Math.round((titleHealthyCount / pageCount) * 100) : 0,
+    },
+    {
+      key: 'descriptions',
+      label: 'Descriptions',
+      count: descriptionHealthyCount,
+      total: pageCount,
+      percent: pageCount > 0 ? Math.round((descriptionHealthyCount / pageCount) * 100) : 0,
+    },
+    {
+      key: 'canonicals',
+      label: 'Canonicals',
+      count: canonicalHealthyCount,
+      total: pageCount,
+      percent: pageCount > 0 ? Math.round((canonicalHealthyCount / pageCount) * 100) : 0,
+    },
+    {
+      key: 'social',
+      label: 'Social tags',
+      count: socialHealthyCount,
+      total: pageCount,
+      percent: pageCount > 0 ? Math.round((socialHealthyCount / pageCount) * 100) : 0,
+    },
+    {
+      key: 'image_alt',
+      label: 'Afbeelding alt',
+      count: totalImages - totalMissingAltImages,
+      total: totalImages,
+      percent: totalImages > 0 ? Math.round(((totalImages - totalMissingAltImages) / totalImages) * 100) : 100,
+    },
+  ];
+
+  const strengths = [];
+  const improvements = [];
+  if (metrics[0].percent >= 80) strengths.push('De meeste pagina\'s hebben al een sterke meta title.');
+  else improvements.push('Een deel van de pagina\'s kan een scherpere meta title gebruiken.');
+  if (metrics[1].percent >= 75) strengths.push('Veel meta descriptions zijn al goed bruikbaar.');
+  else improvements.push('Meerdere meta descriptions missen of zijn nog te generiek.');
+  if (metrics[2].percent >= 80) strengths.push('Canonical URL\'s zijn op veel pagina\'s al netjes afgedekt.');
+  else improvements.push('Canonical URL\'s mogen consistenter naar de live pagina wijzen.');
+  if (metrics[4].percent >= 85) strengths.push('Afbeeldingen hebben op veel plekken al een goede alt-tekst.');
+  else improvements.push('Er ontbreken nog alt-teksten op een deel van de afbeeldingen.');
+  if (pagesNeedingAttention === 0 && pageCount > 0) strengths.push('Geen directe rode vlaggen in de huidige SEO-basis.');
+  if (pagesNeedingAttention > 0) {
+    improvements.push(`${pagesNeedingAttention} pagina${pagesNeedingAttention === 1 ? '' : '\'s'} vragen nog om extra aandacht.`);
+  }
+
+  return {
+    ok: true,
+    auditedAt: new Date().toISOString(),
+    overallScore,
+    totals: {
+      pages: pageCount,
+      pagesNeedingAttention,
+      images: totalImages,
+      missingAltImages: totalMissingAltImages,
+    },
+    metrics,
+    strengths: strengths.slice(0, 4),
+    improvements: improvements.slice(0, 5),
+    pages: sortedPages,
+    modelOptions: getSeoModelPresetOptions(),
+    automation: normalizeSeoAutomationSettings(config.automation),
+  };
+}
+
+function applySeoAuditSuggestionsToConfig(configRaw, auditRaw, modelRaw) {
+  const nextConfig = normalizeSeoConfig(configRaw);
+  const audit = auditRaw && typeof auditRaw === 'object' ? auditRaw : {};
+  const pages = Array.isArray(audit.pages) ? audit.pages : [];
+  const preferredModel = normalizeSeoModelPreset(modelRaw || nextConfig.automation?.preferredModel || 'gpt-5.1');
+
+  let appliedPageFieldCount = 0;
+  let appliedImageAltCount = 0;
+  const changedPages = [];
+
+  pages.forEach((page) => {
+    const fileName = sanitizeKnownHtmlFileName(page?.file);
+    if (!fileName) return;
+
+    const pagePatch = normalizeSeoStoredPageOverrides(page?.suggestedPageOverrides || {});
+    const imagePatch = normalizeSeoStoredImageOverrides(page?.suggestedImageOverrides || {});
+    const pageFieldCount = Object.keys(pagePatch).length;
+    const imageFieldCount = Object.keys(imagePatch).length;
+    if (pageFieldCount === 0 && imageFieldCount === 0) return;
+
+    nextConfig.pages[fileName] = {
+      ...(nextConfig.pages[fileName] || {}),
+      ...pagePatch,
+    };
+
+    nextConfig.images[fileName] = {
+      ...(nextConfig.images[fileName] || {}),
+      ...imagePatch,
+    };
+
+    if (Object.keys(nextConfig.pages[fileName]).length === 0) delete nextConfig.pages[fileName];
+    if (Object.keys(nextConfig.images[fileName]).length === 0) delete nextConfig.images[fileName];
+
+    appliedPageFieldCount += pageFieldCount;
+    appliedImageAltCount += imageFieldCount;
+
+    changedPages.push({
+      file: fileName,
+      path: normalizeString(page?.path || getSeoPathFromFileName(fileName)),
+      title: normalizeString(page?.title || page?.topic || fileName),
+      topic: normalizeString(page?.topic || ''),
+      scoreBefore: Math.max(0, Math.min(100, parseIntSafe(page?.score, 0))),
+      appliedPageFieldCount: pageFieldCount,
+      appliedImageAltCount: imageFieldCount,
+      pageOverrides: pagePatch,
+      imageOverrides: imagePatch,
+    });
+  });
+
+  nextConfig.automation = normalizeSeoAutomationSettings({
+    ...(nextConfig.automation || {}),
+    preferredModel,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return {
+    nextConfig,
+    preferredModel,
+    changedPages,
+    appliedPageFieldCount,
+    appliedImageAltCount,
+  };
 }
 
 function escapeHtmlAttribute(valueRaw) {
@@ -11182,6 +11694,157 @@ app.post('/api/seo/page', async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: 'SEO wijzigingen opslaan mislukt.',
+    });
+  }
+});
+
+app.get('/api/seo/site-audit', async (_req, res) => {
+  try {
+    const audit = await buildSeoSiteAudit();
+    return res.status(200).json(audit);
+  } catch (error) {
+    console.error('[SEO][SiteAuditError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon de volledige SEO-scan niet uitvoeren.',
+    });
+  }
+});
+
+app.post('/api/seo/site-optimize', async (req, res) => {
+  try {
+    const preferredModel = normalizeSeoModelPreset(req.body?.model || req.body?.preferredModel || 'gpt-5.1');
+    const currentConfig = await getSeoConfigCached(true);
+    const currentAudit = await buildSeoSiteAudit(currentConfig);
+    const optimization = applySeoAuditSuggestionsToConfig(currentConfig, currentAudit, preferredModel);
+
+    if (optimization.changedPages.length === 0) {
+      let savedConfig = currentConfig;
+      if (normalizeSeoModelPreset(currentConfig?.automation?.preferredModel || '') !== preferredModel) {
+        const saved = await persistSeoConfig(optimization.nextConfig, {
+          source: 'seo-dashboard',
+          actor: normalizeString(req.body?.actor || 'site-optimize'),
+        });
+        if (saved) savedConfig = saved;
+      }
+      const audit = await buildSeoSiteAudit(savedConfig);
+      return res.status(200).json({
+        ok: true,
+        optimizedAt: new Date().toISOString(),
+        preferredModel,
+        changedPages: [],
+        appliedPageFieldCount: 0,
+        appliedImageAltCount: 0,
+        audit,
+        message: 'Er waren geen extra SEO-aanpassingen nodig.',
+      });
+    }
+
+    const saved = await persistSeoConfig(optimization.nextConfig, {
+      source: 'seo-dashboard',
+      actor: normalizeString(req.body?.actor || 'site-optimize'),
+    });
+    if (!saved) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Kon de AI SEO-optimalisatie niet opslaan.',
+      });
+    }
+
+    appendDashboardActivity(
+      {
+        type: 'seo_site_optimized',
+        title: 'SEO site-optimalisatie uitgevoerd',
+        detail: `${optimization.changedPages.length} pagina's geoptimaliseerd met ${preferredModel}.`,
+        source: 'premium-seo',
+        actor: normalizeString(req.body?.actor || 'site-optimize'),
+      },
+      'dashboard_activity_seo_site_optimized'
+    );
+
+    const audit = await buildSeoSiteAudit(saved);
+    return res.status(200).json({
+      ok: true,
+      optimizedAt: new Date().toISOString(),
+      preferredModel,
+      changedPages: optimization.changedPages,
+      appliedPageFieldCount: optimization.appliedPageFieldCount,
+      appliedImageAltCount: optimization.appliedImageAltCount,
+      audit,
+      message: `${optimization.changedPages.length} pagina's automatisch bijgewerkt.`,
+    });
+  } catch (error) {
+    console.error('[SEO][SiteOptimizeError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon de AI SEO-optimalisatie niet uitvoeren.',
+    });
+  }
+});
+
+app.post('/api/seo/automation', async (req, res) => {
+  try {
+    const currentConfig = await getSeoConfigCached(true);
+    const nextConfig = normalizeSeoConfig(currentConfig);
+    const automationPatch = {
+      ...(nextConfig.automation || {}),
+      updatedAt: new Date().toISOString(),
+    };
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'preferredModel') || Object.prototype.hasOwnProperty.call(req.body || {}, 'model')) {
+      automationPatch.preferredModel = req.body?.preferredModel ?? req.body?.model;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogAutomationEnabled')) {
+      automationPatch.blogAutomationEnabled = req.body?.blogAutomationEnabled;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogCadence')) {
+      automationPatch.blogCadence = req.body?.blogCadence;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogModel')) {
+      automationPatch.blogModel = req.body?.blogModel;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogAutoImages')) {
+      automationPatch.blogAutoImages = req.body?.blogAutoImages;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'searchConsoleConnected')) {
+      automationPatch.searchConsoleConnected = req.body?.searchConsoleConnected;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'analyticsConnected')) {
+      automationPatch.analyticsConnected = req.body?.analyticsConnected;
+    }
+    nextConfig.automation = normalizeSeoAutomationSettings(automationPatch);
+
+    const saved = await persistSeoConfig(nextConfig, {
+      source: 'seo-dashboard',
+      actor: normalizeString(req.body?.actor || 'automation'),
+    });
+    if (!saved) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Kon de SEO automatisering niet opslaan.',
+      });
+    }
+
+    appendDashboardActivity(
+      {
+        type: 'seo_automation_updated',
+        title: 'SEO automatisering bijgewerkt',
+        detail: `Voorkeursmodel ${saved.automation.preferredModel}, blogschema ${saved.automation.blogCadence}.`,
+        source: 'premium-seo',
+        actor: normalizeString(req.body?.actor || 'automation'),
+      },
+      'dashboard_activity_seo_automation_updated'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      automation: normalizeSeoAutomationSettings(saved.automation),
+      modelOptions: getSeoModelPresetOptions(),
+    });
+  } catch (error) {
+    console.error('[SEO][AutomationSaveError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon de SEO automatisering niet opslaan.',
     });
   }
 });
