@@ -1590,7 +1590,7 @@
                 const leadTimeValue = normalizeTimeValue(lead.time || '09:00') || '09:00';
                 const leadLocationValue = String(lead.location || '').trim();
                 const leadWhatsappInfoValue = String(lead.whatsappInfo || '').trim();
-                const leadOwnerValue = String(lead.leadOwnerName || lead.leadOwnerFullName || '').trim();
+                const leadOwnerValue = String(lead.leadOwnerFullName || lead.leadOwnerName || '').trim();
 
                 modalSub.textContent = [
                     String(lead.company || 'Onbekende lead'),
@@ -2016,7 +2016,7 @@
                     const leadOrigin = esc(resolveLeadOrigin(item));
                     const leadProvider = esc(resolveLeadProvider(item));
                     const leadOwner = esc(
-                        String(item.leadOwnerName || item.leadOwnerFullName || '').trim() || 'Nog niet toegewezen'
+                        String(item.leadOwnerFullName || item.leadOwnerName || '').trim() || 'Nog niet toegewezen'
                     );
                     const chipClass = normalize(item?.leadChipClass || '') === 'confirmed' ? 'confirmed' : 'pending';
                     const chipLabel = esc(String(item?.leadChipLabel || 'LEAD').trim() || 'LEAD');

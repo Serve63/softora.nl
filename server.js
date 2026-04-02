@@ -829,15 +829,15 @@ function buildLeadOwnerFallbackRecord(key) {
   if (key === 'martijn') {
     return {
       key: 'martijn',
-      displayName: 'Martijn',
-      fullName: 'Martijn',
+      displayName: 'Martijn van de Ven',
+      fullName: 'Martijn van de Ven',
       userId: '',
       email: '',
     };
   }
   return {
     key: 'serve',
-    displayName: 'Servé',
+    displayName: 'Servé Creusen',
     fullName: 'Servé Creusen',
     userId: '',
     email: '',
@@ -846,11 +846,10 @@ function buildLeadOwnerFallbackRecord(key) {
 
 function buildLeadOwnerRecordFromUser(user, fallbackKey) {
   const fallback = buildLeadOwnerFallbackRecord(fallbackKey);
-  const displayName = truncateText(normalizeString(user?.firstName || ''), 80) || fallback.displayName;
   const fullName = premiumUsersStore.buildUserDisplayName(user) || fallback.fullName;
   return {
     key: fallback.key,
-    displayName,
+    displayName: fullName,
     fullName,
     userId: truncateText(normalizeString(user?.id || ''), 120),
     email: normalizePremiumSessionEmail(user?.email || ''),
