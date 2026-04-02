@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SEO | Softora.nl</title>
+<title>SEO – Softora.nl</title>
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Oswald:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
 <script>
   (function () {
@@ -22,829 +22,532 @@
 </script>
 <script src="assets/personnel-theme.js?v=20260402-4" defer></script>
 <style>
-  *, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: var(--bg-primary);
+  --crimson: var(--accent);
+  --crimson-light: var(--accent-light);
+  --text-dark: var(--text-primary);
+  --text-mid: var(--text-secondary);
+  --text-light: var(--text-tertiary);
+  --white: #fff;
+  --card: var(--bg-secondary);
+  --tag: rgba(139, 34, 82, 0.06);
+  --green: #16733c;
+  --orange: #b45a00;
+  --red: #c0392b;
+  --score-good: #16733c;
+  --score-mid: #b45a00;
+  --score-bad: #c0392b;
+  --seo-shadow: 0 18px 40px rgba(26, 26, 46, 0.06);
+}
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text-dark);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+.dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 280px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+.main-content {
+  margin-left: 280px;
+  width: calc(100% - 280px);
+  min-height: 100vh;
+  min-width: 0;
+  padding: clamp(1.6rem, 3vw, 3rem);
+}
+.page-shell {
+  width: min(1280px, 100%);
+}
+.page-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(2.2rem, 4vw, 3.3rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 0.96;
+  margin-bottom: 6px;
+}
+.page-subtitle {
+  max-width: 62ch;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-mid);
+  margin-bottom: 28px;
+}
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+  overflow-x: auto;
+}
+.tab {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  padding: 12px 18px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-radius: 12px 12px 0 0;
+  position: relative;
+  transition: color .15s, background .15s;
+}
+.tab:hover {
+  color: var(--text-dark);
+  background: rgba(139, 34, 82, 0.04);
+}
+.tab.active { color: var(--crimson); }
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--crimson);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
-  :root {
-    --seo-shell-max: 1340px;
-    --seo-shadow: 0 18px 40px rgba(26, 26, 46, 0.07);
-    --seo-shadow-soft: 0 10px 24px rgba(26, 26, 46, 0.04);
-    --seo-good: #1d8f57;
-    --seo-warn: #d08a18;
-    --seo-bad: #d04949;
-    --seo-info: #346bd6;
-  }
+.scan-url-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  margin-bottom: 28px;
+  align-items: stretch;
+}
+.scan-url-bar input {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  background: var(--card);
+  outline: none;
+  color: var(--text-dark);
+  transition: border-color .15s, box-shadow .15s;
+}
+.scan-url-bar input:focus {
+  border-color: rgba(139, 34, 82, 0.42);
+  box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.12);
+}
+.btn-scan,
+.btn-ai {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 24px;
+  background: var(--crimson);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s, transform .15s, box-shadow .15s;
+  white-space: nowrap;
+  box-shadow: 0 12px 28px rgba(139, 34, 82, 0.18);
+}
+.btn-scan svg,
+.btn-ai svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  display: block;
+}
+.btn-scan:hover,
+.btn-ai:hover {
+  background: var(--crimson-light);
+  transform: translateY(-1px);
+}
+.btn-scan:disabled,
+.btn-ai:disabled { opacity: .6; cursor: not-allowed; }
 
-  body {
-    font-family: 'Inter', sans-serif;
-    color: var(--text-primary);
-    background:
-      radial-gradient(circle at 88% 14%, rgba(139, 34, 82, 0.08), transparent 32%),
-      var(--bg-primary);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+.scan-overview {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+  align-items: start;
+}
+.score-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.score-ring { position: relative; width: 110px; height: 110px; }
+.score-ring svg {
+  width: 110px;
+  height: 110px;
+  display: block;
+  transform: rotate(-90deg);
+}
+.score-ring-track { fill: none; stroke: var(--border); stroke-width: 10; }
+.score-ring-fill { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s ease, stroke .5s; }
+.score-number {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+}
+.score-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+.score-verdict { font-size: 13px; font-weight: 600; padding: 4px 14px; border-radius: 20px; }
+.verdict-good { background: rgba(22,115,60,.1); color: var(--green); }
+.verdict-mid { background: rgba(180,90,0,.1); color: var(--orange); }
+.verdict-bad { background: rgba(192,57,43,.1); color: var(--red); }
 
-  .dashboard-layout {
-    display: flex;
-    min-height: 100vh;
-  }
+.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.metric-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 18px;
+}
+.metric-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 8px;
+}
+.metric-val {
+  font-family: 'Oswald', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.metric-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.metric-bar-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+.metric-note { font-size: 11px; color: var(--text-light); line-height: 1.4; }
 
+.issues-section { margin-top: 24px; }
+.issues-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 12px;
+}
+.issues-list { display: flex; flex-direction: column; gap: 8px; }
+.issue-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.issue-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.issue-dot.error { background: var(--red); }
+.issue-dot.warning { background: var(--orange); }
+.issue-dot.ok { background: var(--green); }
+.issue-text { font-size: 13px; color: var(--text-dark); line-height: 1.4; }
+.issue-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.issue-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+  align-self: center;
+}
+.tag-error { background: rgba(192,57,43,.1); color: var(--red); }
+.tag-warning { background: rgba(180,90,0,.1); color: var(--orange); }
+.tag-ok { background: rgba(22,115,60,.1); color: var(--green); }
+
+.scan-empty,
+.scan-loading,
+.ai-card,
+.kw-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.scan-empty {
+  padding: 60px;
+  text-align: center;
+  color: var(--text-light);
+}
+.scan-empty svg {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  opacity: .3;
+  display: block;
+}
+.scan-empty p { font-size: 13px; }
+.scan-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 60px;
+}
+.loader {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--crimson);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text { font-size: 13px; color: var(--text-light); }
+
+.ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.ai-card { overflow: hidden; }
+.ai-card-head {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--tag);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ai-card-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dark);
+}
+.ai-card-body { padding: 18px; }
+.field-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 6px;
+  margin-top: 14px;
+}
+.field-label:first-child { margin-top: 0; }
+.field-val {
+  font-size: 13px;
+  color: var(--text-dark);
+  line-height: 1.5;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 9px 12px;
+  min-height: 40px;
+}
+.field-val textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: var(--text-dark);
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+}
+.char-count { font-size: 10px; color: var(--text-light); text-align: right; margin-top: 3px; }
+.char-count.over { color: var(--red); }
+
+.btn-ai-all {
+  width: fit-content;
+  max-width: 100%;
+  justify-content: center;
+  padding: 12px 18px;
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+.ai-status {
+  font-size: 11px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ai-status.loading { background: rgba(155,35,85,.08); color: var(--crimson); }
+.ai-status.done { background: rgba(22,115,60,.1); color: var(--green); }
+.ai-status svg { width: 12px; height: 12px; display: block; }
+.ai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--crimson); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+
+.kw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kw-item { padding: 10px 14px; }
+.kw-term { font-size: 13px; font-weight: 600; color: var(--text-dark); margin-bottom: 4px; }
+.kw-meta { display: flex; gap: 12px; }
+.kw-vol { font-size: 11px; color: var(--text-light); }
+.kw-diff { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 3px; }
+.diff-low { background: rgba(22,115,60,.1); color: var(--green); }
+.diff-mid { background: rgba(180,90,0,.1); color: var(--orange); }
+.diff-high { background: rgba(192,57,43,.1); color: var(--red); }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--text-dark);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all .25s;
+  z-index: 999;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+.score-card,
+.metric-card,
+.issue-item,
+.scan-empty,
+.scan-loading,
+.ai-card,
+.kw-item {
+  box-shadow: var(--seo-shadow);
+}
+
+.score-card,
+.metric-card,
+.issue-item,
+.scan-empty,
+.scan-loading,
+.ai-card,
+.kw-item,
+.field-val {
+  border-radius: 18px;
+}
+
+.score-number,
+.score-label,
+.metric-title,
+.metric-val,
+.issues-title,
+.ai-card-title,
+.field-label,
+.kw-diff {
+  font-family: 'Oswald', sans-serif;
+}
+
+.metric-title,
+.issues-title,
+.field-label,
+.char-count,
+.kw-vol {
+  letter-spacing: 0.08em;
+}
+
+.metric-card,
+.issue-item,
+.field-val {
+  background: var(--card);
+}
+
+.field-val {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.ai-card-head {
+  background: var(--tag);
+}
+
+.scan-empty,
+.scan-loading {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+}
+
+.scan-empty {
+  padding: clamp(2rem, 5vw, 4rem);
+}
+
+@media (max-width: 1100px) {
   .sidebar {
-    width: 280px;
-    position: fixed;
-    inset: 0 auto 0 0;
-    height: 100vh;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
+    position: static;
+    width: 100%;
+    height: auto;
   }
-
   .main-content {
-    margin-left: 280px;
-    width: calc(100% - 280px);
-    min-width: 0;
-    min-height: 100vh;
-    padding: clamp(1.5rem, 3vw, 3rem);
-  }
-
-  .page-shell {
-    width: min(var(--seo-shell-max), 100%);
-  }
-
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-    gap: 1.5rem;
-    align-items: end;
-    margin-bottom: 1.25rem;
-  }
-
-  .eyebrow,
-  .panel-kicker,
-  .metric-label,
-  .section-label,
-  .field-label,
-  .subtle-label,
-  .toggle-title,
-  .score-card-label {
-    font-family: 'Oswald', sans-serif;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .eyebrow {
-    font-size: 0.75rem;
-    color: var(--accent);
-    margin-bottom: 0.45rem;
-  }
-
-  .page-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: clamp(3rem, 6vw, 4.4rem);
-    line-height: 0.92;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-  }
-
-  .page-subtitle {
-    margin-top: 0.75rem;
-    max-width: 64ch;
-    color: var(--text-secondary);
-    font-size: 1.02rem;
-    line-height: 1.65;
-  }
-
-  .hero-controls {
-    display: grid;
-    gap: 0.9rem;
-    justify-self: end;
-    width: min(100%, 520px);
-  }
-
-  .control-card,
-  .panel,
-  .metric-card,
-  .score-card,
-  .stack-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 22px;
-    box-shadow: var(--seo-shadow-soft);
-  }
-
-  .control-card {
-    padding: 1rem;
-  }
-
-  .control-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.85rem;
-  }
-
-  .control-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-  }
-
-  .field-label {
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
-    margin-bottom: 0.45rem;
-  }
-
-  .control-select,
-  .action-btn {
-    min-height: 48px;
-    border-radius: 14px;
-    font-size: 0.95rem;
-  }
-
-  .control-select {
+    margin-left: 0;
     width: 100%;
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--border);
-    background: rgba(15, 23, 42, 0.03);
-    color: var(--text-primary);
-    outline: none;
-    font-family: 'Inter', sans-serif;
+    padding: 24px;
   }
-
-  .control-select:focus {
-    border-color: rgba(139, 34, 82, 0.35);
-    box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.1);
+  .scan-overview,
+  .metrics-grid,
+  .ai-grid,
+  .kw-grid {
+    grid-template-columns: 1fr;
   }
+}
 
-  .action-btn {
+@media (max-width: 760px) {
+  .main-content {
+    padding: 16px;
+  }
+  .tabs {
+    overflow-x: auto;
+  }
+  .scan-url-bar {
+    grid-template-columns: 1fr;
+  }
+  .scan-url-bar .btn-scan,
+  .btn-ai-all {
     width: 100%;
-    border: 1px solid var(--border);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.8rem;
-    font-weight: 500;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
   }
-
-  .action-btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-  }
-
-  .action-btn:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
-
-  .action-btn.secondary {
-    background: rgba(15, 23, 42, 0.03);
-  }
-
-  .action-btn.secondary:hover:not(:disabled) {
-    border-color: rgba(139, 34, 82, 0.25);
-    background: rgba(139, 34, 82, 0.08);
-  }
-
-  .action-btn.primary {
-    border-color: transparent;
-    background: linear-gradient(135deg, var(--accent), var(--accent-light));
-    color: #fff;
-    box-shadow: 0 14px 28px rgba(139, 34, 82, 0.2);
-  }
-
-  .action-btn.primary:hover:not(:disabled) {
-    box-shadow: 0 18px 34px rgba(139, 34, 82, 0.28);
-  }
-
-  .status-message {
-    min-height: 48px;
-    display: none;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.85rem 1rem;
-    margin-bottom: 1.25rem;
-    border-radius: 16px;
-    border: 1px solid transparent;
-    font-size: 0.95rem;
-    line-height: 1.45;
-  }
-
-  .status-message.visible {
-    display: flex;
-  }
-
-  .status-message::before {
-    content: '';
-    width: 10px;
-    height: 10px;
-    border-radius: 999px;
-    flex-shrink: 0;
-    background: currentColor;
-  }
-
-  .status-message.info {
-    background: rgba(52, 107, 214, 0.08);
-    border-color: rgba(52, 107, 214, 0.14);
-    color: var(--seo-info);
-  }
-
-  .status-message.success {
-    background: rgba(29, 143, 87, 0.09);
-    border-color: rgba(29, 143, 87, 0.16);
-    color: var(--seo-good);
-  }
-
-  .status-message.error {
-    background: rgba(208, 73, 73, 0.09);
-    border-color: rgba(208, 73, 73, 0.16);
-    color: var(--seo-bad);
-  }
-
-  .overview-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .metric-card {
-    padding: 1.2rem 1.25rem;
-  }
-
-  .metric-label {
-    font-size: 0.7rem;
-    color: var(--text-tertiary);
-    margin-bottom: 0.7rem;
-  }
-
-  .metric-value {
-    font-family: 'Oswald', sans-serif;
-    font-size: clamp(2rem, 4vw, 3rem);
-    line-height: 0.95;
-  }
-
-  .metric-note {
-    margin-top: 0.7rem;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    line-height: 1.45;
-  }
-
-  .metric-note strong {
-    color: var(--text-primary);
-    font-weight: 600;
-  }
-
-  .workspace-grid {
-    display: grid;
-    grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.45fr);
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .bottom-grid {
-    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-  }
-
-  .panel {
-    padding: 1.25rem;
-    min-width: 0;
-  }
-
-  .panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .panel-header.compact {
-    margin-bottom: 0.8rem;
-  }
-
-  .panel-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: 1.45rem;
-    line-height: 0.96;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .panel-subtitle {
-    margin-top: 0.35rem;
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    line-height: 1.5;
-  }
-
-  .panel-kicker {
-    font-size: 0.72rem;
-    color: var(--accent);
-    margin-bottom: 0.3rem;
-  }
-
-  .timestamp {
-    color: var(--text-tertiary);
-    font-size: 0.84rem;
-    text-align: right;
-  }
-
-  .score-pill,
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 34px;
-    padding: 0.45rem 0.75rem;
-    border-radius: 999px;
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.76rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .score-pill {
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    background: rgba(15, 23, 42, 0.04);
-    color: var(--text-primary);
-  }
-
-  .tone-good {
-    background: rgba(29, 143, 87, 0.12);
-    color: var(--seo-good);
-    border-color: rgba(29, 143, 87, 0.2);
-  }
-
-  .tone-okay {
-    background: rgba(208, 138, 24, 0.12);
-    color: var(--seo-warn);
-    border-color: rgba(208, 138, 24, 0.2);
-  }
-
-  .tone-bad {
-    background: rgba(208, 73, 73, 0.12);
-    color: var(--seo-bad);
-    border-color: rgba(208, 73, 73, 0.2);
-  }
-
-  .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  .stack-card {
-    padding: 1rem;
-  }
-
-  .section-label {
-    font-size: 0.72rem;
-    color: var(--text-tertiary);
-    margin-bottom: 0.8rem;
-  }
-
-  .bullet-list {
-    display: grid;
-    gap: 0.65rem;
-    list-style: none;
-  }
-
-  .bullet-list li,
-  .empty-state {
-    color: var(--text-secondary);
-    font-size: 0.94rem;
-    line-height: 1.55;
-  }
-
-  .bullet-list li {
-    position: relative;
-    padding-left: 1rem;
-  }
-
-  .bullet-list li::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0.56rem;
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--accent);
-  }
-
-  .empty-state {
-    padding: 1rem;
-    border-radius: 14px;
-    background: rgba(15, 23, 42, 0.03);
-  }
-
-  .health-breakdown,
-  .score-chart,
-  .audit-list,
-  .detail-stack,
-  .recent-changes,
-  .snapshot-stack {
-    display: grid;
-    gap: 0.75rem;
-  }
-
-  .health-row,
-  .score-chart-row {
-    display: grid;
-    align-items: center;
-    gap: 0.8rem;
-  }
-
-  .health-row {
-    grid-template-columns: minmax(96px, 120px) minmax(0, 1fr) auto;
-  }
-
-  .health-row-label,
-  .score-chart-label {
-    color: var(--text-secondary);
-    font-size: 0.88rem;
-    line-height: 1.35;
-  }
-
-  .health-row-bar,
-  .score-chart-bar {
-    height: 9px;
-    border-radius: 999px;
-    background: rgba(15, 23, 42, 0.08);
-    overflow: hidden;
-  }
-
-  .health-row-fill,
-  .score-chart-fill {
-    height: 100%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, var(--accent), var(--accent-light));
-  }
-
-  .health-row-value,
-  .score-chart-value {
-    color: var(--text-primary);
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.88rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .score-chart-row {
-    grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr) auto;
-  }
-
-  .score-chart-fill.tone-good {
-    background: linear-gradient(90deg, #1d8f57, #38af74);
-  }
-
-  .score-chart-fill.tone-okay {
-    background: linear-gradient(90deg, #d08a18, #e4a63d);
-  }
-
-  .score-chart-fill.tone-bad {
-    background: linear-gradient(90deg, #d04949, #e17171);
-  }
-
-  .audit-list {
-    max-height: 760px;
-    overflow-y: auto;
-    padding-right: 0.15rem;
-  }
-
-  .audit-list-item {
-    width: 100%;
-    padding: 1rem;
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    background: var(--bg-secondary);
-    text-align: left;
-    cursor: pointer;
-    transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
-  }
-
-  .audit-list-item:hover,
-  .audit-list-item.active {
-    transform: translateY(-1px);
-    border-color: rgba(139, 34, 82, 0.22);
-    background: rgba(139, 34, 82, 0.05);
-    box-shadow: var(--seo-shadow-soft);
-  }
-
-  .audit-item-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.8rem;
-  }
-
-  .audit-item-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: 1rem;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    line-height: 1.05;
-  }
-
-  .audit-item-subtitle,
-  .audit-item-meta,
-  .audit-item-note {
-    color: var(--text-secondary);
-  }
-
-  .audit-item-subtitle {
-    margin-top: 0.28rem;
-    font-size: 0.86rem;
-  }
-
-  .audit-item-meta {
-    margin-top: 0.75rem;
-    font-size: 0.84rem;
-  }
-
-  .audit-item-note {
-    margin-top: 0.55rem;
-    font-size: 0.9rem;
-    line-height: 1.5;
-  }
-
-  .detail-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.8rem;
-  }
-
-  .detail-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: clamp(1.7rem, 3vw, 2.5rem);
-    line-height: 0.96;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-  }
-
-  .detail-meta {
-    margin-top: 0.45rem;
-    color: var(--text-secondary);
-    font-size: 0.94rem;
-    line-height: 1.5;
-  }
-
-  .detail-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  .change-row,
-  .snapshot-row {
-    padding: 0.95rem 1rem;
-    border-radius: 16px;
-    background: rgba(15, 23, 42, 0.03);
-    border: 1px solid rgba(15, 23, 42, 0.05);
-  }
-
-  .change-row-label,
-  .snapshot-row-label {
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.74rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-tertiary);
-    margin-bottom: 0.45rem;
-  }
-
-  .change-row-body,
-  .snapshot-row-value {
-    color: var(--text-primary);
-    font-size: 0.94rem;
-    line-height: 1.55;
-    word-break: break-word;
-  }
-
-  .status-pill {
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    background: rgba(15, 23, 42, 0.04);
-    color: var(--text-secondary);
-  }
-
-  .status-pill[data-tone="good"] {
-    background: rgba(29, 143, 87, 0.12);
-    color: var(--seo-good);
-    border-color: rgba(29, 143, 87, 0.18);
-  }
-
-  .status-pill[data-tone="muted"] {
-    background: rgba(15, 23, 42, 0.04);
-    color: var(--text-secondary);
-  }
-
-  .automation-grid {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .connection-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-  }
-
-  .connection-card {
-    padding: 1rem;
-    border-radius: 18px;
-    background: rgba(15, 23, 42, 0.03);
-    border: 1px solid rgba(15, 23, 42, 0.05);
-  }
-
-  .connection-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.82rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-tertiary);
-    margin-bottom: 0.7rem;
-  }
-
-  .analytics-state {
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    line-height: 1.6;
-    padding: 1rem;
-    border-radius: 18px;
-    background: rgba(15, 23, 42, 0.03);
-    border: 1px solid rgba(15, 23, 42, 0.05);
-  }
-
-  .settings-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.85rem;
-  }
-
-  .field-card {
-    padding: 1rem;
-    border-radius: 18px;
-    background: rgba(15, 23, 42, 0.03);
-    border: 1px solid rgba(15, 23, 42, 0.05);
-  }
-
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1rem;
-    border-radius: 18px;
-    background: rgba(15, 23, 42, 0.03);
-    border: 1px solid rgba(15, 23, 42, 0.05);
-  }
-
-  .toggle-copy {
-    min-width: 0;
-  }
-
-  .toggle-title {
-    display: block;
-    font-size: 0.76rem;
-    color: var(--text-primary);
-    margin-bottom: 0.25rem;
-  }
-
-  .toggle-note {
-    display: block;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    line-height: 1.5;
-  }
-
-  .toggle-switch {
-    position: relative;
-    width: 56px;
-    height: 32px;
-    flex-shrink: 0;
-  }
-
-  .toggle-switch input {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
-
-  .toggle-slider {
-    position: absolute;
-    inset: 0;
-    border-radius: 999px;
-    background: rgba(15, 23, 42, 0.12);
-    transition: background 0.2s ease;
-  }
-
-  .toggle-slider::after {
-    content: '';
-    position: absolute;
-    top: 4px;
-    left: 4px;
-    width: 24px;
-    height: 24px;
-    border-radius: 999px;
-    background: #fff;
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
-    transition: transform 0.2s ease;
-  }
-
-  .toggle-switch input:checked + .toggle-slider {
-    background: linear-gradient(135deg, var(--accent), var(--accent-light));
-  }
-
-  .toggle-switch input:checked + .toggle-slider::after {
-    transform: translateX(24px);
-  }
-
-  .meta-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    padding-top: 0.2rem;
-    color: var(--text-secondary);
-    font-size: 0.88rem;
-  }
-
-  .recent-changes .change-row + .change-row {
-    margin-top: 0;
-  }
-
-  @media (max-width: 1260px) {
-    .hero {
-      grid-template-columns: 1fr;
-    }
-
-    .hero-controls {
-      justify-self: stretch;
-      width: 100%;
-    }
-
-    .overview-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .summary-grid,
-    .detail-grid,
-    .settings-grid,
-    .connection-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .bottom-grid,
-    .workspace-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 1100px) {
-    .sidebar {
-      position: static;
-      width: 100%;
-      height: auto;
-    }
-
-    .main-content {
-      margin-left: 0;
-      width: 100%;
-    }
-  }
-
-  @media (max-width: 760px) {
-    .main-content {
-      padding: 1rem;
-    }
-
-    .overview-grid,
-    .control-actions {
-      grid-template-columns: 1fr;
-    }
-
-    .panel,
-    .metric-card,
-    .control-card {
-      border-radius: 18px;
-    }
-
-    .audit-list {
-      max-height: none;
-    }
-  }
+}
 </style>
 </head>
 <body>
@@ -852,205 +555,418 @@
   <aside class="sidebar"></aside>
   <main class="main-content">
     <div class="page-shell">
-      <section class="hero">
-        <div>
-          <div class="eyebrow">Site Control</div>
-          <h1 class="page-title">SEO</h1>
-          <p class="page-subtitle">Bekijk de volledige SEO-basis van alle pagina's, zie direct waar de grootste gaten zitten en laat AI sitebrede verbeteringen veilig opslaan.</p>
-        </div>
+      <div class="page-title">SEO</div>
+      <div class="page-subtitle">Beheer en optimaliseer de SEO van softora.nl</div>
 
-        <div class="hero-controls">
-          <div class="control-card">
-            <div class="control-grid">
-              <div>
-                <div class="field-label">Voorkeursmodel</div>
-                <select class="control-select" id="preferredModelSelect" aria-label="Voorkeursmodel"></select>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('scan', this)">SEO Scan</button>
+        <button class="tab" onclick="switchTab('optimalisatie', this)">AI Optimalisatie</button>
+        <button class="tab" onclick="switchTab('keywords', this)">Keywords</button>
+      </div>
+
+      <div class="tab-panel active" id="tab-scan">
+        <div class="scan-url-bar">
+          <input type="text" id="scan-url" value="https://softora.nl" placeholder="https://softora.nl">
+          <button class="btn-scan" id="scan-btn" onclick="startScan()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Scan starten
+          </button>
+        </div>
+        <div id="scan-result">
+          <div class="scan-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <p>Klik op "Scan starten" om een volledige SEO-analyse te starten van softora.nl</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-optimalisatie">
+        <button class="btn-ai btn-ai-all" id="btn-all" onclick="optimiseAll()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Alles AI optimaliseren
+        </button>
+
+        <div class="ai-grid">
+          <div class="ai-card">
+            <div class="ai-card-head">
+              <div class="ai-card-title">Meta Tags</div>
+              <div id="meta-status"></div>
+            </div>
+            <div class="ai-card-body">
+              <div class="field-label">Title tag <span style="font-weight:400;text-transform:none;letter-spacing:0">(max 60 tekens)</span></div>
+              <div class="field-val">
+                <textarea id="meta-title" rows="2" oninput="charCount('meta-title', 'meta-title-count', 60)">Softora.nl – Professionele Websites & Onderhoud</textarea>
               </div>
-              <div class="control-actions">
-                <button type="button" class="action-btn secondary" id="runAuditBtn">Opnieuw scannen</button>
-                <button type="button" class="action-btn primary" id="optimizeBtn">AI optimaliseren</button>
+              <div class="char-count" id="meta-title-count"></div>
+
+              <div class="field-label">Meta description <span style="font-weight:400;text-transform:none;letter-spacing:0">(max 160 tekens)</span></div>
+              <div class="field-val">
+                <textarea id="meta-desc" rows="3" oninput="charCount('meta-desc', 'meta-desc-count', 160)">Softora.nl bouwt professionele websites voor het MKB. Van ontwerp tot onderhoud — snel, betaalbaar en op maat gemaakt.</textarea>
+              </div>
+              <div class="char-count" id="meta-desc-count"></div>
+
+              <div style="margin-top:14px">
+                <button class="btn-ai" onclick="optimiseField('meta')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  AI verbeteren
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ai-card">
+            <div class="ai-card-head">
+              <div class="ai-card-title">Open Graph</div>
+              <div id="og-status"></div>
+            </div>
+            <div class="ai-card-body">
+              <div class="field-label">OG Title</div>
+              <div class="field-val">
+                <textarea id="og-title" rows="2" oninput="charCount('og-title', 'og-title-count', 60)">Softora.nl – Websites die werken</textarea>
+              </div>
+              <div class="char-count" id="og-title-count"></div>
+
+              <div class="field-label">OG Description</div>
+              <div class="field-val">
+                <textarea id="og-desc" rows="3" oninput="charCount('og-desc', 'og-desc-count', 200)">Wij bouwen snelle, professionele websites voor het MKB. Vraag vandaag nog een offerte aan.</textarea>
+              </div>
+              <div class="char-count" id="og-desc-count"></div>
+
+              <div style="margin-top:14px">
+                <button class="btn-ai" onclick="optimiseField('og')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  AI verbeteren
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ai-card">
+            <div class="ai-card-head">
+              <div class="ai-card-title">Headings</div>
+              <div id="h-status"></div>
+            </div>
+            <div class="ai-card-body">
+              <div class="field-label">H1 (hoofdtitel pagina)</div>
+              <div class="field-val">
+                <textarea id="h1" rows="2" oninput="charCount('h1', 'h1-count', 70)">Professionele websites voor het MKB</textarea>
+              </div>
+              <div class="char-count" id="h1-count"></div>
+
+              <div class="field-label">H2 suggesties</div>
+              <div class="field-val">
+                <textarea id="h2" rows="4">Wat wij doen
+Onze pakketten
+Waarom Softora?
+Neem contact op</textarea>
+              </div>
+
+              <div style="margin-top:14px">
+                <button class="btn-ai" onclick="optimiseField('h')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  AI verbeteren
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ai-card">
+            <div class="ai-card-head">
+              <div class="ai-card-title">Alt Teksten</div>
+              <div id="alt-status"></div>
+            </div>
+            <div class="ai-card-body">
+              <div class="field-label">Hero afbeelding</div>
+              <div class="field-val">
+                <textarea id="alt-hero" rows="2">Professionele website gebouwd door Softora voor een MKB-klant</textarea>
+              </div>
+
+              <div class="field-label">Logo</div>
+              <div class="field-val">
+                <textarea id="alt-logo" rows="2">Softora.nl logo – website bouw en onderhoud</textarea>
+              </div>
+
+              <div class="field-label">Team / over ons</div>
+              <div class="field-val">
+                <textarea id="alt-team" rows="2">Het team van Softora.nl, specialist in website bouw</textarea>
+              </div>
+
+              <div style="margin-top:14px">
+                <button class="btn-ai" onclick="optimiseField('alt')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  AI verbeteren
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <div class="status-message" id="statusMessage" aria-live="polite"></div>
-
-      <section class="overview-grid">
-        <article class="metric-card">
-          <div class="metric-label">Totale SEO score</div>
-          <div class="metric-value" id="overallScoreValue">--</div>
-          <div class="metric-note">Gemiddelde score over alle HTML-pagina's in de sitebasis.</div>
-        </article>
-        <article class="metric-card">
-          <div class="metric-label">Pagina's gescand</div>
-          <div class="metric-value" id="pageCountValue">--</div>
-          <div class="metric-note">Aantal pagina's dat momenteel is meegenomen in de audit.</div>
-        </article>
-        <article class="metric-card">
-          <div class="metric-label">Aandacht nodig</div>
-          <div class="metric-value" id="attentionCountValue">--</div>
-          <div class="metric-note">Pagina's onder de interne drempel van <strong>80/100</strong>.</div>
-        </article>
-        <article class="metric-card">
-          <div class="metric-label">Alt dekking</div>
-          <div class="metric-value" id="altCoverageValue">--</div>
-          <div class="metric-note">Percentage afbeeldingen met een bruikbare alt-tekst.</div>
-        </article>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
+      <div class="tab-panel" id="tab-keywords">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap;">
           <div>
-            <div class="panel-kicker">Overzicht</div>
-            <h2 class="panel-title">Sitegezondheid</h2>
-            <p class="panel-subtitle">Dit overzicht combineert meta-data, canonical dekking, social tags en alt-teksten tot een concreet actieoverzicht.</p>
+            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Doelzoekwoorden</div>
+            <div style="font-size:12px;color:var(--text-mid);margin-top:2px">Focus keywords voor softora.nl</div>
           </div>
-          <div class="timestamp" id="auditTimestamp">Laatst gescand: nog niet</div>
+          <button class="btn-ai" id="keywords-refresh-btn" onclick="refreshKeywords()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            AI suggesties genereren
+          </button>
         </div>
 
-        <div class="summary-grid">
-          <article class="stack-card">
-            <div class="section-label">Sterke punten</div>
-            <div id="strengthList" class="detail-stack"></div>
-          </article>
-          <article class="stack-card">
-            <div class="section-label">Verbeterpunten</div>
-            <div id="improvementList" class="detail-stack"></div>
-          </article>
-          <article class="stack-card">
-            <div class="section-label">Gezondheid per onderdeel</div>
-            <div id="healthBreakdown" class="health-breakdown"></div>
-          </article>
-          <article class="stack-card">
-            <div class="section-label">Laagste paginascores</div>
-            <div id="scoreChart" class="score-chart"></div>
-          </article>
-        </div>
-      </section>
-
-      <section class="workspace-grid">
-        <article class="panel">
-          <div class="panel-header compact">
-            <div>
-              <div class="panel-kicker">Paginalijst</div>
-              <h2 class="panel-title">Auditresultaten</h2>
-            </div>
-          </div>
-          <div id="auditList" class="audit-list"></div>
-        </article>
-
-        <article class="panel">
-          <div class="detail-head">
-            <div>
-              <div class="panel-kicker">Pagina detail</div>
-              <h2 class="detail-title" id="selectedPageTitle">Geen pagina geselecteerd</h2>
-              <div class="detail-meta" id="selectedPageMeta">Draai eerst een scan om paginaresultaten te zien.</div>
-            </div>
-            <div class="score-pill tone-bad" id="selectedPageScore">--</div>
-          </div>
-
-          <div class="detail-grid" style="margin-top: 1.1rem;">
-            <article class="stack-card">
-              <div class="section-label">Sterk op deze pagina</div>
-              <div id="pageStrengthList" class="detail-stack"></div>
-            </article>
-            <article class="stack-card">
-              <div class="section-label">Direct verbeteren</div>
-              <div id="pageImprovementList" class="detail-stack"></div>
-            </article>
-            <article class="stack-card">
-              <div class="section-label">AI zal aanpassen</div>
-              <div id="pageChangeList" class="detail-stack"></div>
-            </article>
-            <article class="stack-card">
-              <div class="section-label">Huidige SEO snapshot</div>
-              <div id="pageCurrentList" class="snapshot-stack"></div>
-            </article>
-          </div>
-        </article>
-      </section>
-
-      <section class="workspace-grid bottom-grid">
-        <article class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="panel-kicker">Autopilot</div>
-              <h2 class="panel-title">SEO automatisering</h2>
-              <p class="panel-subtitle">Beheer welk model SEO-wijzigingen uitvoert en hoe blogproductie automatisch mag verlopen.</p>
-            </div>
-          </div>
-
-          <div class="automation-grid">
-            <div class="connection-grid">
-              <div class="connection-card">
-                <div class="connection-title">Google Search Console</div>
-                <div class="status-pill" id="searchConsoleStatus" data-tone="muted">Klaar voor koppeling</div>
-              </div>
-              <div class="connection-card">
-                <div class="connection-title">Google Analytics</div>
-                <div class="status-pill" id="analyticsStatus" data-tone="muted">Klaar voor koppeling</div>
-              </div>
-            </div>
-
-            <div class="analytics-state" id="analyticsDataState">Live Search Console- en Analytics-grafieken verschijnen hier zodra de koppeling is geactiveerd.</div>
-
-            <div class="settings-grid">
-              <div class="field-card">
-                <div class="field-label">Blogfrequentie</div>
-                <select class="control-select" id="blogCadenceSelect" aria-label="Blogfrequentie"></select>
-              </div>
-              <div class="field-card">
-                <div class="field-label">Blogmodel</div>
-                <select class="control-select" id="blogModelSelect" aria-label="Blogmodel"></select>
-              </div>
-            </div>
-
-            <label class="toggle-row" for="blogAutomationToggle">
-              <span class="toggle-copy">
-                <span class="toggle-title">Blogs automatisch aanmaken</span>
-                <span class="toggle-note">Laat het systeem nieuwe blogconcepten op het gekozen schema voorbereiden.</span>
-              </span>
-              <span class="toggle-switch">
-                <input type="checkbox" id="blogAutomationToggle">
-                <span class="toggle-slider"></span>
-              </span>
-            </label>
-
-            <label class="toggle-row" for="blogAutoImagesToggle">
-              <span class="toggle-copy">
-                <span class="toggle-title">Afbeeldingen automatisch meenemen</span>
-                <span class="toggle-note">Voeg automatisch beeldsuggesties toe wanneer nieuwe blogcontent wordt voorbereid.</span>
-              </span>
-              <span class="toggle-switch">
-                <input type="checkbox" id="blogAutoImagesToggle">
-                <span class="toggle-slider"></span>
-              </span>
-            </label>
-
-            <div class="meta-row">
-              <div id="automationUpdated">Laatste opslag: nog niet</div>
-              <button type="button" class="action-btn primary" id="saveAutomationBtn" style="width: auto; padding-inline: 1.2rem;">Automatisering opslaan</button>
-            </div>
-          </div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="panel-kicker">Laatste run</div>
-              <h2 class="panel-title">Recente wijzigingen</h2>
-              <p class="panel-subtitle">Na een sitebrede AI-optimalisatie zie je hier welke pagina's daadwerkelijk zijn aangepast.</p>
-            </div>
-          </div>
-          <div id="recentChangesList" class="recent-changes"></div>
-        </article>
-      </section>
+        <div class="kw-grid" id="kw-grid"></div>
+      </div>
     </div>
   </main>
 </div>
 
-<script src="assets/seo-dashboard.js?v=20260402-1" defer></script>
+<div class="toast" id="toast"></div>
+
+<script>
+function switchTab(name, el) {
+  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'keywords') renderKeywords();
+}
+
+function charCount(inputId, countId, max) {
+  const len = document.getElementById(inputId).value.length;
+  const el = document.getElementById(countId);
+  el.textContent = `${len} / ${max}`;
+  el.className = 'char-count' + (len > max ? ' over' : '');
+}
+
+['meta-title', 'meta-desc', 'og-title', 'og-desc', 'h1'].forEach((id) => {
+  const limits = { 'meta-title': 60, 'meta-desc': 160, 'og-title': 60, 'og-desc': 200, 'h1': 70 };
+  const countIds = { 'meta-title': 'meta-title-count', 'meta-desc': 'meta-desc-count', 'og-title': 'og-title-count', 'og-desc': 'og-desc-count', 'h1': 'h1-count' };
+  charCount(id, countIds[id], limits[id]);
+});
+
+function startScan() {
+  const btn = document.getElementById('scan-btn');
+  btn.disabled = true;
+  document.getElementById('scan-result').innerHTML = `
+    <div class="scan-loading">
+      <div class="loader"></div>
+      <div class="loader-text">Bezig met scannen van softora.nl…</div>
+    </div>`;
+
+  setTimeout(() => {
+    renderScanResult();
+    btn.disabled = false;
+  }, 2800);
+}
+
+function renderScanResult() {
+  const score = 68;
+  const circumference = 2 * Math.PI * 46;
+  const offset = circumference - (score / 100) * circumference;
+  const scoreColor = score >= 75 ? '#16733c' : score >= 50 ? '#b45a00' : '#c0392b';
+  const verdictClass = score >= 75 ? 'verdict-good' : score >= 50 ? 'verdict-mid' : 'verdict-bad';
+  const verdictText = score >= 75 ? 'Goed' : score >= 50 ? 'Verbetering mogelijk' : 'Kritiek';
+
+  const metrics = [
+    { title: 'Laadtijd', val: '2.4s', pct: 58, note: 'Doel: onder 2s', color: '#b45a00' },
+    { title: 'Mobile score', val: '74/100', pct: 74, note: 'Redelijk — verbetering mogelijk', color: '#b45a00' },
+    { title: 'Desktop score', val: '89/100', pct: 89, note: 'Goed', color: '#16733c' },
+    { title: 'Backlinks', val: '12', pct: 24, note: 'Laag — meer linkbuilding nodig', color: '#c0392b' },
+    { title: "Geïndexeerde pagina's", val: '8', pct: 80, note: 'Normaal voor MKB site', color: '#16733c' },
+    { title: 'Core Web Vitals', val: 'Gemiddeld', pct: 55, note: 'LCP & CLS verbeteren', color: '#b45a00' },
+  ];
+
+  const issues = [
+    { level: 'error', text: "Meta description ontbreekt op 3 pagina's", sub: '/diensten, /contact, /over-ons', tag: 'Kritiek' },
+    { level: 'error', text: 'H1 tag ontbreekt op homepage', sub: 'Geen hoofdtitel gevonden in de HTML', tag: 'Kritiek' },
+    { level: 'warning', text: 'Afbeeldingen missen alt-teksten (7 stuks)', sub: 'hero.jpg, team.jpg en 5 andere afbeeldingen', tag: 'Waarschuwing' },
+    { level: 'warning', text: 'Laadtijd boven 2 seconden', sub: 'Gemiddeld 2.4s — comprimeer afbeeldingen en gebruik caching', tag: 'Waarschuwing' },
+    { level: 'warning', text: 'Geen sitemap.xml gevonden', sub: 'Voeg een sitemap toe en dien in bij Google Search Console', tag: 'Waarschuwing' },
+    { level: 'ok', text: 'SSL certificaat actief', sub: 'HTTPS correct geconfigureerd', tag: 'OK' },
+    { level: 'ok', text: 'robots.txt aanwezig', sub: 'Correct geconfigureerd', tag: 'OK' },
+    { level: 'ok', text: 'Mobile-friendly', sub: 'Pagina reageert correct op mobiele schermen', tag: 'OK' },
+  ];
+
+  document.getElementById('scan-result').innerHTML = `
+    <div class="scan-overview">
+      <div class="score-card">
+        <div class="score-ring">
+          <svg viewBox="0 0 110 110">
+            <circle class="score-ring-track" cx="55" cy="55" r="46"/>
+            <circle class="score-ring-fill" cx="55" cy="55" r="46"
+              stroke="${scoreColor}"
+              stroke-dasharray="${circumference}"
+              stroke-dashoffset="${circumference}"
+              id="score-arc"/>
+          </svg>
+          <div class="score-number" style="color:${scoreColor}">${score}</div>
+        </div>
+        <div class="score-label">SEO Score</div>
+        <div class="score-verdict ${verdictClass}">${verdictText}</div>
+      </div>
+      <div class="metrics-grid">
+        ${metrics.map((m) => `
+          <div class="metric-card">
+            <div class="metric-title">${m.title}</div>
+            <div class="metric-val" style="color:${m.color}">${m.val}</div>
+            <div class="metric-bar"><div class="metric-bar-fill" style="width:0%;background:${m.color}" data-pct="${m.pct}"></div></div>
+            <div class="metric-note">${m.note}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="issues-section">
+      <div class="issues-title">Gevonden punten (${issues.length})</div>
+      <div class="issues-list">
+        ${issues.map((i) => `
+          <div class="issue-item">
+            <div class="issue-dot ${i.level}"></div>
+            <div>
+              <div class="issue-text">${i.text}</div>
+              <div class="issue-sub">${i.sub}</div>
+            </div>
+            <span class="issue-tag tag-${i.level}">${i.tag}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  setTimeout(() => {
+    const arc = document.getElementById('score-arc');
+    if (arc) arc.style.strokeDashoffset = offset;
+    document.querySelectorAll('.metric-bar-fill').forEach((el) => {
+      el.style.width = el.dataset.pct + '%';
+    });
+  }, 50);
+}
+
+const aiSuggestions = {
+  meta: {
+    title: 'Website laten bouwen? Softora.nl – Snel & Professioneel',
+    desc: 'Softora.nl bouwt professionele, snelle websites voor MKB-bedrijven. Vraag vandaag een gratis offerte aan. Op maat, SEO-vriendelijk en mobiel geoptimaliseerd.'
+  },
+  og: {
+    title: 'Softora.nl – Website laten bouwen voor het MKB',
+    desc: 'Professionele websites die scoren. Softora.nl helpt MKB-bedrijven met een sterke online aanwezigheid. Snel, betaalbaar en op maat gemaakt.'
+  },
+  h: {
+    h1: 'Professionele website laten bouwen voor uw bedrijf',
+    h2: 'Wat wij voor u doen\nOnze website pakketten & prijzen\nWaarom kiezen voor Softora?\nBekijk onze referenties\nVraag een gratis offerte aan'
+  },
+  alt: {
+    hero: 'Professioneel ontworpen bedrijfswebsite gemaakt door Softora.nl voor een MKB-klant in Nederland',
+    logo: 'Softora.nl – specialist in website bouwen en website onderhoud voor het MKB',
+    team: 'Het professionele team van Softora.nl helpt bedrijven met een sterke online aanwezigheid'
+  }
+};
+
+function setStatus(id, state) {
+  const el = document.getElementById(id + '-status');
+  if (!el) return;
+  if (state === 'loading') {
+    el.innerHTML = '<div class="ai-status loading"><div class="ai-dot"></div> Bezig…</div>';
+  } else if (state === 'done') {
+    el.innerHTML = '<div class="ai-status done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Geoptimaliseerd</div>';
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+function optimiseField(type) {
+  setStatus(type, 'loading');
+  setTimeout(() => {
+    const s = aiSuggestions[type];
+    if (type === 'meta') {
+      document.getElementById('meta-title').value = s.title;
+      document.getElementById('meta-desc').value = s.desc;
+      charCount('meta-title', 'meta-title-count', 60);
+      charCount('meta-desc', 'meta-desc-count', 160);
+    } else if (type === 'og') {
+      document.getElementById('og-title').value = s.title;
+      document.getElementById('og-desc').value = s.desc;
+      charCount('og-title', 'og-title-count', 60);
+      charCount('og-desc', 'og-desc-count', 200);
+    } else if (type === 'h') {
+      document.getElementById('h1').value = s.h1;
+      document.getElementById('h2').value = s.h2;
+      charCount('h1', 'h1-count', 70);
+    } else if (type === 'alt') {
+      document.getElementById('alt-hero').value = s.hero;
+      document.getElementById('alt-logo').value = s.logo;
+      document.getElementById('alt-team').value = s.team;
+    }
+    setStatus(type, 'done');
+    toast('✓ ' + type.toUpperCase() + ' geoptimaliseerd door AI');
+  }, 1600);
+}
+
+function optimiseAll() {
+  const btn = document.getElementById('btn-all');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="loader" style="width:16px;height:16px;border-width:2px"></div> Bezig…';
+  const types = ['meta', 'og', 'h', 'alt'];
+  types.forEach((t, i) => {
+    setStatus(t, 'loading');
+    setTimeout(() => optimiseField(t), i * 700);
+  });
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Alles AI optimaliseren';
+    toast('✓ Alle SEO-velden geoptimaliseerd!');
+  }, types.length * 700 + 1600);
+}
+
+const keywords = [
+  { term: 'website laten bouwen', vol: '8.100/mnd', diff: 'Hoog' },
+  { term: 'website bouwen MKB', vol: '2.400/mnd', diff: 'Gemiddeld' },
+  { term: 'professionele website', vol: '4.400/mnd', diff: 'Hoog' },
+  { term: 'website onderhoud', vol: '1.600/mnd', diff: 'Laag' },
+  { term: 'webdesign bureau', vol: '3.600/mnd', diff: 'Hoog' },
+  { term: 'goedkope website laten bouwen', vol: '1.900/mnd', diff: 'Gemiddeld' },
+  { term: 'website bouwen offerte', vol: '720/mnd', diff: 'Laag' },
+  { term: 'responsive website', vol: '1.000/mnd', diff: 'Gemiddeld' },
+  { term: 'snel website laten bouwen', vol: '590/mnd', diff: 'Laag' },
+  { term: 'softora website', vol: '210/mnd', diff: 'Laag' },
+];
+
+let kwData = [...keywords];
+
+function renderKeywords() {
+  const grid = document.getElementById('kw-grid');
+  const diffClass = { 'Laag': 'diff-low', 'Gemiddeld': 'diff-mid', 'Hoog': 'diff-high' };
+  grid.innerHTML = kwData.map((k) => `
+    <div class="kw-item">
+      <div class="kw-term">${k.term}</div>
+      <div class="kw-meta">
+        <span class="kw-vol">${k.vol}</span>
+        <span class="kw-diff ${diffClass[k.diff]}">${k.diff}</span>
+      </div>
+    </div>`).join('');
+}
+
+function refreshKeywords() {
+  const btn = document.getElementById('keywords-refresh-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="loader" style="width:14px;height:14px;border-width:2px"></div> Genereren…';
+  setTimeout(() => {
+    kwData = [
+      ...keywords,
+      { term: 'website bouwer nederland', vol: '880/mnd', diff: 'Gemiddeld' },
+      { term: 'MKB website pakket', vol: '390/mnd', diff: 'Laag' },
+    ];
+    renderKeywords();
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> AI suggesties genereren';
+    toast('✓ Keywords bijgewerkt');
+  }, 1800);
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+renderKeywords();
+</script>
 </body>
 </html>
