@@ -24,7 +24,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260402-2" defer></script>
+    <script src="assets/personnel-theme.js?v=20260402-3" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -2245,11 +2245,8 @@
             const ui = resolveOrderUiState(order);
             const claimInfo = getOrderClaimInfo(id);
 
-            if (ui.isPaid) {
-                return 'completed';
-            }
             if (ui.isBuilt) {
-                return 'in_progress';
+                return 'completed';
             }
             if (claimInfo.isClaimed) {
                 return 'in_progress';
@@ -2363,6 +2360,12 @@
 
         function refreshOrderSummaryCards() {
             const cards = Array.from(document.querySelectorAll('#ordersGrid .order-card'));
+            const activeCount = cards.reduce((count, card) => {
+                const id = Number(String(card?.id || '').replace('order-', ''));
+                const order = orders[id];
+                const ui = resolveOrderUiState(order);
+                return count + (ui.isBuilt ? 0 : 1);
+            }, 0);
             const openValue = cards.reduce((sum, card) => {
                 const id = Number(String(card?.id || '').replace('order-', ''));
                 const order = orders[id];
@@ -2375,11 +2378,11 @@
                 const id = Number(String(card?.id || '').replace('order-', ''));
                 const order = orders[id];
                 const ui = resolveOrderUiState(order);
-                return count + (ui.isPaid ? 1 : 0);
+                return count + (ui.isBuilt ? 1 : 0);
             }, 0);
 
             const sumActive = document.getElementById('sumActive');
-            if (sumActive) sumActive.textContent = String(cards.length);
+            if (sumActive) sumActive.textContent = String(activeCount);
 
             const sumTotal = document.getElementById('sumTotal');
             if (sumTotal) sumTotal.textContent = '€' + openValue.toLocaleString('nl-NL');

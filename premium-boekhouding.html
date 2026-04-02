@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/assets/iphone-optimizations.css">
+    <title>Softora | Boekhouding</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                document.documentElement.setAttribute("data-theme-mode", "light");
+                document.documentElement.setAttribute("data-theme", "light");
+            } catch (_) {
+                /* ignore */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js?v=20260402-3" defer></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 320px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content {
+            margin-left: 320px;
+            width: calc(100% - 320px);
+            min-height: 100vh;
+            padding: clamp(1.2rem, 2.4vw, 2rem);
+        }
+
+        .book-shell {
+            width: min(1320px, 100%);
+            margin: 0 auto;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .book-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .book-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2.45rem, 3vw, 3.2rem);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            line-height: 1;
+        }
+
+        .book-subtitle {
+            margin-top: 0.4rem;
+            color: var(--text-secondary);
+            font-size: 1.02rem;
+        }
+
+        .head-note {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.72rem 0.9rem;
+            border: 1px solid rgba(143, 35, 96, 0.18);
+            border-radius: 999px;
+            background: rgba(143, 35, 96, 0.06);
+            color: #8f2360;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.82rem;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-card,
+        .ledger-card,
+        .form-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 14px 40px rgba(20, 18, 34, 0.05);
+        }
+
+        .stat-card {
+            padding: 1rem 1.1rem;
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .stat-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.84rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .stat-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2rem, 3vw, 2.7rem);
+            line-height: 0.95;
+            color: var(--text-primary);
+        }
+
+        .stat-note {
+            color: var(--text-secondary);
+            line-height: 1.55;
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: 380px minmax(0, 1fr);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .form-card,
+        .ledger-card {
+            padding: 1.05rem 1.1rem 1.15rem;
+        }
+
+        .section-kicker {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .section-copy {
+            margin-top: 0.35rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .book-form {
+            display: grid;
+            gap: 0.8rem;
+            margin-top: 1rem;
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8rem;
+        }
+
+        .field {
+            display: grid;
+            gap: 0.35rem;
+        }
+
+        .field label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.76rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .field input,
+        .field select,
+        .field textarea {
+            width: 100%;
+            min-height: 48px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text-primary);
+            font-size: 1rem;
+            padding: 0.8rem 0.9rem;
+            outline: none;
+        }
+
+        .field textarea {
+            min-height: 112px;
+            resize: vertical;
+        }
+
+        .field input:focus,
+        .field select:focus,
+        .field textarea:focus {
+            border-color: rgba(143, 35, 96, 0.34);
+            box-shadow: 0 0 0 3px rgba(143, 35, 96, 0.08);
+        }
+
+        .action-btn {
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #8f2360 0%, #b72e76 100%);
+            color: #fff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.95rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 0.9rem 1rem;
+            cursor: pointer;
+        }
+
+        .ledger-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .ledger-filter {
+            min-width: 220px;
+            min-height: 48px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 0.8rem 0.9rem;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .ledger-table-wrap {
+            overflow: auto;
+        }
+
+        .ledger-table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+        }
+
+        .ledger-table th {
+            text-align: left;
+            padding: 0.8rem 0.9rem;
+            background: rgba(248, 248, 251, 0.88);
+            border-bottom: 1px solid var(--border);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.82rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            white-space: nowrap;
+        }
+
+        .ledger-table td {
+            padding: 0.82rem 0.9rem;
+            border-bottom: 1px solid rgba(180, 182, 195, 0.3);
+            vertical-align: middle;
+        }
+
+        .ledger-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .entry-type {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.32rem 0.58rem;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 700;
+        }
+
+        .entry-type.inkomst {
+            background: rgba(23, 191, 99, 0.12);
+            color: #127846;
+        }
+
+        .entry-type.uitgave,
+        .entry-type.btw {
+            background: rgba(20, 24, 35, 0.06);
+            color: var(--text-secondary);
+        }
+
+        .entry-type.factuur {
+            background: rgba(143, 35, 96, 0.08);
+            color: #8f2360;
+        }
+
+        .amount-positive {
+            color: #127846;
+            font-weight: 700;
+        }
+
+        .amount-negative {
+            color: #8f2360;
+            font-weight: 700;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.32rem 0.58rem;
+            border-radius: 999px;
+            background: rgba(20, 24, 35, 0.06);
+            color: var(--text-secondary);
+            font-size: 0.74rem;
+            font-weight: 700;
+        }
+
+        .remove-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: #8f2360;
+            border-radius: 10px;
+            padding: 0.55rem 0.75rem;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .empty-state {
+            padding: 2rem 1rem;
+            text-align: center;
+            color: var(--text-tertiary);
+        }
+
+        @media (max-width: 1080px) {
+            .sidebar {
+                position: static;
+                width: 100%;
+                height: auto;
+            }
+
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+                padding: 1rem;
+            }
+
+            .book-head {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .cards-grid,
+            .book-grid,
+            .field-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar"></aside>
+        <main class="main-content">
+            <section class="book-shell">
+                <header class="book-head">
+                    <div>
+                        <h1 class="book-title">Boekhouding</h1>
+                        <p class="book-subtitle">Eigen frontend-overzicht voor journaalregels, kasstromen en verwachte verplichtingen.</p>
+                    </div>
+                    <div class="head-note">Aparte pagina los van maandelijkse kosten</div>
+                </header>
+
+                <section class="cards-grid" id="statsGrid"></section>
+
+                <section class="book-grid">
+                    <article class="form-card">
+                        <div class="section-kicker">Nieuwe boeking</div>
+                        <p class="section-copy">Voeg hier handmatig een regel toe. Deze UI draait nu frontend-only en kan later aan je echte boekhoudbron gekoppeld worden.</p>
+
+                        <form id="entryForm" class="book-form">
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label for="entryDate">Datum</label>
+                                    <input id="entryDate" type="date" required>
+                                </div>
+                                <div class="field">
+                                    <label for="entryType">Type</label>
+                                    <select id="entryType">
+                                        <option value="inkomst">Inkomst</option>
+                                        <option value="uitgave">Uitgave</option>
+                                        <option value="factuur">Factuur</option>
+                                        <option value="btw">BTW reservering</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label for="entryRelation">Relatie</label>
+                                    <input id="entryRelation" type="text" placeholder="Bijv. Softora klant / leverancier" required>
+                                </div>
+                                <div class="field">
+                                    <label for="entryAmount">Bedrag (EUR)</label>
+                                    <input id="entryAmount" type="number" step="0.01" placeholder="0,00" required>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label for="entryDescription">Omschrijving</label>
+                                <input id="entryDescription" type="text" placeholder="Bijv. aanbetaling website traject" required>
+                            </div>
+
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label for="entryStatus">Status</label>
+                                    <select id="entryStatus">
+                                        <option value="open">Open</option>
+                                        <option value="verwerkt">Verwerkt</option>
+                                        <option value="gepland">Gepland</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label for="entryNote">Interne notitie</label>
+                                    <input id="entryNote" type="text" placeholder="Optioneel">
+                                </div>
+                            </div>
+
+                            <button class="action-btn" type="submit">Regel toevoegen</button>
+                        </form>
+                    </article>
+
+                    <article class="ledger-card">
+                        <div class="ledger-toolbar">
+                            <div>
+                                <div class="section-kicker">Journaal</div>
+                                <p class="section-copy">Overzicht van de actuele regels op deze pagina.</p>
+                            </div>
+                            <select id="typeFilter" class="ledger-filter">
+                                <option value="all">Alle types</option>
+                                <option value="inkomst">Inkomsten</option>
+                                <option value="uitgave">Uitgaven</option>
+                                <option value="factuur">Facturen</option>
+                                <option value="btw">BTW</option>
+                            </select>
+                        </div>
+
+                        <div class="ledger-table-wrap">
+                            <table class="ledger-table" aria-label="Boekhouding regels">
+                                <thead>
+                                    <tr>
+                                        <th>Datum</th>
+                                        <th>Type</th>
+                                        <th>Relatie</th>
+                                        <th>Omschrijving</th>
+                                        <th>Status</th>
+                                        <th>Bedrag</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ledgerBody"></tbody>
+                            </table>
+                        </div>
+                    </article>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        (function () {
+            const STORAGE_KEY = 'softora_premium_bookkeeping_v1';
+            const form = document.getElementById('entryForm');
+            const typeFilter = document.getElementById('typeFilter');
+            const ledgerBody = document.getElementById('ledgerBody');
+            const statsGrid = document.getElementById('statsGrid');
+
+            const seedEntries = [
+                { id: 'bk-1', date: '2026-04-01', type: 'factuur', relation: 'De Vries B.V.', description: 'Aanbetaling website traject', status: 'open', amount: 1250, note: '' },
+                { id: 'bk-2', date: '2026-04-02', type: 'inkomst', relation: 'Retell AI', description: 'Partner fee maart', status: 'verwerkt', amount: 460, note: '' },
+                { id: 'bk-3', date: '2026-04-02', type: 'uitgave', relation: 'Vercel', description: 'Hosting en deployments', status: 'verwerkt', amount: -49, note: '' },
+                { id: 'bk-4', date: '2026-04-03', type: 'btw', relation: 'Belastingdienst', description: 'BTW reservering lopende maand', status: 'gepland', amount: -310, note: 'Automatische reservering' }
+            ];
+
+            const state = {
+                filter: 'all',
+                entries: seedEntries.slice()
+            };
+
+            function formatEur(amount) {
+                const value = Number(amount) || 0;
+                return value.toLocaleString('nl-NL', {
+                    style: 'currency',
+                    currency: 'EUR',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+
+            function formatDate(value) {
+                if (!value) return '—';
+                const [y, m, d] = String(value).split('-');
+                return `${d}-${m}-${y}`;
+            }
+
+            function loadState() {
+                try {
+                    const raw = window.localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return;
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed.entries) && parsed.entries.length) {
+                        state.entries = parsed.entries;
+                    }
+                    if (typeof parsed.filter === 'string') {
+                        state.filter = parsed.filter;
+                    }
+                } catch (_) {
+                    // ignore
+                }
+            }
+
+            function saveState() {
+                try {
+                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                        filter: state.filter,
+                        entries: state.entries
+                    }));
+                } catch (_) {
+                    // ignore
+                }
+            }
+
+            function getFilteredEntries() {
+                return state.entries
+                    .filter((entry) => state.filter === 'all' || entry.type === state.filter)
+                    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+            }
+
+            function renderStats() {
+                const thisMonth = new Date().toISOString().slice(0, 7);
+                const monthEntries = state.entries.filter((entry) => String(entry.date || '').slice(0, 7) === thisMonth);
+                const revenue = monthEntries.filter((entry) => entry.amount > 0).reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+                const costs = monthEntries.filter((entry) => entry.amount < 0).reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+                const openInvoices = state.entries.filter((entry) => entry.type === 'factuur' && entry.status !== 'verwerkt').length;
+                const vatReserve = state.entries.filter((entry) => entry.type === 'btw').reduce((sum, entry) => sum + Math.abs(Number(entry.amount || 0)), 0);
+
+                const cards = [
+                    { label: 'Omzet deze maand', value: formatEur(revenue), note: 'Positieve inkomsten en facturen' },
+                    { label: 'Uitgaven deze maand', value: formatEur(Math.abs(costs)), note: 'Software, tools en operationele kosten' },
+                    { label: 'Open posten', value: String(openInvoices), note: 'Nog niet volledig verwerkt' },
+                    { label: 'BTW reserve', value: formatEur(vatReserve), note: 'Geremde buffer voor afdrachten' }
+                ];
+
+                statsGrid.innerHTML = cards.map((card) => `
+                    <article class="stat-card">
+                        <div class="stat-label">${card.label}</div>
+                        <div class="stat-value">${card.value}</div>
+                        <div class="stat-note">${card.note}</div>
+                    </article>
+                `).join('');
+            }
+
+            function renderLedger() {
+                const rows = getFilteredEntries();
+                if (!rows.length) {
+                    ledgerBody.innerHTML = '<tr><td colspan="7"><div class="empty-state">Geen regels voor deze filter.</div></td></tr>';
+                    return;
+                }
+
+                ledgerBody.innerHTML = rows.map((entry) => {
+                    const amountClass = Number(entry.amount || 0) >= 0 ? 'amount-positive' : 'amount-negative';
+                    return `
+                        <tr>
+                            <td>${formatDate(entry.date)}</td>
+                            <td><span class="entry-type ${entry.type}">${entry.type}</span></td>
+                            <td>${entry.relation}</td>
+                            <td>${entry.description}${entry.note ? `<div style="margin-top:0.25rem;color:var(--text-secondary);font-size:0.83rem;">${entry.note}</div>` : ''}</td>
+                            <td><span class="status-chip">${entry.status}</span></td>
+                            <td class="${amountClass}">${formatEur(entry.amount)}</td>
+                            <td><button class="remove-btn" type="button" data-remove-id="${entry.id}">Verwijder</button></td>
+                        </tr>
+                    `;
+                }).join('');
+
+                ledgerBody.querySelectorAll('[data-remove-id]').forEach((button) => {
+                    button.addEventListener('click', function () {
+                        const id = String(this.getAttribute('data-remove-id') || '');
+                        state.entries = state.entries.filter((entry) => entry.id !== id);
+                        saveState();
+                        render();
+                    });
+                });
+            }
+
+            function render() {
+                typeFilter.value = state.filter;
+                renderStats();
+                renderLedger();
+            }
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const amountValue = Number(document.getElementById('entryAmount').value || 0);
+                const typeValue = String(document.getElementById('entryType').value || 'inkomst');
+                const normalizedAmount = typeValue === 'inkomst' || typeValue === 'factuur'
+                    ? Math.abs(amountValue)
+                    : -Math.abs(amountValue);
+
+                state.entries.push({
+                    id: `bk-${Date.now()}`,
+                    date: document.getElementById('entryDate').value,
+                    type: typeValue,
+                    relation: document.getElementById('entryRelation').value.trim(),
+                    description: document.getElementById('entryDescription').value.trim(),
+                    status: document.getElementById('entryStatus').value,
+                    amount: normalizedAmount,
+                    note: document.getElementById('entryNote').value.trim()
+                });
+
+                saveState();
+                form.reset();
+                document.getElementById('entryDate').value = new Date().toISOString().slice(0, 10);
+                render();
+            });
+
+            typeFilter.addEventListener('change', function () {
+                state.filter = String(this.value || 'all');
+                saveState();
+                render();
+            });
+
+            loadState();
+            document.getElementById('entryDate').value = new Date().toISOString().slice(0, 10);
+            render();
+        })();
+    </script>
+</body>
+</html>

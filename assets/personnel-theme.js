@@ -371,15 +371,18 @@
         if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldcalling";
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
+        if (p.indexOf("/premium-mailbox") === 0) return "mailbox";
         if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
         if (p.indexOf("/premium-pakketten") === 0) return "packages";
         if (p.indexOf("/premium-pdfs") === 0) return "pdfs";
+        if (p.indexOf("/premium-wachtwoordenregister") === 0) return "passwords";
         if (p.indexOf("/premium-instellingen") === 0) return "settings";
         if (p.indexOf("/premium-kladblok") === 0) return "notepad";
         if (p.indexOf("/premium-financiele-kosten") === 0 || p.indexOf("/premium-maandelijkse-kosten") === 0) {
             return "monthly_costs";
         }
         if (p.indexOf("/premium-analytics") === 0) return "analytics";
+        if (p.indexOf("/premium-boekhouding") === 0) return "bookkeeping";
         return "dashboard";
     }
 
@@ -443,7 +446,7 @@
             },
             {
                 key: "mailbox",
-                href: "/premium-bevestigingsmails",
+                href: "/premium-mailbox",
                 label: "Mailbox",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
             },
@@ -470,7 +473,7 @@
         const extraLinks = [
             {
                 key: "passwords",
-                href: "/premium-instellingen#wachtwoordenregister",
+                href: "/premium-wachtwoordenregister",
                 label: "Wachtwoordenregister",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg>',
             },
@@ -488,7 +491,7 @@
             },
             {
                 key: "bookkeeping",
-                href: "/premium-maandelijkse-kosten",
+                href: "/premium-boekhouding",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg>',
                 label: "Boekhouding",
             },

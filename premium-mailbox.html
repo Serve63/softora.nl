@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/assets/iphone-optimizations.css">
+    <title>Softora | Mailbox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                document.documentElement.setAttribute("data-theme-mode", "light");
+                document.documentElement.setAttribute("data-theme", "light");
+            } catch (_) {
+                /* ignore */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js?v=20260402-3" defer></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 320px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content {
+            margin-left: 320px;
+            width: calc(100% - 320px);
+            min-height: 100vh;
+            padding: clamp(1.2rem, 2.4vw, 2rem);
+        }
+
+        .mail-shell {
+            width: min(1420px, 100%);
+            margin: 0 auto;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .mail-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .mail-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2.45rem, 3vw, 3.2rem);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            line-height: 1;
+        }
+
+        .mail-subtitle {
+            margin-top: 0.4rem;
+            color: var(--text-secondary);
+            font-size: 1.02rem;
+        }
+
+        .mail-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.7rem 0.9rem;
+            border-radius: 999px;
+            border: 1px solid rgba(143, 35, 96, 0.18);
+            background: rgba(143, 35, 96, 0.06);
+            color: #8f2360;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.84rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .mail-layout {
+            display: grid;
+            grid-template-columns: 290px 420px minmax(0, 1fr);
+            gap: 1rem;
+            min-height: calc(100vh - 8.4rem);
+        }
+
+        .mail-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 14px 40px rgba(20, 18, 34, 0.05);
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .card-pad {
+            padding: 1.1rem 1.15rem;
+        }
+
+        .section-kicker {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .mail-search {
+            width: 100%;
+            min-height: 48px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 0.78rem 0.95rem;
+            background: #fff;
+            font-size: 1rem;
+            color: var(--text-primary);
+            outline: none;
+        }
+
+        .mail-search:focus {
+            border-color: rgba(143, 35, 96, 0.34);
+            box-shadow: 0 0 0 3px rgba(143, 35, 96, 0.08);
+        }
+
+        .folder-list,
+        .summary-list {
+            display: grid;
+            gap: 0.55rem;
+            margin-top: 1rem;
+        }
+
+        .folder-button,
+        .summary-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: #fff;
+            padding: 0.9rem 1rem;
+        }
+
+        .folder-button {
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+        }
+
+        .folder-button:hover,
+        .folder-button.active {
+            border-color: rgba(143, 35, 96, 0.24);
+            background: rgba(143, 35, 96, 0.05);
+        }
+
+        .folder-name {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.22rem;
+        }
+
+        .folder-name strong,
+        .summary-row strong {
+            font-size: 0.98rem;
+            color: var(--text-primary);
+        }
+
+        .folder-name span,
+        .summary-row span {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+        }
+
+        .count-pill {
+            min-width: 38px;
+            padding: 0.32rem 0.55rem;
+            border-radius: 999px;
+            background: rgba(143, 35, 96, 0.08);
+            color: #8f2360;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .thread-toolbar,
+        .preview-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.85rem;
+            padding: 1rem 1.1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            flex-wrap: wrap;
+        }
+
+        .ghost-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text-primary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.82rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border-radius: 12px;
+            padding: 0.68rem 0.85rem;
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .ghost-btn:hover {
+            border-color: rgba(143, 35, 96, 0.32);
+            background: rgba(143, 35, 96, 0.05);
+        }
+
+        .thread-list {
+            display: grid;
+            gap: 0.7rem;
+            padding: 1rem;
+            max-height: calc(100vh - 15rem);
+            overflow: auto;
+        }
+
+        .thread-item {
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 16px;
+            padding: 0.95rem 1rem;
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+        }
+
+        .thread-item:hover,
+        .thread-item.active {
+            border-color: rgba(143, 35, 96, 0.24);
+            background: rgba(143, 35, 96, 0.04);
+            transform: translateY(-1px);
+        }
+
+        .thread-item.unread {
+            border-left: 4px solid #8f2360;
+            padding-left: 0.8rem;
+        }
+
+        .thread-top,
+        .thread-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.7rem;
+        }
+
+        .thread-sender {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .thread-time {
+            font-size: 0.82rem;
+            color: var(--text-tertiary);
+            white-space: nowrap;
+        }
+
+        .thread-subject {
+            margin-top: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .thread-snippet {
+            margin-top: 0.35rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .thread-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.65rem;
+        }
+
+        .thread-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.55rem;
+            border-radius: 999px;
+            background: rgba(20, 24, 35, 0.06);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .preview-pane {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .preview-header {
+            padding: 1.15rem 1.25rem 0.9rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .preview-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.8rem;
+            line-height: 1.02;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .preview-subline {
+            margin-top: 0.55rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .preview-subline strong {
+            color: var(--text-primary);
+        }
+
+        .preview-scroll {
+            overflow: auto;
+        }
+
+        .preview-content {
+            padding: 1.15rem 1.25rem 1.35rem;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .preview-html {
+            line-height: 1.7;
+            color: var(--text-primary);
+        }
+
+        .preview-html p + p {
+            margin-top: 0.95rem;
+        }
+
+        .empty-state {
+            display: grid;
+            place-items: center;
+            color: var(--text-tertiary);
+            min-height: 260px;
+            text-align: center;
+            padding: 1.5rem;
+        }
+
+        .sync-note {
+            margin-top: 1rem;
+            padding: 0.9rem 1rem;
+            border-radius: 14px;
+            background: rgba(20, 24, 35, 0.04);
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        @media (max-width: 1280px) {
+            .mail-layout {
+                grid-template-columns: 280px minmax(320px, 0.95fr) minmax(0, 1fr);
+            }
+        }
+
+        @media (max-width: 1040px) {
+            .sidebar {
+                position: static;
+                width: 100%;
+                height: auto;
+            }
+
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+                padding: 1rem;
+            }
+
+            .mail-head {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .mail-layout {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            .thread-list {
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar"></aside>
+        <main class="main-content">
+            <section class="mail-shell">
+                <header class="mail-head">
+                    <div>
+                        <h1 class="mail-title">Mailbox</h1>
+                        <p class="mail-subtitle">Frontend UI voor je eigen inbox. De echte mailboxkoppeling kun je hier later op aansluiten.</p>
+                    </div>
+                    <div class="mail-badge">Eigen mailbox UI klaar voor koppeling</div>
+                </header>
+
+                <section class="mail-layout">
+                    <aside class="mail-card card-pad">
+                        <div class="section-kicker">Mappen</div>
+                        <div class="folder-list" id="folderList"></div>
+
+                        <div class="section-kicker" style="margin-top: 1.25rem;">Overzicht</div>
+                        <div class="summary-list" id="summaryList"></div>
+
+                        <div class="sync-note">
+                            Deze mailbox draait nu volledig lokaal in de frontend. Zodra jij je echte inbox koppelt, kan deze layout dezelfde data direct tonen.
+                        </div>
+                    </aside>
+
+                    <section class="mail-card">
+                        <div class="thread-toolbar">
+                            <div style="flex: 1;">
+                                <div class="section-kicker">Berichten</div>
+                            </div>
+                            <div style="flex: 1.2;">
+                                <input id="mailSearch" class="mail-search" type="search" placeholder="Zoek op afzender, onderwerp of tekst...">
+                            </div>
+                        </div>
+                        <div class="thread-list" id="threadList"></div>
+                    </section>
+
+                    <section class="mail-card preview-pane">
+                        <div class="preview-toolbar">
+                            <div class="section-kicker">Voorbeeld</div>
+                            <div class="toolbar-actions">
+                                <button id="markReadBtn" class="ghost-btn" type="button">Markeer gelezen</button>
+                                <button id="starBtn" class="ghost-btn" type="button">Ster</button>
+                                <button id="archiveBtn" class="ghost-btn" type="button">Archiveer</button>
+                            </div>
+                        </div>
+                        <div id="previewPane" class="preview-scroll"></div>
+                    </section>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        (function () {
+            const STORAGE_KEY = 'softora_premium_mailbox_frontend_v1';
+            const sampleThreads = [
+                {
+                    id: 'mail-1',
+                    folder: 'inbox',
+                    sender: 'Daan Vermeer',
+                    email: 'daan@vermeerbouw.nl',
+                    subject: 'Bevestiging afspraak website traject',
+                    snippet: 'Dank, morgen om 09:30 is akkoord. Kunnen jullie ook alvast een grove planning meenemen?',
+                    timeLabel: '09:12',
+                    unread: true,
+                    starred: true,
+                    tags: ['Afspraak', 'Website'],
+                    bodyHtml: '<p>Hoi Softora,</p><p>Morgen om 09:30 uur is akkoord. Neem als het kan ook direct een grove planning en voorstel voor de homepage mee.</p><p>Groet,<br>Daan</p>'
+                },
+                {
+                    id: 'mail-2',
+                    folder: 'inbox',
+                    sender: 'Nina de Groot',
+                    email: 'nina@mediastudio.nl',
+                    subject: 'Vraag over bedrijfssoftware offerte',
+                    snippet: 'We willen vooral weten of jullie ook met bestaande tooling kunnen koppelen.',
+                    timeLabel: 'Gisteren',
+                    unread: true,
+                    starred: false,
+                    tags: ['Bedrijfssoftware'],
+                    bodyHtml: '<p>Goedemiddag,</p><p>We willen graag beter begrijpen of jullie bedrijfssoftware ook aan onze bestaande tooling kan koppelen. Denk aan facturatie en projectplanning.</p><p>Met vriendelijke groet,<br>Nina de Groot</p>'
+                },
+                {
+                    id: 'mail-3',
+                    folder: 'scheduled',
+                    sender: 'Softora CRM',
+                    email: 'noreply@softora.nl',
+                    subject: 'Concept bevestigingsmail voor afspraak vrijdag',
+                    snippet: 'Deze mail staat ingepland om vrijdag 08:00 te versturen.',
+                    timeLabel: 'Vrijdag',
+                    unread: false,
+                    starred: false,
+                    tags: ['Concept', 'Gepland'],
+                    bodyHtml: '<p>Conceptmail om de afspraak van vrijdag te bevestigen. Deze staat nu nog ingepland en is nog niet live verstuurd.</p>'
+                },
+                {
+                    id: 'mail-4',
+                    folder: 'archive',
+                    sender: 'Marlies van Rijn',
+                    email: 'marlies@rijninteriors.nl',
+                    subject: 'Dank voor de inventarisatie',
+                    snippet: 'Fijn gesprek. De samenvatting klopt, wij wachten jullie eerste concept af.',
+                    timeLabel: '29 mrt',
+                    unread: false,
+                    starred: false,
+                    tags: ['Archief'],
+                    bodyHtml: '<p>Bedankt voor de inventarisatie van vanochtend. De samenvatting klopt en we wachten jullie eerste concept af.</p>'
+                }
+            ];
+
+            const folderMeta = {
+                inbox: { label: 'Inbox', description: 'Binnengekomen berichten' },
+                scheduled: { label: 'Gepland', description: 'Voorbereide mails en drafts' },
+                archive: { label: 'Archief', description: 'Afgehandelde conversaties' }
+            };
+
+            const state = {
+                folder: 'inbox',
+                query: '',
+                selectedId: 'mail-1',
+                items: sampleThreads.slice()
+            };
+
+            const folderListEl = document.getElementById('folderList');
+            const summaryListEl = document.getElementById('summaryList');
+            const threadListEl = document.getElementById('threadList');
+            const previewPaneEl = document.getElementById('previewPane');
+            const mailSearchEl = document.getElementById('mailSearch');
+            const markReadBtn = document.getElementById('markReadBtn');
+            const starBtn = document.getElementById('starBtn');
+            const archiveBtn = document.getElementById('archiveBtn');
+
+            function saveState() {
+                try {
+                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                        folder: state.folder,
+                        selectedId: state.selectedId,
+                        items: state.items
+                    }));
+                } catch (_) {
+                    // ignore storage errors
+                }
+            }
+
+            function loadState() {
+                try {
+                    const raw = window.localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return;
+                    const parsed = JSON.parse(raw);
+                    if (!parsed || typeof parsed !== 'object') return;
+                    if (Array.isArray(parsed.items) && parsed.items.length) {
+                        state.items = parsed.items.map((item) => {
+                            const base = sampleThreads.find((thread) => thread.id === item.id) || {};
+                            return { ...base, ...item };
+                        });
+                    }
+                    if (typeof parsed.folder === 'string') state.folder = parsed.folder;
+                    if (typeof parsed.selectedId === 'string') state.selectedId = parsed.selectedId;
+                } catch (_) {
+                    // ignore parse errors
+                }
+            }
+
+            function getFolderCount(folder) {
+                return state.items.filter((item) => item.folder === folder).length;
+            }
+
+            function getUnreadCount(folder) {
+                return state.items.filter((item) => item.folder === folder && item.unread).length;
+            }
+
+            function getVisibleThreads() {
+                const query = state.query.trim().toLowerCase();
+                return state.items.filter((item) => {
+                    if (item.folder !== state.folder) return false;
+                    if (!query) return true;
+                    return [
+                        item.sender,
+                        item.email,
+                        item.subject,
+                        item.snippet,
+                        Array.isArray(item.tags) ? item.tags.join(' ') : ''
+                    ].join(' ').toLowerCase().includes(query);
+                });
+            }
+
+            function getSelectedThread() {
+                return state.items.find((item) => item.id === state.selectedId) || null;
+            }
+
+            function ensureSelectedThread() {
+                const visible = getVisibleThreads();
+                if (!visible.length) {
+                    state.selectedId = '';
+                    return;
+                }
+                const selectedVisible = visible.some((item) => item.id === state.selectedId);
+                if (!selectedVisible) {
+                    state.selectedId = visible[0].id;
+                }
+            }
+
+            function renderFolders() {
+                folderListEl.innerHTML = Object.entries(folderMeta).map(([key, meta]) => {
+                    const count = getFolderCount(key);
+                    const unread = getUnreadCount(key);
+                    const countText = unread > 0 ? unread : count;
+                    return `
+                        <button class="folder-button ${state.folder === key ? 'active' : ''}" type="button" data-folder="${key}">
+                            <div class="folder-name">
+                                <strong>${meta.label}</strong>
+                                <span>${meta.description}</span>
+                            </div>
+                            <span class="count-pill">${countText}</span>
+                        </button>
+                    `;
+                }).join('');
+
+                folderListEl.querySelectorAll('[data-folder]').forEach((button) => {
+                    button.addEventListener('click', function () {
+                        state.folder = String(this.getAttribute('data-folder') || 'inbox');
+                        ensureSelectedThread();
+                        saveState();
+                        render();
+                    });
+                });
+            }
+
+            function renderSummary() {
+                const unreadCount = state.items.filter((item) => item.unread).length;
+                const starredCount = state.items.filter((item) => item.starred).length;
+                const scheduledCount = getFolderCount('scheduled');
+                summaryListEl.innerHTML = [
+                    { label: 'Ongelezen', value: unreadCount, note: 'Direct aandacht' },
+                    { label: 'Met ster', value: starredCount, note: 'Belangrijke mails' },
+                    { label: 'Gepland', value: scheduledCount, note: 'Klaar om later te verzenden' }
+                ].map((item) => `
+                    <div class="summary-row">
+                        <div>
+                            <strong>${item.label}</strong>
+                            <span>${item.note}</span>
+                        </div>
+                        <span class="count-pill">${item.value}</span>
+                    </div>
+                `).join('');
+            }
+
+            function renderThreads() {
+                ensureSelectedThread();
+                const visible = getVisibleThreads();
+                if (!visible.length) {
+                    threadListEl.innerHTML = '<div class="empty-state">Geen berichten gevonden binnen deze map.</div>';
+                    return;
+                }
+
+                threadListEl.innerHTML = visible.map((item) => `
+                    <article class="thread-item ${state.selectedId === item.id ? 'active' : ''} ${item.unread ? 'unread' : ''}" data-thread-id="${item.id}">
+                        <div class="thread-top">
+                            <div class="thread-sender">${item.sender}</div>
+                            <div class="thread-time">${item.timeLabel}</div>
+                        </div>
+                        <div class="thread-subject">${item.subject}</div>
+                        <div class="thread-snippet">${item.snippet}</div>
+                        <div class="thread-tags">${(item.tags || []).map((tag) => `<span class="thread-tag">${tag}</span>`).join('')}</div>
+                    </article>
+                `).join('');
+
+                threadListEl.querySelectorAll('[data-thread-id]').forEach((itemEl) => {
+                    itemEl.addEventListener('click', function () {
+                        const id = String(this.getAttribute('data-thread-id') || '');
+                        state.selectedId = id;
+                        const thread = state.items.find((item) => item.id === id);
+                        if (thread) thread.unread = false;
+                        saveState();
+                        render();
+                    });
+                });
+            }
+
+            function renderPreview() {
+                const selected = getSelectedThread();
+                if (!selected) {
+                    previewPaneEl.innerHTML = '<div class="empty-state">Kies links een bericht om de preview te openen.</div>';
+                    markReadBtn.disabled = true;
+                    starBtn.disabled = true;
+                    archiveBtn.disabled = true;
+                    return;
+                }
+
+                markReadBtn.disabled = false;
+                starBtn.disabled = false;
+                archiveBtn.disabled = false;
+                markReadBtn.textContent = selected.unread ? 'Markeer gelezen' : 'Markeer ongelezen';
+                starBtn.textContent = selected.starred ? 'Ster verwijderen' : 'Ster';
+                archiveBtn.textContent = selected.folder === 'archive' ? 'Terug naar inbox' : 'Archiveer';
+
+                previewPaneEl.innerHTML = `
+                    <header class="preview-header">
+                        <div class="preview-title">${selected.subject}</div>
+                        <div class="preview-subline">
+                            <span><strong>Van:</strong> ${selected.sender}</span>
+                            <span><strong>E-mail:</strong> ${selected.email}</span>
+                            <span><strong>Tijd:</strong> ${selected.timeLabel}</span>
+                        </div>
+                    </header>
+                    <section class="preview-content">
+                        <div class="thread-tags">${(selected.tags || []).map((tag) => `<span class="thread-tag">${tag}</span>`).join('')}</div>
+                        <div class="preview-html">${selected.bodyHtml || ''}</div>
+                    </section>
+                `;
+            }
+
+            function render() {
+                renderFolders();
+                renderSummary();
+                renderThreads();
+                renderPreview();
+            }
+
+            function updateSelectedThread(mutator) {
+                const selected = getSelectedThread();
+                if (!selected) return;
+                mutator(selected);
+                saveState();
+                render();
+            }
+
+            mailSearchEl.addEventListener('input', function () {
+                state.query = String(this.value || '');
+                renderThreads();
+                renderPreview();
+            });
+
+            markReadBtn.addEventListener('click', function () {
+                updateSelectedThread((thread) => {
+                    thread.unread = !thread.unread;
+                });
+            });
+
+            starBtn.addEventListener('click', function () {
+                updateSelectedThread((thread) => {
+                    thread.starred = !thread.starred;
+                });
+            });
+
+            archiveBtn.addEventListener('click', function () {
+                updateSelectedThread((thread) => {
+                    thread.folder = thread.folder === 'archive' ? 'inbox' : 'archive';
+                    thread.unread = false;
+                });
+            });
+
+            loadState();
+            ensureSelectedThread();
+            render();
+        })();
+    </script>
+</body>
+</html>
