@@ -12314,6 +12314,9 @@ async function setInterestedLeadInAgendaResponse(req, res) {
   if (!appointmentTime) {
     return res.status(400).json({ ok: false, error: 'Vul een geldige tijd in (HH:MM).' });
   }
+  if (!location) {
+    return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
+  }
 
   const baseAppointment = buildMaterializedInterestedLeadAppointment(callId, req.body || {});
   if (!baseAppointment) {
@@ -12770,6 +12773,9 @@ function setLeadTaskInAgendaById(req, res, taskIdRaw) {
   }
   if (!appointmentTime) {
     return res.status(400).json({ ok: false, error: 'Vul een geldige tijd in (HH:MM).' });
+  }
+  if (!location) {
+    return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
   }
 
   const nowIso = new Date().toISOString();
