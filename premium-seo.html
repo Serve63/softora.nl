@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
 <script>
   (function () {
@@ -24,84 +24,99 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #f0ede8;
-  --sidebar-bg: #f7f4f0;
-  --crimson: #9b2355;
-  --crimson-light: #c4346a;
-  --text-dark: #1a1a2e;
-  --text-mid: #555;
-  --text-light: #999;
-  --border: #e2ddd6;
+  --bg: var(--bg-primary);
+  --crimson: var(--accent);
+  --crimson-light: var(--accent-light);
+  --text-dark: var(--text-primary);
+  --text-mid: var(--text-secondary);
+  --text-light: var(--text-tertiary);
   --white: #fff;
-  --card: #ffffff;
-  --tag: #f5f0eb;
+  --card: var(--bg-secondary);
+  --tag: rgba(139, 34, 82, 0.06);
   --green: #16733c;
   --orange: #b45a00;
   --red: #c0392b;
   --score-good: #16733c;
   --score-mid: #b45a00;
   --score-bad: #c0392b;
+  --seo-shadow: 0 18px 40px rgba(26, 26, 46, 0.06);
 }
 body {
-  font-family: 'Barlow', sans-serif;
-  background: var(--bg);
+  font-family: 'Inter', sans-serif;
+  background:
+    radial-gradient(circle at 86% 16%, rgba(139, 34, 82, 0.12), transparent 36%),
+    radial-gradient(circle at 14% 82%, rgba(166, 45, 101, 0.08), transparent 34%),
+    var(--bg);
   color: var(--text-dark);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 .dashboard-layout {
   display: flex;
   min-height: 100vh;
 }
 .sidebar {
-  width: 320px;
+  width: 280px;
   position: fixed;
   top: 0;
   left: 0;
   height: 100vh;
   z-index: 100;
+  display: flex;
+  flex-direction: column;
 }
 .main-content {
-  margin-left: 320px;
-  width: calc(100% - 320px);
+  margin-left: 280px;
+  width: calc(100% - 280px);
   min-height: 100vh;
-  padding: 40px 48px;
+  min-width: 0;
+  padding: clamp(1.6rem, 3vw, 3rem);
 }
 .page-shell {
-  width: min(1240px, 100%);
+  width: min(1280px, 100%);
 }
 .page-title {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: 1px;
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(2.2rem, 4vw, 3.3rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  margin-bottom: 4px;
+  line-height: 0.96;
+  margin-bottom: 6px;
 }
 .page-subtitle {
-  font-size: 13px;
-  color: var(--text-light);
-  margin-bottom: 32px;
+  max-width: 62ch;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-mid);
+  margin-bottom: 28px;
 }
 .tabs {
   display: flex;
-  border-bottom: 2px solid var(--border);
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 32px;
+  overflow-x: auto;
 }
 .tab {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-light);
-  padding: 8px 20px;
+  padding: 12px 18px;
   cursor: pointer;
   border: none;
   background: none;
+  border-radius: 12px 12px 0 0;
   position: relative;
   transition: color .15s;
 }
-.tab:hover { color: var(--text-dark); }
+.tab:hover {
+  color: var(--text-dark);
+  background: rgba(139, 34, 82, 0.04);
+}
 .tab.active { color: var(--crimson); }
 .tab.active::after {
   content:'';
@@ -115,41 +130,56 @@ body {
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
-.scan-url-bar { display: flex; gap: 10px; margin-bottom: 28px; }
+.scan-url-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 28px;
+}
 .scan-url-bar input {
-  flex:1;
-  padding: 11px 16px;
+  flex: 1 1 360px;
+  min-width: 0;
+  padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 5px;
-  font-family: 'Barlow', sans-serif;
-  font-size: 13px;
+  border-radius: 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
   background: var(--card);
   outline: none;
   color: var(--text-dark);
-  transition: border-color .15s;
+  transition: border-color .15s, box-shadow .15s;
 }
-.scan-url-bar input:focus { border-color: var(--crimson); }
+.scan-url-bar input:focus {
+  border-color: rgba(139, 34, 82, 0.42);
+  box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.12);
+}
 .btn-scan,
 .btn-ai {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 24px;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 24px;
   background: var(--crimson);
   color: #fff;
   border: none;
-  border-radius: 5px;
-  font-family: 'Barlow Condensed', sans-serif;
+  border-radius: 14px;
+  font-family: 'Oswald', sans-serif;
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background .15s;
+  transition: background .15s, transform .15s, box-shadow .15s;
   white-space: nowrap;
+  box-shadow: 0 12px 28px rgba(139, 34, 82, 0.18);
 }
 .btn-scan:hover,
-.btn-ai:hover { background: var(--crimson-light); }
+.btn-ai:hover {
+  background: var(--crimson-light);
+  transform: translateY(-1px);
+}
 .btn-scan:disabled,
 .btn-ai:disabled { opacity: .6; cursor: not-allowed; }
 
@@ -179,12 +209,12 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%,-50%);
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 28px;
   font-weight: 800;
 }
 .score-label {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 2px;
@@ -212,7 +242,7 @@ body {
   margin-bottom: 8px;
 }
 .metric-val {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 22px;
   font-weight: 800;
   margin-bottom: 4px;
@@ -229,7 +259,7 @@ body {
 
 .issues-section { margin-top: 24px; }
 .issues-title {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 1.5px;
@@ -318,7 +348,7 @@ body {
   justify-content: space-between;
 }
 .ai-card-title {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 1.5px;
@@ -350,7 +380,7 @@ body {
   width: 100%;
   border: none;
   background: transparent;
-  font-family: 'Barlow', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   color: var(--text-dark);
   resize: none;
@@ -402,6 +432,71 @@ body {
   pointer-events:none;
 }
 .toast.show { opacity:1; transform:translateY(0); }
+
+.score-card,
+.metric-card,
+.issue-item,
+.scan-empty,
+.scan-loading,
+.ai-card,
+.kw-item {
+  box-shadow: var(--seo-shadow);
+}
+
+.score-card,
+.metric-card,
+.issue-item,
+.scan-empty,
+.scan-loading,
+.ai-card,
+.kw-item,
+.field-val {
+  border-radius: 18px;
+}
+
+.score-number,
+.score-label,
+.metric-title,
+.metric-val,
+.issues-title,
+.ai-card-title,
+.field-label,
+.kw-diff {
+  font-family: 'Oswald', sans-serif;
+}
+
+.metric-title,
+.issues-title,
+.field-label,
+.char-count,
+.kw-vol {
+  letter-spacing: 0.08em;
+}
+
+.metric-card,
+.issue-item,
+.field-val {
+  background: var(--card);
+}
+
+.field-val {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.ai-card-head {
+  background: var(--tag);
+}
+
+.scan-empty,
+.scan-loading {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+}
+
+.scan-empty {
+  padding: clamp(2rem, 5vw, 4rem);
+}
 
 @media (max-width: 1100px) {
   .sidebar {
@@ -590,8 +685,8 @@ Neem contact op</textarea>
       <div class="tab-panel" id="tab-keywords">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap;">
           <div>
-            <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.5px">Doelzoekwoorden</div>
-            <div style="font-size:12px;color:var(--text-light);margin-top:2px">Focus keywords voor softora.nl</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Doelzoekwoorden</div>
+            <div style="font-size:12px;color:var(--text-mid);margin-top:2px">Focus keywords voor softora.nl</div>
           </div>
           <button class="btn-ai" id="keywords-refresh-btn" onclick="refreshKeywords()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
