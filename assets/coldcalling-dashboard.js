@@ -3643,21 +3643,25 @@
   }
 
   function getCallRecordingUrl(call) {
+    const callId = normalizeFreeText(call?.callId || '');
     const raw = normalizeFreeText(
       call?.recordingUrl || call?.recording_url || call?.recordingUrlProxy || call?.audioUrl || ''
     );
     if (raw) {
+      if (callId && /\/api\/coldcalling\/recording-proxy/i.test(raw)) {
+        return `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}`;
+      }
       if (/^https?:\/\//i.test(raw)) return raw;
       if (raw.startsWith('/')) return raw;
       return '';
     }
 
-    const callId = normalizeFreeText(call?.callId || '');
     const recordingSid = normalizeFreeText(call?.recordingSid || call?.recording_sid || '');
+    if (callId && recordingSid) {
+      return `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}`;
+    }
     if (!callId || !recordingSid) return '';
-    return `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}&recordingSid=${encodeURIComponent(
-      recordingSid
-    )}`;
+    return `/api/coldcalling/recording-proxy?recordingSid=${encodeURIComponent(recordingSid)}`;
   }
 
   function inferPhoneConversationIntent(call, decisionByPhoneKey, latestCallIdByPhoneKey) {

@@ -2636,7 +2636,7 @@ function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
     payload?.RecordingSid || payload?.recording_sid || extractTwilioRecordingSidFromUrl(payload?.RecordingUrl || '')
   );
   const recordingUrlRaw = normalizeString(payload?.RecordingUrl || payload?.recording_url || '');
-  const recordingUrlProxy = buildTwilioRecordingProxyUrl(callId, recordingSid);
+  const recordingUrlProxy = buildTwilioRecordingProxyUrl(callId);
   const recordingUrl = recordingUrlProxy || recordingUrlRaw;
   const updatedAtMs = Date.now();
   const stackLabel = getColdcallingStackLabel(fallbackStack);
@@ -2678,6 +2678,96 @@ function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
     stack: fallbackStack,
     stackLabel,
   };
+}
+
+function parseTwilioRecordingDurationSeconds(recording) {
+  const rawSeconds = parseNumberSafe(
+    recording?.duration || recording?.duration_seconds || recording?.Duration || recording?.DurationSeconds,
+    null
+  );
+  return Number.isFinite(rawSeconds) && rawSeconds >= 0 ? Math.round(rawSeconds) : null;
+}
+
+function parseTwilioRecordingUpdatedAtMs(recording) {
+  const candidates = [
+    recording?.date_updated,
+    recording?.date_created,
+    recording?.start_time,
+    recording?.startTime,
+    recording?.created_at,
+    recording?.updated_at,
+  ];
+  for (const candidate of candidates) {
+    const raw = normalizeString(candidate);
+    if (!raw) continue;
+    const parsed = Date.parse(raw);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return 0;
+}
+
+function choosePreferredTwilioRecording(recordings, preferredSid = '') {
+  const list = Array.isArray(recordings) ? recordings.filter(Boolean) : [];
+  if (!list.length) return null;
+  const preferredSidNormalized = normalizeString(preferredSid);
+
+  return list
+    .slice()
+    .sort((left, right) => {
+      const leftCompleted = /completed/i.test(normalizeString(left?.status || '')) ? 1 : 0;
+      const rightCompleted = /completed/i.test(normalizeString(right?.status || '')) ? 1 : 0;
+      if (leftCompleted !== rightCompleted) return rightCompleted - leftCompleted;
+
+      const leftDuration = parseTwilioRecordingDurationSeconds(left) || 0;
+      const rightDuration = parseTwilioRecordingDurationSeconds(right) || 0;
+      if (leftDuration !== rightDuration) return rightDuration - leftDuration;
+
+      const leftPreferred = normalizeString(left?.sid || '') === preferredSidNormalized ? 1 : 0;
+      const rightPreferred = normalizeString(right?.sid || '') === preferredSidNormalized ? 1 : 0;
+      if (leftPreferred !== rightPreferred) return rightPreferred - leftPreferred;
+
+      const leftUpdated = parseTwilioRecordingUpdatedAtMs(left);
+      const rightUpdated = parseTwilioRecordingUpdatedAtMs(right);
+      return rightUpdated - leftUpdated;
+    })[0];
+}
+
+function resolvePreferredRecordingUrl(...sources) {
+  let callId = '';
+  let recordingSid = '';
+  let provider = '';
+  const rawUrls = [];
+
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+    callId = callId || normalizeString(source.callId || source.call_id || '');
+    recordingSid =
+      recordingSid ||
+      normalizeString(source.recordingSid || source.recording_sid || extractTwilioRecordingSidFromUrl(source.recordingUrl || source.recording_url || ''));
+    provider = provider || normalizeString(source.provider || '');
+
+    const url = normalizeString(
+      source.recordingUrl ||
+        source.recording_url ||
+        source.recordingUrlProxy ||
+        source.audioUrl ||
+        source.audio_url ||
+        ''
+    );
+    if (url) rawUrls.push(url);
+  }
+
+  const firstRawUrl = rawUrls[0] || '';
+  const hasProxyReference = rawUrls.some((url) => /\/api\/coldcalling\/recording-proxy/i.test(url));
+  const isTwilioLike = provider === 'twilio' || Boolean(recordingSid) || hasProxyReference;
+
+  if (callId && isTwilioLike) {
+    return buildTwilioRecordingProxyUrl(callId);
+  }
+  if (!callId && recordingSid) {
+    return buildTwilioRecordingProxyUrl('', recordingSid);
+  }
+  return firstRawUrl;
 }
 
 function extractCallUpdateFromTwilioCallStatusResponse(callId, data, options = {}) {
@@ -5049,14 +5139,7 @@ function buildInterestedLeadCandidateRows(existingTasks = []) {
         ),
         location: '',
         whatsappInfo: truncateText(normalizeString(insight?.followUpReason || ''), 6000),
-        recordingUrl: normalizeString(
-          callUpdate?.recordingUrl ||
-            callUpdate?.recording_url ||
-            callUpdate?.recordingUrlProxy ||
-            callUpdate?.audioUrl ||
-            callUpdate?.audio_url ||
-            ''
-        ),
+        recordingUrl: resolvePreferredRecordingUrl(callUpdate),
         provider: normalizeString(leadFollowUp?.provider || callUpdate?.provider || '').toLowerCase(),
         providerLabel: coldcallingStackLabel || '',
         coldcallingStack: coldcallingStack || '',
@@ -5285,14 +5368,7 @@ function buildGroupedColdcallingLeadRows(existingTasks = []) {
           ),
           location: '',
           whatsappInfo: truncateText(normalizeString(latestInsight?.followUpReason || ''), 6000),
-          recordingUrl: normalizeString(
-            latestUpdate?.recordingUrl ||
-              latestUpdate?.recording_url ||
-              latestUpdate?.recordingUrlProxy ||
-              latestUpdate?.audioUrl ||
-              latestUpdate?.audio_url ||
-              ''
-          ),
+          recordingUrl: resolvePreferredRecordingUrl(latestUpdate),
           provider: normalizeString(latestUpdate?.provider || latestInsight?.provider || '').toLowerCase(),
           providerLabel: normalizeString(
             latestUpdate?.stackLabel || latestInsight?.coldcallingStackLabel || latestInsight?.stackLabel || ''
@@ -5709,17 +5785,7 @@ function buildConfirmationTaskDetail(appointment) {
   const callUpdate = getLatestCallUpdateByCallId(task.callId);
   const aiInsight = task.callId ? aiCallInsightsByCallId.get(task.callId) || null : null;
   const transcript = getAppointmentTranscriptText(appointment) || '';
-  const recordingUrl = normalizeString(
-    callUpdate?.recordingUrl ||
-      callUpdate?.recording_url ||
-      callUpdate?.recordingUrlProxy ||
-      callUpdate?.audioUrl ||
-      appointment?.recordingUrl ||
-      appointment?.recording_url ||
-      appointment?.recordingUrlProxy ||
-      appointment?.audioUrl ||
-      ''
-  );
+  const recordingUrl = resolvePreferredRecordingUrl(callUpdate, appointment);
 
   return {
     ...task,
@@ -9165,21 +9231,24 @@ app.get('/api/coldcalling/recording-proxy', async (req, res) => {
     recordingSid = extractTwilioRecordingSidFromUrl(cached?.recordingUrl || cached?.recording_url || '');
   }
 
-  if (!recordingSid && callId) {
+  if (callId) {
     try {
       const { recordings } = await fetchTwilioRecordingsByCallId(callId);
-      const preferred =
-        recordings.find((item) => /completed/i.test(normalizeString(item?.status || ''))) ||
-        recordings[0] ||
-        null;
-      recordingSid = normalizeString(preferred?.sid || '');
+      const preferred = choosePreferredTwilioRecording(recordings, recordingSid);
+      if (preferred) {
+        recordingSid = normalizeString(preferred?.sid || '') || recordingSid;
+      }
     } catch (error) {
+      if (recordingSid) {
+        // Fallback naar bekende opname als Twilio-lijst tijdelijk niet beschikbaar is.
+      } else {
       return res.status(Number(error?.status || 502)).json({
         ok: false,
         error: error?.message || 'Kon Twilio recordinglijst niet ophalen.',
         endpoint: error?.endpoint || null,
         details: error?.data || null,
       });
+      }
     }
   }
 
@@ -9215,7 +9284,7 @@ app.get('/api/coldcalling/recording-proxy', async (req, res) => {
     res.set('Cache-Control', 'private, max-age=120');
 
     if (callId) {
-      const proxyUrl = buildTwilioRecordingProxyUrl(callId, recordingSid);
+      const proxyUrl = buildTwilioRecordingProxyUrl(callId);
       const existing = callUpdatesById.get(callId) || {};
       upsertRecentCallUpdate({
         ...existing,
@@ -9609,11 +9678,7 @@ async function buildPremiumDashboardChatContext() {
         (Number.isFinite(Number(item?.updatedAtMs)) && Number(item.updatedAtMs) > 0
           ? Number(item.updatedAtMs)
           : Date.parse(updatedAt)) || 0;
-      const recordingUrl =
-        normalizeString(item?.recordingUrl || '') ||
-        normalizeString(item?.recording_url || '') ||
-        normalizeString(item?.recordingUrlProxy || '') ||
-        normalizeString(item?.audioUrl || '');
+      const recordingUrl = resolvePreferredRecordingUrl(item);
       const hasRecording =
         Boolean(recordingUrl) ||
         toBooleanSafe(item?.recorded, false) ||

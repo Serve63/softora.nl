@@ -2001,6 +2001,22 @@
                 return (Number(value?.id ?? value) || 0) > 0;
             }
 
+            function normalizeLeadRecordingUrl(item) {
+                const callId = String(item?.callId || item?.call_id || '').trim();
+                const raw = String(
+                    item?.recordingUrl ||
+                        item?.recording_url ||
+                        item?.recordingUrlProxy ||
+                        item?.audioUrl ||
+                        item?.audio_url ||
+                        ''
+                ).trim();
+                if (callId && /\/api\/coldcalling\/recording-proxy/i.test(raw)) {
+                    return `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}`;
+                }
+                return raw;
+            }
+
             function normalizeLeadRow(item) {
                 return {
                     id: resolveLeadListId(item),
@@ -2014,14 +2030,7 @@
                     summary: String(item?.summary || '').trim(),
                     location: String(item?.location || item?.appointmentLocation || '').trim(),
                     whatsappInfo: String(item?.whatsappInfo || item?.whatsappNotes || item?.whatsapp || '').trim(),
-                    recordingUrl: String(
-                        item?.recordingUrl ||
-                            item?.recording_url ||
-                            item?.recordingUrlProxy ||
-                            item?.audioUrl ||
-                            item?.audio_url ||
-                            ''
-                    ).trim(),
+                    recordingUrl: normalizeLeadRecordingUrl(item),
                     provider: String(item?.provider || '').trim().toLowerCase(),
                     providerLabel: String(item?.providerLabel || '').trim(),
                     coldcallingStack: String(
@@ -2162,14 +2171,7 @@
                     ).trim(),
                     location: '',
                     whatsappInfo: String(insight?.followUpReason || '').trim(),
-                    recordingUrl: String(
-                        update?.recordingUrl ||
-                            update?.recording_url ||
-                            update?.recordingUrlProxy ||
-                            update?.audioUrl ||
-                            update?.audio_url ||
-                            ''
-                    ).trim(),
+                    recordingUrl: normalizeLeadRecordingUrl(update),
                     provider: String(update?.provider || insight?.provider || '').trim().toLowerCase(),
                     providerLabel: String(
                         update?.stackLabel || insight?.coldcallingStackLabel || insight?.stackLabel || ''
