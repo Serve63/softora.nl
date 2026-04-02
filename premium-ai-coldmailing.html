@@ -496,15 +496,22 @@
             background: rgba(255, 255, 255, 0.01);
         }
 
+        body.lead-modal-open {
+            overflow: hidden !important;
+        }
+
         .lead-modal-overlay {
             position: fixed;
             inset: 0;
             display: none;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             background: rgba(9, 11, 20, 0.62);
             z-index: 1200;
-            padding: 1.2rem;
+            padding: max(1.2rem, 3vh) 1.2rem;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
 
         .lead-modal-overlay.show {
@@ -512,7 +519,9 @@
         }
 
         .lead-modal {
+            position: relative;
             width: min(720px, 100%);
+            max-height: calc(100vh - max(2.4rem, 6vh));
             border: 1px solid var(--border);
             border-radius: 14px;
             background: var(--bg-secondary);
@@ -521,6 +530,9 @@
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-gutter: stable both-edges;
         }
 
         .lead-modal-header {
@@ -986,7 +998,7 @@
         </main>
 
         <div class="lead-modal-overlay" id="leadModalOverlay" aria-hidden="true">
-            <div class="lead-modal">
+            <div class="lead-modal" tabindex="-1">
                 <div class="lead-modal-header">
                     <div>
                         <div class="lead-modal-title">Lead details</div>
@@ -1432,11 +1444,6 @@
                 if (message) {
                     modalLoadingText.textContent = String(message);
                 }
-                if (!isLoading && modalOverlay.classList.contains('show')) {
-                    window.setTimeout(() => {
-                        if (modalDate && typeof modalDate.focus === 'function') modalDate.focus();
-                    }, 20);
-                }
             }
 
             function setModalStatus(message, variant) {
@@ -1454,6 +1461,7 @@
                 setModalLoading(false);
                 setModalTaskActionsEnabled(true);
                 modalContactMeta.innerHTML = '';
+                document.body.classList.remove('lead-modal-open');
                 modalOverlay.classList.remove('show');
                 modalOverlay.setAttribute('aria-hidden', 'true');
             }
@@ -1542,8 +1550,29 @@
             }
 
             function showLeadModal() {
+                document.body.classList.add('lead-modal-open');
                 modalOverlay.classList.add('show');
                 modalOverlay.setAttribute('aria-hidden', 'false');
+                modalOverlay.scrollTop = 0;
+                modalContainer.scrollTop = 0;
+                window.setTimeout(() => {
+                    if (modalCloseBtn && typeof modalCloseBtn.focus === 'function') {
+                        try {
+                            modalCloseBtn.focus({ preventScroll: true });
+                            return;
+                        } catch (error) {
+                            modalCloseBtn.focus();
+                            return;
+                        }
+                    }
+                    if (modalContainer && typeof modalContainer.focus === 'function') {
+                        try {
+                            modalContainer.focus({ preventScroll: true });
+                        } catch (error) {
+                            modalContainer.focus();
+                        }
+                    }
+                }, 20);
             }
 
             async function openLeadModal(taskId) {
