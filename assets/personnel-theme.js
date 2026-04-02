@@ -534,7 +534,7 @@
             '        <div class="sidebar-user-role" data-sidebar-user-role>Administrator</div>',
             "      </div>",
             "    </button>",
-            '    <a href="/premium-personeel-login" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">',
+            '    <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">',
             '      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>',
             "    </a>",
             "  </div>",
@@ -546,9 +546,13 @@
         if (!isPremiumPersonnelContext) return;
         const sidebar = document.querySelector(".sidebar");
         if (!sidebar) return;
+        if (sidebar.dataset.staticSidebar === "1") {
+            sidebar.dataset.sidebarReady = "true";
+            return;
+        }
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
         const activeKey = getSidebarActiveKey(pathname);
-        // Rebuild altijd zodat de sidebar op elke pagina exact dezelfde structuur/labels heeft.
+        // Alleen legacy/lege sidebars nog opbouwen; statische sidebars blijven onaangeroerd.
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
         sidebar.dataset.sidebarReady = "true";
     }
