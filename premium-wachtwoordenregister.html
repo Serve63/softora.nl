@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wachtwoordenregister | Softora.nl</title>
+<title>Wachtwoordenregister – Softora.nl</title>
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Oswald:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
 <script>
   (function () {
@@ -22,711 +22,447 @@
 </script>
 <script src="assets/personnel-theme.js?v=20260402-4" defer></script>
 <style>
-  *, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f0ede8;
+  --crimson: #9b2355;
+  --text-dark: #1a1a2e;
+  --text-mid: #555;
+  --text-light: #999;
+  --border: #e2ddd6;
+  --card: #ffffff;
+  --tag: #f5f0eb;
+  --red: #c0392b;
+  --green: #16733c;
+}
+body {
+  font-family: 'Barlow', sans-serif;
+  background: var(--bg);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+.dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 320px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 100;
+}
+.main-content {
+  margin-left: 320px;
+  width: calc(100% - 320px);
+  min-height: 100vh;
+  padding: 32px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+.register-shell {
+  width: min(1000px, 100%);
+  min-height: calc(100vh - 64px);
+}
 
-  :root {
-    --vault-shell-max: 1340px;
-    --vault-shadow: 0 18px 40px rgba(26, 26, 46, 0.07);
-    --vault-shadow-soft: 0 10px 24px rgba(26, 26, 46, 0.04);
-    --vault-red: #d04949;
-    --vault-green: #1d8f57;
-  }
+/* PIN SCHERM */
+#screen-pin {
+  width: 100%;
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#screen-register {
+  display: none;
+  width: 100%;
+  min-height: calc(100vh - 64px);
+}
 
-  body {
-    font-family: 'Inter', sans-serif;
-    color: var(--text-primary);
-    background:
-      radial-gradient(circle at 86% 16%, rgba(139, 34, 82, 0.12), transparent 34%),
-      radial-gradient(circle at 14% 84%, rgba(166, 45, 101, 0.08), transparent 34%),
-      var(--bg-primary);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+.pin-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 44px 48px 40px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 12px 48px rgba(0,0,0,.08);
+}
+.pin-logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  margin-bottom: 28px;
+}
+.pin-icon {
+  width: 50px;
+  height: 50px;
+  background: rgba(155,35,85,.08);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.pin-icon svg { width: 22px; height: 22px; color: var(--crimson); }
+.pin-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+.pin-sub {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 28px;
+  text-align: center;
+  line-height: 1.5;
+}
+.pin-dots { display: flex; gap: 12px; margin-bottom: 28px; }
+.pin-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  transition: all .15s;
+}
+.pin-dot.filled { background: var(--crimson); border-color: var(--crimson); }
+.pin-dot.error { background: var(--red); border-color: var(--red); animation: shake .3s ease; }
+.pin-dot.success { background: var(--green); border-color: var(--green); }
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-5px)}
+  40%{transform:translateX(5px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}
 
-  .dashboard-layout {
-    display: flex;
-    min-height: 100vh;
-  }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+.num-btn {
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: all .12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+.num-btn:hover { background: var(--card); border-color: rgba(155,35,85,.3); color: var(--crimson); }
+.num-btn:active { transform: scale(.93); }
+.num-btn.ghost { border: none; background: transparent; cursor: default; }
+.num-btn.ghost:hover { background: transparent; border: none; color: var(--text-dark); }
 
+.pin-msg {
+  font-size: 11px;
+  color: var(--red);
+  margin-top: 14px;
+  min-height: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* REGISTER SCHERM */
+.reg-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+.reg-logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  margin-bottom: 4px;
+}
+.reg-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.reg-sub { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+
+.lock-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  margin-top: 6px;
+}
+.lock-btn:hover { border-color: var(--crimson); color: var(--crimson); }
+.lock-btn svg { width: 12px; height: 12px; }
+
+.cat-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.cat-pill {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all .15s;
+}
+.cat-pill:hover { border-color: rgba(155,35,85,.3); color: var(--text-dark); }
+.cat-pill.active { background: var(--crimson); border-color: var(--crimson); color: #fff; }
+
+.search-row {
+  position: relative;
+  margin-bottom: 16px;
+}
+.search-row input {
+  width: 100%;
+  padding: 10px 14px 10px 36px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  background: var(--card);
+  color: var(--text-dark);
+  outline: none;
+  transition: border-color .15s;
+}
+.search-row input:focus { border-color: var(--crimson); }
+.search-row svg {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-light);
+  pointer-events: none;
+}
+
+.table-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.t-head {
+  display: grid;
+  grid-template-columns: 2fr 2fr 2.5fr 32px;
+  gap: 0;
+  padding: 8px 20px;
+  background: var(--tag);
+  border-bottom: 1px solid var(--border);
+}
+.t-head span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+.t-row {
+  display: grid;
+  grid-template-columns: 2fr 2fr 2.5fr 32px;
+  gap: 0;
+  align-items: center;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.t-row:last-child { border-bottom: none; }
+.t-row:hover { background: var(--tag); }
+
+.t-name { display: flex; align-items: center; gap: 10px; }
+.t-favicon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--tag);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--crimson);
+  flex-shrink: 0;
+}
+.t-label { font-size: 13px; font-weight: 600; color: var(--text-dark); }
+.t-url { font-size: 11px; color: var(--text-light); margin-top: 1px; }
+.t-user { font-size: 12px; color: var(--text-mid); }
+
+.t-pw-wrap { display: flex; align-items: center; gap: 6px; }
+.t-pw { font-family: monospace; font-size: 13px; color: var(--text-dark); }
+.t-pw.hidden { color: var(--text-light); letter-spacing: 2px; }
+
+.btn-copy {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.btn-copy:hover { border-color: var(--crimson); color: var(--crimson); }
+.btn-copy svg { width: 13px; height: 13px; }
+.btn-copy.copied { border-color: var(--green); color: var(--green); }
+
+.empty { padding: 48px; text-align: center; color: var(--text-light); font-size: 13px; }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--text-dark);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all .25s;
+  pointer-events: none;
+  z-index: 99;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+@media (max-width: 1100px) {
   .sidebar {
-    width: 280px;
-    position: fixed;
-    inset: 0 auto 0 0;
-    height: 100vh;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
+    position: static;
+    width: 100%;
+    height: auto;
   }
-
   .main-content {
-    margin-left: 280px;
-    width: calc(100% - 280px);
-    min-width: 0;
-    min-height: 100vh;
-    padding: clamp(1.5rem, 3vw, 3rem);
-  }
-
-  .page-shell {
-    width: min(var(--vault-shell-max), 100%);
-  }
-
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
-    gap: 1rem;
-    align-items: end;
-    margin-bottom: 1rem;
-  }
-
-  .eyebrow,
-  .panel-kicker,
-  .input-label,
-  .cat-pill,
-  .table-kicker {
-    font-family: 'Oswald', sans-serif;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .eyebrow {
-    font-size: 0.74rem;
-    color: var(--accent);
-    margin-bottom: 0.45rem;
-  }
-
-  .page-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: clamp(3rem, 5.5vw, 4.2rem);
-    line-height: 0.92;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-  }
-
-  .page-sub {
-    margin-top: 0.75rem;
-    max-width: 62ch;
-    color: var(--text-secondary);
-    font-size: 1rem;
-    line-height: 1.62;
-  }
-
-  .hero-card,
-  .pin-card,
-  .vault-panel,
-  .table-wrap {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 22px;
-    box-shadow: var(--vault-shadow-soft);
-  }
-
-  .hero-card {
-    padding: 1.15rem 1.2rem;
-    justify-self: end;
-    width: min(100%, 440px);
-  }
-
-  .hero-card-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-tertiary);
-  }
-
-  .hero-card-value {
-    margin-top: 0.55rem;
-    font-family: 'Oswald', sans-serif;
-    font-size: 1.5rem;
-    line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .hero-card-note {
-    margin-top: 0.55rem;
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    line-height: 1.55;
-  }
-
-  .register-shell {
+    margin-left: 0;
     width: 100%;
+    padding: 20px;
   }
-
-  #screen-pin {
-    width: 100%;
-    min-height: min(72vh, 760px);
-    display: grid;
-    place-items: center;
-  }
-
+  .register-shell,
+  #screen-pin,
   #screen-register {
-    display: none;
-    width: 100%;
+    min-height: auto;
   }
+}
 
-  .pin-card {
-    width: min(420px, 100%);
-    padding: 2rem;
-    text-align: center;
+@media (max-width: 760px) {
+  .reg-header {
+    flex-direction: column;
+    gap: 14px;
   }
-
-  .pin-logo {
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.82rem;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-bottom: 1rem;
-  }
-
-  .pin-icon {
-    width: 68px;
-    height: 68px;
-    margin: 0 auto 1rem;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background: rgba(139, 34, 82, 0.08);
-    color: var(--accent);
-  }
-
-  .pin-icon svg {
-    width: 28px;
-    height: 28px;
-  }
-
-  .pin-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: 2rem;
-    line-height: 0.96;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .pin-sub {
-    margin-top: 0.7rem;
-    color: var(--text-secondary);
-    font-size: 0.98rem;
-    line-height: 1.6;
-  }
-
-  .pin-dots {
-    display: flex;
-    justify-content: center;
-    gap: 0.7rem;
-    margin: 1.5rem 0;
-  }
-
-  .pin-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 999px;
-    border: 2px solid var(--border);
-    background: transparent;
-    transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
-  }
-
-  .pin-dot.filled {
-    background: var(--accent);
-    border-color: var(--accent);
-  }
-
-  .pin-dot.error {
-    background: var(--vault-red);
-    border-color: var(--vault-red);
-    animation: shake 0.3s ease;
-  }
-
-  .pin-dot.success {
-    background: var(--vault-green);
-    border-color: var(--vault-green);
-  }
-
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    20% { transform: translateX(-5px); }
-    40% { transform: translateX(5px); }
-    60% { transform: translateX(-4px); }
-    80% { transform: translateX(4px); }
-  }
-
-  .numpad {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
-    margin-top: 1.4rem;
-  }
-
-  .num-btn {
-    aspect-ratio: 1;
-    border-radius: 18px;
-    border: 1px solid var(--border);
-    background: rgba(15, 23, 42, 0.03);
-    color: var(--text-primary);
-    font-family: 'Oswald', sans-serif;
-    font-size: 1.4rem;
-    cursor: pointer;
-    transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
-    display: grid;
-    place-items: center;
-    user-select: none;
-  }
-
-  .num-btn:hover {
-    background: rgba(139, 34, 82, 0.06);
-    border-color: rgba(139, 34, 82, 0.24);
-    color: var(--accent);
-  }
-
-  .num-btn:active {
-    transform: scale(0.96);
-  }
-
-  .num-btn.ghost {
-    border: none;
-    background: transparent;
-    cursor: default;
-  }
-
-  .num-btn.ghost:hover {
-    background: transparent;
-    color: var(--text-primary);
-  }
-
-  .pin-msg {
-    min-height: 1.2rem;
-    margin-top: 1rem;
-    color: var(--vault-red);
-    font-size: 0.9rem;
-    font-weight: 600;
-  }
-
-  .vault-panel {
-    padding: 1.2rem;
-  }
-
-  .panel-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .panel-kicker {
-    font-size: 0.72rem;
-    color: var(--accent);
-    margin-bottom: 0.35rem;
-  }
-
-  .vault-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: 1.7rem;
-    line-height: 0.96;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .vault-sub {
-    margin-top: 0.45rem;
-    color: var(--text-secondary);
-    font-size: 0.94rem;
-    line-height: 1.55;
-  }
-
-  .lock-btn,
-  .btn-copy {
-    border: 1px solid var(--border);
-    background: transparent;
-    cursor: pointer;
-    transition: all 0.18s ease;
-  }
-
-  .lock-btn {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.7rem 1rem;
-    border-radius: 14px;
-    color: var(--text-secondary);
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.76rem;
-    text-transform: uppercase;
-    letter-spacing: 0.09em;
-    white-space: nowrap;
-  }
-
-  .lock-btn:hover {
-    border-color: rgba(139, 34, 82, 0.25);
-    color: var(--accent);
-    background: rgba(139, 34, 82, 0.06);
-  }
-
-  .lock-btn svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .cat-bar {
-    display: flex;
-    gap: 0.55rem;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
-  }
-
-  .cat-pill {
-    min-height: 34px;
-    padding: 0.45rem 0.8rem;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: var(--bg-secondary);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    transition: all 0.18s ease;
-    font-size: 0.72rem;
-  }
-
-  .cat-pill:hover {
-    border-color: rgba(139, 34, 82, 0.22);
-    color: var(--text-primary);
-    background: rgba(139, 34, 82, 0.05);
-  }
-
-  .cat-pill.active {
-    background: linear-gradient(135deg, var(--accent), var(--accent-light));
-    border-color: transparent;
-    color: #fff;
-  }
-
-  .search-row {
-    position: relative;
-    margin-bottom: 1rem;
-  }
-
-  .search-row input {
-    width: 100%;
-    min-height: 50px;
-    padding: 0.85rem 1rem 0.85rem 2.9rem;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    background: rgba(15, 23, 42, 0.03);
-    color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.95rem;
-    outline: none;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-  }
-
-  .search-row input:focus {
-    border-color: rgba(139, 34, 82, 0.3);
-    box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.1);
-    background: var(--bg-secondary);
-  }
-
-  .search-row svg {
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    color: var(--text-tertiary);
-    pointer-events: none;
-  }
-
-  .table-wrap {
-    overflow: hidden;
-  }
-
-  .table-zone {
-    overflow-x: auto;
-  }
-
   .t-head,
   .t-row {
-    display: grid;
-    grid-template-columns: minmax(220px, 2fr) minmax(180px, 1.2fr) minmax(220px, 1.5fr) 54px;
-    align-items: center;
-    gap: 0.85rem;
-    min-width: 820px;
-    padding: 0.95rem 1.2rem;
+    grid-template-columns: 1.4fr 1fr 1.2fr 32px;
+    padding-inline: 14px;
   }
-
-  .t-head {
-    background: rgba(15, 23, 42, 0.03);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .t-head span {
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-tertiary);
-  }
-
-  .t-row {
-    border-bottom: 1px solid var(--border);
-  }
-
-  .t-row:last-child {
-    border-bottom: none;
-  }
-
-  .t-row:hover {
-    background: rgba(139, 34, 82, 0.03);
-  }
-
-  .t-name {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    min-width: 0;
-  }
-
-  .t-favicon {
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    background: rgba(139, 34, 82, 0.08);
-    color: var(--accent);
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .t-label {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .t-url {
-    margin-top: 0.16rem;
-    color: var(--text-secondary);
-    font-size: 0.84rem;
-    line-height: 1.45;
-  }
-
-  .t-user {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    word-break: break-word;
-  }
-
-  .t-pw-wrap {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-  }
-
-  .t-pw {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    font-size: 0.9rem;
-    color: var(--text-primary);
-    word-break: break-all;
-  }
-
-  .t-pw.hidden {
-    color: var(--text-tertiary);
-    letter-spacing: 0.18em;
-  }
-
-  .btn-copy {
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-    color: var(--text-tertiary);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .btn-copy:hover {
-    border-color: rgba(139, 34, 82, 0.25);
-    color: var(--accent);
-    background: rgba(139, 34, 82, 0.05);
-  }
-
-  .btn-copy svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .btn-copy.copied {
-    border-color: rgba(29, 143, 87, 0.25);
-    color: var(--vault-green);
-    background: rgba(29, 143, 87, 0.08);
-  }
-
-  .empty {
-    padding: 2.4rem 1.2rem;
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-  }
-
-  .toast {
-    position: fixed;
-    right: 24px;
-    bottom: 24px;
-    background: var(--text-primary);
-    color: #fff;
-    padding: 0.85rem 1rem;
-    border-radius: 14px;
-    font-size: 0.92rem;
-    opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    pointer-events: none;
-    z-index: 200;
-  }
-
-  .toast.show {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  @media (max-width: 1220px) {
-    .hero {
-      grid-template-columns: 1fr;
-    }
-
-    .hero-card {
-      justify-self: stretch;
-      width: 100%;
-    }
-  }
-
-  @media (max-width: 1100px) {
-    .sidebar {
-      position: static;
-      width: 100%;
-      height: auto;
-    }
-
-    .main-content {
-      margin-left: 0;
-      width: 100%;
-      padding: 1.25rem;
-    }
-  }
-
-  @media (max-width: 760px) {
-    .panel-head {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .pin-card,
-    .vault-panel {
-      border-radius: 18px;
-    }
-
-    .t-head,
-    .t-row {
-      min-width: 760px;
-    }
-  }
+}
 </style>
 </head>
 <body>
 <div class="dashboard-layout">
   <aside class="sidebar"></aside>
   <main class="main-content">
-    <div class="page-shell">
-      <section class="hero">
-        <div>
-          <div class="eyebrow">Secure Vault</div>
-          <h1 class="page-title">Wachtwoordenregister</h1>
-          <p class="page-sub">Beveiligd overzicht van belangrijke logins voor hosting, tools en socials. Ontgrendel met je PIN en filter direct op categorie of gebruikersnaam.</p>
-        </div>
-        <div class="hero-card">
-          <div class="hero-card-title">Toegang</div>
-          <div class="hero-card-value" id="vault-status">PIN beveiligd</div>
-          <div class="hero-card-note"><span id="vault-count">0</span> records verdeeld over <span id="vault-categories">0</span> categorieën.</div>
-        </div>
-      </section>
-
-      <div class="register-shell">
-        <div id="screen-pin">
-          <div class="pin-card">
-            <div class="pin-logo">Softora Secure</div>
-            <div class="pin-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
-            </div>
-            <div class="pin-title">Beveiligd</div>
-            <div class="pin-sub">Voer je PIN in om het wachtwoordenregister te openen.</div>
-            <div class="pin-dots" id="pin-dots">
-              <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
-              <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
-            </div>
-            <div class="numpad">
-              <button class="num-btn" onclick="p('1')">1</button>
-              <button class="num-btn" onclick="p('2')">2</button>
-              <button class="num-btn" onclick="p('3')">3</button>
-              <button class="num-btn" onclick="p('4')">4</button>
-              <button class="num-btn" onclick="p('5')">5</button>
-              <button class="num-btn" onclick="p('6')">6</button>
-              <button class="num-btn" onclick="p('7')">7</button>
-              <button class="num-btn" onclick="p('8')">8</button>
-              <button class="num-btn" onclick="p('9')">9</button>
-              <button class="num-btn ghost" aria-hidden="true"></button>
-              <button class="num-btn" onclick="p('0')">0</button>
-              <button class="num-btn" onclick="pb()" aria-label="Verwijder laatste cijfer">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
-              </button>
-            </div>
-            <div class="pin-msg" id="pin-msg"></div>
+    <div class="register-shell">
+      <div id="screen-pin">
+        <div class="pin-box">
+          <div class="pin-logo">SOFTORA.NL</div>
+          <div class="pin-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
           </div>
+          <div class="pin-title">Beveiligd</div>
+          <div class="pin-sub">Voer je PIN in om het<br>wachtwoordenregister te openen</div>
+          <div class="pin-dots" id="pin-dots">
+            <div class="pin-dot"></div><div class="pin-dot"></div>
+            <div class="pin-dot"></div><div class="pin-dot"></div>
+            <div class="pin-dot"></div><div class="pin-dot"></div>
+          </div>
+          <div class="numpad">
+            <button class="num-btn" onclick="p('1')">1</button>
+            <button class="num-btn" onclick="p('2')">2</button>
+            <button class="num-btn" onclick="p('3')">3</button>
+            <button class="num-btn" onclick="p('4')">4</button>
+            <button class="num-btn" onclick="p('5')">5</button>
+            <button class="num-btn" onclick="p('6')">6</button>
+            <button class="num-btn" onclick="p('7')">7</button>
+            <button class="num-btn" onclick="p('8')">8</button>
+            <button class="num-btn" onclick="p('9')">9</button>
+            <button class="num-btn ghost"></button>
+            <button class="num-btn" onclick="p('0')">0</button>
+            <button class="num-btn" onclick="pb()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+            </button>
+          </div>
+          <div class="pin-msg" id="pin-msg"></div>
+        </div>
+      </div>
+
+      <div id="screen-register">
+        <div class="reg-header">
+          <div>
+            <div class="reg-logo">SOFTORA.NL</div>
+            <div class="reg-title">Wachtwoordenregister</div>
+            <div class="reg-sub">Beveiligd overzicht van inloggegevens</div>
+          </div>
+          <button class="lock-btn" onclick="lock()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Vergrendelen
+          </button>
         </div>
 
-        <div id="screen-register">
-          <div class="vault-panel">
-            <div class="panel-head">
-              <div>
-                <div class="panel-kicker">Actieve kluis</div>
-                <div class="vault-title">Inloggegevens</div>
-                <div class="vault-sub">Filter op categorie of zoek direct op naam en gebruikersnaam. Je kunt wachtwoorden tijdelijk tonen of direct kopiëren.</div>
-              </div>
-              <button class="lock-btn" onclick="lock()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
-                Vergrendelen
-              </button>
-            </div>
+        <div class="cat-bar" id="cat-bar"></div>
 
-            <div class="cat-bar" id="cat-bar"></div>
+        <div class="search-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search" placeholder="Zoeken op naam, gebruikersnaam…" oninput="render()">
+        </div>
 
-            <div class="search-row">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input type="text" id="search" placeholder="Zoeken op naam, gebruikersnaam of categorie..." oninput="render()">
-            </div>
-
-            <div class="table-wrap">
-              <div class="table-zone">
-                <div class="t-head">
-                  <span>Naam</span>
-                  <span>Gebruikersnaam</span>
-                  <span>Wachtwoord</span>
-                  <span></span>
-                </div>
-                <div id="list"></div>
-              </div>
-            </div>
+        <div class="table-wrap">
+          <div class="t-head">
+            <span>Naam</span><span>Gebruikersnaam</span><span>Wachtwoord</span><span></span>
           </div>
+          <div id="list"></div>
         </div>
       </div>
     </div>
@@ -737,28 +473,7 @@
 
 <script>
 const PIN = '123456';
-let input = '';
-let attempts = 0;
-let blocked = false;
-
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function updateVaultMeta() {
-  const categories = new Set(entries.map((entry) => entry.cat));
-  document.getElementById('vault-count').textContent = String(entries.length);
-  document.getElementById('vault-categories').textContent = String(categories.size);
-}
-
-function setVaultStatus(text) {
-  document.getElementById('vault-status').textContent = text;
-}
+let input = '', attempts = 0, blocked = false;
 
 function p(d) {
   if (blocked || input.length >= 6) return;
@@ -768,145 +483,132 @@ function p(d) {
 }
 
 function pb() {
-  if (blocked) return;
-  input = input.slice(0, -1);
-  dots();
+  if (!blocked) {
+    input = input.slice(0, -1);
+    dots();
+  }
 }
 
 function dots(state) {
-  document.querySelectorAll('.pin-dot').forEach((dot, index) => {
-    dot.className = 'pin-dot';
-    if (state) dot.classList.add(state);
-    else if (index < input.length) dot.classList.add('filled');
+  document.querySelectorAll('.pin-dot').forEach((d, i) => {
+    d.className = 'pin-dot';
+    if (state) d.classList.add(state);
+    else if (i < input.length) d.classList.add('filled');
   });
-}
-
-function unlockRegister() {
-  document.getElementById('screen-pin').style.display = 'none';
-  document.getElementById('screen-register').style.display = 'block';
-  input = '';
-  attempts = 0;
-  dots();
-  document.getElementById('pin-msg').textContent = '';
-  setVaultStatus('Ontgrendeld');
 }
 
 function check() {
   if (input === PIN) {
     dots('success');
-    setTimeout(unlockRegister, 350);
-    return;
-  }
-
-  attempts++;
-  dots('error');
-  setTimeout(() => {
-    input = '';
-    dots();
-  }, 450);
-
-  if (attempts >= 5) {
-    blocked = true;
-    let seconds = 30;
-    document.getElementById('pin-msg').textContent = `Geblokkeerd, wacht ${seconds}s`;
-    const timer = setInterval(() => {
-      seconds--;
-      if (seconds <= 0) {
-        clearInterval(timer);
-        blocked = false;
-        attempts = 0;
-        document.getElementById('pin-msg').textContent = '';
-      } else {
-        document.getElementById('pin-msg').textContent = `Geblokkeerd, wacht ${seconds}s`;
-      }
-    }, 1000);
+    setTimeout(() => {
+      document.getElementById('screen-pin').style.display = 'none';
+      document.getElementById('screen-register').style.display = 'block';
+      input = '';
+      attempts = 0;
+      dots();
+      document.getElementById('pin-msg').textContent = '';
+    }, 350);
   } else {
-    document.getElementById('pin-msg').textContent = `Onjuiste PIN, nog ${5 - attempts} poging${5 - attempts !== 1 ? 'en' : ''}`;
+    attempts++;
+    dots('error');
+    setTimeout(() => {
+      input = '';
+      dots();
+    }, 450);
+    if (attempts >= 5) {
+      blocked = true;
+      let s = 30;
+      document.getElementById('pin-msg').textContent = `Geblokkeerd — wacht ${s}s`;
+      const t = setInterval(() => {
+        s--;
+        if (s <= 0) {
+          clearInterval(t);
+          blocked = false;
+          attempts = 0;
+          document.getElementById('pin-msg').textContent = '';
+        } else {
+          document.getElementById('pin-msg').textContent = `Geblokkeerd — wacht ${s}s`;
+        }
+      }, 1000);
+    } else {
+      document.getElementById('pin-msg').textContent = `Onjuist — nog ${5 - attempts} poging${5 - attempts !== 1 ? 'en' : ''}`;
+    }
   }
 }
 
-document.addEventListener('keydown', (event) => {
+document.addEventListener('keydown', (e) => {
   const pinScreen = document.getElementById('screen-pin');
   if (!pinScreen || pinScreen.style.display === 'none') return;
-  if (event.key >= '0' && event.key <= '9') p(event.key);
-  if (event.key === 'Backspace') pb();
+  if (e.key >= '0' && e.key <= '9') p(e.key);
+  if (e.key === 'Backspace') pb();
 });
 
 function lock() {
   document.getElementById('screen-register').style.display = 'none';
-  document.getElementById('screen-pin').style.display = 'grid';
+  document.getElementById('screen-pin').style.display = 'flex';
   input = '';
-  attempts = 0;
-  blocked = false;
   dots();
   document.getElementById('pin-msg').textContent = '';
-  setVaultStatus('PIN beveiligd');
 }
 
 const entries = [
-  { id: 1, naam: 'Hostinger', url: 'hostinger.com', user: 'beheer@softora.nl', pw: 'H0st!nger24', cat: 'Hosting' },
-  { id: 2, naam: 'TransIP', url: 'transip.nl', user: 'admin@softora.nl', pw: 'Tr@nsIP2026!', cat: 'Hosting' },
-  { id: 3, naam: 'Google Workspace', url: 'workspace.google.com', user: 'info@softora.nl', pw: 'G00gl3Work!', cat: 'Tools' },
-  { id: 4, naam: 'Instagram', url: 'instagram.com', user: '@softora.nl', pw: 'Insta$oft24', cat: 'Socials' },
-  { id: 5, naam: 'LinkedIn', url: 'linkedin.com', user: 'info@softora.nl', pw: 'Link3dIn!26', cat: 'Socials' },
+  { id:1, naam:'Hostinger', url:'hostinger.com', user:'beheer@softora.nl', pw:'H0st!nger24', cat:'Hosting' },
+  { id:2, naam:'TransIP', url:'transip.nl', user:'admin@softora.nl', pw:'Tr@nsIP2026!', cat:'Hosting' },
+  { id:3, naam:'Google Workspace', url:'workspace.google.com', user:'info@softora.nl', pw:'G00gl3Work!', cat:'Tools' },
+  { id:4, naam:'Instagram', url:'instagram.com', user:'@softora.nl', pw:'Insta$oft24', cat:'Socials' },
+  { id:5, naam:'LinkedIn', url:'linkedin.com', user:'info@softora.nl', pw:'Link3dIn!26', cat:'Socials' },
 ];
 
-const cats = ['Alle', ...new Set(entries.map((entry) => entry.cat))];
+const cats = ['Alle', ...new Set(entries.map((e) => e.cat))];
 let activeCat = 'Alle';
 const visible = {};
 
 function renderCats() {
-  document.getElementById('cat-bar').innerHTML = cats.map((cat) =>
-    `<button class="cat-pill ${cat === activeCat ? 'active' : ''}" onclick='setCat(${JSON.stringify(cat)})'>${escapeHtml(cat)}</button>`
+  document.getElementById('cat-bar').innerHTML = cats.map((c) =>
+    `<button class="cat-pill ${c === activeCat ? 'active' : ''}" onclick="setCat('${c}')">${c}</button>`
   ).join('');
 }
 
-function setCat(cat) {
-  activeCat = cat;
+function setCat(c) {
+  activeCat = c;
   renderCats();
   render();
 }
 
 function render() {
-  const query = document.getElementById('search').value.toLowerCase();
-  const filtered = entries.filter((entry) => {
-    const matchCat = activeCat === 'Alle' || entry.cat === activeCat;
-    const matchQuery =
-      !query ||
-      entry.naam.toLowerCase().includes(query) ||
-      entry.user.toLowerCase().includes(query) ||
-      entry.cat.toLowerCase().includes(query);
-    return matchCat && matchQuery;
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = entries.filter((e) => {
+    const matchCat = activeCat === 'Alle' || e.cat === activeCat;
+    const matchQ = !q || e.naam.toLowerCase().includes(q) || e.user.toLowerCase().includes(q);
+    return matchCat && matchQ;
   });
-
   const list = document.getElementById('list');
   if (!filtered.length) {
     list.innerHTML = '<div class="empty">Geen resultaten gevonden.</div>';
     return;
   }
-
-  list.innerHTML = filtered.map((entry) => {
-    const show = Boolean(visible[entry.id]);
+  list.innerHTML = filtered.map((e) => {
+    const show = visible[e.id];
     return `<div class="t-row">
       <div class="t-name">
-        <div class="t-favicon">${escapeHtml(entry.naam[0].toUpperCase())}</div>
+        <div class="t-favicon">${e.naam[0].toUpperCase()}</div>
         <div>
-          <div class="t-label">${escapeHtml(entry.naam)}</div>
-          <div class="t-url">${escapeHtml(entry.url)}</div>
+          <div class="t-label">${e.naam}</div>
+          <div class="t-url">${e.url}</div>
         </div>
       </div>
-      <div class="t-user">${escapeHtml(entry.user)}</div>
+      <div class="t-user">${e.user}</div>
       <div class="t-pw-wrap">
-        <span class="t-pw ${show ? '' : 'hidden'}" id="pw-${entry.id}">${show ? escapeHtml(entry.pw) : '••••••••••'}</span>
-        <button class="btn-copy" onclick="toggleVis(${entry.id})" title="${show ? 'Verbergen' : 'Tonen'}" aria-label="${show ? 'Verberg' : 'Toon'} wachtwoord">
+        <span class="t-pw ${show ? '' : 'hidden'}" id="pw-${e.id}">${show ? e.pw : '••••••••••'}</span>
+        <button class="btn-copy" onclick="toggleVis(${e.id})" title="${show ? 'Verbergen' : 'Tonen'}">
           ${show
-            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
-            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>'
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
           }
         </button>
       </div>
-      <button class="btn-copy" id="copy-${entry.id}" onclick="copy(${entry.id})" title="Kopieer wachtwoord" aria-label="Kopieer wachtwoord">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+      <button class="btn-copy" id="copy-${e.id}" onclick="copy(${e.id})" title="Kopieer wachtwoord">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
       </button>
     </div>`;
   }).join('');
@@ -918,18 +620,15 @@ function toggleVis(id) {
 }
 
 function copy(id) {
-  const entry = entries.find((item) => item.id === id);
-  if (!entry) return;
-
-  navigator.clipboard.writeText(entry.pw).then(() => {
+  const e = entries.find((entry) => entry.id === id);
+  if (!e) return;
+  navigator.clipboard.writeText(e.pw).then(() => {
     const btn = document.getElementById(`copy-${id}`);
     if (btn) {
       btn.classList.add('copied');
       setTimeout(() => btn.classList.remove('copied'), 1200);
     }
-    toast('Wachtwoord gekopieerd');
-  }).catch(() => {
-    toast('Kopiëren mislukt');
+    toast('✓ Wachtwoord gekopieerd');
   });
 }
 
@@ -940,7 +639,6 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-updateVaultMeta();
 renderCats();
 render();
 </script>

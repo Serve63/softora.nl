@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maandelijkse Kosten | Softora.nl</title>
+<title>Maandelijkse Kosten – Softora.nl</title>
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Oswald:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
 <script>
   (function () {
@@ -22,462 +22,289 @@
 </script>
 <script src="assets/personnel-theme.js?v=20260402-4" defer></script>
 <style>
-  *, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f0ede8;
+  --crimson: #9b2355;
+  --crimson-light: #c4346a;
+  --text-dark: #1a1a2e;
+  --text-mid: #555;
+  --text-light: #999;
+  --border: #e2ddd6;
+  --card: #ffffff;
+  --tag: #f5f0eb;
+  --red: #c0392b;
+  --green: #16733c;
+}
+body {
+  font-family: 'Barlow', sans-serif;
+  background: var(--bg);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+.dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 320px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 100;
+}
+.main-content {
+  margin-left: 320px;
+  width: calc(100% - 320px);
+  min-height: 100vh;
+  padding: 48px;
+}
+.page-shell {
+  width: min(1260px, 100%);
+}
 
-  :root {
-    --finance-shell-max: 1340px;
-    --finance-shadow: 0 18px 40px rgba(26, 26, 46, 0.07);
-    --finance-shadow-soft: 0 10px 24px rgba(26, 26, 46, 0.04);
-    --finance-red: #d04949;
-    --finance-green: #1d8f57;
-    --finance-amber: #c98514;
-  }
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 36px;
+  gap: 16px;
+}
+.logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  margin-bottom: 6px;
+}
+.page-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.page-sub { font-size: 13px; color: var(--text-light); margin-top: 3px; }
 
-  body {
-    font-family: 'Inter', sans-serif;
-    color: var(--text-primary);
-    background:
-      radial-gradient(circle at 85% 16%, rgba(139, 34, 82, 0.12), transparent 34%),
-      radial-gradient(circle at 14% 84%, rgba(166, 45, 101, 0.08), transparent 34%),
-      var(--bg-primary);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+.totals-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.totaal-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 22px;
+}
+.totaal-card.accent { border-color: var(--crimson); border-width: 2px; }
+.totaal-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 8px;
+}
+.totaal-amount {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.totaal-amount.red { color: var(--red); }
+.totaal-amount.green { color: var(--green); }
+.totaal-note { font-size: 11px; color: var(--text-light); margin-top: 4px; }
 
-  .dashboard-layout {
-    display: flex;
-    min-height: 100vh;
-  }
+.category {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.category-header {
+  padding: 13px 20px;
+  background: var(--tag);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.category-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.category-total {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
 
+.cost-row {
+  display: grid;
+  grid-template-columns: 1fr 120px 110px 90px;
+  align-items: center;
+  gap: 0;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.cost-row:last-child { border-bottom: none; }
+.cost-row:hover { background: var(--tag); }
+.cost-row.head {
+  padding: 7px 20px;
+  background: var(--tag);
+  border-bottom: 1px solid var(--border);
+}
+.cost-row.head span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.cost-name { font-size: 13px; font-weight: 600; color: var(--text-dark); }
+.cost-note { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.cost-freq { font-size: 11px; color: var(--text-light); }
+.cost-amount { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-dark); }
+.cost-status { justify-self: end; }
+.status-pill {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+.pill-active { background: rgba(22,115,60,.1); color: var(--green); }
+.pill-pause { background: rgba(180,90,0,.1); color: #b45a00; }
+.pill-yearly { background: rgba(155,35,85,.1); color: var(--crimson); }
+
+.add-row {
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px dashed var(--border);
+}
+.add-inputs {
+  display: grid;
+  grid-template-columns: 1fr 120px 110px 90px;
+  gap: 8px;
+  flex: 1;
+}
+.add-inputs input, .add-inputs select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  color: var(--text-dark);
+  background: var(--bg);
+  outline: none;
+  width: 100%;
+  transition: border-color .15s;
+}
+.add-inputs input:focus,
+.add-inputs select:focus { border-color: var(--crimson); background: #fff; }
+.btn-add {
+  padding: 7px 14px;
+  background: var(--crimson);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-add:hover { background: var(--crimson-light); }
+
+.btn-del {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s;
+  padding: 0;
+}
+.btn-del:hover { color: var(--red); }
+.btn-del svg { width: 13px; height: 13px; }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--text-dark);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all .25s;
+  pointer-events: none;
+  z-index: 99;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+@media (max-width: 1100px) {
   .sidebar {
-    width: 280px;
-    position: fixed;
-    inset: 0 auto 0 0;
-    height: 100vh;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .main-content {
-    margin-left: 280px;
-    width: calc(100% - 280px);
-    min-width: 0;
-    min-height: 100vh;
-    padding: clamp(1.5rem, 3vw, 3rem);
-  }
-
-  .page-shell {
-    width: min(var(--finance-shell-max), 100%);
-  }
-
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
-    gap: 1rem;
-    align-items: end;
-    margin-bottom: 1.1rem;
-  }
-
-  .eyebrow,
-  .metric-label,
-  .section-label,
-  .category-title,
-  .input-label {
-    font-family: 'Oswald', sans-serif;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .eyebrow {
-    font-size: 0.74rem;
-    color: var(--accent);
-    margin-bottom: 0.45rem;
-  }
-
-  .page-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: clamp(3rem, 5.5vw, 4.2rem);
-    line-height: 0.92;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-  }
-
-  .page-sub {
-    margin-top: 0.75rem;
-    max-width: 62ch;
-    color: var(--text-secondary);
-    font-size: 1rem;
-    line-height: 1.6;
-  }
-
-  .hero-card,
-  .metric-card,
-  .category {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 22px;
-    box-shadow: var(--finance-shadow-soft);
-  }
-
-  .hero-card {
-    padding: 1.15rem 1.2rem;
-    justify-self: end;
-    width: min(100%, 420px);
-  }
-
-  .hero-card-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-tertiary);
-  }
-
-  .hero-card-value {
-    margin-top: 0.55rem;
-    font-family: 'Oswald', sans-serif;
-    font-size: 1.5rem;
-    line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .hero-card-note {
-    margin-top: 0.55rem;
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    line-height: 1.55;
-  }
-
-  .totals-row {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .metric-card {
-    padding: 1.2rem 1.25rem;
-  }
-
-  .metric-card.accent {
-    border-color: rgba(139, 34, 82, 0.28);
-    box-shadow: var(--finance-shadow);
-  }
-
-  .metric-label {
-    font-size: 0.7rem;
-    color: var(--text-tertiary);
-    margin-bottom: 0.7rem;
-  }
-
-  .metric-value {
-    font-family: 'Oswald', sans-serif;
-    font-size: clamp(2.2rem, 4vw, 3rem);
-    line-height: 0.94;
-  }
-
-  .metric-value.red {
-    color: var(--finance-red);
-  }
-
-  .metric-value.green {
-    color: var(--finance-green);
-  }
-
-  .metric-note {
-    margin-top: 0.7rem;
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    line-height: 1.5;
-  }
-
-  #categories-wrap {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .category {
-    overflow: hidden;
-  }
-
-  .category-header {
-    padding: 1rem 1.2rem;
-    background: rgba(139, 34, 82, 0.05);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-
-  .category-title {
-    font-size: 0.86rem;
-    color: var(--text-primary);
-  }
-
-  .category-total {
-    font-family: 'Oswald', sans-serif;
-    font-size: 1.1rem;
-    line-height: 1;
-    white-space: nowrap;
-  }
-
-  .category-total span {
-    margin-left: 0.35rem;
-    color: var(--text-tertiary);
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .table-zone {
-    overflow-x: auto;
-  }
-
-  .cost-row {
-    display: grid;
-    grid-template-columns: minmax(220px, 1fr) 140px 130px 120px;
-    align-items: center;
-    gap: 0.8rem;
-    min-width: 760px;
-    padding: 0.95rem 1.2rem;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .cost-row:last-child {
-    border-bottom: none;
-  }
-
-  .cost-row:hover {
-    background: rgba(139, 34, 82, 0.03);
-  }
-
-  .cost-row.head {
-    background: rgba(15, 23, 42, 0.03);
-  }
-
-  .cost-row.head span {
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-tertiary);
-  }
-
-  .cost-name {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .cost-note {
-    margin-top: 0.18rem;
-    color: var(--text-secondary);
-    font-size: 0.84rem;
-    line-height: 1.45;
-  }
-
-  .cost-freq {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-  }
-
-  .cost-amount {
-    font-family: 'Oswald', sans-serif;
-    font-size: 1.02rem;
-    line-height: 1;
-  }
-
-  .cost-status {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.6rem;
-  }
-
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 30px;
-    padding: 0.35rem 0.7rem;
-    border-radius: 999px;
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    border: 1px solid transparent;
-  }
-
-  .pill-active {
-    background: rgba(29, 143, 87, 0.12);
-    color: var(--finance-green);
-    border-color: rgba(29, 143, 87, 0.18);
-  }
-
-  .pill-pause {
-    background: rgba(201, 133, 20, 0.12);
-    color: var(--finance-amber);
-    border-color: rgba(201, 133, 20, 0.18);
-  }
-
-  .pill-yearly {
-    background: rgba(139, 34, 82, 0.12);
-    color: var(--accent);
-    border-color: rgba(139, 34, 82, 0.18);
-  }
-
-  .btn-del,
-  .btn-add {
-    border: 1px solid var(--border);
-    cursor: pointer;
-    transition: all 0.18s ease;
-  }
-
-  .btn-del {
-    width: 30px;
-    height: 30px;
-    border-radius: 10px;
-    background: transparent;
-    color: var(--text-tertiary);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .btn-del:hover {
-    border-color: rgba(208, 73, 73, 0.25);
-    color: var(--finance-red);
-    background: rgba(208, 73, 73, 0.07);
-  }
-
-  .btn-del svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .add-row {
-    padding: 1rem 1.2rem 1.2rem;
-    border-top: 1px dashed var(--border);
-    display: flex;
-    align-items: flex-end;
-    gap: 0.85rem;
-  }
-
-  .add-inputs {
-    flex: 1;
-    display: grid;
-    grid-template-columns: minmax(220px, 1fr) 140px 130px 120px;
-    gap: 0.75rem;
-  }
-
-  .add-inputs input,
-  .add-inputs select {
+    position: static;
     width: 100%;
-    min-height: 46px;
-    padding: 0.75rem 0.9rem;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    background: rgba(15, 23, 42, 0.03);
-    color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.92rem;
-    outline: none;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    height: auto;
   }
-
-  .add-inputs input:focus,
-  .add-inputs select:focus {
-    border-color: rgba(139, 34, 82, 0.3);
-    box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.1);
-    background: var(--bg-secondary);
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    padding: 24px;
   }
-
-  .btn-add {
-    min-height: 46px;
-    padding: 0.75rem 1rem;
-    border-radius: 14px;
-    background: linear-gradient(135deg, var(--accent), var(--accent-light));
-    color: #fff;
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.09em;
-    white-space: nowrap;
+  .totals-row {
+    grid-template-columns: 1fr;
   }
+}
 
-  .btn-add:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 14px 28px rgba(139, 34, 82, 0.18);
+@media (max-width: 860px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
   }
-
-  .toast {
-    position: fixed;
-    right: 24px;
-    bottom: 24px;
-    background: var(--text-primary);
-    color: #fff;
-    padding: 0.85rem 1rem;
-    border-radius: 14px;
-    font-size: 0.92rem;
-    opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    pointer-events: none;
-    z-index: 200;
+  .cost-row,
+  .add-inputs {
+    grid-template-columns: 1fr;
   }
-
-  .toast.show {
-    opacity: 1;
-    transform: translateY(0);
+  .cost-status {
+    justify-self: start;
   }
-
-  @media (max-width: 1220px) {
-    .hero {
-      grid-template-columns: 1fr;
-    }
-
-    .hero-card {
-      justify-self: stretch;
-      width: 100%;
-    }
+  .add-row {
+    flex-direction: column;
+    align-items: stretch;
   }
-
-  @media (max-width: 1100px) {
-    .sidebar {
-      position: static;
-      width: 100%;
-      height: auto;
-    }
-
-    .main-content {
-      margin-left: 0;
-      width: 100%;
-      padding: 1.25rem;
-    }
-  }
-
-  @media (max-width: 860px) {
-    .totals-row {
-      grid-template-columns: 1fr;
-    }
-
-    .add-row {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .add-inputs {
-      grid-template-columns: 1fr;
-    }
-  }
+}
 </style>
 </head>
 <body>
@@ -485,36 +312,32 @@
   <aside class="sidebar"></aside>
   <main class="main-content">
     <div class="page-shell">
-      <section class="hero">
+      <div class="header">
         <div>
-          <div class="eyebrow">Finance</div>
-          <h1 class="page-title">Maandelijkse Kosten</h1>
-          <p class="page-sub">Beheer alle vaste lasten vanuit één overzicht. De bedragen worden direct doorgerekend in het totaal per maand en per jaar.</p>
+          <div class="logo">SOFTORA.NL</div>
+          <div class="page-title">Maandelijkse Kosten</div>
+          <div class="page-sub">Overzicht van alle vaste lasten</div>
         </div>
-        <div class="hero-card">
-          <div class="hero-card-title">Laatste update</div>
-          <div class="hero-card-value" id="last-updated">Bijgewerkt: --</div>
-          <div class="hero-card-note">Nieuwe posten of verwijderingen werken direct door in alle totalen op deze pagina.</div>
-        </div>
-      </section>
+        <div style="font-size:12px;color:var(--text-light)" id="last-updated"></div>
+      </div>
 
-      <section class="totals-row">
-        <article class="metric-card accent">
-          <div class="metric-label">Totaal per maand</div>
-          <div class="metric-value red" id="totaal-maand">€0,00</div>
-          <div class="metric-note">Alle actieve kosten inclusief jaarlijkse of kwartaalposten zoals ze nu in dit overzicht zijn ingevoerd.</div>
-        </article>
-        <article class="metric-card">
-          <div class="metric-label">Per jaar</div>
-          <div class="metric-value" id="totaal-jaar">€0,00</div>
-          <div class="metric-note">Schatting op basis van het actuele maandtotaal vermenigvuldigd met twaalf.</div>
-        </article>
-        <article class="metric-card">
-          <div class="metric-label">Actieve posten</div>
-          <div class="metric-value green" id="totaal-posten">0</div>
-          <div class="metric-note">Aantal kostenregels dat nu meetelt in het totaal.</div>
-        </article>
-      </section>
+      <div class="totals-row">
+        <div class="totaal-card accent">
+          <div class="totaal-label">Totaal per maand</div>
+          <div class="totaal-amount red" id="totaal-maand">€0,00</div>
+          <div class="totaal-note">Alle actieve kosten</div>
+        </div>
+        <div class="totaal-card">
+          <div class="totaal-label">Per jaar (schatting)</div>
+          <div class="totaal-amount" id="totaal-jaar">€0,00</div>
+          <div class="totaal-note">Maandbedrag × 12</div>
+        </div>
+        <div class="totaal-card">
+          <div class="totaal-label">Aantal posten</div>
+          <div class="totaal-amount" id="totaal-posten">0</div>
+          <div class="totaal-note">Actieve kostenposten</div>
+        </div>
+      </div>
 
       <div id="categories-wrap"></div>
     </div>
@@ -526,42 +349,32 @@
 <script>
 let data = {
   'Hosting & Domeinen': [
-    { id: 1, naam: 'Hostinger VPS', note: 'Webhosting server', freq: 'maandelijks', bedrag: 9.99, status: 'active' },
-    { id: 2, naam: 'softora.nl domein', note: 'Jaarlijkse verlenging', freq: 'jaarlijks', bedrag: 1.25, status: 'yearly' },
-    { id: 3, naam: 'TransIP backup', note: 'Extra opslag', freq: 'maandelijks', bedrag: 3.00, status: 'active' },
+    { id:1, naam:'Hostinger VPS', note:'Webhosting server', freq:'maandelijks', bedrag:9.99, status:'active' },
+    { id:2, naam:'softora.nl domein', note:'Jaarlijkse verlenging', freq:'jaarlijks', bedrag:1.25, status:'yearly' },
+    { id:3, naam:'TransIP backup', note:'Extra opslag', freq:'maandelijks', bedrag:3.00, status:'active' },
   ],
   'Software & Tools': [
-    { id: 4, naam: 'Adobe Creative Cloud', note: 'Photoshop, Illustrator', freq: 'maandelijks', bedrag: 59.99, status: 'active' },
-    { id: 5, naam: 'ChatGPT Plus', note: 'AI assistent', freq: 'maandelijks', bedrag: 20.00, status: 'active' },
-    { id: 6, naam: 'Figma Pro', note: 'Design tool', freq: 'maandelijks', bedrag: 15.00, status: 'active' },
-    { id: 7, naam: 'Notion', note: 'Project management', freq: 'maandelijks', bedrag: 8.00, status: 'pause' },
+    { id:4, naam:'Adobe Creative Cloud', note:'Photoshop, Illustrator', freq:'maandelijks', bedrag:59.99, status:'active' },
+    { id:5, naam:'ChatGPT Plus', note:'AI assistent', freq:'maandelijks', bedrag:20.00, status:'active' },
+    { id:6, naam:'Figma Pro', note:'Design tool', freq:'maandelijks', bedrag:15.00, status:'active' },
+    { id:7, naam:'Notion', note:'Project management', freq:'maandelijks', bedrag:8.00, status:'pause' },
   ],
   'Marketing & SEO': [
-    { id: 8, naam: 'Google Workspace', note: 'Gmail, Drive, Docs', freq: 'maandelijks', bedrag: 6.00, status: 'active' },
-    { id: 9, naam: 'Ubersuggest', note: 'SEO tool', freq: 'maandelijks', bedrag: 12.00, status: 'active' },
+    { id:8, naam:'Google Workspace', note:'Gmail, Drive, Docs', freq:'maandelijks', bedrag:6.00, status:'active' },
+    { id:9, naam:'Ubersuggest', note:'SEO tool', freq:'maandelijks', bedrag:12.00, status:'active' },
   ],
   'Overig': [
-    { id: 10, naam: 'Boekhoudpakket', note: 'Administratie software', freq: 'maandelijks', bedrag: 18.00, status: 'active' },
+    { id:10, naam:'Boekhoudpakket', note:'Administratie software', freq:'maandelijks', bedrag:18.00, status:'active' },
   ],
 };
-
 let nextId = 20;
 
-const freqLabel = { maandelijks: 'Maandelijks', jaarlijks: 'Jaarlijks', kwartaal: 'Per kwartaal' };
-const statusLabel = { active: 'Actief', pause: 'Gepauzeerd', yearly: 'Jaarlijks' };
-const statusClass = { active: 'pill-active', pause: 'pill-pause', yearly: 'pill-yearly' };
+const freqLabel = { maandelijks:'Maandelijks', jaarlijks:'Jaarlijks', kwartaal:'Per kwartaal' };
+const statusLabel = { active:'Actief', pause:'Gepauzeerd', yearly:'Jaarlijks' };
+const statusClass = { active:'pill-active', pause:'pill-pause', yearly:'pill-yearly' };
 
 function catKey(cat) {
   return String(cat).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 function toMonthly(item) {
@@ -572,10 +385,7 @@ function toMonthly(item) {
 }
 
 function fmtEur(n) {
-  return '€' + Number(n || 0).toLocaleString('nl-NL', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return '€' + n.toLocaleString('nl-NL', { minimumFractionDigits:2, maximumFractionDigits:2 });
 }
 
 function updateTotals() {
@@ -587,7 +397,7 @@ function updateTotals() {
   });
   document.getElementById('totaal-maand').textContent = fmtEur(total);
   document.getElementById('totaal-jaar').textContent = fmtEur(total * 12);
-  document.getElementById('totaal-posten').textContent = String(count);
+  document.getElementById('totaal-posten').textContent = count;
 }
 
 function render() {
@@ -595,39 +405,34 @@ function render() {
   wrap.innerHTML = '';
 
   Object.entries(data).forEach(([cat, items]) => {
-    const catTotal = items.reduce((sum, item) => sum + toMonthly(item), 0);
+    const catTotal = items.reduce((s, i) => s + toMonthly(i), 0);
     const key = catKey(cat);
-    const block = document.createElement('section');
+    const block = document.createElement('div');
     block.className = 'category';
     block.innerHTML = `
       <div class="category-header">
-        <div class="category-title">${escapeHtml(cat)}</div>
-        <div class="category-total">${fmtEur(catTotal)}<span>/mnd</span></div>
+        <div class="category-title">${cat}</div>
+        <div class="category-total">${fmtEur(catTotal)}<span style="font-size:11px;font-weight:400;color:var(--text-light);margin-left:4px">/mnd</span></div>
       </div>
-      <div class="table-zone">
-        <div class="cost-row head">
-          <span>Post</span>
-          <span>Frequentie</span>
-          <span>Bedrag</span>
-          <span style="text-align:right">Status</span>
-        </div>
-        <div id="rows-${key}">
-          ${items.map((item) => `
-            <div class="cost-row" id="item-${item.id}">
-              <div>
-                <div class="cost-name">${escapeHtml(item.naam)}</div>
-                <div class="cost-note">${escapeHtml(item.note || '')}</div>
-              </div>
-              <div class="cost-freq">${escapeHtml(freqLabel[item.freq] || item.freq)}</div>
-              <div class="cost-amount">${fmtEur(item.bedrag)}</div>
-              <div class="cost-status">
-                <span class="status-pill ${statusClass[item.status] || 'pill-active'}">${escapeHtml(statusLabel[item.status] || item.status)}</span>
-                <button class="btn-del" onclick='deleteItem(${JSON.stringify(cat)}, ${item.id})' title="Verwijderen" aria-label="Verwijder ${escapeHtml(item.naam)}">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg>
-                </button>
-              </div>
-            </div>`).join('')}
-        </div>
+      <div class="cost-row head">
+        <span>Post</span><span>Frequentie</span><span>Bedrag</span><span style="text-align:right">Status</span>
+      </div>
+      <div id="rows-${key}">
+        ${items.map((item) => `
+          <div class="cost-row" id="item-${item.id}">
+            <div>
+              <div class="cost-name">${item.naam}</div>
+              <div class="cost-note">${item.note}</div>
+            </div>
+            <div class="cost-freq">${freqLabel[item.freq]}</div>
+            <div class="cost-amount">${fmtEur(item.bedrag)}</div>
+            <div class="cost-status" style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+              <span class="status-pill ${statusClass[item.status]}">${statusLabel[item.status]}</span>
+              <button class="btn-del" onclick="deleteItem(${JSON.stringify(cat)},${item.id})" title="Verwijderen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+              </button>
+            </div>
+          </div>`).join('')}
       </div>
       <div class="add-row">
         <div class="add-inputs">
@@ -644,7 +449,7 @@ function render() {
             <option value="yearly">Jaarlijks</option>
           </select>
         </div>
-        <button class="btn-add" onclick='addItem(${JSON.stringify(cat)})'>Post toevoegen</button>
+        <button class="btn-add" onclick="addItem(${JSON.stringify(cat)})">+ Toevoegen</button>
       </div>`;
     wrap.appendChild(block);
   });
@@ -658,28 +463,16 @@ function addItem(cat) {
   const freq = document.getElementById(`new-freq-${key}`).value;
   const bedrag = parseFloat(document.getElementById(`new-bedrag-${key}`).value);
   const status = document.getElementById(`new-status-${key}`).value;
-
-  if (!naam || Number.isNaN(bedrag) || bedrag <= 0) {
-    showToast('Vul eerst een naam en bedrag in');
-    return;
-  }
-
-  data[cat].push({
-    id: nextId++,
-    naam,
-    note: '',
-    freq,
-    bedrag,
-    status,
-  });
+  if (!naam || isNaN(bedrag) || bedrag <= 0) return showToast('Vul naam en bedrag in');
+  data[cat].push({ id: nextId++, naam, note: '', freq, bedrag, status });
   render();
-  showToast(`${naam} toegevoegd`);
+  showToast('✓ ' + naam + ' toegevoegd');
 }
 
 function deleteItem(cat, id) {
-  data[cat] = data[cat].filter((item) => item.id !== id);
+  data[cat] = data[cat].filter((i) => i.id !== id);
   render();
-  showToast('Post verwijderd');
+  showToast('✓ Post verwijderd');
 }
 
 function showToast(msg) {
@@ -691,11 +484,7 @@ function showToast(msg) {
 
 const now = new Date();
 document.getElementById('last-updated').textContent =
-  'Bijgewerkt: ' + now.toLocaleDateString('nl-NL', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  'Bijgewerkt: ' + now.toLocaleDateString('nl-NL', { day:'numeric', month:'long', year:'numeric' });
 
 render();
 </script>
