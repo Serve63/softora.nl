@@ -556,6 +556,10 @@
             font-size: 0.83rem;
         }
 
+        .lead-modal-sub[hidden] {
+            display: none;
+        }
+
         .lead-modal-close {
             border: 1px solid var(--border);
             background: transparent;
@@ -611,7 +615,11 @@
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 0.4rem;
-            margin-bottom: 0.6rem;
+        }
+
+        .lead-modal-contact-strip {
+            display: grid;
+            gap: 0.38rem;
         }
 
         .lead-modal-meta-item {
@@ -999,7 +1007,7 @@
                 <div class="lead-modal-header">
                     <div>
                         <div class="lead-modal-title">Lead details</div>
-                        <div class="lead-modal-sub" id="leadModalSub">-</div>
+                        <div class="lead-modal-sub" id="leadModalSub" hidden></div>
                     </div>
                     <button class="lead-modal-close" id="leadModalClose" type="button" aria-label="Sluiten">×</button>
                 </div>
@@ -1010,10 +1018,12 @@
                 </div>
 
                 <div class="lead-modal-content" id="leadModalContent">
+                    <div class="lead-modal-contact-strip">
+                        <div class="lead-modal-contact-meta" id="leadModalContactMeta"></div>
+                    </div>
                     <div class="lead-modal-info-grid">
                         <div class="lead-modal-info">
-                            <div class="lead-modal-contact-meta" id="leadModalContactMeta"></div>
-                            <div class="lead-modal-info-label">Gesprek samenvatting</div>
+                            <div class="lead-modal-info-label">Samenvatting</div>
                             <div class="lead-modal-info-text" id="leadModalSummary">Nog geen samenvatting beschikbaar.</div>
                         </div>
                         <div class="lead-modal-info lead-modal-audio-info">
@@ -1587,10 +1597,8 @@
                 const leadTimeValue = normalizeTimeValue(lead.time || '09:00') || '09:00';
                 const leadLocationValue = String(lead.location || '').trim();
                 const leadWhatsappInfoValue = String(lead.whatsappInfo || '').trim();
-                modalSub.textContent = [
-                    String(lead.company || 'Onbekende lead'),
-                    leadType,
-                ].filter(Boolean).join(' · ');
+                modalSub.textContent = '';
+                modalSub.hidden = true;
                 modalDate.value = leadDateValue;
                 modalTime.value = leadTimeValue;
                 modalLocation.value = leadLocationValue;
