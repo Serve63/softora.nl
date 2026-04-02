@@ -2015,11 +2015,10 @@
                     const leadTypeClass = leadTypeToClass(resolveLeadType(item));
                     const leadOrigin = esc(resolveLeadOrigin(item));
                     const leadProvider = esc(resolveLeadProvider(item));
-                    const leadOwner = esc(
-                        String(item.leadOwnerFullName || item.leadOwnerName || '').trim() || 'Nog niet toegewezen'
-                    );
                     const chipClass = normalize(item?.leadChipClass || '') === 'confirmed' ? 'confirmed' : 'pending';
-                    const chipLabel = esc(String(item?.leadChipLabel || 'LEAD').trim() || 'LEAD');
+                    const chipLabel = esc(
+                        String(item.leadOwnerFullName || item.leadOwnerName || item?.leadChipLabel || 'LEAD').trim() || 'LEAD'
+                    );
                     const taskId = Number(item.id) || 0;
                     const openAttrs = taskId
                         ? ` class="lead-item ${leadTypeClass} clickable" data-lead-open="${taskId}" role="button" tabindex="0"`
@@ -2031,7 +2030,6 @@
                                 <div class="lead-name">${company}</div>
                                 <div class="lead-meta"><span class="lead-meta-label">Bron:</span> ${leadOrigin}</div>
                                 <div class="lead-meta"><span class="lead-meta-label">Provider:</span> ${leadProvider}</div>
-                                <div class="lead-meta"><span class="lead-meta-label">Opvolger:</span> ${leadOwner}</div>
                             </div>
                             <span class="lead-chip ${chipClass}">${chipLabel}</span>
                         </article>
