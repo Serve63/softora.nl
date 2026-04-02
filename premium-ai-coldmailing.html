@@ -693,23 +693,38 @@
             to { transform: rotate(360deg); }
         }
 
-        .lead-modal-audio-strip {
-            display: block;
+        .lead-modal-audio-shell {
             width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: var(--bg-primary);
+            padding: 0.2rem 0.28rem;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
         }
 
         .lead-modal-audio-player {
             width: 100%;
-            height: 36px;
-            min-height: 36px;
-            border-radius: 999px;
+            height: 38px;
+            min-height: 38px;
+            border-radius: 7px;
             display: block;
+            background: transparent;
+            color-scheme: light;
+        }
+
+        .lead-modal-audio-player::-webkit-media-controls-enclosure,
+        .lead-modal-audio-player::-webkit-media-controls-panel {
+            background-color: var(--bg-primary);
+            border-radius: 7px;
         }
 
         .lead-modal-audio-empty {
             color: var(--text-tertiary);
             font-size: 0.74rem;
             line-height: 1.35;
+            padding: 0.12rem 0.08rem;
         }
 
         .lead-modal-grid {
@@ -1015,9 +1030,12 @@
                             <div class="lead-modal-info-text" id="leadModalSummary">Nog geen samenvatting beschikbaar.</div>
                         </div>
                     </div>
-                    <div class="lead-modal-audio-strip">
+                    <div class="lead-modal-field lead-modal-field-full">
+                        <label class="lead-modal-label" for="leadModalAudioPlayer">Gespreksopname</label>
+                        <div class="lead-modal-audio-shell">
                             <audio class="lead-modal-audio-player" id="leadModalAudioPlayer" controls preload="none" hidden></audio>
                             <div class="lead-modal-audio-empty" id="leadModalAudioEmpty">Nog geen audio-opname beschikbaar voor deze lead.</div>
+                        </div>
                     </div>
 
                     <div class="lead-modal-grid">
