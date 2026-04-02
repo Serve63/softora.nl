@@ -1590,8 +1590,13 @@
                 const leadTimeValue = normalizeTimeValue(lead.time || '09:00') || '09:00';
                 const leadLocationValue = String(lead.location || '').trim();
                 const leadWhatsappInfoValue = String(lead.whatsappInfo || '').trim();
+                const leadOwnerValue = String(lead.leadOwnerName || lead.leadOwnerFullName || '').trim();
 
-                modalSub.textContent = `${String(lead.company || 'Onbekende lead')} · ${leadType}`;
+                modalSub.textContent = [
+                    String(lead.company || 'Onbekende lead'),
+                    leadType,
+                    leadOwnerValue ? `Opvolger: ${leadOwnerValue}` : '',
+                ].filter(Boolean).join(' · ');
                 modalDate.value = leadDateValue;
                 modalTime.value = leadTimeValue;
                 modalLocation.value = leadLocationValue;
@@ -2010,6 +2015,9 @@
                     const leadTypeClass = leadTypeToClass(resolveLeadType(item));
                     const leadOrigin = esc(resolveLeadOrigin(item));
                     const leadProvider = esc(resolveLeadProvider(item));
+                    const leadOwner = esc(
+                        String(item.leadOwnerName || item.leadOwnerFullName || '').trim() || 'Nog niet toegewezen'
+                    );
                     const chipClass = normalize(item?.leadChipClass || '') === 'confirmed' ? 'confirmed' : 'pending';
                     const chipLabel = esc(String(item?.leadChipLabel || 'LEAD').trim() || 'LEAD');
                     const taskId = Number(item.id) || 0;
@@ -2023,6 +2031,7 @@
                                 <div class="lead-name">${company}</div>
                                 <div class="lead-meta"><span class="lead-meta-label">Bron:</span> ${leadOrigin}</div>
                                 <div class="lead-meta"><span class="lead-meta-label">Provider:</span> ${leadProvider}</div>
+                                <div class="lead-meta"><span class="lead-meta-label">Opvolger:</span> ${leadOwner}</div>
                             </div>
                             <span class="lead-chip ${chipClass}">${chipLabel}</span>
                         </article>
@@ -2129,6 +2138,11 @@
                     ).trim(),
                     leadChipLabel: String(item?.leadChipLabel || '').trim(),
                     leadChipClass: String(item?.leadChipClass || '').trim(),
+                    leadOwnerKey: String(item?.leadOwnerKey || item?.assignedToKey || '').trim(),
+                    leadOwnerName: String(item?.leadOwnerName || item?.assignedToName || '').trim(),
+                    leadOwnerFullName: String(item?.leadOwnerFullName || item?.assignedToFullName || '').trim(),
+                    leadOwnerUserId: String(item?.leadOwnerUserId || item?.assignedToUserId || '').trim(),
+                    leadOwnerEmail: String(item?.leadOwnerEmail || item?.assignedToEmail || '').trim(),
                 };
             }
 
@@ -2193,6 +2207,11 @@
                     leadType: String(preferred?.leadType || secondary?.leadType || '').trim(),
                     leadChipLabel: String(preferred?.leadChipLabel || secondary?.leadChipLabel || '').trim(),
                     leadChipClass: String(preferred?.leadChipClass || secondary?.leadChipClass || '').trim(),
+                    leadOwnerKey: String(preferred?.leadOwnerKey || secondary?.leadOwnerKey || '').trim(),
+                    leadOwnerName: String(preferred?.leadOwnerName || secondary?.leadOwnerName || '').trim(),
+                    leadOwnerFullName: String(preferred?.leadOwnerFullName || secondary?.leadOwnerFullName || '').trim(),
+                    leadOwnerUserId: String(preferred?.leadOwnerUserId || secondary?.leadOwnerUserId || '').trim(),
+                    leadOwnerEmail: String(preferred?.leadOwnerEmail || secondary?.leadOwnerEmail || '').trim(),
                 };
             }
 

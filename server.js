@@ -212,6 +212,8 @@ const aiAnalysisInFlightCallIds = new Set();
 const generatedAgendaAppointments = [];
 const agendaAppointmentIdByCallId = new Map();
 const dismissedInterestedLeadCallIds = new Set();
+const leadOwnerAssignmentsByCallId = new Map();
+let nextLeadOwnerRotationIndex = 0;
 let nextGeneratedAgendaAppointmentId = 100000;
 const sequentialDispatchQueues = new Map();
 const sequentialDispatchQueueIdByCallId = new Map();
@@ -811,6 +813,144 @@ const premiumUsersStore = createPremiumUsersStore({
   },
 });
 
+function normalizeLeadOwnerKey(value) {
+  const normalized = normalizeString(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (normalized.includes('serve')) return 'serve';
+  if (normalized.includes('martijn')) return 'martijn';
+  return normalized;
+}
+
+function buildLeadOwnerFallbackRecord(key) {
+  if (key === 'martijn') {
+    return {
+      key: 'martijn',
+      displayName: 'Martijn',
+      fullName: 'Martijn',
+      userId: '',
+      email: '',
+    };
+  }
+  return {
+    key: 'serve',
+    displayName: 'Servé',
+    fullName: 'Servé Creusen',
+    userId: '',
+    email: '',
+  };
+}
+
+function buildLeadOwnerRecordFromUser(user, fallbackKey) {
+  const fallback = buildLeadOwnerFallbackRecord(fallbackKey);
+  const displayName = truncateText(normalizeString(user?.firstName || ''), 80) || fallback.displayName;
+  const fullName = premiumUsersStore.buildUserDisplayName(user) || fallback.fullName;
+  return {
+    key: fallback.key,
+    displayName,
+    fullName,
+    userId: truncateText(normalizeString(user?.id || ''), 120),
+    email: normalizePremiumSessionEmail(user?.email || ''),
+  };
+}
+
+function getLeadOwnerPool() {
+  const activeUsers = premiumUsersStore
+    .getCachedUsers()
+    .filter((user) => user && normalizeString(user?.status || '').toLowerCase() !== 'inactive');
+
+  const serveUser =
+    activeUsers.find((user) => {
+      const display = normalizeLeadOwnerKey(premiumUsersStore.buildUserDisplayName(user));
+      const email = normalizeLeadOwnerKey(user?.email || '');
+      return display.includes('serve') || email.includes('serve');
+    }) || null;
+  const martijnUser =
+    activeUsers.find((user) => {
+      const display = normalizeLeadOwnerKey(premiumUsersStore.buildUserDisplayName(user));
+      const email = normalizeLeadOwnerKey(user?.email || '');
+      return display.includes('martijn') || email.includes('martijn');
+    }) || null;
+
+  return [
+    serveUser ? buildLeadOwnerRecordFromUser(serveUser, 'serve') : buildLeadOwnerFallbackRecord('serve'),
+    martijnUser ? buildLeadOwnerRecordFromUser(martijnUser, 'martijn') : buildLeadOwnerFallbackRecord('martijn'),
+  ];
+}
+
+function normalizeLeadOwnerRecord(value) {
+  if (!value || typeof value !== 'object') return null;
+  const fallbackKey = normalizeLeadOwnerKey(value.key || value.displayName || value.fullName || value.email || '') || 'serve';
+  const fallback = buildLeadOwnerFallbackRecord(fallbackKey);
+  return {
+    key: fallback.key,
+    displayName:
+      truncateText(normalizeString(value.displayName || value.name || ''), 80) || fallback.displayName,
+    fullName:
+      truncateText(normalizeString(value.fullName || value.displayName || value.name || ''), 160) ||
+      fallback.fullName,
+    userId: truncateText(normalizeString(value.userId || value.id || ''), 120),
+    email: normalizePremiumSessionEmail(value.email || ''),
+  };
+}
+
+function getOrAssignLeadOwnerByCallId(callId, options = {}) {
+  const normalizedCallId = normalizeString(callId);
+  if (!normalizedCallId) return null;
+
+  const existing = normalizeLeadOwnerRecord(leadOwnerAssignmentsByCallId.get(normalizedCallId));
+  if (existing) {
+    leadOwnerAssignmentsByCallId.set(normalizedCallId, existing);
+    return existing;
+  }
+
+  if (options.createIfMissing === false) return null;
+
+  const pool = getLeadOwnerPool();
+  if (!pool.length) return null;
+  const index = Math.abs(Number(nextLeadOwnerRotationIndex) || 0) % pool.length;
+  const assigned = normalizeLeadOwnerRecord(pool[index]);
+  nextLeadOwnerRotationIndex = (index + 1) % pool.length;
+  leadOwnerAssignmentsByCallId.set(normalizedCallId, assigned);
+  queueRuntimeStatePersist('lead_owner_assignment');
+  return assigned;
+}
+
+function buildLeadOwnerFields(callId, existingValue = null) {
+  const existing = normalizeLeadOwnerRecord(existingValue);
+  if (existing) {
+    return {
+      leadOwnerKey: existing.key,
+      leadOwnerName: existing.displayName,
+      leadOwnerFullName: existing.fullName,
+      leadOwnerUserId: existing.userId,
+      leadOwnerEmail: existing.email,
+    };
+  }
+
+  const assigned = getOrAssignLeadOwnerByCallId(callId);
+  if (!assigned) {
+    return {
+      leadOwnerKey: '',
+      leadOwnerName: '',
+      leadOwnerFullName: '',
+      leadOwnerUserId: '',
+      leadOwnerEmail: '',
+    };
+  }
+
+  return {
+    leadOwnerKey: assigned.key,
+    leadOwnerName: assigned.displayName,
+    leadOwnerFullName: assigned.fullName,
+    leadOwnerUserId: assigned.userId,
+    leadOwnerEmail: assigned.email,
+  };
+}
+
 function createPremiumSessionToken({ email, maxAgeMs, userId = '', role = '' }) {
   if (!isPremiumAuthConfigured()) return '';
   const ttlMs = Math.max(60_000, Number(maxAgeMs) || PREMIUM_SESSION_TTL_HOURS * 60 * 60 * 1000);
@@ -1365,7 +1505,7 @@ function buildRuntimeStateSnapshotPayload() {
   }));
 
   return {
-    version: 3,
+    version: 4,
     savedAt: new Date().toISOString(),
     recentWebhookEvents: compactWebhookEvents,
     recentCallUpdates: recentCallUpdates.slice(0, 500),
@@ -1374,6 +1514,14 @@ function buildRuntimeStateSnapshotPayload() {
     recentSecurityAuditEvents: recentSecurityAuditEvents.slice(0, 500),
     generatedAgendaAppointments: generatedAgendaAppointments.slice(),
     dismissedInterestedLeadCallIds: Array.from(dismissedInterestedLeadCallIds).slice(0, 1000),
+    leadOwnerAssignments: Array.from(leadOwnerAssignmentsByCallId.entries())
+      .slice(0, 5000)
+      .map(([callId, owner]) => ({
+        callId: normalizeString(callId),
+        owner: normalizeLeadOwnerRecord(owner),
+      }))
+      .filter((item) => item.callId && item.owner),
+    nextLeadOwnerRotationIndex,
     nextGeneratedAgendaAppointmentId,
   };
 }
@@ -1395,6 +1543,9 @@ function applyRuntimeStateSnapshotPayload(payload) {
     : [];
   const nextDismissedInterestedLeadCallIds = Array.isArray(payload.dismissedInterestedLeadCallIds)
     ? payload.dismissedInterestedLeadCallIds.slice(0, 1000)
+    : [];
+  const nextLeadOwnerAssignments = Array.isArray(payload.leadOwnerAssignments)
+    ? payload.leadOwnerAssignments.slice(0, 5000)
     : [];
 
   recentWebhookEvents.splice(0, recentWebhookEvents.length, ...nextWebhookEvents);
@@ -1421,9 +1572,17 @@ function applyRuntimeStateSnapshotPayload(payload) {
   generatedAgendaAppointments.splice(0, generatedAgendaAppointments.length, ...nextAppointments);
   agendaAppointmentIdByCallId.clear();
   dismissedInterestedLeadCallIds.clear();
+  leadOwnerAssignmentsByCallId.clear();
   nextDismissedInterestedLeadCallIds.forEach((item) => {
     const callId = normalizeString(item);
     if (callId) dismissedInterestedLeadCallIds.add(callId);
+  });
+  nextLeadOwnerAssignments.forEach((item) => {
+    const callId = normalizeString(item?.callId || '');
+    const owner = normalizeLeadOwnerRecord(item?.owner || item);
+    if (callId && owner) {
+      leadOwnerAssignmentsByCallId.set(callId, owner);
+    }
   });
   let maxAppointmentId = 99999;
   generatedAgendaAppointments.forEach((item) => {
@@ -1436,6 +1595,10 @@ function applyRuntimeStateSnapshotPayload(payload) {
   });
 
   const payloadNextId = Number(payload.nextGeneratedAgendaAppointmentId);
+  const payloadLeadOwnerRotationIndex = Number(payload.nextLeadOwnerRotationIndex);
+  nextLeadOwnerRotationIndex = Number.isFinite(payloadLeadOwnerRotationIndex)
+    ? Math.max(0, payloadLeadOwnerRotationIndex)
+    : 0;
   nextGeneratedAgendaAppointmentId = Number.isFinite(payloadNextId)
     ? Math.max(payloadNextId, maxAppointmentId + 1)
     : maxAppointmentId + 1;
@@ -5023,6 +5186,7 @@ function buildGeneratedLeadFollowUpFromCall(callUpdate, insight = null) {
   if (!shouldCreateLeadFollowUpFromCall(callUpdate, insight)) return null;
   const callId = normalizeString(callUpdate?.callId || '');
   if (!callId) return null;
+  const leadOwner = buildLeadOwnerFields(callId);
 
   const company =
     normalizeString(callUpdate?.company || insight?.company || insight?.leadCompany || '') || 'Onbekende lead';
@@ -5066,6 +5230,7 @@ function buildGeneratedLeadFollowUpFromCall(callUpdate, insight = null) {
     provider: normalizeString(callUpdate?.provider || ''),
     coldcallingStack: normalizedStack || '',
     coldcallingStackLabel: stackLabel || '',
+    ...leadOwner,
   };
 }
 
@@ -5218,6 +5383,7 @@ function buildInterestedLeadCandidateRows(existingTasks = []) {
         createdAt:
           normalizeString(leadFollowUp?.createdAt || callUpdate?.endedAt || callUpdate?.updatedAt || '') ||
           new Date().toISOString(),
+        ...buildLeadOwnerFields(callId, leadFollowUp),
       };
       const key = buildLeadFollowUpCandidateKey(row);
       const rowTs = getLeadLikeRecencyTimestamp(row);
@@ -5466,6 +5632,7 @@ function buildGroupedColdcallingLeadRows(existingTasks = []) {
           createdAt:
             normalizeString(latestUpdate?.updatedAt || latestUpdate?.endedAt || latestInsight?.analyzedAt || '') ||
             new Date().toISOString(),
+          ...buildLeadOwnerFields(normalizeString(latestUpdate?.callId || latestInsight?.callId || '')),
         }
       : null;
     if (!row) return;
@@ -5818,6 +5985,18 @@ function mapAppointmentToConfirmationTask(appointment) {
     providerLabel: providerLabel || '',
     coldcallingStack: normalizedStack || '',
     coldcallingStackLabel: stackLabel || '',
+    ...buildLeadOwnerFields(
+      callId,
+      appointment?.leadOwnerName || appointment?.leadOwnerFullName || appointment?.leadOwnerKey
+        ? {
+            key: appointment?.leadOwnerKey,
+            displayName: appointment?.leadOwnerName,
+            fullName: appointment?.leadOwnerFullName,
+            userId: appointment?.leadOwnerUserId,
+            email: appointment?.leadOwnerEmail,
+          }
+        : null
+    ),
   };
 }
 
@@ -6064,6 +6243,7 @@ function buildGeneratedAgendaAppointmentFromAiInsight(insight) {
   const summary = timeWasGuessed
     ? `${summaryCore}${summaryCore ? ' ' : ''}(Tijd niet expliciet genoemd; standaard op 09:00 gezet.)`
     : summaryCore;
+  const callId = normalizeString(insight.callId);
 
   return {
     company,
@@ -6078,12 +6258,13 @@ function buildGeneratedAgendaAppointmentFromAiInsight(insight) {
     source: 'AI Cold Calling (Retell + AI)',
     summary: summary || 'AI-samenvatting aangemaakt op basis van call update.',
     aiGenerated: true,
-    callId: normalizeString(insight.callId),
+    callId,
     createdAt: new Date().toISOString(),
     confirmationTaskType: 'send_confirmation_email',
     provider: provider || '',
     coldcallingStack: coldcallingStack || '',
     coldcallingStackLabel: coldcallingStackLabel || '',
+    ...buildLeadOwnerFields(callId),
   };
 }
 
@@ -11957,6 +12138,46 @@ function buildMaterializedInterestedLeadAppointment(callId, requestBody = {}) {
       insight?.stackLabel ||
       getColdcallingStackLabel(normalizedStack)
   );
+  const leadOwner = buildLeadOwnerFields(
+    normalizedCallId,
+    existingAppointment?.leadOwnerName ||
+      existingAppointment?.leadOwnerFullName ||
+      existingAppointment?.leadOwnerKey ||
+      followUpLead?.leadOwnerName ||
+      followUpLead?.leadOwnerFullName ||
+      followUpLead?.leadOwnerKey ||
+      leadRow?.leadOwnerName ||
+      leadRow?.leadOwnerFullName ||
+      leadRow?.leadOwnerKey
+      ? {
+          key:
+            existingAppointment?.leadOwnerKey ||
+            followUpLead?.leadOwnerKey ||
+            leadRow?.leadOwnerKey ||
+            '',
+          displayName:
+            existingAppointment?.leadOwnerName ||
+            followUpLead?.leadOwnerName ||
+            leadRow?.leadOwnerName ||
+            '',
+          fullName:
+            existingAppointment?.leadOwnerFullName ||
+            followUpLead?.leadOwnerFullName ||
+            leadRow?.leadOwnerFullName ||
+            '',
+          userId:
+            existingAppointment?.leadOwnerUserId ||
+            followUpLead?.leadOwnerUserId ||
+            leadRow?.leadOwnerUserId ||
+            '',
+          email:
+            existingAppointment?.leadOwnerEmail ||
+            followUpLead?.leadOwnerEmail ||
+            leadRow?.leadOwnerEmail ||
+            '',
+        }
+      : null
+  );
 
   return {
     company:
@@ -12067,6 +12288,7 @@ function buildMaterializedInterestedLeadAppointment(callId, requestBody = {}) {
     whatsappInfo: sanitizeAppointmentWhatsappInfo(
       requestBody.whatsappInfo || existingAppointment?.whatsappInfo || leadRow?.whatsappInfo || ''
     ),
+    ...leadOwner,
   };
 }
 
