@@ -1,719 +1,646 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/assets/iphone-optimizations.css">
-    <title>Softora | Wachtwoordenregister</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
-    <script>
-        (function () {
-            document.documentElement.setAttribute("data-personnel-loading", "true");
-            try {
-                document.documentElement.setAttribute("data-theme-mode", "light");
-                document.documentElement.setAttribute("data-theme", "light");
-            } catch (_) {
-                /* ignore */
-            }
-        })();
-    </script>
-    <script src="assets/personnel-theme.js?v=20260402-3" defer></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wachtwoordenregister – Softora.nl</title>
+<link rel="stylesheet" href="/assets/iphone-optimizations.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
+<script>
+  (function () {
+    document.documentElement.setAttribute("data-personnel-loading", "true");
+    try {
+      document.documentElement.setAttribute("data-theme-mode", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    } catch (_) {
+      /* ignore */
+    }
+  })();
+</script>
+<script src="assets/personnel-theme.js?v=20260402-4" defer></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f0ede8;
+  --crimson: #9b2355;
+  --text-dark: #1a1a2e;
+  --text-mid: #555;
+  --text-light: #999;
+  --border: #e2ddd6;
+  --card: #ffffff;
+  --tag: #f5f0eb;
+  --red: #c0392b;
+  --green: #16733c;
+}
+body {
+  font-family: 'Barlow', sans-serif;
+  background: var(--bg);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+.dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 320px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 100;
+}
+.main-content {
+  margin-left: 320px;
+  width: calc(100% - 320px);
+  min-height: 100vh;
+  padding: 32px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+.register-shell {
+  width: min(1000px, 100%);
+  min-height: calc(100vh - 64px);
+}
 
-        body {
-            font-family: 'Inter', sans-serif;
-            color: var(--text-primary);
-            background: var(--bg-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+/* PIN SCHERM */
+#screen-pin {
+  width: 100%;
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#screen-register {
+  display: none;
+  width: 100%;
+  min-height: calc(100vh - 64px);
+}
 
-        .dashboard-layout {
-            display: flex;
-            min-height: 100vh;
-        }
+.pin-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 44px 48px 40px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 12px 48px rgba(0,0,0,.08);
+}
+.pin-logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  margin-bottom: 28px;
+}
+.pin-icon {
+  width: 50px;
+  height: 50px;
+  background: rgba(155,35,85,.08);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.pin-icon svg { width: 22px; height: 22px; color: var(--crimson); }
+.pin-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+.pin-sub {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 28px;
+  text-align: center;
+  line-height: 1.5;
+}
+.pin-dots { display: flex; gap: 12px; margin-bottom: 28px; }
+.pin-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  transition: all .15s;
+}
+.pin-dot.filled { background: var(--crimson); border-color: var(--crimson); }
+.pin-dot.error { background: var(--red); border-color: var(--red); animation: shake .3s ease; }
+.pin-dot.success { background: var(--green); border-color: var(--green); }
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-5px)}
+  40%{transform:translateX(5px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}
 
-        .sidebar {
-            width: 320px;
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            z-index: 100;
-            display: flex;
-            flex-direction: column;
-        }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+.num-btn {
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: all .12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+.num-btn:hover { background: var(--card); border-color: rgba(155,35,85,.3); color: var(--crimson); }
+.num-btn:active { transform: scale(.93); }
+.num-btn.ghost { border: none; background: transparent; cursor: default; }
+.num-btn.ghost:hover { background: transparent; border: none; color: var(--text-dark); }
 
-        .main-content {
-            margin-left: 320px;
-            width: calc(100% - 320px);
-            min-height: 100vh;
-            padding: clamp(1.2rem, 2.4vw, 2rem);
-        }
+.pin-msg {
+  font-size: 11px;
+  color: var(--red);
+  margin-top: 14px;
+  min-height: 14px;
+  font-weight: 600;
+  text-align: center;
+}
 
-        .gate-shell,
-        .vault-shell {
-            width: min(1320px, 100%);
-            margin: 0 auto;
-        }
+/* REGISTER SCHERM */
+.reg-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+.reg-logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  margin-bottom: 4px;
+}
+.reg-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.reg-sub { font-size: 12px; color: var(--text-light); margin-top: 2px; }
 
-        .gate-shell {
-            min-height: calc(100vh - 4rem);
-            display: grid;
-            place-items: center;
-        }
+.lock-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  margin-top: 6px;
+}
+.lock-btn:hover { border-color: var(--crimson); color: var(--crimson); }
+.lock-btn svg { width: 12px; height: 12px; }
 
-        .gate-card,
-        .vault-card,
-        .entry-card,
-        .form-card {
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            box-shadow: 0 14px 40px rgba(20, 18, 34, 0.05);
-        }
+.cat-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.cat-pill {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all .15s;
+}
+.cat-pill:hover { border-color: rgba(155,35,85,.3); color: var(--text-dark); }
+.cat-pill.active { background: var(--crimson); border-color: var(--crimson); color: #fff; }
 
-        .gate-card {
-            width: min(560px, 100%);
-            padding: 1.35rem;
-            display: grid;
-            gap: 1rem;
-        }
+.search-row {
+  position: relative;
+  margin-bottom: 16px;
+}
+.search-row input {
+  width: 100%;
+  padding: 10px 14px 10px 36px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  background: var(--card);
+  color: var(--text-dark);
+  outline: none;
+  transition: border-color .15s;
+}
+.search-row input:focus { border-color: var(--crimson); }
+.search-row svg {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-light);
+  pointer-events: none;
+}
 
-        .gate-title,
-        .vault-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: clamp(2.2rem, 3vw, 3rem);
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            line-height: 0.98;
-        }
+.table-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.t-head {
+  display: grid;
+  grid-template-columns: 2fr 2fr 2.5fr 32px;
+  gap: 0;
+  padding: 8px 20px;
+  background: var(--tag);
+  border-bottom: 1px solid var(--border);
+}
+.t-head span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+.t-row {
+  display: grid;
+  grid-template-columns: 2fr 2fr 2.5fr 32px;
+  gap: 0;
+  align-items: center;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.t-row:last-child { border-bottom: none; }
+.t-row:hover { background: var(--tag); }
 
-        .gate-subtitle,
-        .vault-subtitle {
-            color: var(--text-secondary);
-            line-height: 1.7;
-            margin-top: 0.35rem;
-        }
+.t-name { display: flex; align-items: center; gap: 10px; }
+.t-favicon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--tag);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--crimson);
+  flex-shrink: 0;
+}
+.t-label { font-size: 13px; font-weight: 600; color: var(--text-dark); }
+.t-url { font-size: 11px; color: var(--text-light); margin-top: 1px; }
+.t-user { font-size: 12px; color: var(--text-mid); }
 
-        .verification-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            width: fit-content;
-            padding: 0.62rem 0.82rem;
-            border-radius: 999px;
-            border: 1px solid rgba(143, 35, 96, 0.16);
-            background: rgba(143, 35, 96, 0.06);
-            color: #8f2360;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.82rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
+.t-pw-wrap { display: flex; align-items: center; gap: 6px; }
+.t-pw { font-family: monospace; font-size: 13px; color: var(--text-dark); }
+.t-pw.hidden { color: var(--text-light); letter-spacing: 2px; }
 
-        .gate-grid,
-        .field-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.85rem;
-        }
+.btn-copy {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.btn-copy:hover { border-color: var(--crimson); color: var(--crimson); }
+.btn-copy svg { width: 13px; height: 13px; }
+.btn-copy.copied { border-color: var(--green); color: var(--green); }
 
-        .field {
-            display: grid;
-            gap: 0.35rem;
-        }
+.empty { padding: 48px; text-align: center; color: var(--text-light); font-size: 13px; }
 
-        .field label,
-        .section-kicker {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.78rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--text-tertiary);
-        }
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--text-dark);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all .25s;
+  pointer-events: none;
+  z-index: 99;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
 
-        .field input,
-        .field select,
-        .field textarea {
-            width: 100%;
-            min-height: 48px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            background: #fff;
-            color: var(--text-primary);
-            font-size: 1rem;
-            padding: 0.8rem 0.9rem;
-            outline: none;
-        }
+@media (max-width: 1100px) {
+  .sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    padding: 20px;
+  }
+  .register-shell,
+  #screen-pin,
+  #screen-register {
+    min-height: auto;
+  }
+}
 
-        .field textarea {
-            min-height: 108px;
-            resize: vertical;
-        }
-
-        .field input:focus,
-        .field select:focus,
-        .field textarea:focus {
-            border-color: rgba(143, 35, 96, 0.34);
-            box-shadow: 0 0 0 3px rgba(143, 35, 96, 0.08);
-        }
-
-        .confirm-row {
-            display: flex;
-            align-items: center;
-            gap: 0.7rem;
-            color: var(--text-secondary);
-        }
-
-        .primary-btn,
-        .ghost-btn {
-            border-radius: 14px;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.92rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            padding: 0.9rem 1rem;
-            cursor: pointer;
-        }
-
-        .primary-btn {
-            border: none;
-            background: linear-gradient(135deg, #8f2360 0%, #b72e76 100%);
-            color: #fff;
-        }
-
-        .ghost-btn {
-            border: 1px solid var(--border);
-            background: #fff;
-            color: var(--text-primary);
-        }
-
-        .feedback {
-            min-height: 1.3rem;
-            color: #8f2360;
-            font-weight: 600;
-        }
-
-        .vault-shell {
-            display: none;
-            gap: 1rem;
-        }
-
-        .vault-shell.ready {
-            display: grid;
-        }
-
-        .vault-head {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-
-        .vault-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.6rem;
-        }
-
-        .vault-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.68rem 0.88rem;
-            border-radius: 999px;
-            border: 1px solid rgba(143, 35, 96, 0.16);
-            background: rgba(143, 35, 96, 0.05);
-            color: #8f2360;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.8rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .vault-grid {
-            display: grid;
-            grid-template-columns: 390px minmax(0, 1fr);
-            gap: 1rem;
-            align-items: start;
-        }
-
-        .form-card,
-        .vault-card {
-            padding: 1.08rem 1.12rem 1.15rem;
-        }
-
-        .section-copy {
-            margin-top: 0.35rem;
-            color: var(--text-secondary);
-            line-height: 1.65;
-        }
-
-        .toolbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.8rem;
-            margin-bottom: 1rem;
-        }
-
-        .search-input {
-            width: min(340px, 100%);
-            min-height: 48px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            padding: 0.8rem 0.9rem;
-            font-size: 1rem;
-            outline: none;
-        }
-
-        .entry-list {
-            display: grid;
-            gap: 0.8rem;
-        }
-
-        .entry-card {
-            padding: 1rem 1.05rem;
-            display: grid;
-            gap: 0.85rem;
-        }
-
-        .entry-top,
-        .entry-meta,
-        .entry-actions {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-
-        .entry-name {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .entry-platform {
-            color: var(--text-secondary);
-        }
-
-        .entry-chip {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.28rem 0.56rem;
-            border-radius: 999px;
-            background: rgba(20, 24, 35, 0.06);
-            color: var(--text-secondary);
-            font-size: 0.74rem;
-            font-weight: 700;
-        }
-
-        .entry-password {
-            font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
-            font-size: 0.96rem;
-            padding: 0.82rem 0.9rem;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            background: #faf8f5;
-            color: var(--text-primary);
-            overflow-wrap: anywhere;
-        }
-
-        .small-btn {
-            border: 1px solid var(--border);
-            background: #fff;
-            color: var(--text-primary);
-            border-radius: 10px;
-            padding: 0.6rem 0.8rem;
-            cursor: pointer;
-            font-weight: 700;
-        }
-
-        .small-btn:hover,
-        .ghost-btn:hover {
-            border-color: rgba(143, 35, 96, 0.32);
-            background: rgba(143, 35, 96, 0.05);
-        }
-
-        .empty-state {
-            padding: 2rem 1rem;
-            text-align: center;
-            color: var(--text-tertiary);
-        }
-
-        @media (max-width: 1080px) {
-            .sidebar {
-                position: static;
-                width: 100%;
-                height: auto;
-            }
-
-            .main-content {
-                margin-left: 0;
-                width: 100%;
-                padding: 1rem;
-            }
-
-            .vault-head,
-            .gate-grid,
-            .field-grid,
-            .vault-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .vault-head {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-        }
-    </style>
+@media (max-width: 760px) {
+  .reg-header {
+    flex-direction: column;
+    gap: 14px;
+  }
+  .t-head,
+  .t-row {
+    grid-template-columns: 1.4fr 1fr 1.2fr 32px;
+    padding-inline: 14px;
+  }
+}
+</style>
 </head>
 <body>
-    <div class="dashboard-layout">
-        <aside class="sidebar"></aside>
-        <main class="main-content">
-            <section id="gateShell" class="gate-shell">
-                <article class="gate-card">
-                    <div class="verification-pill">Extra verificatie vereist</div>
-                    <div>
-                        <h1 class="gate-title">Wachtwoordenregister</h1>
-                        <p class="gate-subtitle">Voordat je deze pagina opent, doen we eerst een korte menselijke verificatie. Zo voorkom je dat iemand per ongeluk direct in het register valt.</p>
-                    </div>
+<div class="dashboard-layout">
+  <aside class="sidebar"></aside>
+  <main class="main-content">
+    <div class="register-shell">
+      <div id="screen-pin">
+        <div class="pin-box">
+          <div class="pin-logo">SOFTORA.NL</div>
+          <div class="pin-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </div>
+          <div class="pin-title">Beveiligd</div>
+          <div class="pin-sub">Voer je PIN in om het<br>wachtwoordenregister te openen</div>
+          <div class="pin-dots" id="pin-dots">
+            <div class="pin-dot"></div><div class="pin-dot"></div>
+            <div class="pin-dot"></div><div class="pin-dot"></div>
+            <div class="pin-dot"></div><div class="pin-dot"></div>
+          </div>
+          <div class="numpad">
+            <button class="num-btn" onclick="p('1')">1</button>
+            <button class="num-btn" onclick="p('2')">2</button>
+            <button class="num-btn" onclick="p('3')">3</button>
+            <button class="num-btn" onclick="p('4')">4</button>
+            <button class="num-btn" onclick="p('5')">5</button>
+            <button class="num-btn" onclick="p('6')">6</button>
+            <button class="num-btn" onclick="p('7')">7</button>
+            <button class="num-btn" onclick="p('8')">8</button>
+            <button class="num-btn" onclick="p('9')">9</button>
+            <button class="num-btn ghost"></button>
+            <button class="num-btn" onclick="p('0')">0</button>
+            <button class="num-btn" onclick="pb()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+            </button>
+          </div>
+          <div class="pin-msg" id="pin-msg"></div>
+        </div>
+      </div>
 
-                    <div class="gate-grid">
-                        <div class="field">
-                            <label for="challengeInput">Menselijke check</label>
-                            <input id="challengeInput" type="text" inputmode="numeric" placeholder="Los de som op">
-                        </div>
-                        <div class="field">
-                            <label for="challengePrompt">Opdracht</label>
-                            <input id="challengePrompt" type="text" disabled>
-                        </div>
-                    </div>
+      <div id="screen-register">
+        <div class="reg-header">
+          <div>
+            <div class="reg-logo">SOFTORA.NL</div>
+            <div class="reg-title">Wachtwoordenregister</div>
+            <div class="reg-sub">Beveiligd overzicht van inloggegevens</div>
+          </div>
+          <button class="lock-btn" onclick="lock()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Vergrendelen
+          </button>
+        </div>
 
-                    <label class="confirm-row">
-                        <input id="privateCheck" type="checkbox">
-                        <span>Ik zit in een privé-omgeving en open dit register bewust.</span>
-                    </label>
+        <div class="cat-bar" id="cat-bar"></div>
 
-                    <div class="feedback" id="gateFeedback"></div>
+        <div class="search-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search" placeholder="Zoeken op naam, gebruikersnaam…" oninput="render()">
+        </div>
 
-                    <div style="display:flex;gap:0.7rem;flex-wrap:wrap;">
-                        <button id="verifyBtn" class="primary-btn" type="button">Register openen</button>
-                        <button id="refreshChallengeBtn" class="ghost-btn" type="button">Nieuwe verificatie</button>
-                    </div>
-                </article>
-            </section>
-
-            <section id="vaultShell" class="vault-shell">
-                <header class="vault-head">
-                    <div>
-                        <h1 class="vault-title">Wachtwoordenregister</h1>
-                        <p class="vault-subtitle">Eigen frontend voor inloggegevens, toegangen en interne notities. De extra verificatiestap blijft per browsersessie actief.</p>
-                    </div>
-                    <div class="vault-badges">
-                        <div class="vault-badge">Sessie ontgrendeld</div>
-                        <div class="vault-badge" id="entryCountBadge">0 items</div>
-                    </div>
-                </header>
-
-                <section class="vault-grid">
-                    <article class="form-card">
-                        <div class="section-kicker">Nieuwe toegang</div>
-                        <p class="section-copy">Voeg hier een nieuwe login toe of vul een bestaand systeem aan. Deze demo bewaart alles lokaal in de browser.</p>
-
-                        <form id="vaultForm" style="display:grid;gap:0.85rem;margin-top:1rem;">
-                            <div class="field-grid">
-                                <div class="field">
-                                    <label for="platformInput">Platform</label>
-                                    <input id="platformInput" type="text" placeholder="Bijv. Vercel" required>
-                                </div>
-                                <div class="field">
-                                    <label for="labelInput">Label</label>
-                                    <input id="labelInput" type="text" placeholder="Bijv. Productie account" required>
-                                </div>
-                            </div>
-
-                            <div class="field-grid">
-                                <div class="field">
-                                    <label for="usernameInput">Gebruikersnaam / e-mail</label>
-                                    <input id="usernameInput" type="text" placeholder="info@softora.nl" required>
-                                </div>
-                                <div class="field">
-                                    <label for="urlInput">URL</label>
-                                    <input id="urlInput" type="url" placeholder="https://...">
-                                </div>
-                            </div>
-
-                            <div class="field">
-                                <label for="passwordInput">Wachtwoord</label>
-                                <input id="passwordInput" type="text" placeholder="Sterk wachtwoord" required>
-                            </div>
-
-                            <div class="field">
-                                <label for="notesInput">Interne notitie</label>
-                                <textarea id="notesInput" placeholder="Bijv. 2FA via Servé, alleen gebruiken voor productie..."></textarea>
-                            </div>
-
-                            <button class="primary-btn" type="submit">Toegang opslaan</button>
-                        </form>
-                    </article>
-
-                    <article class="vault-card">
-                        <div class="toolbar">
-                            <div>
-                                <div class="section-kicker">Overzicht</div>
-                                <p class="section-copy">Zoek, toon en kopieer inloggegevens vanuit één scherm.</p>
-                            </div>
-                            <input id="searchInput" class="search-input" type="search" placeholder="Zoek op platform, label of gebruiker...">
-                        </div>
-
-                        <div class="entry-list" id="entryList"></div>
-                    </article>
-                </section>
-            </section>
-        </main>
+        <div class="table-wrap">
+          <div class="t-head">
+            <span>Naam</span><span>Gebruikersnaam</span><span>Wachtwoord</span><span></span>
+          </div>
+          <div id="list"></div>
+        </div>
+      </div>
     </div>
+  </main>
+</div>
 
-    <script>
-        (function () {
-            const STORAGE_KEY = 'softora_premium_password_vault_v1';
-            const UNLOCK_KEY = 'softora_password_vault_unlocked_v1';
-            const UNLOCK_TTL_MS = 20 * 60 * 1000;
-            const gateShell = document.getElementById('gateShell');
-            const vaultShell = document.getElementById('vaultShell');
-            const challengeInput = document.getElementById('challengeInput');
-            const challengePrompt = document.getElementById('challengePrompt');
-            const privateCheck = document.getElementById('privateCheck');
-            const gateFeedback = document.getElementById('gateFeedback');
-            const verifyBtn = document.getElementById('verifyBtn');
-            const refreshChallengeBtn = document.getElementById('refreshChallengeBtn');
-            const entryList = document.getElementById('entryList');
-            const searchInput = document.getElementById('searchInput');
-            const entryCountBadge = document.getElementById('entryCountBadge');
-            const vaultForm = document.getElementById('vaultForm');
-            const revealed = new Set();
-            let challengeAnswer = 0;
+<div class="toast" id="toast"></div>
 
-            const seedEntries = [
-                { id: 'pw-1', platform: 'Vercel', label: 'Productie deployment', username: 'info@softora.nl', password: 'Softora!Deploy2026', url: 'https://vercel.com', notes: '2FA via beheerder telefoon', updatedAt: Date.now() - 86400000 },
-                { id: 'pw-2', platform: 'Google Analytics', label: 'Analytics hoofdaccount', username: 'analytics@softora.nl', password: 'GA4-Softora-Pro', url: 'https://analytics.google.com', notes: 'Gebruiken voor dashboards en SEO-koppelingen', updatedAt: Date.now() - 7200000 },
-                { id: 'pw-3', platform: 'OpenAI', label: 'API omgeving', username: 'api@softora.nl', password: 'sk-live-softora-demo', url: 'https://platform.openai.com', notes: 'Sleutel later via echte secret store vervangen', updatedAt: Date.now() - 3600000 }
-            ];
+<script>
+const PIN = '123456';
+let input = '', attempts = 0, blocked = false;
 
-            const state = {
-                query: '',
-                entries: seedEntries.slice()
-            };
+function p(d) {
+  if (blocked || input.length >= 6) return;
+  input += d;
+  dots();
+  if (input.length === 6) setTimeout(check, 120);
+}
 
-            function formatDate(timestamp) {
-                try {
-                    return new Date(timestamp).toLocaleDateString('nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                } catch (_) {
-                    return '—';
-                }
-            }
+function pb() {
+  if (!blocked) {
+    input = input.slice(0, -1);
+    dots();
+  }
+}
 
-            function loadEntries() {
-                try {
-                    const raw = window.localStorage.getItem(STORAGE_KEY);
-                    if (!raw) return;
-                    const parsed = JSON.parse(raw);
-                    if (Array.isArray(parsed) && parsed.length) {
-                        state.entries = parsed;
-                    }
-                } catch (_) {
-                    // ignore
-                }
-            }
+function dots(state) {
+  document.querySelectorAll('.pin-dot').forEach((d, i) => {
+    d.className = 'pin-dot';
+    if (state) d.classList.add(state);
+    else if (i < input.length) d.classList.add('filled');
+  });
+}
 
-            function saveEntries() {
-                try {
-                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
-                } catch (_) {
-                    // ignore
-                }
-            }
+function check() {
+  if (input === PIN) {
+    dots('success');
+    setTimeout(() => {
+      document.getElementById('screen-pin').style.display = 'none';
+      document.getElementById('screen-register').style.display = 'block';
+      input = '';
+      attempts = 0;
+      dots();
+      document.getElementById('pin-msg').textContent = '';
+    }, 350);
+  } else {
+    attempts++;
+    dots('error');
+    setTimeout(() => {
+      input = '';
+      dots();
+    }, 450);
+    if (attempts >= 5) {
+      blocked = true;
+      let s = 30;
+      document.getElementById('pin-msg').textContent = `Geblokkeerd — wacht ${s}s`;
+      const t = setInterval(() => {
+        s--;
+        if (s <= 0) {
+          clearInterval(t);
+          blocked = false;
+          attempts = 0;
+          document.getElementById('pin-msg').textContent = '';
+        } else {
+          document.getElementById('pin-msg').textContent = `Geblokkeerd — wacht ${s}s`;
+        }
+      }, 1000);
+    } else {
+      document.getElementById('pin-msg').textContent = `Onjuist — nog ${5 - attempts} poging${5 - attempts !== 1 ? 'en' : ''}`;
+    }
+  }
+}
 
-            function buildChallenge() {
-                const a = Math.floor(Math.random() * 7) + 4;
-                const b = Math.floor(Math.random() * 5) + 3;
-                challengeAnswer = a + b;
-                challengePrompt.value = `Wat is ${a} + ${b}?`;
-                challengeInput.value = '';
-                gateFeedback.textContent = '';
-            }
+document.addEventListener('keydown', (e) => {
+  const pinScreen = document.getElementById('screen-pin');
+  if (!pinScreen || pinScreen.style.display === 'none') return;
+  if (e.key >= '0' && e.key <= '9') p(e.key);
+  if (e.key === 'Backspace') pb();
+});
 
-            function hasValidUnlock() {
-                try {
-                    const raw = window.sessionStorage.getItem(UNLOCK_KEY);
-                    if (!raw) return false;
-                    const ts = Number(raw);
-                    return Number.isFinite(ts) && (Date.now() - ts) < UNLOCK_TTL_MS;
-                } catch (_) {
-                    return false;
-                }
-            }
+function lock() {
+  document.getElementById('screen-register').style.display = 'none';
+  document.getElementById('screen-pin').style.display = 'flex';
+  input = '';
+  dots();
+  document.getElementById('pin-msg').textContent = '';
+}
 
-            function unlockVault() {
-                try {
-                    window.sessionStorage.setItem(UNLOCK_KEY, String(Date.now()));
-                } catch (_) {
-                    // ignore
-                }
-                gateShell.hidden = true;
-                vaultShell.classList.add('ready');
-            }
+const entries = [
+  { id:1, naam:'Hostinger', url:'hostinger.com', user:'beheer@softora.nl', pw:'H0st!nger24', cat:'Hosting' },
+  { id:2, naam:'TransIP', url:'transip.nl', user:'admin@softora.nl', pw:'Tr@nsIP2026!', cat:'Hosting' },
+  { id:3, naam:'Google Workspace', url:'workspace.google.com', user:'info@softora.nl', pw:'G00gl3Work!', cat:'Tools' },
+  { id:4, naam:'Instagram', url:'instagram.com', user:'@softora.nl', pw:'Insta$oft24', cat:'Socials' },
+  { id:5, naam:'LinkedIn', url:'linkedin.com', user:'info@softora.nl', pw:'Link3dIn!26', cat:'Socials' },
+];
 
-            function getVisibleEntries() {
-                const query = state.query.trim().toLowerCase();
-                return state.entries.filter((entry) => {
-                    if (!query) return true;
-                    return [
-                        entry.platform,
-                        entry.label,
-                        entry.username,
-                        entry.url,
-                        entry.notes
-                    ].join(' ').toLowerCase().includes(query);
-                });
-            }
+const cats = ['Alle', ...new Set(entries.map((e) => e.cat))];
+let activeCat = 'Alle';
+const visible = {};
 
-            function renderEntries() {
-                const visible = getVisibleEntries();
-                entryCountBadge.textContent = `${state.entries.length} items`;
-                if (!visible.length) {
-                    entryList.innerHTML = '<div class="empty-state">Geen toegangen gevonden voor deze zoekopdracht.</div>';
-                    return;
-                }
+function renderCats() {
+  document.getElementById('cat-bar').innerHTML = cats.map((c) =>
+    `<button class="cat-pill ${c === activeCat ? 'active' : ''}" onclick="setCat('${c}')">${c}</button>`
+  ).join('');
+}
 
-                entryList.innerHTML = visible.map((entry) => {
-                    const passwordText = revealed.has(entry.id)
-                        ? entry.password
-                        : '•'.repeat(Math.max(8, String(entry.password || '').length));
-                    const notesHtml = entry.notes
-                        ? `<div style="color:var(--text-secondary);line-height:1.6;">${entry.notes}</div>`
-                        : '';
-                    const urlHtml = entry.url
-                        ? `<a href="${entry.url}" target="_blank" rel="noreferrer" style="color:#8f2360;text-decoration:none;">${entry.url}</a>`
-                        : '<span style="color:var(--text-tertiary);">Geen URL gekoppeld</span>';
-                    return `
-                        <article class="entry-card">
-                            <div class="entry-top">
-                                <div>
-                                    <div class="entry-name">${entry.label}</div>
-                                    <div class="entry-platform">${entry.platform}</div>
-                                </div>
-                                <div class="entry-meta">
-                                    <span class="entry-chip">Bijgewerkt ${formatDate(entry.updatedAt)}</span>
-                                    <span class="entry-chip">${entry.username}</span>
-                                </div>
-                            </div>
-                            <div class="entry-password">${passwordText}</div>
-                            <div class="entry-meta">
-                                ${urlHtml}
-                            </div>
-                            ${notesHtml}
-                            <div class="entry-actions">
-                                <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
-                                    <button class="small-btn" type="button" data-reveal-id="${entry.id}">${revealed.has(entry.id) ? 'Verberg' : 'Toon wachtwoord'}</button>
-                                    <button class="small-btn" type="button" data-copy-id="${entry.id}">Kopieer</button>
-                                </div>
-                                <button class="small-btn" type="button" data-remove-id="${entry.id}">Verwijder</button>
-                            </div>
-                        </article>
-                    `;
-                }).join('');
+function setCat(c) {
+  activeCat = c;
+  renderCats();
+  render();
+}
 
-                entryList.querySelectorAll('[data-reveal-id]').forEach((button) => {
-                    button.addEventListener('click', function () {
-                        const id = String(this.getAttribute('data-reveal-id') || '');
-                        if (revealed.has(id)) revealed.delete(id);
-                        else revealed.add(id);
-                        renderEntries();
-                    });
-                });
+function render() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = entries.filter((e) => {
+    const matchCat = activeCat === 'Alle' || e.cat === activeCat;
+    const matchQ = !q || e.naam.toLowerCase().includes(q) || e.user.toLowerCase().includes(q);
+    return matchCat && matchQ;
+  });
+  const list = document.getElementById('list');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">Geen resultaten gevonden.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map((e) => {
+    const show = visible[e.id];
+    return `<div class="t-row">
+      <div class="t-name">
+        <div class="t-favicon">${e.naam[0].toUpperCase()}</div>
+        <div>
+          <div class="t-label">${e.naam}</div>
+          <div class="t-url">${e.url}</div>
+        </div>
+      </div>
+      <div class="t-user">${e.user}</div>
+      <div class="t-pw-wrap">
+        <span class="t-pw ${show ? '' : 'hidden'}" id="pw-${e.id}">${show ? e.pw : '••••••••••'}</span>
+        <button class="btn-copy" onclick="toggleVis(${e.id})" title="${show ? 'Verbergen' : 'Tonen'}">
+          ${show
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+          }
+        </button>
+      </div>
+      <button class="btn-copy" id="copy-${e.id}" onclick="copy(${e.id})" title="Kopieer wachtwoord">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
 
-                entryList.querySelectorAll('[data-copy-id]').forEach((button) => {
-                    button.addEventListener('click', async function () {
-                        const id = String(this.getAttribute('data-copy-id') || '');
-                        const entry = state.entries.find((item) => item.id === id);
-                        if (!entry) return;
-                        try {
-                            await navigator.clipboard.writeText(entry.password);
-                            this.textContent = 'Gekopieerd';
-                            setTimeout(() => {
-                                this.textContent = 'Kopieer';
-                            }, 1200);
-                        } catch (_) {
-                            this.textContent = 'Kopiëren mislukt';
-                        }
-                    });
-                });
+function toggleVis(id) {
+  visible[id] = !visible[id];
+  render();
+}
 
-                entryList.querySelectorAll('[data-remove-id]').forEach((button) => {
-                    button.addEventListener('click', function () {
-                        const id = String(this.getAttribute('data-remove-id') || '');
-                        state.entries = state.entries.filter((entry) => entry.id !== id);
-                        revealed.delete(id);
-                        saveEntries();
-                        renderEntries();
-                    });
-                });
-            }
+function copy(id) {
+  const e = entries.find((entry) => entry.id === id);
+  if (!e) return;
+  navigator.clipboard.writeText(e.pw).then(() => {
+    const btn = document.getElementById(`copy-${id}`);
+    if (btn) {
+      btn.classList.add('copied');
+      setTimeout(() => btn.classList.remove('copied'), 1200);
+    }
+    toast('✓ Wachtwoord gekopieerd');
+  });
+}
 
-            verifyBtn.addEventListener('click', function () {
-                const answer = Number(challengeInput.value || 0);
-                if (!privateCheck.checked) {
-                    gateFeedback.textContent = 'Bevestig eerst dat je in een privé-omgeving zit.';
-                    return;
-                }
-                if (answer !== challengeAnswer) {
-                    gateFeedback.textContent = 'De verificatie klopt niet. Probeer het opnieuw.';
-                    buildChallenge();
-                    return;
-                }
-                unlockVault();
-                renderEntries();
-            });
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
 
-            refreshChallengeBtn.addEventListener('click', buildChallenge);
-
-            searchInput.addEventListener('input', function () {
-                state.query = String(this.value || '');
-                renderEntries();
-            });
-
-            vaultForm.addEventListener('submit', function (event) {
-                event.preventDefault();
-                state.entries.unshift({
-                    id: `pw-${Date.now()}`,
-                    platform: document.getElementById('platformInput').value.trim(),
-                    label: document.getElementById('labelInput').value.trim(),
-                    username: document.getElementById('usernameInput').value.trim(),
-                    password: document.getElementById('passwordInput').value.trim(),
-                    url: document.getElementById('urlInput').value.trim(),
-                    notes: document.getElementById('notesInput').value.trim(),
-                    updatedAt: Date.now()
-                });
-                saveEntries();
-                vaultForm.reset();
-                renderEntries();
-            });
-
-            loadEntries();
-            buildChallenge();
-            if (hasValidUnlock()) {
-                unlockVault();
-                renderEntries();
-            }
-        })();
-    </script>
+renderCats();
+render();
+</script>
 </body>
 </html>

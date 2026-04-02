@@ -1,543 +1,492 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="/assets/iphone-optimizations.css">
-<title>Softora | Maandelijkse kosten</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
-    <script>
-        (function () {
-            document.documentElement.setAttribute("data-personnel-loading", "true");
-            try {
-                document.documentElement.setAttribute("data-theme-mode", "light");
-                document.documentElement.setAttribute("data-theme", "light");
-            } catch (error) {
-                /* ignore storage errors */
-            }
-        })();
-    </script>
-    <script src="assets/personnel-theme.js?v=20260402-3" defer></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maandelijkse Kosten – Softora.nl</title>
+<link rel="stylesheet" href="/assets/iphone-optimizations.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260401-3">
+<script>
+  (function () {
+    document.documentElement.setAttribute("data-personnel-loading", "true");
+    try {
+      document.documentElement.setAttribute("data-theme-mode", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    } catch (_) {
+      /* ignore */
+    }
+  })();
+</script>
+<script src="assets/personnel-theme.js?v=20260402-4" defer></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f0ede8;
+  --crimson: #9b2355;
+  --crimson-light: #c4346a;
+  --text-dark: #1a1a2e;
+  --text-mid: #555;
+  --text-light: #999;
+  --border: #e2ddd6;
+  --card: #ffffff;
+  --tag: #f5f0eb;
+  --red: #c0392b;
+  --green: #16733c;
+}
+body {
+  font-family: 'Barlow', sans-serif;
+  background: var(--bg);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+.dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 320px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 100;
+}
+.main-content {
+  margin-left: 320px;
+  width: calc(100% - 320px);
+  min-height: 100vh;
+  padding: 48px;
+}
+.page-shell {
+  width: min(1260px, 100%);
+}
 
-        body {
-            font-family: 'Inter', sans-serif;
-            color: var(--text-primary);
-            background: var(--bg-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 36px;
+  gap: 16px;
+}
+.logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  margin-bottom: 6px;
+}
+.page-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.page-sub { font-size: 13px; color: var(--text-light); margin-top: 3px; }
 
-        .dashboard-layout {
-            display: flex;
-            min-height: 100vh;
-        }
+.totals-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.totaal-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 22px;
+}
+.totaal-card.accent { border-color: var(--crimson); border-width: 2px; }
+.totaal-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 8px;
+}
+.totaal-amount {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+.totaal-amount.red { color: var(--red); }
+.totaal-amount.green { color: var(--green); }
+.totaal-note { font-size: 11px; color: var(--text-light); margin-top: 4px; }
 
-        .sidebar {
-            width: 320px;
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            z-index: 100;
-            display: flex;
-            flex-direction: column;
-        }
+.category {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.category-header {
+  padding: 13px 20px;
+  background: var(--tag);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.category-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.category-total {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
 
-        .main-content {
-            margin-left: 320px;
-            width: calc(100% - 320px);
-            min-height: 100vh;
-            padding: clamp(1.2rem, 2.4vw, 2rem);
-        }
+.cost-row {
+  display: grid;
+  grid-template-columns: 1fr 120px 110px 90px;
+  align-items: center;
+  gap: 0;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.cost-row:last-child { border-bottom: none; }
+.cost-row:hover { background: var(--tag); }
+.cost-row.head {
+  padding: 7px 20px;
+  background: var(--tag);
+  border-bottom: 1px solid var(--border);
+}
+.cost-row.head span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
 
-        .costs-shell {
-            width: min(1280px, 100%);
-            margin: 0 auto;
-            display: grid;
-            gap: 1rem;
-        }
+.cost-name { font-size: 13px; font-weight: 600; color: var(--text-dark); }
+.cost-note { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.cost-freq { font-size: 11px; color: var(--text-light); }
+.cost-amount { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-dark); }
+.cost-status { justify-self: end; }
+.status-pill {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+.pill-active { background: rgba(22,115,60,.1); color: var(--green); }
+.pill-pause { background: rgba(180,90,0,.1); color: #b45a00; }
+.pill-yearly { background: rgba(155,35,85,.1); color: var(--crimson); }
 
-        .costs-head {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 1rem;
-        }
+.add-row {
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px dashed var(--border);
+}
+.add-inputs {
+  display: grid;
+  grid-template-columns: 1fr 120px 110px 90px;
+  gap: 8px;
+  flex: 1;
+}
+.add-inputs input, .add-inputs select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  color: var(--text-dark);
+  background: var(--bg);
+  outline: none;
+  width: 100%;
+  transition: border-color .15s;
+}
+.add-inputs input:focus,
+.add-inputs select:focus { border-color: var(--crimson); background: #fff; }
+.btn-add {
+  padding: 7px 14px;
+  background: var(--crimson);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-add:hover { background: var(--crimson-light); }
 
-        .costs-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: clamp(2.45rem, 3vw, 3.2rem);
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            line-height: 1;
-        }
+.btn-del {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s;
+  padding: 0;
+}
+.btn-del:hover { color: var(--red); }
+.btn-del svg { width: 13px; height: 13px; }
 
-        .costs-subtitle {
-            margin-top: 0.4rem;
-            color: var(--text-secondary);
-            font-size: 1.02rem;
-        }
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--text-dark);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all .25s;
+  pointer-events: none;
+  z-index: 99;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
 
-        .add-row-btn {
-            border: 1px solid var(--border);
-            background: #fff;
-            color: var(--text-primary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.02rem;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            border-radius: 12px;
-            padding: 0.7rem 1.05rem;
-            cursor: pointer;
-            transition: border-color 0.2s ease, background 0.2s ease;
-            white-space: nowrap;
-        }
+@media (max-width: 1100px) {
+  .sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    padding: 24px;
+  }
+  .totals-row {
+    grid-template-columns: 1fr;
+  }
+}
 
-        .add-row-btn:hover {
-            border-color: rgba(143, 35, 96, 0.35);
-            background: rgba(143, 35, 96, 0.05);
-        }
-
-        .costs-table-card {
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            box-shadow: 0 14px 40px rgba(20, 18, 34, 0.05);
-            overflow: hidden;
-        }
-
-        .table-scroll {
-            overflow-x: auto;
-            width: 100%;
-        }
-
-        .costs-table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 980px;
-        }
-
-        .costs-table thead th {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.88rem;
-            letter-spacing: 0.09em;
-            text-transform: uppercase;
-            color: var(--text-tertiary);
-            text-align: left;
-            padding: 1rem 1rem 0.8rem;
-            border-bottom: 1px solid var(--border);
-            background: rgba(248, 248, 251, 0.88);
-            white-space: nowrap;
-        }
-
-        .costs-table tbody td {
-            padding: 0.55rem 1rem;
-            border-bottom: 1px solid rgba(180, 182, 195, 0.32);
-            vertical-align: middle;
-        }
-
-        .costs-table tbody tr:last-child td {
-            border-bottom: 0;
-        }
-
-        .cost-input {
-            width: 100%;
-            min-height: 45px;
-            padding: 0.7rem 0.75rem;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            font-size: 1rem;
-            color: var(--text-primary);
-            background: #fff;
-            outline: none;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .cost-input:focus {
-            border-color: rgba(143, 35, 96, 0.42);
-            box-shadow: 0 0 0 3px rgba(143, 35, 96, 0.1);
-        }
-
-        .remove-row-btn {
-            border: 1px solid var(--border);
-            background: #fff;
-            color: #8f2360;
-            border-radius: 10px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            padding: 0.6rem 0.8rem;
-            cursor: pointer;
-            transition: background 0.2s ease, border-color 0.2s ease;
-        }
-
-        .remove-row-btn:hover {
-            border-color: rgba(143, 35, 96, 0.4);
-            background: rgba(143, 35, 96, 0.08);
-        }
-
-        .table-footer {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.8rem;
-            padding: 0.95rem 1rem 1rem;
-            border-top: 1px solid var(--border);
-            background: rgba(248, 248, 251, 0.7);
-        }
-
-        .total-monthly {
-            margin-left: auto;
-            display: inline-flex;
-            align-items: baseline;
-            gap: 0.55rem;
-            font-family: 'Oswald', sans-serif;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            font-size: 0.93rem;
-            color: var(--text-secondary);
-        }
-
-        .total-monthly strong {
-            color: var(--text-primary);
-            font-size: 1.4rem;
-            letter-spacing: 0.02em;
-        }
-
-        @media (max-width: 900px) {
-            .sidebar {
-                position: static;
-                width: 100%;
-                height: auto;
-            }
-
-            .main-content {
-                margin-left: 0;
-                width: 100%;
-                padding: 1rem;
-            }
-
-            .costs-head {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .table-footer {
-                flex-wrap: wrap;
-            }
-        }
-    </style>
+@media (max-width: 860px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .cost-row,
+  .add-inputs {
+    grid-template-columns: 1fr;
+  }
+  .cost-status {
+    justify-self: start;
+  }
+  .add-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+</style>
 </head>
 <body>
-    <div class="dashboard-layout">
-        <aside class="sidebar"></aside>
-        <main class="main-content">
-            <section class="costs-shell">
-                <header class="costs-head">
-                    <div>
-                        <h1 class="costs-title">Maandelijkse kosten</h1>
-                        <p class="costs-subtitle">Vul hier je producten en vaste maandelijkse kosten in rijen in.</p>
-                    </div>
-                    <button id="addRowTop" class="add-row-btn" type="button">+ Regel toevoegen</button>
-                </header>
+<div class="dashboard-layout">
+  <aside class="sidebar"></aside>
+  <main class="main-content">
+    <div class="page-shell">
+      <div class="header">
+        <div>
+          <div class="logo">SOFTORA.NL</div>
+          <div class="page-title">Maandelijkse Kosten</div>
+          <div class="page-sub">Overzicht van alle vaste lasten</div>
+        </div>
+        <div style="font-size:12px;color:var(--text-light)" id="last-updated"></div>
+      </div>
 
-                <article class="costs-table-card">
-                    <div class="table-scroll">
-                        <table class="costs-table" aria-label="Maandelijkse kosten overzicht">
-                            <thead>
-                                <tr>
-                                    <th style="width: 30%">Product / dienst</th>
-                                    <th style="width: 22%">Categorie</th>
-                                    <th style="width: 18%">Kosten p/m (EUR)</th>
-                                    <th style="width: 25%">Notitie</th>
-                                    <th style="width: 5%"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="monthlyCostsRows"></tbody>
-                        </table>
-                    </div>
-                    <footer class="table-footer">
-                        <button id="addRowBottom" class="add-row-btn" type="button">+ Regel toevoegen</button>
-                        <div class="total-monthly">
-                            <span>Totaal per maand</span>
-                            <strong id="monthlyTotal">EUR 0,00</strong>
-                        </div>
-                    </footer>
-                </article>
-            </section>
-        </main>
+      <div class="totals-row">
+        <div class="totaal-card accent">
+          <div class="totaal-label">Totaal per maand</div>
+          <div class="totaal-amount red" id="totaal-maand">€0,00</div>
+          <div class="totaal-note">Alle actieve kosten</div>
+        </div>
+        <div class="totaal-card">
+          <div class="totaal-label">Per jaar (schatting)</div>
+          <div class="totaal-amount" id="totaal-jaar">€0,00</div>
+          <div class="totaal-note">Maandbedrag × 12</div>
+        </div>
+        <div class="totaal-card">
+          <div class="totaal-label">Aantal posten</div>
+          <div class="totaal-amount" id="totaal-posten">0</div>
+          <div class="totaal-note">Actieve kostenposten</div>
+        </div>
+      </div>
+
+      <div id="categories-wrap"></div>
     </div>
+  </main>
+</div>
 
-    <script>
-        (function () {
-            const REMOTE_SCOPE = 'premium_monthly_costs';
-            const REMOTE_KEY = 'softora_premium_monthly_cost_rows_v1';
-            const tbody = document.getElementById('monthlyCostsRows');
-            const totalEl = document.getElementById('monthlyTotal');
-            const addRowTop = document.getElementById('addRowTop');
-            const addRowBottom = document.getElementById('addRowBottom');
+<div class="toast" id="toast"></div>
 
-            if (!tbody || !totalEl || !addRowTop || !addRowBottom) return;
+<script>
+let data = {
+  'Hosting & Domeinen': [
+    { id:1, naam:'Hostinger VPS', note:'Webhosting server', freq:'maandelijks', bedrag:9.99, status:'active' },
+    { id:2, naam:'softora.nl domein', note:'Jaarlijkse verlenging', freq:'jaarlijks', bedrag:1.25, status:'yearly' },
+    { id:3, naam:'TransIP backup', note:'Extra opslag', freq:'maandelijks', bedrag:3.00, status:'active' },
+  ],
+  'Software & Tools': [
+    { id:4, naam:'Adobe Creative Cloud', note:'Photoshop, Illustrator', freq:'maandelijks', bedrag:59.99, status:'active' },
+    { id:5, naam:'ChatGPT Plus', note:'AI assistent', freq:'maandelijks', bedrag:20.00, status:'active' },
+    { id:6, naam:'Figma Pro', note:'Design tool', freq:'maandelijks', bedrag:15.00, status:'active' },
+    { id:7, naam:'Notion', note:'Project management', freq:'maandelijks', bedrag:8.00, status:'pause' },
+  ],
+  'Marketing & SEO': [
+    { id:8, naam:'Google Workspace', note:'Gmail, Drive, Docs', freq:'maandelijks', bedrag:6.00, status:'active' },
+    { id:9, naam:'Ubersuggest', note:'SEO tool', freq:'maandelijks', bedrag:12.00, status:'active' },
+  ],
+  'Overig': [
+    { id:10, naam:'Boekhoudpakket', note:'Administratie software', freq:'maandelijks', bedrag:18.00, status:'active' },
+  ],
+};
+let nextId = 20;
 
-            const euroFormatter = new Intl.NumberFormat('nl-NL', {
-                style: 'currency',
-                currency: 'EUR',
-            });
+const freqLabel = { maandelijks:'Maandelijks', jaarlijks:'Jaarlijks', kwartaal:'Per kwartaal' };
+const statusLabel = { active:'Actief', pause:'Gepauzeerd', yearly:'Jaarlijks' };
+const statusClass = { active:'pill-active', pause:'pill-pause', yearly:'pill-yearly' };
 
-            function newRow(overrides) {
-                const input = overrides && typeof overrides === 'object' ? overrides : {};
-                return {
-                    id: String(input.id || ('row_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9))),
-                    product: String(input.product || ''),
-                    category: String(input.category || ''),
-                    amount: String(input.amount || ''),
-                    note: String(input.note || ''),
-                };
-            }
+function catKey(cat) {
+  return String(cat).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
 
-            function normalizeRows(rawRows) {
-                if (!Array.isArray(rawRows)) return [newRow()];
-                const cleaned = rawRows
-                    .filter(function (row) { return row && typeof row === 'object'; })
-                    .map(function (row) { return newRow(row); })
-                    .slice(0, 200);
-                return cleaned.length ? cleaned : [newRow()];
-            }
+function toMonthly(item) {
+  if (item.status === 'pause') return 0;
+  if (item.freq === 'jaarlijks') return item.bedrag;
+  if (item.freq === 'kwartaal') return item.bedrag / 3;
+  return item.bedrag;
+}
 
-            async function fetchUiStateGet(scope) {
-                const encodedScope = encodeURIComponent(String(scope || ''));
-                const urls = [
-                    `/api/ui-state-get?scope=${encodedScope}`,
-                    `/api/ui-state/${encodedScope}`
-                ];
-                let lastError = null;
+function fmtEur(n) {
+  return '€' + n.toLocaleString('nl-NL', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
 
-                for (const url of urls) {
-                    try {
-                        const res = await fetch(url, { method: 'GET', cache: 'no-store' });
-                        if (!res.ok) throw new Error(`UI-state GET mislukt (${res.status})`);
-                        return await res.json().catch(function () { return {}; });
-                    } catch (error) {
-                        lastError = error;
-                    }
-                }
+function updateTotals() {
+  let total = 0;
+  let count = 0;
+  Object.values(data).flat().forEach((item) => {
+    total += toMonthly(item);
+    if (item.status !== 'pause') count++;
+  });
+  document.getElementById('totaal-maand').textContent = fmtEur(total);
+  document.getElementById('totaal-jaar').textContent = fmtEur(total * 12);
+  document.getElementById('totaal-posten').textContent = count;
+}
 
-                throw lastError || new Error('UI-state GET mislukt');
-            }
+function render() {
+  const wrap = document.getElementById('categories-wrap');
+  wrap.innerHTML = '';
 
-            async function fetchUiStateSet(scope, body) {
-                const encodedScope = encodeURIComponent(String(scope || ''));
-                const urls = [
-                    `/api/ui-state-set?scope=${encodedScope}`,
-                    `/api/ui-state/${encodedScope}`
-                ];
-                let lastError = null;
+  Object.entries(data).forEach(([cat, items]) => {
+    const catTotal = items.reduce((s, i) => s + toMonthly(i), 0);
+    const key = catKey(cat);
+    const block = document.createElement('div');
+    block.className = 'category';
+    block.innerHTML = `
+      <div class="category-header">
+        <div class="category-title">${cat}</div>
+        <div class="category-total">${fmtEur(catTotal)}<span style="font-size:11px;font-weight:400;color:var(--text-light);margin-left:4px">/mnd</span></div>
+      </div>
+      <div class="cost-row head">
+        <span>Post</span><span>Frequentie</span><span>Bedrag</span><span style="text-align:right">Status</span>
+      </div>
+      <div id="rows-${key}">
+        ${items.map((item) => `
+          <div class="cost-row" id="item-${item.id}">
+            <div>
+              <div class="cost-name">${item.naam}</div>
+              <div class="cost-note">${item.note}</div>
+            </div>
+            <div class="cost-freq">${freqLabel[item.freq]}</div>
+            <div class="cost-amount">${fmtEur(item.bedrag)}</div>
+            <div class="cost-status" style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+              <span class="status-pill ${statusClass[item.status]}">${statusLabel[item.status]}</span>
+              <button class="btn-del" onclick="deleteItem(${JSON.stringify(cat)},${item.id})" title="Verwijderen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+              </button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="add-row">
+        <div class="add-inputs">
+          <input type="text" placeholder="Naam" id="new-naam-${key}">
+          <select id="new-freq-${key}">
+            <option value="maandelijks">Maandelijks</option>
+            <option value="jaarlijks">Jaarlijks</option>
+            <option value="kwartaal">Per kwartaal</option>
+          </select>
+          <input type="number" placeholder="Bedrag" step="0.01" min="0" id="new-bedrag-${key}">
+          <select id="new-status-${key}">
+            <option value="active">Actief</option>
+            <option value="pause">Gepauzeerd</option>
+            <option value="yearly">Jaarlijks</option>
+          </select>
+        </div>
+        <button class="btn-add" onclick="addItem(${JSON.stringify(cat)})">+ Toevoegen</button>
+      </div>`;
+    wrap.appendChild(block);
+  });
 
-                for (const url of urls) {
-                    try {
-                        const res = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(body || {})
-                        });
-                        if (!res.ok) throw new Error(`UI-state POST mislukt (${res.status})`);
-                        return await res.json().catch(function () { return {}; });
-                    } catch (error) {
-                        lastError = error;
-                    }
-                }
+  updateTotals();
+}
 
-                throw lastError || new Error('UI-state POST mislukt');
-            }
+function addItem(cat) {
+  const key = catKey(cat);
+  const naam = document.getElementById(`new-naam-${key}`).value.trim();
+  const freq = document.getElementById(`new-freq-${key}`).value;
+  const bedrag = parseFloat(document.getElementById(`new-bedrag-${key}`).value);
+  const status = document.getElementById(`new-status-${key}`).value;
+  if (!naam || isNaN(bedrag) || bedrag <= 0) return showToast('Vul naam en bedrag in');
+  data[cat].push({ id: nextId++, naam, note: '', freq, bedrag, status });
+  render();
+  showToast('✓ ' + naam + ' toegevoegd');
+}
 
-            async function loadRows() {
-                try {
-                    const state = await fetchUiStateGet(REMOTE_SCOPE);
-                    const raw = String(state && state.values && state.values[REMOTE_KEY] || '');
-                    if (!raw) return [newRow()];
-                    return normalizeRows(JSON.parse(raw));
-                } catch (error) {
-                    console.error('Maandelijkse kosten laden via Supabase mislukt:', error);
-                    return [newRow()];
-                }
-            }
+function deleteItem(cat, id) {
+  data[cat] = data[cat].filter((i) => i.id !== id);
+  render();
+  showToast('✓ Post verwijderd');
+}
 
-            let rows = [newRow()];
-            let saveTimer = 0;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
 
-            async function saveRows() {
-                try {
-                    await fetchUiStateSet(REMOTE_SCOPE, {
-                        patch: {
-                            [REMOTE_KEY]: JSON.stringify(rows)
-                        },
-                        source: 'premium-maandelijkse-kosten',
-                        actor: 'browser'
-                    });
-                } catch (error) {
-                    console.error('Maandelijkse kosten opslaan via Supabase mislukt:', error);
-                }
-            }
+const now = new Date();
+document.getElementById('last-updated').textContent =
+  'Bijgewerkt: ' + now.toLocaleDateString('nl-NL', { day:'numeric', month:'long', year:'numeric' });
 
-            function scheduleSave() {
-                window.clearTimeout(saveTimer);
-                saveTimer = window.setTimeout(function () {
-                    void saveRows();
-                }, 240);
-            }
-
-            function normalizeAmount(value) {
-                const normalized = String(value || '')
-                    .replace(/\s+/g, '')
-                    .replace(',', '.')
-                    .replace(/[^0-9.-]/g, '');
-                const parsed = Number.parseFloat(normalized);
-                if (!Number.isFinite(parsed)) return 0;
-                return Math.max(parsed, 0);
-            }
-
-            function buildInput(field, value, placeholder) {
-                const input = document.createElement('input');
-                input.className = 'cost-input';
-                input.type = 'text';
-                input.dataset.field = field;
-                input.value = value;
-                input.placeholder = placeholder;
-                input.autocomplete = 'off';
-                return input;
-            }
-
-            function render() {
-                tbody.innerHTML = '';
-
-                rows.forEach(function (row) {
-                    const tr = document.createElement('tr');
-                    tr.dataset.rowId = row.id;
-
-                    const productCell = document.createElement('td');
-                    productCell.appendChild(buildInput('product', row.product, 'Bijv. Retell AI licentie'));
-                    tr.appendChild(productCell);
-
-                    const categoryCell = document.createElement('td');
-                    categoryCell.appendChild(buildInput('category', row.category, 'Bijv. Software'));
-                    tr.appendChild(categoryCell);
-
-                    const amountCell = document.createElement('td');
-                    amountCell.appendChild(buildInput('amount', row.amount, '0,00'));
-                    tr.appendChild(amountCell);
-
-                    const noteCell = document.createElement('td');
-                    noteCell.appendChild(buildInput('note', row.note, 'Optioneel'));
-                    tr.appendChild(noteCell);
-
-                    const removeCell = document.createElement('td');
-                    const removeButton = document.createElement('button');
-                    removeButton.type = 'button';
-                    removeButton.className = 'remove-row-btn';
-                    removeButton.textContent = 'X';
-                    removeButton.dataset.removeRow = row.id;
-                    removeButton.setAttribute('aria-label', 'Verwijder regel');
-                    removeCell.appendChild(removeButton);
-                    tr.appendChild(removeCell);
-
-                    tbody.appendChild(tr);
-                });
-
-                const total = rows.reduce(function (sum, row) {
-                    return sum + normalizeAmount(row.amount);
-                }, 0);
-                totalEl.textContent = euroFormatter.format(total);
-            }
-
-            function addRow() {
-                rows.push(newRow());
-                render();
-                scheduleSave();
-                const lastProductInput = tbody.querySelector('tr:last-child input[data-field="product"]');
-                if (lastProductInput) lastProductInput.focus();
-            }
-
-            async function removeRow(rowId) {
-                if (!rowId) return;
-
-                let approved = true;
-                if (window.SoftoraDialog && typeof window.SoftoraDialog.confirm === 'function') {
-                    approved = await window.SoftoraDialog.confirm('Weet je zeker dat je deze kostenregel wilt verwijderen?', {
-                        title: 'Regel verwijderen',
-                        confirmText: 'Verwijderen',
-                        cancelText: 'Annuleren',
-                    });
-                }
-                if (!approved) return;
-
-                rows = rows.filter(function (row) {
-                    return row.id !== rowId;
-                });
-
-                if (!rows.length) {
-                    rows = [newRow()];
-                }
-
-                render();
-                scheduleSave();
-            }
-
-            tbody.addEventListener('input', function (event) {
-                const target = event.target;
-                if (!(target instanceof HTMLInputElement)) return;
-
-                const field = String(target.dataset.field || '');
-                if (!field) return;
-
-                const rowElement = target.closest('tr[data-row-id]');
-                const rowId = rowElement ? String(rowElement.dataset.rowId || '') : '';
-                if (!rowId) return;
-
-                const row = rows.find(function (item) {
-                    return item.id === rowId;
-                });
-                if (!row) return;
-
-                row[field] = target.value;
-                const total = rows.reduce(function (sum, item) {
-                    return sum + normalizeAmount(item.amount);
-                }, 0);
-                totalEl.textContent = euroFormatter.format(total);
-                scheduleSave();
-            });
-
-            tbody.addEventListener('click', function (event) {
-                const target = event.target;
-                if (!(target instanceof Element)) return;
-                const btn = target.closest('[data-remove-row]');
-                if (!btn) return;
-                event.preventDefault();
-                const rowId = String(btn.getAttribute('data-remove-row') || '');
-                removeRow(rowId);
-            });
-
-            addRowTop.addEventListener('click', function () {
-                addRow();
-            });
-
-            addRowBottom.addEventListener('click', function () {
-                addRow();
-            });
-
-            window.addEventListener('beforeunload', function () {
-                window.clearTimeout(saveTimer);
-                saveRows();
-            });
-
-            (async function bootstrapRows() {
-                rows = await loadRows();
-                render();
-            })();
-        })();
-    </script>
+render();
+</script>
 </body>
 </html>
