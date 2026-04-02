@@ -5874,18 +5874,144 @@ function sanitizeAppointmentWhatsappInfo(value) {
   return truncateText(normalizeString(value || ''), 6000);
 }
 
-function buildLeadToAgendaSummary(baseSummary, location, whatsappInfo) {
+function buildLeadToAgendaSummaryFallback(baseSummary, location, whatsappInfo) {
   const parts = [];
-  const summaryText = normalizeString(baseSummary || '');
+  const summaryText = truncateText(normalizeString(baseSummary || ''), 2600);
   const locationText = sanitizeAppointmentLocation(location || '');
   const whatsappText = sanitizeAppointmentWhatsappInfo(whatsappInfo || '');
 
-  if (summaryText) parts.push(summaryText);
-  if (locationText) parts.push(`Locatie afspraak: ${locationText}`);
-  if (whatsappText) parts.push(`Overige info uit WhatsApp:\n${whatsappText}`);
+  if (summaryText) {
+    parts.push(summaryText);
+  } else {
+    parts.push('De lead is ingepland voor verdere opvolging vanuit het leads-overzicht.');
+  }
+  if (locationText) {
+    parts.push(`De afspraak staat ingepland op locatie ${locationText}.`);
+  }
+  if (whatsappText) {
+    parts.push(`Aanvullend is via WhatsApp bevestigd: ${whatsappText}.`);
+  }
 
-  const merged = parts.join('\n\n');
-  return truncateText(merged, 4000) || 'Lead handmatig ingepland vanuit Leads.';
+  return truncateText(parts.join('\n\n'), 4000) || 'Lead handmatig ingepland vanuit Leads.';
+}
+
+function agendaSummaryNeedsRefresh(summary, whatsappInfo, summaryFormatVersion = 0) {
+  const summaryText = normalizeString(summary || '');
+  const whatsappText = sanitizeAppointmentWhatsappInfo(whatsappInfo || '');
+  const version = Number(summaryFormatVersion || 0);
+
+  if (!summaryText && !whatsappText) return false;
+  if (summaryContainsEnglishMarkers(summaryText)) return true;
+  if (/overige info uit whatsapp/i.test(summaryText)) return true;
+  if (whatsappText && version < 2) return true;
+  return false;
+}
+
+async function buildLeadToAgendaSummary(baseSummary, location, whatsappInfo) {
+  const summaryText = truncateText(normalizeString(baseSummary || ''), 2600);
+  const locationText = sanitizeAppointmentLocation(location || '');
+  const whatsappText = sanitizeAppointmentWhatsappInfo(whatsappInfo || '');
+  const fallback = buildLeadToAgendaSummaryFallback(summaryText, locationText, whatsappText);
+
+  if (!getOpenAiApiKey()) return fallback;
+  if (!summaryText && !locationText && !whatsappText) return fallback;
+
+  const sourceText = [
+    summaryText ? `Bestaande leadsamenvatting:\n${summaryText}` : '',
+    locationText ? `Afspraaklocatie:\n${locationText}` : '',
+    whatsappText ? `Aanvullende bevestiging uit WhatsApp:\n${whatsappText}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  try {
+    const result = await generateTextSummaryWithAi({
+      text: sourceText,
+      style: 'medium',
+      language: 'nl',
+      maxSentences: 4,
+      extraInstructions: [
+        'Schrijf uitsluitend in natuurlijk Nederlands.',
+        'Maak een korte agendasamenvatting voor Softora in doorlopende tekst.',
+        'Verwerk locatie en eventuele extra informatie uit WhatsApp natuurlijk in dezelfde samenvatting.',
+        'Noem niet apart "Overige info uit WhatsApp".',
+        'Gebruik geen koppen, bullets, labels of Engelstalige formuleringen.',
+      ].join(' '),
+    });
+    return truncateText(normalizeString(result?.summary || ''), 4000) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function refreshGeneratedAgendaAppointmentSummaryAtIndex(idx, reason = 'agenda_summary_refresh') {
+  if (!Number.isInteger(idx) || idx < 0 || idx >= generatedAgendaAppointments.length) return null;
+
+  const appointment = generatedAgendaAppointments[idx];
+  if (!appointment || !agendaSummaryNeedsRefresh(appointment?.summary, appointment?.whatsappInfo, appointment?.summaryFormatVersion)) {
+    return appointment || null;
+  }
+
+  const nextSummary = await buildLeadToAgendaSummary(
+    appointment?.summary,
+    appointment?.location || appointment?.appointmentLocation || '',
+    appointment?.whatsappInfo || appointment?.whatsappNotes || appointment?.whatsapp || ''
+  );
+  const currentSummary = normalizeString(appointment?.summary || '');
+  const currentVersion = Number(appointment?.summaryFormatVersion || 0);
+  if (nextSummary === currentSummary && currentVersion >= 2) {
+    return appointment;
+  }
+
+  return setGeneratedAgendaAppointmentAtIndex(
+    idx,
+    {
+      ...appointment,
+      summary: nextSummary,
+      summaryFormatVersion: 2,
+    },
+    reason
+  );
+}
+
+async function refreshGeneratedAgendaSummariesIfNeeded(limit = 24) {
+  const candidateIndexes = generatedAgendaAppointments
+    .map((appointment, idx) => ({ appointment, idx }))
+    .filter(({ appointment }) => isGeneratedAppointmentConfirmedForAgenda(appointment))
+    .filter(({ appointment }) =>
+      agendaSummaryNeedsRefresh(appointment?.summary, appointment?.whatsappInfo, appointment?.summaryFormatVersion)
+    )
+    .sort((a, b) => {
+      const aTs =
+        Date.parse(
+          normalizeString(
+            a.appointment?.updatedAt ||
+              a.appointment?.confirmationResponseReceivedAt ||
+              a.appointment?.confirmationEmailSentAt ||
+              a.appointment?.createdAt ||
+              ''
+          )
+        ) || 0;
+      const bTs =
+        Date.parse(
+          normalizeString(
+            b.appointment?.updatedAt ||
+              b.appointment?.confirmationResponseReceivedAt ||
+              b.appointment?.confirmationEmailSentAt ||
+              b.appointment?.createdAt ||
+              ''
+          )
+        ) || 0;
+      return bTs - aTs;
+    })
+    .slice(0, Math.max(1, limit));
+
+  let refreshed = 0;
+  for (const { idx } of candidateIndexes) {
+    const updated = await refreshGeneratedAgendaAppointmentSummaryAtIndex(idx, 'agenda_summary_autorefresh');
+    if (updated) refreshed += 1;
+  }
+  return refreshed;
 }
 
 function mapAppointmentToConfirmationTask(appointment) {
@@ -11033,6 +11159,7 @@ app.get('/api/agenda/appointments', async (req, res) => {
   if (isImapMailConfigured()) {
     await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
   }
+  await refreshGeneratedAgendaSummariesIfNeeded();
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 200)));
   const sorted = generatedAgendaAppointments
     .filter(isGeneratedAppointmentConfirmedForAgenda)
@@ -12334,6 +12461,7 @@ async function setInterestedLeadInAgendaResponse(req, res) {
   }
 
   const nowIso = new Date().toISOString();
+  const mergedSummary = await buildLeadToAgendaSummary(baseAppointment.summary, location, whatsappInfo);
   const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
     idx,
     {
@@ -12342,7 +12470,8 @@ async function setInterestedLeadInAgendaResponse(req, res) {
       time: appointmentTime,
       location: location || null,
       whatsappInfo: whatsappInfo || null,
-      summary: buildLeadToAgendaSummary(baseAppointment.summary, location, whatsappInfo),
+      summary: mergedSummary,
+      summaryFormatVersion: 2,
       needsConfirmationEmail: false,
       confirmationEmailSent: true,
       confirmationEmailSentAt: normalizeString(persistedAppointment?.confirmationEmailSentAt || '') || nowIso,
@@ -12738,7 +12867,7 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-sent', (req, res) => {
   });
 });
 
-function setLeadTaskInAgendaById(req, res, taskIdRaw) {
+async function setLeadTaskInAgendaById(req, res, taskIdRaw) {
   const idx = getGeneratedAppointmentIndexById(taskIdRaw);
   if (idx < 0) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
@@ -12779,6 +12908,7 @@ function setLeadTaskInAgendaById(req, res, taskIdRaw) {
   }
 
   const nowIso = new Date().toISOString();
+  const mergedSummary = await buildLeadToAgendaSummary(appointment?.summary, location, whatsappInfo);
   const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
     idx,
     {
@@ -12787,7 +12917,8 @@ function setLeadTaskInAgendaById(req, res, taskIdRaw) {
       time: appointmentTime,
       location: location || null,
       whatsappInfo: whatsappInfo || null,
-      summary: buildLeadToAgendaSummary(appointment?.summary, location, whatsappInfo),
+      summary: mergedSummary,
+      summaryFormatVersion: 2,
       needsConfirmationEmail: false,
       confirmationEmailSent: true,
       confirmationEmailSentAt: normalizeString(appointment?.confirmationEmailSentAt || '') || nowIso,
@@ -12825,12 +12956,12 @@ function setLeadTaskInAgendaById(req, res, taskIdRaw) {
   });
 }
 
-app.post('/api/agenda/confirmation-tasks/:id/set-in-agenda', (req, res) => {
+app.post('/api/agenda/confirmation-tasks/:id/set-in-agenda', async (req, res) => {
   return setLeadTaskInAgendaById(req, res, req.params.id);
 });
 
 // Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/agenda/lead-to-agenda', (req, res) => {
+app.post('/api/agenda/lead-to-agenda', async (req, res) => {
   return setLeadTaskInAgendaById(req, res, req.query.taskId);
 });
 

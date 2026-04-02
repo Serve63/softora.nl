@@ -347,6 +347,38 @@
             white-space: pre-line;
         }
 
+        .modal-audio-block {
+            margin-top: 1rem;
+            margin-bottom: 1.1rem;
+        }
+
+        .modal-audio-shell {
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            padding: 0.28rem 0.32rem;
+        }
+
+        .modal-audio-player {
+            width: 100%;
+            min-height: 40px;
+            height: 40px;
+            display: block;
+            background: transparent;
+            color-scheme: light;
+        }
+
+        .modal-audio-player::-webkit-media-controls-enclosure,
+        .modal-audio-player::-webkit-media-controls-panel {
+            background: var(--bg-primary);
+        }
+
+        .modal-audio-empty {
+            font-size: 0.78rem;
+            line-height: 1.45;
+            color: var(--text-tertiary);
+            padding: 0.35rem 0.4rem;
+        }
+
         .modal-workspace { display: none; }
         .modal-workspace.show { display: block; }
 
@@ -575,6 +607,54 @@
             .modal-details { grid-template-columns: 1fr; }
             .modal-workspace-grid { grid-template-columns: 1fr; }
         }
+
+        @media print {
+            body {
+                background: #fff !important;
+            }
+
+            .noise-overlay,
+            .cursor,
+            .cursor-dot,
+            .dashboard-layout,
+            .modal-close,
+            .modal-footer,
+            .modal-workspace,
+            .modal-audio-block {
+                display: none !important;
+            }
+
+            .modal-overlay,
+            .modal-overlay.show {
+                position: static !important;
+                inset: auto !important;
+                background: #fff !important;
+                backdrop-filter: none !important;
+                display: block !important;
+                opacity: 1 !important;
+                padding: 0 !important;
+            }
+
+            .modal {
+                width: 100% !important;
+                max-width: none !important;
+                max-height: none !important;
+                border: none !important;
+                box-shadow: none !important;
+                transform: none !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+
+            .modal-top,
+            .modal-body {
+                padding: 0 !important;
+            }
+
+            .modal-overview {
+                display: block !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -622,6 +702,13 @@
                 </div>
                 <div class="modal-summary-label">AI Samenvatting van Lead</div>
                 <div class="modal-summary" id="modalSummary">-</div>
+                <div class="modal-audio-block" id="modalAudioBlock">
+                    <div class="modal-summary-label">Gespreksopname</div>
+                    <div class="modal-audio-shell">
+                        <audio class="modal-audio-player" id="modalAudioPlayer" controls preload="none" hidden></audio>
+                        <div class="modal-audio-empty" id="modalAudioEmpty">Nog geen audio-opname beschikbaar voor deze afspraak.</div>
+                    </div>
+                </div>
             </div>
             <div class="modal-workspace" id="modalWorkspace">
                 <div class="modal-workspace-label">Meeting notities</div>
@@ -653,6 +740,7 @@
             </div>
         </div>
         <div class="modal-footer">
+            <button class="modal-btn secondary magnetic" id="modalPdfBtn" type="button">Download PDF</button>
             <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Akkoord</button>
             <button class="modal-btn danger magnetic" id="modalNoDealBtn" type="button">Geen deal</button>
             <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>
@@ -758,8 +846,12 @@
     const modalOverviewElement = document.getElementById('modalOverview');
     const modalWorkspaceElement = document.getElementById('modalWorkspace');
     const modalPrimaryBtn = document.getElementById('modalPrimaryBtn');
+    const modalPdfBtn = document.getElementById('modalPdfBtn');
     const modalNoDealBtn = document.getElementById('modalNoDealBtn');
     const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
+    const modalAudioBlock = document.getElementById('modalAudioBlock');
+    const modalAudioPlayer = document.getElementById('modalAudioPlayer');
+    const modalAudioEmpty = document.getElementById('modalAudioEmpty');
     const workspaceTranscriptEl = document.getElementById('workspaceTranscript');
     const workspaceDomainEl = document.getElementById('workspaceDomain');
     const workspaceVoiceStatusEl = document.getElementById('workspaceVoiceStatus');
@@ -955,6 +1047,27 @@
         return 'Onbekend';
     }
 
+    function resolveAppointmentRecordingUrl(item) {
+        const callId = String(item?.callId || '').trim();
+        const raw = String(
+            item?.recordingUrl ||
+            item?.recording_url ||
+            item?.recordingUrlProxy ||
+            item?.audioUrl ||
+            item?.audio_url ||
+            ''
+        ).trim();
+
+        if (raw) {
+            if (callId && /\/api\/coldcalling\/recording-proxy/i.test(raw)) {
+                return `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}`;
+            }
+            return raw;
+        }
+
+        return callId ? `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}` : '';
+    }
+
     function resolveAppointmentSourceLabel(item) {
         const raw = String(item?.source || '').trim();
         if (!raw) return 'Coldcalling';
@@ -982,8 +1095,11 @@
             source: resolveAppointmentSourceLabel(item),
             providerLabel: resolveAppointmentProviderLabel(item),
             summary: String(item.summary || 'AI-samenvatting niet beschikbaar.'),
+            summaryFormatVersion: Number(item.summaryFormatVersion || 0) || 0,
             location: String(item.location || item.appointmentLocation || ''),
             whatsappInfo: String(item.whatsappInfo || item.whatsappNotes || ''),
+            callId: String(item.callId || ''),
+            recordingUrl: resolveAppointmentRecordingUrl(item),
             postCallStatus: String(item.postCallStatus || ''),
             postCallNotesTranscript: String(item.postCallNotesTranscript || ''),
             postCallPrompt: String(item.postCallPrompt || ''),
@@ -1051,8 +1167,35 @@
         modalWorkspaceElement.classList.toggle('show', modalWorkspaceMode);
         modalNoDealBtn.hidden = modalWorkspaceMode;
         modalNoDealBtn.disabled = workspaceBusy || modalWorkspaceMode;
+        if (modalPdfBtn) modalPdfBtn.hidden = modalWorkspaceMode;
+        if (modalAudioBlock) modalAudioBlock.hidden = modalWorkspaceMode;
         refreshWorkspacePrimaryButtonLabel();
         modalSecondaryBtn.textContent = modalWorkspaceMode ? 'Terug' : 'Sluiten';
+    }
+
+    function syncAppointmentAudio(apt) {
+        if (!modalAudioPlayer || !modalAudioEmpty || !modalAudioBlock) return;
+
+        const recordingUrl = String(apt?.recordingUrl || '').trim();
+        if (!recordingUrl) {
+            modalAudioPlayer.pause();
+            modalAudioPlayer.hidden = true;
+            modalAudioPlayer.removeAttribute('src');
+            modalAudioPlayer.load();
+            modalAudioEmpty.hidden = false;
+            modalAudioBlock.hidden = modalWorkspaceMode;
+            return;
+        }
+
+        if (modalAudioPlayer.getAttribute('src') !== recordingUrl) {
+            modalAudioPlayer.pause();
+            modalAudioPlayer.removeAttribute('src');
+            modalAudioPlayer.load();
+            modalAudioPlayer.setAttribute('src', recordingUrl);
+        }
+        modalAudioPlayer.hidden = false;
+        modalAudioEmpty.hidden = true;
+        modalAudioBlock.hidden = modalWorkspaceMode;
     }
 
     function getActiveAppointment() {
@@ -1690,11 +1833,8 @@
         document.getElementById('modalSource').textContent = apt.source;
         document.getElementById('modalProvider').textContent = apt.providerLabel || 'Onbekend';
         document.getElementById('modalLocation').textContent = String(apt.location || '').trim() || 'Nog niet ingevuld';
-        const summaryParts = [String(apt.summary || '').trim()].filter(Boolean);
-        if (String(apt.whatsappInfo || '').trim()) {
-            summaryParts.push(`Overige info uit WhatsApp:\n${String(apt.whatsappInfo || '').trim()}`);
-        }
-        document.getElementById('modalSummary').textContent = summaryParts.join('\n\n') || '-';
+        document.getElementById('modalSummary').textContent = String(apt.summary || '').trim() || '-';
+        syncAppointmentAudio(apt);
         fillWorkspaceFromAppointment(apt);
         applyWorkspaceMode(false);
 
@@ -1704,6 +1844,9 @@
     function closeModal() {
         if (notesImageUploadInput) notesImageUploadInput.value = '';
         if (referencePhotosInput) referencePhotosInput.value = '';
+        if (modalAudioPlayer) {
+            modalAudioPlayer.pause();
+        }
         modalElement.classList.remove('show');
     }
 
@@ -1727,6 +1870,11 @@
     }
 
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
+    if (modalPdfBtn) {
+        modalPdfBtn.addEventListener('click', () => {
+            window.print();
+        });
+    }
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
     modalSecondaryBtn.addEventListener('click', handleModalSecondaryAction);
     if (notesImageUploadBtn && notesImageUploadInput) {
