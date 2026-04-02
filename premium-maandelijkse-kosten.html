@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260402-6">
 <script>
   (function () {
@@ -24,20 +24,19 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #f0ede8;
-  --crimson: #9b2355;
-  --crimson-light: #c4346a;
-  --text-dark: #1a1a2e;
-  --text-mid: #555;
-  --text-light: #999;
-  --border: #e2ddd6;
-  --card: #ffffff;
-  --tag: #f5f0eb;
+  --bg: var(--bg-primary);
+  --crimson: var(--accent);
+  --crimson-light: var(--accent-light);
+  --text-dark: var(--text-primary);
+  --text-mid: var(--text-secondary);
+  --text-light: var(--text-tertiary);
+  --card: var(--bg-secondary);
+  --tag: rgba(139, 34, 82, 0.06);
   --red: #c0392b;
   --green: #16733c;
 }
 body {
-  font-family: 'Barlow', sans-serif;
+  font-family: 'Inter', sans-serif;
   background: var(--bg);
   color: var(--text-dark);
   min-height: 100vh;
@@ -59,6 +58,7 @@ body {
   width: calc(100% - 280px);
   min-height: 100vh;
   padding: 48px;
+  font-family: 'Barlow', sans-serif;
 }
 .page-shell {
   width: min(1260px, 100%);
