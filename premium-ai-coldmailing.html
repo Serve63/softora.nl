@@ -1555,7 +1555,7 @@
 
                 const openSeq = ++modalOpenSequence;
                 activeTaskId = normalizedTaskId;
-                setModalTaskActionsEnabled(hasTaskActions);
+                setModalTaskActionsEnabled(true);
                 const leadType = resolveLeadType(lead);
                 const leadDateValue = String(lead.date || '').slice(0, 10);
                 const leadTimeValue = normalizeTimeValue(lead.time || '09:00') || '09:00';
@@ -1670,7 +1670,10 @@
 
             async function submitLeadToAgenda() {
                 const taskId = Number(activeTaskId) || 0;
-                if (taskId <= 0 || modalBusy) return;
+                if (!taskId || modalBusy) return;
+                const lead = getLeadById(taskId);
+                if (!lead) return;
+                const hasTaskActions = hasPersistedLeadTask(lead);
 
                 const date = String(modalDate.value || '').trim();
                 const time = normalizeTimeValue(modalTime.value || '');
@@ -1697,19 +1700,44 @@
                 setModalBusy(true);
                 setModalStatus('Afspraak wordt in agenda gezet...', '');
                 try {
-                    await postJsonWithFallback(
-                        [
-                            `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/set-in-agenda`,
-                            `/api/agenda/lead-to-agenda?taskId=${encodeURIComponent(String(taskId))}`,
-                        ],
-                        {
-                            appointmentDate: date,
-                            appointmentTime: time,
-                            location,
-                            whatsappInfo,
-                            actor: 'Leads pagina',
+                    if (hasTaskActions) {
+                        await postJsonWithFallback(
+                            [
+                                `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/set-in-agenda`,
+                                `/api/agenda/lead-to-agenda?taskId=${encodeURIComponent(String(taskId))}`,
+                            ],
+                            {
+                                appointmentDate: date,
+                                appointmentTime: time,
+                                location,
+                                whatsappInfo,
+                                actor: 'Leads pagina',
+                            }
+                        );
+                    } else {
+                        const callId = String(lead.callId || '').trim();
+                        if (!callId) {
+                            throw new Error('Deze lead heeft geen callId en kan daarom niet in de agenda worden gezet.');
                         }
-                    );
+                        await postJsonWithFallback(
+                            [
+                                '/api/agenda/interested-leads/set-in-agenda',
+                                '/api/agenda/interested-lead-set-in-agenda',
+                            ],
+                            {
+                                callId,
+                                appointmentDate: date,
+                                appointmentTime: time,
+                                location,
+                                whatsappInfo,
+                                actor: 'Leads pagina',
+                                company: lead.company,
+                                contact: lead.contact,
+                                phone: lead.phone,
+                                summary: lead.summary,
+                            }
+                        );
+                    }
 
                     allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
                     delete leadDetailsById[String(taskId)];
@@ -1743,8 +1771,10 @@
 
             async function removeLead() {
                 const taskId = Number(activeTaskId) || 0;
-                if (taskId <= 0 || modalBusy) return;
+                if (!taskId || modalBusy) return;
                 const lead = getLeadById(taskId);
+                if (!lead) return;
+                const hasTaskActions = hasPersistedLeadTask(lead);
                 const company = String(lead?.company || 'deze lead');
                 const confirmed =
                     window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
@@ -1762,16 +1792,33 @@
                 setModalBusy(true);
                 setModalStatus('Lead wordt verwijderd...', '');
                 try {
-                    await postJsonWithFallback(
-                        [
-                            `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/mark-cancelled`,
-                            `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(taskId))}`,
-                        ],
-                        {
-                            actor: 'Leads pagina',
-                            reason: 'Handmatig verwijderd via lead-popup',
+                    if (hasTaskActions) {
+                        await postJsonWithFallback(
+                            [
+                                `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/mark-cancelled`,
+                                `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(taskId))}`,
+                            ],
+                            {
+                                actor: 'Leads pagina',
+                                reason: 'Handmatig verwijderd via lead-popup',
+                            }
+                        );
+                    } else {
+                        const callId = String(lead.callId || '').trim();
+                        if (!callId) {
+                            throw new Error('Deze lead heeft geen callId en kan daarom niet blijvend worden verwijderd.');
                         }
-                    );
+                        await postJsonWithFallback(
+                            [
+                                '/api/agenda/interested-leads/dismiss',
+                                '/api/agenda/interested-lead-dismiss',
+                            ],
+                            {
+                                callId,
+                                actor: 'Leads pagina',
+                            }
+                        );
+                    }
 
                     allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
                     delete leadDetailsById[String(taskId)];
