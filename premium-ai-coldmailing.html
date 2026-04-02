@@ -1223,12 +1223,25 @@
                 return stripped.replace(/\s*\n+\s*/g, ' ').trim();
             }
 
+            function looksMixedLanguageSummary(value) {
+                const normalized = sanitizeConversationCopy(value).toLowerCase();
+                if (!normalized) return false;
+                const strongMatches =
+                    (normalized.match(
+                        /\b(the|call|conversation|agent|user|brief|outbound|inbound|ended|shortly|mentioned|during|standards|expectations|activities|interaction|follow-up|meeting|appointment|summary|details)\b/g
+                    ) || []).length;
+                const mildMatches =
+                    (normalized.match(/\b(was|were|is|are|had|with|after|before|where|for)\b/g) || []).length;
+                return strongMatches >= 2 || (strongMatches >= 1 && mildMatches >= 3) || mildMatches >= 6;
+            }
+
             function pickReadableSummary(...candidates) {
                 for (const candidate of candidates) {
                     const raw = String(candidate || '').trim();
                     if (!raw) continue;
                     if (looksLikeTranscriptText(raw)) continue;
                     const cleaned = sanitizeConversationCopy(raw);
+                    if (looksMixedLanguageSummary(cleaned)) continue;
                     if (cleaned) return cleaned;
                 }
                 return '';
@@ -1309,7 +1322,7 @@
                         style: 'medium',
                         maxSentences: 5,
                         extraInstructions:
-                            'Schrijf voor een accountmanager van Softora. Geef een korte, efficiënte samenvatting in doorlopende tekst. Verwerk uitkomst, afspraken, datum/tijd, locatie en vervolgactie in dezelfde tekst als dat bekend is. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+                            'Schrijf uitsluitend in natuurlijk Nederlands. Gebruik geen Engels behalve onvermijdelijke eigennamen, merknamen, productnamen, URLs of exacte onvertaalbare termen. Schrijf voor een accountmanager van Softora. Geef een korte, efficiënte samenvatting in doorlopende tekst. Verwerk uitkomst, afspraken, datum/tijd, locatie en vervolgactie in dezelfde tekst als dat bekend is. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
                     });
 
                     const summaryText = sanitizeConversationCopy(mergedRaw);
