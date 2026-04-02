@@ -21,7 +21,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260401-4" defer></script>
+    <script src="assets/personnel-theme.js?v=20260402-1" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -2622,9 +2622,23 @@
 
             loadLeads({ silent: cachedLeads.leads.length > 0 });
 
+            function refreshLeadSurfaces() {
+                loadLeads({ silent: true });
+                if (window.SoftoraPersonnelTheme && typeof window.SoftoraPersonnelTheme.refreshSidebarCounts === 'function') {
+                    window.SoftoraPersonnelTheme.refreshSidebarCounts();
+                }
+            }
+
             pollTimer = window.setInterval(() => {
                 loadLeads({ silent: true });
-            }, 45000);
+            }, 20000);
+
+            window.addEventListener('focus', refreshLeadSurfaces);
+            window.addEventListener('pageshow', refreshLeadSurfaces);
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) return;
+                refreshLeadSurfaces();
+            });
 
             window.addEventListener('beforeunload', () => {
                 if (pollTimer) window.clearInterval(pollTimer);

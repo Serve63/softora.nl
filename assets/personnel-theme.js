@@ -469,16 +469,10 @@
 
         const extraLinks = [
             {
-                key: "notepad",
-                href: "/premium-kladblok",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg>',
-                label: "Kladblok",
-            },
-            {
-                key: "analytics",
-                href: "/premium-analytics",
-                label: "Google analytics",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg>',
+                key: "passwords",
+                href: "/premium-instellingen#wachtwoordenregister",
+                label: "Wachtwoordenregister",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg>',
             },
             {
                 key: "monthly_costs",
@@ -487,16 +481,22 @@
                 label: "Maandelijkse kosten",
             },
             {
+                key: "analytics",
+                href: "/premium-analytics",
+                label: "Google analytics",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg>',
+            },
+            {
                 key: "bookkeeping",
                 href: "/premium-maandelijkse-kosten",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg>',
                 label: "Boekhouding",
             },
             {
-                key: "passwords",
-                href: "/premium-instellingen#wachtwoordenregister",
-                label: "Wachtwoordenregister",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg>',
+                key: "notepad",
+                href: "/premium-kladblok",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg>',
+                label: "Kladblok",
             },
             {
                 key: "settings",
@@ -1319,6 +1319,12 @@
         }
         refreshSidebarNotificationCounts();
         window.setInterval(refreshSidebarNotificationCounts, 45000);
+        window.addEventListener("focus", refreshSidebarNotificationCounts);
+        window.addEventListener("pageshow", refreshSidebarNotificationCounts);
+        document.addEventListener("visibilitychange", function () {
+            if (document.hidden) return;
+            refreshSidebarNotificationCounts();
+        });
     }
 
     function forceLightTheme() {

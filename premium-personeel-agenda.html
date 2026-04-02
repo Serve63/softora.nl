@@ -24,7 +24,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260401-4" defer></script>
+    <script src="assets/personnel-theme.js?v=20260402-1" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -510,13 +510,10 @@
             padding: 0.45rem;
         }
 
-        .workspace-attachments-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--text-tertiary);
-            margin-bottom: 0.45rem;
+        .modal-workspace-field-actions {
+            display: flex;
+            justify-content: flex-start;
+            margin-top: 0.6rem;
         }
 
         .workspace-attachments-grid {
@@ -711,13 +708,9 @@
                 </div>
             </div>
             <div class="modal-workspace" id="modalWorkspace">
-                <div class="modal-workspace-label">Meeting notities</div>
+                <div class="modal-workspace-label">Website-bouw input</div>
                 <div class="modal-workspace-help">
-                    Noteer hier de wensen van de klant uit de meeting. Deze info wordt gekoppeld aan de opdracht en gaat mee naar actieve opdrachten.
-                </div>
-                <div class="modal-workspace-actions">
-                    <button class="workspace-attachment-btn magnetic" id="referencePhotosBtn" type="button">Foto-bijlagen toevoegen</button>
-                    <input class="workspace-file-input" id="referencePhotosInput" type="file" accept="image/*" multiple>
+                    Leg hier de wensen van de klant en de beeldreferenties uit de meeting vast. Alles wordt samen gekoppeld aan de opdracht en gaat mee naar actieve opdrachten.
                 </div>
                 <div class="modal-workspace-status" id="workspaceVoiceStatus"></div>
                 <div class="modal-workspace-grid">
@@ -727,12 +720,14 @@
                         <div class="modal-workspace-hint">Optioneel, maar nodig als je later domein-koppeling/registratie wilt automatiseren.</div>
                     </div>
                     <div class="modal-workspace-field">
-                        <div class="modal-workspace-label">Notities meeting & klantwensen</div>
+                        <div class="modal-workspace-label">Notities meeting & foto's</div>
                         <textarea id="workspaceTranscript" placeholder="Zet hier alle meetingnotities: doelen, wensen, stijl, functionaliteiten, planning, budget, bijzonderheden..."></textarea>
-                        <div class="workspace-attachments">
-                            <div class="workspace-attachments-label">Foto-bijlagen voor website-bouw</div>
+                        <div class="modal-workspace-field-actions">
+                            <button class="workspace-attachment-btn magnetic" id="referencePhotosBtn" type="button">Foto's toevoegen</button>
+                            <input class="workspace-file-input" id="referencePhotosInput" type="file" accept="image/*" multiple>
+                        </div>
+                        <div class="workspace-attachments" id="workspaceAttachmentsBlock" hidden>
                             <div class="workspace-attachments-grid" id="workspaceAttachmentsList"></div>
-                            <div class="workspace-attachment-empty" id="workspaceAttachmentsEmpty">Nog geen bijlagen toegevoegd.</div>
                         </div>
                     </div>
                 </div>
@@ -860,8 +855,8 @@
     const notesImageUploadInput = document.getElementById('notesImageUploadInput');
     const referencePhotosBtn = document.getElementById('referencePhotosBtn');
     const referencePhotosInput = document.getElementById('referencePhotosInput');
+    const workspaceAttachmentsBlock = document.getElementById('workspaceAttachmentsBlock');
     const workspaceAttachmentsList = document.getElementById('workspaceAttachmentsList');
-    const workspaceAttachmentsEmpty = document.getElementById('workspaceAttachmentsEmpty');
     const ACTIVE_ORDERS_UI_SCOPE = 'premium_active_orders';
     const ACTIVE_ORDERS_CUSTOM_KEY = 'softora_custom_orders_premium_v1';
 
@@ -872,6 +867,7 @@
     let workspaceReferenceImages = [];
     let knownActiveOrderIds = new Set();
     let knownActiveOrderByAppointmentId = new Map();
+    let loadServerAppointmentsPromise = null;
 
     function normalizeWorkspaceDomainName(value) {
         const raw = String(value || '')
@@ -1122,15 +1118,15 @@
     }
 
     function renderWorkspaceReferenceImages() {
-        if (!workspaceAttachmentsList || !workspaceAttachmentsEmpty) return;
+        if (!workspaceAttachmentsList || !workspaceAttachmentsBlock) return;
         workspaceAttachmentsList.innerHTML = '';
 
         if (!workspaceReferenceImages.length) {
-            workspaceAttachmentsEmpty.style.display = 'block';
+            workspaceAttachmentsBlock.hidden = true;
             return;
         }
 
-        workspaceAttachmentsEmpty.style.display = 'none';
+        workspaceAttachmentsBlock.hidden = false;
         workspaceReferenceImages.forEach((image) => {
             const item = document.createElement('div');
             item.className = 'workspace-attachment-item';
@@ -1688,48 +1684,50 @@
     }
 
     async function loadServerAppointments() {
-        try {
-            const response = await fetch('/api/agenda/appointments?limit=250');
-            const data = await response.json();
-            if (!response.ok || !data?.ok || !Array.isArray(data.appointments)) return;
+        if (loadServerAppointmentsPromise) return loadServerAppointmentsPromise;
 
-            const existing = new Set(appointments.map(appointmentFingerprint));
-            const indexById = new Map(
-                appointments
-                    .map((item, idx) => ({ id: Number(item?.id || 0), idx }))
-                    .filter((entry) => Number.isFinite(entry.id) && entry.id > 0)
-                    .map((entry) => [entry.id, entry.idx])
-            );
-            let added = 0;
-            let updated = 0;
+        loadServerAppointmentsPromise = (async () => {
+            try {
+                const response = await fetch('/api/agenda/appointments?limit=250', { cache: 'no-store' });
+                const data = await response.json();
+                if (!response.ok || !data?.ok || !Array.isArray(data.appointments)) return;
 
-            data.appointments.forEach((item) => {
-                const apt = normalizeServerAppointment(item);
-                if (!apt) return;
-                const aptId = Number(apt.id || 0);
-                if (Number.isFinite(aptId) && aptId > 0 && indexById.has(aptId)) {
-                    const existingIndex = indexById.get(aptId);
-                    appointments[existingIndex] = {
-                        ...appointments[existingIndex],
-                        ...apt
-                    };
-                    updated += 1;
-                    return;
-                }
-                const fp = appointmentFingerprint(apt);
-                if (existing.has(fp)) return;
-                existing.add(fp);
-                appointments.push(apt);
-                added += 1;
-            });
+                const existing = new Set(appointments.map(appointmentFingerprint));
+                const indexById = new Map(
+                    appointments
+                        .map((item, idx) => ({ id: Number(item?.id || 0), idx }))
+                        .filter((entry) => Number.isFinite(entry.id) && entry.id > 0)
+                        .map((entry) => [entry.id, entry.idx])
+                );
 
-            if (added > 0 || updated > 0) {
+                data.appointments.forEach((item) => {
+                    const apt = normalizeServerAppointment(item);
+                    if (!apt) return;
+                    const aptId = Number(apt.id || 0);
+                    if (Number.isFinite(aptId) && aptId > 0 && indexById.has(aptId)) {
+                        const existingIndex = indexById.get(aptId);
+                        appointments[existingIndex] = {
+                            ...appointments[existingIndex],
+                            ...apt
+                        };
+                        return;
+                    }
+                    const fp = appointmentFingerprint(apt);
+                    if (existing.has(fp)) return;
+                    existing.add(fp);
+                    appointments.push(apt);
+                });
+
                 appointments.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
                 renderCalendar();
+            } catch {
+                // Zonder backend blijft de agenda leeg tot echte afspraken binnenkomen.
+            } finally {
+                loadServerAppointmentsPromise = null;
             }
-        } catch {
-            // Zonder backend blijft de agenda leeg tot echte afspraken binnenkomen.
-        }
+        })();
+
+        return loadServerAppointmentsPromise;
     }
 
     function renderCalendar() {
@@ -1913,7 +1911,13 @@
     renderWorkspaceReferenceImages();
     void refreshKnownActiveOrdersIndex();
     void loadServerAppointments();
-    window.setInterval(() => { void loadServerAppointments(); }, 15000);
+    window.setInterval(() => { void loadServerAppointments(); }, 10000);
+    window.addEventListener('focus', () => { void loadServerAppointments(); });
+    window.addEventListener('pageshow', () => { void loadServerAppointments(); });
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        void loadServerAppointments();
+    });
 
     // Cursor
     const cursor = document.querySelector('.cursor');

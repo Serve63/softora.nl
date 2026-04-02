@@ -5661,10 +5661,60 @@ function getOpenInterestedLeadTasks() {
     .filter(Boolean);
 }
 
+function getMaterializedInterestedLeadRows() {
+  const rows = [];
+  const seenCallIds = new Set();
+  const seenKeys = new Set();
+
+  generatedAgendaAppointments.forEach((appointment) => {
+    const callId = normalizeString(appointment?.callId || '');
+    if (callId && callId.startsWith('demo-')) return;
+
+    const pendingTask = mapAppointmentToConfirmationTask(appointment);
+    const isConfirmedAppointment = isGeneratedAppointmentConfirmedForAgenda(appointment);
+    if (!pendingTask && !isConfirmedAppointment) return;
+
+    const row =
+      pendingTask ||
+      {
+        id: Number(appointment?.id || 0) || 0,
+        appointmentId: Number(appointment?.id || 0) || 0,
+        type: normalizeString(appointment?.type || 'meeting') || 'meeting',
+        confirmationTaskType: normalizeString(appointment?.confirmationTaskType || appointment?.type || ''),
+        company: normalizeString(appointment?.company || '') || 'Onbekende lead',
+        contact: normalizeString(appointment?.contact || '') || 'Onbekend',
+        phone: normalizeString(appointment?.phone || ''),
+        date: normalizeDateYyyyMmDd(appointment?.date || '') || '',
+        time: normalizeTimeHhMm(appointment?.time || '') || '09:00',
+        source: normalizeString(appointment?.source || 'Agenda afspraak'),
+        summary: truncateText(normalizeString(appointment?.summary || ''), 900),
+        createdAt:
+          normalizeString(
+            appointment?.updatedAt ||
+              appointment?.confirmationResponseReceivedAt ||
+              appointment?.confirmationEmailSentAt ||
+              appointment?.createdAt ||
+              ''
+          ) || new Date().toISOString(),
+        callId,
+      };
+
+    const rowKey = buildLeadFollowUpCandidateKey(row);
+    if (callId && seenCallIds.has(callId)) return;
+    if (rowKey && seenKeys.has(rowKey)) return;
+
+    if (callId) seenCallIds.add(callId);
+    if (rowKey) seenKeys.add(rowKey);
+    rows.push(row);
+  });
+
+  return rows;
+}
+
 function buildAllInterestedLeadRows() {
-  const openTasks = getOpenInterestedLeadTasks();
-  const interestedLeadTasks = buildInterestedLeadCandidateRows(openTasks);
-  const groupedLeadRows = buildGroupedColdcallingLeadRows(openTasks.concat(interestedLeadTasks));
+  const existingMaterializedRows = getMaterializedInterestedLeadRows();
+  const interestedLeadTasks = buildInterestedLeadCandidateRows(existingMaterializedRows);
+  const groupedLeadRows = buildGroupedColdcallingLeadRows(existingMaterializedRows.concat(interestedLeadTasks));
   return interestedLeadTasks.concat(groupedLeadRows).sort(compareConfirmationTasks);
 }
 

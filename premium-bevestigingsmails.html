@@ -21,7 +21,7 @@
         }
     })();
 </script>
-<script src="assets/personnel-theme.js?v=20260401-4" defer></script>
+<script src="assets/personnel-theme.js?v=20260402-1" defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -229,17 +229,6 @@ body {
   justify-content: center;
 }
 
-.coming-card {
-  width: 100%;
-  max-width: 720px;
-  background: rgba(255, 255, 255, 0.74);
-  border: 1px solid rgba(20, 24, 35, 0.08);
-  box-shadow: var(--shadow);
-  padding: 4rem 3rem;
-  text-align: center;
-  backdrop-filter: blur(10px);
-}
-
 .coming-title {
   font-family: 'Oswald', sans-serif;
   font-size: clamp(2.8rem, 7vw, 5.6rem);
@@ -248,12 +237,6 @@ body {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--text-dark);
-}
-
-@media (max-width: 1100px) {
-  .coming-card {
-    max-width: 640px;
-  }
 }
 
 @media (max-width: 920px) {
@@ -278,10 +261,6 @@ body {
 }
 
 @media (max-width: 640px) {
-  .coming-card {
-    padding: 2.5rem 1.5rem;
-  }
-
 }
 </style>
 </head>
@@ -331,9 +310,7 @@ body {
 
   <main class="main-content">
     <section class="coming-shell">
-      <div class="coming-card">
-        <h1 class="coming-title">Coming Soon</h1>
-      </div>
+      <h1 class="coming-title">Coming Soon</h1>
     </section>
   </main>
 </div>
