@@ -6406,6 +6406,17 @@ function isGeneratedAppointmentConfirmedForAgenda(appointment) {
   return Boolean(appointment.confirmationResponseReceived || appointment.confirmationResponseReceivedAt);
 }
 
+function isGeneratedAppointmentVisibleForAgenda(appointment) {
+  if (!appointment || typeof appointment !== 'object') return false;
+  if (
+    appointment.confirmationAppointmentCancelled ||
+    appointment.confirmationAppointmentCancelledAt
+  ) {
+    return false;
+  }
+  return Boolean(normalizeDateYyyyMmDd(appointment?.date || ''));
+}
+
 function compareConfirmationTasks(a, b) {
   const aTs = Date.parse(normalizeString(a?.confirmationTaskCreatedAt || a?.createdAt || '')) || 0;
   const bTs = Date.parse(normalizeString(b?.confirmationTaskCreatedAt || b?.createdAt || '')) || 0;
@@ -11875,7 +11886,7 @@ app.get('/api/agenda/appointments', async (req, res) => {
   await refreshGeneratedAgendaSummariesIfNeeded();
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 200)));
   const sorted = generatedAgendaAppointments
-    .filter(isGeneratedAppointmentConfirmedForAgenda)
+    .filter(isGeneratedAppointmentVisibleForAgenda)
     .slice()
     .sort(compareAgendaAppointments);
   return res.status(200).json({
