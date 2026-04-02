@@ -1,829 +1,456 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/assets/iphone-optimizations.css">
-    <title>Softora | Mailbox</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260402-6">
-    <script>
-        (function () {
-            document.documentElement.setAttribute("data-personnel-loading", "true");
-            try {
-                document.documentElement.setAttribute("data-theme-mode", "light");
-                document.documentElement.setAttribute("data-theme", "light");
-            } catch (_) {
-                /* ignore */
-            }
-        })();
-    </script>
-    <script src="assets/personnel-theme.js?v=20260402-6" defer></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mailbox – Softora.nl</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f0ede8; --crimson: #9b2355; --crimson-light: #c4346a;
+  --text-dark: #1a1a2e; --text-mid: #555; --text-light: #999;
+  --border: #e2ddd6; --card: #ffffff; --tag: #f5f0eb;
+  --green: #16733c; --blue: #1a5f8a; --orange: #b45a00;
+}
+html, body { height: 100%; }
+body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text-dark); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            color: var(--text-primary);
-            background: var(--bg-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+/* TOP BAR */
+.topbar { height: 52px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0; }
+.topbar-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); margin-right: 8px; }
+.topbar-title { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-light); }
+.topbar-search { flex: 1; max-width: 400px; margin-left: auto; position: relative; }
+.topbar-search input { width: 100%; padding: 7px 12px 7px 32px; border: 1px solid var(--border); border-radius: 4px; font-family: 'Barlow', sans-serif; font-size: 13px; background: var(--bg); color: var(--text-dark); outline: none; transition: border-color .15s; }
+.topbar-search input:focus { border-color: var(--crimson); background: #fff; }
+.topbar-search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; color: var(--text-light); pointer-events: none; }
+.btn-compose { display: flex; align-items: center; gap: 7px; padding: 7px 16px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.btn-compose:hover { background: var(--crimson-light); }
+.btn-compose svg { width: 13px; height: 13px; }
 
-        .dashboard-layout {
-            display: flex;
-            min-height: 100vh;
-        }
+/* LAYOUT */
+.layout { display: flex; flex: 1; overflow: hidden; }
 
-        .sidebar {
-            width: 320px;
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            z-index: 100;
-            display: flex;
-            flex-direction: column;
-        }
+/* SIDEBAR */
+.mail-sidebar { width: 190px; flex-shrink: 0; background: var(--card); border-right: 1px solid var(--border); padding: 16px 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.folder-item { display: flex; align-items: center; gap: 10px; padding: 8px 18px; font-size: 13px; font-weight: 500; color: var(--text-mid); cursor: pointer; transition: all .12s; border-radius: 0; position: relative; }
+.folder-item:hover { background: var(--tag); color: var(--text-dark); }
+.folder-item.active { color: var(--crimson); background: rgba(155,35,85,.06); font-weight: 600; }
+.folder-item.active::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--crimson); border-radius:0 2px 2px 0; }
+.folder-icon { width: 15px; height: 15px; opacity: .6; flex-shrink: 0; }
+.folder-item.active .folder-icon { opacity: 1; }
+.folder-badge { margin-left: auto; background: var(--crimson); color: #fff; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+.folder-divider { height: 1px; background: var(--border); margin: 8px 16px; }
+.folder-label { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-light); padding: 10px 18px 4px; }
 
-        .main-content {
-            margin-left: 320px;
-            width: calc(100% - 320px);
-            min-height: 100vh;
-            padding: clamp(1.2rem, 2.4vw, 2rem);
-        }
+/* MAIL LIST */
+.mail-list { width: 310px; flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; background: var(--card); }
+.mail-list-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: var(--tag); }
+.mail-list-title { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-light); }
+.mail-list-count { font-size: 11px; color: var(--text-light); }
+.mail-items { flex: 1; overflow-y: auto; }
+.mail-item { padding: 13px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; position: relative; }
+.mail-item:hover { background: var(--tag); }
+.mail-item.active { background: rgba(155,35,85,.05); border-left: 3px solid var(--crimson); }
+.mail-item.unread .mail-from { font-weight: 700; color: var(--text-dark); }
+.mail-item.unread .mail-subject { font-weight: 600; color: var(--text-dark); }
+.unread-dot { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); width: 6px; height: 6px; background: var(--crimson); border-radius: 50%; }
+.mail-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+.mail-from { font-size: 13px; font-weight: 500; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+.mail-time { font-size: 11px; color: var(--text-light); white-space: nowrap; }
+.mail-subject { font-size: 12px; color: var(--text-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.mail-preview { font-size: 11px; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail-tags { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.mail-tag { font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; }
+.tag-offerte { background: rgba(26,95,138,.1); color: var(--blue); }
+.tag-factuur { background: rgba(22,115,60,.1); color: var(--green); }
+.tag-klant { background: rgba(155,35,85,.1); color: var(--crimson); }
+.tag-urgent { background: rgba(192,57,43,.1); color: #c0392b; }
+.tag-info { background: rgba(180,90,0,.1); color: var(--orange); }
 
-        .mail-shell {
-            width: min(1420px, 100%);
-            margin: 0 auto;
-            display: grid;
-            gap: 1rem;
-        }
+/* MAIL DETAIL */
+.mail-detail { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.detail-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-light); }
+.detail-empty svg { width: 40px; height: 40px; opacity: .25; }
+.detail-empty p { font-size: 13px; }
 
-        .mail-head {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 1rem;
-        }
+.detail-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 18px 24px 16px; flex-shrink: 0; }
+.detail-subject { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: .5px; margin-bottom: 10px; }
+.detail-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.detail-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0; }
+.detail-from-wrap { display: flex; align-items: center; gap: 10px; flex: 1; }
+.detail-from { font-size: 13px; font-weight: 600; color: var(--text-dark); }
+.detail-email { font-size: 11px; color: var(--text-light); }
+.detail-date { font-size: 11px; color: var(--text-light); white-space: nowrap; }
+.detail-actions { display: flex; gap: 6px; }
+.btn-action { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-mid); cursor: pointer; transition: all .15s; }
+.btn-action:hover { border-color: var(--crimson); color: var(--crimson); }
+.btn-action svg { width: 12px; height: 12px; }
+.btn-action.primary { background: var(--crimson); color: #fff; border-color: var(--crimson); }
+.btn-action.primary:hover { background: var(--crimson-light); border-color: var(--crimson-light); }
 
-        .mail-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: clamp(2.45rem, 3vw, 3.2rem);
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            line-height: 1;
-        }
+.detail-body { flex: 1; overflow-y: auto; padding: 24px; }
+.detail-body-text { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 24px; font-size: 14px; line-height: 1.8; color: var(--text-dark); white-space: pre-wrap; }
 
-        .mail-subtitle {
-            margin-top: 0.4rem;
-            color: var(--text-secondary);
-            font-size: 1.02rem;
-        }
+/* COMPOSE MODAL */
+.compose-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 50; display: none; align-items: flex-end; justify-content: flex-end; padding: 24px; }
+.compose-overlay.open { display: flex; }
+.compose-box { width: 520px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.18); display: flex; flex-direction: column; overflow: hidden; animation: slideup .2s ease; }
+@keyframes slideup { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none} }
+.compose-head { padding: 12px 16px; background: var(--text-dark); color: #fff; display: flex; align-items: center; justify-content: space-between; }
+.compose-head-title { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.compose-x { background: none; border: none; color: rgba(255,255,255,.6); cursor: pointer; font-size: 18px; line-height: 1; padding: 0; transition: color .15s; }
+.compose-x:hover { color: #fff; }
+.compose-field { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+.compose-field-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-light); padding: 10px 14px; width: 60px; flex-shrink: 0; }
+.compose-field input { flex: 1; padding: 10px 12px; border: none; font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--text-dark); outline: none; background: transparent; }
+.compose-body { padding: 0; }
+.compose-body textarea { width: 100%; min-height: 200px; padding: 14px; border: none; font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--text-dark); resize: none; outline: none; background: transparent; line-height: 1.6; }
+.compose-footer { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.btn-send { padding: 8px 20px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+.btn-send:hover { background: var(--crimson-light); }
+.btn-discard { padding: 8px 14px; background: none; color: var(--text-light); border: 1px solid var(--border); border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .15s; }
+.btn-discard:hover { color: var(--red); border-color: var(--red); }
 
-        .mail-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            padding: 0.7rem 0.9rem;
-            border-radius: 999px;
-            border: 1px solid rgba(143, 35, 96, 0.18);
-            background: rgba(143, 35, 96, 0.06);
-            color: #8f2360;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.84rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        .mail-layout {
-            display: grid;
-            grid-template-columns: 290px 420px minmax(0, 1fr);
-            gap: 1rem;
-            min-height: calc(100vh - 8.4rem);
-        }
-
-        .mail-card {
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            box-shadow: 0 14px 40px rgba(20, 18, 34, 0.05);
-            overflow: hidden;
-            min-width: 0;
-        }
-
-        .card-pad {
-            padding: 1.1rem 1.15rem;
-        }
-
-        .section-kicker {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.88rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: var(--text-tertiary);
-        }
-
-        .mail-search {
-            width: 100%;
-            min-height: 48px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            padding: 0.78rem 0.95rem;
-            background: #fff;
-            font-size: 1rem;
-            color: var(--text-primary);
-            outline: none;
-        }
-
-        .mail-search:focus {
-            border-color: rgba(143, 35, 96, 0.34);
-            box-shadow: 0 0 0 3px rgba(143, 35, 96, 0.08);
-        }
-
-        .folder-list,
-        .summary-list {
-            display: grid;
-            gap: 0.55rem;
-            margin-top: 1rem;
-        }
-
-        .folder-button,
-        .summary-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            width: 100%;
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            background: #fff;
-            padding: 0.9rem 1rem;
-        }
-
-        .folder-button {
-            cursor: pointer;
-            transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
-        }
-
-        .folder-button:hover,
-        .folder-button.active {
-            border-color: rgba(143, 35, 96, 0.24);
-            background: rgba(143, 35, 96, 0.05);
-        }
-
-        .folder-name {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 0.22rem;
-        }
-
-        .folder-name strong,
-        .summary-row strong {
-            font-size: 0.98rem;
-            color: var(--text-primary);
-        }
-
-        .folder-name span,
-        .summary-row span {
-            font-size: 0.82rem;
-            color: var(--text-secondary);
-        }
-
-        .count-pill {
-            min-width: 38px;
-            padding: 0.32rem 0.55rem;
-            border-radius: 999px;
-            background: rgba(143, 35, 96, 0.08);
-            color: #8f2360;
-            font-weight: 700;
-            text-align: center;
-        }
-
-        .thread-toolbar,
-        .preview-toolbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.85rem;
-            padding: 1rem 1.1rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .toolbar-actions {
-            display: flex;
-            align-items: center;
-            gap: 0.55rem;
-            flex-wrap: wrap;
-        }
-
-        .ghost-btn {
-            border: 1px solid var(--border);
-            background: #fff;
-            color: var(--text-primary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.82rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            border-radius: 12px;
-            padding: 0.68rem 0.85rem;
-            cursor: pointer;
-            transition: border-color 0.18s ease, background 0.18s ease;
-        }
-
-        .ghost-btn:hover {
-            border-color: rgba(143, 35, 96, 0.32);
-            background: rgba(143, 35, 96, 0.05);
-        }
-
-        .thread-list {
-            display: grid;
-            gap: 0.7rem;
-            padding: 1rem;
-            max-height: calc(100vh - 15rem);
-            overflow: auto;
-        }
-
-        .thread-item {
-            border: 1px solid var(--border);
-            background: #fff;
-            border-radius: 16px;
-            padding: 0.95rem 1rem;
-            cursor: pointer;
-            transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
-        }
-
-        .thread-item:hover,
-        .thread-item.active {
-            border-color: rgba(143, 35, 96, 0.24);
-            background: rgba(143, 35, 96, 0.04);
-            transform: translateY(-1px);
-        }
-
-        .thread-item.unread {
-            border-left: 4px solid #8f2360;
-            padding-left: 0.8rem;
-        }
-
-        .thread-top,
-        .thread-meta {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.7rem;
-        }
-
-        .thread-sender {
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .thread-time {
-            font-size: 0.82rem;
-            color: var(--text-tertiary);
-            white-space: nowrap;
-        }
-
-        .thread-subject {
-            margin-top: 0.5rem;
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .thread-snippet {
-            margin-top: 0.35rem;
-            color: var(--text-secondary);
-            line-height: 1.5;
-        }
-
-        .thread-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-            margin-top: 0.65rem;
-        }
-
-        .thread-tag {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.25rem 0.55rem;
-            border-radius: 999px;
-            background: rgba(20, 24, 35, 0.06);
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-
-        .preview-pane {
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-        }
-
-        .preview-header {
-            padding: 1.15rem 1.25rem 0.9rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .preview-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.8rem;
-            line-height: 1.02;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-
-        .preview-subline {
-            margin-top: 0.55rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.55rem 0.85rem;
-            color: var(--text-secondary);
-        }
-
-        .preview-subline strong {
-            color: var(--text-primary);
-        }
-
-        .preview-scroll {
-            overflow: auto;
-        }
-
-        .preview-content {
-            padding: 1.15rem 1.25rem 1.35rem;
-            display: grid;
-            gap: 1rem;
-        }
-
-        .preview-html {
-            line-height: 1.7;
-            color: var(--text-primary);
-        }
-
-        .preview-html p + p {
-            margin-top: 0.95rem;
-        }
-
-        .empty-state {
-            display: grid;
-            place-items: center;
-            color: var(--text-tertiary);
-            min-height: 260px;
-            text-align: center;
-            padding: 1.5rem;
-        }
-
-        .sync-note {
-            margin-top: 1rem;
-            padding: 0.9rem 1rem;
-            border-radius: 14px;
-            background: rgba(20, 24, 35, 0.04);
-            color: var(--text-secondary);
-            line-height: 1.6;
-        }
-
-        @media (max-width: 1280px) {
-            .mail-layout {
-                grid-template-columns: 280px minmax(320px, 0.95fr) minmax(0, 1fr);
-            }
-        }
-
-        @media (max-width: 1040px) {
-            .sidebar {
-                position: static;
-                width: 100%;
-                height: auto;
-            }
-
-            .main-content {
-                margin-left: 0;
-                width: 100%;
-                padding: 1rem;
-            }
-
-            .mail-head {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .mail-layout {
-                grid-template-columns: 1fr;
-                min-height: auto;
-            }
-
-            .thread-list {
-                max-height: none;
-            }
-        }
-    </style>
+/* TOAST */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px); background: var(--text-dark); color: #fff; padding: 10px 18px; border-radius: 5px; font-size: 13px; opacity: 0; transition: all .25s; pointer-events: none; z-index: 99; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
 </head>
 <body>
-    <div class="dashboard-layout">
-        <aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">
-          <a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
-          <nav class="sidebar-nav">
-            <div class="sidebar-section sidebar-flow-section">
-              <div class="sidebar-section-label">Overzicht</div>
-              <a href="/premium-personeel-dashboard" class="sidebar-link magnetic" data-sidebar-key="dashboard"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span class="sidebar-link-text">Dashboard</span></a>
-              <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic" data-sidebar-key="active_orders"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="sidebar-link-text">Actieve Opdrachten</span></a>
-              <a href="/premium-personeel-agenda" class="sidebar-link magnetic" data-sidebar-key="agenda"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg><span class="sidebar-link-text">Agenda</span></a>
-              <a href="/premium-ai-coldmailing" class="sidebar-link magnetic" data-sidebar-key="leads"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg><span class="sidebar-link-text">Leads</span><span class="sidebar-notification-badge" data-sidebar-count-key="leads" hidden>0</span></a>
-              <a href="/premium-ai-lead-generator" class="sidebar-link magnetic" data-sidebar-key="coldcalling"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg><span class="sidebar-link-text">Coldcalling</span></a>
-              <a href="/premium-bevestigingsmails" class="sidebar-link magnetic" data-sidebar-key="coldmailing"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Coldmailing</span></a>
-            </div>
-            <div class="sidebar-section">
-              <div class="sidebar-section-label">Beheer</div>
-              <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
-              <a href="/premium-mailbox" class="sidebar-link magnetic active" data-sidebar-key="mailbox"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Mailbox</span></a>
-              <a href="/premium-seo" class="sidebar-link magnetic" data-sidebar-key="seo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span class="sidebar-link-text">SEO</span></a>
-              <a href="/premium-pakketten" class="sidebar-link magnetic" data-sidebar-key="packages"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg><span class="sidebar-link-text">Pakketten</span></a>
-              <a href="/premium-pdfs" class="sidebar-link magnetic" data-sidebar-key="pdfs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span class="sidebar-link-text">PDF'S</span></a>
-            </div>
-            <div class="sidebar-section">
-              <div class="sidebar-section-label">Extra</div>
-              <a href="/premium-wachtwoordenregister" class="sidebar-link magnetic" data-sidebar-key="passwords"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg><span class="sidebar-link-text">Wachtwoordenregister</span></a>
-              <a href="/premium-maandelijkse-kosten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Maandelijkse kosten</span></a>
-              <a href="/premium-analytics" class="sidebar-link magnetic" data-sidebar-key="analytics"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg><span class="sidebar-link-text">Google Analytics</span></a>
-              <a href="/premium-boekhouding" class="sidebar-link magnetic" data-sidebar-key="bookkeeping"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg><span class="sidebar-link-text">Boekhouding</span></a>
-              <a href="/premium-kladblok" class="sidebar-link magnetic" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
-              <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
-            </div>
-          </nav>
-          <div class="sidebar-footer">
-            <div class="sidebar-user">
-              <button type="button" class="sidebar-user-trigger" data-sidebar-profile-trigger="1" aria-label="Profiel bewerken">
-                <div class="sidebar-avatar" data-sidebar-avatar>SP</div>
-                <div class="sidebar-user-info">
-                  <div class="sidebar-user-name" data-sidebar-user-name>Softora Premium</div>
-                  <div class="sidebar-user-role" data-sidebar-user-role>Administrator</div>
-                </div>
-              </button>
-              <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-              </a>
-            </div>
-          </div>
-        </aside>
-        <main class="main-content">
-            <section class="mail-shell">
-                <header class="mail-head">
-                    <div>
-                        <h1 class="mail-title">Mailbox</h1>
-                        <p class="mail-subtitle">Frontend UI voor je eigen inbox. De echte mailboxkoppeling kun je hier later op aansluiten.</p>
-                    </div>
-                    <div class="mail-badge">Eigen mailbox UI klaar voor koppeling</div>
-                </header>
 
-                <section class="mail-layout">
-                    <aside class="mail-card card-pad">
-                        <div class="section-kicker">Mappen</div>
-                        <div class="folder-list" id="folderList"></div>
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">SOFTORA.NL</div>
+  <div class="topbar-title">Mailbox</div>
+  <div class="topbar-search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" placeholder="Zoeken in mailbox…" id="search-input" oninput="filterMails()">
+  </div>
+  <button class="btn-compose" onclick="openCompose()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Nieuwe mail
+  </button>
+</div>
 
-                        <div class="section-kicker" style="margin-top: 1.25rem;">Overzicht</div>
-                        <div class="summary-list" id="summaryList"></div>
+<!-- LAYOUT -->
+<div class="layout">
 
-                        <div class="sync-note">
-                            Deze mailbox draait nu volledig lokaal in de frontend. Zodra jij je echte inbox koppelt, kan deze layout dezelfde data direct tonen.
-                        </div>
-                    </aside>
-
-                    <section class="mail-card">
-                        <div class="thread-toolbar">
-                            <div style="flex: 1;">
-                                <div class="section-kicker">Berichten</div>
-                            </div>
-                            <div style="flex: 1.2;">
-                                <input id="mailSearch" class="mail-search" type="search" placeholder="Zoek op afzender, onderwerp of tekst...">
-                            </div>
-                        </div>
-                        <div class="thread-list" id="threadList"></div>
-                    </section>
-
-                    <section class="mail-card preview-pane">
-                        <div class="preview-toolbar">
-                            <div class="section-kicker">Voorbeeld</div>
-                            <div class="toolbar-actions">
-                                <button id="markReadBtn" class="ghost-btn" type="button">Markeer gelezen</button>
-                                <button id="starBtn" class="ghost-btn" type="button">Ster</button>
-                                <button id="archiveBtn" class="ghost-btn" type="button">Archiveer</button>
-                            </div>
-                        </div>
-                        <div id="previewPane" class="preview-scroll"></div>
-                    </section>
-                </section>
-            </section>
-        </main>
+  <!-- FOLDERS -->
+  <div class="mail-sidebar">
+    <div class="folder-item active" onclick="setFolder('inbox', this)">
+      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>
+      Inbox
+      <span class="folder-badge" id="badge-inbox">3</span>
     </div>
+    <div class="folder-item" onclick="setFolder('starred', this)">
+      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Gemarkeerd
+    </div>
+    <div class="folder-item" onclick="setFolder('sent', this)">
+      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Verzonden
+    </div>
+    <div class="folder-item" onclick="setFolder('drafts', this)">
+      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Concepten
+    </div>
+    <div class="folder-item" onclick="setFolder('spam', this)">
+      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Spam
+    </div>
+    <div class="folder-item" onclick="setFolder('trash', this)">
+      <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+      Prullenbak
+    </div>
+    <div class="folder-divider"></div>
+    <div class="folder-label">Labels</div>
+    <div class="folder-item" onclick="setFolder('offerte', this)">
+      <div style="width:10px;height:10px;border-radius:50%;background:#1a5f8a;flex-shrink:0"></div>
+      Offertes
+    </div>
+    <div class="folder-item" onclick="setFolder('factuur', this)">
+      <div style="width:10px;height:10px;border-radius:50%;background:#16733c;flex-shrink:0"></div>
+      Facturen
+    </div>
+    <div class="folder-item" onclick="setFolder('klant', this)">
+      <div style="width:10px;height:10px;border-radius:50%;background:#9b2355;flex-shrink:0"></div>
+      Klanten
+    </div>
+  </div>
 
-    <script>
-        (function () {
-            const STORAGE_KEY = 'softora_premium_mailbox_frontend_v1';
-            const sampleThreads = [
-                {
-                    id: 'mail-1',
-                    folder: 'inbox',
-                    sender: 'Daan Vermeer',
-                    email: 'daan@vermeerbouw.nl',
-                    subject: 'Bevestiging afspraak website traject',
-                    snippet: 'Dank, morgen om 09:30 is akkoord. Kunnen jullie ook alvast een grove planning meenemen?',
-                    timeLabel: '09:12',
-                    unread: true,
-                    starred: true,
-                    tags: ['Afspraak', 'Website'],
-                    bodyHtml: '<p>Hoi Softora,</p><p>Morgen om 09:30 uur is akkoord. Neem als het kan ook direct een grove planning en voorstel voor de homepage mee.</p><p>Groet,<br>Daan</p>'
-                },
-                {
-                    id: 'mail-2',
-                    folder: 'inbox',
-                    sender: 'Nina de Groot',
-                    email: 'nina@mediastudio.nl',
-                    subject: 'Vraag over bedrijfssoftware offerte',
-                    snippet: 'We willen vooral weten of jullie ook met bestaande tooling kunnen koppelen.',
-                    timeLabel: 'Gisteren',
-                    unread: true,
-                    starred: false,
-                    tags: ['Bedrijfssoftware'],
-                    bodyHtml: '<p>Goedemiddag,</p><p>We willen graag beter begrijpen of jullie bedrijfssoftware ook aan onze bestaande tooling kan koppelen. Denk aan facturatie en projectplanning.</p><p>Met vriendelijke groet,<br>Nina de Groot</p>'
-                },
-                {
-                    id: 'mail-3',
-                    folder: 'scheduled',
-                    sender: 'Softora CRM',
-                    email: 'noreply@softora.nl',
-                    subject: 'Concept bevestigingsmail voor afspraak vrijdag',
-                    snippet: 'Deze mail staat ingepland om vrijdag 08:00 te versturen.',
-                    timeLabel: 'Vrijdag',
-                    unread: false,
-                    starred: false,
-                    tags: ['Concept', 'Gepland'],
-                    bodyHtml: '<p>Conceptmail om de afspraak van vrijdag te bevestigen. Deze staat nu nog ingepland en is nog niet live verstuurd.</p>'
-                },
-                {
-                    id: 'mail-4',
-                    folder: 'archive',
-                    sender: 'Marlies van Rijn',
-                    email: 'marlies@rijninteriors.nl',
-                    subject: 'Dank voor de inventarisatie',
-                    snippet: 'Fijn gesprek. De samenvatting klopt, wij wachten jullie eerste concept af.',
-                    timeLabel: '29 mrt',
-                    unread: false,
-                    starred: false,
-                    tags: ['Archief'],
-                    bodyHtml: '<p>Bedankt voor de inventarisatie van vanochtend. De samenvatting klopt en we wachten jullie eerste concept af.</p>'
-                }
-            ];
+  <!-- MAIL LIST -->
+  <div class="mail-list">
+    <div class="mail-list-header">
+      <div class="mail-list-title" id="folder-label">Inbox</div>
+      <div class="mail-list-count" id="mail-count"></div>
+    </div>
+    <div class="mail-items" id="mail-items"></div>
+  </div>
 
-            const folderMeta = {
-                inbox: { label: 'Inbox', description: 'Binnengekomen berichten' },
-                scheduled: { label: 'Gepland', description: 'Voorbereide mails en drafts' },
-                archive: { label: 'Archief', description: 'Afgehandelde conversaties' }
-            };
+  <!-- MAIL DETAIL -->
+  <div class="mail-detail" id="mail-detail">
+    <div class="detail-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>
+      <p>Selecteer een e-mail om te lezen</p>
+    </div>
+  </div>
 
-            const state = {
-                folder: 'inbox',
-                query: '',
-                selectedId: 'mail-1',
-                items: sampleThreads.slice()
-            };
+</div>
 
-            const folderListEl = document.getElementById('folderList');
-            const summaryListEl = document.getElementById('summaryList');
-            const threadListEl = document.getElementById('threadList');
-            const previewPaneEl = document.getElementById('previewPane');
-            const mailSearchEl = document.getElementById('mailSearch');
-            const markReadBtn = document.getElementById('markReadBtn');
-            const starBtn = document.getElementById('starBtn');
-            const archiveBtn = document.getElementById('archiveBtn');
+<!-- COMPOSE -->
+<div class="compose-overlay" id="compose-overlay">
+  <div class="compose-box">
+    <div class="compose-head">
+      <div class="compose-head-title">Nieuwe mail</div>
+      <button class="compose-x" onclick="closeCompose()">×</button>
+    </div>
+    <div class="compose-field"><div class="compose-field-label">Aan</div><input type="email" id="c-to" placeholder="ontvanger@email.nl"></div>
+    <div class="compose-field"><div class="compose-field-label">Onderwerp</div><input type="text" id="c-subject" placeholder="Onderwerp…"></div>
+    <div class="compose-body"><textarea id="c-body" placeholder="Typ je bericht hier…"></textarea></div>
+    <div class="compose-footer">
+      <button class="btn-discard" onclick="closeCompose()">Verwijderen</button>
+      <button class="btn-send" onclick="sendMail()">Versturen</button>
+    </div>
+  </div>
+</div>
 
-            function saveState() {
-                try {
-                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                        folder: state.folder,
-                        selectedId: state.selectedId,
-                        items: state.items
-                    }));
-                } catch (_) {
-                    // ignore storage errors
-                }
-            }
+<div class="toast" id="toast"></div>
 
-            function loadState() {
-                try {
-                    const raw = window.localStorage.getItem(STORAGE_KEY);
-                    if (!raw) return;
-                    const parsed = JSON.parse(raw);
-                    if (!parsed || typeof parsed !== 'object') return;
-                    if (Array.isArray(parsed.items) && parsed.items.length) {
-                        state.items = parsed.items.map((item) => {
-                            const base = sampleThreads.find((thread) => thread.id === item.id) || {};
-                            return { ...base, ...item };
-                        });
-                    }
-                    if (typeof parsed.folder === 'string') state.folder = parsed.folder;
-                    if (typeof parsed.selectedId === 'string') state.selectedId = parsed.selectedId;
-                } catch (_) {
-                    // ignore parse errors
-                }
-            }
+<script>
+const avatarColors = ['#9b2355','#1a5f8a','#16733c','#7b3f00','#4a1a6b','#b45a00','#2c6e49'];
+const getColor = str => avatarColors[str.charCodeAt(0) % avatarColors.length];
+const initials = name => name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
 
-            function getFolderCount(folder) {
-                return state.items.filter((item) => item.folder === folder).length;
-            }
+const mails = [
+  { id:1, folder:'inbox', from:'De Vries Installaties', email:'info@devries-inst.nl', subject:'Offerte aanvraag website', preview:'Goedemiddag, wij zijn geïnteresseerd in een nieuwe bedrijfswebsite…', body:`Goedemiddag,
 
-            function getUnreadCount(folder) {
-                return state.items.filter((item) => item.folder === folder && item.unread).length;
-            }
+Wij zijn een installatiebedrijf gevestigd in Breda en zijn op zoek naar een nieuwe, professionele bedrijfswebsite.
 
-            function getVisibleThreads() {
-                const query = state.query.trim().toLowerCase();
-                return state.items.filter((item) => {
-                    if (item.folder !== state.folder) return false;
-                    if (!query) return true;
-                    return [
-                        item.sender,
-                        item.email,
-                        item.subject,
-                        item.snippet,
-                        Array.isArray(item.tags) ? item.tags.join(' ') : ''
-                    ].join(' ').toLowerCase().includes(query);
-                });
-            }
+Kunt u ons een offerte sturen voor een website met de volgende wensen:
+- Moderne uitstraling
+- Contactformulier
+- Overzicht van onze diensten
+- Mobiel vriendelijk
 
-            function getSelectedThread() {
-                return state.items.find((item) => item.id === state.selectedId) || null;
-            }
+Graag horen wij van u.
 
-            function ensureSelectedThread() {
-                const visible = getVisibleThreads();
-                if (!visible.length) {
-                    state.selectedId = '';
-                    return;
-                }
-                const selectedVisible = visible.some((item) => item.id === state.selectedId);
-                if (!selectedVisible) {
-                    state.selectedId = visible[0].id;
-                }
-            }
+Met vriendelijke groet,
+Jan de Vries
+De Vries Installaties`, time:'10:24', date:'Vandaag', unread:true, starred:false, tags:['offerte','klant'] },
 
-            function renderFolders() {
-                folderListEl.innerHTML = Object.entries(folderMeta).map(([key, meta]) => {
-                    const count = getFolderCount(key);
-                    const unread = getUnreadCount(key);
-                    const countText = unread > 0 ? unread : count;
-                    return `
-                        <button class="folder-button ${state.folder === key ? 'active' : ''}" type="button" data-folder="${key}">
-                            <div class="folder-name">
-                                <strong>${meta.label}</strong>
-                                <span>${meta.description}</span>
-                            </div>
-                            <span class="count-pill">${countText}</span>
-                        </button>
-                    `;
-                }).join('');
+  { id:2, folder:'inbox', from:'Hostinger', email:'billing@hostinger.com', subject:'Factuur #HG-2026-03142 beschikbaar', preview:'Uw factuur voor de maand maart is beschikbaar in uw account…', body:`Beste klant,
 
-                folderListEl.querySelectorAll('[data-folder]').forEach((button) => {
-                    button.addEventListener('click', function () {
-                        state.folder = String(this.getAttribute('data-folder') || 'inbox');
-                        ensureSelectedThread();
-                        saveState();
-                        render();
-                    });
-                });
-            }
+Uw factuur #HG-2026-03142 voor de maand maart 2026 is beschikbaar in uw Hostinger account.
 
-            function renderSummary() {
-                const unreadCount = state.items.filter((item) => item.unread).length;
-                const starredCount = state.items.filter((item) => item.starred).length;
-                const scheduledCount = getFolderCount('scheduled');
-                summaryListEl.innerHTML = [
-                    { label: 'Ongelezen', value: unreadCount, note: 'Direct aandacht' },
-                    { label: 'Met ster', value: starredCount, note: 'Belangrijke mails' },
-                    { label: 'Gepland', value: scheduledCount, note: 'Klaar om later te verzenden' }
-                ].map((item) => `
-                    <div class="summary-row">
-                        <div>
-                            <strong>${item.label}</strong>
-                            <span>${item.note}</span>
-                        </div>
-                        <span class="count-pill">${item.value}</span>
-                    </div>
-                `).join('');
-            }
+Bedrag: €9,99 incl. BTW
+Betaalmethode: Automatische incasso
+Status: Betaald
 
-            function renderThreads() {
-                ensureSelectedThread();
-                const visible = getVisibleThreads();
-                if (!visible.length) {
-                    threadListEl.innerHTML = '<div class="empty-state">Geen berichten gevonden binnen deze map.</div>';
-                    return;
-                }
+U kunt de factuur downloaden via uw control panel.
 
-                threadListEl.innerHTML = visible.map((item) => `
-                    <article class="thread-item ${state.selectedId === item.id ? 'active' : ''} ${item.unread ? 'unread' : ''}" data-thread-id="${item.id}">
-                        <div class="thread-top">
-                            <div class="thread-sender">${item.sender}</div>
-                            <div class="thread-time">${item.timeLabel}</div>
-                        </div>
-                        <div class="thread-subject">${item.subject}</div>
-                        <div class="thread-snippet">${item.snippet}</div>
-                        <div class="thread-tags">${(item.tags || []).map((tag) => `<span class="thread-tag">${tag}</span>`).join('')}</div>
-                    </article>
-                `).join('');
+Met vriendelijke groet,
+Het Hostinger Team`, time:'09:11', date:'Vandaag', unread:true, starred:false, tags:['factuur'] },
 
-                threadListEl.querySelectorAll('[data-thread-id]').forEach((itemEl) => {
-                    itemEl.addEventListener('click', function () {
-                        const id = String(this.getAttribute('data-thread-id') || '');
-                        state.selectedId = id;
-                        const thread = state.items.find((item) => item.id === id);
-                        if (thread) thread.unread = false;
-                        saveState();
-                        render();
-                    });
-                });
-            }
+  { id:3, folder:'inbox', from:'Sander Hoekstra', email:'s.hoekstra@gmail.com', subject:'Re: Onderhoudspakket verlenging', preview:'Hoi, bedankt voor de herinnering. Ik wil het pakket graag verlengen…', body:`Hoi,
 
-            function renderPreview() {
-                const selected = getSelectedThread();
-                if (!selected) {
-                    previewPaneEl.innerHTML = '<div class="empty-state">Kies links een bericht om de preview te openen.</div>';
-                    markReadBtn.disabled = true;
-                    starBtn.disabled = true;
-                    archiveBtn.disabled = true;
-                    return;
-                }
+Bedankt voor de herinnering. Ik wil het pakket inderdaad graag verlengen voor nog een jaar.
 
-                markReadBtn.disabled = false;
-                starBtn.disabled = false;
-                archiveBtn.disabled = false;
-                markReadBtn.textContent = selected.unread ? 'Markeer gelezen' : 'Markeer ongelezen';
-                starBtn.textContent = selected.starred ? 'Ster verwijderen' : 'Ster';
-                archiveBtn.textContent = selected.folder === 'archive' ? 'Terug naar inbox' : 'Archiveer';
+Kun je mij een nieuwe factuur sturen? Je kunt het gewoon op hetzelfde IBAN overmaken als vorige keer.
 
-                previewPaneEl.innerHTML = `
-                    <header class="preview-header">
-                        <div class="preview-title">${selected.subject}</div>
-                        <div class="preview-subline">
-                            <span><strong>Van:</strong> ${selected.sender}</span>
-                            <span><strong>E-mail:</strong> ${selected.email}</span>
-                            <span><strong>Tijd:</strong> ${selected.timeLabel}</span>
-                        </div>
-                    </header>
-                    <section class="preview-content">
-                        <div class="thread-tags">${(selected.tags || []).map((tag) => `<span class="thread-tag">${tag}</span>`).join('')}</div>
-                        <div class="preview-html">${selected.bodyHtml || ''}</div>
-                    </section>
-                `;
-            }
+Groeten,
+Sander`, time:'Gist.', date:'Gisteren', unread:true, starred:true, tags:['klant'] },
 
-            function render() {
-                renderFolders();
-                renderSummary();
-                renderThreads();
-                renderPreview();
-            }
+  { id:4, folder:'inbox', from:'Google Workspace', email:'noreply@google.com', subject:'Maandoverzicht maart 2026', preview:'Uw Google Workspace abonnement wordt op 1 april verlengd…', body:`Beste gebruiker,
 
-            function updateSelectedThread(mutator) {
-                const selected = getSelectedThread();
-                if (!selected) return;
-                mutator(selected);
-                saveState();
-                render();
-            }
+Uw maandoverzicht voor Google Workspace (Business Starter) is beschikbaar.
 
-            mailSearchEl.addEventListener('input', function () {
-                state.query = String(this.value || '');
-                renderThreads();
-                renderPreview();
-            });
+Periode: 1 maart – 31 maart 2026
+Kosten: €6,00 excl. BTW
+Volgende betaling: 1 april 2026
 
-            markReadBtn.addEventListener('click', function () {
-                updateSelectedThread((thread) => {
-                    thread.unread = !thread.unread;
-                });
-            });
+Bedankt voor uw gebruik van Google Workspace.
 
-            starBtn.addEventListener('click', function () {
-                updateSelectedThread((thread) => {
-                    thread.starred = !thread.starred;
-                });
-            });
+Met vriendelijke groet,
+Google Workspace Team`, time:'02 apr', date:'2 april', unread:false, starred:false, tags:['factuur'] },
 
-            archiveBtn.addEventListener('click', function () {
-                updateSelectedThread((thread) => {
-                    thread.folder = thread.folder === 'archive' ? 'inbox' : 'archive';
-                    thread.unread = false;
-                });
-            });
+  { id:5, folder:'inbox', from:'Martine Bakker', email:'m.bakker@bakkermode.nl', subject:'Wijziging homepage tekst', preview:'Beste, kunnen jullie de tekst op onze homepage aanpassen? We hebben…', body:`Beste,
 
-            loadState();
-            ensureSelectedThread();
-            render();
-        })();
-    </script>
+Kunnen jullie de tekst op onze homepage aanpassen? We hebben een nieuwe collectie gelanceerd en de tekst klopt niet meer.
+
+De nieuwe tekst:
+"Welkom bij Bakker Mode — dé modezaak van Tilburg. Bekijk onze nieuwe lentecollectie 2026."
+
+Kunnen jullie dit deze week nog aanpassen?
+
+Alvast bedankt,
+Martine Bakker`, time:'01 apr', date:'1 april', unread:false, starred:true, tags:['klant'] },
+
+  { id:6, folder:'sent', from:'Jij (Softora.nl)', email:'info@softora.nl', subject:'Offerte – Business pakket', preview:'Beste, hierbij ontvangt u de gevraagde offerte voor het Business pakket…', body:`Beste De Vries Installaties,
+
+Hierbij ontvangt u de gevraagde offerte voor het Business pakket.
+
+Pakket: Business
+Prijs: €1.499,- excl. BTW
+Oplevering: binnen 3 weken na akkoord
+
+De offerte is 30 dagen geldig.
+
+Met vriendelijke groet,
+Softora.nl`, time:'Vandaag', date:'Vandaag', unread:false, starred:false, tags:['offerte'] },
+
+  { id:7, folder:'drafts', from:'Concept', email:'', subject:'Nieuwsbrief april 2026', preview:'Beste klanten, hierbij de maandelijkse update van Softora…', body:`Beste klanten,
+
+Hierbij de maandelijkse update van Softora.nl.
+
+[CONCEPT — NOG NIET VERZONDEN]
+
+Met vriendelijke groet,
+Softora.nl`, time:'31 mrt', date:'31 maart', unread:false, starred:false, tags:[] },
+];
+
+let activeFolder = 'inbox';
+let activeMail = null;
+let filteredMails = [];
+
+function setFolder(folder, el) {
+  activeFolder = folder;
+  activeMail = null;
+  document.querySelectorAll('.folder-item').forEach(f => f.classList.remove('active'));
+  el.classList.add('active');
+  const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
+  document.getElementById('folder-label').textContent = labels[folder] || folder;
+  document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
+  renderList();
+}
+
+function getMailsForFolder(folder) {
+  if (['offerte','factuur','klant'].includes(folder)) return mails.filter(m => m.tags.includes(folder));
+  if (folder === 'starred') return mails.filter(m => m.starred);
+  return mails.filter(m => m.folder === folder);
+}
+
+function filterMails() { renderList(); }
+
+function renderList() {
+  const q = (document.getElementById('search-input').value || '').toLowerCase();
+  let list = getMailsForFolder(activeFolder);
+  if (q) list = list.filter(m => m.from.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.preview.toLowerCase().includes(q));
+  filteredMails = list;
+  document.getElementById('mail-count').textContent = list.length + ' mail' + (list.length !== 1 ? 's' : '');
+
+  const wrap = document.getElementById('mail-items');
+  if (!list.length) { wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Geen e-mails gevonden.</div>`; return; }
+
+  wrap.innerHTML = list.map(m => `
+    <div class="mail-item ${m.unread ? 'unread' : ''} ${activeMail === m.id ? 'active' : ''}" onclick="openMail(${m.id})">
+      ${m.unread ? '<div class="unread-dot"></div>' : ''}
+      <div class="mail-item-top">
+        <div class="mail-from">${m.from}</div>
+        <div class="mail-time">${m.time}</div>
+      </div>
+      <div class="mail-subject">${m.subject}</div>
+      <div class="mail-preview">${m.preview}</div>
+      ${m.tags.length ? `<div class="mail-tags">${m.tags.map(t => `<span class="mail-tag tag-${t}">${t}</span>`).join('')}</div>` : ''}
+    </div>`).join('');
+
+  const unread = mails.filter(m => m.folder === 'inbox' && m.unread).length;
+  const badge = document.getElementById('badge-inbox');
+  badge.textContent = unread;
+  badge.style.display = unread ? 'flex' : 'none';
+}
+
+function openMail(id) {
+  const m = mails.find(m => m.id === id);
+  if (!m) return;
+  activeMail = id;
+  m.unread = false;
+  renderList();
+
+  document.getElementById('mail-detail').innerHTML = `
+    <div class="detail-header">
+      <div class="detail-subject">${m.subject}</div>
+      <div class="detail-meta">
+        <div class="detail-from-wrap">
+          <div class="detail-avatar" style="background:${getColor(m.from)}">${initials(m.from)}</div>
+          <div>
+            <div class="detail-from">${m.from}</div>
+            <div class="detail-email">${m.email}</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+          <div class="detail-date">${m.date} · ${m.time}</div>
+          <div class="detail-actions">
+            <button class="btn-action" onclick="toggleStar(${m.id})">
+              <svg viewBox="0 0 24 24" fill="${m.starred ? '#9b2355' : 'none'}" stroke="${m.starred ? '#9b2355' : 'currentColor'}" stroke-width="1.8" width="12" height="12"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              ${m.starred ? 'Gemarkeerd' : 'Markeren'}
+            </button>
+            <button class="btn-action" onclick="replyMail('${m.email}', '${m.subject}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
+              Beantwoorden
+            </button>
+            <button class="btn-action" onclick="deleteMail(${m.id})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+              Verwijderen
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-body-text">${m.body}</div>
+    </div>`;
+}
+
+function toggleStar(id) {
+  const m = mails.find(m => m.id === id);
+  if (!m) return;
+  m.starred = !m.starred;
+  openMail(id);
+  renderList();
+}
+
+function deleteMail(id) {
+  const m = mails.find(m => m.id === id);
+  if (!m) return;
+  m.folder = 'trash';
+  activeMail = null;
+  document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
+  renderList();
+  toast('Mail verplaatst naar prullenbak');
+}
+
+function replyMail(email, subject) {
+  document.getElementById('c-to').value = email;
+  document.getElementById('c-subject').value = 'Re: ' + subject;
+  openCompose();
+}
+
+function openCompose() { document.getElementById('compose-overlay').classList.add('open'); }
+function closeCompose() {
+  document.getElementById('compose-overlay').classList.remove('open');
+  ['c-to','c-subject','c-body'].forEach(id => document.getElementById(id).value = '');
+}
+
+function sendMail() {
+  const to = document.getElementById('c-to').value.trim();
+  const subject = document.getElementById('c-subject').value.trim();
+  if (!to || !subject) { toast('Vul ontvanger en onderwerp in'); return; }
+  mails.push({ id: Date.now(), folder:'sent', from:'Jij (Softora.nl)', email:'info@softora.nl', subject, preview: document.getElementById('c-body').value.slice(0,80)+'…', body: document.getElementById('c-body').value, time:'Zojuist', date:'Vandaag', unread:false, starred:false, tags:[] });
+  closeCompose();
+  toast('✓ Mail verzonden');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg;
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+document.getElementById('compose-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('compose-overlay')) closeCompose();
+});
+
+renderList();
+</script>
 </body>
 </html>
