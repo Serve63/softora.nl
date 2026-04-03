@@ -290,15 +290,24 @@
 
         .modal-top {
             padding: 1.35rem 1.5rem 0;
-            display: flex; justify-content: space-between; align-items: flex-start;
+            display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
         }
+        .modal-top-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+        .modal-icon-btn,
         .modal-close {
             width: 36px; height: 36px; border: 1px solid var(--border);
             background: none; color: var(--text-tertiary); cursor: none;
             display: flex; align-items: center; justify-content: center; transition: all 0.2s;
             flex-shrink: 0;
         }
+        .modal-icon-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); }
         .modal-close:hover { border-color: var(--red); color: var(--red); }
+        .modal-icon-btn svg,
         .modal-close svg { width: 16px; height: 16px; }
 
         .modal-type-badge {
@@ -669,9 +678,18 @@
                 <div class="modal-company" id="modalCompany">Bedrijf</div>
                 <div class="modal-contact" id="modalContact">Contact</div>
             </div>
-            <button class="modal-close magnetic" onclick="closeModal()" type="button">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+            <div class="modal-top-actions">
+                <button class="modal-icon-btn magnetic" id="modalPdfBtn" type="button" aria-label="Download PDF" title="Download PDF">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v11"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m7 10 5 5 5-5"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 20h14"></path>
+                    </svg>
+                </button>
+                <button class="modal-close magnetic" onclick="closeModal()" type="button" aria-label="Sluiten">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
         </div>
         <div class="modal-body">
             <div class="modal-overview" id="modalOverview">
@@ -735,7 +753,6 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn secondary magnetic" id="modalPdfBtn" type="button">Download PDF</button>
             <button class="modal-btn primary magnetic" id="modalPrimaryBtn" type="button">Akkoord</button>
             <button class="modal-btn danger magnetic" id="modalNoDealBtn" type="button">Geen deal</button>
             <button class="modal-btn secondary magnetic" id="modalSecondaryBtn" type="button">Sluiten</button>

@@ -3221,6 +3221,19 @@ function extractCallUpdateFromRetellPayload(payload) {
     normalizeString(call?.metadata?.leadBranche) ||
     normalizeString(call?.metadata?.branche) ||
     normalizeString(call?.metadata?.sector);
+  const region =
+    normalizeString(call?.metadata?.leadRegion) ||
+    normalizeString(call?.metadata?.region) ||
+    normalizeString(call?.metadata?.leadCity) ||
+    normalizeString(call?.metadata?.city);
+  const province =
+    normalizeString(call?.metadata?.leadProvince) ||
+    normalizeString(call?.metadata?.province) ||
+    normalizeString(call?.metadata?.state);
+  const address =
+    normalizeString(call?.metadata?.leadAddress) ||
+    normalizeString(call?.metadata?.address) ||
+    normalizeString(call?.metadata?.street);
   const name =
     normalizeString(call?.metadata?.leadName) ||
     normalizeString(call?.metadata?.lead_name);
@@ -3260,6 +3273,9 @@ function extractCallUpdateFromRetellPayload(payload) {
     phone,
     company,
     branche,
+    region,
+    province,
+    address,
     name,
     status,
     messageType: `retell.${event || 'webhook'}`,
@@ -3335,6 +3351,15 @@ function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
       ''
   );
   const durationSeconds = parseNumberSafe(payload?.CallDuration || payload?.duration, null);
+  const region = normalizeString(
+    payload?.Region || payload?.region || payload?.LeadRegion || payload?.leadRegion || payload?.City || payload?.city || ''
+  );
+  const province = normalizeString(
+    payload?.Province || payload?.province || payload?.State || payload?.state || ''
+  );
+  const address = normalizeString(
+    payload?.Address || payload?.address || payload?.LeadAddress || payload?.leadAddress || payload?.Street || payload?.street || ''
+  );
   const recordingSid = normalizeString(
     payload?.RecordingSid || payload?.recording_sid || extractTwilioRecordingSidFromUrl(payload?.RecordingUrl || '')
   );
@@ -3358,6 +3383,9 @@ function extractCallUpdateFromTwilioPayload(payload = {}, options = {}) {
     branche: normalizeString(
       payload?.Branche || payload?.branche || payload?.Sector || payload?.sector || payload?.LeadBranche || ''
     ),
+    region,
+    province,
+    address,
     name: normalizeString(
       payload?.LeadName || payload?.name || payload?.CallerName || payload?.callerName || ''
     ),
@@ -3590,6 +3618,9 @@ function upsertRecentCallUpdate(update) {
         phone: update.phone || existing.phone || '',
         company: update.company || existing.company || '',
         branche: update.branche || existing.branche || '',
+        region: update.region || existing.region || '',
+        province: update.province || existing.province || '',
+        address: update.address || existing.address || '',
         name: update.name || existing.name || '',
         status: update.status || existing.status || '',
         summary: update.summary || existing.summary || '',
@@ -5660,6 +5691,49 @@ function resolveLeadFollowUpDateAndTime(callUpdate) {
   };
 }
 
+function sanitizeResolvedLocationText(value) {
+  return truncateText(normalizeString(value || ''), 220);
+}
+
+function composeResolvedAppointmentLocation(addressValue, regionValue) {
+  const address = sanitizeResolvedLocationText(addressValue || '');
+  const region = sanitizeResolvedLocationText(regionValue || '');
+  if (address && region) {
+    const addressKey = normalizeString(address).toLowerCase();
+    const regionKey = normalizeString(region).toLowerCase();
+    if (addressKey.includes(regionKey)) return address;
+    return truncateText(`${address}, ${region}`, 220);
+  }
+  return address || region;
+}
+
+function resolveAppointmentLocation(...sources) {
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+
+    const explicit = sanitizeResolvedLocationText(
+      source.location || source.appointmentLocation || source.locatie || ''
+    );
+    if (explicit) return explicit;
+
+    const combined = composeResolvedAppointmentLocation(
+      source.address || source.adres || source.street || source.straat || '',
+      source.region ||
+        source.regio ||
+        source.city ||
+        source.plaats ||
+        source.stad ||
+        source.province ||
+        source.provincie ||
+        source.state ||
+        ''
+    );
+    if (combined) return combined;
+  }
+
+  return '';
+}
+
 function shouldCreateLeadFollowUpFromCall(callUpdate, insight = null) {
   if (!callUpdate || !normalizeString(callUpdate.callId || '')) return false;
   if (!isOutboundOrUnknownCall(callUpdate)) return false;
@@ -5741,6 +5815,8 @@ function buildGeneratedLeadFollowUpFromCall(callUpdate, insight = null) {
     provider: normalizeString(callUpdate?.provider || ''),
     coldcallingStack: normalizedStack || '',
     coldcallingStackLabel: stackLabel || '',
+    location: resolveAppointmentLocation(callUpdate, insight),
+    recordingUrl: resolvePreferredRecordingUrl(callUpdate, insight),
     ...leadOwner,
   };
 }
@@ -5871,9 +5947,9 @@ function buildInterestedLeadCandidateRows(existingTasks = []) {
           ),
           900
         ),
-        location: '',
+        location: resolveAppointmentLocation(leadFollowUp, callUpdate, insight),
         whatsappInfo: truncateText(normalizeString(insight?.followUpReason || ''), 6000),
-        recordingUrl: resolvePreferredRecordingUrl(callUpdate),
+        recordingUrl: resolvePreferredRecordingUrl(leadFollowUp, callUpdate, insight),
         provider: normalizeString(leadFollowUp?.provider || callUpdate?.provider || '').toLowerCase(),
         providerLabel: coldcallingStackLabel || '',
         coldcallingStack: coldcallingStack || '',
@@ -6109,9 +6185,9 @@ function buildGroupedColdcallingLeadRows(existingTasks = []) {
             ),
             900
           ),
-          location: '',
+          location: resolveAppointmentLocation(latestUpdate, latestInsight),
           whatsappInfo: truncateText(normalizeString(latestInsight?.followUpReason || ''), 6000),
-          recordingUrl: resolvePreferredRecordingUrl(latestUpdate),
+          recordingUrl: resolvePreferredRecordingUrl(latestUpdate, latestInsight),
           provider: normalizeString(latestUpdate?.provider || latestInsight?.provider || '').toLowerCase(),
           providerLabel: normalizeString(
             latestUpdate?.stackLabel || latestInsight?.coldcallingStackLabel || latestInsight?.stackLabel || ''
@@ -6272,6 +6348,10 @@ function createRuleBasedInsightFromCallUpdate(callUpdate) {
     contactName: normalizeString(callUpdate.name || ''),
     phone: normalizeString(callUpdate.phone || ''),
     branche: normalizeString(callUpdate.branche || ''),
+    region: normalizeString(callUpdate.region || ''),
+    province: normalizeString(callUpdate.province || ''),
+    address: normalizeString(callUpdate.address || ''),
+    location: resolveAppointmentLocation(callUpdate),
     summary: ruleSummary,
     appointmentBooked: Boolean(appointmentBooked && appointmentDate),
     appointmentDate: appointmentBooked ? appointmentDate : '',
@@ -6450,13 +6530,14 @@ function sanitizeAppointmentWhatsappInfo(value) {
 function buildLeadToAgendaSummaryFallback(baseSummary, location, whatsappInfo) {
   const parts = [];
   const summaryText = truncateText(normalizeString(baseSummary || ''), 2600);
+  const normalizedSummaryText = summaryContainsEnglishMarkers(summaryText) ? '' : summaryText;
   const locationText = sanitizeAppointmentLocation(location || '');
   const whatsappText = sanitizeAppointmentWhatsappInfo(whatsappInfo || '');
 
-  if (summaryText) {
-    parts.push(summaryText);
+  if (normalizedSummaryText) {
+    parts.push(normalizedSummaryText);
   } else {
-    parts.push('De lead is ingepland voor verdere opvolging vanuit het leads-overzicht.');
+    parts.push('De lead is telefonisch gesproken en ingepland voor verdere opvolging door Softora.');
   }
   if (locationText) {
     parts.push(`De afspraak staat ingepland op locatie ${locationText}.`);
@@ -6550,7 +6631,7 @@ async function refreshGeneratedAgendaAppointmentSummaryAtIndex(idx, reason = 'ag
 async function refreshGeneratedAgendaSummariesIfNeeded(limit = 24) {
   const candidateIndexes = generatedAgendaAppointments
     .map((appointment, idx) => ({ appointment, idx }))
-    .filter(({ appointment }) => isGeneratedAppointmentConfirmedForAgenda(appointment))
+    .filter(({ appointment }) => isGeneratedAppointmentVisibleForAgenda(appointment))
     .filter(({ appointment }) =>
       agendaSummaryNeedsRefresh(appointment?.summary, appointment?.whatsappInfo, appointment?.summaryFormatVersion)
     )
@@ -6585,6 +6666,111 @@ async function refreshGeneratedAgendaSummariesIfNeeded(limit = 24) {
     if (updated) refreshed += 1;
   }
   return refreshed;
+}
+
+function buildBackfilledGeneratedAgendaAppointment(appointment) {
+  if (!appointment || typeof appointment !== 'object') return appointment;
+
+  const callId = normalizeString(appointment.callId || '');
+  if (!callId || callId.startsWith('demo-')) return appointment;
+
+  const callUpdate = getLatestCallUpdateByCallId(callId);
+  const insight = aiCallInsightsByCallId.get(callId) || null;
+  const nextLocation = resolveAppointmentLocation(appointment, callUpdate, insight);
+  const nextRecordingUrl = resolvePreferredRecordingUrl(appointment, callUpdate, insight);
+  const nextSummary = truncateText(
+    normalizeString(
+      appointment.summary ||
+        insight?.summary ||
+        callUpdate?.summary ||
+        callUpdate?.transcriptSnippet ||
+        ''
+    ),
+    4000
+  );
+
+  let changed = false;
+  const nextAppointment = { ...appointment };
+
+  if (nextLocation && nextLocation !== normalizeString(appointment.location || appointment.appointmentLocation || '')) {
+    nextAppointment.location = nextLocation;
+    changed = true;
+  }
+
+  if (nextRecordingUrl && nextRecordingUrl !== normalizeString(appointment.recordingUrl || '')) {
+    nextAppointment.recordingUrl = nextRecordingUrl;
+    changed = true;
+  }
+
+  if (nextSummary && nextSummary !== normalizeString(appointment.summary || '')) {
+    nextAppointment.summary = nextSummary;
+    changed = true;
+  }
+
+  if (!changed) return appointment;
+  return nextAppointment;
+}
+
+function backfillGeneratedAgendaAppointmentsMetadataIfNeeded() {
+  let touched = false;
+
+  generatedAgendaAppointments.forEach((appointment, idx) => {
+    const nextAppointment = buildBackfilledGeneratedAgendaAppointment(appointment);
+    if (nextAppointment === appointment) return;
+
+    generatedAgendaAppointments[idx] = nextAppointment;
+    const id = Number(nextAppointment?.id || 0);
+    const callId = normalizeString(nextAppointment?.callId || '');
+    if (id > 0 && callId) {
+      agendaAppointmentIdByCallId.set(callId, id);
+    }
+    touched = true;
+  });
+
+  if (touched) {
+    queueRuntimeStatePersist('agenda_appointment_metadata_backfill');
+  }
+
+  return touched;
+}
+
+async function refreshAgendaAppointmentCallSourcesIfNeeded(limit = 8) {
+  const candidates = generatedAgendaAppointments
+    .map((appointment) => {
+      const callId = normalizeString(appointment?.callId || '');
+      const provider = normalizeString(appointment?.provider || '').toLowerCase();
+      return {
+        appointment,
+        callId,
+        provider,
+        missingLocation: !resolveAppointmentLocation(appointment),
+        missingRecording: !resolvePreferredRecordingUrl(appointment),
+      };
+    })
+    .filter(({ appointment, callId, missingLocation, missingRecording }) => {
+      if (!isGeneratedAppointmentVisibleForAgenda(appointment)) return false;
+      if (!callId || callId.startsWith('demo-')) return false;
+      return missingLocation || missingRecording;
+    })
+    .slice(0, Math.max(0, Math.min(20, Number(limit || 8) || 8)));
+
+  if (!candidates.length) return 0;
+
+  const unique = new Map();
+  candidates.forEach((item) => {
+    if (!unique.has(item.callId)) unique.set(item.callId, item);
+  });
+
+  await Promise.allSettled(
+    Array.from(unique.values()).map(async ({ callId, provider }) => {
+      if (provider === 'twilio' || /^CA[a-z0-9]+$/i.test(callId)) {
+        return refreshCallUpdateFromTwilioStatusApi(callId, { direction: 'outbound' });
+      }
+      return refreshCallUpdateFromRetellStatusApi(callId);
+    })
+  );
+
+  return unique.size;
 }
 
 function mapAppointmentToConfirmationTask(appointment) {
@@ -6962,6 +7148,8 @@ function buildGeneratedAgendaAppointmentFromAiInsight(insight) {
     provider: provider || '',
     coldcallingStack: coldcallingStack || '',
     coldcallingStackLabel: coldcallingStackLabel || '',
+    location: resolveAppointmentLocation(insight),
+    recordingUrl: resolvePreferredRecordingUrl(getLatestCallUpdateByCallId(callId), insight),
     ...buildLeadOwnerFields(callId),
   };
 }
@@ -8395,6 +8583,8 @@ function isTerminalColdcallingStatus(status, endedReason = '') {
 function buildRetellPayload(lead, campaign) {
   const normalizedPhone = normalizeNlPhoneToE164(lead.phone);
   const effectiveRegion = normalizeString(lead.region) || normalizeString(campaign.region);
+  const effectiveProvince = normalizeString(lead.province);
+  const effectiveAddress = normalizeString(lead.address);
   const overrideAgentId = normalizeString(process.env.RETELL_AGENT_ID);
   const overrideAgentVersion = parseIntSafe(process.env.RETELL_AGENT_VERSION, 0);
 
@@ -8416,6 +8606,9 @@ function buildRetellPayload(lead, campaign) {
       leadName: normalizeString(lead.name),
       leadBranche: normalizeString(lead.branche || lead.branch || lead.sector || ''),
       leadPhoneE164: normalizedPhone,
+      leadRegion: effectiveRegion,
+      leadProvince: effectiveProvince,
+      leadAddress: effectiveAddress,
       sector: normalizeString(campaign.sector),
       region: effectiveRegion,
     },
@@ -8464,6 +8657,9 @@ async function processRetellColdcallingLead(lead, campaign, index) {
         phone: normalizedPhone,
         company: normalizeString(lead.company),
         branche: normalizeString(lead.branche || lead.branch || lead.sector || campaign.sector || ''),
+        region: normalizeString(lead.region || campaign.region || ''),
+        province: normalizeString(lead.province || ''),
+        address: normalizeString(lead.address || ''),
         name: normalizeString(lead.name),
         status: callStatus,
         messageType: 'coldcalling.start.response',
@@ -8601,6 +8797,9 @@ async function processTwilioColdcallingLead(lead, campaign, index) {
         phone: normalizedPhone,
         company: normalizeString(lead.company),
         branche: normalizeString(lead.branche || lead.branch || lead.sector || campaign.sector || ''),
+        region: normalizeString(lead.region || campaign.region || ''),
+        province: normalizeString(lead.province || ''),
+        address: normalizeString(lead.address || ''),
         name: normalizeString(lead.name),
         status: callStatus,
         messageType: 'twilio.start.response',
@@ -11883,6 +12082,9 @@ app.get('/api/agenda/appointments', async (req, res) => {
   if (isImapMailConfigured()) {
     await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
   }
+  backfillInsightsAndAppointmentsFromRecentCallUpdates();
+  await refreshAgendaAppointmentCallSourcesIfNeeded();
+  backfillGeneratedAgendaAppointmentsMetadataIfNeeded();
   await refreshGeneratedAgendaSummariesIfNeeded();
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 200)));
   const sorted = generatedAgendaAppointments
@@ -13134,10 +13336,18 @@ function buildMaterializedInterestedLeadAppointment(callId, requestBody = {}) {
       ) || '',
     coldcallingStack: normalizedStack || '',
     coldcallingStackLabel: stackLabel || '',
-    location: sanitizeAppointmentLocation(requestBody.location || existingAppointment?.location || ''),
+    location: resolveAppointmentLocation(
+      requestBody,
+      existingAppointment,
+      followUpLead,
+      leadRow,
+      callUpdate,
+      insight
+    ),
     whatsappInfo: sanitizeAppointmentWhatsappInfo(
       requestBody.whatsappInfo || existingAppointment?.whatsappInfo || leadRow?.whatsappInfo || ''
     ),
+    recordingUrl: resolvePreferredRecordingUrl(existingAppointment, followUpLead, leadRow, callUpdate, insight),
     ...leadOwner,
   };
 }
