@@ -3729,9 +3729,12 @@
   }
 
   function isQualifiedPhoneConversation(call) {
-    const statusText = normalizeSearchText(`${call?.status || ''} ${call?.endedReason || ''}`);
     const messageType = normalizeSearchText(String(call?.messageType || ''));
     const directionText = normalizeSearchText(String(call?.direction || ''));
+    const callId = normalizeFreeText(call?.callId || '');
+    const phone = normalizeFreeText(call?.phone || '');
+    const status = normalizeSearchText(String(call?.status || ''));
+    const endedReason = normalizeSearchText(String(call?.endedReason || ''));
     const hasConversationContent = Boolean(
       String(call?.summary || '').trim() ||
       String(call?.transcriptSnippet || '').trim() ||
@@ -3749,18 +3752,10 @@
       return false;
     }
 
-    if (
-      /(not[_ -]?connected|no[_ -]?answer|unanswered|failed|dial[_ -]?failed|busy|voicemail|initiated|queued|ringing|cancelled|canceled|rejected|error)/.test(
-        statusText
-      )
-    ) {
-      return false;
-    }
-
-    const answered = inferConversationAnswered(call);
-    if (answered === false) return false;
-
+    // Telefoongesprekken in de Database moeten niet verdwijnen wanneer een provider
+    // later statuslabels bijwerkt (bijv. failed/no_answer/not_connected).
     if (hasRecording || hasConversationContent || hasKnownDuration) return true;
+    if (callId && (status || endedReason || phone)) return true;
     if (looksLikeInboundStreamCall) return true;
     return false;
   }
