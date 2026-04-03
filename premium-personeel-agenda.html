@@ -1130,9 +1130,13 @@
     function extractAddressLikeLocationFromText(value) {
         const text = String(value || '').replace(/\s+/g, ' ').trim();
         if (!text) return '';
-        const match = text.match(
-            /\b([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-]*)*\s(?:straat|laan|weg|dreef|plein|markt|kade|gracht|singel|steeg|boulevard|pad|hof|baan|wal|plantsoen|poort)\s+\d{1,4}[a-zA-Z]?(?:\s*,\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-\s]{1,60})?)/i
-        );
+        const match =
+            text.match(
+                /\b([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-]*)*(?:straat|laan|weg|dreef|plein|markt|kade|gracht|singel|steeg|boulevard|pad|hof|baan|wal|plantsoen|poort)\s+\d{1,4}[a-zA-Z]?(?:\s*,\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-\s]{1,60})?)/i
+            ) ||
+            text.match(
+                /\b([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-]*)*\s(?:straat|laan|weg|dreef|plein|markt|kade|gracht|singel|steeg|boulevard|pad|hof|baan|wal|plantsoen|poort)\s+\d{1,4}[a-zA-Z]?(?:\s*,\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-\s]{1,60})?)/i
+            );
         return match ? String(match[1] || '').trim() : '';
     }
 
@@ -1145,14 +1149,42 @@
     }
 
     function buildAppointmentSummaryDisplay(apt, locationText) {
-        const baseSummary = String(apt?.summary || '').trim();
+        let baseSummary = String(apt?.summary || '').trim();
+        const whatsappConfirmed = Boolean(apt?.whatsappConfirmed);
         const whatsappInfo = String(apt?.whatsappInfo || '').trim();
+
+        if (locationText) {
+            const extractedLocation = extractAddressLikeLocationFromText(baseSummary);
+            if (extractedLocation && !textIncludesNormalized(locationText, extractedLocation)) {
+                const escapedLocation = extractedLocation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                baseSummary = baseSummary.replace(new RegExp(escapedLocation, 'gi'), locationText);
+            }
+            baseSummary = baseSummary
+                .replace(/\bnog niet ingevuld\b/gi, locationText)
+                .replace(/\bonbekend\b/gi, locationText)
+                .replace(
+                    /\blocatie\s+(?:is|staat|op)\s+\d+(?:[.,]\d+)?\s*(?:km|kilometer|kilometers|m|meter|meters)\b/gi,
+                    `locatie is ${locationText}`
+                );
+        }
+
+        if (whatsappConfirmed) {
+            baseSummary = baseSummary
+                .replace(/\b(er\s+wordt\s+nog\s+een\s+bevestigings(?:bericht|mail)[^.?!]*[.?!])/gi, ' ')
+                .replace(/\b([A-Za-zÀ-ÿ'’\s-]{1,80}\s+reageert\s+op\s+dat\s+bericht[^.?!]*[.?!])/gi, ' ')
+                .replace(/\b([A-Za-zÀ-ÿ'’\s-]{1,80}\s+heeft\s+aangegeven\s+op\s+dit\s+bericht\s+te\s+zullen\s+reageren[^.?!]*[.?!])/gi, ' ')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+        }
         const parts = [];
         if (baseSummary) {
             parts.push(baseSummary);
         }
         if (locationText && !textIncludesNormalized(baseSummary, locationText)) {
             parts.push(`Locatie: ${locationText}.`);
+        }
+        if (whatsappConfirmed && !/bevestigd via whatsapp/i.test(baseSummary)) {
+            parts.push('De afspraak is bevestigd via WhatsApp.');
         }
         if (whatsappInfo && !textIncludesNormalized(baseSummary, whatsappInfo)) {
             parts.push(`Aanvullend via WhatsApp: ${whatsappInfo}.`);
@@ -1195,6 +1227,7 @@
             summaryFormatVersion: Number(item.summaryFormatVersion || 0) || 0,
             location: String(item.location || item.appointmentLocation || ''),
             whatsappInfo: String(item.whatsappInfo || item.whatsappNotes || ''),
+            whatsappConfirmed: Boolean(item.whatsappConfirmed),
             durationSeconds: Number(item.durationSeconds || item.duration_seconds || 0) || 0,
             callId: String(item.callId || ''),
             recordingUrl: resolveAppointmentRecordingUrl(item),
