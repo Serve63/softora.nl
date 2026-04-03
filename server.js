@@ -98,6 +98,8 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const SUPABASE_STATE_TABLE = String(process.env.SUPABASE_STATE_TABLE || 'softora_runtime_state').trim();
 const SUPABASE_STATE_KEY = String(process.env.SUPABASE_STATE_KEY || 'core').trim();
+const SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX = `${SUPABASE_STATE_KEY}:call_update:`;
+const SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT = 1000;
 const DEFAULT_TWILIO_MEDIA_WS_URL = 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media';
 const PREMIUM_LOGIN_EMAILS = Array.from(
   new Set(
@@ -226,11 +228,14 @@ let inboundConfirmationMailSyncLastResult = null;
 let supabaseStateHydrationPromise = null;
 let supabaseStateHydrated = false;
 let supabasePersistChain = Promise.resolve(true);
+let supabaseCallUpdatePersistChain = Promise.resolve(true);
 let supabaseHydrateRetryNotBeforeMs = 0;
 let supabaseLastHydrateError = '';
 let supabaseLastPersistError = '';
+let supabaseLastCallUpdatePersistError = '';
 let runtimeStateObservedAtMs = 0;
 let runtimeStateLastSupabaseSyncCheckMs = 0;
+let supabaseCallUpdatesLastSyncCheckMs = 0;
 const RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS = 4000;
 const RUNTIME_STATE_REMOTE_NEWER_THRESHOLD_MS = 250;
 const UI_STATE_SCOPE_PREFIX = 'ui_state:';
@@ -1494,6 +1499,62 @@ async function upsertSupabaseRowViaRest(row) {
   }
 }
 
+function buildSupabaseCallUpdateStateKey(callId) {
+  const normalizedCallId = normalizeString(callId || '');
+  if (!normalizedCallId) return '';
+  return `${SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX}${normalizedCallId}`;
+}
+
+function extractCallIdFromSupabaseCallUpdateStateKey(stateKey) {
+  const normalizedStateKey = normalizeString(stateKey || '');
+  if (!normalizedStateKey) return '';
+  if (!normalizedStateKey.startsWith(SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX)) return '';
+  return normalizeString(normalizedStateKey.slice(SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX.length));
+}
+
+async function fetchSupabaseCallUpdateRowsViaRest(limit = SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT) {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
+  }
+
+  const safeLimit = Math.max(1, Math.min(2000, Number(limit) || SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT));
+  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
+  const likePattern = `${SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX}%`;
+  const url =
+    `${baseUrl}/rest/v1/${encodeURIComponent(SUPABASE_STATE_TABLE)}` +
+    `?select=${encodeURIComponent('state_key,payload,updated_at')}` +
+    `&state_key=like.${encodeURIComponent(likePattern)}` +
+    '&order=updated_at.desc' +
+    `&limit=${safeLimit}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
+
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = text;
+    }
+
+    return { ok: response.ok, status: response.status, body, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      status: null,
+      body: null,
+      error: truncateText(error?.message || String(error), 500),
+    };
+  }
+}
+
 function getSupabaseClient() {
   if (!isSupabaseConfigured()) return null;
   if (supabaseClient) return supabaseClient;
@@ -1553,6 +1614,87 @@ function compactRuntimeSnapshotCallUpdate(item) {
     business_mode: compactRuntimeSnapshotText(item?.business_mode, 80),
     serviceType: compactRuntimeSnapshotText(item?.serviceType, 80),
     service_type: compactRuntimeSnapshotText(item?.service_type, 80),
+  };
+}
+
+function buildSupabaseCallUpdatePayload(callUpdate, reason = 'call_update_row') {
+  const compact = compactRuntimeSnapshotCallUpdate(callUpdate || {});
+  if (!normalizeString(compact?.callId || '')) return null;
+  const persistedAtIso = new Date().toISOString();
+  return {
+    version: 1,
+    type: 'call_update',
+    reason: compactRuntimeSnapshotText(reason, 80),
+    savedAt: persistedAtIso,
+    callUpdate: compact,
+  };
+}
+
+function extractSupabaseCallUpdateFromRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  const rowCallId = extractCallIdFromSupabaseCallUpdateStateKey(row?.state_key || row?.stateKey || '');
+  const payload = row?.payload && typeof row.payload === 'object' ? row.payload : null;
+  const candidate =
+    payload && payload.callUpdate && typeof payload.callUpdate === 'object'
+      ? payload.callUpdate
+      : payload && payload.update && typeof payload.update === 'object'
+        ? payload.update
+        : payload && payload.type === 'call_update'
+          ? payload
+          : null;
+  const compact = compactRuntimeSnapshotCallUpdate({
+    ...(candidate && typeof candidate === 'object' ? candidate : {}),
+    callId:
+      normalizeString(candidate?.callId || candidate?.call_id || '') ||
+      rowCallId,
+    updatedAt:
+      normalizeString(candidate?.updatedAt || candidate?.updated_at || '') ||
+      normalizeString(row?.updated_at || row?.updatedAt || ''),
+    updatedAtMs:
+      Number(candidate?.updatedAtMs || candidate?.updated_at_ms || 0) ||
+      Date.parse(
+        normalizeString(candidate?.updatedAt || candidate?.updated_at || row?.updated_at || row?.updatedAt || '')
+      ) ||
+      0,
+  });
+  if (!normalizeString(compact?.callId || '')) return null;
+  return compact;
+}
+
+async function fetchSupabaseCallUpdateRows(limit = SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT) {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, status: null, rows: [], error: 'Supabase niet geconfigureerd.' };
+  }
+
+  const safeLimit = Math.max(1, Math.min(2000, Number(limit) || SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT));
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from(SUPABASE_STATE_TABLE)
+        .select('state_key,payload,updated_at')
+        .like('state_key', `${SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX}%`)
+        .order('updated_at', { ascending: false })
+        .limit(safeLimit);
+      if (!error) {
+        return {
+          ok: true,
+          status: 200,
+          rows: Array.isArray(data) ? data : [],
+          error: null,
+        };
+      }
+    } catch {
+      // Val terug op REST wanneer client query faalt.
+    }
+  }
+
+  const fallback = await fetchSupabaseCallUpdateRowsViaRest(safeLimit);
+  return {
+    ok: Boolean(fallback.ok),
+    status: fallback.status,
+    rows: Array.isArray(fallback.body) ? fallback.body : [],
+    error: fallback.error || null,
   };
 }
 
@@ -2134,6 +2276,7 @@ async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
         if (row && row.payload && typeof row.payload === 'object') {
           applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
         }
+        await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
         supabaseStateHydrated = true;
         supabaseLastHydrateError = '';
         supabaseHydrateRetryNotBeforeMs = 0;
@@ -2155,6 +2298,8 @@ async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
           })
         );
       }
+
+      await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
 
       supabaseStateHydrated = true;
       supabaseLastHydrateError = '';
@@ -2313,11 +2458,178 @@ function queueRuntimeStatePersist(reason = 'unknown') {
 async function waitForQueuedRuntimeStatePersist() {
   if (!isSupabaseConfigured()) return false;
   try {
-    return Boolean(await supabasePersistChain);
+    const runtimePersistOk = Boolean(await supabasePersistChain);
+    const callUpdatePersistOk = Boolean(await supabaseCallUpdatePersistChain);
+    return runtimePersistOk && callUpdatePersistOk;
   } catch (error) {
     console.error('[Supabase][PersistAwaitError]', error?.message || error);
     return false;
   }
+}
+
+function buildCallUpdateRowPersistMeta(callUpdate, reason = 'call_update_row') {
+  return {
+    reason: truncateText(normalizeString(reason || ''), 80) || 'call_update_row',
+    callId: truncateText(normalizeString(callUpdate?.callId || ''), 140),
+    status: truncateText(normalizeString(callUpdate?.status || ''), 80),
+    provider: truncateText(normalizeString(callUpdate?.provider || ''), 40),
+    updatedAt: normalizeString(callUpdate?.updatedAt || '') || new Date().toISOString(),
+  };
+}
+
+async function persistSingleCallUpdateRowToSupabase(callUpdate, reason = 'call_update_row') {
+  if (!isSupabaseConfigured()) return false;
+  const compact = compactRuntimeSnapshotCallUpdate(callUpdate || {});
+  const callId = normalizeString(compact?.callId || '');
+  if (!callId || callId.startsWith('demo-')) return false;
+
+  const stateKey = buildSupabaseCallUpdateStateKey(callId);
+  if (!stateKey) return false;
+
+  const payload = buildSupabaseCallUpdatePayload(compact, reason);
+  if (!payload) return false;
+
+  const updatedAt = normalizeString(compact?.updatedAt || '') || new Date().toISOString();
+  const row = {
+    state_key: stateKey,
+    payload,
+    updated_at: updatedAt,
+    meta: buildCallUpdateRowPersistMeta(compact, reason),
+  };
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
+        onConflict: 'state_key',
+      });
+      if (!error) {
+        supabaseLastCallUpdatePersistError = '';
+        return true;
+      }
+      const fallback = await upsertSupabaseRowViaRest(row);
+      if (fallback.ok) {
+        supabaseLastCallUpdatePersistError = '';
+        return true;
+      }
+      const fallbackMsg = fallback.error
+        ? ` | REST fallback: ${fallback.error}`
+        : fallback.status
+          ? ` | REST fallback status: ${fallback.status}`
+          : '';
+      supabaseLastCallUpdatePersistError = truncateText(
+        `${error.message || String(error)}${fallbackMsg}`,
+        500
+      );
+      return false;
+    } catch (error) {
+      const fallback = await upsertSupabaseRowViaRest(row);
+      if (fallback.ok) {
+        supabaseLastCallUpdatePersistError = '';
+        return true;
+      }
+      const fallbackMsg = fallback.error
+        ? ` | REST fallback: ${fallback.error}`
+        : fallback.status
+          ? ` | REST fallback status: ${fallback.status}`
+          : '';
+      supabaseLastCallUpdatePersistError = truncateText(
+        `${error?.message || String(error)}${fallbackMsg}`,
+        500
+      );
+      return false;
+    }
+  }
+
+  const fallback = await upsertSupabaseRowViaRest(row);
+  if (fallback.ok) {
+    supabaseLastCallUpdatePersistError = '';
+    return true;
+  }
+  supabaseLastCallUpdatePersistError = truncateText(
+    fallback.error || `REST fallback status: ${fallback.status || 'onbekend'}`,
+    500
+  );
+  return false;
+}
+
+function queueCallUpdateRowPersist(callUpdate, reason = 'call_update_row') {
+  if (!isSupabaseConfigured()) return Promise.resolve(false);
+  const callId = normalizeString(callUpdate?.callId || '');
+  if (!callId || callId.startsWith('demo-')) return Promise.resolve(false);
+
+  supabaseCallUpdatePersistChain = supabaseCallUpdatePersistChain
+    .catch(() => null)
+    .then(() => persistSingleCallUpdateRowToSupabase(callUpdate, reason))
+    .catch((error) => {
+      supabaseLastCallUpdatePersistError = truncateText(error?.message || String(error), 500);
+      return false;
+    });
+
+  return supabaseCallUpdatePersistChain;
+}
+
+async function waitForQueuedCallUpdateRowPersist() {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    return Boolean(await supabaseCallUpdatePersistChain);
+  } catch (error) {
+    console.error('[Supabase][CallUpdatePersistAwaitError]', error?.message || error);
+    return false;
+  }
+}
+
+function mergeCallUpdatesFromSupabaseRows(rows = []) {
+  let touched = 0;
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const callUpdate = extractSupabaseCallUpdateFromRow(row);
+    if (!callUpdate) return;
+    const before = callUpdatesById.get(callUpdate.callId) || null;
+    const after = upsertRecentCallUpdate(callUpdate, {
+      persistRuntimeState: false,
+      persistCallUpdateRow: false,
+    });
+    if (!after) return;
+    const beforeMs = getRuntimeSnapshotItemTimestampMs(before || {});
+    const afterMs = getRuntimeSnapshotItemTimestampMs(after || {});
+    if (!before || afterMs > beforeMs) {
+      touched += 1;
+    }
+  });
+  return touched;
+}
+
+async function syncCallUpdatesFromSupabaseRows(options = {}) {
+  if (!isSupabaseConfigured()) return false;
+
+  const force = Boolean(options?.force);
+  const maxAgeMs = Math.max(
+    0,
+    parseNumberSafe(options?.maxAgeMs, RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS) ||
+      RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS
+  );
+  const nowMs = Date.now();
+
+  if (
+    !force &&
+    supabaseCallUpdatesLastSyncCheckMs > 0 &&
+    nowMs - supabaseCallUpdatesLastSyncCheckMs < maxAgeMs
+  ) {
+    return false;
+  }
+
+  await waitForQueuedCallUpdateRowPersist();
+  const rowsResult = await fetchSupabaseCallUpdateRows(SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT);
+  supabaseCallUpdatesLastSyncCheckMs = Date.now();
+  if (!rowsResult.ok) {
+    if (rowsResult.error) {
+      supabaseLastHydrateError = truncateText(rowsResult.error, 500);
+    }
+    return false;
+  }
+
+  const touched = mergeCallUpdatesFromSupabaseRows(rowsResult.rows || []);
+  return touched > 0;
 }
 
 async function syncRuntimeStateFromSupabaseIfNewer(options = {}) {
@@ -2379,10 +2691,13 @@ async function syncRuntimeStateFromSupabaseIfNewer(options = {}) {
   supabaseLastHydrateError = '';
 
   if (!shouldApply) {
+    await syncCallUpdatesFromSupabaseRows({ force, maxAgeMs });
     return false;
   }
 
-  return applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
+  const applied = applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
+  await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
+  return applied;
 }
 
 function createSecurityAuditEvent(input) {
@@ -4206,46 +4521,99 @@ function shouldRefreshRetellCallStatus(update, nowMs = Date.now()) {
   return true;
 }
 
-function upsertRecentCallUpdate(update) {
+function collectMissingCallUpdateRefreshCandidates(limit = 6) {
+  const maxItems = Math.max(0, Math.min(30, Number(limit) || 6));
+  if (maxItems <= 0) return [];
+
+  const seenCallIds = new Set();
+  const candidates = [];
+
+  const registerCandidate = (item) => {
+    const callId = normalizeString(item?.callId || item?.call_id || '');
+    if (!callId || callId.startsWith('demo-')) return;
+    if (callUpdatesById.has(callId) || seenCallIds.has(callId)) return;
+
+    const stack = normalizeColdcallingStack(
+      item?.coldcallingStack || item?.callingStack || item?.stack || item?.callingEngine || ''
+    );
+    const providerHint = normalizeString(item?.provider || inferCallProvider(callId, 'retell')).toLowerCase();
+    const provider = inferCallProvider(callId, providerHint || 'retell');
+    const updatedAtMs = getRuntimeSnapshotItemTimestampMs(item || {});
+
+    seenCallIds.add(callId);
+    candidates.push({
+      callId,
+      provider,
+      direction: 'outbound',
+      stack,
+      updatedAtMs,
+    });
+  };
+
+  generatedAgendaAppointments.forEach(registerCandidate);
+  recentAiCallInsights.forEach(registerCandidate);
+
+  return candidates
+    .sort((a, b) => Number(b?.updatedAtMs || 0) - Number(a?.updatedAtMs || 0))
+    .slice(0, maxItems);
+}
+
+function upsertRecentCallUpdate(update, options = {}) {
   if (!update) return null;
 
-  const existing = callUpdatesById.get(update.callId);
+  const normalizedCallId = normalizeString(update?.callId || '');
+  if (!normalizedCallId) return null;
+
+  const persistRuntimeState = options?.persistRuntimeState !== false;
+  const persistCallUpdateRow = options?.persistCallUpdateRow !== false;
+  const persistReason = truncateText(normalizeString(options?.persistReason || ''), 80) || 'call_update';
+  const safeUpdatedAt = normalizeString(update?.updatedAt || '') || new Date().toISOString();
+  const safeUpdatedAtMs = Number(update?.updatedAtMs || Date.parse(safeUpdatedAt) || Date.now()) || Date.now();
+
+  const normalizedUpdate = {
+    ...update,
+    callId: normalizedCallId,
+    updatedAt: safeUpdatedAt,
+    updatedAtMs: safeUpdatedAtMs,
+  };
+
+  const existing = callUpdatesById.get(normalizedCallId);
   const merged = existing
     ? {
         ...existing,
-        ...update,
-        phone: update.phone || existing.phone || '',
-        company: update.company || existing.company || '',
-        branche: update.branche || existing.branche || '',
-        region: update.region || existing.region || '',
-        province: update.province || existing.province || '',
-        address: update.address || existing.address || '',
-        name: update.name || existing.name || '',
-        status: update.status || existing.status || '',
-        summary: update.summary || existing.summary || '',
-        transcriptSnippet: update.transcriptSnippet || existing.transcriptSnippet || '',
-        transcriptFull: update.transcriptFull || existing.transcriptFull || '',
-        endedReason: update.endedReason || existing.endedReason || '',
-        startedAt: update.startedAt || existing.startedAt || '',
-        endedAt: update.endedAt || existing.endedAt || '',
+        ...normalizedUpdate,
+        phone: normalizedUpdate.phone || existing.phone || '',
+        company: normalizedUpdate.company || existing.company || '',
+        branche: normalizedUpdate.branche || existing.branche || '',
+        region: normalizedUpdate.region || existing.region || '',
+        province: normalizedUpdate.province || existing.province || '',
+        address: normalizedUpdate.address || existing.address || '',
+        name: normalizedUpdate.name || existing.name || '',
+        status: normalizedUpdate.status || existing.status || '',
+        summary: normalizedUpdate.summary || existing.summary || '',
+        transcriptSnippet: normalizedUpdate.transcriptSnippet || existing.transcriptSnippet || '',
+        transcriptFull: normalizedUpdate.transcriptFull || existing.transcriptFull || '',
+        endedReason: normalizedUpdate.endedReason || existing.endedReason || '',
+        startedAt: normalizedUpdate.startedAt || existing.startedAt || '',
+        endedAt: normalizedUpdate.endedAt || existing.endedAt || '',
         durationSeconds:
-          Number.isFinite(Number(update.durationSeconds)) && Number(update.durationSeconds) > 0
-            ? Math.round(Number(update.durationSeconds))
+          Number.isFinite(Number(normalizedUpdate.durationSeconds)) && Number(normalizedUpdate.durationSeconds) > 0
+            ? Math.round(Number(normalizedUpdate.durationSeconds))
             : Number.isFinite(Number(existing.durationSeconds)) && Number(existing.durationSeconds) > 0
               ? Math.round(Number(existing.durationSeconds))
               : null,
-        recordingUrl: update.recordingUrl || existing.recordingUrl || '',
-        recordingSid: update.recordingSid || existing.recordingSid || '',
-        recordingUrlProxy: update.recordingUrlProxy || existing.recordingUrlProxy || '',
-        provider: update.provider || existing.provider || '',
-        direction: update.direction || existing.direction || '',
-        stack: update.stack || existing.stack || '',
-        stackLabel: update.stackLabel || existing.stackLabel || '',
-        messageType: update.messageType || existing.messageType || '',
-        updatedAt: update.updatedAt,
-        updatedAtMs: update.updatedAtMs,
+        recordingUrl: normalizedUpdate.recordingUrl || existing.recordingUrl || '',
+        recordingSid: normalizedUpdate.recordingSid || existing.recordingSid || '',
+        recordingUrlProxy: normalizedUpdate.recordingUrlProxy || existing.recordingUrlProxy || '',
+        provider: normalizedUpdate.provider || existing.provider || '',
+        direction: normalizedUpdate.direction || existing.direction || '',
+        stack: normalizedUpdate.stack || existing.stack || '',
+        stackLabel: normalizedUpdate.stackLabel || existing.stackLabel || '',
+        messageType: normalizedUpdate.messageType || existing.messageType || '',
+        updatedAt: normalizedUpdate.updatedAt,
+        updatedAtMs: normalizedUpdate.updatedAtMs,
       }
-    : update;
+    : normalizedUpdate;
 
   callUpdatesById.set(merged.callId, merged);
 
@@ -4265,7 +4633,12 @@ function upsertRecentCallUpdate(update) {
     }
   }
 
-  queueRuntimeStatePersist('call_update');
+  if (persistRuntimeState) {
+    queueRuntimeStatePersist(persistReason);
+  }
+  if (persistCallUpdateRow) {
+    queueCallUpdateRowPersist(merged, persistReason);
+  }
 
   return merged;
 }
@@ -11484,32 +11857,72 @@ app.post('/api/retell/webhook', async (req, res) => {
 app.get('/api/coldcalling/call-updates', async (req, res) => {
   if (isSupabaseConfigured()) {
     await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
+    await syncCallUpdatesFromSupabaseRows({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
   }
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 200)));
   const sinceMs = parseNumberSafe(req.query.sinceMs, null);
   const nowMs = Date.now();
 
-  const callIdsToRefresh = [];
+  const refreshCandidates = [];
   const seenCallIds = new Set();
   for (const item of recentCallUpdates) {
-    if (callIdsToRefresh.length >= 8) break;
+    if (refreshCandidates.length >= 8) break;
     const callId = normalizeString(item?.callId || '');
     if (!callId || seenCallIds.has(callId)) continue;
     if (!shouldRefreshRetellCallStatus(item, nowMs)) continue;
     seenCallIds.add(callId);
-    callIdsToRefresh.push(callId);
+    refreshCandidates.push({
+      callId,
+      provider: normalizeString(item?.provider || ''),
+      direction: normalizeString(item?.direction || ''),
+      stack: normalizeString(item?.stack || ''),
+    });
   }
 
-  if (callIdsToRefresh.length > 0) {
+  const missingCandidates = collectMissingCallUpdateRefreshCandidates(6);
+  for (const candidate of missingCandidates) {
+    if (refreshCandidates.length >= 14) break;
+    const callId = normalizeString(candidate?.callId || '');
+    if (!callId || seenCallIds.has(callId)) continue;
+    if (
+      !shouldRefreshRetellCallStatus(
+        {
+          callId,
+          status: 'queued',
+          endedReason: '',
+          provider: candidate?.provider || '',
+          updatedAtMs: 0,
+        },
+        nowMs
+      )
+    ) {
+      continue;
+    }
+    seenCallIds.add(callId);
+    refreshCandidates.push({
+      callId,
+      provider: normalizeString(candidate?.provider || ''),
+      direction: normalizeString(candidate?.direction || ''),
+      stack: normalizeString(candidate?.stack || ''),
+    });
+  }
+
+  if (refreshCandidates.length > 0) {
     await Promise.allSettled(
-      callIdsToRefresh.map(async (callId) => {
+      refreshCandidates.map(async (candidate) => {
+        const callId = normalizeString(candidate?.callId || '');
+        if (!callId) return null;
         const cached = callUpdatesById.get(callId) || null;
-        const provider = inferCallProvider(callId, normalizeString(cached?.provider || 'retell').toLowerCase() || 'retell');
+        const provider = inferCallProvider(
+          callId,
+          normalizeString(candidate?.provider || cached?.provider || 'retell').toLowerCase() || 'retell'
+        );
         const refreshed =
           provider === 'twilio'
             ? await refreshCallUpdateFromTwilioStatusApi(callId, {
-                direction: normalizeString(cached?.direction || '') || 'outbound',
-                stack: normalizeString(cached?.stack || ''),
+                direction:
+                  normalizeString(cached?.direction || candidate?.direction || '') || 'outbound',
+                stack: normalizeString(cached?.stack || candidate?.stack || ''),
               })
             : await refreshCallUpdateFromRetellStatusApi(callId);
         if (refreshed) {
@@ -15105,6 +15518,8 @@ function sendRuntimeHealthDebug(_req, res) {
       hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
       lastHydrateError: supabaseLastHydrateError || null,
       lastPersistError: supabaseLastPersistError || null,
+      lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
+      callUpdateStateKeyPrefix: SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX,
     },
     mail: {
       smtpConfigured: isSmtpMailConfigured(),
@@ -15207,6 +15622,7 @@ app.post('/api/runtime-sync-now', requireRuntimeDebugAccess, async (_req, res) =
     hydrated: supabaseStateHydrated,
     lastHydrateError: supabaseLastHydrateError || null,
     lastPersistError: supabaseLastPersistError || null,
+    lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
   };
 
   const persistOk = await persistRuntimeStateToSupabase('debug_runtime_sync_now');
@@ -15224,6 +15640,7 @@ app.post('/api/runtime-sync-now', requireRuntimeDebugAccess, async (_req, res) =
       hydrated: supabaseStateHydrated,
       lastHydrateError: supabaseLastHydrateError || null,
       lastPersistError: supabaseLastPersistError || null,
+      lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
       counts: {
         webhookEvents: recentWebhookEvents.length,
         callUpdates: recentCallUpdates.length,
