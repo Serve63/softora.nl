@@ -600,6 +600,59 @@
         .modal-btn.danger:hover { color: #ffd0d0; border-color: rgba(236, 94, 94, 0.75); box-shadow: 0 0 24px rgba(236, 94, 94, 0.2); }
         .modal-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
+        .customer-db-reminder {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) translateY(8px);
+            width: min(86vw, 560px);
+            background: rgba(12, 12, 12, 0.94);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 22px 58px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(8px);
+            z-index: 6200;
+            padding: 0.8rem 1rem 0.72rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+
+        .customer-db-reminder.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) translateY(0);
+        }
+
+        .customer-db-reminder-text {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: rgba(245, 245, 245, 0.95);
+            letter-spacing: 0.01em;
+        }
+
+        .customer-db-reminder-progress {
+            margin-top: 0.62rem;
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.16);
+            overflow: hidden;
+        }
+
+        .customer-db-reminder-progress-bar {
+            width: 100%;
+            height: 100%;
+            transform-origin: left center;
+            background: linear-gradient(90deg, rgba(166, 45, 101, 0.95), rgba(139, 34, 82, 0.75));
+        }
+
+        .customer-db-reminder.show .customer-db-reminder-progress-bar {
+            animation: customerReminderCountdown 5s linear forwards;
+        }
+
+        @keyframes customerReminderCountdown {
+            from { transform: scaleX(1); }
+            to { transform: scaleX(0); }
+        }
+
         .modal-overview.hide { display: none; }
 
         /* Responsive */
@@ -635,6 +688,7 @@
             .noise-overlay,
             .cursor,
             .cursor-dot,
+            .customer-db-reminder,
             .dashboard-layout,
             .modal-close,
             .modal-footer,
@@ -799,12 +853,11 @@
             </div>
             <div class="sidebar-section">
               <div class="sidebar-section-label">Extra</div>
-              <a href="/premium-wachtwoordenregister" class="sidebar-link magnetic" data-sidebar-key="passwords"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg><span class="sidebar-link-text">Wachtwoordenregister</span></a>
-              <a href="/premium-maandelijkse-kosten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Maandelijkse kosten</span></a>
-              <a href="/premium-analytics" class="sidebar-link magnetic" data-sidebar-key="analytics"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg><span class="sidebar-link-text">Google Analytics</span></a>
-              <a href="/premium-boekhouding" class="sidebar-link magnetic" data-sidebar-key="bookkeeping"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg><span class="sidebar-link-text">Boekhouding</span></a>
-              <a href="/premium-kladblok" class="sidebar-link magnetic" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
-              <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
+	              <a href="/premium-wachtwoordenregister" class="sidebar-link magnetic" data-sidebar-key="passwords"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg><span class="sidebar-link-text">Wachtwoordenregister</span></a>
+	              <a href="/premium-maandelijkse-kosten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Maandelijkse kosten</span></a>
+	              <a href="/premium-boekhouding" class="sidebar-link magnetic" data-sidebar-key="bookkeeping"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg><span class="sidebar-link-text">Boekhouding</span></a>
+	              <a href="/premium-kladblok" class="sidebar-link magnetic" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
+	              <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
             </div>
           </nav>
           <div class="sidebar-footer">
@@ -864,6 +917,13 @@
     </main>
 </div>
 
+<div class="customer-db-reminder" id="customerDbReminder" role="status" aria-live="polite" hidden>
+    <div class="customer-db-reminder-text" id="customerDbReminderText"></div>
+    <div class="customer-db-reminder-progress">
+        <div class="customer-db-reminder-progress-bar" id="customerDbReminderProgress"></div>
+    </div>
+</div>
+
 <script>
     // Appointments data
     const appointments = [];
@@ -894,6 +954,9 @@
     const referencePhotosInput = document.getElementById('referencePhotosInput');
     const workspaceAttachmentsBlock = document.getElementById('workspaceAttachmentsBlock');
     const workspaceAttachmentsList = document.getElementById('workspaceAttachmentsList');
+    const customerDbReminderEl = document.getElementById('customerDbReminder');
+    const customerDbReminderTextEl = document.getElementById('customerDbReminderText');
+    const customerDbReminderProgressEl = document.getElementById('customerDbReminderProgress');
     const ACTIVE_ORDERS_UI_SCOPE = 'premium_active_orders';
     const ACTIVE_ORDERS_CUSTOM_KEY = 'softora_custom_orders_premium_v1';
 
@@ -905,6 +968,7 @@
     let knownActiveOrderIds = new Set();
     let knownActiveOrderByAppointmentId = new Map();
     let loadServerAppointmentsPromise = null;
+    let customerDbReminderTimer = null;
 
     function normalizeWorkspaceDomainName(value) {
         const raw = String(value || '')
@@ -1250,6 +1314,52 @@
     function setVoiceStatus(message, variant = '') {
         workspaceVoiceStatusEl.textContent = message || '';
         workspaceVoiceStatusEl.className = `modal-workspace-status${variant ? ` ${variant}` : ''}`;
+    }
+
+    function normalizeReminderName(value) {
+        const text = String(value || '').trim();
+        if (!text) return '';
+        if (/^(onbekend|unknown|n\/a|nvt|null|undefined|-|onbekende lead)$/i.test(text)) return '';
+        return text;
+    }
+
+    function resolveReminderCustomerName(apt) {
+        return normalizeReminderName(apt?.contact) || normalizeReminderName(apt?.company) || 'deze klant';
+    }
+
+    function hideCustomerDbReminder() {
+        if (!customerDbReminderEl) return;
+        customerDbReminderEl.classList.remove('show');
+        window.setTimeout(() => {
+            if (!customerDbReminderEl.classList.contains('show')) {
+                customerDbReminderEl.hidden = true;
+            }
+        }, 220);
+    }
+
+    function showCustomerDbReminder(name) {
+        if (!customerDbReminderEl || !customerDbReminderTextEl || !customerDbReminderProgressEl) return;
+        const customerName = normalizeReminderName(name) || 'deze klant';
+        customerDbReminderTextEl.textContent = `Vergeet ${customerName} niet toe te voegen aan je klanten database`;
+
+        if (customerDbReminderTimer) {
+            window.clearTimeout(customerDbReminderTimer);
+            customerDbReminderTimer = null;
+        }
+
+        customerDbReminderEl.hidden = false;
+        customerDbReminderEl.classList.remove('show');
+        customerDbReminderProgressEl.style.animation = 'none';
+        void customerDbReminderProgressEl.offsetWidth;
+        customerDbReminderProgressEl.style.animation = '';
+        window.requestAnimationFrame(() => {
+            customerDbReminderEl.classList.add('show');
+        });
+
+        customerDbReminderTimer = window.setTimeout(() => {
+            hideCustomerDbReminder();
+            customerDbReminderTimer = null;
+        }, 5000);
     }
 
     function renderWorkspaceReferenceImages() {
@@ -1821,6 +1931,7 @@
             } else {
                 setWorkspaceStatus('Opdracht aangemaakt en toegevoegd aan actieve opdrachten.', 'success');
             }
+            showCustomerDbReminder(resolveReminderCustomerName(apt));
             return result;
         } catch (error) {
             setWorkspaceStatus(`Opdracht aanmaken mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');

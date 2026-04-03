@@ -381,7 +381,6 @@
         if (p.indexOf("/premium-financiele-kosten") === 0 || p.indexOf("/premium-maandelijkse-kosten") === 0) {
             return "monthly_costs";
         }
-        if (p.indexOf("/premium-analytics") === 0) return "analytics";
         if (p.indexOf("/premium-boekhouding") === 0) return "bookkeeping";
         return "dashboard";
     }
@@ -484,12 +483,6 @@
                 label: "Maandelijkse kosten",
             },
             {
-                key: "analytics",
-                href: "/premium-analytics",
-                label: "Google Analytics",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5h16"></path><rect x="6" y="11" width="2.5" height="6.5" rx="0.5"></rect><rect x="10.75" y="8" width="2.5" height="9.5" rx="0.5"></rect><rect x="15.5" y="5" width="2.5" height="12.5" rx="0.5"></rect></svg>',
-            },
-            {
                 key: "bookkeeping",
                 href: "/premium-boekhouding",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg>',
@@ -542,11 +535,24 @@
         ].join("");
     }
 
+    function pruneDeprecatedSidebarLinks(sidebar) {
+        if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
+        const legacyAnalyticsLinks = sidebar.querySelectorAll(
+            'a[data-sidebar-key="analytics"], a[href^="/premium-analytics"]'
+        );
+        legacyAnalyticsLinks.forEach(function (link) {
+            if (link && link.parentNode) {
+                link.parentNode.removeChild(link);
+            }
+        });
+    }
+
     function applyUnifiedPremiumSidebar() {
         if (!isPremiumPersonnelContext) return;
         const sidebar = document.querySelector(".sidebar");
         if (!sidebar) return;
         if (sidebar.dataset.staticSidebar === "1") {
+            pruneDeprecatedSidebarLinks(sidebar);
             sidebar.dataset.sidebarReady = "true";
             return;
         }
@@ -554,6 +560,7 @@
         const activeKey = getSidebarActiveKey(pathname);
         // Alleen legacy/lege sidebars nog opbouwen; statische sidebars blijven onaangeroerd.
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
+        pruneDeprecatedSidebarLinks(sidebar);
         sidebar.dataset.sidebarReady = "true";
     }
 
