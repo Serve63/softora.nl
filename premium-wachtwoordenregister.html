@@ -85,20 +85,13 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 44px 48px 40px;
-  width: 320px;
+  padding: 44px 56px;
+  width: min(396px, calc(100vw - 48px));
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   box-shadow: 0 12px 48px rgba(0,0,0,.08);
-}
-.pin-logo {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: var(--crimson);
-  margin-bottom: 28px;
 }
 .pin-icon {
   width: 50px;
@@ -120,13 +113,14 @@ body {
   margin-bottom: 4px;
 }
 .pin-sub {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-light);
-  margin-bottom: 28px;
+  margin-bottom: 30px;
   text-align: center;
   line-height: 1.5;
+  max-width: 252px;
 }
-.pin-dots { display: flex; gap: 12px; margin-bottom: 28px; }
+.pin-dots { display: flex; gap: 12px; margin-bottom: 30px; }
 .pin-dot {
   width: 13px;
   height: 13px;
@@ -146,14 +140,14 @@ body {
   80%{transform:translateX(4px)}
 }
 
-.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
 .num-btn {
   aspect-ratio: 1;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg);
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--text-dark);
   cursor: pointer;
@@ -171,8 +165,8 @@ body {
 .pin-msg {
   font-size: 11px;
   color: var(--red);
-  margin-top: 14px;
-  min-height: 14px;
+  margin-top: 16px;
+  min-height: 16px;
   font-weight: 600;
   text-align: center;
 }
@@ -451,7 +445,6 @@ body {
     <div class="register-shell">
       <div id="screen-pin">
         <div class="pin-box">
-          <div class="pin-logo">SOFTORA.NL</div>
           <div class="pin-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
           </div>
