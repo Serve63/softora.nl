@@ -1503,29 +1503,230 @@ function getSupabaseClient() {
   return supabaseClient;
 }
 
-function buildRuntimeStateSnapshotPayload() {
-  const compactWebhookEvents = recentWebhookEvents.slice(0, 80).map((event) => ({
+function compactRuntimeSnapshotText(value, maxLength = 500) {
+  return truncateText(normalizeString(value || ''), Math.max(40, Number(maxLength) || 500));
+}
+
+function compactRuntimeSnapshotWebhookEvent(event) {
+  return {
     receivedAt: normalizeString(event?.receivedAt || ''),
-    messageType: normalizeString(event?.messageType || ''),
-    callId: normalizeString(event?.callId || ''),
-    callStatus: normalizeString(event?.callStatus || ''),
-    // Volledige webhook payloads (met transcript/messages) maken de snapshot snel te groot
-    // voor serverless + Supabase sync. Call updates bevatten de relevante transcriptdata al.
+    messageType: compactRuntimeSnapshotText(event?.messageType, 120),
+    callId: compactRuntimeSnapshotText(event?.callId, 120),
+    callStatus: compactRuntimeSnapshotText(event?.callStatus, 80),
+    // Geen rauwe payloads opslaan; call updates bevatten de relevante details al.
     payload: null,
-  }));
+  };
+}
+
+function compactRuntimeSnapshotCallUpdate(item) {
+  const durationSeconds = Number(item?.durationSeconds);
+  const updatedAtMs = Number(item?.updatedAtMs || 0);
+  return {
+    callId: compactRuntimeSnapshotText(item?.callId, 140),
+    phone: compactRuntimeSnapshotText(item?.phone, 80),
+    company: compactRuntimeSnapshotText(item?.company, 180),
+    branche: compactRuntimeSnapshotText(item?.branche, 120),
+    region: compactRuntimeSnapshotText(item?.region, 120),
+    province: compactRuntimeSnapshotText(item?.province, 120),
+    address: compactRuntimeSnapshotText(item?.address, 220),
+    name: compactRuntimeSnapshotText(item?.name, 140),
+    status: compactRuntimeSnapshotText(item?.status, 80),
+    messageType: compactRuntimeSnapshotText(item?.messageType, 120),
+    summary: compactRuntimeSnapshotText(item?.summary, 1400),
+    transcriptSnippet: compactRuntimeSnapshotText(item?.transcriptSnippet, 900),
+    transcriptFull: compactRuntimeSnapshotText(item?.transcriptFull, 2200),
+    endedReason: compactRuntimeSnapshotText(item?.endedReason, 120),
+    startedAt: normalizeString(item?.startedAt || ''),
+    endedAt: normalizeString(item?.endedAt || ''),
+    durationSeconds:
+      Number.isFinite(durationSeconds) && durationSeconds > 0 ? Math.round(durationSeconds) : null,
+    recordingUrl: compactRuntimeSnapshotText(item?.recordingUrl, 1200),
+    recordingSid: compactRuntimeSnapshotText(item?.recordingSid, 120),
+    recordingUrlProxy: compactRuntimeSnapshotText(item?.recordingUrlProxy, 260),
+    updatedAt: normalizeString(item?.updatedAt || ''),
+    updatedAtMs: Number.isFinite(updatedAtMs) && updatedAtMs > 0 ? Math.round(updatedAtMs) : 0,
+    provider: compactRuntimeSnapshotText(item?.provider, 40),
+    direction: compactRuntimeSnapshotText(item?.direction, 40),
+    stack: compactRuntimeSnapshotText(item?.stack, 80),
+    stackLabel: compactRuntimeSnapshotText(item?.stackLabel, 80),
+    businessMode: compactRuntimeSnapshotText(item?.businessMode, 80),
+    business_mode: compactRuntimeSnapshotText(item?.business_mode, 80),
+    serviceType: compactRuntimeSnapshotText(item?.serviceType, 80),
+    service_type: compactRuntimeSnapshotText(item?.service_type, 80),
+  };
+}
+
+function compactRuntimeSnapshotAiInsight(item) {
+  const estimatedValueEur = parseNumberSafe(item?.estimatedValueEur ?? item?.estimated_value_eur, null);
+  return {
+    callId: compactRuntimeSnapshotText(item?.callId, 140),
+    company: compactRuntimeSnapshotText(item?.company, 180),
+    leadCompany: compactRuntimeSnapshotText(item?.leadCompany, 180),
+    contactName: compactRuntimeSnapshotText(item?.contactName, 140),
+    leadName: compactRuntimeSnapshotText(item?.leadName, 140),
+    phone: compactRuntimeSnapshotText(item?.phone, 80),
+    branche: compactRuntimeSnapshotText(item?.branche, 120),
+    summary: compactRuntimeSnapshotText(item?.summary, 1400),
+    appointmentBooked: toBooleanSafe(item?.appointmentBooked ?? item?.appointment_booked, false),
+    appointmentDate: normalizeDateYyyyMmDd(item?.appointmentDate || item?.appointment_date || ''),
+    appointmentTime: normalizeTimeHhMm(item?.appointmentTime || item?.appointment_time || ''),
+    estimatedValueEur: Number.isFinite(estimatedValueEur) ? estimatedValueEur : null,
+    followUpRequired: toBooleanSafe(item?.followUpRequired ?? item?.follow_up_required, false),
+    followUpReason: compactRuntimeSnapshotText(item?.followUpReason || item?.follow_up_reason, 900),
+    source: compactRuntimeSnapshotText(item?.source, 40),
+    model: compactRuntimeSnapshotText(item?.model, 80),
+    analyzedAt: normalizeString(item?.analyzedAt || ''),
+    agendaAppointmentId: Number(item?.agendaAppointmentId || 0) || null,
+    provider: compactRuntimeSnapshotText(item?.provider, 40),
+    coldcallingStack: compactRuntimeSnapshotText(item?.coldcallingStack || item?.stack, 80),
+    coldcallingStackLabel: compactRuntimeSnapshotText(item?.coldcallingStackLabel || item?.stackLabel, 80),
+    businessMode: compactRuntimeSnapshotText(item?.businessMode || item?.business_mode, 80),
+    serviceType: compactRuntimeSnapshotText(item?.serviceType || item?.service_type, 80),
+    contactEmail: compactRuntimeSnapshotText(item?.contactEmail || item?.email || item?.leadEmail, 180),
+    region: compactRuntimeSnapshotText(item?.region || item?.leadRegion, 120),
+    province: compactRuntimeSnapshotText(item?.province || item?.leadProvince, 120),
+    address: compactRuntimeSnapshotText(item?.address || item?.leadAddress, 220),
+  };
+}
+
+function compactRuntimeSnapshotDashboardActivity(item) {
+  return {
+    id: compactRuntimeSnapshotText(item?.id, 140),
+    type: compactRuntimeSnapshotText(item?.type, 80),
+    title: compactRuntimeSnapshotText(item?.title, 200),
+    detail: compactRuntimeSnapshotText(item?.detail || item?.message, 1200),
+    company: compactRuntimeSnapshotText(item?.company, 180),
+    actor: compactRuntimeSnapshotText(item?.actor, 120),
+    taskId: Number(item?.taskId || 0) || null,
+    callId: compactRuntimeSnapshotText(item?.callId, 140),
+    source: compactRuntimeSnapshotText(item?.source, 120),
+    createdAt: normalizeString(item?.createdAt || ''),
+    updatedAt: normalizeString(item?.updatedAt || ''),
+    updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
+  };
+}
+
+function compactRuntimeSnapshotSecurityAuditEvent(item) {
+  return {
+    id: compactRuntimeSnapshotText(item?.id, 140),
+    type: compactRuntimeSnapshotText(item?.type, 120),
+    severity: compactRuntimeSnapshotText(item?.severity, 20),
+    success: toBooleanSafe(item?.success, false),
+    email: compactRuntimeSnapshotText(item?.email, 180),
+    ip: compactRuntimeSnapshotText(item?.ip, 80),
+    path: compactRuntimeSnapshotText(item?.path, 220),
+    origin: compactRuntimeSnapshotText(item?.origin, 220),
+    detail: compactRuntimeSnapshotText(item?.detail || item?.message, 600),
+    userAgent: compactRuntimeSnapshotText(item?.userAgent, 300),
+    createdAt: normalizeString(item?.createdAt || ''),
+    updatedAt: normalizeString(item?.updatedAt || ''),
+    updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
+  };
+}
+
+function compactRuntimeSnapshotGeneratedAgendaAppointment(item) {
+  if (!item || typeof item !== 'object') return null;
+  return {
+    id: Number(item?.id || 0) || 0,
+    type: compactRuntimeSnapshotText(item?.type, 60),
+    company: compactRuntimeSnapshotText(item?.company, 180),
+    contact: compactRuntimeSnapshotText(item?.contact, 140),
+    phone: compactRuntimeSnapshotText(item?.phone, 80),
+    date: normalizeDateYyyyMmDd(item?.date || ''),
+    time: normalizeTimeHhMm(item?.time || ''),
+    value: compactRuntimeSnapshotText(item?.value, 80),
+    branche: compactRuntimeSnapshotText(item?.branche, 120),
+    source: compactRuntimeSnapshotText(item?.source, 140),
+    summary: compactRuntimeSnapshotText(item?.summary, 1800),
+    aiGenerated: toBooleanSafe(item?.aiGenerated, false),
+    callId: compactRuntimeSnapshotText(item?.callId, 140),
+    createdAt: normalizeString(item?.createdAt || ''),
+    needsConfirmationEmail: toBooleanSafe(item?.needsConfirmationEmail, false),
+    confirmationTaskType: compactRuntimeSnapshotText(item?.confirmationTaskType, 60),
+    provider: compactRuntimeSnapshotText(item?.provider, 40),
+    coldcallingStack: compactRuntimeSnapshotText(item?.coldcallingStack, 80),
+    coldcallingStackLabel: compactRuntimeSnapshotText(item?.coldcallingStackLabel, 80),
+    location: compactRuntimeSnapshotText(item?.location || item?.appointmentLocation, 220),
+    whatsappInfo: compactRuntimeSnapshotText(item?.whatsappInfo || item?.whatsappNotes || item?.whatsapp, 1200),
+    recordingUrl: compactRuntimeSnapshotText(item?.recordingUrl, 1200),
+    contactEmail: compactRuntimeSnapshotText(item?.contactEmail || item?.email, 180),
+    confirmationEmailSent: toBooleanSafe(item?.confirmationEmailSent, false),
+    confirmationEmailSentAt: normalizeString(item?.confirmationEmailSentAt || ''),
+    confirmationEmailSentBy: compactRuntimeSnapshotText(item?.confirmationEmailSentBy, 120),
+    confirmationResponseReceived: toBooleanSafe(item?.confirmationResponseReceived, false),
+    confirmationResponseReceivedAt: normalizeString(item?.confirmationResponseReceivedAt || ''),
+    confirmationResponseReceivedBy: compactRuntimeSnapshotText(item?.confirmationResponseReceivedBy, 120),
+    confirmationAppointmentCancelled: toBooleanSafe(item?.confirmationAppointmentCancelled, false),
+    confirmationAppointmentCancelledAt: normalizeString(item?.confirmationAppointmentCancelledAt || ''),
+    confirmationAppointmentCancelledBy: compactRuntimeSnapshotText(item?.confirmationAppointmentCancelledBy, 120),
+    confirmationEmailDraft: compactRuntimeSnapshotText(item?.confirmationEmailDraft, 1800),
+    confirmationEmailDraftGeneratedAt: normalizeString(item?.confirmationEmailDraftGeneratedAt || ''),
+    confirmationEmailDraftSource: compactRuntimeSnapshotText(item?.confirmationEmailDraftSource, 60),
+    confirmationEmailLastError: compactRuntimeSnapshotText(item?.confirmationEmailLastError, 600),
+    confirmationEmailLastSentMessageId: compactRuntimeSnapshotText(item?.confirmationEmailLastSentMessageId, 180),
+    confirmationTaskCreatedAt: normalizeString(item?.confirmationTaskCreatedAt || ''),
+    postCallStatus: compactRuntimeSnapshotText(item?.postCallStatus, 60),
+    postCallNotesTranscript: compactRuntimeSnapshotText(item?.postCallNotesTranscript, 1800),
+    postCallPrompt: compactRuntimeSnapshotText(item?.postCallPrompt, 1200),
+    postCallDomainName: compactRuntimeSnapshotText(item?.postCallDomainName || item?.domainName, 220),
+    postCallUpdatedAt: normalizeString(item?.postCallUpdatedAt || ''),
+    postCallUpdatedBy: compactRuntimeSnapshotText(item?.postCallUpdatedBy, 120),
+    activeOrderId: Number(item?.activeOrderId || 0) || null,
+    activeOrderAddedAt: normalizeString(item?.activeOrderAddedAt || ''),
+    activeOrderAddedBy: compactRuntimeSnapshotText(item?.activeOrderAddedBy, 120),
+    activeOrderReferenceImageCount: Number(item?.activeOrderReferenceImageCount || 0) || 0,
+    leadOwnerKey: compactRuntimeSnapshotText(item?.leadOwnerKey, 160),
+    leadOwnerName: compactRuntimeSnapshotText(item?.leadOwnerName, 140),
+    leadOwnerFullName: compactRuntimeSnapshotText(item?.leadOwnerFullName, 180),
+    leadOwnerUserId: compactRuntimeSnapshotText(item?.leadOwnerUserId, 120),
+    leadOwnerEmail: compactRuntimeSnapshotText(item?.leadOwnerEmail, 180),
+    updatedAt: normalizeString(item?.updatedAt || ''),
+    updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
+  };
+}
+
+function buildRuntimeStateSnapshotPayloadWithLimits(options = {}) {
+  const maxWebhookEvents = Math.max(10, Math.min(200, Number(options?.maxWebhookEvents || 80) || 80));
+  const maxCallUpdates = Math.max(20, Math.min(500, Number(options?.maxCallUpdates || 500) || 500));
+  const maxAiCallInsights = Math.max(20, Math.min(500, Number(options?.maxAiCallInsights || 500) || 500));
+  const maxDashboardActivities = Math.max(20, Math.min(500, Number(options?.maxDashboardActivities || 500) || 500));
+  const maxSecurityAuditEvents = Math.max(20, Math.min(500, Number(options?.maxSecurityAuditEvents || 500) || 500));
+  const maxAgendaAppointments = Math.max(40, Math.min(5000, Number(options?.maxAgendaAppointments || 5000) || 5000));
+  const maxDismissedCallIds = Math.max(100, Math.min(2000, Number(options?.maxDismissedCallIds || 1000) || 1000));
+  const maxLeadOwnerAssignments = Math.max(200, Math.min(5000, Number(options?.maxLeadOwnerAssignments || 5000) || 5000));
 
   return {
-    version: 4,
+    version: 5,
     savedAt: new Date().toISOString(),
-    recentWebhookEvents: compactWebhookEvents,
-    recentCallUpdates: recentCallUpdates.slice(0, 500),
-    recentAiCallInsights: recentAiCallInsights.slice(0, 500),
-    recentDashboardActivities: recentDashboardActivities.slice(0, 500),
-    recentSecurityAuditEvents: recentSecurityAuditEvents.slice(0, 500),
-    generatedAgendaAppointments: generatedAgendaAppointments.slice(),
-    dismissedInterestedLeadCallIds: Array.from(dismissedInterestedLeadCallIds).slice(0, 1000),
+    recentWebhookEvents: recentWebhookEvents
+      .slice(0, maxWebhookEvents)
+      .map(compactRuntimeSnapshotWebhookEvent),
+    recentCallUpdates: recentCallUpdates
+      .slice(0, maxCallUpdates)
+      .map(compactRuntimeSnapshotCallUpdate)
+      .filter((item) => normalizeString(item?.callId || '')),
+    recentAiCallInsights: recentAiCallInsights
+      .slice(0, maxAiCallInsights)
+      .map(compactRuntimeSnapshotAiInsight)
+      .filter((item) => normalizeString(item?.callId || '')),
+    recentDashboardActivities: recentDashboardActivities
+      .slice(0, maxDashboardActivities)
+      .map(compactRuntimeSnapshotDashboardActivity)
+      .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || '')),
+    recentSecurityAuditEvents: recentSecurityAuditEvents
+      .slice(0, maxSecurityAuditEvents)
+      .map(compactRuntimeSnapshotSecurityAuditEvent)
+      .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || '')),
+    generatedAgendaAppointments: generatedAgendaAppointments
+      .slice(0, maxAgendaAppointments)
+      .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
+      .filter(Boolean),
+    dismissedInterestedLeadCallIds: Array.from(dismissedInterestedLeadCallIds)
+      .slice(0, maxDismissedCallIds)
+      .map((item) => normalizeString(item))
+      .filter(Boolean),
     leadOwnerAssignments: Array.from(leadOwnerAssignmentsByCallId.entries())
-      .slice(0, 5000)
+      .slice(0, maxLeadOwnerAssignments)
       .map(([callId, owner]) => ({
         callId: normalizeString(callId),
         owner: normalizeLeadOwnerRecord(owner),
@@ -1534,6 +1735,10 @@ function buildRuntimeStateSnapshotPayload() {
     nextLeadOwnerRotationIndex,
     nextGeneratedAgendaAppointmentId,
   };
+}
+
+function buildRuntimeStateSnapshotPayload() {
+  return buildRuntimeStateSnapshotPayloadWithLimits();
 }
 
 function getRuntimeSnapshotItemTimestampMs(item) {
@@ -1614,69 +1819,117 @@ function mergeRuntimeSnapshotArraysByKey(localItems, remoteItems, keyFn, limit =
 function mergeRuntimeSnapshotPayloads(localPayload, remotePayload) {
   const safeLocal = localPayload && typeof localPayload === 'object' ? localPayload : {};
   const safeRemote = remotePayload && typeof remotePayload === 'object' ? remotePayload : {};
+  const localLeadOwnerAssignments = (Array.isArray(safeLocal.leadOwnerAssignments) ? safeLocal.leadOwnerAssignments : [])
+    .map((item) => ({
+      callId: normalizeString(item?.callId || ''),
+      owner: normalizeLeadOwnerRecord(item?.owner || {}),
+    }))
+    .filter((item) => item.callId && item.owner);
+  const remoteLeadOwnerAssignments = (Array.isArray(safeRemote.leadOwnerAssignments) ? safeRemote.leadOwnerAssignments : [])
+    .map((item) => ({
+      callId: normalizeString(item?.callId || ''),
+      owner: normalizeLeadOwnerRecord(item?.owner || {}),
+    }))
+    .filter((item) => item.callId && item.owner);
+  const localGeneratedAgendaAppointments = (Array.isArray(safeLocal.generatedAgendaAppointments) ? safeLocal.generatedAgendaAppointments : [])
+    .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
+    .filter(Boolean);
+  const remoteGeneratedAgendaAppointments = (Array.isArray(safeRemote.generatedAgendaAppointments) ? safeRemote.generatedAgendaAppointments : [])
+    .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
+    .filter(Boolean);
+  const localWebhookEvents = (Array.isArray(safeLocal.recentWebhookEvents) ? safeLocal.recentWebhookEvents : [])
+    .map(compactRuntimeSnapshotWebhookEvent);
+  const remoteWebhookEvents = (Array.isArray(safeRemote.recentWebhookEvents) ? safeRemote.recentWebhookEvents : [])
+    .map(compactRuntimeSnapshotWebhookEvent);
+  const localCallUpdates = (Array.isArray(safeLocal.recentCallUpdates) ? safeLocal.recentCallUpdates : [])
+    .map(compactRuntimeSnapshotCallUpdate)
+    .filter((item) => normalizeString(item?.callId || ''));
+  const remoteCallUpdates = (Array.isArray(safeRemote.recentCallUpdates) ? safeRemote.recentCallUpdates : [])
+    .map(compactRuntimeSnapshotCallUpdate)
+    .filter((item) => normalizeString(item?.callId || ''));
+  const localAiCallInsights = (Array.isArray(safeLocal.recentAiCallInsights) ? safeLocal.recentAiCallInsights : [])
+    .map(compactRuntimeSnapshotAiInsight)
+    .filter((item) => normalizeString(item?.callId || ''));
+  const remoteAiCallInsights = (Array.isArray(safeRemote.recentAiCallInsights) ? safeRemote.recentAiCallInsights : [])
+    .map(compactRuntimeSnapshotAiInsight)
+    .filter((item) => normalizeString(item?.callId || ''));
+  const localDashboardActivities = (Array.isArray(safeLocal.recentDashboardActivities) ? safeLocal.recentDashboardActivities : [])
+    .map(compactRuntimeSnapshotDashboardActivity)
+    .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
+  const remoteDashboardActivities = (Array.isArray(safeRemote.recentDashboardActivities) ? safeRemote.recentDashboardActivities : [])
+    .map(compactRuntimeSnapshotDashboardActivity)
+    .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
+  const localSecurityAuditEvents = (Array.isArray(safeLocal.recentSecurityAuditEvents) ? safeLocal.recentSecurityAuditEvents : [])
+    .map(compactRuntimeSnapshotSecurityAuditEvent)
+    .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
+  const remoteSecurityAuditEvents = (Array.isArray(safeRemote.recentSecurityAuditEvents) ? safeRemote.recentSecurityAuditEvents : [])
+    .map(compactRuntimeSnapshotSecurityAuditEvent)
+    .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
+  const remoteDismissedCallIds = (Array.isArray(safeRemote.dismissedInterestedLeadCallIds) ? safeRemote.dismissedInterestedLeadCallIds : [])
+    .map((item) => normalizeString(item))
+    .filter(Boolean);
+  const localDismissedCallIds = (Array.isArray(safeLocal.dismissedInterestedLeadCallIds) ? safeLocal.dismissedInterestedLeadCallIds : [])
+    .map((item) => normalizeString(item))
+    .filter(Boolean);
 
   const leadOwnerAssignments = mergeRuntimeSnapshotArraysByKey(
-    safeLocal.leadOwnerAssignments,
-    safeRemote.leadOwnerAssignments,
+    localLeadOwnerAssignments,
+    remoteLeadOwnerAssignments,
     (item) => item?.callId || '',
     5000
   );
 
   const generatedAgendaAppointments = mergeRuntimeSnapshotArraysByKey(
-    safeLocal.generatedAgendaAppointments,
-    safeRemote.generatedAgendaAppointments,
+    localGeneratedAgendaAppointments,
+    remoteGeneratedAgendaAppointments,
     (item) => String(item?.id || item?.callId || ''),
     5000
   );
 
   const recentWebhookEvents = mergeRuntimeSnapshotArraysByKey(
-    safeLocal.recentWebhookEvents,
-    safeRemote.recentWebhookEvents,
+    localWebhookEvents,
+    remoteWebhookEvents,
     (item) => `${normalizeString(item?.receivedAt || '')}|${normalizeString(item?.messageType || '')}|${normalizeString(item?.callId || '')}`,
     80
   );
 
   const recentCallUpdates = mergeRuntimeSnapshotArraysByKey(
-    safeLocal.recentCallUpdates,
-    safeRemote.recentCallUpdates,
+    localCallUpdates,
+    remoteCallUpdates,
     (item) => item?.callId || '',
     500
   );
 
   const recentAiCallInsights = mergeRuntimeSnapshotArraysByKey(
-    safeLocal.recentAiCallInsights,
-    safeRemote.recentAiCallInsights,
+    localAiCallInsights,
+    remoteAiCallInsights,
     (item) => item?.callId || '',
     500
   );
 
   const recentDashboardActivities = mergeRuntimeSnapshotArraysByKey(
-    safeLocal.recentDashboardActivities,
-    safeRemote.recentDashboardActivities,
+    localDashboardActivities,
+    remoteDashboardActivities,
     (item) => item?.id || '',
     500
   );
 
   const recentSecurityAuditEvents = mergeRuntimeSnapshotArraysByKey(
-    safeLocal.recentSecurityAuditEvents,
-    safeRemote.recentSecurityAuditEvents,
+    localSecurityAuditEvents,
+    remoteSecurityAuditEvents,
     (item) => item?.id || '',
     500
   );
 
   const dismissedInterestedLeadCallIds = Array.from(
     new Set([
-      ...((Array.isArray(safeRemote.dismissedInterestedLeadCallIds) ? safeRemote.dismissedInterestedLeadCallIds : []).map((item) =>
-        normalizeString(item)
-      )),
-      ...((Array.isArray(safeLocal.dismissedInterestedLeadCallIds) ? safeLocal.dismissedInterestedLeadCallIds : []).map((item) =>
-        normalizeString(item)
-      )),
+      ...remoteDismissedCallIds,
+      ...localDismissedCallIds,
     ].filter(Boolean))
   ).slice(0, 1000);
 
   return {
-    version: Math.max(Number(safeLocal.version || 0), Number(safeRemote.version || 0), 4),
+    version: Math.max(Number(safeLocal.version || 0), Number(safeRemote.version || 0), 5),
     savedAt: new Date().toISOString(),
     recentWebhookEvents,
     recentCallUpdates,
@@ -1725,17 +1978,38 @@ function markRuntimeStateSynced(atMs = Date.now()) {
 function applyRuntimeStateSnapshotPayload(payload, options = {}) {
   if (!payload || typeof payload !== 'object') return false;
 
-  const nextWebhookEvents = Array.isArray(payload.recentWebhookEvents) ? payload.recentWebhookEvents.slice(0, 200) : [];
-  const nextCallUpdates = Array.isArray(payload.recentCallUpdates) ? payload.recentCallUpdates.slice(0, 500) : [];
-  const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights) ? payload.recentAiCallInsights.slice(0, 500) : [];
+  const nextWebhookEvents = Array.isArray(payload.recentWebhookEvents)
+    ? payload.recentWebhookEvents.slice(0, 200).map(compactRuntimeSnapshotWebhookEvent)
+    : [];
+  const nextCallUpdates = Array.isArray(payload.recentCallUpdates)
+    ? payload.recentCallUpdates
+        .slice(0, 500)
+        .map(compactRuntimeSnapshotCallUpdate)
+        .filter((item) => normalizeString(item?.callId || ''))
+    : [];
+  const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights)
+    ? payload.recentAiCallInsights
+        .slice(0, 500)
+        .map(compactRuntimeSnapshotAiInsight)
+        .filter((item) => normalizeString(item?.callId || ''))
+    : [];
   const nextDashboardActivities = Array.isArray(payload.recentDashboardActivities)
-    ? payload.recentDashboardActivities.slice(0, 500)
+    ? payload.recentDashboardActivities
+        .slice(0, 500)
+        .map(compactRuntimeSnapshotDashboardActivity)
+        .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''))
     : [];
   const nextSecurityAuditEvents = Array.isArray(payload.recentSecurityAuditEvents)
-    ? payload.recentSecurityAuditEvents.slice(0, 500)
+    ? payload.recentSecurityAuditEvents
+        .slice(0, 500)
+        .map(compactRuntimeSnapshotSecurityAuditEvent)
+        .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''))
     : [];
   const nextAppointments = Array.isArray(payload.generatedAgendaAppointments)
-    ? payload.generatedAgendaAppointments.slice()
+    ? payload.generatedAgendaAppointments
+        .slice()
+        .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
+        .filter(Boolean)
     : [];
   const nextDismissedInterestedLeadCallIds = Array.isArray(payload.dismissedInterestedLeadCallIds)
     ? payload.dismissedInterestedLeadCallIds.slice(0, 1000)
@@ -1749,16 +2023,18 @@ function applyRuntimeStateSnapshotPayload(payload, options = {}) {
   recentCallUpdates.splice(0, recentCallUpdates.length, ...nextCallUpdates);
   callUpdatesById.clear();
   recentCallUpdates.forEach((item) => {
-    if (item && item.callId) {
-      callUpdatesById.set(item.callId, item);
+    const callId = normalizeString(item?.callId || '');
+    if (callId) {
+      callUpdatesById.set(callId, item);
     }
   });
 
   recentAiCallInsights.splice(0, recentAiCallInsights.length, ...nextAiCallInsights);
   aiCallInsightsByCallId.clear();
   recentAiCallInsights.forEach((item) => {
-    if (item && item.callId) {
-      aiCallInsightsByCallId.set(item.callId, item);
+    const callId = normalizeString(item?.callId || '');
+    if (callId) {
+      aiCallInsightsByCallId.set(callId, item);
     }
   });
 
@@ -1918,7 +2194,34 @@ async function persistRuntimeStateToSupabase(reason = 'unknown') {
   try {
     const client = getSupabaseClient();
     if (!client) return false;
-    let payload = buildRuntimeStateSnapshotPayload();
+
+    async function persistRow(row) {
+      const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
+        onConflict: 'state_key',
+      });
+
+      if (!error) {
+        return { ok: true, source: 'client', error: null };
+      }
+
+      const fallback = await upsertSupabaseStateRowViaRest(row);
+      if (fallback.ok) {
+        return { ok: true, source: 'rest', error: null };
+      }
+
+      const fallbackMsg = fallback.error
+        ? ` | REST fallback: ${fallback.error}`
+        : fallback.status
+          ? ` | REST fallback status: ${fallback.status}`
+          : '';
+      return {
+        ok: false,
+        source: 'none',
+        error: truncateText(`${error.message || String(error)}${fallbackMsg}`, 500),
+      };
+    }
+
+    let payload = buildRuntimeStateSnapshotPayloadWithLimits();
     const remoteSnapshot = await fetchSupabaseStateRowViaRest('payload,updated_at');
     if (remoteSnapshot.ok) {
       const remoteRow = Array.isArray(remoteSnapshot.body) ? remoteSnapshot.body[0] || null : remoteSnapshot.body;
@@ -1943,32 +2246,48 @@ async function persistRuntimeStateToSupabase(reason = 'unknown') {
       },
     };
 
-    const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
-      onConflict: 'state_key',
-    });
-
-    if (error) {
-      const fallback = await upsertSupabaseStateRowViaRest(row);
-      if (!fallback.ok) {
-        console.error('[Supabase][PersistError]', error.message || error);
-        const fallbackMsg = fallback.error
-          ? ` | REST fallback: ${fallback.error}`
-          : fallback.status
-            ? ` | REST fallback status: ${fallback.status}`
-            : '';
-        supabaseLastPersistError = truncateText(`${error.message || String(error)}${fallbackMsg}`, 500);
-        return false;
-      }
+    const primaryPersist = await persistRow(row);
+    if (primaryPersist.ok) {
       supabaseLastPersistError = '';
       supabaseStateHydrated = true;
       markRuntimeStateSynced(resolveRuntimeStateVersionMs(row.updated_at, row.payload));
       return true;
     }
 
-    supabaseLastPersistError = '';
-    supabaseStateHydrated = true;
-    markRuntimeStateSynced(resolveRuntimeStateVersionMs(row.updated_at, row.payload));
-    return true;
+    const compactPayload = buildRuntimeStateSnapshotPayloadWithLimits({
+      maxWebhookEvents: 40,
+      maxCallUpdates: 180,
+      maxAiCallInsights: 180,
+      maxDashboardActivities: 220,
+      maxSecurityAuditEvents: 200,
+      maxAgendaAppointments: 1200,
+      maxDismissedCallIds: 700,
+      maxLeadOwnerAssignments: 2000,
+    });
+    const compactRow = {
+      ...row,
+      payload: compactPayload,
+      updated_at: new Date().toISOString(),
+      meta: {
+        ...(row.meta && typeof row.meta === 'object' ? row.meta : {}),
+        reason: `${reason}:compact_retry`,
+      },
+    };
+    const compactPersist = await persistRow(compactRow);
+    if (compactPersist.ok) {
+      supabaseLastPersistError = '';
+      supabaseStateHydrated = true;
+      markRuntimeStateSynced(resolveRuntimeStateVersionMs(compactRow.updated_at, compactRow.payload));
+      return true;
+    }
+
+    const combinedError = truncateText(
+      `primary=${primaryPersist.error || 'onbekend'} | compact=${compactPersist.error || 'onbekend'}`,
+      500
+    );
+    console.error('[Supabase][PersistError]', combinedError);
+    supabaseLastPersistError = combinedError;
+    return false;
   } catch (error) {
     console.error('[Supabase][PersistCrash]', error?.message || error);
     supabaseLastPersistError = truncateText(error?.message || String(error), 500);
