@@ -6663,8 +6663,20 @@ function resolveLeadFollowUpDateAndTime(callUpdate) {
   };
 }
 
+function isWeakAppointmentLocationText(value) {
+  const text = normalizeString(value || '').trim();
+  if (!text) return true;
+  const lower = text.toLowerCase();
+  if (/^(onbekend|nog niet ingevuld|nvt|n\/a|null|undefined|-)$/.test(lower)) return true;
+  if (/^\d+(?:[.,]\d+)?\s*(km|kilometer|kilometers|m|meter|meters)\b/.test(lower)) return true;
+  return false;
+}
+
 function sanitizeResolvedLocationText(value) {
-  return truncateText(normalizeString(value || ''), 220);
+  const sanitized = truncateText(normalizeString(value || ''), 220);
+  if (!sanitized) return '';
+  if (isWeakAppointmentLocationText(sanitized)) return '';
+  return sanitized;
 }
 
 function composeResolvedAppointmentLocation(addressValue, regionValue) {
@@ -6704,6 +6716,16 @@ function resolveAppointmentLocation(...sources) {
   }
 
   return '';
+}
+
+function extractAddressLikeLocationFromText(value) {
+  const text = normalizeString(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  const streetMatch = text.match(
+    /\b([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-]*)*\s(?:straat|laan|weg|dreef|plein|markt|kade|gracht|singel|steeg|boulevard|pad|hof|baan|wal|plantsoen|poort)\s+\d{1,4}[a-zA-Z]?(?:\s*,\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’.\-\s]{1,60})?)/i
+  );
+  if (!streetMatch) return '';
+  return truncateText(normalizeString(streetMatch[1] || ''), 220);
 }
 
 function shouldCreateLeadFollowUpFromCall(callUpdate, insight = null) {
@@ -7717,6 +7739,20 @@ function sanitizeAppointmentWhatsappInfo(value) {
   return truncateText(normalizeString(value || ''), 6000);
 }
 
+function resolveAgendaLocationValue(locationInput, ...contextTexts) {
+  const explicit = sanitizeAppointmentLocation(locationInput || '');
+  if (explicit && !isWeakAppointmentLocationText(explicit)) {
+    return explicit;
+  }
+
+  for (const context of contextTexts) {
+    const extracted = extractAddressLikeLocationFromText(context);
+    if (extracted) return sanitizeAppointmentLocation(extracted);
+  }
+
+  return explicit;
+}
+
 function buildLeadToAgendaSummaryFallback(baseSummary, location, whatsappInfo) {
   const parts = [];
   const summaryText = truncateText(normalizeString(baseSummary || ''), 2600);
@@ -7756,6 +7792,9 @@ async function buildLeadToAgendaSummary(baseSummary, location, whatsappInfo) {
   const locationText = sanitizeAppointmentLocation(location || '');
   const whatsappText = sanitizeAppointmentWhatsappInfo(whatsappInfo || '');
   const fallback = buildLeadToAgendaSummaryFallback(summaryText, locationText, whatsappText);
+
+  // Houd bestaande Nederlandse leadsamenvatting intact; niet onnodig inkorten.
+  if (summaryText && !summaryContainsEnglishMarkers(summaryText)) return fallback;
 
   if (!getOpenAiApiKey()) return fallback;
   if (!summaryText && !locationText && !whatsappText) return fallback;
@@ -14741,7 +14780,7 @@ async function setInterestedLeadInAgendaResponse(req, res) {
 
   const appointmentDate = normalizeDateYyyyMmDd(req.body?.appointmentDate || req.body?.date || '');
   const appointmentTime = normalizeTimeHhMm(req.body?.appointmentTime || req.body?.time || '');
-  const location = sanitizeAppointmentLocation(req.body?.location || '');
+  const rawLocation = sanitizeAppointmentLocation(req.body?.location || '');
   const whatsappInfo = sanitizeAppointmentWhatsappInfo(req.body?.whatsappInfo || '');
   const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
 
@@ -14751,13 +14790,21 @@ async function setInterestedLeadInAgendaResponse(req, res) {
   if (!appointmentTime) {
     return res.status(400).json({ ok: false, error: 'Vul een geldige tijd in (HH:MM).' });
   }
-  if (!location) {
-    return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
-  }
 
   const baseAppointment = buildMaterializedInterestedLeadAppointment(callId, req.body || {});
   if (!baseAppointment) {
     return res.status(404).json({ ok: false, error: 'Lead of call niet gevonden.' });
+  }
+
+  const location = resolveAgendaLocationValue(
+    rawLocation,
+    req.body?.summary,
+    baseAppointment?.summary || '',
+    req.body?.whatsappInfo || '',
+    baseAppointment?.whatsappInfo || ''
+  );
+  if (!location) {
+    return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
   }
 
   const persistedAppointment = upsertGeneratedAgendaAppointment(baseAppointment, callId);
@@ -15197,8 +15244,15 @@ async function setLeadTaskInAgendaById(req, res, taskIdRaw) {
   const appointmentTime = normalizeTimeHhMm(
     req.body?.appointmentTime || req.body?.time || appointment?.time || ''
   );
-  const location = sanitizeAppointmentLocation(
+  const rawLocation = sanitizeAppointmentLocation(
     req.body?.location || req.body?.appointmentLocation || appointment?.location || ''
+  );
+  const location = resolveAgendaLocationValue(
+    rawLocation,
+    req.body?.summary,
+    appointment?.summary || '',
+    req.body?.whatsappInfo || req.body?.whatsappNotes || req.body?.notes || '',
+    appointment?.whatsappInfo || ''
   );
   const whatsappInfo = sanitizeAppointmentWhatsappInfo(
     req.body?.whatsappInfo ||
