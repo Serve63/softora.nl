@@ -8794,6 +8794,8 @@ async function processRetellColdcallingLead(lead, campaign, index) {
           latestUpdate = refreshed;
         }
       }
+
+      await waitForQueuedRuntimeStatePersist();
     }
 
     const effectiveStatus = normalizeString(latestUpdate?.status || callStatus).toLowerCase();
@@ -8924,6 +8926,8 @@ async function processTwilioColdcallingLead(lead, campaign, index) {
         provider: 'twilio',
         direction: 'outbound',
       });
+
+      await waitForQueuedRuntimeStatePersist();
     }
 
     const effectiveStatus = normalizeString(latestUpdate?.status || callStatus).toLowerCase();
@@ -10420,6 +10424,8 @@ app.post('/api/coldcalling/start', async (req, res) => {
       `[Coldcalling][Sequential Queue] ${queue.id} gestart: direct ${results.length}/${queue.leads.length} verwerkt, ${queuedRemaining} wachtend`
     );
 
+    await waitForQueuedRuntimeStatePersist();
+
     return res.status(200).json({
       ok: true,
       summary: {
@@ -10460,6 +10466,8 @@ app.post('/api/coldcalling/start', async (req, res) => {
 
   const started = results.filter((item) => item.success).length;
   const failed = results.length - started;
+
+  await waitForQueuedRuntimeStatePersist();
 
   return res.status(200).json({
     ok: true,
