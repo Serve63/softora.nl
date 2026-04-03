@@ -714,6 +714,10 @@
             color-scheme: light;
         }
 
+        .lead-modal-audio-player[hidden] {
+            display: none !important;
+        }
+
         .lead-modal-audio-player::-webkit-media-controls-enclosure,
         .lead-modal-audio-player::-webkit-media-controls-panel {
             background-color: var(--bg-primary);
@@ -1038,7 +1042,7 @@
                     <div class="lead-modal-field lead-modal-field-full">
                         <label class="lead-modal-label" for="leadModalAudioPlayer">Gespreksopname</label>
                         <div class="lead-modal-audio-shell">
-                            <audio class="lead-modal-audio-player" id="leadModalAudioPlayer" controls preload="none" hidden></audio>
+                            <audio class="lead-modal-audio-player" id="leadModalAudioPlayer" controls preload="metadata" hidden></audio>
                             <div class="lead-modal-audio-empty" id="leadModalAudioEmpty">Nog geen audio-opname beschikbaar voor deze lead.</div>
                         </div>
                     </div>
@@ -1550,6 +1554,7 @@
                 if (recordingUrl) {
                     if (activeSrc !== recordingUrl) {
                         modalAudioPlayer.pause();
+                        modalAudioPlayer.preload = 'metadata';
                         modalAudioPlayer.setAttribute('src', recordingUrl);
                         modalAudioPlayer.load();
                     }
@@ -1725,6 +1730,7 @@
                 const time = normalizeTimeValue(modalTime.value || '');
                 const location = String(modalLocation.value || '').trim();
                 const whatsappInfo = String(modalWhatsappInfo.value || '').trim();
+                const summaryText = String(modalSummary.textContent || lead.summary || '').trim();
                 const whatsappConfirmed = Boolean(modalWhatsappConfirm.checked);
 
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -1762,6 +1768,7 @@
                                 appointmentTime: time,
                                 location,
                                 whatsappInfo,
+                                summary: summaryText,
                                 actor: 'Leads pagina',
                             }
                         );
@@ -1781,6 +1788,7 @@
                                 appointmentTime: time,
                                 location,
                                 whatsappInfo,
+                                summary: summaryText,
                                 actor: 'Leads pagina',
                                 company: lead.company,
                                 contact: lead.contact,

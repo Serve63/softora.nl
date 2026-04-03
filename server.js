@@ -1790,6 +1790,7 @@ function compactRuntimeSnapshotGeneratedAgendaAppointment(item) {
     coldcallingStackLabel: compactRuntimeSnapshotText(item?.coldcallingStackLabel, 80),
     location: compactRuntimeSnapshotText(item?.location || item?.appointmentLocation, 220),
     whatsappInfo: compactRuntimeSnapshotText(item?.whatsappInfo || item?.whatsappNotes || item?.whatsapp, 1200),
+    durationSeconds: resolveCallDurationSeconds(item),
     recordingUrl: compactRuntimeSnapshotText(item?.recordingUrl, 1200),
     contactEmail: compactRuntimeSnapshotText(item?.contactEmail || item?.email, 180),
     confirmationEmailSent: toBooleanSafe(item?.confirmationEmailSent, false),
@@ -6810,6 +6811,7 @@ function buildGeneratedLeadFollowUpFromCall(callUpdate, insight = null) {
     coldcallingStack: normalizedStack || '',
     coldcallingStackLabel: stackLabel || '',
     location: resolveAppointmentLocation(callUpdate, insight),
+    durationSeconds: resolveCallDurationSeconds(callUpdate, insight),
     recordingUrl: resolvePreferredRecordingUrl(callUpdate, insight),
     ...leadOwner,
   };
@@ -6916,6 +6918,7 @@ function mergeInterestedLeadRows(preferred, secondary) {
     source: normalizeString(preferred?.source || secondary?.source || ''),
     summary: truncateText(normalizeString(preferred?.summary || secondary?.summary || ''), 900),
     location: resolveAppointmentLocation(preferred, secondary),
+    durationSeconds: resolveCallDurationSeconds(preferred, secondary),
     whatsappInfo: sanitizeAppointmentWhatsappInfo(preferred?.whatsappInfo || secondary?.whatsappInfo || ''),
     recordingUrl: resolvePreferredRecordingUrl(preferred, secondary),
     provider: normalizeString(preferred?.provider || secondary?.provider || '').toLowerCase(),
@@ -7060,6 +7063,7 @@ function buildInterestedLeadCandidateRows(existingTasks = []) {
           900
         ),
         location: resolveAppointmentLocation(leadFollowUp, callUpdate, insight),
+        durationSeconds: resolveCallDurationSeconds(leadFollowUp, callUpdate, insight),
         whatsappInfo: truncateText(normalizeString(insight?.followUpReason || ''), 6000),
         recordingUrl: resolvePreferredRecordingUrl(leadFollowUp, callUpdate, insight),
         provider: normalizeString(leadFollowUp?.provider || callUpdate?.provider || '').toLowerCase(),
@@ -7403,6 +7407,16 @@ function getMaterializedInterestedLeadRows() {
           time: normalizeTimeHhMm(appointment?.time || '') || '09:00',
           source: normalizeString(appointment?.source || 'Agenda afspraak'),
           summary: truncateText(normalizeString(appointment?.summary || ''), 900),
+          location: resolveAgendaLocationValue(
+            sanitizeAppointmentLocation(appointment?.location || appointment?.appointmentLocation || ''),
+            appointment?.summary || '',
+            appointment?.whatsappInfo || ''
+          ),
+          whatsappInfo: sanitizeAppointmentWhatsappInfo(
+            appointment?.whatsappInfo || appointment?.whatsappNotes || appointment?.whatsapp || ''
+          ),
+          durationSeconds: resolveCallDurationSeconds(appointment),
+          recordingUrl: resolvePreferredRecordingUrl(appointment),
           createdAt:
             normalizeString(
               appointment?.updatedAt ||
@@ -7636,6 +7650,7 @@ function backfillOpenLeadFollowUpAppointmentsFromLatestCalls() {
         ) || new Date().toISOString(),
       callId: normalizeString(latestRow?.callId || appointment?.callId || ''),
       location: resolveAppointmentLocation(latestRow, appointment),
+      durationSeconds: resolveCallDurationSeconds(latestRow, appointment),
       whatsappInfo: sanitizeAppointmentWhatsappInfo(latestRow?.whatsappInfo || appointment?.whatsappInfo || ''),
       recordingUrl: resolvePreferredRecordingUrl(latestRow, appointment),
       provider: normalizeString(latestRow?.provider || appointment?.provider || ''),
@@ -7739,6 +7754,81 @@ function sanitizeAppointmentWhatsappInfo(value) {
   return truncateText(normalizeString(value || ''), 6000);
 }
 
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeSearchKey(value) {
+  return normalizeString(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function textContainsNormalized(haystack, needle) {
+  const hay = normalizeSearchKey(haystack);
+  const ndl = normalizeSearchKey(needle);
+  if (!hay || !ndl) return false;
+  return hay.includes(ndl);
+}
+
+function syncSummaryLocationText(summaryText, locationText) {
+  const summary = normalizeString(summaryText || '');
+  const location = sanitizeAppointmentLocation(locationText || '');
+  if (!summary || !location) return summary;
+
+  let rewritten = summary;
+  const extractedAddress = extractAddressLikeLocationFromText(summary);
+  if (extractedAddress && !textContainsNormalized(location, extractedAddress)) {
+    const escapedAddress = escapeRegExp(extractedAddress);
+    rewritten = rewritten.replace(new RegExp(escapedAddress, 'gi'), location);
+  }
+
+  rewritten = rewritten.replace(/\bnog niet ingevuld\b/gi, location);
+  rewritten = rewritten.replace(/\bonbekend\b/gi, location);
+  rewritten = rewritten.replace(
+    /\blocatie\s+(?:is|staat|op)\s+\d+(?:[.,]\d+)?\s*(?:km|kilometer|kilometers|m|meter|meters)\b/gi,
+    `locatie is ${location}`
+  );
+  return rewritten.trim();
+}
+
+function summaryMentionsLocation(summaryText, locationText) {
+  const summary = normalizeString(summaryText || '');
+  const location = sanitizeAppointmentLocation(locationText || '');
+  if (!summary || !location) return false;
+  if (textContainsNormalized(summary, location)) return true;
+  const extracted = extractAddressLikeLocationFromText(summary);
+  return Boolean(extracted && textContainsNormalized(extracted, location));
+}
+
+function summaryMentionsWhatsapp(summaryText, whatsappInfo) {
+  const summary = normalizeString(summaryText || '');
+  const whatsapp = sanitizeAppointmentWhatsappInfo(whatsappInfo || '');
+  if (!summary || !whatsapp) return false;
+  if (textContainsNormalized(summary, whatsapp)) return true;
+  return /whatsapp/i.test(summary);
+}
+
+function resolveCallDurationSeconds(...sources) {
+  for (const source of sources) {
+    const parsed = parseNumberSafe(
+      source?.durationSeconds ??
+        source?.duration_seconds ??
+        source?.callDurationSeconds ??
+        source?.duration ??
+        null,
+      null
+    );
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.max(1, Math.round(parsed));
+    }
+  }
+  return null;
+}
+
 function resolveAgendaLocationValue(locationInput, ...contextTexts) {
   const explicit = sanitizeAppointmentLocation(locationInput || '');
   if (explicit && !isWeakAppointmentLocationText(explicit)) {
@@ -7755,20 +7845,21 @@ function resolveAgendaLocationValue(locationInput, ...contextTexts) {
 
 function buildLeadToAgendaSummaryFallback(baseSummary, location, whatsappInfo) {
   const parts = [];
-  const summaryText = truncateText(normalizeString(baseSummary || ''), 2600);
+  const summaryText = truncateText(normalizeString(baseSummary || ''), 4000);
   const normalizedSummaryText = summaryContainsEnglishMarkers(summaryText) ? '' : summaryText;
   const locationText = sanitizeAppointmentLocation(location || '');
   const whatsappText = sanitizeAppointmentWhatsappInfo(whatsappInfo || '');
 
+  const summaryWithLocation = syncSummaryLocationText(normalizedSummaryText, locationText);
   if (normalizedSummaryText) {
-    parts.push(normalizedSummaryText);
+    parts.push(summaryWithLocation || normalizedSummaryText);
   } else {
     parts.push('De lead is telefonisch gesproken en ingepland voor verdere opvolging door Softora.');
   }
-  if (locationText) {
+  if (locationText && !summaryMentionsLocation(summaryWithLocation || normalizedSummaryText, locationText)) {
     parts.push(`De afspraak staat ingepland op locatie ${locationText}.`);
   }
-  if (whatsappText) {
+  if (whatsappText && !summaryMentionsWhatsapp(summaryWithLocation || normalizedSummaryText, whatsappText)) {
     parts.push(`Aanvullend is via WhatsApp bevestigd: ${whatsappText}.`);
   }
 
@@ -7783,12 +7874,13 @@ function agendaSummaryNeedsRefresh(summary, whatsappInfo, summaryFormatVersion =
   if (!summaryText && !whatsappText) return false;
   if (summaryContainsEnglishMarkers(summaryText)) return true;
   if (/overige info uit whatsapp/i.test(summaryText)) return true;
-  if (whatsappText && version < 2) return true;
+  if (whatsappText && version < 3) return true;
+  if (version < 3) return true;
   return false;
 }
 
 async function buildLeadToAgendaSummary(baseSummary, location, whatsappInfo) {
-  const summaryText = truncateText(normalizeString(baseSummary || ''), 2600);
+  const summaryText = truncateText(normalizeString(baseSummary || ''), 4000);
   const locationText = sanitizeAppointmentLocation(location || '');
   const whatsappText = sanitizeAppointmentWhatsappInfo(whatsappInfo || '');
   const fallback = buildLeadToAgendaSummaryFallback(summaryText, locationText, whatsappText);
@@ -7842,7 +7934,7 @@ async function refreshGeneratedAgendaAppointmentSummaryAtIndex(idx, reason = 'ag
   );
   const currentSummary = normalizeString(appointment?.summary || '');
   const currentVersion = Number(appointment?.summaryFormatVersion || 0);
-  if (nextSummary === currentSummary && currentVersion >= 2) {
+  if (nextSummary === currentSummary && currentVersion >= 3) {
     return appointment;
   }
 
@@ -7851,7 +7943,7 @@ async function refreshGeneratedAgendaAppointmentSummaryAtIndex(idx, reason = 'ag
     {
       ...appointment,
       summary: nextSummary,
-      summaryFormatVersion: 2,
+      summaryFormatVersion: 3,
     },
     reason
   );
@@ -7907,6 +7999,7 @@ function buildBackfilledGeneratedAgendaAppointment(appointment) {
   const insight = aiCallInsightsByCallId.get(callId) || null;
   const nextLocation = resolveAppointmentLocation(appointment, callUpdate, insight);
   const nextRecordingUrl = resolvePreferredRecordingUrl(appointment, callUpdate, insight);
+  const nextDurationSeconds = resolveCallDurationSeconds(appointment, callUpdate, insight);
   const nextSummary = truncateText(
     normalizeString(
       appointment.summary ||
@@ -7928,6 +8021,15 @@ function buildBackfilledGeneratedAgendaAppointment(appointment) {
 
   if (nextRecordingUrl && nextRecordingUrl !== normalizeString(appointment.recordingUrl || '')) {
     nextAppointment.recordingUrl = nextRecordingUrl;
+    changed = true;
+  }
+
+  if (
+    Number.isFinite(nextDurationSeconds) &&
+    nextDurationSeconds > 0 &&
+    nextDurationSeconds !== Number(appointment.durationSeconds || 0)
+  ) {
+    nextAppointment.durationSeconds = nextDurationSeconds;
     changed = true;
   }
 
@@ -8074,10 +8176,15 @@ function mapAppointmentToConfirmationTask(appointment) {
     appointmentId: Number(appointment.id) || 0,
     callId: normalizeString(appointment.callId || ''),
     contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
-    location: sanitizeAppointmentLocation(appointment.location || appointment.appointmentLocation || ''),
+    location: resolveAgendaLocationValue(
+      sanitizeAppointmentLocation(appointment.location || appointment.appointmentLocation || ''),
+      appointment?.summary || '',
+      appointment?.whatsappInfo || ''
+    ),
     whatsappInfo: sanitizeAppointmentWhatsappInfo(
       appointment.whatsappInfo || appointment.whatsappNotes || appointment.whatsapp || ''
     ),
+    durationSeconds: resolveCallDurationSeconds(appointment, callUpdate),
     mailDraftAvailable: Boolean(normalizeString(appointment.confirmationEmailDraft || '')),
     mailSent: Boolean(appointment.confirmationEmailSent || appointment.confirmationEmailSentAt),
     mailSentAt: normalizeString(appointment.confirmationEmailSentAt || '') || null,
@@ -8213,14 +8320,34 @@ function buildConfirmationTaskDetail(appointment) {
   const aiInsight = task.callId ? aiCallInsightsByCallId.get(task.callId) || null : null;
   const transcript = getAppointmentTranscriptText(appointment) || '';
   const recordingUrl = resolvePreferredRecordingUrl(callUpdate, appointment);
+  const fullSummary = truncateText(
+    normalizeString(
+      appointment?.summary ||
+        callUpdate?.summary ||
+        aiInsight?.summary ||
+        task?.summary ||
+        ''
+    ),
+    4000
+  );
+  const resolvedLocation = resolveAgendaLocationValue(
+    sanitizeAppointmentLocation(appointment.location || appointment.appointmentLocation || ''),
+    fullSummary,
+    appointment?.whatsappInfo || appointment?.whatsappNotes || appointment?.whatsapp || '',
+    callUpdate?.summary || '',
+    callUpdate?.transcriptSnippet || '',
+    transcript
+  );
 
   return {
     ...task,
+    summary: fullSummary || task.summary || '',
     contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
-    location: sanitizeAppointmentLocation(appointment.location || appointment.appointmentLocation || ''),
+    location: resolvedLocation || '',
     whatsappInfo: sanitizeAppointmentWhatsappInfo(
       appointment.whatsappInfo || appointment.whatsappNotes || appointment.whatsapp || ''
     ),
+    durationSeconds: resolveCallDurationSeconds(appointment, callUpdate, aiInsight),
     transcript,
     transcriptAvailable: Boolean(transcript),
     recordingUrl,
@@ -14759,6 +14886,14 @@ function buildMaterializedInterestedLeadAppointment(callId, requestBody = {}) {
       callUpdate,
       insight
     ),
+    durationSeconds: resolveCallDurationSeconds(
+      requestBody,
+      existingAppointment,
+      followUpLead,
+      leadRow,
+      callUpdate,
+      insight
+    ),
     whatsappInfo: sanitizeAppointmentWhatsappInfo(
       requestBody.whatsappInfo || existingAppointment?.whatsappInfo || leadRow?.whatsappInfo || ''
     ),
@@ -14818,7 +14953,11 @@ async function setInterestedLeadInAgendaResponse(req, res) {
   }
 
   const nowIso = new Date().toISOString();
-  const mergedSummary = await buildLeadToAgendaSummary(baseAppointment.summary, location, whatsappInfo);
+  const mergedSummary = await buildLeadToAgendaSummary(
+    req.body?.summary || baseAppointment.summary,
+    location,
+    whatsappInfo
+  );
   const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
     idx,
     {
@@ -14828,7 +14967,7 @@ async function setInterestedLeadInAgendaResponse(req, res) {
       location: location || null,
       whatsappInfo: whatsappInfo || null,
       summary: mergedSummary,
-      summaryFormatVersion: 2,
+      summaryFormatVersion: 3,
       needsConfirmationEmail: false,
       confirmationEmailSent: true,
       confirmationEmailSentAt: normalizeString(persistedAppointment?.confirmationEmailSentAt || '') || nowIso,
@@ -15273,7 +15412,11 @@ async function setLeadTaskInAgendaById(req, res, taskIdRaw) {
   }
 
   const nowIso = new Date().toISOString();
-  const mergedSummary = await buildLeadToAgendaSummary(appointment?.summary, location, whatsappInfo);
+  const mergedSummary = await buildLeadToAgendaSummary(
+    req.body?.summary || appointment?.summary,
+    location,
+    whatsappInfo
+  );
   const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
     idx,
     {
@@ -15283,7 +15426,7 @@ async function setLeadTaskInAgendaById(req, res, taskIdRaw) {
       location: location || null,
       whatsappInfo: whatsappInfo || null,
       summary: mergedSummary,
-      summaryFormatVersion: 2,
+      summaryFormatVersion: 3,
       needsConfirmationEmail: false,
       confirmationEmailSent: true,
       confirmationEmailSentAt: normalizeString(appointment?.confirmationEmailSentAt || '') || nowIso,
