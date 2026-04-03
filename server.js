@@ -1536,6 +1536,170 @@ function buildRuntimeStateSnapshotPayload() {
   };
 }
 
+function getRuntimeSnapshotItemTimestampMs(item) {
+  const explicitMs = Number(item?.updatedAtMs || 0);
+  if (Number.isFinite(explicitMs) && explicitMs > 0) return explicitMs;
+
+  const candidateFields = [
+    item?.updatedAt,
+    item?.analyzedAt,
+    item?.receivedAt,
+    item?.endedAt,
+    item?.startedAt,
+    item?.createdAt,
+    item?.confirmationEmailSentAt,
+    item?.confirmationResponseReceivedAt,
+    item?.confirmationAppointmentCancelledAt,
+    item?.postCallUpdatedAt,
+  ];
+
+  for (const candidate of candidateFields) {
+    const parsedMs = Date.parse(normalizeString(candidate || ''));
+    if (Number.isFinite(parsedMs) && parsedMs > 0) return parsedMs;
+  }
+
+  return 0;
+}
+
+function chooseRuntimeSnapshotValue(primaryValue, fallbackValue) {
+  if (primaryValue === undefined || primaryValue === null) return fallbackValue;
+  if (typeof primaryValue === 'string') {
+    return primaryValue.trim() ? primaryValue : fallbackValue;
+  }
+  if (Array.isArray(primaryValue)) {
+    return primaryValue.length > 0 ? primaryValue.slice() : Array.isArray(fallbackValue) ? fallbackValue.slice() : primaryValue.slice();
+  }
+  return primaryValue;
+}
+
+function mergeRuntimeSnapshotObjects(primary, fallback) {
+  const safePrimary = primary && typeof primary === 'object' ? primary : {};
+  const safeFallback = fallback && typeof fallback === 'object' ? fallback : {};
+  const merged = { ...safeFallback };
+  const keys = new Set([...Object.keys(safeFallback), ...Object.keys(safePrimary)]);
+  keys.forEach((key) => {
+    merged[key] = chooseRuntimeSnapshotValue(safePrimary[key], safeFallback[key]);
+  });
+  return merged;
+}
+
+function mergeRuntimeSnapshotArraysByKey(localItems, remoteItems, keyFn, limit = 500) {
+  const mergedByKey = new Map();
+  const append = (items) => {
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const key = normalizeString(keyFn(item) || '');
+      if (!key) return;
+      const existing = mergedByKey.get(key) || null;
+      if (!existing) {
+        mergedByKey.set(key, item);
+        return;
+      }
+      const existingTs = getRuntimeSnapshotItemTimestampMs(existing);
+      const incomingTs = getRuntimeSnapshotItemTimestampMs(item);
+      const primary = incomingTs >= existingTs ? item : existing;
+      const fallback = incomingTs >= existingTs ? existing : item;
+      mergedByKey.set(key, mergeRuntimeSnapshotObjects(primary, fallback));
+    });
+  };
+
+  append(remoteItems);
+  append(localItems);
+
+  return Array.from(mergedByKey.values())
+    .sort((a, b) => getRuntimeSnapshotItemTimestampMs(b) - getRuntimeSnapshotItemTimestampMs(a))
+    .slice(0, limit);
+}
+
+function mergeRuntimeSnapshotPayloads(localPayload, remotePayload) {
+  const safeLocal = localPayload && typeof localPayload === 'object' ? localPayload : {};
+  const safeRemote = remotePayload && typeof remotePayload === 'object' ? remotePayload : {};
+
+  const leadOwnerAssignments = mergeRuntimeSnapshotArraysByKey(
+    safeLocal.leadOwnerAssignments,
+    safeRemote.leadOwnerAssignments,
+    (item) => item?.callId || '',
+    5000
+  );
+
+  const generatedAgendaAppointments = mergeRuntimeSnapshotArraysByKey(
+    safeLocal.generatedAgendaAppointments,
+    safeRemote.generatedAgendaAppointments,
+    (item) => String(item?.id || item?.callId || ''),
+    5000
+  );
+
+  const recentWebhookEvents = mergeRuntimeSnapshotArraysByKey(
+    safeLocal.recentWebhookEvents,
+    safeRemote.recentWebhookEvents,
+    (item) => `${normalizeString(item?.receivedAt || '')}|${normalizeString(item?.messageType || '')}|${normalizeString(item?.callId || '')}`,
+    80
+  );
+
+  const recentCallUpdates = mergeRuntimeSnapshotArraysByKey(
+    safeLocal.recentCallUpdates,
+    safeRemote.recentCallUpdates,
+    (item) => item?.callId || '',
+    500
+  );
+
+  const recentAiCallInsights = mergeRuntimeSnapshotArraysByKey(
+    safeLocal.recentAiCallInsights,
+    safeRemote.recentAiCallInsights,
+    (item) => item?.callId || '',
+    500
+  );
+
+  const recentDashboardActivities = mergeRuntimeSnapshotArraysByKey(
+    safeLocal.recentDashboardActivities,
+    safeRemote.recentDashboardActivities,
+    (item) => item?.id || '',
+    500
+  );
+
+  const recentSecurityAuditEvents = mergeRuntimeSnapshotArraysByKey(
+    safeLocal.recentSecurityAuditEvents,
+    safeRemote.recentSecurityAuditEvents,
+    (item) => item?.id || '',
+    500
+  );
+
+  const dismissedInterestedLeadCallIds = Array.from(
+    new Set([
+      ...((Array.isArray(safeRemote.dismissedInterestedLeadCallIds) ? safeRemote.dismissedInterestedLeadCallIds : []).map((item) =>
+        normalizeString(item)
+      )),
+      ...((Array.isArray(safeLocal.dismissedInterestedLeadCallIds) ? safeLocal.dismissedInterestedLeadCallIds : []).map((item) =>
+        normalizeString(item)
+      )),
+    ].filter(Boolean))
+  ).slice(0, 1000);
+
+  return {
+    version: Math.max(Number(safeLocal.version || 0), Number(safeRemote.version || 0), 4),
+    savedAt: new Date().toISOString(),
+    recentWebhookEvents,
+    recentCallUpdates,
+    recentAiCallInsights,
+    recentDashboardActivities,
+    recentSecurityAuditEvents,
+    generatedAgendaAppointments,
+    dismissedInterestedLeadCallIds,
+    leadOwnerAssignments,
+    nextLeadOwnerRotationIndex: Math.max(
+      0,
+      Number(safeLocal.nextLeadOwnerRotationIndex || 0),
+      Number(safeRemote.nextLeadOwnerRotationIndex || 0)
+    ),
+    nextGeneratedAgendaAppointmentId: Math.max(
+      100000,
+      Number(safeLocal.nextGeneratedAgendaAppointmentId || 0),
+      Number(safeRemote.nextGeneratedAgendaAppointmentId || 0),
+      ...generatedAgendaAppointments.map((item) => Number(item?.id || 0) + 1).filter((value) => Number.isFinite(value) && value > 0)
+    ),
+  };
+}
+
 function resolveRuntimeStateVersionMs(updatedAt = '', payload = null) {
   const candidates = [normalizeString(updatedAt), normalizeString(payload?.savedAt || '')];
   for (const candidate of candidates) {
@@ -1754,7 +1918,14 @@ async function persistRuntimeStateToSupabase(reason = 'unknown') {
   try {
     const client = getSupabaseClient();
     if (!client) return false;
-    const payload = buildRuntimeStateSnapshotPayload();
+    let payload = buildRuntimeStateSnapshotPayload();
+    const remoteSnapshot = await fetchSupabaseStateRowViaRest('payload,updated_at');
+    if (remoteSnapshot.ok) {
+      const remoteRow = Array.isArray(remoteSnapshot.body) ? remoteSnapshot.body[0] || null : remoteSnapshot.body;
+      if (remoteRow?.payload && typeof remoteRow.payload === 'object') {
+        payload = mergeRuntimeSnapshotPayloads(payload, remoteRow.payload);
+      }
+    }
     const row = {
       state_key: SUPABASE_STATE_KEY,
       payload,
