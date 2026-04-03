@@ -6141,6 +6141,114 @@ function getLeadLikeRecencyTimestamp(value) {
   return 0;
 }
 
+function isInterestedLeadRowPreferred(candidate, existing) {
+  const candidateTs = getLeadLikeRecencyTimestamp(candidate);
+  const existingTs = getLeadLikeRecencyTimestamp(existing);
+  if (candidateTs !== existingTs) return candidateTs > existingTs;
+
+  const candidateConfirmed = normalizeString(candidate?.leadChipClass || '').toLowerCase() === 'confirmed';
+  const existingConfirmed = normalizeString(existing?.leadChipClass || '').toLowerCase() === 'confirmed';
+  if (candidateConfirmed !== existingConfirmed) return candidateConfirmed;
+
+  const candidateHasTaskId =
+    (Number(candidate?.id || 0) > 0) || (Number(candidate?.appointmentId || 0) > 0);
+  const existingHasTaskId =
+    (Number(existing?.id || 0) > 0) || (Number(existing?.appointmentId || 0) > 0);
+  if (candidateHasTaskId !== existingHasTaskId) return candidateHasTaskId;
+
+  const candidateHasCall = Boolean(normalizeString(candidate?.callId || ''));
+  const existingHasCall = Boolean(normalizeString(existing?.callId || ''));
+  if (candidateHasCall !== existingHasCall) return candidateHasCall;
+
+  const candidateHasRecording = Boolean(resolvePreferredRecordingUrl(candidate));
+  const existingHasRecording = Boolean(resolvePreferredRecordingUrl(existing));
+  if (candidateHasRecording !== existingHasRecording) return candidateHasRecording;
+
+  return false;
+}
+
+function mergeInterestedLeadRows(preferred, secondary) {
+  const preferredId = Number(preferred?.id || 0) || 0;
+  const secondaryId = Number(secondary?.id || 0) || 0;
+  const preferredAppointmentId = Number(preferred?.appointmentId || 0) || 0;
+  const secondaryAppointmentId = Number(secondary?.appointmentId || 0) || 0;
+  const mergedId = preferredId || secondaryId || preferredAppointmentId || secondaryAppointmentId || 0;
+  const mergedAppointmentId = preferredAppointmentId || secondaryAppointmentId || mergedId || 0;
+
+  return {
+    ...secondary,
+    ...preferred,
+    id: mergedId,
+    appointmentId: mergedAppointmentId,
+    type: normalizeString(preferred?.type || secondary?.type || ''),
+    confirmationTaskType: normalizeString(
+      preferred?.confirmationTaskType || secondary?.confirmationTaskType || preferred?.type || secondary?.type || ''
+    ),
+    company: normalizeString(preferred?.company || secondary?.company || '') || 'Onbekende lead',
+    contact: normalizeString(preferred?.contact || secondary?.contact || ''),
+    phone: normalizeString(preferred?.phone || secondary?.phone || ''),
+    date: normalizeDateYyyyMmDd(preferred?.date || secondary?.date || '') || '',
+    time: normalizeTimeHhMm(preferred?.time || secondary?.time || '') || '09:00',
+    source: normalizeString(preferred?.source || secondary?.source || ''),
+    summary: truncateText(normalizeString(preferred?.summary || secondary?.summary || ''), 900),
+    location: resolveAppointmentLocation(preferred, secondary),
+    whatsappInfo: sanitizeAppointmentWhatsappInfo(preferred?.whatsappInfo || secondary?.whatsappInfo || ''),
+    recordingUrl: resolvePreferredRecordingUrl(preferred, secondary),
+    provider: normalizeString(preferred?.provider || secondary?.provider || '').toLowerCase(),
+    providerLabel: normalizeString(preferred?.providerLabel || secondary?.providerLabel || ''),
+    coldcallingStack: normalizeColdcallingStack(preferred?.coldcallingStack || secondary?.coldcallingStack || ''),
+    coldcallingStackLabel: normalizeString(
+      preferred?.coldcallingStackLabel || secondary?.coldcallingStackLabel || preferred?.providerLabel || secondary?.providerLabel || ''
+    ),
+    leadType: normalizeString(preferred?.leadType || secondary?.leadType || ''),
+    leadChipLabel: normalizeString(preferred?.leadChipLabel || secondary?.leadChipLabel || ''),
+    leadChipClass: normalizeString(preferred?.leadChipClass || secondary?.leadChipClass || ''),
+    createdAt:
+      normalizeString(preferred?.createdAt || secondary?.createdAt || preferred?.confirmationTaskCreatedAt || secondary?.confirmationTaskCreatedAt || '') ||
+      new Date().toISOString(),
+    confirmationTaskCreatedAt:
+      normalizeString(
+        preferred?.confirmationTaskCreatedAt ||
+          secondary?.confirmationTaskCreatedAt ||
+          preferred?.createdAt ||
+          secondary?.createdAt ||
+          ''
+      ) || null,
+    leadOwnerKey: normalizeString(preferred?.leadOwnerKey || secondary?.leadOwnerKey || ''),
+    leadOwnerName: normalizeString(preferred?.leadOwnerName || secondary?.leadOwnerName || ''),
+    leadOwnerFullName: normalizeString(preferred?.leadOwnerFullName || secondary?.leadOwnerFullName || ''),
+    leadOwnerUserId: normalizeString(preferred?.leadOwnerUserId || secondary?.leadOwnerUserId || ''),
+    leadOwnerEmail: normalizeString(preferred?.leadOwnerEmail || secondary?.leadOwnerEmail || ''),
+  };
+}
+
+function dedupeInterestedLeadRows(rows = []) {
+  const map = new Map();
+
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    if (!row || typeof row !== 'object') return;
+
+    const rowId = Number(row?.id || row?.appointmentId || 0) || 0;
+    const callId = normalizeString(row?.callId || '');
+    const key =
+      buildLeadFollowUpCandidateKey(row) ||
+      (callId ? `call:${callId}` : rowId > 0 ? `id:${rowId}` : '');
+    if (!key) return;
+
+    if (!map.has(key)) {
+      map.set(key, row);
+      return;
+    }
+
+    const existing = map.get(key) || {};
+    const preferred = isInterestedLeadRowPreferred(row, existing) ? row : existing;
+    const secondary = preferred === row ? existing : row;
+    map.set(key, mergeInterestedLeadRows(preferred, secondary));
+  });
+
+  return Array.from(map.values()).sort(compareConfirmationTasks);
+}
+
 function buildInterestedLeadCandidateRows(existingTasks = []) {
   const existingCallIds = new Set();
   const existingLatestTsByKey = new Map();
@@ -6529,52 +6637,67 @@ function getOpenInterestedLeadTasks() {
     .filter(Boolean);
 }
 
+function buildLatestInterestedLeadRowsByKey() {
+  const rows = dedupeInterestedLeadRows(
+    [].concat(buildInterestedLeadCandidateRows([]), buildGroupedColdcallingLeadRows([]))
+  );
+  const map = new Map();
+  rows.forEach((row) => {
+    const key = buildLeadFollowUpCandidateKey(row);
+    if (key) map.set(key, row);
+  });
+  return map;
+}
+
 function getMaterializedInterestedLeadRows() {
   const rows = [];
   const seenCallIds = new Set();
   const seenKeys = new Set();
 
-  generatedAgendaAppointments.forEach((appointment) => {
-    const callId = normalizeString(appointment?.callId || '');
-    if (callId && callId.startsWith('demo-')) return;
+  generatedAgendaAppointments
+    .slice()
+    .sort((a, b) => getLeadLikeRecencyTimestamp(b) - getLeadLikeRecencyTimestamp(a))
+    .forEach((appointment) => {
+      const callId = normalizeString(appointment?.callId || '');
+      if (callId && callId.startsWith('demo-')) return;
 
-    const pendingTask = mapAppointmentToConfirmationTask(appointment);
-    const isConfirmedAppointment = isGeneratedAppointmentConfirmedForAgenda(appointment);
-    if (!pendingTask && !isConfirmedAppointment) return;
+      const pendingTask = mapAppointmentToConfirmationTask(appointment);
+      const isConfirmedAppointment = isGeneratedAppointmentConfirmedForAgenda(appointment);
+      if (!pendingTask && !isConfirmedAppointment) return;
 
-    const row =
-      pendingTask ||
-      {
-        id: Number(appointment?.id || 0) || 0,
-        appointmentId: Number(appointment?.id || 0) || 0,
-        type: normalizeString(appointment?.type || 'meeting') || 'meeting',
-        confirmationTaskType: normalizeString(appointment?.confirmationTaskType || appointment?.type || ''),
-        company: normalizeString(appointment?.company || '') || 'Onbekende lead',
-        contact: normalizeString(appointment?.contact || '') || 'Onbekend',
-        phone: normalizeString(appointment?.phone || ''),
-        date: normalizeDateYyyyMmDd(appointment?.date || '') || '',
-        time: normalizeTimeHhMm(appointment?.time || '') || '09:00',
-        source: normalizeString(appointment?.source || 'Agenda afspraak'),
-        summary: truncateText(normalizeString(appointment?.summary || ''), 900),
-        createdAt:
-          normalizeString(
-            appointment?.updatedAt ||
-              appointment?.confirmationResponseReceivedAt ||
-              appointment?.confirmationEmailSentAt ||
-              appointment?.createdAt ||
-              ''
-          ) || new Date().toISOString(),
-        callId,
-      };
+      const row =
+        pendingTask ||
+        {
+          id: Number(appointment?.id || 0) || 0,
+          appointmentId: Number(appointment?.id || 0) || 0,
+          type: normalizeString(appointment?.type || 'meeting') || 'meeting',
+          confirmationTaskType: normalizeString(appointment?.confirmationTaskType || appointment?.type || ''),
+          company: normalizeString(appointment?.company || '') || 'Onbekende lead',
+          contact: normalizeString(appointment?.contact || '') || 'Onbekend',
+          phone: normalizeString(appointment?.phone || ''),
+          date: normalizeDateYyyyMmDd(appointment?.date || '') || '',
+          time: normalizeTimeHhMm(appointment?.time || '') || '09:00',
+          source: normalizeString(appointment?.source || 'Agenda afspraak'),
+          summary: truncateText(normalizeString(appointment?.summary || ''), 900),
+          createdAt:
+            normalizeString(
+              appointment?.updatedAt ||
+                appointment?.confirmationResponseReceivedAt ||
+                appointment?.confirmationEmailSentAt ||
+                appointment?.createdAt ||
+                ''
+            ) || new Date().toISOString(),
+          callId,
+        };
 
-    const rowKey = buildLeadFollowUpCandidateKey(row);
-    if (callId && seenCallIds.has(callId)) return;
-    if (rowKey && seenKeys.has(rowKey)) return;
+      const rowKey = buildLeadFollowUpCandidateKey(row);
+      if (callId && seenCallIds.has(callId)) return;
+      if (rowKey && seenKeys.has(rowKey)) return;
 
-    if (callId) seenCallIds.add(callId);
-    if (rowKey) seenKeys.add(rowKey);
-    rows.push(row);
-  });
+      if (callId) seenCallIds.add(callId);
+      if (rowKey) seenKeys.add(rowKey);
+      rows.push(row);
+    });
 
   return rows;
 }
@@ -6583,7 +6706,7 @@ function buildAllInterestedLeadRows() {
   const existingMaterializedRows = getMaterializedInterestedLeadRows();
   const interestedLeadTasks = buildInterestedLeadCandidateRows(existingMaterializedRows);
   const groupedLeadRows = buildGroupedColdcallingLeadRows(existingMaterializedRows.concat(interestedLeadTasks));
-  return interestedLeadTasks.concat(groupedLeadRows).sort(compareConfirmationTasks);
+  return dedupeInterestedLeadRows(existingMaterializedRows.concat(interestedLeadTasks, groupedLeadRows));
 }
 
 function findInterestedLeadRowByCallId(callId) {
@@ -6744,6 +6867,91 @@ function backfillInsightsAndAppointmentsFromRecentCallUpdates() {
       touched += 1;
     }
   }
+  touched += backfillOpenLeadFollowUpAppointmentsFromLatestCalls();
+  return touched;
+}
+
+function backfillOpenLeadFollowUpAppointmentsFromLatestCalls() {
+  const latestRowsByKey = buildLatestInterestedLeadRowsByKey();
+  if (!latestRowsByKey.size) return 0;
+
+  let touched = 0;
+
+  generatedAgendaAppointments.forEach((appointment, idx) => {
+    if (!isOpenLeadFollowUpAppointment(appointment)) return;
+
+    const key = buildLeadFollowUpCandidateKey(appointment);
+    if (!key) return;
+
+    const latestRow = latestRowsByKey.get(key);
+    if (!latestRow) return;
+
+    const latestTs = getLeadLikeRecencyTimestamp(latestRow);
+    const currentTs = getLeadLikeRecencyTimestamp(appointment);
+    if (latestTs <= currentTs) return;
+
+    const updated = {
+      ...appointment,
+      company: normalizeString(latestRow?.company || appointment?.company || '') || 'Onbekende lead',
+      contact: normalizeString(latestRow?.contact || appointment?.contact || '') || 'Onbekend',
+      phone: normalizeString(latestRow?.phone || appointment?.phone || ''),
+      date: normalizeDateYyyyMmDd(latestRow?.date || appointment?.date || '') || '',
+      time: normalizeTimeHhMm(latestRow?.time || appointment?.time || '') || '09:00',
+      source: normalizeString(latestRow?.source || appointment?.source || ''),
+      summary: truncateText(normalizeString(latestRow?.summary || appointment?.summary || ''), 4000),
+      createdAt:
+        normalizeString(latestRow?.createdAt || latestRow?.confirmationTaskCreatedAt || appointment?.createdAt || '') ||
+        new Date().toISOString(),
+      confirmationTaskCreatedAt:
+        normalizeString(
+          latestRow?.confirmationTaskCreatedAt ||
+            latestRow?.createdAt ||
+            appointment?.confirmationTaskCreatedAt ||
+            appointment?.createdAt ||
+            ''
+        ) || new Date().toISOString(),
+      callId: normalizeString(latestRow?.callId || appointment?.callId || ''),
+      location: resolveAppointmentLocation(latestRow, appointment),
+      whatsappInfo: sanitizeAppointmentWhatsappInfo(latestRow?.whatsappInfo || appointment?.whatsappInfo || ''),
+      recordingUrl: resolvePreferredRecordingUrl(latestRow, appointment),
+      provider: normalizeString(latestRow?.provider || appointment?.provider || ''),
+      coldcallingStack: normalizeColdcallingStack(
+        latestRow?.coldcallingStack || appointment?.coldcallingStack || ''
+      ),
+      coldcallingStackLabel: normalizeString(
+        latestRow?.coldcallingStackLabel || appointment?.coldcallingStackLabel || latestRow?.providerLabel || ''
+      ),
+      leadType: normalizeString(latestRow?.leadType || appointment?.leadType || ''),
+      leadOwnerKey: normalizeString(latestRow?.leadOwnerKey || appointment?.leadOwnerKey || ''),
+      leadOwnerName: normalizeString(latestRow?.leadOwnerName || appointment?.leadOwnerName || ''),
+      leadOwnerFullName: normalizeString(latestRow?.leadOwnerFullName || appointment?.leadOwnerFullName || ''),
+      leadOwnerUserId: normalizeString(latestRow?.leadOwnerUserId || appointment?.leadOwnerUserId || ''),
+      leadOwnerEmail: normalizeString(latestRow?.leadOwnerEmail || appointment?.leadOwnerEmail || ''),
+    };
+
+    const previousCallId = normalizeString(appointment?.callId || '');
+    const nextCallId = normalizeString(updated?.callId || '');
+    generatedAgendaAppointments[idx] = updated;
+
+    const appointmentId = Number(updated?.id || 0) || 0;
+    if (previousCallId && previousCallId !== nextCallId) {
+      const mappedId = agendaAppointmentIdByCallId.get(previousCallId);
+      if (Number(mappedId || 0) === appointmentId) {
+        agendaAppointmentIdByCallId.delete(previousCallId);
+      }
+    }
+    if (appointmentId > 0 && nextCallId) {
+      agendaAppointmentIdByCallId.set(nextCallId, appointmentId);
+      clearDismissedInterestedLeadCallId(nextCallId);
+    }
+
+    touched += 1;
+  });
+
+  if (touched > 0) {
+    queueRuntimeStatePersist('lead_follow_up_latest_call_backfill');
+  }
+
   return touched;
 }
 
@@ -7174,15 +7382,58 @@ function setGeneratedAgendaAppointmentAtIndex(idx, nextValue, reason = 'agenda_a
   if (!Number.isInteger(idx) || idx < 0 || idx >= generatedAgendaAppointments.length) return null;
   if (!nextValue || typeof nextValue !== 'object') return null;
 
+  const previous = generatedAgendaAppointments[idx];
+  const previousCallId = normalizeString(previous?.callId || '');
   generatedAgendaAppointments[idx] = nextValue;
   const id = Number(nextValue.id);
   const callId = normalizeString(nextValue.callId || '');
+  if (previousCallId && previousCallId !== callId) {
+    const mappedId = agendaAppointmentIdByCallId.get(previousCallId);
+    if (Number(mappedId || 0) === Number(id || 0)) {
+      agendaAppointmentIdByCallId.delete(previousCallId);
+    }
+  }
   if (Number.isFinite(id) && id > 0 && callId) {
     agendaAppointmentIdByCallId.set(callId, id);
     clearDismissedInterestedLeadCallId(callId);
   }
   queueRuntimeStatePersist(reason);
   return generatedAgendaAppointments[idx];
+}
+
+function isOpenLeadFollowUpAppointment(appointment) {
+  if (!appointment || typeof appointment !== 'object') return false;
+  const taskType = normalizeString(
+    appointment?.confirmationTaskType || appointment?.taskType || appointment?.type || ''
+  ).toLowerCase();
+  if (taskType !== 'lead_follow_up') return false;
+  return Boolean(mapAppointmentToConfirmationTask(appointment));
+}
+
+function findReusableLeadFollowUpAppointmentIndex(appointment, callId) {
+  const key = buildLeadFollowUpCandidateKey(appointment);
+  const normalizedCallId = normalizeString(callId || appointment?.callId || '');
+  if (!key) return -1;
+
+  let bestIdx = -1;
+  let bestTs = -1;
+
+  generatedAgendaAppointments.forEach((item, idx) => {
+    if (!isOpenLeadFollowUpAppointment(item)) return;
+
+    const itemKey = buildLeadFollowUpCandidateKey(item);
+    const itemCallId = normalizeString(item?.callId || '');
+    if (!itemKey || itemKey !== key) return;
+    if (normalizedCallId && itemCallId === normalizedCallId) return;
+
+    const itemTs = getLeadLikeRecencyTimestamp(item);
+    if (itemTs > bestTs) {
+      bestTs = itemTs;
+      bestIdx = idx;
+    }
+  });
+
+  return bestIdx;
 }
 
 function getLatestCallUpdateByCallId(callId) {
@@ -7346,6 +7597,78 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
       }
       return setGeneratedAgendaAppointmentAtIndex(idx, updated, 'agenda_appointment_upsert');
     }
+  }
+
+  const reusableIdx = findReusableLeadFollowUpAppointmentIndex(appointment, callId);
+  if (reusableIdx >= 0) {
+    const existing = generatedAgendaAppointments[reusableIdx];
+    const existingIdForReuse = Number(existing?.id || 0) || 0;
+    const updated = {
+      ...existing,
+      ...appointment,
+      id: existingIdForReuse,
+      callId,
+      createdAt: normalizeString(appointment?.createdAt || existing?.createdAt || '') || new Date().toISOString(),
+      needsConfirmationEmail: toBooleanSafe(
+        existing?.needsConfirmationEmail,
+        toBooleanSafe(appointment?.aiGenerated, false)
+      ),
+      confirmationEmailSent: Boolean(existing?.confirmationEmailSent || existing?.confirmationEmailSentAt),
+      confirmationEmailSentAt: normalizeString(existing?.confirmationEmailSentAt || '') || null,
+      confirmationEmailSentBy: normalizeString(existing?.confirmationEmailSentBy || '') || null,
+      confirmationResponseReceived: Boolean(
+        existing?.confirmationResponseReceived || existing?.confirmationResponseReceivedAt
+      ),
+      confirmationResponseReceivedAt:
+        normalizeString(existing?.confirmationResponseReceivedAt || '') || null,
+      confirmationResponseReceivedBy:
+        normalizeString(existing?.confirmationResponseReceivedBy || '') || null,
+      confirmationAppointmentCancelled: Boolean(
+        existing?.confirmationAppointmentCancelled || existing?.confirmationAppointmentCancelledAt
+      ),
+      confirmationAppointmentCancelledAt:
+        normalizeString(existing?.confirmationAppointmentCancelledAt || '') || null,
+      confirmationAppointmentCancelledBy:
+        normalizeString(existing?.confirmationAppointmentCancelledBy || '') || null,
+      confirmationEmailDraft: normalizeString(existing?.confirmationEmailDraft || '') || null,
+      confirmationEmailDraftGeneratedAt:
+        normalizeString(existing?.confirmationEmailDraftGeneratedAt || '') || null,
+      confirmationEmailDraftSource:
+        normalizeString(existing?.confirmationEmailDraftSource || '') || null,
+      contactEmail:
+        normalizeEmailAddress(
+          appointment?.contactEmail || appointment?.email || existing?.contactEmail || existing?.email || ''
+        ) || null,
+      confirmationEmailLastError:
+        normalizeString(existing?.confirmationEmailLastError || '') || null,
+      confirmationEmailLastSentMessageId:
+        normalizeString(existing?.confirmationEmailLastSentMessageId || '') || null,
+      confirmationTaskCreatedAt:
+        normalizeString(appointment?.createdAt || appointment?.updatedAt || '') ||
+        normalizeString(existing?.confirmationTaskCreatedAt || '') ||
+        normalizeString(existing?.createdAt || '') ||
+        new Date().toISOString(),
+      postCallStatus:
+        normalizeString(existing?.postCallStatus || appointment?.postCallStatus || '') || null,
+      postCallNotesTranscript:
+        normalizeString(
+          existing?.postCallNotesTranscript || appointment?.postCallNotesTranscript || ''
+        ) || null,
+      postCallPrompt:
+        normalizeString(existing?.postCallPrompt || appointment?.postCallPrompt || '') || null,
+      postCallUpdatedAt:
+        normalizeString(existing?.postCallUpdatedAt || appointment?.postCallUpdatedAt || '') || null,
+      postCallUpdatedBy:
+        normalizeString(existing?.postCallUpdatedBy || appointment?.postCallUpdatedBy || '') || null,
+    };
+    if (!normalizeString(updated.confirmationEmailDraft || '')) {
+      updated.confirmationEmailDraft = buildConfirmationEmailDraftFallback(updated, updated);
+      updated.confirmationEmailDraftGeneratedAt =
+        normalizeString(updated.confirmationEmailDraftGeneratedAt || '') || new Date().toISOString();
+      updated.confirmationEmailDraftSource =
+        normalizeString(updated.confirmationEmailDraftSource || '') || 'template-auto';
+    }
+    return setGeneratedAgendaAppointmentAtIndex(reusableIdx, updated, 'agenda_appointment_reuse_upsert');
   }
 
   const createdAtIso = normalizeString(appointment?.createdAt) || new Date().toISOString();
@@ -13372,6 +13695,7 @@ app.get('/api/agenda/confirmation-tasks', async (req, res) => {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
+  await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
   if (!quickMode && isImapMailConfigured()) {
     await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
   }
@@ -13448,6 +13772,7 @@ app.get('/api/agenda/interested-leads', async (req, res) => {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
+  await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
 
   const interestedLeads = buildAllInterestedLeadRows();
@@ -13822,6 +14147,7 @@ async function sendConfirmationTaskDetailResponse(req, res, taskIdRaw) {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
+  await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
   if (isImapMailConfigured()) {
     await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
   }
