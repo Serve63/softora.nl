@@ -140,9 +140,14 @@ body {
   80%{transform:translateX(4px)}
 }
 
-.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: clamp(96px, 8vw, 118px);
+  gap: 12px;
+  width: 100%;
+}
 .num-btn {
-  aspect-ratio: 1;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg);
@@ -156,7 +161,10 @@ body {
   align-items: center;
   justify-content: center;
   user-select: none;
+  width: 100%;
+  height: 100%;
 }
+.num-btn.zero { grid-column: span 2; }
 .num-btn:hover { background: var(--card); border-color: rgba(155,35,85,.3); color: var(--crimson); }
 .num-btn:active { transform: scale(.93); }
 .num-btn.ghost { border: none; background: transparent; cursor: default; }
@@ -465,8 +473,7 @@ body {
             <button class="num-btn" onclick="p('7')">7</button>
             <button class="num-btn" onclick="p('8')">8</button>
             <button class="num-btn" onclick="p('9')">9</button>
-            <button class="num-btn ghost"></button>
-            <button class="num-btn" onclick="p('0')">0</button>
+            <button class="num-btn zero" onclick="p('0')">0</button>
             <button class="num-btn" onclick="pb()">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
             </button>
