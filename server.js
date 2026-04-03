@@ -6801,8 +6801,18 @@ function normalizeLeadFollowUpCandidateKeyPart(value) {
     .trim();
 }
 
+function normalizeLeadLikePhoneKey(value) {
+  const digits = normalizeString(value || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('0031')) return `31${digits.slice(4)}`;
+  if (digits.startsWith('31')) return digits;
+  if (digits.startsWith('0') && digits.length >= 10) return `31${digits.slice(1)}`;
+  if (digits.startsWith('6') && digits.length === 9) return `31${digits}`;
+  return digits;
+}
+
 function buildLeadFollowUpCandidateKey(item) {
-  const phoneDigits = normalizeString(item?.phone || '').replace(/\D/g, '');
+  const phoneDigits = normalizeLeadLikePhoneKey(item?.phone || '');
   if (phoneDigits) return `phone:${phoneDigits}`;
   const companyKey = normalizeLeadFollowUpCandidateKeyPart(item?.company || '');
   const contactKey = normalizeLeadFollowUpCandidateKeyPart(item?.contact || '');
@@ -6961,7 +6971,7 @@ function buildInterestedLeadCandidateRows(existingTasks = []) {
   const insightByCompanyKey = new Map();
   recentAiCallInsights.forEach((insight) => {
     const callId = normalizeString(insight?.callId || '');
-    const phoneKey = normalizeString(insight?.phone || '').replace(/\D/g, '');
+    const phoneKey = normalizeLeadLikePhoneKey(insight?.phone || '');
     const companyKey = normalizeLeadFollowUpCandidateKeyPart(insight?.company || insight?.leadCompany || '');
     if (callId && !insightByCallId.has(callId)) insightByCallId.set(callId, insight);
     if (phoneKey && !insightByPhoneKey.has(phoneKey)) insightByPhoneKey.set(phoneKey, insight);
@@ -6986,7 +6996,7 @@ function buildInterestedLeadCandidateRows(existingTasks = []) {
       if (!callId || existingCallIds.has(callId) || seenCallIds.has(callId)) return null;
       if (isInterestedLeadDismissed(callId)) return null;
 
-      const phoneKey = normalizeString(callUpdate?.phone || '').replace(/\D/g, '');
+      const phoneKey = normalizeLeadLikePhoneKey(callUpdate?.phone || '');
       const companyKey = normalizeLeadFollowUpCandidateKeyPart(callUpdate?.company || '');
       const insight =
         insightByCallId.get(callId) ||
@@ -7189,7 +7199,7 @@ function buildGroupedColdcallingLeadRows(existingTasks = []) {
   }
 
   recentCallUpdates.forEach((update) => {
-    const phoneDigits = normalizeString(update?.phone || '').replace(/\D/g, '');
+    const phoneDigits = normalizeLeadLikePhoneKey(update?.phone || '');
     const companyKey = normalizeColdcallingLeadSearch(update?.company || '');
     const key = phoneDigits ? `phone:${phoneDigits}` : companyKey ? `company:${companyKey}` : '';
     if (!key) return;
@@ -7202,7 +7212,7 @@ function buildGroupedColdcallingLeadRows(existingTasks = []) {
   });
 
   recentAiCallInsights.forEach((insight) => {
-    const phoneDigits = normalizeString(insight?.phone || '').replace(/\D/g, '');
+    const phoneDigits = normalizeLeadLikePhoneKey(insight?.phone || '');
     const companyKey = normalizeColdcallingLeadSearch(insight?.company || insight?.leadCompany || '');
     const key = phoneDigits ? `phone:${phoneDigits}` : companyKey ? `company:${companyKey}` : '';
     if (!key) return;
