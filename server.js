@@ -225,10 +225,14 @@ let inboundConfirmationMailSyncNotBeforeMs = 0;
 let inboundConfirmationMailSyncLastResult = null;
 let supabaseStateHydrationPromise = null;
 let supabaseStateHydrated = false;
-let supabasePersistChain = Promise.resolve();
+let supabasePersistChain = Promise.resolve(true);
 let supabaseHydrateRetryNotBeforeMs = 0;
 let supabaseLastHydrateError = '';
 let supabaseLastPersistError = '';
+let runtimeStateObservedAtMs = 0;
+let runtimeStateLastSupabaseSyncCheckMs = 0;
+const RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS = 4000;
+const RUNTIME_STATE_REMOTE_NEWER_THRESHOLD_MS = 250;
 const UI_STATE_SCOPE_PREFIX = 'ui_state:';
 const PREMIUM_ACTIVE_ORDERS_SCOPE = 'premium_active_orders';
 const PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
@@ -1532,7 +1536,29 @@ function buildRuntimeStateSnapshotPayload() {
   };
 }
 
-function applyRuntimeStateSnapshotPayload(payload) {
+function resolveRuntimeStateVersionMs(updatedAt = '', payload = null) {
+  const candidates = [normalizeString(updatedAt), normalizeString(payload?.savedAt || '')];
+  for (const candidate of candidates) {
+    const parsedMs = Date.parse(candidate);
+    if (Number.isFinite(parsedMs) && parsedMs > 0) {
+      return parsedMs;
+    }
+  }
+  return 0;
+}
+
+function markRuntimeStateObserved(atMs = Date.now()) {
+  const nextMs = Number(atMs);
+  runtimeStateObservedAtMs =
+    Number.isFinite(nextMs) && nextMs > 0 ? Math.max(runtimeStateObservedAtMs, nextMs) : Math.max(runtimeStateObservedAtMs, Date.now());
+}
+
+function markRuntimeStateSynced(atMs = Date.now()) {
+  runtimeStateObservedAtMs = Number.isFinite(Number(atMs)) && Number(atMs) > 0 ? Number(atMs) : Date.now();
+  runtimeStateLastSupabaseSyncCheckMs = Date.now();
+}
+
+function applyRuntimeStateSnapshotPayload(payload, options = {}) {
   if (!payload || typeof payload !== 'object') return false;
 
   const nextWebhookEvents = Array.isArray(payload.recentWebhookEvents) ? payload.recentWebhookEvents.slice(0, 200) : [];
@@ -1608,6 +1634,7 @@ function applyRuntimeStateSnapshotPayload(payload) {
   nextGeneratedAgendaAppointmentId = Number.isFinite(payloadNextId)
     ? Math.max(payloadNextId, maxAppointmentId + 1)
     : maxAppointmentId + 1;
+  markRuntimeStateSynced(resolveRuntimeStateVersionMs(options?.updatedAt || '', payload));
 
   return true;
 }
@@ -1665,7 +1692,7 @@ async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
 
         const row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
         if (row && row.payload && typeof row.payload === 'object') {
-          applyRuntimeStateSnapshotPayload(row.payload);
+          applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
         }
         supabaseStateHydrated = true;
         supabaseLastHydrateError = '';
@@ -1674,7 +1701,7 @@ async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
       }
 
       if (data && data.payload && typeof data.payload === 'object') {
-        applyRuntimeStateSnapshotPayload(data.payload);
+        applyRuntimeStateSnapshotPayload(data.payload, { updatedAt: data.updated_at || '' });
         console.log(
           '[Supabase] Runtime state geladen',
           JSON.stringify({
@@ -1762,10 +1789,14 @@ async function persistRuntimeStateToSupabase(reason = 'unknown') {
         return false;
       }
       supabaseLastPersistError = '';
+      supabaseStateHydrated = true;
+      markRuntimeStateSynced(resolveRuntimeStateVersionMs(row.updated_at, row.payload));
       return true;
     }
 
     supabaseLastPersistError = '';
+    supabaseStateHydrated = true;
+    markRuntimeStateSynced(resolveRuntimeStateVersionMs(row.updated_at, row.payload));
     return true;
   } catch (error) {
     console.error('[Supabase][PersistCrash]', error?.message || error);
@@ -1775,7 +1806,8 @@ async function persistRuntimeStateToSupabase(reason = 'unknown') {
 }
 
 function queueRuntimeStatePersist(reason = 'unknown') {
-  if (!isSupabaseConfigured()) return;
+  markRuntimeStateObserved();
+  if (!isSupabaseConfigured()) return Promise.resolve(false);
 
   supabasePersistChain = supabasePersistChain
     .catch(() => null)
@@ -1784,6 +1816,83 @@ function queueRuntimeStatePersist(reason = 'unknown') {
       console.error('[Supabase][PersistQueueError]', error?.message || error);
       return false;
     });
+
+  return supabasePersistChain;
+}
+
+async function waitForQueuedRuntimeStatePersist() {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    return Boolean(await supabasePersistChain);
+  } catch (error) {
+    console.error('[Supabase][PersistAwaitError]', error?.message || error);
+    return false;
+  }
+}
+
+async function syncRuntimeStateFromSupabaseIfNewer(options = {}) {
+  if (!isSupabaseConfigured()) return false;
+
+  const force = Boolean(options?.force);
+  const maxAgeMs = Math.max(
+    0,
+    parseNumberSafe(options?.maxAgeMs, RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS) || RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS
+  );
+
+  if (supabaseStateHydrationPromise) {
+    try {
+      await supabaseStateHydrationPromise;
+    } catch {
+      // Hydrate fouten worden al elders gelogd; hier alleen door.
+    }
+  }
+
+  if (!force && !supabaseStateHydrated) {
+    return forceHydrateRuntimeStateWithRetries(3);
+  }
+
+  const nowMs = Date.now();
+  if (
+    !force &&
+    runtimeStateLastSupabaseSyncCheckMs > 0 &&
+    nowMs - runtimeStateLastSupabaseSyncCheckMs < maxAgeMs
+  ) {
+    return false;
+  }
+
+  await waitForQueuedRuntimeStatePersist();
+  runtimeStateLastSupabaseSyncCheckMs = Date.now();
+
+  const snapshot = await fetchSupabaseStateRowViaRest('payload,updated_at');
+  if (!snapshot.ok) {
+    if (snapshot.error) {
+      supabaseLastHydrateError = truncateText(snapshot.error, 500);
+    }
+    return false;
+  }
+
+  const row = Array.isArray(snapshot.body) ? snapshot.body[0] || null : snapshot.body;
+  if (!row || !row.payload || typeof row.payload !== 'object') {
+    supabaseStateHydrated = true;
+    supabaseLastHydrateError = '';
+    return false;
+  }
+
+  const remoteVersionMs = resolveRuntimeStateVersionMs(row.updated_at || '', row.payload);
+  const shouldApply =
+    force ||
+    !supabaseStateHydrated ||
+    (Number.isFinite(remoteVersionMs) &&
+      remoteVersionMs > runtimeStateObservedAtMs + RUNTIME_STATE_REMOTE_NEWER_THRESHOLD_MS);
+
+  supabaseStateHydrated = true;
+  supabaseLastHydrateError = '';
+
+  if (!shouldApply) {
+    return false;
+  }
+
+  return applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
 }
 
 function createSecurityAuditEvent(input) {
@@ -3581,10 +3690,10 @@ async function refreshCallUpdateFromTwilioStatusApi(callId, options = {}) {
 
 function shouldRefreshRetellCallStatus(update, nowMs = Date.now()) {
   const callId = normalizeString(update?.callId || '');
-  if (!callId || !callId.startsWith('call_')) return false;
+  if (!callId) return false;
 
-  const provider = normalizeString(update?.provider || 'retell').toLowerCase();
-  if (provider && provider !== 'retell') return false;
+  const provider = inferCallProvider(callId, normalizeString(update?.provider || 'retell').toLowerCase() || 'retell');
+  if (provider !== 'retell' && provider !== 'twilio') return false;
 
   const status = normalizeString(update?.status || '').toLowerCase();
   const endedReason = normalizeString(update?.endedReason || '');
@@ -9283,6 +9392,7 @@ async function sendColdcallingStatusResponse(res, callId) {
       if (update) {
         upsertRecentCallUpdate(update);
         triggerPostCallAutomation(update);
+        await waitForQueuedRuntimeStatePersist();
       }
 
       return res.status(200).json({
@@ -9319,6 +9429,7 @@ async function sendColdcallingStatusResponse(res, callId) {
     if (update) {
       upsertRecentCallUpdate(update);
       triggerPostCallAutomation(update);
+      await waitForQueuedRuntimeStatePersist();
     }
 
     return res.status(200).json({
@@ -9598,7 +9709,7 @@ function handleTwilioInboundVoice(req, res) {
   );
 }
 
-function handleTwilioStatusWebhook(req, res) {
+async function handleTwilioStatusWebhook(req, res) {
   if (!isTwilioWebhookAuthorized(req)) {
     appendSecurityAuditEvent(
       {
@@ -9634,6 +9745,8 @@ function handleTwilioStatusWebhook(req, res) {
   if (callUpdate) {
     triggerPostCallAutomation(callUpdate);
   }
+
+  await waitForQueuedRuntimeStatePersist();
 
   return res.status(200).json({ ok: true });
 }
@@ -10479,7 +10592,7 @@ app.get('/api/coldcalling/recording-proxy', async (req, res) => {
   }
 });
 
-app.post('/api/retell/webhook', (req, res) => {
+app.post('/api/retell/webhook', async (req, res) => {
   if (!isRetellWebhookAuthorized(req)) {
     appendSecurityAuditEvent(
       {
@@ -10542,12 +10655,14 @@ app.post('/api/retell/webhook', (req, res) => {
     triggerPostCallAutomation(callUpdate);
   }
 
+  await waitForQueuedRuntimeStatePersist();
+
   return res.status(200).json({ ok: true });
 });
 
 app.get('/api/coldcalling/call-updates', async (req, res) => {
-  if (isSupabaseConfigured() && !supabaseStateHydrated) {
-    await forceHydrateRuntimeStateWithRetries(3);
+  if (isSupabaseConfigured()) {
+    await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
   }
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 200)));
   const sinceMs = parseNumberSafe(req.query.sinceMs, null);
@@ -10567,9 +10682,21 @@ app.get('/api/coldcalling/call-updates', async (req, res) => {
   if (callIdsToRefresh.length > 0) {
     await Promise.allSettled(
       callIdsToRefresh.map(async (callId) => {
-        await refreshCallUpdateFromRetellStatusApi(callId);
+        const cached = callUpdatesById.get(callId) || null;
+        const provider = inferCallProvider(callId, normalizeString(cached?.provider || 'retell').toLowerCase() || 'retell');
+        const refreshed =
+          provider === 'twilio'
+            ? await refreshCallUpdateFromTwilioStatusApi(callId, {
+                direction: normalizeString(cached?.direction || '') || 'outbound',
+                stack: normalizeString(cached?.stack || ''),
+              })
+            : await refreshCallUpdateFromRetellStatusApi(callId);
+        if (refreshed) {
+          triggerPostCallAutomation(refreshed);
+        }
       })
     );
+    await waitForQueuedRuntimeStatePersist();
   }
 
   const filtered = recentCallUpdates.filter((item) => {
@@ -10643,10 +10770,13 @@ app.get('/api/coldcalling/webhook-debug', requireRuntimeDebugAccess, (req, res) 
 });
 
 app.get('/api/ai/call-insights', async (req, res) => {
-  if (isSupabaseConfigured() && !supabaseStateHydrated) {
-    await forceHydrateRuntimeStateWithRetries(3);
+  if (isSupabaseConfigured()) {
+    await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
   }
-  backfillInsightsAndAppointmentsFromRecentCallUpdates();
+  const touched = backfillInsightsAndAppointmentsFromRecentCallUpdates();
+  if (touched > 0) {
+    await waitForQueuedRuntimeStatePersist();
+  }
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
   return res.status(200).json({
     ok: true,
