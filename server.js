@@ -900,13 +900,22 @@ function normalizeLeadOwnerRecord(value) {
   if (!value || typeof value !== 'object') return null;
   const fallbackKey = normalizeLeadOwnerKey(value.key || value.displayName || value.fullName || value.email || '') || 'serve';
   const fallback = buildLeadOwnerFallbackRecord(fallbackKey);
+  const rawDisplayName = truncateText(normalizeString(value.displayName || value.name || ''), 80);
+  const rawFullName =
+    truncateText(normalizeString(value.fullName || value.displayName || value.name || ''), 160) || rawDisplayName;
+  const looksLikeUsername = (input) => {
+    const text = normalizeString(input || '');
+    if (!text) return true;
+    if (/\s/.test(text)) return false;
+    return /^[a-z0-9._-]{3,}$/i.test(text);
+  };
+  const forceFallbackHumanName =
+    (fallback.key === 'martijn' || fallback.key === 'serve') &&
+    (looksLikeUsername(rawDisplayName) || looksLikeUsername(rawFullName));
   return {
     key: fallback.key,
-    displayName:
-      truncateText(normalizeString(value.displayName || value.name || ''), 80) || fallback.displayName,
-    fullName:
-      truncateText(normalizeString(value.fullName || value.displayName || value.name || ''), 160) ||
-      fallback.fullName,
+    displayName: forceFallbackHumanName ? fallback.displayName : rawDisplayName || fallback.displayName,
+    fullName: forceFallbackHumanName ? fallback.fullName : rawFullName || fallback.fullName,
     userId: truncateText(normalizeString(value.userId || value.id || ''), 120),
     email: normalizePremiumSessionEmail(value.email || ''),
   };
@@ -7393,10 +7402,10 @@ function getMaterializedInterestedLeadRows() {
     .forEach((appointment) => {
       const callId = normalizeString(appointment?.callId || '');
       if (callId && callId.startsWith('demo-')) return;
+      if (callId && isInterestedLeadDismissed(callId)) return;
 
       const pendingTask = mapAppointmentToConfirmationTask(appointment);
-      const isConfirmedAppointment = isGeneratedAppointmentConfirmedForAgenda(appointment);
-      if (!pendingTask && !isConfirmedAppointment) return;
+      if (!pendingTask) return;
 
       const row =
         pendingTask ||
@@ -8280,7 +8289,10 @@ function setGeneratedAgendaAppointmentAtIndex(idx, nextValue, reason = 'agenda_a
   }
   if (Number.isFinite(id) && id > 0 && callId) {
     agendaAppointmentIdByCallId.set(callId, id);
-    clearDismissedInterestedLeadCallId(callId);
+    const hasOpenLeadTask = Boolean(mapAppointmentToConfirmationTask(nextValue));
+    if (hasOpenLeadTask) {
+      clearDismissedInterestedLeadCallId(callId);
+    }
   }
   queueRuntimeStatePersist(reason);
   return generatedAgendaAppointments[idx];
@@ -15028,6 +15040,10 @@ async function setInterestedLeadInAgendaResponse(req, res) {
     },
     'interested_lead_set_in_agenda'
   );
+  dismissInterestedLeadCallId(
+    normalizeString(updatedAppointment?.callId || callId || ''),
+    'interested_lead_set_in_agenda_dismiss'
+  );
 
   appendDashboardActivity(
     {
@@ -15493,6 +15509,10 @@ async function setLeadTaskInAgendaById(req, res, taskIdRaw) {
       confirmationAppointmentCancelledBy: null,
     },
     'confirmation_task_set_in_agenda'
+  );
+  dismissInterestedLeadCallId(
+    normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+    'confirmation_task_set_in_agenda_dismiss'
   );
 
   appendDashboardActivity(

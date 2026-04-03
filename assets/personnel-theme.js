@@ -953,20 +953,27 @@
     function dedupeLeadRowsForCount(rows) {
         const map = new Map();
         (Array.isArray(rows) ? rows : []).forEach(function (row) {
-            const key = [
-                normalizeLeadFieldForCount(row.company),
-                normalizeLeadFieldForCount(row.contact),
-                normalizeLeadFieldForCount(row.phone),
-                normalizeLeadFieldForCount(row.date),
-                normalizeLeadFieldForCount(row.time),
+            const fallbackKey = [
+                normalizeLeadFieldForCount(row && row.company),
+                normalizeLeadFieldForCount(row && row.contact),
+                normalizeLeadFieldForCount(row && row.phone),
+                normalizeLeadFieldForCount(row && row.date),
+                normalizeLeadFieldForCount(row && row.time),
             ].join("|");
+            const key = buildLeadMatchKeyForCount(row) || fallbackKey;
             if (!map.has(key)) map.set(key, row);
         });
         return Array.from(map.values());
     }
 
     function normalizeLeadPhoneDigitsForCount(value) {
-        return String(value || "").replace(/\D/g, "");
+        const digits = String(value || "").replace(/\D/g, "");
+        if (!digits) return "";
+        if (digits.indexOf("0031") === 0) return `31${digits.slice(4)}`;
+        if (digits.indexOf("31") === 0) return digits;
+        if (digits.indexOf("0") === 0 && digits.length >= 10) return `31${digits.slice(1)}`;
+        if (digits.indexOf("6") === 0 && digits.length === 9) return `31${digits}`;
+        return digits;
     }
 
     function buildLeadMatchKeyForCount(item) {
@@ -1160,7 +1167,7 @@
 
         const responses = await Promise.all([
             fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400"),
-            fetchJsonNoStore("/api/agenda/interested-leads?countOnly=1&limit=500"),
+            fetchJsonNoStore("/api/agenda/interested-leads?limit=500"),
         ]);
         const tasksData = responses[0];
         const interestedLeadsData = responses[1];
@@ -1177,9 +1184,10 @@
         const pendingRows = Array.isArray(tasksData && tasksData.tasks)
             ? tasksData.tasks.map(normalizeLeadRowForCount)
             : [];
-        const pendingCount = dedupeLeadRowsForCount(pendingRows).length;
-        const interestedCount = Math.max(0, Math.floor(Number(interestedLeadsData && interestedLeadsData.count) || 0));
-        const total = pendingCount + interestedCount;
+        const interestedRows = Array.isArray(interestedLeadsData && interestedLeadsData.leads)
+            ? interestedLeadsData.leads.map(normalizeLeadRowForCount)
+            : [];
+        const total = dedupeLeadRowsForCount([].concat(pendingRows, interestedRows)).length;
         paintSidebarCount("leads", total, { singular: "open lead", plural: "open leads" });
     }
 
