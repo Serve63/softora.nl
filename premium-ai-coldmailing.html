@@ -1196,6 +1196,15 @@
                 return Boolean(String(value?.callId || '').trim());
             }
 
+            function isGenericConversationPlaceholder(value) {
+                const text = normalize(String(value || ''));
+                if (!text) return true;
+                return (
+                    text === 'nog geen gesprekssamenvatting beschikbaar.' ||
+                    text === 'samenvatting volgt na verwerking van het gesprek.'
+                );
+            }
+
             function normalizeAudioUrl(value) {
                 const raw = String(value || '').trim();
                 if (!raw) return '';
@@ -1997,6 +2006,28 @@
                     const detailTimeValue = normalizeTimeValue(detail?.time || '') || '';
                     const detailLocationValue = String(detail?.location || '').trim();
                     const detailWhatsappInfoValue = String(detail?.whatsappInfo || '').trim();
+                    const recoveredCallId = String(lead?.callId || detail?.callId || '').trim();
+                    const recoveredLead = recoveredCallId
+                        ? {
+                            ...lead,
+                            callId: recoveredCallId,
+                            recordingUrl: pickRecordingUrl(
+                                lead?.recordingUrl,
+                                detail?.recordingUrl,
+                                detail?.recording_url,
+                                detail?.recordingUrlProxy,
+                                detail?.audioUrl,
+                                detail?.audio_url
+                            ),
+                        }
+                        : lead;
+
+                    if (recoveredCallId && !String(lead?.callId || '').trim()) {
+                        const leadIndex = allLeads.findIndex((item) => Number(item?.id) === normalizedTaskId);
+                        if (leadIndex >= 0) {
+                            allLeads[leadIndex] = recoveredLead;
+                        }
+                    }
 
                     if (!String(modalDate.value || '').trim() || String(modalDate.value || '') === leadDateValue) {
                         modalDate.value = detailDateValue || leadDateValue;
@@ -2020,10 +2051,33 @@
                         modalWhatsappInfo.value = detailWhatsappInfoValue || leadWhatsappInfoValue;
                     }
 
-                    const summaryText = await ensureModalCopyWithAi(normalizedTaskId, lead, detail);
+                    if (recoveredCallId) {
+                        delete leadDetailsById[String(normalizedTaskId)];
+                        delete leadAiCopyById[String(normalizedTaskId)];
+                        const callBackedDetail = (await ensureCallBackedLeadDetail(normalizedTaskId, recoveredLead)) || detail;
+                        if (openSeq !== modalOpenSequence) return;
+                        const summaryText = await ensureCallBackedModalCopy(
+                            normalizedTaskId,
+                            recoveredLead,
+                            callBackedDetail
+                        );
+                        if (openSeq !== modalOpenSequence) return;
+
+                        renderLeadDetailsInModal(recoveredLead, callBackedDetail || detail, normalizedTaskId, {
+                            summaryText,
+                        });
+                        await ensureMinimumLoader(summaryText ? 500 : 250);
+                        if (openSeq !== modalOpenSequence) return;
+                        setModalLoading(false);
+                        setModalBusy(false);
+                        setModalStatus('');
+                        return;
+                    }
+
+                    const summaryText = await ensureModalCopyWithAi(normalizedTaskId, recoveredLead, detail);
                     if (openSeq !== modalOpenSequence) return;
 
-                    renderLeadDetailsInModal(lead, detail, normalizedTaskId, { summaryText });
+                    renderLeadDetailsInModal(recoveredLead, detail, normalizedTaskId, { summaryText });
                     await ensureMinimumLoader(700);
                     if (openSeq !== modalOpenSequence) return;
                     setModalLoading(false);
@@ -2604,14 +2658,24 @@
                     : secondaryId > 0
                         ? secondaryId
                         : (preferredId || secondaryId || 0);
+                const preferredSummary = String(preferred?.summary || '').trim();
+                const secondarySummary = String(secondary?.summary || '').trim();
                 return {
                     ...preferred,
                     id: mergedId,
+                    callId: String(preferred?.callId || secondary?.callId || '').trim(),
                     company: String(preferred?.company || secondary?.company || 'Onbekende lead').trim() || 'Onbekende lead',
                     contact: String(preferred?.contact || secondary?.contact || '').trim(),
                     phone: String(preferred?.phone || secondary?.phone || '').trim(),
+                    date: String(preferred?.date || secondary?.date || '').trim(),
+                    time: String(preferred?.time || secondary?.time || '').trim(),
                     source: String(preferred?.source || secondary?.source || '').trim(),
-                    summary: String(preferred?.summary || secondary?.summary || '').trim(),
+                    summary: String(
+                        (!preferredSummary || isGenericConversationPlaceholder(preferredSummary))
+                            ? (secondarySummary || preferredSummary)
+                            : (preferredSummary || secondarySummary)
+                    ).trim(),
+                    location: String(preferred?.location || secondary?.location || '').trim(),
                     whatsappInfo: String(preferred?.whatsappInfo || secondary?.whatsappInfo || '').trim(),
                     createdAt: String(preferred?.createdAt || secondary?.createdAt || '').trim(),
                     recordingUrl: String(preferred?.recordingUrl || secondary?.recordingUrl || '').trim(),
