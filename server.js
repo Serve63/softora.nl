@@ -214,6 +214,7 @@ const aiAnalysisInFlightCallIds = new Set();
 const generatedAgendaAppointments = [];
 const agendaAppointmentIdByCallId = new Map();
 const dismissedInterestedLeadCallIds = new Set();
+const dismissedInterestedLeadKeys = new Set();
 const leadOwnerAssignmentsByCallId = new Map();
 let nextLeadOwnerRotationIndex = 0;
 let nextGeneratedAgendaAppointmentId = 100000;
@@ -1846,6 +1847,7 @@ function buildRuntimeStateSnapshotPayloadWithLimits(options = {}) {
   const maxSecurityAuditEvents = Math.max(20, Math.min(500, Number(options?.maxSecurityAuditEvents || 500) || 500));
   const maxAgendaAppointments = Math.max(40, Math.min(5000, Number(options?.maxAgendaAppointments || 5000) || 5000));
   const maxDismissedCallIds = Math.max(100, Math.min(2000, Number(options?.maxDismissedCallIds || 1000) || 1000));
+  const maxDismissedLeadKeys = Math.max(100, Math.min(4000, Number(options?.maxDismissedLeadKeys || 2000) || 2000));
   const maxLeadOwnerAssignments = Math.max(200, Math.min(5000, Number(options?.maxLeadOwnerAssignments || 5000) || 5000));
 
   return {
@@ -1876,6 +1878,10 @@ function buildRuntimeStateSnapshotPayloadWithLimits(options = {}) {
       .filter(Boolean),
     dismissedInterestedLeadCallIds: Array.from(dismissedInterestedLeadCallIds)
       .slice(0, maxDismissedCallIds)
+      .map((item) => normalizeString(item))
+      .filter(Boolean),
+    dismissedInterestedLeadKeys: Array.from(dismissedInterestedLeadKeys)
+      .slice(0, maxDismissedLeadKeys)
       .map((item) => normalizeString(item))
       .filter(Boolean),
     leadOwnerAssignments: Array.from(leadOwnerAssignmentsByCallId.entries())
@@ -2024,6 +2030,12 @@ function mergeRuntimeSnapshotPayloads(localPayload, remotePayload) {
   const localDismissedCallIds = (Array.isArray(safeLocal.dismissedInterestedLeadCallIds) ? safeLocal.dismissedInterestedLeadCallIds : [])
     .map((item) => normalizeString(item))
     .filter(Boolean);
+  const remoteDismissedLeadKeys = (Array.isArray(safeRemote.dismissedInterestedLeadKeys) ? safeRemote.dismissedInterestedLeadKeys : [])
+    .map((item) => normalizeString(item))
+    .filter(Boolean);
+  const localDismissedLeadKeys = (Array.isArray(safeLocal.dismissedInterestedLeadKeys) ? safeLocal.dismissedInterestedLeadKeys : [])
+    .map((item) => normalizeString(item))
+    .filter(Boolean);
 
   const leadOwnerAssignments = mergeRuntimeSnapshotArraysByKey(
     localLeadOwnerAssignments,
@@ -2080,6 +2092,12 @@ function mergeRuntimeSnapshotPayloads(localPayload, remotePayload) {
       ...localDismissedCallIds,
     ].filter(Boolean))
   ).slice(0, 1000);
+  const dismissedInterestedLeadKeys = Array.from(
+    new Set([
+      ...remoteDismissedLeadKeys,
+      ...localDismissedLeadKeys,
+    ].filter(Boolean))
+  ).slice(0, 2000);
 
   return {
     version: Math.max(Number(safeLocal.version || 0), Number(safeRemote.version || 0), 5),
@@ -2091,6 +2109,7 @@ function mergeRuntimeSnapshotPayloads(localPayload, remotePayload) {
     recentSecurityAuditEvents,
     generatedAgendaAppointments,
     dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
     leadOwnerAssignments,
     nextLeadOwnerRotationIndex: Math.max(
       0,
@@ -2167,6 +2186,9 @@ function applyRuntimeStateSnapshotPayload(payload, options = {}) {
   const nextDismissedInterestedLeadCallIds = Array.isArray(payload.dismissedInterestedLeadCallIds)
     ? payload.dismissedInterestedLeadCallIds.slice(0, 1000)
     : [];
+  const nextDismissedInterestedLeadKeys = Array.isArray(payload.dismissedInterestedLeadKeys)
+    ? payload.dismissedInterestedLeadKeys.slice(0, 2000)
+    : [];
   const nextLeadOwnerAssignments = Array.isArray(payload.leadOwnerAssignments)
     ? payload.leadOwnerAssignments.slice(0, 5000)
     : [];
@@ -2197,10 +2219,15 @@ function applyRuntimeStateSnapshotPayload(payload, options = {}) {
   generatedAgendaAppointments.splice(0, generatedAgendaAppointments.length, ...nextAppointments);
   agendaAppointmentIdByCallId.clear();
   dismissedInterestedLeadCallIds.clear();
+  dismissedInterestedLeadKeys.clear();
   leadOwnerAssignmentsByCallId.clear();
   nextDismissedInterestedLeadCallIds.forEach((item) => {
     const callId = normalizeString(item);
     if (callId) dismissedInterestedLeadCallIds.add(callId);
+  });
+  nextDismissedInterestedLeadKeys.forEach((item) => {
+    const leadKey = normalizeString(item);
+    if (leadKey) dismissedInterestedLeadKeys.add(leadKey);
   });
   nextLeadOwnerAssignments.forEach((item) => {
     const callId = normalizeString(item?.callId || '');
@@ -2234,7 +2261,19 @@ function applyRuntimeStateSnapshotPayload(payload, options = {}) {
 
 function isInterestedLeadDismissed(callId) {
   const normalizedCallId = normalizeString(callId);
-  return Boolean(normalizedCallId && dismissedInterestedLeadCallIds.has(normalizedCallId));
+  if (normalizedCallId && dismissedInterestedLeadCallIds.has(normalizedCallId)) return true;
+  return false;
+}
+
+function isInterestedLeadDismissedByKey(leadKey) {
+  const normalizedLeadKey = normalizeString(leadKey);
+  return Boolean(normalizedLeadKey && dismissedInterestedLeadKeys.has(normalizedLeadKey));
+}
+
+function isInterestedLeadDismissedForRow(callId, rowLike) {
+  if (isInterestedLeadDismissed(callId)) return true;
+  const leadKey = buildLeadFollowUpCandidateKey(rowLike || {});
+  return isInterestedLeadDismissedByKey(leadKey);
 }
 
 function dismissInterestedLeadCallId(callId, reason = 'interested_lead_dismissed') {
@@ -2243,6 +2282,22 @@ function dismissInterestedLeadCallId(callId, reason = 'interested_lead_dismissed
   dismissedInterestedLeadCallIds.add(normalizedCallId);
   queueRuntimeStatePersist(reason);
   return true;
+}
+
+function dismissInterestedLeadKey(leadKey, reason = 'interested_lead_dismissed') {
+  const normalizedLeadKey = normalizeString(leadKey);
+  if (!normalizedLeadKey || dismissedInterestedLeadKeys.has(normalizedLeadKey)) return false;
+  dismissedInterestedLeadKeys.add(normalizedLeadKey);
+  queueRuntimeStatePersist(reason);
+  return true;
+}
+
+function dismissInterestedLeadIdentity(callId, rowLike, reason = 'interested_lead_dismissed') {
+  const normalizedCallId = normalizeString(callId || '');
+  const leadKey = buildLeadFollowUpCandidateKey(rowLike || {});
+  const byCall = normalizedCallId ? dismissInterestedLeadCallId(normalizedCallId, reason) : false;
+  const byKey = leadKey ? dismissInterestedLeadKey(leadKey, reason) : false;
+  return Boolean(byCall || byKey);
 }
 
 function clearDismissedInterestedLeadCallId(callId) {
@@ -7033,7 +7088,15 @@ function buildInterestedLeadCandidateRows(existingTasks = []) {
     .map((callUpdate) => {
       const callId = normalizeString(callUpdate?.callId || '');
       if (!callId || existingCallIds.has(callId) || seenCallIds.has(callId)) return null;
-      if (isInterestedLeadDismissed(callId)) return null;
+      if (
+        isInterestedLeadDismissedForRow(callId, {
+          phone: callUpdate?.phone || '',
+          company: callUpdate?.company || '',
+          contact: callUpdate?.name || '',
+        })
+      ) {
+        return null;
+      }
 
       const phoneKey = normalizeLeadLikePhoneKey(callUpdate?.phone || '');
       const companyKey = normalizeLeadFollowUpCandidateKeyPart(callUpdate?.company || '');
@@ -7103,6 +7166,7 @@ function buildInterestedLeadCandidateRows(existingTasks = []) {
         ...buildLeadOwnerFields(callId, leadFollowUp),
       };
       const key = buildLeadFollowUpCandidateKey(row);
+      if (isInterestedLeadDismissedForRow(callId, row)) return null;
       const rowTs = getLeadLikeRecencyTimestamp(row);
       if (key && Number(existingLatestTsByKey.get(key) || 0) >= rowTs) return null;
       if (key && seenKeys.has(key)) return null;
@@ -7356,7 +7420,7 @@ function buildGroupedColdcallingLeadRows(existingTasks = []) {
 
     const callId = normalizeString(row.callId || '');
     const key = buildLeadFollowUpCandidateKey(row);
-    if (callId && isInterestedLeadDismissed(callId)) return;
+    if (isInterestedLeadDismissedForRow(callId, row)) return;
     if (callId && existingCallIds.has(callId)) return;
     if (key && Number(existingLatestTsByKey.get(key) || 0) >= getLeadLikeRecencyTimestamp(row)) return;
     if (key && seenKeys.has(key)) return;
@@ -7402,7 +7466,7 @@ function getMaterializedInterestedLeadRows() {
     .forEach((appointment) => {
       const callId = normalizeString(appointment?.callId || '');
       if (callId && callId.startsWith('demo-')) return;
-      if (callId && isInterestedLeadDismissed(callId)) return;
+      if (isInterestedLeadDismissedForRow(callId, appointment)) return;
 
       const pendingTask = mapAppointmentToConfirmationTask(appointment);
       if (!pendingTask) return;
@@ -7441,6 +7505,8 @@ function getMaterializedInterestedLeadRows() {
             ) || new Date().toISOString(),
           callId,
         };
+
+      if (isInterestedLeadDismissedForRow(callId, row)) return;
 
       const rowKey = buildLeadFollowUpCandidateKey(row);
       if (callId && seenCallIds.has(callId)) return;
@@ -15040,8 +15106,9 @@ async function setInterestedLeadInAgendaResponse(req, res) {
     },
     'interested_lead_set_in_agenda'
   );
-  dismissInterestedLeadCallId(
+  dismissInterestedLeadIdentity(
     normalizeString(updatedAppointment?.callId || callId || ''),
+    updatedAppointment || baseAppointment || {},
     'interested_lead_set_in_agenda_dismiss'
   );
 
@@ -15089,7 +15156,11 @@ async function dismissInterestedLeadResponse(req, res) {
 
   const leadRow = findInterestedLeadRowByCallId(callId);
   const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
-  dismissInterestedLeadCallId(callId, 'interested_lead_dismissed_manual');
+  dismissInterestedLeadIdentity(
+    callId,
+    leadRow || getLatestCallUpdateByCallId(callId) || {},
+    'interested_lead_dismissed_manual'
+  );
 
   appendDashboardActivity(
     {
@@ -15510,8 +15581,9 @@ async function setLeadTaskInAgendaById(req, res, taskIdRaw) {
     },
     'confirmation_task_set_in_agenda'
   );
-  dismissInterestedLeadCallId(
+  dismissInterestedLeadIdentity(
     normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+    updatedAppointment || appointment || {},
     'confirmation_task_set_in_agenda_dismiss'
   );
 
@@ -15628,8 +15700,9 @@ function markLeadTaskCancelledById(req, res, taskIdRaw) {
     },
     'confirmation_task_mark_cancelled'
   );
-  dismissInterestedLeadCallId(
+  dismissInterestedLeadIdentity(
     normalizeString(updatedAppointment?.callId || callId || ''),
+    updatedAppointment || appointment || {},
     'confirmation_task_mark_cancelled_dismiss'
   );
 
