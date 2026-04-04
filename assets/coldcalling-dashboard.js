@@ -85,6 +85,55 @@
       .replace(/[\u0300-\u036f]/g, '');
   }
 
+  function looksLikeConversationTranscript(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    const lower = normalizeSearchText(raw);
+    if (/(^|\s)(user|bot|agent|klant)\s*:/.test(lower)) return true;
+    if (raw.includes('|') && /(user|bot|agent|klant)\s*:/i.test(raw)) return true;
+    if (raw.split(/\||\n/).length >= 4 && /(user|bot|agent|klant)\s*:/i.test(raw)) return true;
+    return false;
+  }
+
+  function stripConversationDialogueMarkers(value) {
+    return String(value || '')
+      .replace(/\s*\|\s*/g, ' ')
+      .replace(/\b(user|bot|agent|klant)\s*:\s*/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  function sanitizeConversationSummaryCopy(value) {
+    const stripped = stripConversationDialogueMarkers(value);
+    return stripped.replace(/\s*\n+\s*/g, ' ').trim();
+  }
+
+  function looksMixedLanguageConversationSummary(value) {
+    const normalized = sanitizeConversationSummaryCopy(value).toLowerCase();
+    if (!normalized) return false;
+    const strongMatches =
+      (
+        normalized.match(
+          /\b(the|call|conversation|agent|user|brief|outbound|inbound|ended|shortly|mentioned|during|standards|expectations|activities|interaction|follow-up|meeting|appointment|summary|details)\b/g
+        ) || []
+      ).length;
+    const mildMatches = (normalized.match(/\b(was|were|is|are|had|with|after|before|where|for)\b/g) || []).length;
+    return strongMatches >= 2 || (strongMatches >= 1 && mildMatches >= 3) || mildMatches >= 6;
+  }
+
+  function pickReadableConversationSummary() {
+    const candidates = Array.from(arguments);
+    for (const candidate of candidates) {
+      const raw = String(candidate || '').trim();
+      if (!raw) continue;
+      if (looksLikeConversationTranscript(raw)) continue;
+      const cleaned = sanitizeConversationSummaryCopy(raw);
+      if (looksMixedLanguageConversationSummary(cleaned)) continue;
+      if (cleaned) return cleaned;
+    }
+    return '';
+  }
+
   function normalizeBusinessMode(mode) {
     const raw = String(mode || '').trim().toLowerCase();
     if (raw === 'voice_software' || raw === 'voice software' || raw === 'voicesoftware') {
@@ -3604,6 +3653,7 @@
     const calls = buildConversationRecordsFromUpdates(scopedUpdates);
     return {
       records,
+      insights: scopedInsights,
       updates: scopedUpdates,
       calls,
       sourceErrors,
@@ -3805,6 +3855,7 @@
       error: '',
       info: '',
       records: [],
+      insights: [],
       calls: [],
       search: '',
       filter: 'callback',
@@ -4024,6 +4075,30 @@
       );
     }
 
+    function getCallInsightRecord(callId) {
+      const normalizedCallId = normalizeFreeText(callId);
+      if (!normalizedCallId) return null;
+      let latestInsight = null;
+      (Array.isArray(state.insights) ? state.insights : []).forEach((insight) => {
+        if (normalizeFreeText(insight?.callId || '') !== normalizedCallId) return;
+        if (!latestInsight || getCallLikeRecordUpdatedMs(insight) > getCallLikeRecordUpdatedMs(latestInsight)) {
+          latestInsight = insight;
+        }
+      });
+      return latestInsight;
+    }
+
+    function getLeadDatabaseCallSummary(call) {
+      const insight = getCallInsightRecord(call?.callId || '');
+      const readableSummary = pickReadableConversationSummary(
+        insight?.summary,
+        call?.summary,
+        insight?.followUpReason,
+        call?.transcriptSnippet
+      );
+      return readableSummary || getConversationConclusion(call);
+    }
+
     function closeCallDetail() {
       const detailOverlay = byId('leadDatabaseCallDetailOverlay');
       const detailAudio = byId('leadDatabaseCallDetailAudio');
@@ -4060,7 +4135,7 @@
         .filter(Boolean)
         .join(' · ');
       const recordingUrl = getCallRecordingUrl(call);
-      const summaryText = getConversationConclusion(call);
+      const summaryText = getLeadDatabaseCallSummary(call);
 
       detailTitle.textContent = company;
       detailMeta.textContent = metaLine;
@@ -4433,6 +4508,7 @@
           cacheBust: force ? String(Date.now()) : '',
         });
         state.records = Array.isArray(data.records) ? data.records : [];
+        state.insights = Array.isArray(data.insights) ? data.insights : [];
         state.calls = Array.isArray(data.calls) ? data.calls : Array.isArray(data.updates) ? data.updates : [];
         state.sourceErrors = Array.isArray(data.sourceErrors) ? data.sourceErrors : [];
         state.lastRefreshedAt = new Date().toISOString();
