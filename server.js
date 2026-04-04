@@ -8268,7 +8268,7 @@ function mapAppointmentToConfirmationTask(appointment) {
   );
   if ((!needsConfirmation && !isLeadFollowUpTask) || alreadyDone) return null;
 
-  const callId = normalizeString(appointment.callId || '');
+  const callId = resolveAppointmentCallId(appointment);
   const callUpdate = callId ? getLatestCallUpdateByCallId(callId) : null;
   const rawProvider = normalizeString(callUpdate?.provider || appointment?.provider || '').toLowerCase();
   const normalizedStack = normalizeColdcallingStack(
@@ -8320,7 +8320,7 @@ function mapAppointmentToConfirmationTask(appointment) {
     value: normalizeString(appointment.value || ''),
     createdAt: normalizeString(appointment.confirmationTaskCreatedAt || appointment.createdAt || ''),
     appointmentId: Number(appointment.id) || 0,
-    callId: normalizeString(appointment.callId || ''),
+    callId,
     contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
     location: resolveAgendaLocationValue(
       sanitizeAppointmentLocation(appointment.location || appointment.appointmentLocation || ''),
@@ -8453,7 +8453,7 @@ function findTranscriptFromWebhookEvents(callId) {
 
 function getAppointmentTranscriptText(appointment) {
   if (!appointment) return '';
-  const callId = normalizeString(appointment.callId || '');
+  const callId = resolveAppointmentCallId(appointment);
   const fromCallUpdate = getLatestCallUpdateByCallId(callId);
   const transcript = normalizeString(fromCallUpdate?.transcriptFull || fromCallUpdate?.transcriptSnippet || '');
   if (transcript) return transcript;
@@ -10632,6 +10632,179 @@ function extractTwilioRecordingSidFromUrl(value) {
   if (!raw) return '';
   const match = raw.match(/\/Recordings\/(RE[0-9a-f]{32})/i);
   return normalizeString(match?.[1] || '');
+}
+
+function extractCallIdFromRecordingUrl(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw, 'https://softora.local');
+    return normalizeString(parsed.searchParams.get('callId') || '');
+  } catch {
+    const match = raw.match(/[?&]callId=([^&#]+)/i);
+    if (!match) return '';
+    try {
+      return normalizeString(decodeURIComponent(match[1] || ''));
+    } catch {
+      return normalizeString(match[1] || '');
+    }
+  }
+}
+
+function normalizeRecordingReference(value) {
+  const raw = normalizeString(value);
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw, 'https://softora.local');
+    const pathname = normalizeString(parsed.pathname || '');
+    const callId = normalizeString(parsed.searchParams.get('callId') || '');
+    const recordingSid = normalizeString(parsed.searchParams.get('recordingSid') || '');
+    if (callId) return `${pathname}?callId=${callId}`;
+    if (recordingSid) return `${pathname}?recordingSid=${recordingSid}`;
+    return pathname || raw;
+  } catch {
+    return raw;
+  }
+}
+
+function findCallUpdateByRecordingReference(...sources) {
+  const directCallIds = [];
+  const recordingSids = [];
+  const recordingRefs = [];
+  const phoneKeys = [];
+  const timestamps = [];
+
+  (Array.isArray(sources) ? sources : []).forEach((source) => {
+    if (!source || typeof source !== 'object') return;
+    const directCallId =
+      normalizeString(source.callId || source.call_id || source.sourceCallId || source.source_call_id || '') ||
+      extractCallIdFromRecordingUrl(
+        source.recordingUrl ||
+          source.recording_url ||
+          source.recordingUrlProxy ||
+          source.audioUrl ||
+          source.audio_url ||
+          ''
+      );
+    if (directCallId) directCallIds.push(directCallId);
+
+    const recordingSid =
+      normalizeString(source.recordingSid || source.recording_sid || '') ||
+      extractTwilioRecordingSidFromUrl(
+        source.recordingUrl ||
+          source.recording_url ||
+          source.recordingUrlProxy ||
+          source.audioUrl ||
+          source.audio_url ||
+          ''
+      );
+    if (recordingSid) recordingSids.push(recordingSid);
+
+    [
+      source.recordingUrl,
+      source.recording_url,
+      source.recordingUrlProxy,
+      source.audioUrl,
+      source.audio_url,
+    ].forEach((candidate) => {
+      const normalizedRef = normalizeRecordingReference(candidate);
+      if (normalizedRef) recordingRefs.push(normalizedRef);
+    });
+
+    const phoneKey = normalizeLeadLikePhoneKey(source.phone || source.phoneNumber || source.phone_number || '');
+    if (phoneKey) phoneKeys.push(phoneKey);
+
+    [
+      source.updatedAt,
+      source.createdAt,
+      source.confirmationTaskCreatedAt,
+      source.startedAt,
+      source.endedAt,
+      source.date && source.time ? `${source.date}T${source.time}:00` : source.date,
+    ].forEach((candidate) => {
+      const parsed = Date.parse(normalizeString(candidate || ''));
+      if (Number.isFinite(parsed) && parsed > 0) timestamps.push(parsed);
+    });
+  });
+
+  for (const callId of directCallIds) {
+    const matched = getLatestCallUpdateByCallId(callId);
+    if (matched) return matched;
+  }
+
+  const recordingSidSet = new Set(recordingSids.filter(Boolean));
+  if (recordingSidSet.size > 0) {
+    for (const candidate of recentCallUpdates) {
+      const candidateSid =
+        normalizeString(candidate?.recordingSid || candidate?.recording_sid || '') ||
+        extractTwilioRecordingSidFromUrl(
+          candidate?.recordingUrl || candidate?.recording_url || candidate?.recordingUrlProxy || ''
+        );
+      if (candidateSid && recordingSidSet.has(candidateSid)) return candidate;
+    }
+  }
+
+  const recordingRefSet = new Set(recordingRefs.filter(Boolean));
+  if (recordingRefSet.size > 0) {
+    for (const candidate of recentCallUpdates) {
+      const candidateRefs = [
+        candidate?.recordingUrl,
+        candidate?.recording_url,
+        candidate?.recordingUrlProxy,
+        candidate?.audioUrl,
+        candidate?.audio_url,
+      ]
+        .map((value) => normalizeRecordingReference(value))
+        .filter(Boolean);
+      if (candidateRefs.some((ref) => recordingRefSet.has(ref))) return candidate;
+    }
+  }
+
+  const phoneKeySet = new Set(phoneKeys.filter(Boolean));
+  if (phoneKeySet.size === 0) return null;
+
+  const targetTs = timestamps.length > 0 ? Math.max(...timestamps) : 0;
+  let best = null;
+  let bestScore = -Infinity;
+
+  for (const candidate of recentCallUpdates) {
+    const candidatePhoneKey = normalizeLeadLikePhoneKey(candidate?.phone || '');
+    if (!candidatePhoneKey || !phoneKeySet.has(candidatePhoneKey)) continue;
+
+    const candidateHasRecording = Boolean(
+      normalizeString(candidate?.recordingUrl || candidate?.recording_url || candidate?.recordingUrlProxy || '')
+    );
+    const candidateTs = getRuntimeSnapshotItemTimestampMs(candidate);
+    const distancePenalty =
+      targetTs > 0 && candidateTs > 0 ? Math.min(10_000_000, Math.abs(candidateTs - targetTs)) / 1000 : 3600;
+    const score = (candidateHasRecording ? 100000 : 0) - distancePenalty;
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
+function resolveAppointmentCallId(appointment) {
+  const direct = normalizeString(
+    appointment?.callId || appointment?.call_id || appointment?.sourceCallId || appointment?.source_call_id || ''
+  );
+  if (direct) return direct;
+
+  const fromRecordingUrl = extractCallIdFromRecordingUrl(
+    appointment?.recordingUrl ||
+      appointment?.recording_url ||
+      appointment?.recordingUrlProxy ||
+      appointment?.audioUrl ||
+      appointment?.audio_url ||
+      ''
+  );
+  if (fromRecordingUrl) return fromRecordingUrl;
+
+  const matchedUpdate = findCallUpdateByRecordingReference(appointment);
+  return normalizeString(matchedUpdate?.callId || '');
 }
 
 function parseDateToIso(value) {
@@ -15810,8 +15983,17 @@ async function sendConfirmationTaskDetailResponse(req, res, taskIdRaw) {
   ensureConfirmationEmailDraftAtIndex(idx, { reason: 'confirmation_task_detail_auto_draft' });
   const appointment = generatedAgendaAppointments[idx];
   let detail = buildConfirmationTaskDetail(appointment);
-  if (detail && !detail.transcriptAvailable && normalizeString(appointment?.callId || '')) {
-    await refreshCallUpdateFromRetellStatusApi(appointment.callId);
+  const resolvedCallId = resolveAppointmentCallId(appointment);
+  if (detail && !detail.transcriptAvailable && resolvedCallId) {
+    const provider = inferCallProvider(
+      resolvedCallId,
+      normalizeString(detail?.provider || appointment?.provider || '')
+    );
+    if (provider === 'twilio') {
+      await refreshCallUpdateFromTwilioStatusApi(resolvedCallId, { direction: 'outbound' });
+    } else {
+      await refreshCallUpdateFromRetellStatusApi(resolvedCallId);
+    }
     detail = buildConfirmationTaskDetail(generatedAgendaAppointments[idx] || appointment);
   }
   if (!detail) {
