@@ -3664,52 +3664,43 @@
     return `/api/coldcalling/recording-proxy?recordingSid=${encodeURIComponent(recordingSid)}`;
   }
 
-  function inferPhoneConversationIntent(call, decisionByPhoneKey, latestCallIdByPhoneKey, interestedCallIdSet) {
-    const text = normalizeSearchText(
-      `${call?.summary || ''} ${call?.transcriptSnippet || ''} ${call?.transcriptFull || ''} ${call?.status || ''} ${call?.endedReason || ''}`
+  function hasNegativePhoneConversationInterestSignal(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return /(niet meer bellen|bel( me)? niet|geen interesse|niet geinteresseerd|niet geïnteresseerd|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst)/.test(
+      text
     );
-    const callPhoneKey = phoneKey(call?.phone);
-    const linkedDecision = callPhoneKey ? normalizeLeadDatabaseDecision(decisionByPhoneKey?.get(callPhoneKey) || '') : '';
-    const latestCallId = callPhoneKey ? normalizeFreeText(latestCallIdByPhoneKey?.get(callPhoneKey) || '') : '';
+  }
+
+  function hasPositivePhoneConversationInterestSignal(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return /(interesse|geinteresseerd|geïnteresseerd|afspraak|demo|offerte|stuur (de )?(mail|info)|mail .* (offerte|informatie)|terugbellen|callback)/.test(
+      text
+    );
+  }
+
+  function inferPhoneConversationIntent(call, callIntentByCallId) {
+    const text = `${call?.summary || ''} ${call?.transcriptSnippet || ''} ${call?.transcriptFull || ''} ${call?.status || ''} ${call?.endedReason || ''}`;
     const callId = normalizeFreeText(call?.callId || '');
+    const callSpecificIntent = callId ? normalizeFreeText(callIntentByCallId?.get(callId) || '') : '';
 
-    if (callId && interestedCallIdSet && typeof interestedCallIdSet.has === 'function' && interestedCallIdSet.has(callId)) {
-      return 'interesse';
-    }
-    if (linkedDecision === 'do_not_call') return 'geen_interesse';
-    if (linkedDecision === 'appointment' || linkedDecision === 'customer') {
-      return 'interesse';
-    }
-    if (linkedDecision === 'callback' && callId && latestCallId && callId === latestCallId) {
-      return 'interesse';
-    }
-
-    if (
-      /(niet meer bellen|bel( me)? niet|geen interesse|niet geinteresseerd|niet geïnteresseerd|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst)/.test(
-        text
-      )
-    ) {
-      return 'geen_interesse';
-    }
-
-    if (
-      /(interesse|geinteresseerd|geïnteresseerd|afspraak|demo|offerte|stuur (de )?(mail|info)|mail .* (offerte|informatie)|terugbellen|callback)/.test(
-        text
-      )
-    ) {
-      return 'interesse';
-    }
-
+    // Telefoongesprekken moeten het specifieke gesprek labelen, niet de huidige leadstatus op hetzelfde nummer.
+    if (hasNegativePhoneConversationInterestSignal(text)) return 'geen_interesse';
+    if (callSpecificIntent === 'geen_interesse') return 'geen_interesse';
+    if (hasPositivePhoneConversationInterestSignal(text)) return 'interesse';
+    if (callSpecificIntent === 'interesse') return 'interesse';
     return 'onbekend';
   }
 
-  function buildInterestedCallIdSet(records) {
-    const result = new Set();
+  function buildCallIntentByCallId(records) {
+    const result = new Map();
     (Array.isArray(records) ? records : []).forEach((record) => {
       (Array.isArray(record?.insights) ? record.insights : []).forEach((insight) => {
         const callId = normalizeFreeText(insight?.callId || '');
         if (!callId) return;
-        const text = normalizeSearchText(`${insight?.summary || ''} ${insight?.followUpReason || ''}`);
+        const text = `${insight?.summary || ''} ${insight?.followUpReason || ''}`;
+        const hasNegativeInsight = hasNegativePhoneConversationInterestSignal(text);
         const hasPositiveInsight =
           Boolean(
             insight?.appointmentBooked ||
@@ -3717,11 +3708,12 @@
               insight?.followUpRequired ||
               insight?.follow_up_required
           ) ||
-          /(interesse|geinteresseerd|geïnteresseerd|afspraak|demo|offerte|stuur (de )?(mail|info)|mail .* (offerte|informatie)|terugbellen|callback)/.test(
-            text
-          );
-        if (hasPositiveInsight) {
-          result.add(callId);
+          hasPositivePhoneConversationInterestSignal(text);
+        const nextIntent = hasNegativeInsight ? 'geen_interesse' : hasPositiveInsight ? 'interesse' : '';
+        const previousIntent = normalizeFreeText(result.get(callId) || '');
+        if (!nextIntent || previousIntent === 'geen_interesse') return;
+        if (nextIntent === 'geen_interesse' || !previousIntent) {
+          result.set(callId, nextIntent);
         }
       });
     });
@@ -4181,18 +4173,7 @@
 
       if (state.filter === 'phone_calls') {
         const calls = getFilteredCalls();
-        const decisionByPhoneKey = new Map(
-          (Array.isArray(state.records) ? state.records : [])
-            .filter((record) => record?.phoneKey)
-            .map((record) => [record.phoneKey, normalizeLeadDatabaseDecision(record.decision)])
-        );
-        const interestedCallIdSet = buildInterestedCallIdSet(state.records);
-        const latestCallIdByPhoneKey = new Map();
-        calls.forEach((call) => {
-          const key = phoneKey(call?.phone);
-          if (!key || latestCallIdByPhoneKey.has(key)) return;
-          latestCallIdByPhoneKey.set(key, normalizeFreeText(call?.callId || ''));
-        });
+        const callIntentByCallId = buildCallIntentByCallId(state.records);
         if (calls.length === 0) {
           tableWrap.innerHTML = `<div style="padding:18px; color:${theme.textMuted};">Geen telefoongesprekken gevonden.</div>`;
           return;
@@ -4214,12 +4195,7 @@
                 .map((call) => {
                   const company = normalizeFreeText(call?.company || call?.name || 'Onbekend');
                   const phone = formatLeadDatabasePhone(normalizeFreeText(call?.phone || ''));
-                  const intent = inferPhoneConversationIntent(
-                    call,
-                    decisionByPhoneKey,
-                    latestCallIdByPhoneKey,
-                    interestedCallIdSet
-                  );
+                  const intent = inferPhoneConversationIntent(call, callIntentByCallId);
                   const isNegative = intent === 'geen_interesse';
                   const isPositive = intent === 'interesse';
                   const status = isNegative ? 'Geen interesse' : isPositive ? 'Interesse' : 'Geen duidelijke interesse';
