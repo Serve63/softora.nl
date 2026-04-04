@@ -1144,7 +1144,7 @@
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
-            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v2';
+            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v3';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
             const leadDetailLoadPromiseById = Object.create(null);
@@ -1402,6 +1402,19 @@
                 return callBackedLeadSourcesLoadPromise;
             }
 
+            async function fetchCallBackedLeadDetail(callId) {
+                const normalizedCallId = String(callId || '').trim();
+                if (!normalizedCallId) return null;
+                const response = await fetch(`/api/coldcalling/call-detail?callId=${encodeURIComponent(normalizedCallId)}`, {
+                    cache: 'no-store',
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data?.ok || !data?.detail) {
+                    throw new Error(String(data?.error || data?.detail || `Call detail laden mislukt (${response.status})`));
+                }
+                return data.detail;
+            }
+
             function buildCallBackedModalSourceText(lead, interestedLead, update, insight) {
                 return [
                     update?.transcriptFull,
@@ -1493,6 +1506,13 @@
                 if (leadDetailLoadPromiseById[cacheKey]) return leadDetailLoadPromiseById[cacheKey];
 
                 const run = (async () => {
+                    try {
+                        const detail = await fetchCallBackedLeadDetail(callId);
+                        leadDetailsById[cacheKey] = detail;
+                        return detail;
+                    } catch (error) {
+                        // Fallback to client-side source merge when the server route is not available yet.
+                    }
                     const sources = await ensureCallBackedLeadSources();
                     const interestedLead = getLatestCallBackedSourceItemByCallId(sources?.interestedLeads, callId);
                     const update = getLatestCallBackedSourceItemByCallId(sources?.updates, callId);

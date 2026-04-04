@@ -8461,6 +8461,153 @@ function getAppointmentTranscriptText(appointment) {
   return '';
 }
 
+function looksLikeAgendaConfirmationSummary(value) {
+  const text = normalizeString(value || '').toLowerCase();
+  if (!text) return false;
+  return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie|controleer de gegevens en zet daarna de afspraak in de agenda)/.test(
+    text
+  );
+}
+
+function sanitizeConversationSummaryText(value) {
+  return normalizeString(value || '')
+    .replace(/\s*\|\s*/g, ' ')
+    .replace(/\b(user|bot|agent|klant)\s*:\s*/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function pickReadableConversationSummaryForLeadDetail(...candidates) {
+  for (const candidate of candidates) {
+    const cleaned = sanitizeConversationSummaryText(candidate);
+    if (!cleaned) continue;
+    if (looksLikeAgendaConfirmationSummary(cleaned)) continue;
+    if (summaryContainsEnglishMarkers(cleaned)) continue;
+    return truncateText(cleaned, 4000);
+  }
+  return '';
+}
+
+async function buildConversationSummaryForLeadDetail(callUpdate, aiInsight, interestedLead, transcriptText = '') {
+  const transcript = normalizeString(transcriptText || '');
+  const transcriptSnippet = normalizeString(callUpdate?.transcriptSnippet || '');
+  const callSummary = normalizeString(callUpdate?.summary || '');
+  const aiSummary = normalizeString(aiInsight?.summary || '');
+  const interestedSummary = normalizeString(interestedLead?.summary || '');
+  const followUpReason = normalizeString(aiInsight?.followUpReason || interestedLead?.whatsappInfo || '');
+
+  const fallbackSummary = pickReadableConversationSummaryForLeadDetail(
+    callSummary,
+    aiSummary,
+    transcriptSnippet,
+    interestedSummary,
+    followUpReason
+  );
+
+  const sourceText = [
+    transcript ? `Transcript van het gesprek:\n${truncateText(transcript, 9000)}` : '',
+    transcriptSnippet ? `Korte transcript-snippet:\n${truncateText(transcriptSnippet, 1200)}` : '',
+    callSummary && !looksLikeAgendaConfirmationSummary(callSummary)
+      ? `Bestaande call-samenvatting:\n${truncateText(callSummary, 1800)}`
+      : '',
+    aiSummary && !looksLikeAgendaConfirmationSummary(aiSummary)
+      ? `Bestaande AI-samenvatting:\n${truncateText(aiSummary, 1800)}`
+      : '',
+    followUpReason ? `Vervolgactie of context:\n${truncateText(followUpReason, 900)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  const needsAiRewrite =
+    Boolean(sourceText) &&
+    (!fallbackSummary || fallbackSummary.length < 220 || summaryContainsEnglishMarkers(fallbackSummary));
+
+  if (needsAiRewrite && getOpenAiApiKey()) {
+    try {
+      const result = await generateTextSummaryWithAi({
+        text: sourceText,
+        style: 'medium',
+        language: 'nl',
+        maxSentences: 4,
+        extraInstructions: [
+          'Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging.',
+          'Benoem de behoefte of vraag van de prospect, de reactie van de prospect en eventuele bezwaren of context.',
+          'Noem alleen aan het einde een vervolgstap of afspraak als die echt in het gesprek naar voren kwam.',
+          'Schrijf nadrukkelijk niet als agenda-item, afspraakbevestiging of bevestigingsbericht.',
+          'Gebruik geen koppen, bullets of labels zoals user:, bot:, agent: of klant:.',
+        ].join(' '),
+      });
+      const rewrittenSummary = pickReadableConversationSummaryForLeadDetail(result?.summary || '');
+      if (rewrittenSummary) return rewrittenSummary;
+    } catch (error) {
+      // Fall back to available local sources.
+    }
+  }
+
+  if (fallbackSummary) return fallbackSummary;
+
+  const transcriptFallback = sanitizeConversationSummaryText(transcriptSnippet || transcript);
+  if (transcriptFallback) {
+    return truncateText(transcriptFallback, 4000);
+  }
+
+  return '';
+}
+
+async function buildCallBackedLeadDetail(callId) {
+  const normalizedCallId = normalizeString(callId);
+  if (!normalizedCallId) return null;
+
+  const callUpdate = getLatestCallUpdateByCallId(normalizedCallId);
+  const interestedLead = findInterestedLeadRowByCallId(normalizedCallId);
+  let aiInsight = aiCallInsightsByCallId.get(normalizedCallId) || null;
+
+  if (!callUpdate && !interestedLead && !aiInsight) return null;
+
+  if (!aiInsight && callUpdate) {
+    aiInsight = ensureRuleBasedInsightAndAppointment(callUpdate) || aiCallInsightsByCallId.get(normalizedCallId) || null;
+  }
+
+  const transcript =
+    normalizeString(callUpdate?.transcriptFull || callUpdate?.transcriptSnippet || '') ||
+    findTranscriptFromWebhookEvents(normalizedCallId) ||
+    '';
+  const summary = await buildConversationSummaryForLeadDetail(callUpdate, aiInsight, interestedLead, transcript);
+  const recordingUrl = resolvePreferredRecordingUrl(
+    callUpdate,
+    interestedLead,
+    { callId: normalizedCallId, provider: normalizeString(callUpdate?.provider || interestedLead?.provider || '') }
+  );
+
+  return {
+    callId: normalizedCallId,
+    company:
+      normalizeString(callUpdate?.company || interestedLead?.company || aiInsight?.company || aiInsight?.leadCompany || '') ||
+      'Onbekende lead',
+    contact:
+      normalizeString(callUpdate?.name || interestedLead?.contact || aiInsight?.contactName || aiInsight?.leadName || '') ||
+      'Onbekend',
+    phone: normalizeString(callUpdate?.phone || interestedLead?.phone || aiInsight?.phone || ''),
+    date: normalizeDateYyyyMmDd(interestedLead?.date || ''),
+    time: normalizeTimeHhMm(interestedLead?.time || ''),
+    location: sanitizeAppointmentLocation(interestedLead?.location || ''),
+    whatsappInfo: sanitizeAppointmentWhatsappInfo(interestedLead?.whatsappInfo || ''),
+    summary: truncateText(normalizeString(summary || ''), 4000),
+    callSummary: truncateText(normalizeString(callUpdate?.summary || ''), 1800),
+    aiSummary: truncateText(normalizeString(aiInsight?.summary || ''), 1800),
+    followUpReason: truncateText(normalizeString(aiInsight?.followUpReason || interestedLead?.whatsappInfo || ''), 900),
+    transcriptSnippet: truncateText(normalizeString(callUpdate?.transcriptSnippet || transcript), 1200),
+    transcript: truncateText(normalizeString(transcript), 9000),
+    recordingUrl: normalizeString(recordingUrl || ''),
+    recordingUrlAvailable: Boolean(normalizeString(recordingUrl || '')),
+    durationSeconds: resolveCallDurationSeconds(callUpdate, interestedLead, aiInsight),
+    provider: normalizeString(callUpdate?.provider || interestedLead?.provider || ''),
+    updatedAt:
+      normalizeString(callUpdate?.updatedAt || aiInsight?.analyzedAt || interestedLead?.createdAt || '') ||
+      new Date().toISOString(),
+  };
+}
+
 function buildConfirmationTaskDetail(appointment) {
   const task = mapAppointmentToConfirmationTask(appointment);
   if (!task) return null;
@@ -12268,6 +12415,42 @@ app.get('/api/coldcalling/call-updates', async (req, res) => {
     count: Math.min(limit, filtered.length),
     updates: filtered.slice(0, limit),
   });
+});
+
+app.get('/api/coldcalling/call-detail', async (req, res) => {
+  if (isSupabaseConfigured()) {
+    await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
+    await syncCallUpdatesFromSupabaseRows({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
+  }
+
+  const callId = normalizeString(req.query?.callId || '');
+  if (!callId) {
+    return res.status(400).json({
+      ok: false,
+      error: 'callId ontbreekt.',
+    });
+  }
+
+  backfillInsightsAndAppointmentsFromRecentCallUpdates();
+
+  try {
+    const detail = await buildCallBackedLeadDetail(callId);
+    if (!detail) {
+      return res.status(404).json({
+        ok: false,
+        error: 'Call niet gevonden.',
+      });
+    }
+    return res.status(200).json({
+      ok: true,
+      detail,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: normalizeString(error?.message || '') || 'Call detail laden mislukt.',
+    });
+  }
 });
 
 app.get('/api/coldcalling/webhook-debug', requireRuntimeDebugAccess, (req, res) => {
