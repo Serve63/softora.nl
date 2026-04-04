@@ -10,7 +10,20 @@ const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-js');
+
+// ==============================================================================
+// SECTIE: Imports & Dependencies
+// ==============================================================================
 const { createPremiumUsersStore } = require('./lib/premium-users-store');
+const { parseIntSafe, parseNumberSafe, normalizeString, escapeHtml, truncateText, clipText } = require('./lib/utils');
+const {
+  recentWebhookEvents, recentCallUpdates, callUpdatesById, retellCallStatusRefreshByCallId,
+  recentAiCallInsights, aiCallInsightsByCallId, aiAnalysisFingerprintByCallId, aiAnalysisInFlightCallIds,
+  recentDashboardActivities, recentSecurityAuditEvents, inMemoryUiStateByScope,
+  generatedAgendaAppointments, agendaAppointmentIdByCallId,
+  dismissedInterestedLeadCallIds, dismissedInterestedLeadKeys, leadOwnerAssignmentsByCallId,
+  sequentialDispatchQueues, sequentialDispatchQueueIdByCallId,
+} = require('./lib/state');
 require('dotenv').config();
 
 function normalizeLoginEmailValue(value) {
@@ -199,27 +212,14 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
   5_000,
   Math.min(300_000, Number(process.env.MAIL_IMAP_POLL_COOLDOWN_MS || 20_000) || 20_000)
 );
-const recentWebhookEvents = [];
-const recentCallUpdates = [];
-const callUpdatesById = new Map();
-const retellCallStatusRefreshByCallId = new Map();
+
+// ==============================================================================
+// SECTIE: Runtime State (primitieven — collections in lib/state.js)
+// ==============================================================================
+// In-memory state collections → lib/state.js
 const RETELL_STATUS_REFRESH_COOLDOWN_MS = 8000;
-const recentAiCallInsights = [];
-const recentDashboardActivities = [];
-const recentSecurityAuditEvents = [];
-const inMemoryUiStateByScope = new Map();
-const aiCallInsightsByCallId = new Map();
-const aiAnalysisFingerprintByCallId = new Map();
-const aiAnalysisInFlightCallIds = new Set();
-const generatedAgendaAppointments = [];
-const agendaAppointmentIdByCallId = new Map();
-const dismissedInterestedLeadCallIds = new Set();
-const dismissedInterestedLeadKeys = new Set();
-const leadOwnerAssignmentsByCallId = new Map();
 let nextLeadOwnerRotationIndex = 0;
 let nextGeneratedAgendaAppointmentId = 100000;
-const sequentialDispatchQueues = new Map();
-const sequentialDispatchQueueIdByCallId = new Map();
 let nextSequentialDispatchQueueId = 1;
 let supabaseClient = null;
 let smtpTransporter = null;
@@ -282,6 +282,10 @@ const DEMO_CONFIRMATION_TASK_ENABLED = /^(1|true|yes)$/i.test(
   String(process.env.ENABLE_DEMO_CONFIRMATION_TASK || '')
 );
 
+
+// ==============================================================================
+// SECTIE: HTML Pagina Helpers
+// ==============================================================================
 // Vercel bundelt dynamische sendFile-doelen niet altijd mee. Door de root-dir
 // één keer te scannen op .html bestanden worden die files traceable voor de
 // serverless bundle en blijven pagina-links zoals /premium-website.html werken.
@@ -389,6 +393,10 @@ function appendQueryParamsToUrl(rawUrl, params = {}) {
   }
 }
 
+
+// ==============================================================================
+// SECTIE: Express Setup & Middleware
+// ==============================================================================
 app.disable('x-powered-by');
 
 app.use(
@@ -545,21 +553,11 @@ app.use((req, _res, next) => {
     });
 });
 
-function parseIntSafe(value, fallback = 0) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
 
-function parseNumberSafe(value, fallback = null) {
-  if (value === '' || value === null || value === undefined) return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeString(value, fallback = '') {
-  if (value === null || value === undefined) return fallback;
-  return String(value).trim();
-}
+// ==============================================================================
+// SECTIE: Utility Functies (zie ook lib/utils.js)
+// ==============================================================================
+// parseIntSafe, parseNumberSafe, normalizeString → lib/utils.js
 
 function getRequestPathname(req) {
   const rawUrl = normalizeString(req?.originalUrl || req?.url || req?.path || '/');
@@ -567,6 +565,10 @@ function getRequestPathname(req) {
   return questionMarkIndex >= 0 ? rawUrl.slice(0, questionMarkIndex) : rawUrl;
 }
 
+
+// ==============================================================================
+// SECTIE: IP & Origin Helpers
+// ==============================================================================
 function normalizeIpAddress(value) {
   const raw = normalizeString(value);
   if (!raw) return '';
@@ -636,6 +638,10 @@ function getRequestOriginFromHeaders(req) {
   return '';
 }
 
+
+// ==============================================================================
+// SECTIE: Crypto Helpers
+// ==============================================================================
 function toBase64Url(value) {
   return Buffer.from(String(value || ''), 'utf8')
     .toString('base64')
@@ -713,6 +719,10 @@ function getPremiumMfaSecretBuffer() {
   return premiumMfaSecretBufferCache;
 }
 
+
+// ==============================================================================
+// SECTIE: Premium Auth & MFA
+// ==============================================================================
 function isPremiumMfaConfigured() {
   const buffer = getPremiumMfaSecretBuffer();
   return Boolean(buffer && buffer.length > 0);
@@ -751,6 +761,10 @@ function isPremiumMfaCodeValid(codeRaw) {
   return false;
 }
 
+
+// ==============================================================================
+// SECTIE: Session & Cookie Management
+// ==============================================================================
 function buildCookieMap(req) {
   const headerValue = normalizeString(req?.headers?.cookie || '');
   const map = new Map();
@@ -800,6 +814,10 @@ function buildSetCookieHeader(name, value, options = {}) {
   return parts.join('; ');
 }
 
+
+// ==============================================================================
+// SECTIE: Premium Auth Middleware
+// ==============================================================================
 function isPremiumAuthConfigured() {
   return premiumUsersStore.hasConfiguredUsers();
 }
@@ -830,6 +848,10 @@ const premiumUsersStore = createPremiumUsersStore({
   },
 });
 
+
+// ==============================================================================
+// SECTIE: Lead Owner Management
+// ==============================================================================
 function normalizeLeadOwnerKey(value) {
   const normalized = normalizeString(value || '')
     .toLowerCase()
@@ -1307,29 +1329,12 @@ function requireRuntimeDebugAccess(req, res, next) {
   return next();
 }
 
-function escapeHtml(value) {
-  return normalizeString(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+// escapeHtml, truncateText, clipText → lib/utils.js
 
-function truncateText(value, maxLength = 500) {
-  const text = normalizeString(value);
-  if (!text) return '';
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
-}
 
-function clipText(value, maxLength = 500) {
-  const text = normalizeString(value);
-  if (!text) return '';
-  if (!Number.isFinite(Number(maxLength)) || Number(maxLength) <= 0) return '';
-  const limit = Math.floor(Number(maxLength));
-  return text.length > limit ? text.slice(0, limit) : text;
-}
-
+// ==============================================================================
+// SECTIE: Supabase Configuratie & Client
+// ==============================================================================
 function isSupabaseConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 }
@@ -1345,6 +1350,10 @@ function redactSupabaseUrlForDebug(url) {
   }
 }
 
+
+// ==============================================================================
+// SECTIE: Supabase REST Operaties
+// ==============================================================================
 async function fetchSupabaseStateRowViaRest(selectColumns = 'payload,updated_at') {
   if (!isSupabaseConfigured()) return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
 
@@ -1839,6 +1848,10 @@ function compactRuntimeSnapshotGeneratedAgendaAppointment(item) {
   };
 }
 
+
+// ==============================================================================
+// SECTIE: Runtime State Snapshot & Persistentie
+// ==============================================================================
 function buildRuntimeStateSnapshotPayloadWithLimits(options = {}) {
   const maxWebhookEvents = Math.max(10, Math.min(200, Number(options?.maxWebhookEvents || 80) || 80));
   const maxCallUpdates = Math.max(20, Math.min(500, Number(options?.maxCallUpdates || 500) || 500));
@@ -2340,6 +2353,10 @@ function cancelOpenLeadFollowUpTasksByIdentity(callId, rowLike, actor = '', reas
   return cancelledCount;
 }
 
+
+// ==============================================================================
+// SECTIE: Supabase Hydration & Sync
+// ==============================================================================
 async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
   const force = Boolean(options && options.force);
   if (!isSupabaseConfigured()) return false;
@@ -2855,6 +2872,10 @@ function appendDashboardActivity(input, reason = 'dashboard_activity') {
   return entry;
 }
 
+
+// ==============================================================================
+// SECTIE: UI State Management
+// ==============================================================================
 function normalizeUiStateScope(scope) {
   const value = normalizeString(scope || '').toLowerCase();
   if (!/^[a-z0-9:_-]{1,80}$/.test(value)) return '';
@@ -3199,6 +3220,10 @@ async function persistSeoConfig(config, meta = {}) {
   return normalizedConfig;
 }
 
+
+// ==============================================================================
+// SECTIE: SEO Management
+// ==============================================================================
 function getSeoEditableHtmlFiles() {
   return Array.from(knownHtmlPageFiles)
     .filter((fileName) => fileName !== 'premium-seo.html')
@@ -9070,6 +9095,10 @@ function buildConfirmationEmailDraftFallback(appointment, detail = {}) {
   ].join('\n');
 }
 
+
+// ==============================================================================
+// SECTIE: Email (SMTP / IMAP)
+// ==============================================================================
 function isSmtpMailConfigured() {
   return Boolean(
     MAIL_SMTP_HOST &&
@@ -11080,6 +11109,10 @@ function isTwilioWebhookAuthorized(req) {
   return secret === headerSecret || secret === querySecret || secret === bearerSecret;
 }
 
+
+// ==============================================================================
+// SECTIE: Twilio Integratie
+// ==============================================================================
 function handleTwilioInboundVoice(req, res) {
   if (!isTwilioWebhookAuthorized(req)) {
     appendSecurityAuditEvent(
@@ -11272,6 +11305,10 @@ app.post('/api/twilio/status', express.urlencoded({ extended: false }), handleTw
 
 app.use('/api/auth/login', premiumLoginRateLimiter);
 
+
+// ==============================================================================
+// SECTIE: Routes — Auth
+// ==============================================================================
 app.get('/api/auth/session', async (req, res) => {
   const authState = await getResolvedPremiumAuthState(req);
   res.setHeader('Cache-Control', 'no-store, private');
@@ -11666,6 +11703,10 @@ app.patch('/api/auth/profile', async (req, res) => {
   });
 });
 
+
+// ==============================================================================
+// SECTIE: Routes — Premium Users
+// ==============================================================================
 app.get('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) => {
   const hydrated = await premiumUsersStore.ensureUsersHydrated({ force: true });
   const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
@@ -11889,6 +11930,10 @@ app.delete('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, r
 });
 
 
+
+// ==============================================================================
+// SECTIE: Routes — Coldcalling
+// ==============================================================================
 app.post('/api/coldcalling/start', async (req, res) => {
   const validated = validateStartPayload(req.body);
   if (validated.error) {
@@ -12328,6 +12373,10 @@ app.get('/api/coldcalling/webhook-debug', requireRuntimeDebugAccess, (req, res) 
   });
 });
 
+
+// ==============================================================================
+// SECTIE: Routes — AI
+// ==============================================================================
 app.get('/api/ai/call-insights', async (req, res) => {
   if (isSupabaseConfigured()) {
     await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
@@ -13282,6 +13331,10 @@ app.post(['/api/active-orders/launch-site', '/api/active-order-launch-site'], as
   return sendActiveOrderLaunchSiteResponse(req, res);
 });
 
+
+// ==============================================================================
+// SECTIE: Routes — Dashboard
+// ==============================================================================
 app.get('/api/dashboard/activity', (req, res) => {
   const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
   return res.status(200).json({
@@ -13323,6 +13376,10 @@ async function sendUiStateGetResponse(req, res, scopeRaw) {
   });
 }
 
+
+// ==============================================================================
+// SECTIE: Routes — UI State
+// ==============================================================================
 app.get('/api/ui-state/:scope', async (req, res) => {
   return sendUiStateGetResponse(req, res, req.params.scope);
 });
@@ -13385,6 +13442,10 @@ app.post('/api/ui-state-set', async (req, res) => {
   return sendUiStateSetResponse(req, res, req.query.scope);
 });
 
+
+// ==============================================================================
+// SECTIE: Routes — SEO
+// ==============================================================================
 app.get('/api/seo/pages', async (req, res) => {
   const files = getSeoEditableHtmlFiles();
   const query = normalizeString(req.query.q || '').toLowerCase();
@@ -13734,6 +13795,10 @@ app.post('/api/dashboard/activity', (req, res) => {
   });
 });
 
+
+// ==============================================================================
+// SECTIE: Routes — Agenda
+// ==============================================================================
 app.get('/api/agenda/appointments', async (req, res) => {
   const quickMode = toBooleanSafe(req.query.quick, false) || toBooleanSafe(req.query.fast, false);
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
@@ -15807,6 +15872,10 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 });
 
 // Simpele healthcheck voor hosting platforms (Render/Railway).
+
+// ==============================================================================
+// SECTIE: Routes — System (healthz, robots, debug)
+// ==============================================================================
 app.get('/healthz', (_req, res) => {
   res.status(200).json({
     ok: true,
@@ -16034,6 +16103,10 @@ app.post('/api/runtime-sync-now', requireRuntimeDebugAccess, async (_req, res) =
 });
 
 // API routes eerst, daarna statische frontend assets/html serveren.
+
+// ==============================================================================
+// SECTIE: Statische Bestanden & HTML Pagina Routing
+// ==============================================================================
 app.use(
   '/assets',
   express.static(path.join(__dirname, 'assets'), {
@@ -16217,6 +16290,10 @@ function seedDemoConfirmationTaskForUiTesting() {
   console.log('[Startup] Demo bevestigingstaak toegevoegd voor UI-testen.');
 }
 
+
+// ==============================================================================
+// SECTIE: Global Error Handler
+// ==============================================================================
 // Global error handler — vangt onverwachte fouten op zonder stack trace te lekken
 app.use((err, req, res, _next) => {
   console.error('[UnhandledError]', err?.message || err, { path: req?.path, method: req?.method });
@@ -16224,6 +16301,10 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ ok: false, error: 'Er is een onverwachte fout opgetreden.' });
 });
 
+
+// ==============================================================================
+// SECTIE: Server Startup
+// ==============================================================================
 // In serverless (zoals Vercel) wordt startServer() niet aangeroepen, dus seed de
 // demo-taak ook bij module-load. De functie is idempotent op basis van callId.
 seedDemoConfirmationTaskForUiTesting();
