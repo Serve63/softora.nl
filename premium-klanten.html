@@ -900,8 +900,6 @@
             }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-    <script src="assets/shared.js"></script>
 </head>
 <body>
     <div class="noise-overlay"></div>
@@ -1241,6 +1239,15 @@
             });
         }
 
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         function formatMoney(value) {
             const amount = Number(value) || 0;
             return new Intl.NumberFormat("nl-NL", {
@@ -1359,6 +1366,63 @@
                     setStatusMessage("");
                 }, 3200);
             }
+        }
+
+        async function fetchUiStateGetWithFallback(scope) {
+            const encodedScope = encodeURIComponent(String(scope || ""));
+            const urls = [
+                "/api/ui-state-get?scope=" + encodedScope,
+                "/api/ui-state/" + encodedScope
+            ];
+            let lastError = null;
+
+            for (const url of urls) {
+                try {
+                    const response = await fetch(url, {
+                        method: "GET",
+                        cache: "no-store"
+                    });
+                    if (!response.ok) {
+                        throw new Error("UI-state GET mislukt (" + response.status + ")");
+                    }
+                    return await response.json().catch(function () {
+                        return {};
+                    });
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error("UI-state GET mislukt");
+        }
+
+        async function fetchUiStateSetWithFallback(scope, body) {
+            const encodedScope = encodeURIComponent(String(scope || ""));
+            const urls = [
+                "/api/ui-state-set?scope=" + encodedScope,
+                "/api/ui-state/" + encodedScope
+            ];
+            let lastError = null;
+
+            for (const url of urls) {
+                try {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body || {})
+                    });
+                    if (!response.ok) {
+                        throw new Error("UI-state POST mislukt (" + response.status + ")");
+                    }
+                    return await response.json().catch(function () {
+                        return {};
+                    });
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error("UI-state POST mislukt");
         }
 
         function parseCustomers(raw) {
@@ -1497,7 +1561,7 @@
                 return;
             }
 
-            nodes.body.innerHTML = DOMPurify.sanitize(filtered.map(function (customer) {
+            nodes.body.innerHTML = filtered.map(function (customer) {
                 const statusClass = customer.status === "Betaald" ? "is-paid" : "is-open";
                 const activeClass = customer.actief === "Ja" ? "is-yes" : "is-no";
                 const websiteLabel = normalizeString(customer && customer.website);
@@ -1530,7 +1594,7 @@
                         "</td>",
                     "</tr>"
                 ].join("");
-            }).join(""));
+            }).join("");
         }
 
         function renderPage() {

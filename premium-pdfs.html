@@ -859,7 +859,6 @@
             .pdf-page { transform-origin: top left; }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
     <div class="noise-overlay"></div>
@@ -1169,11 +1168,11 @@
             regelData[p].forEach(r => {
                 const d = document.createElement('div');
                 d.className = 'regel-row';
-                d.innerHTML = DOMPurify.sanitize(`
+                d.innerHTML = `
                     <input type="text" value="${r.omschrijving}" placeholder="Dienst omschrijving" oninput="updateRegel('${p}',${r.id},'omschrijving',this.value)">
                     <input type="number" value="${r.aantal}" min="1" oninput="updateRegel('${p}',${r.id},'aantal',this.value)">
                     <input type="number" value="${r.prijs || ''}" placeholder="0,00" step="0.01" min="0" oninput="updateRegel('${p}',${r.id},'prijs',this.value)">
-                    <button class="btn-remove" type="button" onclick="removeRegel('${p}',${r.id})">×</button>`);
+                    <button class="btn-remove" type="button" onclick="removeRegel('${p}',${r.id})">×</button>`;
                 c.appendChild(d);
             });
             updatePreview();
@@ -1297,7 +1296,7 @@
         function updatePreview() {
             const builders = { offerte: buildOfferte, factuur: buildFactuur, herinnering: buildHerinnering };
             const previewEl = document.getElementById('preview-' + activeTab);
-            if (previewEl && builders[activeTab]) previewEl.innerHTML = DOMPurify.sanitize(builders[activeTab]());
+            if (previewEl && builders[activeTab]) previewEl.innerHTML = builders[activeTab]();
             queuePreviewScale();
         }
 

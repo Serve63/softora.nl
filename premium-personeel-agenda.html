@@ -730,7 +730,6 @@
             }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
 
@@ -2054,7 +2053,7 @@
             html += '</div>';
         }
 
-        grid.innerHTML = DOMPurify.sanitize(html);
+        grid.innerHTML = html;
 
         // Re-attach magnetic
         document.querySelectorAll('.appointment.magnetic').forEach((elem) => {

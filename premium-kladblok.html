@@ -149,7 +149,6 @@
             }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -278,7 +277,7 @@
                 try {
                     const state = await fetchUiStateGet(REMOTE_SCOPE);
                     const html = String(state && state.values && state.values[REMOTE_KEY] || '');
-                    if (html) editor.innerHTML = DOMPurify.sanitize(html);
+                    if (html) editor.innerHTML = html;
                 } catch (error) {
                     console.error('Kladblok laden via Supabase mislukt:', error);
                 }

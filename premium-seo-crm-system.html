@@ -907,8 +907,6 @@
             .image-row > *:nth-child(5) { grid-column: 2 / -1; }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-    <script src="assets/shared.js"></script>
 </head>
 <body>
 
@@ -1485,6 +1483,10 @@
           }
         ];
 
+        function safeJsonParse(value, fallback) {
+            try { return JSON.parse(value); } catch { return fallback; }
+        }
+
         const REMOTE_UI_STATE_SCOPE = 'premium_seo_crm';
         let remoteUiStateCache = {};
         let remoteUiStatePendingPatch = {};
@@ -1594,6 +1596,16 @@
             return Promise.resolve();
         }
 
+        function slugify(input) {
+            return String(input || '')
+                .toLowerCase()
+                .trim()
+                .replace(/[\s_]+/g, '-')
+                .replace(/[^a-z0-9-]/g, '')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+        }
+
         function imgKey(item) {
             return `${item.file}::${item.src}`;
         }
@@ -1675,7 +1687,7 @@
                 row.className = 'image-row';
                 row.dataset.key = key;
 
-                row.innerHTML = DOMPurify.sanitize(`
+                row.innerHTML = `
                     <div class="thumb">
                         <img src="${buildThumbUrl(it.src)}" alt="" loading="lazy" decoding="async">
                     </div>
@@ -1692,10 +1704,18 @@
                     <div>
                         <span class="status-badge ${status.cls}">${status.text}</span>
                     </div>
-                `);
+                `;
 
                 imageList.appendChild(row);
             });
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;');
         }
 
         function computeImageSummary() {
@@ -1877,13 +1897,13 @@
                 const item = document.createElement('div');
                 item.className = 'list-item magnetic';
                 item.dataset.id = b.id;
-                item.innerHTML = DOMPurify.sanitize(`
+                item.innerHTML = `
                     <div style="min-width:0;">
                         <div class="list-title">${escapeHtml(b.title || '(Zonder titel)')}</div>
                         <div class="list-sub">/${escapeHtml(b.slug || 'slug')}</div>
                     </div>
                     <span class="pill ${b.published ? 'published' : 'draft'}">${b.published ? 'Gepubliceerd' : 'Concept'}</span>
-                `);
+                `;
                 item.addEventListener('click', () => setActiveBlog(b.id));
                 blogList.appendChild(item);
             });
@@ -2013,13 +2033,13 @@
                 const item = document.createElement('div');
                 item.className = 'list-item magnetic';
                 item.dataset.id = k.id;
-                item.innerHTML = DOMPurify.sanitize(`
+                item.innerHTML = `
                     <div style="min-width:0;">
                         <div class="list-title">${escapeHtml(k.title || '(Zonder titel)')}</div>
                         <div class="list-sub">${escapeHtml(k.category)} / ${escapeHtml(k.slug || 'slug')}</div>
                     </div>
                     <span class="pill ${k.published ? 'published' : 'draft'}">${k.published ? 'Gepubliceerd' : 'Concept'}</span>
-                `);
+                `;
                 item.addEventListener('click', () => setActiveKb(k.id));
                 kbList.appendChild(item);
             });
@@ -2464,7 +2484,7 @@
                     const item = document.createElement('div');
                     item.className = 'list-item magnetic';
                     item.dataset.pageId = p.id;
-                    item.innerHTML = DOMPurify.sanitize(`
+                    item.innerHTML = `
                         <div style="min-width:0;">
                             <div class="list-title">${escapeHtml(p.id)}</div>
                             <div class="list-sub">Title: ${escapeHtml(p.title || '(leeg)')} • H1: ${escapeHtml(p.h1s[0] || '(geen)')}</div>
@@ -2473,7 +2493,7 @@
                             <span class="pill ${scorePill}">Score ${p.score}</span>
                             <span class="pill ${issuesPill}">${critCount + warnCount} issues</span>
                         </div>
-                    `);
+                    `;
                     item.addEventListener('click', () => setScanDetails(p));
                     scanPageList.appendChild(item);
                 });
@@ -2495,13 +2515,13 @@
                     const title = ISSUE_LABELS[it.code] || it.code;
                     const item = document.createElement('div');
                     item.className = 'list-item';
-                    item.innerHTML = DOMPurify.sanitize(`
+                    item.innerHTML = `
                         <div style="min-width:0;">
                             <div class="list-title">${escapeHtml(title)}</div>
                             <div class="list-sub">Voorbeeld: ${escapeHtml(it.pages.join(', '))}</div>
                         </div>
                         <span class="pill ${pill}">${it.count}</span>
-                    `);
+                    `;
                     scanIssueList.appendChild(item);
                 });
             }
@@ -2576,12 +2596,12 @@
         async function startSeoScan() {
             const startBtnOriginal = startScanBtn.innerHTML;
             startScanBtn.disabled = true;
-            startScanBtn.innerHTML = DOMPurify.sanitize(`
+            startScanBtn.innerHTML = `
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 4H6a2 2 0 00-2 2v4m14-6h-4m4 0a2 2 0 012 2v4m-2 10h-4m4 0a2 2 0 002-2v-4M6 20h4m-4 0a2 2 0 01-2-2v-4m6-4l2-2m0 0l2 2m-2-2v8"/>
                 </svg>
                 Scannen...
-            `);
+            `;
 
             downloadReportBtn.disabled = true;
             scanProgress.textContent = 'Scan wordt voorbereid...';
@@ -2687,8 +2707,8 @@
                         if (scanProgressFill) scanProgressFill.style.width = '0%';
                         scanBadge.textContent = 'Nog niet gescand';
                         scanIssuesBadge.textContent = '0 issues';
-                        scanPageList.innerHTML = DOMPurify.sanitize('<div class="hint" style="padding-top: 0.5rem;">Vul minimaal 1 URL in (1 per regel) of gebruik Lokale map.</div>');
-                        scanIssueList.innerHTML = DOMPurify.sanitize('<div class="hint" style="padding-top: 0.5rem;">Geen scan uitgevoerd.</div>');
+                        scanPageList.innerHTML = '<div class="hint" style="padding-top: 0.5rem;">Vul minimaal 1 URL in (1 per regel) of gebruik Lokale map.</div>';
+                        scanIssueList.innerHTML = '<div class="hint" style="padding-top: 0.5rem;">Geen scan uitgevoerd.</div>';
                         return;
                     }
 
@@ -2736,7 +2756,7 @@
                 // eslint-disable-next-line no-console
                 console.error(err);
             } finally {
-                startScanBtn.innerHTML = DOMPurify.sanitize(startBtnOriginal);
+                startScanBtn.innerHTML = startBtnOriginal;
                 startScanBtn.disabled = false;
             }
         }

@@ -306,7 +306,6 @@ body {
   }
 }
 </style>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
 <div class="dashboard-layout">
@@ -453,7 +452,7 @@ function render() {
     const key = catKey(cat);
     const block = document.createElement('div');
     block.className = 'category';
-    block.innerHTML = DOMPurify.sanitize(`
+    block.innerHTML = `
       <div class="category-header">
         <div class="category-title">${cat}</div>
         <div class="category-total">${fmtEur(catTotal)}<span style="font-size:11px;font-weight:400;color:var(--text-light);margin-left:4px">/mnd</span></div>
@@ -462,7 +461,7 @@ function render() {
         <span>Post</span><span>Frequentie</span><span>Bedrag</span><span style="text-align:right">Status</span>
       </div>
       <div id="rows-${key}">
-        ${items.map((item) => `);
+        ${items.map((item) => `
           <div class="cost-row" id="item-${item.id}">
             <div>
               <div class="cost-name">${item.naam}</div>

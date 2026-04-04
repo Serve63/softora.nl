@@ -143,7 +143,6 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   .mail-page-shell { min-height: auto; max-height: none; }
 }
 </style>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
 <div class="dashboard-layout">
@@ -384,7 +383,7 @@ function setFolder(folder, el) {
   el.classList.add('active');
   const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
   document.getElementById('folder-label').textContent = labels[folder] || folder;
-  document.getElementById('mail-detail').innerHTML = DOMPurify.sanitize(`<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`);
+  document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
   renderList();
 }
 
@@ -406,7 +405,7 @@ function renderList() {
   const wrap = document.getElementById('mail-items');
   if (!list.length) { wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Geen e-mails gevonden.</div>`; return; }
 
-  wrap.innerHTML = DOMPurify.sanitize(list.map(m => `
+  wrap.innerHTML = list.map(m => `
     <div class="mail-item ${m.unread ? 'unread' : ''} ${activeMail === m.id ? 'active' : ''}" onclick="openMail(${m.id})">
       ${m.unread ? '<div class="unread-dot"></div>' : ''}
       <div class="mail-item-top">
@@ -416,7 +415,7 @@ function renderList() {
       <div class="mail-subject">${m.subject}</div>
       <div class="mail-preview">${m.preview}</div>
       ${m.tags.length ? `<div class="mail-tags">${m.tags.map(t => `<span class="mail-tag tag-${t}">${t}</span>`).join('')}</div>` : ''}
-    </div>`).join(''));
+    </div>`).join('');
 
   const unread = mails.filter(m => m.folder === 'inbox' && m.unread).length;
   const badge = document.getElementById('badge-inbox');
@@ -431,7 +430,7 @@ function openMail(id) {
   m.unread = false;
   renderList();
 
-  document.getElementById('mail-detail').innerHTML = DOMPurify.sanitize(`
+  document.getElementById('mail-detail').innerHTML = `
     <div class="detail-header">
       <div class="detail-subject">${m.subject}</div>
       <div class="detail-meta">
@@ -463,7 +462,7 @@ function openMail(id) {
     </div>
     <div class="detail-body">
       <div class="detail-body-text">${m.body}</div>
-    </div>`);
+    </div>`;
 }
 
 function toggleStar(id) {
@@ -479,7 +478,7 @@ function deleteMail(id) {
   if (!m) return;
   m.folder = 'trash';
   activeMail = null;
-  document.getElementById('mail-detail').innerHTML = DOMPurify.sanitize(`<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`);
+  document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
   renderList();
   toast('Mail verplaatst naar prullenbak');
 }

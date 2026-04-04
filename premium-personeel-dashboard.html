@@ -1374,8 +1374,6 @@
             }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-    <script src="assets/shared.js"></script>
 </head>
 <body>
 
@@ -1584,6 +1582,15 @@
         const dashboardPeriodLabel = document.getElementById('dashboardPeriodLabel');
         const dashboardPeriodMenu = document.getElementById('dashboardPeriodMenu');
         const dashboardPeriodOptions = Array.from(document.querySelectorAll('[data-period-value]'));
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
 
         function normalizeDashboardString(value) {
             return String(value || '').trim();
@@ -1943,12 +1950,12 @@
             if (chartAreaEl.dataset.chartSignature === nextSignature) return;
             const shouldAnimate = chartAreaEl.dataset.chartHydrated !== 'true';
 
-            chartAreaEl.innerHTML = DOMPurify.sanitize(labels.map((label, index) => `
+            chartAreaEl.innerHTML = labels.map((label, index) => `
                 <div class="chart-bar-group">
                     <div class="chart-bar${shouldAnimate ? ' is-animate' : ''}" data-chart-index="${index}" style="height: 0;"></div>
                     <span class="chart-label">${escapeHtml(label)}</span>
                 </div>
-            `).join(''));
+            `).join('');
             chartAreaEl.dataset.chartSignature = nextSignature;
             chartAreaEl.dataset.chartHydrated = 'true';
 
@@ -2234,13 +2241,13 @@
             }
             const item = document.createElement('div');
             item.className = 'activity-item';
-            item.innerHTML = DOMPurify.sanitize(`
+            item.innerHTML = `
                 <div class="activity-dot" style="background: var(--green);"></div>
                 <div>
                     <div class="activity-text">${labelHtml} naar ${escapeHtml(company || 'lead')}</div>
                     <div class="activity-time">Zojuist</div>
                 </div>
-            `);
+            `;
             activityList.prepend(item);
             while (activityList.children.length > 6) {
                 activityList.removeChild(activityList.lastElementChild);
@@ -2343,12 +2350,12 @@
             countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
 
             if (!tasks.length) {
-                listEl.innerHTML = DOMPurify.sanitize('<div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>');
+                listEl.innerHTML = '<div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>';
                 confirmationTaskState.expandedTaskId = null;
                 return;
             }
 
-            listEl.innerHTML = DOMPurify.sanitize(tasks.map((task) => {
+            listEl.innerHTML = tasks.map((task) => {
                 const taskId = Number(task.id) || 0;
                 const company = escapeHtml(task.company || 'Onbekende lead');
                 const contact = escapeHtml(task.contact || 'Onbekend');
@@ -2375,7 +2382,7 @@
                         ${renderConfirmationTaskDetail(task)}
                     </div>
                 `;
-            }).join(''));
+            }).join('');
 
             listEl.querySelectorAll('[data-open-task-id]').forEach((btn) => {
                 btn.addEventListener('click', async (e) => {

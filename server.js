@@ -10,20 +10,7 @@ const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-js');
-
-// ==============================================================================
-// SECTIE: Imports & Dependencies
-// ==============================================================================
 const { createPremiumUsersStore } = require('./lib/premium-users-store');
-const { parseIntSafe, parseNumberSafe, normalizeString, escapeHtml, truncateText, clipText } = require('./lib/utils');
-const {
-  recentWebhookEvents, recentCallUpdates, callUpdatesById, retellCallStatusRefreshByCallId,
-  recentAiCallInsights, aiCallInsightsByCallId, aiAnalysisFingerprintByCallId, aiAnalysisInFlightCallIds,
-  recentDashboardActivities, recentSecurityAuditEvents, inMemoryUiStateByScope,
-  generatedAgendaAppointments, agendaAppointmentIdByCallId,
-  dismissedInterestedLeadCallIds, dismissedInterestedLeadKeys, leadOwnerAssignmentsByCallId,
-  sequentialDispatchQueues, sequentialDispatchQueueIdByCallId,
-} = require('./lib/state');
 require('dotenv').config();
 
 function normalizeLoginEmailValue(value) {
@@ -212,14 +199,27 @@ const MAIL_IMAP_POLL_COOLDOWN_MS = Math.max(
   5_000,
   Math.min(300_000, Number(process.env.MAIL_IMAP_POLL_COOLDOWN_MS || 20_000) || 20_000)
 );
-
-// ==============================================================================
-// SECTIE: Runtime State (primitieven — collections in lib/state.js)
-// ==============================================================================
-// In-memory state collections → lib/state.js
+const recentWebhookEvents = [];
+const recentCallUpdates = [];
+const callUpdatesById = new Map();
+const retellCallStatusRefreshByCallId = new Map();
 const RETELL_STATUS_REFRESH_COOLDOWN_MS = 8000;
+const recentAiCallInsights = [];
+const recentDashboardActivities = [];
+const recentSecurityAuditEvents = [];
+const inMemoryUiStateByScope = new Map();
+const aiCallInsightsByCallId = new Map();
+const aiAnalysisFingerprintByCallId = new Map();
+const aiAnalysisInFlightCallIds = new Set();
+const generatedAgendaAppointments = [];
+const agendaAppointmentIdByCallId = new Map();
+const dismissedInterestedLeadCallIds = new Set();
+const dismissedInterestedLeadKeys = new Set();
+const leadOwnerAssignmentsByCallId = new Map();
 let nextLeadOwnerRotationIndex = 0;
 let nextGeneratedAgendaAppointmentId = 100000;
+const sequentialDispatchQueues = new Map();
+const sequentialDispatchQueueIdByCallId = new Map();
 let nextSequentialDispatchQueueId = 1;
 let supabaseClient = null;
 let smtpTransporter = null;
@@ -282,10 +282,6 @@ const DEMO_CONFIRMATION_TASK_ENABLED = /^(1|true|yes)$/i.test(
   String(process.env.ENABLE_DEMO_CONFIRMATION_TASK || '')
 );
 
-
-// ==============================================================================
-// SECTIE: HTML Pagina Helpers
-// ==============================================================================
 // Vercel bundelt dynamische sendFile-doelen niet altijd mee. Door de root-dir
 // één keer te scannen op .html bestanden worden die files traceable voor de
 // serverless bundle en blijven pagina-links zoals /premium-website.html werken.
@@ -393,10 +389,6 @@ function appendQueryParamsToUrl(rawUrl, params = {}) {
   }
 }
 
-
-// ==============================================================================
-// SECTIE: Express Setup & Middleware
-// ==============================================================================
 app.disable('x-powered-by');
 
 app.use(
@@ -553,11 +545,21 @@ app.use((req, _res, next) => {
     });
 });
 
+function parseIntSafe(value, fallback = 0) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
 
-// ==============================================================================
-// SECTIE: Utility Functies (zie ook lib/utils.js)
-// ==============================================================================
-// parseIntSafe, parseNumberSafe, normalizeString → lib/utils.js
+function parseNumberSafe(value, fallback = null) {
+  if (value === '' || value === null || value === undefined) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeString(value, fallback = '') {
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim();
+}
 
 function getRequestPathname(req) {
   const rawUrl = normalizeString(req?.originalUrl || req?.url || req?.path || '/');
@@ -565,10 +567,6 @@ function getRequestPathname(req) {
   return questionMarkIndex >= 0 ? rawUrl.slice(0, questionMarkIndex) : rawUrl;
 }
 
-
-// ==============================================================================
-// SECTIE: IP & Origin Helpers
-// ==============================================================================
 function normalizeIpAddress(value) {
   const raw = normalizeString(value);
   if (!raw) return '';
@@ -638,10 +636,6 @@ function getRequestOriginFromHeaders(req) {
   return '';
 }
 
-
-// ==============================================================================
-// SECTIE: Crypto Helpers
-// ==============================================================================
 function toBase64Url(value) {
   return Buffer.from(String(value || ''), 'utf8')
     .toString('base64')
@@ -719,10 +713,6 @@ function getPremiumMfaSecretBuffer() {
   return premiumMfaSecretBufferCache;
 }
 
-
-// ==============================================================================
-// SECTIE: Premium Auth & MFA
-// ==============================================================================
 function isPremiumMfaConfigured() {
   const buffer = getPremiumMfaSecretBuffer();
   return Boolean(buffer && buffer.length > 0);
@@ -761,10 +751,6 @@ function isPremiumMfaCodeValid(codeRaw) {
   return false;
 }
 
-
-// ==============================================================================
-// SECTIE: Session & Cookie Management
-// ==============================================================================
 function buildCookieMap(req) {
   const headerValue = normalizeString(req?.headers?.cookie || '');
   const map = new Map();
@@ -814,10 +800,6 @@ function buildSetCookieHeader(name, value, options = {}) {
   return parts.join('; ');
 }
 
-
-// ==============================================================================
-// SECTIE: Premium Auth Middleware
-// ==============================================================================
 function isPremiumAuthConfigured() {
   return premiumUsersStore.hasConfiguredUsers();
 }
@@ -848,10 +830,6 @@ const premiumUsersStore = createPremiumUsersStore({
   },
 });
 
-
-// ==============================================================================
-// SECTIE: Lead Owner Management
-// ==============================================================================
 function normalizeLeadOwnerKey(value) {
   const normalized = normalizeString(value || '')
     .toLowerCase()
@@ -1329,12 +1307,29 @@ function requireRuntimeDebugAccess(req, res, next) {
   return next();
 }
 
-// escapeHtml, truncateText, clipText → lib/utils.js
+function escapeHtml(value) {
+  return normalizeString(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
+function truncateText(value, maxLength = 500) {
+  const text = normalizeString(value);
+  if (!text) return '';
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
+}
 
-// ==============================================================================
-// SECTIE: Supabase Configuratie & Client
-// ==============================================================================
+function clipText(value, maxLength = 500) {
+  const text = normalizeString(value);
+  if (!text) return '';
+  if (!Number.isFinite(Number(maxLength)) || Number(maxLength) <= 0) return '';
+  const limit = Math.floor(Number(maxLength));
+  return text.length > limit ? text.slice(0, limit) : text;
+}
+
 function isSupabaseConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 }
@@ -1350,10 +1345,6 @@ function redactSupabaseUrlForDebug(url) {
   }
 }
 
-
-// ==============================================================================
-// SECTIE: Supabase REST Operaties
-// ==============================================================================
 async function fetchSupabaseStateRowViaRest(selectColumns = 'payload,updated_at') {
   if (!isSupabaseConfigured()) return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
 
@@ -1848,10 +1839,6 @@ function compactRuntimeSnapshotGeneratedAgendaAppointment(item) {
   };
 }
 
-
-// ==============================================================================
-// SECTIE: Runtime State Snapshot & Persistentie
-// ==============================================================================
 function buildRuntimeStateSnapshotPayloadWithLimits(options = {}) {
   const maxWebhookEvents = Math.max(10, Math.min(200, Number(options?.maxWebhookEvents || 80) || 80));
   const maxCallUpdates = Math.max(20, Math.min(500, Number(options?.maxCallUpdates || 500) || 500));
@@ -2353,10 +2340,6 @@ function cancelOpenLeadFollowUpTasksByIdentity(callId, rowLike, actor = '', reas
   return cancelledCount;
 }
 
-
-// ==============================================================================
-// SECTIE: Supabase Hydration & Sync
-// ==============================================================================
 async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
   const force = Boolean(options && options.force);
   if (!isSupabaseConfigured()) return false;
@@ -2562,7 +2545,7 @@ function queueRuntimeStatePersist(reason = 'unknown') {
   if (!isSupabaseConfigured()) return Promise.resolve(false);
 
   supabasePersistChain = supabasePersistChain
-    .catch((error) => { console.error('[Supabase][PersistChainReset]', error?.message || error); return null; })
+    .catch(() => null)
     .then(() => persistRuntimeStateToSupabase(reason))
     .catch((error) => {
       console.error('[Supabase][PersistQueueError]', error?.message || error);
@@ -2676,7 +2659,7 @@ function queueCallUpdateRowPersist(callUpdate, reason = 'call_update_row') {
   if (!callId || callId.startsWith('demo-')) return Promise.resolve(false);
 
   supabaseCallUpdatePersistChain = supabaseCallUpdatePersistChain
-    .catch((error) => { console.error('[Supabase][CallUpdateChainReset]', error?.message || error); return null; })
+    .catch(() => null)
     .then(() => persistSingleCallUpdateRowToSupabase(callUpdate, reason))
     .catch((error) => {
       supabaseLastCallUpdatePersistError = truncateText(error?.message || String(error), 500);
@@ -2872,10 +2855,6 @@ function appendDashboardActivity(input, reason = 'dashboard_activity') {
   return entry;
 }
 
-
-// ==============================================================================
-// SECTIE: UI State Management
-// ==============================================================================
 function normalizeUiStateScope(scope) {
   const value = normalizeString(scope || '').toLowerCase();
   if (!/^[a-z0-9:_-]{1,80}$/.test(value)) return '';
@@ -3220,10 +3199,6 @@ async function persistSeoConfig(config, meta = {}) {
   return normalizedConfig;
 }
 
-
-// ==============================================================================
-// SECTIE: SEO Management
-// ==============================================================================
 function getSeoEditableHtmlFiles() {
   return Array.from(knownHtmlPageFiles)
     .filter((fileName) => fileName !== 'premium-seo.html')
@@ -9095,10 +9070,6 @@ function buildConfirmationEmailDraftFallback(appointment, detail = {}) {
   ].join('\n');
 }
 
-
-// ==============================================================================
-// SECTIE: Email (SMTP / IMAP)
-// ==============================================================================
 function isSmtpMailConfigured() {
   return Boolean(
     MAIL_SMTP_HOST &&
@@ -11109,10 +11080,6 @@ function isTwilioWebhookAuthorized(req) {
   return secret === headerSecret || secret === querySecret || secret === bearerSecret;
 }
 
-
-// ==============================================================================
-// SECTIE: Twilio Integratie
-// ==============================================================================
 function handleTwilioInboundVoice(req, res) {
   if (!isTwilioWebhookAuthorized(req)) {
     appendSecurityAuditEvent(
@@ -11305,12 +11272,1062 @@ app.post('/api/twilio/status', express.urlencoded({ extended: false }), handleTw
 
 app.use('/api/auth/login', premiumLoginRateLimiter);
 
+app.get('/api/auth/session', async (req, res) => {
+  const authState = await getResolvedPremiumAuthState(req);
+  res.setHeader('Cache-Control', 'no-store, private');
+  if (authState.revoked) {
+    clearPremiumSessionCookie(req, res);
+  }
+  return res.status(200).json(buildPremiumAuthSessionPayload(authState));
+});
 
-// ==============================================================================
-// Auth routes → routes/auth.js
-// ==============================================================================
-// SECTIE: Routes — AI
-// ==============================================================================
+app.post('/api/auth/login', async (req, res) => {
+  const email = normalizePremiumSessionEmail(req.body?.email || '');
+  const password = String(req.body?.password || '');
+  const otp = normalizeString(req.body?.otp || '').replace(/\s+/g, '');
+  const remember = /^(1|true|yes|on)$/i.test(String(req.body?.remember || ''));
+  const nextPath = getSafePremiumRedirectPath(req.body?.next || req.query?.next || '');
+  const clientIp = getClientIpFromRequest(req);
+  const requestPath = getRequestPathname(req);
+  const requestOrigin = getRequestOriginFromHeaders(req);
+  const userAgent = normalizeString(req.get('user-agent') || '');
+
+  res.setHeader('Cache-Control', 'no-store, private');
+
+  const hydrated = await premiumUsersStore.ensureUsersHydrated();
+  const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
+
+  if (!PREMIUM_SESSION_SECRET || hydrated?.source !== 'supabase' || users.length === 0) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_rejected',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: 'Premium login niet geconfigureerd op de server.',
+      },
+      'security_login_rejected'
+    );
+    return res.status(503).json({
+      ok: false,
+      error:
+        'Premium login is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase en zet PREMIUM_SESSION_SECRET.',
+    });
+  }
+
+  if (!isPremiumAdminIpAllowed(req)) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_ip_blocked',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: 'Login geweigerd door admin IP allowlist.',
+      },
+      'security_login_ip_blocked'
+    );
+    return res.status(403).json({
+      ok: false,
+      error: 'Inloggen is vanaf dit IP-adres niet toegestaan.',
+    });
+  }
+
+  if (!email || !password) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_failed',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: 'E-mailadres of wachtwoord ontbreekt.',
+      },
+      'security_login_failed'
+    );
+    return res.status(400).json({
+      ok: false,
+      error: 'Vul je e-mailadres en wachtwoord in.',
+    });
+  }
+
+  const matchedUser = premiumUsersStore.findUserByEmail(users, email);
+  const isPasswordValid = matchedUser
+    ? premiumUsersStore.verifyPasswordHash(password, matchedUser.passwordHash)
+    : false;
+  if (!matchedUser || !isPasswordValid) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_failed',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: 'Ongeldige inloggegevens.',
+      },
+      'security_login_failed'
+    );
+    return res.status(401).json({
+      ok: false,
+      error: 'Ongeldige inloggegevens.',
+    });
+  }
+
+  if (premiumUsersStore.normalizeUserStatus(matchedUser.status) !== 'active') {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_failed',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: 'Inloggen geweigerd omdat het account inactief is.',
+      },
+      'security_login_failed'
+    );
+    return res.status(403).json({
+      ok: false,
+      error: 'Dit account is gedeactiveerd.',
+    });
+  }
+
+  if (isPremiumMfaConfigured() && !isPremiumMfaCodeValid(otp)) {
+    appendSecurityAuditEvent(
+      {
+        type: 'login_mfa_failed',
+        severity: 'warning',
+        success: false,
+        email,
+        ip: clientIp,
+        path: requestPath,
+        origin: requestOrigin,
+        userAgent,
+        detail: '2FA-code ongeldig of ontbreekt.',
+      },
+      'security_login_mfa_failed'
+    );
+    return res.status(401).json({
+      ok: false,
+      error: 'Ongeldige of ontbrekende 2FA-code.',
+      mfaRequired: true,
+    });
+  }
+
+  const sessionMaxAgeMs = remember
+    ? PREMIUM_SESSION_REMEMBER_TTL_DAYS * 24 * 60 * 60 * 1000
+    : PREMIUM_SESSION_TTL_HOURS * 60 * 60 * 1000;
+  const sessionToken = createPremiumSessionToken({
+    email,
+    maxAgeMs: sessionMaxAgeMs,
+    userId: matchedUser.id,
+    role: matchedUser.role,
+  });
+  setPremiumSessionCookie(req, res, sessionToken, sessionMaxAgeMs);
+  appendSecurityAuditEvent(
+    {
+      type: 'login_success',
+      severity: 'info',
+      success: true,
+      email,
+      ip: clientIp,
+      path: requestPath,
+      origin: requestOrigin,
+      userAgent,
+      detail: remember
+        ? 'Premium login succesvol met verlengde sessie.'
+        : 'Premium login succesvol.',
+    },
+    'security_login_success'
+  );
+
+  return res.status(200).json({
+    ok: true,
+    authenticated: true,
+    role: matchedUser.role,
+    next: nextPath,
+  });
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  const authState = await getResolvedPremiumAuthState(req);
+  res.setHeader('Cache-Control', 'no-store, private');
+  clearPremiumSessionCookie(req, res);
+  appendSecurityAuditEvent(
+    {
+      type: 'logout',
+      severity: 'info',
+      success: true,
+      email: authState.email || '',
+      ip: getClientIpFromRequest(req),
+      path: getRequestPathname(req),
+      origin: getRequestOriginFromHeaders(req),
+      userAgent: req.get('user-agent'),
+      detail: 'Premium sessie uitgelogd.',
+    },
+    'security_logout'
+  );
+  return res.status(200).json({ ok: true, authenticated: false });
+});
+
+app.use('/api', async (req, res, next) => {
+  if (isPremiumPublicApiRequest(req)) return next();
+
+  const authState = await getResolvedPremiumAuthState(req);
+  res.setHeader('Cache-Control', 'no-store, private');
+
+  if (!authState.configured) {
+    return res.status(503).json({
+      ok: false,
+      error:
+        'Premium auth is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase en zet PREMIUM_SESSION_SECRET.',
+    });
+  }
+
+  if (authState.authenticated) {
+    if (!isPremiumAdminIpAllowed(req)) {
+      appendSecurityAuditEvent(
+        {
+          type: 'admin_ip_blocked',
+          severity: 'warning',
+          success: false,
+          email: authState.email || '',
+          ip: getClientIpFromRequest(req),
+          path: getRequestPathname(req),
+          origin: getRequestOriginFromHeaders(req),
+          userAgent: req.get('user-agent'),
+          detail: 'Ingelogde API-request geweigerd door admin IP allowlist.',
+        },
+        'security_admin_ip_blocked'
+      );
+      clearPremiumSessionCookie(req, res);
+      return res.status(403).json({
+        ok: false,
+        error: 'Toegang vanaf dit IP-adres is niet toegestaan.',
+      });
+    }
+    req.premiumAuth = authState;
+    return next();
+  }
+
+  if (authState.expired || authState.revoked) {
+    clearPremiumSessionCookie(req, res);
+  }
+
+  return res.status(401).json({
+    ok: false,
+    error: 'Niet ingelogd.',
+  });
+});
+
+function requirePremiumAdminApiAccess(req, res, next) {
+  const authState = req.premiumAuth || null;
+  if (!authState || !authState.authenticated) {
+    return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
+  }
+  if (!authState.isAdmin) {
+    return res.status(403).json({ ok: false, error: 'Alleen administrators hebben toegang.' });
+  }
+  return next();
+}
+
+app.get('/api/auth/profile', async (req, res) => {
+  const authState = req.premiumAuth || null;
+  if (!authState || !authState.authenticated) {
+    return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    user: premiumUsersStore.sanitizeUserForClient(authState.user),
+    session: buildPremiumAuthSessionPayload(authState),
+  });
+});
+
+app.patch('/api/auth/profile', async (req, res) => {
+  const authState = req.premiumAuth || null;
+  if (!authState || !authState.authenticated) {
+    return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
+  }
+
+  const users =
+    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
+    premiumUsersStore.getCachedUsers();
+  const existingUser =
+    premiumUsersStore.findUserById(users, authState.userId) ||
+    premiumUsersStore.findUserByEmail(users, authState.email);
+
+  if (!existingUser) {
+    return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
+  }
+
+  const hasDisplayNameInput =
+    req.body?.displayName !== undefined || req.body?.naam !== undefined || req.body?.fullName !== undefined;
+  const avatarInputProvided = req.body?.avatarDataUrl !== undefined || req.body?.avatar !== undefined;
+  const removeAvatar = /^(1|true|yes|on)$/i.test(String(req.body?.removeAvatar || ''));
+
+  let nextFirstName = existingUser.firstName;
+  let nextLastName = existingUser.lastName;
+  if (hasDisplayNameInput) {
+    const parsedNames = parsePremiumProfileDisplayName(
+      req.body?.displayName || req.body?.naam || req.body?.fullName || ''
+    );
+    if (!parsedNames.firstName) {
+      return res.status(400).json({ ok: false, error: 'Voer een geldige naam in.' });
+    }
+    nextFirstName = parsedNames.firstName;
+    nextLastName = parsedNames.lastName;
+  }
+
+  let nextAvatarDataUrl = premiumUsersStore.sanitizeAvatarDataUrl(existingUser.avatarDataUrl || '');
+  if (removeAvatar) {
+    nextAvatarDataUrl = '';
+  } else if (avatarInputProvided) {
+    nextAvatarDataUrl = premiumUsersStore.sanitizeAvatarDataUrl(req.body?.avatarDataUrl || req.body?.avatar || '');
+    const providedAvatarValue = normalizeString(req.body?.avatarDataUrl || req.body?.avatar || '');
+    if (providedAvatarValue && !nextAvatarDataUrl) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Profielfoto moet een geldige PNG, JPG, WEBP of GIF data-url zijn.',
+      });
+    }
+  }
+
+  const nextUsers = users.map((user) => {
+    if (user.id !== existingUser.id) return user;
+    return premiumUsersStore.sanitizeUserRecord({
+      ...user,
+      firstName: nextFirstName,
+      lastName: nextLastName,
+      avatarDataUrl: nextAvatarDataUrl,
+      updatedAt: new Date().toISOString(),
+      source: 'self_service_profile',
+    });
+  });
+
+  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
+    source: 'premium_profile_update',
+    reason: 'premium_profile_updated',
+    actorEmail: authState.email,
+  });
+  if (!saved || saved.source !== 'supabase') {
+    return res.status(503).json({
+      ok: false,
+      error: 'Profiel kon niet worden opgeslagen zonder geldige Supabase-opslag.',
+    });
+  }
+  const updatedUser =
+    premiumUsersStore.findUserById(saved.users, existingUser.id) ||
+    premiumUsersStore.findUserByEmail(saved.users, authState.email);
+
+  appendSecurityAuditEvent(
+    {
+      type: 'premium_profile_updated',
+      severity: 'info',
+      success: true,
+      email: authState.email || '',
+      ip: getClientIpFromRequest(req),
+      path: getRequestPathname(req),
+      origin: getRequestOriginFromHeaders(req),
+      userAgent: req.get('user-agent'),
+      detail: 'Premium gebruiker heeft eigen profiel bijgewerkt.',
+    },
+    'security_premium_profile_updated'
+  );
+
+  const refreshedAuthState = {
+    ...authState,
+    user: updatedUser,
+    firstName: normalizeString(updatedUser?.firstName || ''),
+    lastName: normalizeString(updatedUser?.lastName || ''),
+    displayName: premiumUsersStore.buildUserDisplayName(updatedUser),
+    avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(updatedUser?.avatarDataUrl || ''),
+  };
+
+  return res.status(200).json({
+    ok: true,
+    user: premiumUsersStore.sanitizeUserForClient(updatedUser),
+    session: buildPremiumAuthSessionPayload(refreshedAuthState),
+  });
+});
+
+app.get('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) => {
+  const hydrated = await premiumUsersStore.ensureUsersHydrated({ force: true });
+  const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
+  return res.status(200).json({
+    ok: true,
+    users: users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
+    updatedAt: hydrated?.updatedAt || premiumUsersStore.getUsersUpdatedAt() || null,
+  });
+});
+
+app.post('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) => {
+  const authState = req.premiumAuth;
+  const users =
+    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
+    premiumUsersStore.getCachedUsers();
+  const email = premiumUsersStore.validateUserEmail(req.body?.email || '');
+  const password = String(req.body?.password || '');
+  const { firstName, lastName } = premiumUsersStore.normalizeUserInputNames(req.body || {});
+  const role = premiumUsersStore.normalizeUserRole(req.body?.rol || req.body?.role || 'medewerker');
+
+  if (!email || !password) {
+    return res.status(400).json({ ok: false, error: 'E-mail en wachtwoord zijn verplicht.' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ ok: false, error: 'Wachtwoord moet minimaal 8 tekens bevatten.' });
+  }
+  if (premiumUsersStore.findUserByEmail(users, email)) {
+    return res.status(409).json({ ok: false, error: 'Dit e-mailadres bestaat al.' });
+  }
+
+  const nowIso = new Date().toISOString();
+  const nextUsers = users.concat([
+    premiumUsersStore.sanitizeUserRecord({
+      firstName,
+      lastName,
+      email,
+      role,
+      status: 'active',
+      passwordHash: premiumUsersStore.createPasswordHash(password),
+      source: 'managed_ui',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    }),
+  ]);
+
+  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
+    source: 'premium_users_api_create',
+    reason: 'premium_user_created',
+    actorEmail: authState.email,
+  });
+  if (!saved || saved.source !== 'supabase') {
+    return res.status(503).json({
+      ok: false,
+      error: 'Gebruiker kon niet worden opgeslagen zonder geldige Supabase-opslag.',
+    });
+  }
+  const createdUser = premiumUsersStore.findUserByEmail(saved.users, email);
+  appendSecurityAuditEvent(
+    {
+      type: 'premium_user_created',
+      severity: 'info',
+      success: true,
+      email: authState.email || '',
+      ip: getClientIpFromRequest(req),
+      path: getRequestPathname(req),
+      origin: getRequestOriginFromHeaders(req),
+      userAgent: req.get('user-agent'),
+      detail: `Premium gebruiker toegevoegd: ${email}.`,
+    },
+    'security_premium_user_created'
+  );
+
+  return res.status(201).json({
+    ok: true,
+    user: premiumUsersStore.sanitizeUserForClient(createdUser),
+    users: saved.users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
+  });
+});
+
+app.patch('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, res) => {
+  const authState = req.premiumAuth;
+  const userId = truncateText(normalizeString(req.params?.id || ''), 120);
+  const users =
+    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
+    premiumUsersStore.getCachedUsers();
+  const existingUser = premiumUsersStore.findUserById(users, userId);
+  if (!existingUser) {
+    return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
+  }
+
+  const emailRaw = req.body?.email;
+  const password = String(req.body?.password || '');
+  const role = premiumUsersStore.normalizeUserRole(req.body?.rol || req.body?.role || existingUser.role);
+  const status = premiumUsersStore.normalizeUserStatus(req.body?.status || existingUser.status);
+  const nextEmail =
+    emailRaw === undefined ? existingUser.email : premiumUsersStore.validateUserEmail(emailRaw);
+  const { firstName, lastName } = premiumUsersStore.normalizeUserInputNames({
+    firstName: req.body?.firstName === undefined ? existingUser.firstName : req.body?.firstName,
+    lastName: req.body?.lastName === undefined ? existingUser.lastName : req.body?.lastName,
+    voornaam: req.body?.voornaam,
+    achternaam: req.body?.achternaam,
+  });
+
+  if (!nextEmail) {
+    return res.status(400).json({ ok: false, error: 'Voer een geldig e-mailadres in.' });
+  }
+  if (password && password.length < 8) {
+    return res.status(400).json({ ok: false, error: 'Wachtwoord moet minimaal 8 tekens bevatten.' });
+  }
+  if (users.some((item) => item.id !== userId && item.email === nextEmail)) {
+    return res.status(409).json({ ok: false, error: 'Dit e-mailadres is al in gebruik.' });
+  }
+
+  const nextUsers = users.map((user) => {
+    if (user.id !== userId) return user;
+    return premiumUsersStore.sanitizeUserRecord({
+      ...user,
+      firstName,
+      lastName,
+      email: nextEmail,
+      role,
+      status,
+      passwordHash: password ? premiumUsersStore.createPasswordHash(password) : user.passwordHash,
+      source: 'managed_ui',
+      updatedAt: new Date().toISOString(),
+    });
+  });
+
+  if (premiumUsersStore.countActiveAdmins(nextUsers) < 1) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Er moet altijd minimaal één actieve administrator overblijven.',
+    });
+  }
+
+  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
+    source: 'premium_users_api_update',
+    reason: 'premium_user_updated',
+    actorEmail: authState.email,
+  });
+  if (!saved || saved.source !== 'supabase') {
+    return res.status(503).json({
+      ok: false,
+      error: 'Gebruiker kon niet worden bijgewerkt zonder geldige Supabase-opslag.',
+    });
+  }
+  const updatedUser = premiumUsersStore.findUserById(saved.users, userId);
+
+  appendSecurityAuditEvent(
+    {
+      type: 'premium_user_updated',
+      severity: 'info',
+      success: true,
+      email: authState.email || '',
+      ip: getClientIpFromRequest(req),
+      path: getRequestPathname(req),
+      origin: getRequestOriginFromHeaders(req),
+      userAgent: req.get('user-agent'),
+      detail: `Premium gebruiker bijgewerkt: ${nextEmail}.`,
+    },
+    'security_premium_user_updated'
+  );
+
+  return res.status(200).json({
+    ok: true,
+    user: premiumUsersStore.sanitizeUserForClient(updatedUser),
+    users: saved.users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
+  });
+});
+
+app.delete('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, res) => {
+  const authState = req.premiumAuth;
+  const userId = truncateText(normalizeString(req.params?.id || ''), 120);
+  const users =
+    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
+    premiumUsersStore.getCachedUsers();
+  const existingUser = premiumUsersStore.findUserById(users, userId);
+  if (!existingUser) {
+    return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
+  }
+
+  const nextUsers = users.filter((user) => user.id !== userId);
+  if (premiumUsersStore.countActiveAdmins(nextUsers) < 1) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Er moet altijd minimaal één actieve administrator overblijven.',
+    });
+  }
+
+  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
+    source: 'premium_users_api_delete',
+    reason: 'premium_user_deleted',
+    actorEmail: authState.email,
+  });
+  if (!saved || saved.source !== 'supabase') {
+    return res.status(503).json({
+      ok: false,
+      error: 'Gebruiker kon niet worden verwijderd zonder geldige Supabase-opslag.',
+    });
+  }
+
+  appendSecurityAuditEvent(
+    {
+      type: 'premium_user_deleted',
+      severity: 'info',
+      success: true,
+      email: authState.email || '',
+      ip: getClientIpFromRequest(req),
+      path: getRequestPathname(req),
+      origin: getRequestOriginFromHeaders(req),
+      userAgent: req.get('user-agent'),
+      detail: `Premium gebruiker verwijderd: ${existingUser.email}.`,
+    },
+    'security_premium_user_deleted'
+  );
+
+  return res.status(200).json({
+    ok: true,
+    users: saved.users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
+  });
+});
+
+
+app.post('/api/coldcalling/start', async (req, res) => {
+  const validated = validateStartPayload(req.body);
+  if (validated.error) {
+    return res.status(400).json({ ok: false, error: validated.error });
+  }
+
+  const { campaign, leads } = validated;
+  campaign.publicBaseUrl = getEffectivePublicBaseUrl(req);
+  const provider = resolveColdcallingProviderForCampaign(campaign);
+  const missingEnv = getMissingEnvVars(provider);
+
+  if (missingEnv.length > 0) {
+    const providerLabel = provider === 'twilio' ? 'Twilio' : 'Retell';
+    return res.status(500).json({
+      ok: false,
+      error: `Server mist vereiste environment variables voor ${providerLabel} outbound calling.`,
+      missingEnv,
+      provider,
+    });
+  }
+
+  const leadsToProcess = leads.slice(0, Math.min(campaign.amount, leads.length));
+
+  console.log(
+    `[Coldcalling] Start campagne ontvangen via ${provider} (stack=${campaign.coldcallingStack}): ${leadsToProcess.length}/${leads.length} leads, sector="${campaign.sector}", regio="${campaign.region}", mode="${campaign.dispatchMode}", delay=${campaign.dispatchDelaySeconds}s`
+  );
+
+  let results = [];
+
+  if (campaign.dispatchMode === 'parallel') {
+    results = await Promise.all(
+      leadsToProcess.map((lead, index) => processColdcallingLead(lead, campaign, index))
+    );
+  } else if (campaign.dispatchMode === 'sequential' && leadsToProcess.length > 1) {
+    const queue = createSequentialDispatchQueue(campaign, leadsToProcess);
+    await advanceSequentialDispatchQueue(queue.id, 'start-request');
+    results = queue.results.slice();
+
+    const startedNow = results.filter((item) => item.success).length;
+    const failedNow = results.length - startedNow;
+    const queuedRemaining = Math.max(0, queue.leads.length - queue.results.length);
+
+    console.log(
+      `[Coldcalling][Sequential Queue] ${queue.id} gestart: direct ${results.length}/${queue.leads.length} verwerkt, ${queuedRemaining} wachtend`
+    );
+
+    await waitForQueuedRuntimeStatePersist();
+
+    return res.status(200).json({
+      ok: true,
+      summary: {
+        requested: leads.length,
+        attempted: leadsToProcess.length,
+        started: startedNow,
+        failed: failedNow,
+        provider,
+        coldcallingStack: campaign.coldcallingStack,
+        coldcallingStackLabel: campaign.coldcallingStackLabel,
+        dispatchMode: campaign.dispatchMode,
+        dispatchDelaySeconds: 0,
+        sequentialWaitForCallEnd: true,
+        queueId: queue.id,
+        queuedRemaining,
+      },
+      results,
+    });
+  } else {
+    results = [];
+    const delayMs =
+      campaign.dispatchMode === 'delay' ? Math.round(campaign.dispatchDelaySeconds * 1000) : 0;
+
+    for (let index = 0; index < leadsToProcess.length; index += 1) {
+      const lead = leadsToProcess[index];
+      const result = await processColdcallingLead(lead, campaign, index);
+      results.push(result);
+
+      const isLast = index === leadsToProcess.length - 1;
+      if (!isLast && delayMs > 0) {
+        console.log(
+          `[Coldcalling] Wacht ${campaign.dispatchDelaySeconds}s voor volgende lead (${index + 1}/${leadsToProcess.length})`
+        );
+        await sleep(delayMs);
+      }
+    }
+  }
+
+  const started = results.filter((item) => item.success).length;
+  const failed = results.length - started;
+
+  await waitForQueuedRuntimeStatePersist();
+
+  return res.status(200).json({
+    ok: true,
+    summary: {
+      requested: leads.length,
+      attempted: leadsToProcess.length,
+      started,
+      failed,
+      provider,
+      coldcallingStack: campaign.coldcallingStack,
+      coldcallingStackLabel: campaign.coldcallingStackLabel,
+      dispatchMode: campaign.dispatchMode,
+      dispatchDelaySeconds: campaign.dispatchMode === 'delay' ? campaign.dispatchDelaySeconds : 0,
+    },
+    results,
+  });
+});
+
+app.get('/api/coldcalling/call-status/:callId', async (req, res) => {
+  const callId = normalizeString(req.params?.callId);
+  if (!callId) {
+    return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
+  }
+  return sendColdcallingStatusResponse(res, callId);
+});
+
+// Vercel route-fallback: sommige serverless route-combinaties geven NOT_FOUND op diepere paden.
+// Deze variant gebruikt een ondiep pad met querystring en werkt betrouwbaarder.
+app.get('/api/coldcalling/status', async (req, res) => {
+  const callId = normalizeString(req.query?.callId);
+  if (!callId) {
+    return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
+  }
+  return sendColdcallingStatusResponse(res, callId);
+});
+
+app.get('/api/coldcalling/recording-proxy', async (req, res) => {
+  if (!isTwilioStatusApiConfigured()) {
+    return res.status(500).json({ ok: false, error: 'TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN ontbreken op server.' });
+  }
+
+  const callId = normalizeString(req.query?.callId || '');
+  let recordingSid = normalizeString(req.query?.recordingSid || '');
+  if (!callId && !recordingSid) {
+    return res.status(400).json({ ok: false, error: 'callId of recordingSid ontbreekt.' });
+  }
+
+  const cached = callId ? callUpdatesById.get(callId) || null : null;
+  if (!recordingSid) {
+    recordingSid = normalizeString(cached?.recordingSid || '');
+  }
+  if (!recordingSid) {
+    recordingSid = extractTwilioRecordingSidFromUrl(cached?.recordingUrl || cached?.recording_url || '');
+  }
+
+  if (callId) {
+    try {
+      const { recordings } = await fetchTwilioRecordingsByCallId(callId);
+      const preferred = choosePreferredTwilioRecording(recordings, recordingSid);
+      if (preferred) {
+        recordingSid = normalizeString(preferred?.sid || '') || recordingSid;
+      }
+    } catch (error) {
+      if (recordingSid) {
+        // Fallback naar bekende opname als Twilio-lijst tijdelijk niet beschikbaar is.
+      } else {
+      return res.status(Number(error?.status || 502)).json({
+        ok: false,
+        error: error?.message || 'Kon Twilio recordinglijst niet ophalen.',
+        endpoint: error?.endpoint || null,
+        details: error?.data || null,
+      });
+      }
+    }
+  }
+
+  if (!recordingSid) {
+    return res.status(404).json({ ok: false, error: 'Nog geen opname beschikbaar voor deze call.' });
+  }
+
+  const mediaUrl = buildTwilioRecordingMediaUrl(recordingSid);
+  if (!mediaUrl) {
+    return res.status(500).json({ ok: false, error: 'Kon Twilio recording URL niet opbouwen.' });
+  }
+
+  try {
+    const upstream = await fetch(mediaUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: getTwilioBasicAuthorizationHeader(),
+      },
+    });
+
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => '');
+      return res.status(upstream.status).json({
+        ok: false,
+        error: `Twilio opname ophalen mislukt (${upstream.status}).`,
+        details: text || null,
+      });
+    }
+
+    const bytes = Buffer.from(await upstream.arrayBuffer());
+    const contentType = normalizeString(upstream.headers.get('content-type') || '');
+    res.set('Content-Type', contentType && /audio/i.test(contentType) ? contentType : 'audio/mpeg');
+    res.set('Cache-Control', 'private, max-age=120');
+
+    if (callId) {
+      const proxyUrl = buildTwilioRecordingProxyUrl(callId);
+      const existing = callUpdatesById.get(callId) || {};
+      upsertRecentCallUpdate({
+        ...existing,
+        callId,
+        recordingSid,
+        recordingUrl: proxyUrl,
+        recordingUrlProxy: proxyUrl,
+        messageType: normalizeString(existing?.messageType || 'twilio.recording.resolved'),
+        updatedAt: new Date().toISOString(),
+        updatedAtMs: Date.now(),
+        provider: 'twilio',
+      });
+    }
+
+    return res.status(200).send(bytes);
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      error: error?.message || 'Kon Twilio opname niet proxien.',
+    });
+  }
+});
+
+app.post('/api/retell/webhook', async (req, res) => {
+  if (!isRetellWebhookAuthorized(req)) {
+    appendSecurityAuditEvent(
+      {
+        type: 'retell_webhook_rejected',
+        severity: 'warning',
+        success: false,
+        ip: getClientIpFromRequest(req),
+        path: getRequestPathname(req),
+        origin: getRequestOriginFromHeaders(req),
+        userAgent: req.get('user-agent'),
+        detail: 'Retell webhook geweigerd door signature/secret check.',
+      },
+      'security_retell_webhook_rejected'
+    );
+    return res.status(401).json({ ok: false, error: 'Retell webhook signature/secret ongeldig.' });
+  }
+
+  const eventType = normalizeString(req.body?.event || req.body?.type || 'unknown');
+  const callData = req.body?.call && typeof req.body.call === 'object' ? req.body.call : null;
+
+  const record = {
+    receivedAt: new Date().toISOString(),
+    messageType: `retell.${eventType || 'unknown'}`,
+    callId: normalizeString(callData?.call_id || ''),
+    callStatus: normalizeString(callData?.call_status || ''),
+    payload: req.body,
+  };
+
+  recentWebhookEvents.unshift(record);
+  if (recentWebhookEvents.length > 200) {
+    recentWebhookEvents.pop();
+  }
+
+  if (VERBOSE_CALL_WEBHOOK_LOGS) {
+    console.log(
+      '[Retell Webhook]',
+      JSON.stringify(
+        {
+          eventType,
+          call: callData,
+        },
+        null,
+        2
+      )
+    );
+  } else {
+    console.log(
+      '[Retell Webhook]',
+      JSON.stringify({
+        eventType,
+        callId: normalizeString(callData?.call_id || ''),
+        status: normalizeString(callData?.call_status || ''),
+        endedReason: normalizeString(callData?.disconnection_reason || ''),
+      })
+    );
+  }
+
+  const callUpdate = upsertRecentCallUpdate(extractCallUpdateFromRetellPayload(req.body));
+  if (callUpdate) {
+    triggerPostCallAutomation(callUpdate);
+  }
+
+  await waitForQueuedRuntimeStatePersist();
+
+  return res.status(200).json({ ok: true });
+});
+
+app.get('/api/coldcalling/call-updates', async (req, res) => {
+  if (isSupabaseConfigured()) {
+    await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
+    await syncCallUpdatesFromSupabaseRows({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
+  }
+  const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 200)));
+  const sinceMs = parseNumberSafe(req.query.sinceMs, null);
+  const nowMs = Date.now();
+
+  const refreshCandidates = [];
+  const seenCallIds = new Set();
+  for (const item of recentCallUpdates) {
+    if (refreshCandidates.length >= 8) break;
+    const callId = normalizeString(item?.callId || '');
+    if (!callId || seenCallIds.has(callId)) continue;
+    if (!shouldRefreshRetellCallStatus(item, nowMs)) continue;
+    seenCallIds.add(callId);
+    refreshCandidates.push({
+      callId,
+      provider: normalizeString(item?.provider || ''),
+      direction: normalizeString(item?.direction || ''),
+      stack: normalizeString(item?.stack || ''),
+    });
+  }
+
+  const missingCandidates = collectMissingCallUpdateRefreshCandidates(6);
+  for (const candidate of missingCandidates) {
+    if (refreshCandidates.length >= 14) break;
+    const callId = normalizeString(candidate?.callId || '');
+    if (!callId || seenCallIds.has(callId)) continue;
+    if (
+      !shouldRefreshRetellCallStatus(
+        {
+          callId,
+          status: 'queued',
+          endedReason: '',
+          provider: candidate?.provider || '',
+          updatedAtMs: 0,
+        },
+        nowMs
+      )
+    ) {
+      continue;
+    }
+    seenCallIds.add(callId);
+    refreshCandidates.push({
+      callId,
+      provider: normalizeString(candidate?.provider || ''),
+      direction: normalizeString(candidate?.direction || ''),
+      stack: normalizeString(candidate?.stack || ''),
+    });
+  }
+
+  if (refreshCandidates.length > 0) {
+    await Promise.allSettled(
+      refreshCandidates.map(async (candidate) => {
+        const callId = normalizeString(candidate?.callId || '');
+        if (!callId) return null;
+        const cached = callUpdatesById.get(callId) || null;
+        const provider = inferCallProvider(
+          callId,
+          normalizeString(candidate?.provider || cached?.provider || 'retell').toLowerCase() || 'retell'
+        );
+        const refreshed =
+          provider === 'twilio'
+            ? await refreshCallUpdateFromTwilioStatusApi(callId, {
+                direction:
+                  normalizeString(cached?.direction || candidate?.direction || '') || 'outbound',
+                stack: normalizeString(cached?.stack || candidate?.stack || ''),
+              })
+            : await refreshCallUpdateFromRetellStatusApi(callId);
+        if (refreshed) {
+          triggerPostCallAutomation(refreshed);
+        }
+      })
+    );
+    await waitForQueuedRuntimeStatePersist();
+  }
+
+  const filtered = recentCallUpdates.filter((item) => {
+    if (!Number.isFinite(sinceMs)) return true;
+    return Number(item.updatedAtMs || 0) > Number(sinceMs);
+  });
+
+  return res.status(200).json({
+    ok: true,
+    count: Math.min(limit, filtered.length),
+    updates: filtered.slice(0, limit),
+  });
+});
+
+app.get('/api/coldcalling/webhook-debug', requireRuntimeDebugAccess, (req, res) => {
+  const limit = Math.max(1, Math.min(100, parseIntSafe(req.query.limit, 20)));
+  const demoCallIdPrefix = 'demo-';
+
+  const latestWebhookEvents = recentWebhookEvents.slice(0, limit).map((event) => {
+    const payload = event?.payload && typeof event.payload === 'object' ? event.payload : null;
+    const call = payload?.call && typeof payload.call === 'object' ? payload.call : null;
+
+    return {
+      receivedAt: normalizeString(event?.receivedAt || ''),
+      messageType: normalizeString(event?.messageType || ''),
+      callId: normalizeString(event?.callId || call?.call_id || ''),
+      callStatus: normalizeString(event?.callStatus || call?.call_status || ''),
+      endedReason: normalizeString(call?.disconnection_reason || ''),
+      topLevelKeys: payload ? Object.keys(payload).slice(0, 30) : [],
+      callKeys: call ? Object.keys(call).slice(0, 30) : [],
+    };
+  });
+
+  const latestRealCallUpdates = recentCallUpdates
+    .filter((item) => {
+      const callId = normalizeString(item?.callId || '');
+      return callId && !callId.startsWith(demoCallIdPrefix);
+    })
+    .slice(0, limit)
+    .map((item) => ({
+      callId: normalizeString(item?.callId || ''),
+      phone: normalizeString(item?.phone || ''),
+      company: normalizeString(item?.company || ''),
+      status: normalizeString(item?.status || ''),
+      messageType: normalizeString(item?.messageType || ''),
+      hasSummary: Boolean(normalizeString(item?.summary || '')),
+      hasTranscriptSnippet: Boolean(normalizeString(item?.transcriptSnippet || '')),
+      transcriptSnippetLen: normalizeString(item?.transcriptSnippet || '').length || 0,
+      hasTranscriptFull: Boolean(normalizeString(item?.transcriptFull || '')),
+      transcriptFullLen: normalizeString(item?.transcriptFull || '').length || 0,
+      updatedAt: normalizeString(item?.updatedAt || ''),
+      updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
+    }));
+
+  const allCallUpdateCount = recentCallUpdates.length;
+  const realCallUpdateCount = recentCallUpdates.filter((item) => {
+    const callId = normalizeString(item?.callId || '');
+    return callId && !callId.startsWith(demoCallIdPrefix);
+  }).length;
+
+  return res.status(200).json({
+    ok: true,
+    now: new Date().toISOString(),
+    webhookEventCount: recentWebhookEvents.length,
+    callUpdateCount: allCallUpdateCount,
+    realCallUpdateCount,
+    demoOnlyCallUpdates: allCallUpdateCount > 0 && realCallUpdateCount === 0,
+    latestWebhookEvents,
+    latestRealCallUpdates,
+  });
+});
+
 app.get('/api/ai/call-insights', async (req, res) => {
   if (isSupabaseConfigured()) {
     await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
@@ -11810,7 +12827,12 @@ async function sendPremiumDashboardChatResponse(req, res) {
   }
 }
 
-app.post(['/api/ai/dashboard-chat', '/api/ai-dashboard-chat'], async (req, res) => {
+app.post('/api/ai/dashboard-chat', async (req, res) => {
+  return sendPremiumDashboardChatResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ai-dashboard-chat', async (req, res) => {
   return sendPremiumDashboardChatResponse(req, res);
 });
 
@@ -11946,7 +12968,12 @@ async function sendAiOrderDossierResponse(req, res) {
   }
 }
 
-app.post(['/api/ai/order-dossier', '/api/ai-order-dossier'], async (req, res) => {
+app.post('/api/ai/order-dossier', async (req, res) => {
+  return sendAiOrderDossierResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ai-order-dossier', async (req, res) => {
   return sendAiOrderDossierResponse(req, res);
 });
 
@@ -12022,7 +13049,12 @@ async function sendAiTranscriptToPromptResponse(req, res) {
   }
 }
 
-app.post(['/api/ai/transcript-to-prompt', '/api/ai-transcript-to-prompt'], async (req, res) => {
+app.post('/api/ai/transcript-to-prompt', async (req, res) => {
+  return sendAiTranscriptToPromptResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ai-transcript-to-prompt', async (req, res) => {
   return sendAiTranscriptToPromptResponse(req, res);
 });
 
@@ -12103,7 +13135,12 @@ async function sendAiNotesImageToTextResponse(req, res) {
   }
 }
 
-app.post(['/api/ai/notes-image-to-text', '/api/ai-notes-image-to-text'], async (req, res) => {
+app.post('/api/ai/notes-image-to-text', async (req, res) => {
+  return sendAiNotesImageToTextResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ai-notes-image-to-text', async (req, res) => {
   return sendAiNotesImageToTextResponse(req, res);
 });
 
@@ -12203,7 +13240,12 @@ async function sendActiveOrderGenerateSiteResponse(req, res) {
   }
 }
 
-app.post(['/api/active-orders/generate-site', '/api/active-order-generate-site'], async (req, res) => {
+app.post('/api/active-orders/generate-site', async (req, res) => {
+  return sendActiveOrderGenerateSiteResponse(req, res);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/active-order-generate-site', async (req, res) => {
   return sendActiveOrderGenerateSiteResponse(req, res);
 });
 
@@ -12261,12 +13303,32 @@ async function sendActiveOrderLaunchSiteResponse(req, res) {
   }
 }
 
-app.post(['/api/active-orders/launch-site', '/api/active-order-launch-site'], async (req, res) => {
+app.post('/api/active-orders/launch-site', async (req, res) => {
   return sendActiveOrderLaunchSiteResponse(req, res);
 });
 
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/active-order-launch-site', async (req, res) => {
+  return sendActiveOrderLaunchSiteResponse(req, res);
+});
 
-// Dashboard & security routes → routes/dashboard.js
+app.get('/api/dashboard/activity', (req, res) => {
+  const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
+  return res.status(200).json({
+    ok: true,
+    count: Math.min(limit, recentDashboardActivities.length),
+    activities: recentDashboardActivities.slice(0, limit),
+  });
+});
+
+app.get('/api/security/audit-log', requireRuntimeDebugAccess, (req, res) => {
+  const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
+  return res.status(200).json({
+    ok: true,
+    count: Math.min(limit, recentSecurityAuditEvents.length),
+    events: recentSecurityAuditEvents.slice(0, limit),
+  });
+});
 
 async function sendUiStateGetResponse(req, res, scopeRaw) {
   const scope = normalizeUiStateScope(scopeRaw);
@@ -12291,28 +13353,428 @@ async function sendUiStateGetResponse(req, res, scopeRaw) {
   });
 }
 
+app.get('/api/ui-state/:scope', async (req, res) => {
+  return sendUiStateGetResponse(req, res, req.params.scope);
+});
 
-// UI State routes → routes/ui-state.js
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.get('/api/ui-state-get', async (req, res) => {
+  return sendUiStateGetResponse(req, res, req.query.scope);
+});
 
-// ==============================================================================
-// SECTIE: Routes — Agenda
-// ==============================================================================
+async function sendUiStateSetResponse(req, res, scopeRaw) {
+  const scope = normalizeUiStateScope(scopeRaw);
+  if (!scope) {
+    return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
+  }
+
+  const patchProvided = req.body && typeof req.body === 'object' && req.body.patch && typeof req.body.patch === 'object';
+  let valuesToSave;
+
+  if (patchProvided) {
+    const current = await getUiStateValues(scope);
+    if (!current) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Kon UI state patch niet laden zonder geldige Supabase-opslag.',
+      });
+    }
+    const currentValues = current && current.values && typeof current.values === 'object' ? current.values : {};
+    const patchValues = sanitizeUiStateValues(req.body.patch);
+    valuesToSave = { ...currentValues, ...patchValues };
+  } else {
+    valuesToSave = sanitizeUiStateValues(req.body?.values || {});
+  }
+
+  const state = await setUiStateValues(scope, valuesToSave, {
+    source: normalizeString(req.body?.source || 'frontend'),
+    actor: normalizeString(req.body?.actor || ''),
+  });
+  if (!state) {
+    return res.status(503).json({
+      ok: false,
+      error: 'Kon UI state niet opslaan zonder geldige Supabase-opslag.',
+    });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    scope,
+    values: state.values || {},
+    source: state.source || 'supabase',
+    updatedAt: state.updatedAt || null,
+  });
+}
+
+app.post('/api/ui-state/:scope', async (req, res) => {
+  return sendUiStateSetResponse(req, res, req.params.scope);
+});
+
+// Vercel fallback voor diepe API-paths in sommige regio's.
+app.post('/api/ui-state-set', async (req, res) => {
+  return sendUiStateSetResponse(req, res, req.query.scope);
+});
+
+app.get('/api/seo/pages', async (req, res) => {
+  const files = getSeoEditableHtmlFiles();
+  const query = normalizeString(req.query.q || '').toLowerCase();
+
+  try {
+    const config = await getSeoConfigCached();
+    const pages = [];
+
+    for (const fileName of files) {
+      const html = await readHtmlPageContent(fileName);
+      if (!html) continue;
+      const source = extractSeoSourceFromHtml(html);
+      const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
+      const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
+      const effective = mergeSeoSourceWithOverrides(source, pageOverrides);
+      const images = extractImageEntriesFromHtml(html);
+      const slug = String(fileName).replace(/\.html$/i, '');
+      const pathName = slug === 'index' ? '/' : `/${slug}`;
+      const searchIndex = `${fileName} ${pathName} ${effective.title || ''}`.toLowerCase();
+
+      if (query && !searchIndex.includes(query)) continue;
+
+      pages.push({
+        file: fileName,
+        slug,
+        path: pathName,
+        title: effective.title || source.title || slug,
+        metaDescription: effective.metaDescription || source.metaDescription || '',
+        imageCount: images.length,
+        pageOverrideCount: Object.keys(pageOverrides).length,
+        imageOverrideCount: Object.keys(imageOverrides).length,
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      count: pages.length,
+      pages,
+    });
+  } catch (error) {
+    console.error('[SEO][PagesError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon SEO pagina-overzicht niet ophalen.',
+    });
+  }
+});
+
+app.get('/api/seo/page', async (req, res) => {
+  const fileName = resolveSeoPageFileFromRequest(req.query.file, req.query.slug);
+  if (!fileName) {
+    return res.status(400).json({ ok: false, error: 'Ongeldig of onbekend HTML-bestand.' });
+  }
+
+  const html = await readHtmlPageContent(fileName);
+  if (!html) {
+    return res.status(404).json({ ok: false, error: 'Pagina niet gevonden of onleesbaar.' });
+  }
+
+  try {
+    const config = await getSeoConfigCached();
+    const source = extractSeoSourceFromHtml(html);
+    const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
+    const effective = mergeSeoSourceWithOverrides(source, pageOverrides);
+    const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
+    const images = extractImageEntriesFromHtml(html).map((entry) => {
+      const overrideAlt = normalizeString(imageOverrides[entry.src] || '');
+      return {
+        src: entry.src,
+        sourceAlt: entry.alt || '',
+        overrideAlt,
+        effectiveAlt: overrideAlt || entry.alt || '',
+      };
+    });
+
+    return res.status(200).json({
+      ok: true,
+      file: fileName,
+      slug: String(fileName).replace(/\.html$/i, ''),
+      seo: {
+        source,
+        overrides: pageOverrides,
+        effective,
+      },
+      imageCount: images.length,
+      images,
+    });
+  } catch (error) {
+    console.error('[SEO][PageError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon SEO data voor deze pagina niet ophalen.',
+    });
+  }
+});
+
+app.post('/api/seo/page', async (req, res) => {
+  const fileName = resolveSeoPageFileFromRequest(req.body?.file, req.body?.slug);
+  if (!fileName) {
+    return res.status(400).json({ ok: false, error: 'Ongeldig of onbekend HTML-bestand.' });
+  }
+
+  const pageOverridePatch = normalizeSeoPageOverridePatch(req.body?.pageOverrides || req.body?.page || {});
+  const imageOverridePatch = normalizeSeoImageOverridePatch(
+    req.body?.imageAltOverrides || req.body?.imageOverrides || req.body?.images || {}
+  );
+
+  try {
+    const currentConfig = await getSeoConfigCached(true);
+    const nextConfig = normalizeSeoConfig(currentConfig);
+
+    const nextPageOverrides = {
+      ...(nextConfig.pages[fileName] || {}),
+    };
+    for (const field of SEO_PAGE_FIELD_DEFS) {
+      if (!Object.prototype.hasOwnProperty.call(pageOverridePatch, field.key)) continue;
+      const value = normalizeString(pageOverridePatch[field.key]);
+      if (!value) {
+        delete nextPageOverrides[field.key];
+        continue;
+      }
+      nextPageOverrides[field.key] = value;
+    }
+    if (Object.keys(nextPageOverrides).length > 0) {
+      nextConfig.pages[fileName] = nextPageOverrides;
+    } else {
+      delete nextConfig.pages[fileName];
+    }
+
+    const nextImageOverrides = {
+      ...(nextConfig.images[fileName] || {}),
+    };
+    for (const [src, altRaw] of Object.entries(imageOverridePatch)) {
+      const alt = normalizeString(altRaw);
+      if (!alt) {
+        delete nextImageOverrides[src];
+        continue;
+      }
+      nextImageOverrides[src] = alt;
+    }
+    if (Object.keys(nextImageOverrides).length > 0) {
+      nextConfig.images[fileName] = nextImageOverrides;
+    } else {
+      delete nextConfig.images[fileName];
+    }
+
+    const saved = await persistSeoConfig(nextConfig, {
+      source: 'seo-dashboard',
+      actor: normalizeString(req.body?.actor || 'dashboard'),
+    });
+    if (!saved) {
+      return res.status(500).json({ ok: false, error: 'Kon SEO wijzigingen niet opslaan.' });
+    }
+
+    appendDashboardActivity(
+      {
+        type: 'seo_page_updated',
+        title: 'SEO-instellingen opgeslagen',
+        detail: `SEO updates opgeslagen voor ${fileName}.`,
+        source: 'premium-seo',
+        actor: normalizeString(req.body?.actor || 'dashboard'),
+      },
+      'dashboard_activity_seo_updated'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      file: fileName,
+      saved: {
+        pageOverrideCount: Object.keys(saved.pages[fileName] || {}).length,
+        imageOverrideCount: Object.keys(saved.images[fileName] || {}).length,
+      },
+    });
+  } catch (error) {
+    console.error('[SEO][SaveError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'SEO wijzigingen opslaan mislukt.',
+    });
+  }
+});
+
+app.get('/api/seo/site-audit', async (_req, res) => {
+  try {
+    const audit = await buildSeoSiteAudit();
+    return res.status(200).json(audit);
+  } catch (error) {
+    console.error('[SEO][SiteAuditError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon de volledige SEO-scan niet uitvoeren.',
+    });
+  }
+});
+
+app.post('/api/seo/site-optimize', async (req, res) => {
+  try {
+    const preferredModel = normalizeSeoModelPreset(req.body?.model || req.body?.preferredModel || 'gpt-5.1');
+    const currentConfig = await getSeoConfigCached(true);
+    const currentAudit = await buildSeoSiteAudit(currentConfig);
+    const optimization = applySeoAuditSuggestionsToConfig(currentConfig, currentAudit, preferredModel);
+
+    if (optimization.changedPages.length === 0) {
+      let savedConfig = currentConfig;
+      if (normalizeSeoModelPreset(currentConfig?.automation?.preferredModel || '') !== preferredModel) {
+        const saved = await persistSeoConfig(optimization.nextConfig, {
+          source: 'seo-dashboard',
+          actor: normalizeString(req.body?.actor || 'site-optimize'),
+        });
+        if (saved) savedConfig = saved;
+      }
+      const audit = await buildSeoSiteAudit(savedConfig);
+      return res.status(200).json({
+        ok: true,
+        optimizedAt: new Date().toISOString(),
+        preferredModel,
+        changedPages: [],
+        appliedPageFieldCount: 0,
+        appliedImageAltCount: 0,
+        audit,
+        message: 'Er waren geen extra SEO-aanpassingen nodig.',
+      });
+    }
+
+    const saved = await persistSeoConfig(optimization.nextConfig, {
+      source: 'seo-dashboard',
+      actor: normalizeString(req.body?.actor || 'site-optimize'),
+    });
+    if (!saved) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Kon de AI SEO-optimalisatie niet opslaan.',
+      });
+    }
+
+    appendDashboardActivity(
+      {
+        type: 'seo_site_optimized',
+        title: 'SEO site-optimalisatie uitgevoerd',
+        detail: `${optimization.changedPages.length} pagina's geoptimaliseerd met ${preferredModel}.`,
+        source: 'premium-seo',
+        actor: normalizeString(req.body?.actor || 'site-optimize'),
+      },
+      'dashboard_activity_seo_site_optimized'
+    );
+
+    const audit = await buildSeoSiteAudit(saved);
+    return res.status(200).json({
+      ok: true,
+      optimizedAt: new Date().toISOString(),
+      preferredModel,
+      changedPages: optimization.changedPages,
+      appliedPageFieldCount: optimization.appliedPageFieldCount,
+      appliedImageAltCount: optimization.appliedImageAltCount,
+      audit,
+      message: `${optimization.changedPages.length} pagina's automatisch bijgewerkt.`,
+    });
+  } catch (error) {
+    console.error('[SEO][SiteOptimizeError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon de AI SEO-optimalisatie niet uitvoeren.',
+    });
+  }
+});
+
+app.post('/api/seo/automation', async (req, res) => {
+  try {
+    const currentConfig = await getSeoConfigCached(true);
+    const nextConfig = normalizeSeoConfig(currentConfig);
+    const automationPatch = {
+      ...(nextConfig.automation || {}),
+      updatedAt: new Date().toISOString(),
+    };
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'preferredModel') || Object.prototype.hasOwnProperty.call(req.body || {}, 'model')) {
+      automationPatch.preferredModel = req.body?.preferredModel ?? req.body?.model;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogAutomationEnabled')) {
+      automationPatch.blogAutomationEnabled = req.body?.blogAutomationEnabled;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogCadence')) {
+      automationPatch.blogCadence = req.body?.blogCadence;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogModel')) {
+      automationPatch.blogModel = req.body?.blogModel;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogAutoImages')) {
+      automationPatch.blogAutoImages = req.body?.blogAutoImages;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'searchConsoleConnected')) {
+      automationPatch.searchConsoleConnected = req.body?.searchConsoleConnected;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'analyticsConnected')) {
+      automationPatch.analyticsConnected = req.body?.analyticsConnected;
+    }
+    nextConfig.automation = normalizeSeoAutomationSettings(automationPatch);
+
+    const saved = await persistSeoConfig(nextConfig, {
+      source: 'seo-dashboard',
+      actor: normalizeString(req.body?.actor || 'automation'),
+    });
+    if (!saved) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Kon de SEO automatisering niet opslaan.',
+      });
+    }
+
+    appendDashboardActivity(
+      {
+        type: 'seo_automation_updated',
+        title: 'SEO automatisering bijgewerkt',
+        detail: `Voorkeursmodel ${saved.automation.preferredModel}, blogschema ${saved.automation.blogCadence}.`,
+        source: 'premium-seo',
+        actor: normalizeString(req.body?.actor || 'automation'),
+      },
+      'dashboard_activity_seo_automation_updated'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      automation: normalizeSeoAutomationSettings(saved.automation),
+      modelOptions: getSeoModelPresetOptions(),
+    });
+  } catch (error) {
+    console.error('[SEO][AutomationSaveError]', error?.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Kon de SEO automatisering niet opslaan.',
+    });
+  }
+});
+
+app.post('/api/dashboard/activity', (req, res) => {
+  const entry = appendDashboardActivity(
+    {
+      ...req.body,
+      source: normalizeString(req.body?.source || 'premium-personeel-dashboard'),
+      actor: normalizeString(req.body?.actor || ''),
+    },
+    'dashboard_activity_manual'
+  );
+
+  return res.status(201).json({
+    ok: true,
+    activity: entry,
+  });
+});
+
 app.get('/api/agenda/appointments', async (req, res) => {
-  const quickMode = toBooleanSafe(req.query.quick, false) || toBooleanSafe(req.query.fast, false);
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
-  if (!quickMode && isImapMailConfigured()) {
+  if (isImapMailConfigured()) {
     await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
   }
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
-  if (!quickMode) {
-    await refreshAgendaAppointmentCallSourcesIfNeeded();
-  }
+  await refreshAgendaAppointmentCallSourcesIfNeeded();
   backfillGeneratedAgendaAppointmentsMetadataIfNeeded();
-  if (!quickMode) {
-    await refreshGeneratedAgendaSummariesIfNeeded();
-  }
+  await refreshGeneratedAgendaSummariesIfNeeded();
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 200)));
   const sorted = generatedAgendaAppointments
     .filter(isGeneratedAppointmentVisibleForAgenda)
@@ -14370,16 +15832,233 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 });
 
 // Simpele healthcheck voor hosting platforms (Render/Railway).
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: 'softora-retell-coldcalling-backend',
+    supabase: {
+      enabled: isSupabaseConfigured(),
+      hydrated: supabaseStateHydrated,
+      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
+      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
 
-// ==============================================================================
-// SECTIE: Routes — System (healthz, robots, debug)
-// ==============================================================================
-// System routes (healthz, robots, security.txt, debug) → routes/system.js
+// Alias voor serverless setups waar de backend onder /api/* hangt (zoals Vercel).
+app.get('/api/healthz', (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: 'softora-retell-coldcalling-backend',
+    supabase: {
+      enabled: isSupabaseConfigured(),
+      hydrated: supabaseStateHydrated,
+      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
+      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/robots.txt', (_req, res) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  return res.status(200).send(
+    [
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /api/',
+      'Disallow: /premium-',
+      'Disallow: /personeel-',
+      'Disallow: /actieve-opdrachten',
+      'Disallow: /ai-coldmailing',
+      'Disallow: /ai-lead-generator',
+      'Disallow: /seo-crm-system',
+      '',
+    ].join('\n')
+  );
+});
+
+app.get('/.well-known/security.txt', (req, res) => {
+  const publicBaseUrl = getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  return res.status(200).send(
+    [
+      `Contact: mailto:${SECURITY_CONTACT_EMAIL || 'info@softora.nl'}`,
+      `Expires: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()}`,
+      `Canonical: ${publicBaseUrl}/.well-known/security.txt`,
+      `Preferred-Languages: nl, en`,
+      '',
+    ].join('\n')
+  );
+});
+
+function sendRuntimeHealthDebug(_req, res) {
+  return res.status(200).json({
+    ok: true,
+    timestamp: new Date().toISOString(),
+    runtime: {
+      webhookEvents: recentWebhookEvents.length,
+      callUpdates: recentCallUpdates.length,
+      aiCallInsights: recentAiCallInsights.length,
+      securityAuditEvents: recentSecurityAuditEvents.length,
+      appointments: generatedAgendaAppointments.length,
+      realCallUpdates: recentCallUpdates.filter((item) => {
+        const callId = normalizeString(item?.callId || '');
+        return callId && !callId.startsWith('demo-');
+      }).length,
+    },
+    supabase: {
+      enabled: isSupabaseConfigured(),
+      hydrated: supabaseStateHydrated,
+      hydrateRetryNotBeforeMs: supabaseHydrateRetryNotBeforeMs,
+      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
+      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
+      host: redactSupabaseUrlForDebug(SUPABASE_URL),
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      lastHydrateError: supabaseLastHydrateError || null,
+      lastPersistError: supabaseLastPersistError || null,
+      lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
+      callUpdateStateKeyPrefix: SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX,
+    },
+    mail: {
+      smtpConfigured: isSmtpMailConfigured(),
+      imapConfigured: isImapMailConfigured(),
+      imapMailbox: isImapMailConfigured() ? MAIL_IMAP_MAILBOX : null,
+      imapPollCooldownMs: MAIL_IMAP_POLL_COOLDOWN_MS,
+      imapNextPollAfterMs: inboundConfirmationMailSyncNotBeforeMs,
+      imapLastSync: inboundConfirmationMailSyncLastResult || null,
+    },
+  });
+}
+
+app.get('/api/debug/runtime-health', requireRuntimeDebugAccess, sendRuntimeHealthDebug);
+app.get('/api/runtime-health', requireRuntimeDebugAccess, sendRuntimeHealthDebug);
+
+/* app.get('/api/debug/runtime-health', (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    timestamp: new Date().toISOString(),
+    runtime: {
+      webhookEvents: recentWebhookEvents.length,
+      callUpdates: recentCallUpdates.length,
+      aiCallInsights: recentAiCallInsights.length,
+      appointments: generatedAgendaAppointments.length,
+      realCallUpdates: recentCallUpdates.filter((item) => {
+        const callId = normalizeString(item?.callId || '');
+        return callId && !callId.startsWith('demo-');
+      }).length,
+    },
+    supabase: {
+      enabled: isSupabaseConfigured(),
+      hydrated: supabaseStateHydrated,
+      hydrateRetryNotBeforeMs: supabaseHydrateRetryNotBeforeMs,
+      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
+      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
+      host: redactSupabaseUrlForDebug(SUPABASE_URL),
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      lastHydrateError: supabaseLastHydrateError || null,
+      lastPersistError: supabaseLastPersistError || null,
+    },
+  });
+}); */
+
+app.get('/api/supabase-probe', requireRuntimeDebugAccess, async (_req, res) => {
+  if (!isSupabaseConfigured()) {
+    return res.status(200).json({
+      ok: false,
+      configured: false,
+      error: 'Supabase niet geconfigureerd.',
+    });
+  }
+
+  const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/${encodeURIComponent(
+    SUPABASE_STATE_TABLE
+  )}?select=state_key&limit=1`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
+
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = truncateText(text, 800);
+    }
+
+    return res.status(200).json({
+      ok: response.ok,
+      configured: true,
+      status: response.status,
+      supabaseHost: redactSupabaseUrlForDebug(SUPABASE_URL),
+      table: SUPABASE_STATE_TABLE,
+      stateKey: SUPABASE_STATE_KEY,
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      body,
+    });
+  } catch (error) {
+    return res.status(200).json({
+      ok: false,
+      configured: true,
+      status: null,
+      supabaseHost: redactSupabaseUrlForDebug(SUPABASE_URL),
+      table: SUPABASE_STATE_TABLE,
+      stateKey: SUPABASE_STATE_KEY,
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      error: truncateText(error?.message || String(error), 500),
+    });
+  }
+});
+
+app.post('/api/runtime-sync-now', requireRuntimeDebugAccess, async (_req, res) => {
+  const before = {
+    hydrated: supabaseStateHydrated,
+    lastHydrateError: supabaseLastHydrateError || null,
+    lastPersistError: supabaseLastPersistError || null,
+    lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
+  };
+
+  const persistOk = await persistRuntimeStateToSupabase('debug_runtime_sync_now');
+
+  // Forceer een nieuwe hydrate-attempt op deze instance voor directe diagnose.
+  supabaseStateHydrated = false;
+  supabaseHydrateRetryNotBeforeMs = 0;
+
+  const hydratedOk = await ensureRuntimeStateHydratedFromSupabase();
+
+  return res.status(200).json({
+    ok: Boolean(persistOk && hydratedOk),
+    before,
+    after: {
+      hydrated: supabaseStateHydrated,
+      lastHydrateError: supabaseLastHydrateError || null,
+      lastPersistError: supabaseLastPersistError || null,
+      lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
+      counts: {
+        webhookEvents: recentWebhookEvents.length,
+        callUpdates: recentCallUpdates.length,
+        aiCallInsights: recentAiCallInsights.length,
+        appointments: generatedAgendaAppointments.length,
+      },
+    },
+    persistOk,
+    hydratedOk,
+    supabase: {
+      host: redactSupabaseUrlForDebug(SUPABASE_URL),
+      table: SUPABASE_STATE_TABLE,
+      stateKey: SUPABASE_STATE_KEY,
+    },
+  });
+});
+
 // API routes eerst, daarna statische frontend assets/html serveren.
-
-// ==============================================================================
-// SECTIE: Statische Bestanden & HTML Pagina Routing
-// ==============================================================================
 app.use(
   '/assets',
   express.static(path.join(__dirname, 'assets'), {
@@ -14563,125 +16242,6 @@ function seedDemoConfirmationTaskForUiTesting() {
   console.log('[Startup] Demo bevestigingstaak toegevoegd voor UI-testen.');
 }
 
-
-function requirePremiumAdminApiAccess(req, res, next) {
-  const authState = req.premiumAuth || null;
-  if (!authState || !authState.authenticated) {
-    return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
-  }
-  if (!authState.isAdmin) {
-    return res.status(403).json({ ok: false, error: 'Alleen administrators hebben toegang.' });
-  }
-  return next();
-}
-
-// ==============================================================================
-// SECTIE: Route modules registreren
-// ==============================================================================
-// Context-object met alle gedeelde functies en state voor route-modules.
-// Let-variabelen worden via getters/setters doorgegeven zodat route-modules
-// altijd de actuele waarde lezen, niet een snapshot.
-const routeCtx = {
-  // Utilities (lib/utils.js)
-  parseIntSafe, parseNumberSafe, normalizeString, escapeHtml, truncateText, clipText,
-
-  // State collections (lib/state.js)
-  recentWebhookEvents, recentCallUpdates, callUpdatesById, retellCallStatusRefreshByCallId,
-  recentAiCallInsights, aiCallInsightsByCallId, aiAnalysisFingerprintByCallId, aiAnalysisInFlightCallIds,
-  recentDashboardActivities, recentSecurityAuditEvents, inMemoryUiStateByScope,
-  generatedAgendaAppointments, agendaAppointmentIdByCallId,
-  dismissedInterestedLeadCallIds, dismissedInterestedLeadKeys, leadOwnerAssignmentsByCallId,
-  sequentialDispatchQueues, sequentialDispatchQueueIdByCallId,
-
-  // Supabase functies
-  isSupabaseConfigured, getSupabaseClient,
-  fetchSupabaseRowByKeyViaRest, upsertSupabaseRowViaRest,
-
-  // Supabase constanten
-  SUPABASE_STATE_TABLE, SUPABASE_STATE_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-  SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX, UI_STATE_SCOPE_PREFIX,
-
-  // UI State functies
-  normalizeUiStateScope, sanitizeUiStateValues, getUiStateValues, setUiStateValues,
-
-  // Auth functies
-  getResolvedPremiumAuthState, buildPremiumAuthSessionPayload,
-  clearPremiumSessionCookie, createPremiumSessionToken, setPremiumSessionCookie,
-  normalizePremiumSessionEmail, getSafePremiumRedirectPath,
-  getClientIpFromRequest, getRequestPathname, getRequestOriginFromHeaders,
-  appendSecurityAuditEvent, isPremiumAdminIpAllowed,
-  isPremiumMfaConfigured, isPremiumMfaCodeValid,
-  isPremiumPublicApiRequest, parsePremiumProfileDisplayName,
-  premiumUsersStore,
-  PREMIUM_SESSION_SECRET, PREMIUM_SESSION_TTL_HOURS, PREMIUM_SESSION_REMEMBER_TTL_DAYS,
-
-  // Coldcalling functies
-  validateStartPayload, processColdcallingLead,
-  createSequentialDispatchQueue, advanceSequentialDispatchQueue,
-  waitForQueuedRuntimeStatePersist, sendColdcallingStatusResponse,
-  resolveColdcallingProviderForCampaign, getMissingEnvVars, sleep,
-  isTwilioStatusApiConfigured, extractTwilioRecordingSidFromUrl,
-  fetchTwilioRecordingsByCallId, choosePreferredTwilioRecording,
-  buildTwilioRecordingMediaUrl, buildTwilioRecordingProxyUrl, getTwilioBasicAuthorizationHeader,
-  isRetellWebhookAuthorized, extractCallUpdateFromRetellPayload, triggerPostCallAutomation,
-  syncRuntimeStateFromSupabaseIfNewer, syncCallUpdatesFromSupabaseRows,
-  shouldRefreshRetellCallStatus, collectMissingCallUpdateRefreshCandidates,
-  refreshCallUpdateFromRetellStatusApi, refreshCallUpdateFromTwilioStatusApi,
-  VERBOSE_CALL_WEBHOOK_LOGS, RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS,
-
-  // SEO functies
-  SEO_PAGE_FIELD_DEFS,
-  getSeoEditableHtmlFiles, getSeoConfigCached, persistSeoConfig,
-  readHtmlPageContent, extractSeoSourceFromHtml,
-  normalizeSeoStoredPageOverrides, normalizeSeoStoredImageOverrides,
-  mergeSeoSourceWithOverrides, extractImageEntriesFromHtml,
-  resolveSeoPageFileFromRequest, normalizeSeoPageOverridePatch, normalizeSeoImageOverridePatch,
-  normalizeSeoConfig, buildSeoSiteAudit, applySeoAuditSuggestionsToConfig,
-  normalizeSeoModelPreset, normalizeSeoAutomationSettings, getSeoModelPresetOptions,
-
-  // Server functies
-  appendDashboardActivity, requireRuntimeDebugAccess, requirePremiumAdminApiAccess,
-  getEffectivePublicBaseUrl, redactSupabaseUrlForDebug,
-  isSmtpMailConfigured, isImapMailConfigured,
-  persistRuntimeStateToSupabase, ensureRuntimeStateHydratedFromSupabase,
-
-  // Constanten
-  SECURITY_CONTACT_EMAIL, MAIL_IMAP_MAILBOX, MAIL_IMAP_POLL_COOLDOWN_MS,
-
-  // Getters/setters voor mutable let-variabelen
-  getSupabaseStateHydrated: () => supabaseStateHydrated,
-  setSupabaseStateHydrated: (v) => { supabaseStateHydrated = v; },
-  getSupabaseHydrateRetryNotBeforeMs: () => supabaseHydrateRetryNotBeforeMs,
-  setSupabaseHydrateRetryNotBeforeMs: (v) => { supabaseHydrateRetryNotBeforeMs = v; },
-  getSupabaseLastHydrateError: () => supabaseLastHydrateError,
-  getSupabaseLastPersistError: () => supabaseLastPersistError,
-  getSupabaseLastCallUpdatePersistError: () => supabaseLastCallUpdatePersistError,
-  getInboundConfirmationMailSyncNotBeforeMs: () => inboundConfirmationMailSyncNotBeforeMs,
-  getInboundConfirmationMailSyncLastResult: () => inboundConfirmationMailSyncLastResult,
-};
-
-require('./routes/auth')(app, routeCtx);
-require('./routes/premium-users')(app, routeCtx);
-require('./routes/ui-state')(app, routeCtx);
-require('./routes/dashboard')(app, routeCtx);
-require('./routes/system')(app, routeCtx);
-require('./routes/seo')(app, routeCtx);
-require('./routes/coldcalling')(app, routeCtx);
-
-// ==============================================================================
-// SECTIE: Global Error Handler
-// ==============================================================================
-// Global error handler — vangt onverwachte fouten op zonder stack trace te lekken
-app.use((err, req, res, _next) => {
-  console.error('[UnhandledError]', err?.message || err, { path: req?.path, method: req?.method });
-  if (res.headersSent) return;
-  res.status(500).json({ ok: false, error: 'Er is een onverwachte fout opgetreden.' });
-});
-
-
-// ==============================================================================
-// SECTIE: Server Startup
-// ==============================================================================
 // In serverless (zoals Vercel) wordt startServer() niet aangeroepen, dus seed de
 // demo-taak ook bij module-load. De functie is idempotent op basis van callId.
 seedDemoConfirmationTaskForUiTesting();
