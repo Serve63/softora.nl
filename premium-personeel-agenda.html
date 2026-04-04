@@ -798,15 +798,8 @@
                 <div class="modal-workspace-status" id="workspaceVoiceStatus"></div>
                 <div class="modal-workspace-grid">
                     <div class="modal-workspace-field">
-                        <input class="modal-workspace-input" id="workspaceDomain" type="text" placeholder="Bijv. salonnova.nl" autocomplete="off">
-                    </div>
-                    <div class="modal-workspace-field">
-                        <div class="modal-workspace-label">Notities meeting & foto's</div>
+                        <div class="modal-workspace-label">Notities meeting</div>
                         <textarea id="workspaceTranscript" placeholder="Zet hier alle meetingnotities: doelen, wensen, stijl, functionaliteiten, planning, budget, bijzonderheden..."></textarea>
-                        <div class="modal-workspace-field-actions">
-                            <button class="workspace-attachment-btn magnetic" id="referencePhotosBtn" type="button">Foto's toevoegen</button>
-                            <input class="workspace-file-input" id="referencePhotosInput" type="file" accept="image/*" multiple>
-                        </div>
                         <div class="workspace-attachments" id="workspaceAttachmentsBlock" hidden>
                             <div class="workspace-attachments-grid" id="workspaceAttachmentsList"></div>
                         </div>
@@ -946,8 +939,6 @@
     const workspaceSaveStatusEl = document.getElementById('workspaceSaveStatus');
     const notesImageUploadBtn = document.getElementById('notesImageUploadBtn');
     const notesImageUploadInput = document.getElementById('notesImageUploadInput');
-    const referencePhotosBtn = document.getElementById('referencePhotosBtn');
-    const referencePhotosInput = document.getElementById('referencePhotosInput');
     const workspaceAttachmentsBlock = document.getElementById('workspaceAttachmentsBlock');
     const workspaceAttachmentsList = document.getElementById('workspaceAttachmentsList');
     const customerDbReminderEl = document.getElementById('customerDbReminder');
@@ -1501,7 +1492,7 @@
         }
 
         modalPrimaryBtn.textContent = 'Opdracht aanmaken';
-        modalPrimaryBtn.disabled = workspaceBusy || !hasWorkspaceNotesReady();
+        modalPrimaryBtn.disabled = workspaceBusy;
     }
 
     async function markActiveAppointmentNoDeal() {
@@ -1774,7 +1765,6 @@
 
         workspaceBusy = true;
         refreshWorkspacePrimaryButtonLabel();
-        if (referencePhotosBtn) referencePhotosBtn.disabled = true;
         setVoiceStatus('Bijlagen verwerken...', '');
 
         try {
@@ -1792,9 +1782,7 @@
             setVoiceStatus(`Bijlagen toevoegen mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
         } finally {
             workspaceBusy = false;
-            if (referencePhotosBtn) referencePhotosBtn.disabled = false;
             refreshWorkspacePrimaryButtonLabel();
-            if (referencePhotosInput) referencePhotosInput.value = '';
         }
     }
 
@@ -2097,7 +2085,6 @@
 
     function closeModal() {
         if (notesImageUploadInput) notesImageUploadInput.value = '';
-        if (referencePhotosInput) referencePhotosInput.value = '';
         if (modalAudioPlayer) {
             modalAudioPlayer.pause();
         }
@@ -2140,17 +2127,6 @@
             const file = event?.target?.files?.[0] || null;
             if (!file) return;
             void handleNotesImageUpload(file);
-        });
-    }
-    if (referencePhotosBtn && referencePhotosInput) {
-        referencePhotosBtn.addEventListener('click', () => {
-            if (workspaceBusy) return;
-            referencePhotosInput.click();
-        });
-        referencePhotosInput.addEventListener('change', (event) => {
-            const files = event?.target?.files || [];
-            if (!files || !files.length) return;
-            void addReferencePhotoFiles(files);
         });
     }
     if (workspaceDomainEl) {
