@@ -1144,7 +1144,7 @@
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
-            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v1';
+            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v2';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
             const leadDetailLoadPromiseById = Object.create(null);
@@ -1308,6 +1308,14 @@
                 return '';
             }
 
+            function looksLikeAgendaConfirmationSummary(value) {
+                const text = normalize(String(value || ''));
+                if (!text) return false;
+                return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie)/.test(
+                    text
+                );
+            }
+
             function readSharedCallSummaryCache() {
                 try {
                     const raw = String(window.localStorage.getItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY) || '').trim();
@@ -1395,21 +1403,14 @@
             }
 
             function buildCallBackedModalSourceText(lead, interestedLead, update, insight) {
-                const appointmentDate = String(interestedLead?.date || lead?.date || '').trim();
-                const appointmentTime = normalizeTimeValue(interestedLead?.time || lead?.time || '');
-                const appointmentLocation = String(interestedLead?.location || lead?.location || '').trim();
                 return [
-                    appointmentDate || appointmentTime
-                        ? `Afspraakmoment: ${[appointmentDate, appointmentTime].filter(Boolean).join(' ')}`
-                        : '',
-                    appointmentLocation ? `Locatie: ${appointmentLocation}` : '',
-                    interestedLead?.summary,
-                    interestedLead?.whatsappInfo,
-                    insight?.summary,
-                    insight?.followUpReason,
+                    update?.transcriptFull,
                     update?.summary,
                     update?.transcriptSnippet,
-                    update?.transcriptFull,
+                    insight?.summary,
+                    insight?.followUpReason,
+                    interestedLead?.summary,
+                    interestedLead?.whatsappInfo,
                     lead?.summary,
                 ]
                     .map((value) => String(value || '').trim())
@@ -1418,26 +1419,103 @@
             }
 
             function getCallBackedModalFallbackSummary(lead, interestedLead, update, insight) {
-                return (
-                    pickReadableSummary(
-                        interestedLead?.summary,
-                        insight?.summary,
-                        insight?.followUpReason,
-                        interestedLead?.whatsappInfo,
-                        lead?.summary,
-                        update?.transcriptSnippet,
-                        update?.transcriptFull
-                    ) || ''
+                const preferred = pickReadableSummary(
+                    update?.summary,
+                    insight?.summary,
+                    update?.transcriptSnippet,
+                    interestedLead?.summary,
+                    insight?.followUpReason,
+                    lead?.summary,
+                    update?.transcriptFull
                 );
+                return looksLikeAgendaConfirmationSummary(preferred) ? '' : preferred || '';
+            }
+
+            function getCallBackedModalFallbackSummaryFromDetail(lead, detail) {
+                const preferred = pickReadableSummary(
+                    detail?.callSummary,
+                    detail?.aiSummary,
+                    detail?.transcriptSnippet,
+                    detail?.summary,
+                    detail?.followUpReason,
+                    lead?.summary,
+                    detail?.transcript
+                );
+                return looksLikeAgendaConfirmationSummary(preferred) ? '' : preferred || '';
+            }
+
+            function buildCallBackedLeadDetail(lead, interestedLead, update, insight) {
+                const callId = String(
+                    lead?.callId || interestedLead?.callId || update?.callId || insight?.callId || insight?.call_id || ''
+                ).trim();
+                const fallbackRecordingUrl = callId
+                    ? `/api/coldcalling/recording-proxy?callId=${encodeURIComponent(callId)}`
+                    : '';
+                return {
+                    callId,
+                    summary: String(interestedLead?.summary || lead?.summary || '').trim(),
+                    callSummary: String(update?.summary || '').trim(),
+                    aiSummary: String(insight?.summary || '').trim(),
+                    followUpReason: String(insight?.followUpReason || interestedLead?.whatsappInfo || '').trim(),
+                    transcript: String(update?.transcriptFull || '').trim(),
+                    transcriptSnippet: String(update?.transcriptSnippet || '').trim(),
+                    date: String(interestedLead?.date || lead?.date || '').trim(),
+                    time: normalizeTimeValue(interestedLead?.time || lead?.time || ''),
+                    location: String(interestedLead?.location || lead?.location || '').trim(),
+                    whatsappInfo: String(interestedLead?.whatsappInfo || lead?.whatsappInfo || '').trim(),
+                    recordingUrl: pickRecordingUrl(
+                        update?.recordingUrl,
+                        update?.recording_url,
+                        update?.recordingUrlProxy,
+                        update?.audioUrl,
+                        update?.audio_url,
+                        interestedLead?.recordingUrl,
+                        interestedLead?.recording_url,
+                        interestedLead?.recordingUrlProxy,
+                        interestedLead?.audioUrl,
+                        interestedLead?.audio_url,
+                        lead?.recordingUrl,
+                        lead?.recording_url,
+                        lead?.recordingUrlProxy,
+                        lead?.audioUrl,
+                        lead?.audio_url,
+                        fallbackRecordingUrl
+                    ),
+                };
+            }
+
+            async function ensureCallBackedLeadDetail(taskId, lead) {
+                const id = Number(taskId) || 0;
+                const cacheKey = String(id || `call:${String(lead?.callId || '').trim()}`);
+                const callId = String(lead?.callId || '').trim();
+                if (!callId) return null;
+                if (leadDetailsById[cacheKey]) return leadDetailsById[cacheKey];
+                if (leadDetailLoadPromiseById[cacheKey]) return leadDetailLoadPromiseById[cacheKey];
+
+                const run = (async () => {
+                    const sources = await ensureCallBackedLeadSources();
+                    const interestedLead = getLatestCallBackedSourceItemByCallId(sources?.interestedLeads, callId);
+                    const update = getLatestCallBackedSourceItemByCallId(sources?.updates, callId);
+                    const insight = getLatestCallBackedSourceItemByCallId(sources?.insights, callId);
+                    const detail = buildCallBackedLeadDetail(lead, interestedLead, update, insight);
+                    leadDetailsById[cacheKey] = detail;
+                    return detail;
+                })().finally(() => {
+                    delete leadDetailLoadPromiseById[cacheKey];
+                });
+
+                leadDetailLoadPromiseById[cacheKey] = run;
+                return run;
             }
 
             function buildModalSourceText(lead, detail) {
                 return [
                     detail?.transcript,
                     detail?.transcriptSnippet,
-                    detail?.summary,
                     detail?.callSummary,
                     detail?.aiSummary,
+                    detail?.followUpReason,
+                    detail?.summary,
                     lead?.summary,
                 ]
                     .map((value) => String(value || '').trim())
@@ -1485,7 +1563,7 @@
                 return String(result?.summary || '').trim();
             }
 
-            async function ensureCallBackedModalCopy(taskId, lead) {
+            async function ensureCallBackedModalCopy(taskId, lead, detail) {
                 const id = Number(taskId) || 0;
                 const cacheKey = String(id || `call:${String(lead?.callId || '').trim()}`);
                 const callId = String(lead?.callId || '').trim();
@@ -1496,7 +1574,7 @@
                 }
 
                 const sharedSummary = getSharedCallSummary(callId);
-                if (sharedSummary) {
+                if (sharedSummary && !looksLikeAgendaConfirmationSummary(sharedSummary)) {
                     leadAiCopyById[cacheKey] = { summaryText: sharedSummary };
                     return sharedSummary;
                 }
@@ -1506,27 +1584,31 @@
                 }
 
                 const run = (async () => {
-                    const sources = await ensureCallBackedLeadSources();
-                    const interestedLead = getLatestCallBackedSourceItemByCallId(sources?.interestedLeads, callId);
-                    const update = getLatestCallBackedSourceItemByCallId(sources?.updates, callId);
-                    const insight = getLatestCallBackedSourceItemByCallId(sources?.insights, callId);
-                    const fallbackSummary = getCallBackedModalFallbackSummary(lead, interestedLead, update, insight);
+                    const resolvedDetail = detail || (await ensureCallBackedLeadDetail(taskId, lead)) || {};
+                    const fallbackSummary = getCallBackedModalFallbackSummaryFromDetail(lead, resolvedDetail);
                     const readableLeadSummary = pickReadableSummary(
-                        interestedLead?.summary,
-                        insight?.summary,
-                        insight?.followUpReason
+                        resolvedDetail?.callSummary,
+                        resolvedDetail?.aiSummary,
+                        resolvedDetail?.transcriptSnippet,
+                        resolvedDetail?.summary,
+                        resolvedDetail?.followUpReason
                     );
-                    if (readableLeadSummary && readableLeadSummary.length >= 160) {
+                    if (
+                        readableLeadSummary &&
+                        readableLeadSummary.length >= 160 &&
+                        !looksLikeAgendaConfirmationSummary(readableLeadSummary)
+                    ) {
                         leadAiCopyById[cacheKey] = { summaryText: readableLeadSummary };
                         setSharedCallSummary(callId, readableLeadSummary);
                         return readableLeadSummary;
                     }
 
-                    const sourceText = buildCallBackedModalSourceText(lead, interestedLead, update, insight);
+                    const sourceText = buildModalSourceText(lead, resolvedDetail);
                     const shouldRewrite =
                         !fallbackSummary ||
                         fallbackSummary === 'Samenvatting volgt na verwerking van het gesprek.' ||
-                        fallbackSummary.length < 160;
+                        fallbackSummary.length < 160 ||
+                        looksLikeAgendaConfirmationSummary(fallbackSummary);
                     if (!shouldRewrite || sourceText.length < 24) {
                         const preferredSummary = fallbackSummary || '';
                         if (preferredSummary) {
@@ -1537,12 +1619,18 @@
 
                     const mergedRaw = await summarizeWithAi(sourceText, {
                         style: 'medium',
-                        maxSentences: 5,
+                        maxSentences: 4,
                         extraInstructions:
-                            'Schrijf uitsluitend in natuurlijk Nederlands. Gebruik geen Engels behalve onvermijdelijke eigennamen, merknamen, productnamen, URLs of exacte onvertaalbare termen. Schrijf voor een accountmanager van Softora. Geef een korte, efficiënte samenvatting in doorlopende tekst. Verwerk uitkomst, afspraken, datum/tijd, locatie en vervolgactie in dezelfde tekst als dat bekend is. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de afgesproken vervolgstap als die er is. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
                     });
 
-                    const summaryText = pickReadableSummary(mergedRaw) || fallbackSummary || '';
+                    const rewrittenSummary = pickReadableSummary(mergedRaw);
+                    const summaryText =
+                        (rewrittenSummary && !looksLikeAgendaConfirmationSummary(rewrittenSummary)
+                            ? rewrittenSummary
+                            : '') ||
+                        fallbackSummary ||
+                        '';
                     if (summaryText) {
                         leadAiCopyById[cacheKey] = { summaryText };
                         setSharedCallSummary(callId, summaryText);
@@ -1577,12 +1665,13 @@
                 const run = (async () => {
                     const mergedRaw = await summarizeWithAi(sourceText, {
                         style: 'medium',
-                        maxSentences: 5,
+                        maxSentences: 4,
                         extraInstructions:
-                            'Schrijf uitsluitend in natuurlijk Nederlands. Gebruik geen Engels behalve onvermijdelijke eigennamen, merknamen, productnamen, URLs of exacte onvertaalbare termen. Schrijf voor een accountmanager van Softora. Geef een korte, efficiënte samenvatting in doorlopende tekst. Verwerk uitkomst, afspraken, datum/tijd, locatie en vervolgactie in dezelfde tekst als dat bekend is. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de afgesproken vervolgstap als die er is. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
                     });
 
-                    const summaryText = sanitizeConversationCopy(mergedRaw);
+                    const rewrittenSummary = sanitizeConversationCopy(mergedRaw);
+                    const summaryText = looksLikeAgendaConfirmationSummary(rewrittenSummary) ? '' : rewrittenSummary;
 
                     leadAiCopyById[cacheKey] = {
                         summaryText: summaryText || '',
@@ -1747,12 +1836,15 @@
                 const preferredSummary = String(options?.summaryText || '').trim();
 
                 const readableSummary = pickReadableSummary(
-                    detail?.aiSummary,
                     detail?.callSummary,
+                    detail?.aiSummary,
+                    detail?.transcriptSnippet,
                     detail?.summary,
                     lead?.summary
                 );
-                const fallbackSummary = readableSummary || 'Samenvatting volgt na verwerking van het gesprek.';
+                const fallbackSummary =
+                    (!looksLikeAgendaConfirmationSummary(readableSummary) ? readableSummary : '') ||
+                    'Samenvatting volgt na verwerking van het gesprek.';
                 const fallbackAgreements = buildFallbackAgreementsText(lead, detail);
                 const fallbackCombined = [fallbackSummary, fallbackAgreements]
                     .filter(Boolean)
@@ -1859,9 +1951,13 @@
                 };
 
                 if (!hasPersistedTask || isCallBackedLead) {
-                    const summaryText = isCallBackedLead ? await ensureCallBackedModalCopy(normalizedTaskId, lead) : '';
+                    const callBackedDetail = isCallBackedLead ? await ensureCallBackedLeadDetail(normalizedTaskId, lead) : null;
                     if (openSeq !== modalOpenSequence) return;
-                    renderLeadDetailsInModal(lead, null, normalizedTaskId, { summaryText });
+                    const summaryText = isCallBackedLead
+                        ? await ensureCallBackedModalCopy(normalizedTaskId, lead, callBackedDetail)
+                        : '';
+                    if (openSeq !== modalOpenSequence) return;
+                    renderLeadDetailsInModal(lead, callBackedDetail, normalizedTaskId, { summaryText });
                     await ensureMinimumLoader(summaryText ? 500 : 250);
                     if (openSeq !== modalOpenSequence) return;
                     setModalLoading(false);

@@ -24,7 +24,7 @@
   const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
   const LEAD_DATABASE_OVERRIDES_STORAGE_KEY = 'softora_coldcalling_lead_database_overrides_json';
-  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v1';
+  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v2';
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const STATS_RESET_BASELINE_STORAGE_KEY = 'softora_stats_reset_baseline_started';
@@ -133,6 +133,14 @@
       if (cleaned) return cleaned;
     }
     return '';
+  }
+
+  function looksLikeAgendaConfirmationSummary(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie)/.test(
+      text
+    );
   }
 
   async function summarizeConversationTextNl(text, options = {}) {
@@ -4176,21 +4184,14 @@
     }
 
     function buildLeadDatabaseCallSummarySourceText(call, insight, interestedLead) {
-      const appointmentDate = normalizeFreeText(interestedLead?.date || '');
-      const appointmentTime = normalizeFreeText(interestedLead?.time || '');
-      const appointmentLocation = normalizeFreeText(interestedLead?.location || '');
       return [
-        appointmentDate || appointmentTime
-          ? `Afspraakmoment: ${[appointmentDate, appointmentTime].filter(Boolean).join(' ')}`
-          : '',
-        appointmentLocation ? `Locatie: ${appointmentLocation}` : '',
-        interestedLead?.summary,
-        interestedLead?.whatsappInfo,
-        insight?.summary,
-        insight?.followUpReason,
+        call?.transcriptFull,
         call?.summary,
         call?.transcriptSnippet,
-        call?.transcriptFull,
+        insight?.summary,
+        insight?.followUpReason,
+        interestedLead?.summary,
+        interestedLead?.whatsappInfo,
       ]
         .map((value) => String(value || '').trim())
         .filter(Boolean)
@@ -4199,14 +4200,14 @@
 
     function getLeadDatabaseCallSummaryFallback(call, insight, interestedLead) {
       const readableSummary = pickReadableConversationSummary(
-        interestedLead?.summary,
+        call?.summary,
         insight?.summary,
-        insight?.followUpReason,
-        interestedLead?.whatsappInfo,
         call?.transcriptSnippet,
+        interestedLead?.summary,
+        insight?.followUpReason,
         call?.transcriptFull
       );
-      if (readableSummary) return readableSummary;
+      if (readableSummary && !looksLikeAgendaConfirmationSummary(readableSummary)) return readableSummary;
       return 'Samenvatting volgt na verwerking van het gesprek.';
     }
 
@@ -4215,17 +4216,22 @@
       const insight = getCallInsightRecord(normalizedCallId);
       const interestedLead = getInterestedLeadRecord(normalizedCallId);
       const sharedSummary = getSharedCallSummary(normalizedCallId);
-      if (sharedSummary) {
+      if (sharedSummary && !looksLikeAgendaConfirmationSummary(sharedSummary)) {
         callDetailSummaryByCallId.set(normalizedCallId, sharedSummary);
         return sharedSummary;
       }
       const fallbackSummary = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
       const readableLeadSummary = pickReadableConversationSummary(
-        interestedLead?.summary,
+        call?.summary,
         insight?.summary,
+        call?.transcriptSnippet,
+        interestedLead?.summary,
         insight?.followUpReason
       );
-      const leadSummaryLooksStrong = readableLeadSummary && readableLeadSummary.length >= 160;
+      const leadSummaryLooksStrong =
+        readableLeadSummary &&
+        readableLeadSummary.length >= 160 &&
+        !looksLikeAgendaConfirmationSummary(readableLeadSummary);
       if (leadSummaryLooksStrong) {
         callDetailSummaryByCallId.set(normalizedCallId, readableLeadSummary);
         setSharedCallSummary(normalizedCallId, readableLeadSummary);
@@ -4236,7 +4242,8 @@
       const shouldRewrite =
         !fallbackSummary ||
         fallbackSummary === 'Samenvatting volgt na verwerking van het gesprek.' ||
-        fallbackSummary.length < 160;
+        fallbackSummary.length < 160 ||
+        looksLikeAgendaConfirmationSummary(fallbackSummary);
       if (!shouldRewrite || sourceText.length < 24 || !normalizedCallId) {
         return fallbackSummary;
       }
@@ -4250,12 +4257,16 @@
 
       const run = summarizeConversationTextNl(sourceText, {
         style: 'medium',
-        maxSentences: 5,
+        maxSentences: 4,
         extraInstructions:
-          'Schrijf uitsluitend in natuurlijk Nederlands. Gebruik geen Engels behalve onvermijdelijke eigennamen, merknamen, productnamen, URLs of exacte onvertaalbare termen. Schrijf voor een accountmanager van Softora. Geef een korte, efficiënte samenvatting in doorlopende tekst. Verwerk uitkomst, afspraken, datum/tijd, locatie en vervolgactie in dezelfde tekst als dat bekend is. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+          'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de afgesproken vervolgstap als die er is. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
       })
         .then((summaryText) => {
-          const cleanedSummary = pickReadableConversationSummary(summaryText) || fallbackSummary;
+          const rewrittenSummary = pickReadableConversationSummary(summaryText);
+          const cleanedSummary =
+            (rewrittenSummary && !looksLikeAgendaConfirmationSummary(rewrittenSummary)
+              ? rewrittenSummary
+              : '') || fallbackSummary;
           if (cleanedSummary) {
             callDetailSummaryByCallId.set(normalizedCallId, cleanedSummary);
             setSharedCallSummary(normalizedCallId, cleanedSummary);
