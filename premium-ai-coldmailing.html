@@ -1558,6 +1558,46 @@
                 };
             }
 
+            function mergeLeadModalDetailSources(preferred, secondary) {
+                const primary = preferred && typeof preferred === 'object' ? preferred : {};
+                const fallback = secondary && typeof secondary === 'object' ? secondary : {};
+                const mergedConversationSummary = pickReadableSummary(
+                    primary?.conversationSummary,
+                    fallback?.conversationSummary,
+                    primary?.summary,
+                    fallback?.summary
+                );
+
+                return {
+                    ...fallback,
+                    ...primary,
+                    callId: resolveLeadCallId(primary, fallback) || resolveLeadCallId(fallback, primary),
+                    summary: String(primary?.summary || fallback?.summary || '').trim(),
+                    conversationSummary: mergedConversationSummary || '',
+                    callSummary: String(primary?.callSummary || fallback?.callSummary || '').trim(),
+                    aiSummary: String(primary?.aiSummary || fallback?.aiSummary || '').trim(),
+                    followUpReason: String(primary?.followUpReason || fallback?.followUpReason || '').trim(),
+                    transcript: String(primary?.transcript || fallback?.transcript || '').trim(),
+                    transcriptSnippet: String(primary?.transcriptSnippet || fallback?.transcriptSnippet || '').trim(),
+                    date: String(primary?.date || fallback?.date || '').trim(),
+                    time: normalizeTimeValue(primary?.time || fallback?.time || ''),
+                    location: String(primary?.location || fallback?.location || '').trim(),
+                    whatsappInfo: String(primary?.whatsappInfo || fallback?.whatsappInfo || '').trim(),
+                    recordingUrl: pickRecordingUrl(
+                        primary?.recordingUrl,
+                        primary?.recording_url,
+                        primary?.recordingUrlProxy,
+                        primary?.audioUrl,
+                        primary?.audio_url,
+                        fallback?.recordingUrl,
+                        fallback?.recording_url,
+                        fallback?.recordingUrlProxy,
+                        fallback?.audioUrl,
+                        fallback?.audio_url
+                    ),
+                };
+            }
+
             async function ensureCallBackedLeadDetail(taskId, lead) {
                 const id = Number(taskId) || 0;
                 const callId = resolveLeadCallId(lead);
@@ -2046,13 +2086,78 @@
                 };
 
                 if (!hasPersistedTask || isCallBackedLead) {
-                    const callBackedDetail = isCallBackedLead ? await ensureCallBackedLeadDetail(normalizedTaskId, lead) : null;
+                    let taskDetail = null;
+                    if (hasPersistedTask) {
+                        try {
+                            taskDetail = await ensureTaskDetailLoaded(normalizedTaskId);
+                        } catch (error) {
+                            taskDetail = null;
+                        }
+                        if (openSeq !== modalOpenSequence) return;
+                    }
+
+                    const recoveredCallId = resolveLeadCallId(lead, taskDetail);
+                    const recoveredLead = recoveredCallId
+                        ? {
+                            ...lead,
+                            callId: recoveredCallId,
+                            recordingUrl: pickRecordingUrl(
+                                lead?.recordingUrl,
+                                taskDetail?.recordingUrl,
+                                taskDetail?.recording_url,
+                                taskDetail?.recordingUrlProxy,
+                                taskDetail?.audioUrl,
+                                taskDetail?.audio_url
+                            ),
+                        }
+                        : lead;
+
+                    if (recoveredCallId && !String(lead?.callId || '').trim()) {
+                        const leadIndex = allLeads.findIndex((item) => Number(item?.id) === normalizedTaskId);
+                        if (leadIndex >= 0) {
+                            allLeads[leadIndex] = recoveredLead;
+                        }
+                    }
+
+                    if (taskDetail) {
+                        const detailDateValue = String(taskDetail?.date || '').slice(0, 10);
+                        const detailTimeValue = normalizeTimeValue(taskDetail?.time || '') || '';
+                        const detailLocationValue = String(taskDetail?.location || '').trim();
+                        const detailWhatsappInfoValue = String(taskDetail?.whatsappInfo || '').trim();
+
+                        if (!String(modalDate.value || '').trim() || String(modalDate.value || '') === leadDateValue) {
+                            modalDate.value = detailDateValue || leadDateValue;
+                        }
+                        if (
+                            !String(modalTime.value || '').trim() ||
+                            normalizeTimeValue(modalTime.value || '') === leadTimeValue
+                        ) {
+                            modalTime.value = detailTimeValue || leadTimeValue;
+                        }
+                        if (
+                            !String(modalLocation.value || '').trim() ||
+                            String(modalLocation.value || '').trim() === leadLocationValue
+                        ) {
+                            modalLocation.value = detailLocationValue || leadLocationValue;
+                        }
+                        if (
+                            !String(modalWhatsappInfo.value || '').trim() ||
+                            String(modalWhatsappInfo.value || '').trim() === leadWhatsappInfoValue
+                        ) {
+                            modalWhatsappInfo.value = detailWhatsappInfoValue || leadWhatsappInfoValue;
+                        }
+                    }
+
+                    const callBackedDetail = isCallBackedLead || Boolean(recoveredCallId)
+                        ? await ensureCallBackedLeadDetail(normalizedTaskId, recoveredLead)
+                        : null;
                     if (openSeq !== modalOpenSequence) return;
-                    const summaryText = isCallBackedLead
-                        ? await ensureCallBackedModalCopy(normalizedTaskId, lead, callBackedDetail)
+                    const mergedDetail = mergeLeadModalDetailSources(callBackedDetail, taskDetail);
+                    const summaryText = isCallBackedLead || Boolean(resolveLeadCallId(recoveredLead, mergedDetail))
+                        ? await ensureCallBackedModalCopy(normalizedTaskId, recoveredLead, mergedDetail)
                         : '';
                     if (openSeq !== modalOpenSequence) return;
-                    renderLeadDetailsInModal(lead, callBackedDetail, normalizedTaskId, { summaryText });
+                    renderLeadDetailsInModal(recoveredLead, mergedDetail || taskDetail || callBackedDetail, normalizedTaskId, { summaryText });
                     await ensureMinimumLoader(summaryText ? 500 : 250);
                     if (openSeq !== modalOpenSequence) return;
                     setModalLoading(false);
