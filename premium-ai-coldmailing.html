@@ -1142,10 +1142,15 @@
             let modalBusy = false;
             const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v2';
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
+            const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
+            const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
             const leadDetailLoadPromiseById = Object.create(null);
             const leadAiCopyPromiseById = Object.create(null);
+            let leadDatabaseIdentityLoaded = false;
+            let leadDatabaseIdentityLoadPromise = null;
+            let leadDatabaseIdentityByPhone = new Map();
             let modalOpenSequence = 0;
             let loadLeadsPromise = null;
             let queuedReload = false;
@@ -1182,6 +1187,10 @@
                     .normalize('NFD')
                     .replace(/[\u0300-\u036f]/g, '')
                     .trim();
+            }
+
+            function hasCallBackedLead(value) {
+                return Boolean(String(value?.callId || '').trim());
             }
 
             function normalizeAudioUrl(value) {
@@ -1425,31 +1434,31 @@
 
             function resolveLeadContactPerson(lead, detail) {
                 return pickLeadMetaValue(
-                    detail?.contact,
-                    detail?.contactName,
-                    detail?.contact_person,
-                    detail?.contactpersoon,
                     lead?.contact,
                     lead?.contactName,
                     lead?.contact_person,
-                    lead?.contactpersoon
+                    lead?.contactpersoon,
+                    detail?.contact,
+                    detail?.contactName,
+                    detail?.contact_person,
+                    detail?.contactpersoon
                 );
             }
 
             function resolveLeadCompanyName(lead, detail) {
-                return pickLeadMetaValue(detail?.company, detail?.companyName, lead?.company, lead?.companyName);
+                return pickLeadMetaValue(lead?.company, lead?.companyName, detail?.company, detail?.companyName);
             }
 
             function resolveLeadPhoneNumber(lead, detail) {
                 return pickLeadMetaValue(
-                    detail?.phone,
-                    detail?.phoneNumber,
-                    detail?.phone_number,
-                    detail?.mobile,
                     lead?.phone,
                     lead?.phoneNumber,
                     lead?.phone_number,
-                    lead?.mobile
+                    lead?.mobile,
+                    detail?.phone,
+                    detail?.phoneNumber,
+                    detail?.phone_number,
+                    detail?.mobile
                 );
             }
 
@@ -1618,11 +1627,13 @@
                 if (!normalizedTaskId) return;
                 const lead = getLeadById(normalizedTaskId);
                 if (!lead) return;
-                const hasTaskActions = hasPersistedLeadTask(lead);
+                const hasPersistedTask = hasPersistedLeadTask(lead);
+                const isCallBackedLead = hasCallBackedLead(lead);
+                const hasTaskActions = hasPersistedTask || isCallBackedLead;
 
                 const openSeq = ++modalOpenSequence;
                 activeTaskId = normalizedTaskId;
-                setModalTaskActionsEnabled(true);
+                setModalTaskActionsEnabled(hasTaskActions);
                 const leadType = resolveLeadType(lead);
                 const leadDateValue = String(lead.date || '').slice(0, 10);
                 const leadTimeValue = normalizeTimeValue(lead.time || '09:00') || '09:00';
@@ -1648,7 +1659,7 @@
                     }
                 };
 
-                if (!hasTaskActions) {
+                if (!hasPersistedTask || isCallBackedLead) {
                     renderLeadDetailsInModal(lead, null, normalizedTaskId);
                     await ensureMinimumLoader(250);
                     if (openSeq !== modalOpenSequence) return;
@@ -1740,7 +1751,8 @@
                 if (!taskId || modalBusy) return;
                 const lead = getLeadById(taskId);
                 if (!lead) return;
-                const hasTaskActions = hasPersistedLeadTask(lead);
+                const isCallBackedLead = hasCallBackedLead(lead);
+                const hasTaskActions = hasPersistedLeadTask(lead) && !isCallBackedLead;
 
                 const date = String(modalDate.value || '').trim();
                 const time = normalizeTimeValue(modalTime.value || '');
@@ -1773,23 +1785,7 @@
                 setModalBusy(true);
                 setModalStatus('Afspraak wordt in agenda gezet...', '');
                 try {
-                    if (hasTaskActions) {
-                        await postJsonWithFallback(
-                            [
-                                `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/set-in-agenda`,
-                                `/api/agenda/lead-to-agenda?taskId=${encodeURIComponent(String(taskId))}`,
-                            ],
-                            {
-                                appointmentDate: date,
-                                appointmentTime: time,
-                                location,
-                                whatsappInfo,
-                                whatsappConfirmed,
-                                summary: summaryText,
-                                actor: 'Leads pagina',
-                            }
-                        );
-                    } else {
+                    if (isCallBackedLead) {
                         const callId = String(lead.callId || '').trim();
                         if (!callId) {
                             throw new Error('Deze lead heeft geen callId en kan daarom niet in de agenda worden gezet.');
@@ -1813,6 +1809,24 @@
                                 phone: lead.phone,
                             }
                         );
+                    } else if (hasTaskActions) {
+                        await postJsonWithFallback(
+                            [
+                                `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/set-in-agenda`,
+                                `/api/agenda/lead-to-agenda?taskId=${encodeURIComponent(String(taskId))}`,
+                            ],
+                            {
+                                appointmentDate: date,
+                                appointmentTime: time,
+                                location,
+                                whatsappInfo,
+                                whatsappConfirmed,
+                                summary: summaryText,
+                                actor: 'Leads pagina',
+                            }
+                        );
+                    } else {
+                        throw new Error('Deze lead heeft geen geldige taak of callId.');
                     }
 
                     allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
@@ -1850,7 +1864,8 @@
                 if (!taskId || modalBusy) return;
                 const lead = getLeadById(taskId);
                 if (!lead) return;
-                const hasTaskActions = hasPersistedLeadTask(lead);
+                const isCallBackedLead = hasCallBackedLead(lead);
+                const hasTaskActions = hasPersistedLeadTask(lead) && !isCallBackedLead;
                 const company = String(lead?.company || 'deze lead');
                 const confirmed =
                     window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
@@ -1868,18 +1883,7 @@
                 setModalBusy(true);
                 setModalStatus('Lead wordt verwijderd...', '');
                 try {
-                    if (hasTaskActions) {
-                        await postJsonWithFallback(
-                            [
-                                `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/mark-cancelled`,
-                                `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(taskId))}`,
-                            ],
-                            {
-                                actor: 'Leads pagina',
-                                reason: 'Handmatig verwijderd via lead-popup',
-                            }
-                        );
-                    } else {
+                    if (isCallBackedLead) {
                         const callId = String(lead.callId || '').trim();
                         if (!callId) {
                             throw new Error('Deze lead heeft geen callId en kan daarom niet blijvend worden verwijderd.');
@@ -1894,6 +1898,19 @@
                                 actor: 'Leads pagina',
                             }
                         );
+                    } else if (hasTaskActions) {
+                        await postJsonWithFallback(
+                            [
+                                `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/mark-cancelled`,
+                                `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(taskId))}`,
+                            ],
+                            {
+                                actor: 'Leads pagina',
+                                reason: 'Handmatig verwijderd via lead-popup',
+                            }
+                        );
+                    } else {
+                        throw new Error('Deze lead heeft geen geldige taak of callId.');
                     }
 
                     allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
@@ -2165,6 +2182,10 @@
                     company: String(item?.company || 'Onbekende lead').trim() || 'Onbekende lead',
                     contact: String(item?.contact || '').trim(),
                     phone: String(item?.phone || '').trim(),
+                    branche: String(item?.branche || item?.branch || '').trim(),
+                    province: String(item?.province || item?.provincie || '').trim(),
+                    address: String(item?.address || item?.adres || '').trim(),
+                    website: String(item?.website || item?.webiste || item?.url || '').trim(),
                     date: String(item?.date || '').trim(),
                     time: String(item?.time || '').trim(),
                     source: String(item?.source || '').trim(),
@@ -2279,6 +2300,10 @@
                     coldcallingStack: String(preferred?.coldcallingStack || secondary?.coldcallingStack || '').trim().toLowerCase(),
                     coldcallingStackLabel: String(preferred?.coldcallingStackLabel || secondary?.coldcallingStackLabel || '').trim(),
                     leadType: String(preferred?.leadType || secondary?.leadType || '').trim(),
+                    branche: String(preferred?.branche || secondary?.branche || '').trim(),
+                    province: String(preferred?.province || secondary?.province || '').trim(),
+                    address: String(preferred?.address || secondary?.address || '').trim(),
+                    website: String(preferred?.website || secondary?.website || '').trim(),
                     leadChipLabel: String(preferred?.leadChipLabel || secondary?.leadChipLabel || '').trim(),
                     leadChipClass: String(preferred?.leadChipClass || secondary?.leadChipClass || '').trim(),
                     leadOwnerKey: String(preferred?.leadOwnerKey || secondary?.leadOwnerKey || '').trim(),
@@ -2286,6 +2311,80 @@
                     leadOwnerFullName: String(preferred?.leadOwnerFullName || secondary?.leadOwnerFullName || '').trim(),
                     leadOwnerUserId: String(preferred?.leadOwnerUserId || secondary?.leadOwnerUserId || '').trim(),
                     leadOwnerEmail: String(preferred?.leadOwnerEmail || secondary?.leadOwnerEmail || '').trim(),
+                };
+            }
+
+            function normalizeLeadDatabaseRow(item) {
+                return {
+                    company: String(item?.company || '').trim(),
+                    contact: String(item?.contactPerson || item?.contact || item?.contactpersoon || '').trim(),
+                    phone: String(item?.phone || '').trim(),
+                    branche: String(item?.branche || item?.branch || '').trim(),
+                    province: String(item?.province || item?.provincie || '').trim(),
+                    address: String(item?.address || item?.adres || '').trim(),
+                    website: String(item?.website || item?.webiste || item?.url || '').trim(),
+                };
+            }
+
+            async function ensureLeadDatabaseIdentityByPhone() {
+                if (leadDatabaseIdentityLoaded) return leadDatabaseIdentityByPhone;
+                if (leadDatabaseIdentityLoadPromise) return leadDatabaseIdentityLoadPromise;
+
+                leadDatabaseIdentityLoadPromise = (async () => {
+                    const endpoints = [
+                        `/api/ui-state-get?scope=${encodeURIComponent(LEAD_DATABASE_UI_SCOPE)}`,
+                        `/api/ui-state/${encodeURIComponent(LEAD_DATABASE_UI_SCOPE)}`,
+                    ];
+
+                    for (const endpoint of endpoints) {
+                        try {
+                            const data = await fetchTasksJson(endpoint, 7000);
+                            const raw = String(data?.values?.[LEAD_DATABASE_ROWS_STORAGE_KEY] || '').trim();
+                            if (!raw) continue;
+                            const parsed = JSON.parse(raw);
+                            if (!Array.isArray(parsed)) continue;
+
+                            const nextMap = new Map();
+                            parsed.forEach((item) => {
+                                const row = normalizeLeadDatabaseRow(item);
+                                const phoneKey = normalizePhoneDigits(row.phone || '');
+                                if (!phoneKey || nextMap.has(phoneKey)) return;
+                                nextMap.set(phoneKey, row);
+                            });
+                            leadDatabaseIdentityByPhone = nextMap;
+                            leadDatabaseIdentityLoaded = true;
+                            return nextMap;
+                        } catch (error) {
+                            // Try the fallback endpoint next.
+                        }
+                    }
+
+                    leadDatabaseIdentityByPhone = new Map();
+                    leadDatabaseIdentityLoaded = true;
+                    return leadDatabaseIdentityByPhone;
+                })().finally(() => {
+                    leadDatabaseIdentityLoadPromise = null;
+                });
+
+                return leadDatabaseIdentityLoadPromise;
+            }
+
+            function applyLeadDatabaseIdentity(row, databaseByPhone) {
+                const base = row && typeof row === 'object' ? row : {};
+                const map = databaseByPhone instanceof Map ? databaseByPhone : leadDatabaseIdentityByPhone;
+                const phoneKey = normalizePhoneDigits(base.phone || '');
+                if (!phoneKey || !map.has(phoneKey)) return base;
+
+                const databaseRow = map.get(phoneKey) || {};
+                return {
+                    ...base,
+                    company: String(databaseRow.company || base.company || 'Onbekende lead').trim() || 'Onbekende lead',
+                    contact: String(databaseRow.contact || base.contact || '').trim(),
+                    phone: String(databaseRow.phone || base.phone || '').trim(),
+                    branche: String(databaseRow.branche || base.branche || '').trim(),
+                    province: String(databaseRow.province || base.province || '').trim(),
+                    address: String(databaseRow.address || base.address || '').trim(),
+                    website: String(databaseRow.website || base.website || '').trim(),
                 };
             }
 
@@ -2435,7 +2534,7 @@
                 try {
                     const data = await fetchTasksJson('/api/agenda/interested-leads?limit=500', 8000);
                     return (Array.isArray(data?.leads) ? data.leads : [])
-                        .map((item) => normalizeLeadRow(item))
+                        .map((item) => applyLeadDatabaseIdentity(normalizeLeadRow(item)))
                         .filter((row) => {
                             const callId = String(row?.callId || '').trim();
                             const matchKey = buildLeadMatchKey(row);
@@ -2488,7 +2587,7 @@
                         null;
                     if (!isInterestedCall(update, insight)) return;
 
-                    const row = normalizeInterestedLeadRow(update, insight);
+                    const row = applyLeadDatabaseIdentity(normalizeInterestedLeadRow(update, insight));
                     const matchKey = buildLeadMatchKey(row);
                     if (matchKey && Number(existingLatestTsByKey.get(matchKey) || 0) >= buildLeadRecencyTimestamp(row)) return;
                     if (matchKey && seenKeys.has(matchKey)) return;
@@ -2565,6 +2664,7 @@
             }
 
             async function fetchLeadRows() {
+                const databaseByPhone = await ensureLeadDatabaseIdentityByPhone();
                 const endpoints = [
                     { url: '/api/agenda/confirmation-tasks?quick=1&limit=400', timeoutMs: 5000 },
                     { url: '/api/agenda/confirmation-tasks?fast=1&limit=400', timeoutMs: 5000 },
@@ -2576,7 +2676,7 @@
                     try {
                         const tasksData = await fetchTasksJson(endpoint.url, endpoint.timeoutMs);
                         pendingRows = Array.isArray(tasksData?.tasks)
-                            ? tasksData.tasks.map((item) => normalizeLeadRow(item))
+                            ? tasksData.tasks.map((item) => applyLeadDatabaseIdentity(normalizeLeadRow(item), databaseByPhone))
                             : [];
                         break;
                     } catch (error) {
@@ -2592,7 +2692,9 @@
                     interestError = error;
                 }
 
-                const mergedRows = dedupe([].concat(pendingRows || [], interestedRows || [])).sort(sortByDateDesc);
+                const mergedRows = dedupe([].concat(pendingRows || [], interestedRows || []))
+                    .map((row) => applyLeadDatabaseIdentity(row, databaseByPhone))
+                    .sort(sortByDateDesc);
                 if (mergedRows.length > 0 || (!taskError && !interestError)) {
                     return mergedRows;
                 }
