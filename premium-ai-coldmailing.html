@@ -1509,14 +1509,16 @@
             }
 
             function buildModalSourceText(lead, detail) {
+                const safeDetailSummary = looksLikeAgendaConfirmationSummary(detail?.summary) ? '' : detail?.summary;
+                const safeLeadSummary = looksLikeAgendaConfirmationSummary(lead?.summary) ? '' : lead?.summary;
                 return [
                     detail?.transcript,
                     detail?.transcriptSnippet,
                     detail?.callSummary,
                     detail?.aiSummary,
                     detail?.followUpReason,
-                    detail?.summary,
-                    lead?.summary,
+                    safeDetailSummary,
+                    safeLeadSummary,
                 ]
                     .map((value) => String(value || '').trim())
                     .filter(Boolean)
@@ -1834,6 +1836,7 @@
                 const id = Number(taskId || lead?.id || 0) || 0;
                 const aiCopy = id > 0 ? leadAiCopyById[String(id)] : null;
                 const preferredSummary = String(options?.summaryText || '').trim();
+                const isCallBacked = hasCallBackedLead(lead) || Boolean(String(detail?.callId || '').trim());
 
                 const readableSummary = pickReadableSummary(
                     detail?.callSummary,
@@ -1842,13 +1845,13 @@
                     detail?.summary,
                     lead?.summary
                 );
+                const fallbackSummaryBase = !looksLikeAgendaConfirmationSummary(readableSummary) ? readableSummary : '';
                 const fallbackSummary =
-                    (!looksLikeAgendaConfirmationSummary(readableSummary) ? readableSummary : '') ||
-                    'Samenvatting volgt na verwerking van het gesprek.';
+                    fallbackSummaryBase || (isCallBacked ? 'Nog geen gesprekssamenvatting beschikbaar.' : 'Samenvatting volgt na verwerking van het gesprek.');
                 const fallbackAgreements = buildFallbackAgreementsText(lead, detail);
-                const fallbackCombined = [fallbackSummary, fallbackAgreements]
-                    .filter(Boolean)
-                    .join(' ');
+                const fallbackCombined = isCallBacked
+                    ? fallbackSummary
+                    : [fallbackSummary, fallbackAgreements].filter(Boolean).join(' ');
 
                 renderLeadContactMeta(lead, detail);
                 modalSummary.textContent =
