@@ -1193,7 +1193,7 @@
             }
 
             function hasCallBackedLead(value) {
-                return Boolean(String(value?.callId || '').trim());
+                return Boolean(resolveLeadCallId(value));
             }
 
             function isGenericConversationPlaceholder(value) {
@@ -1212,6 +1212,43 @@
                 if (/^\/[^/]/.test(raw)) return raw;
                 if (/^data:audio\//i.test(raw)) return raw;
                 return '';
+            }
+
+            function extractCallIdFromRecordingUrl(value) {
+                const raw = normalizeAudioUrl(value);
+                if (!raw) return '';
+                try {
+                    const parsed = new URL(raw, window.location.origin);
+                    return String(parsed.searchParams.get('callId') || '').trim();
+                } catch (error) {
+                    const match = raw.match(/[?&]callId=([^&#]+)/i);
+                    if (!match) return '';
+                    try {
+                        return decodeURIComponent(String(match[1] || '').trim());
+                    } catch (decodeError) {
+                        return String(match[1] || '').trim();
+                    }
+                }
+            }
+
+            function resolveLeadCallId(value, detail = null) {
+                return String(
+                    value?.callId ||
+                    value?.call_id ||
+                    detail?.callId ||
+                    detail?.call_id ||
+                    extractCallIdFromRecordingUrl(value?.recordingUrl) ||
+                    extractCallIdFromRecordingUrl(value?.recording_url) ||
+                    extractCallIdFromRecordingUrl(value?.recordingUrlProxy) ||
+                    extractCallIdFromRecordingUrl(value?.audioUrl) ||
+                    extractCallIdFromRecordingUrl(value?.audio_url) ||
+                    extractCallIdFromRecordingUrl(detail?.recordingUrl) ||
+                    extractCallIdFromRecordingUrl(detail?.recording_url) ||
+                    extractCallIdFromRecordingUrl(detail?.recordingUrlProxy) ||
+                    extractCallIdFromRecordingUrl(detail?.audioUrl) ||
+                    extractCallIdFromRecordingUrl(detail?.audio_url) ||
+                    ''
+                ).trim();
             }
 
             function pickRecordingUrl(...candidates) {
@@ -1508,8 +1545,8 @@
 
             async function ensureCallBackedLeadDetail(taskId, lead) {
                 const id = Number(taskId) || 0;
-                const cacheKey = String(id || `call:${String(lead?.callId || '').trim()}`);
-                const callId = String(lead?.callId || '').trim();
+                const callId = resolveLeadCallId(lead);
+                const cacheKey = String(id || `call:${callId}`);
                 if (!callId) return null;
                 if (leadDetailsById[cacheKey]) return leadDetailsById[cacheKey];
                 if (leadDetailLoadPromiseById[cacheKey]) return leadDetailLoadPromiseById[cacheKey];
@@ -1596,8 +1633,8 @@
 
             async function ensureCallBackedModalCopy(taskId, lead, detail) {
                 const id = Number(taskId) || 0;
-                const cacheKey = String(id || `call:${String(lead?.callId || '').trim()}`);
-                const callId = String(lead?.callId || '').trim();
+                const callId = resolveLeadCallId(lead, detail);
+                const cacheKey = String(id || `call:${callId}`);
                 if (!callId) return '';
 
                 if (leadAiCopyById[cacheKey]) {
@@ -2006,7 +2043,7 @@
                     const detailTimeValue = normalizeTimeValue(detail?.time || '') || '';
                     const detailLocationValue = String(detail?.location || '').trim();
                     const detailWhatsappInfoValue = String(detail?.whatsappInfo || '').trim();
-                    const recoveredCallId = String(lead?.callId || detail?.callId || '').trim();
+                    const recoveredCallId = resolveLeadCallId(lead, detail);
                     const recoveredLead = recoveredCallId
                         ? {
                             ...lead,
@@ -2534,7 +2571,7 @@
             }
 
             function normalizeLeadRecordingUrl(item) {
-                const callId = String(item?.callId || item?.call_id || '').trim();
+                const callId = resolveLeadCallId(item);
                 const raw = String(
                     item?.recordingUrl ||
                         item?.recording_url ||
@@ -2552,7 +2589,7 @@
             function normalizeLeadRow(item) {
                 return {
                     id: resolveLeadListId(item),
-                    callId: String(item?.callId || '').trim(),
+                    callId: resolveLeadCallId(item),
                     company: String(item?.company || 'Onbekende lead').trim() || 'Onbekende lead',
                     contact: String(item?.contact || '').trim(),
                     phone: String(item?.phone || '').trim(),
