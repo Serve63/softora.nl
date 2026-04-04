@@ -15610,6 +15610,7 @@ function markLeadTaskCancelledById(req, res, taskIdRaw) {
   }
 
   const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
+  const callId = normalizeString(appointment?.callId || '');
   const nowIso = new Date().toISOString();
   const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
     idx,
@@ -15627,6 +15628,10 @@ function markLeadTaskCancelledById(req, res, taskIdRaw) {
     },
     'confirmation_task_mark_cancelled'
   );
+  dismissInterestedLeadCallId(
+    normalizeString(updatedAppointment?.callId || callId || ''),
+    'confirmation_task_mark_cancelled_dismiss'
+  );
 
   appendDashboardActivity(
     {
@@ -15636,7 +15641,7 @@ function markLeadTaskCancelledById(req, res, taskIdRaw) {
       company: updatedAppointment?.company || appointment?.company || '',
       actor,
       taskId: Number(updatedAppointment?.id || appointment?.id || 0) || null,
-      callId: normalizeString(updatedAppointment?.callId || appointment?.callId || ''),
+      callId: normalizeString(updatedAppointment?.callId || callId || ''),
       source: 'premium-personeel-dashboard',
     },
     'dashboard_activity_mark_cancelled'
