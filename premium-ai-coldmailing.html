@@ -2232,6 +2232,10 @@
             }
 
             function isLeadRowPreferred(candidate, existing) {
+                const candidateHasTask = hasPersistedLeadTask(candidate);
+                const existingHasTask = hasPersistedLeadTask(existing);
+                if (candidateHasTask !== existingHasTask) return candidateHasTask;
+
                 const candidateTs = buildLeadRecencyTimestamp(candidate);
                 const existingTs = buildLeadRecencyTimestamp(existing);
                 if (candidateTs !== existingTs) return candidateTs > existingTs;
@@ -2252,8 +2256,16 @@
             }
 
             function mergeLeadRows(preferred, secondary) {
+                const preferredId = Number(preferred?.id) || 0;
+                const secondaryId = Number(secondary?.id) || 0;
+                const mergedId = preferredId > 0
+                    ? preferredId
+                    : secondaryId > 0
+                        ? secondaryId
+                        : (preferredId || secondaryId || 0);
                 return {
                     ...preferred,
+                    id: mergedId,
                     company: String(preferred?.company || secondary?.company || 'Onbekende lead').trim() || 'Onbekende lead',
                     contact: String(preferred?.contact || secondary?.contact || '').trim(),
                     phone: String(preferred?.phone || secondary?.phone || '').trim(),

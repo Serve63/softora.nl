@@ -2306,6 +2306,40 @@ function clearDismissedInterestedLeadCallId(callId) {
   return dismissedInterestedLeadCallIds.delete(normalizedCallId);
 }
 
+function cancelOpenLeadFollowUpTasksByIdentity(callId, rowLike, actor = '', reason = 'interested_lead_dismissed_manual_cancel') {
+  const normalizedCallId = normalizeString(callId || '');
+  const identityKey = buildLeadFollowUpCandidateKey(rowLike || {});
+  if (!normalizedCallId && !identityKey) return 0;
+
+  const nowIso = new Date().toISOString();
+  let cancelledCount = 0;
+  generatedAgendaAppointments.forEach((appointment, idx) => {
+    if (!appointment || !mapAppointmentToConfirmationTask(appointment)) return;
+    const appointmentCallId = normalizeString(appointment?.callId || '');
+    const appointmentKey = buildLeadFollowUpCandidateKey(appointment);
+    const matchesCallId = Boolean(normalizedCallId && appointmentCallId && appointmentCallId === normalizedCallId);
+    const matchesKey = Boolean(identityKey && appointmentKey && appointmentKey === identityKey);
+    if (!matchesCallId && !matchesKey) return;
+
+    setGeneratedAgendaAppointmentAtIndex(
+      idx,
+      {
+        ...appointment,
+        confirmationResponseReceived: false,
+        confirmationResponseReceivedAt: null,
+        confirmationResponseReceivedBy: null,
+        confirmationAppointmentCancelled: true,
+        confirmationAppointmentCancelledAt: nowIso,
+        confirmationAppointmentCancelledBy: actor || null,
+      },
+      reason
+    );
+    cancelledCount += 1;
+  });
+
+  return cancelledCount;
+}
+
 async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
   const force = Boolean(options && options.force);
   if (!isSupabaseConfigured()) return false;
@@ -15161,6 +15195,12 @@ async function dismissInterestedLeadResponse(req, res) {
     leadRow || getLatestCallUpdateByCallId(callId) || {},
     'interested_lead_dismissed_manual'
   );
+  const cancelledTasks = cancelOpenLeadFollowUpTasksByIdentity(
+    callId,
+    leadRow || getLatestCallUpdateByCallId(callId) || {},
+    actor,
+    'interested_lead_dismissed_manual_cancel'
+  );
 
   appendDashboardActivity(
     {
@@ -15180,6 +15220,7 @@ async function dismissInterestedLeadResponse(req, res) {
     ok: true,
     dismissed: true,
     callId,
+    cancelledTasks,
   });
 }
 
