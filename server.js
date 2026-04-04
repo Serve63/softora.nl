@@ -212,6 +212,7 @@ const aiCallInsightsByCallId = new Map();
 const aiAnalysisFingerprintByCallId = new Map();
 const aiAnalysisInFlightCallIds = new Set();
 const callRecordingTranscriptionPromiseByCallId = new Map();
+const confirmationTaskConversationPromiseByCacheKey = new Map();
 const generatedAgendaAppointments = [];
 const agendaAppointmentIdByCallId = new Map();
 const dismissedInterestedLeadCallIds = new Set();
@@ -8317,6 +8318,7 @@ function mapAppointmentToConfirmationTask(appointment) {
     datetimeLabel: formatDateTimeLabelNl(appointment.date, appointment.time),
     source: normalizeString(appointment.source || 'AI Cold Calling'),
     summary: truncateText(normalizeString(appointment.summary || ''), 300),
+    conversationSummary: truncateText(normalizeString(appointment.leadConversationSummary || ''), 4000),
     value: normalizeString(appointment.value || ''),
     createdAt: normalizeString(appointment.confirmationTaskCreatedAt || appointment.createdAt || ''),
     appointmentId: Number(appointment.id) || 0,
@@ -8453,6 +8455,10 @@ function findTranscriptFromWebhookEvents(callId) {
 
 function getAppointmentTranscriptText(appointment) {
   if (!appointment) return '';
+  const storedTranscript = normalizeString(
+    appointment?.leadConversationTranscript || appointment?.leadConversationTranscriptFull || ''
+  );
+  if (storedTranscript) return storedTranscript;
   const callId = resolveAppointmentCallId(appointment);
   const fromCallUpdate = getLatestCallUpdateByCallId(callId);
   const transcript = normalizeString(fromCallUpdate?.transcriptFull || fromCallUpdate?.transcriptSnippet || '');
@@ -8470,6 +8476,15 @@ function looksLikeAgendaConfirmationSummary(value) {
   );
 }
 
+function isGenericConversationSummaryPlaceholder(value) {
+  const text = normalizeString(value || '').toLowerCase();
+  if (!text) return false;
+  return (
+    text === 'nog geen gesprekssamenvatting beschikbaar.' ||
+    text === 'samenvatting volgt na verwerking van het gesprek.'
+  );
+}
+
 function sanitizeConversationSummaryText(value) {
   return normalizeString(value || '')
     .replace(/\s*\|\s*/g, ' ')
@@ -8482,6 +8497,7 @@ function pickReadableConversationSummaryForLeadDetail(...candidates) {
   for (const candidate of candidates) {
     const cleaned = sanitizeConversationSummaryText(candidate);
     if (!cleaned) continue;
+    if (isGenericConversationSummaryPlaceholder(cleaned)) continue;
     if (looksLikeAgendaConfirmationSummary(cleaned)) continue;
     if (summaryContainsEnglishMarkers(cleaned)) continue;
     return truncateText(cleaned, 4000);
@@ -8964,6 +8980,9 @@ function buildConfirmationTaskDetail(appointment) {
 
   const callUpdate = getLatestCallUpdateByCallId(task.callId);
   const aiInsight = task.callId ? aiCallInsightsByCallId.get(task.callId) || null : null;
+  const storedConversationSummary = pickReadableConversationSummaryForLeadDetail(
+    appointment?.leadConversationSummary || ''
+  );
   const transcript = getAppointmentTranscriptText(appointment) || '';
   const recordingUrl = resolvePreferredRecordingUrl(callUpdate, appointment);
   const fullSummary = truncateText(
@@ -8987,6 +9006,8 @@ function buildConfirmationTaskDetail(appointment) {
 
   return {
     ...task,
+    appointmentSummary: fullSummary || task.summary || '',
+    conversationSummary: storedConversationSummary || '',
     summary: fullSummary || task.summary || '',
     contactEmail: normalizeEmailAddress(appointment.contactEmail || appointment.email || '') || '',
     location: resolvedLocation || '',
@@ -9013,6 +9034,320 @@ function buildConfirmationTaskDetail(appointment) {
       endedReason: normalizeString(callUpdate?.endedReason || ''),
     },
   };
+}
+
+async function fetchRecordingForConfirmationTaskDetail(req, appointment, detail, resolvedCallId = '') {
+  const normalizedCallId = normalizeString(resolvedCallId || detail?.callId || appointment?.callId || '');
+  const provider = normalizeString(detail?.provider || appointment?.provider || '').toLowerCase();
+  const recordingUrl = resolvePreferredRecordingUrl(
+    detail,
+    appointment,
+    normalizedCallId ? { callId: normalizedCallId, provider } : null
+  );
+  if (!recordingUrl) return null;
+
+  let recordingSid =
+    normalizeString(
+      detail?.recordingSid ||
+        detail?.recording_sid ||
+        appointment?.recordingSid ||
+        appointment?.recording_sid ||
+        ''
+    ) || extractTwilioRecordingSidFromUrl(recordingUrl);
+  const hasTwilioProxyReference = /\/api\/coldcalling\/recording-proxy/i.test(recordingUrl);
+
+  if ((provider === 'twilio' || recordingSid || hasTwilioProxyReference) && isTwilioStatusApiConfigured()) {
+    try {
+      if (!recordingSid && normalizedCallId) {
+        const { recordings } = await fetchTwilioRecordingsByCallId(normalizedCallId);
+        const preferred = choosePreferredTwilioRecording(recordings);
+        recordingSid = normalizeString(preferred?.sid || '');
+      }
+
+      if (recordingSid) {
+        const mediaUrl = buildTwilioRecordingMediaUrl(recordingSid);
+        if (mediaUrl) {
+          const { response, bytes } = await fetchBinaryWithTimeout(
+            mediaUrl,
+            {
+              method: 'GET',
+              headers: {
+                Authorization: getTwilioBasicAuthorizationHeader(),
+              },
+            },
+            30000
+          );
+
+          if (!response.ok) {
+            const err = new Error(`Twilio opname ophalen mislukt (${response.status}).`);
+            err.status = response.status;
+            throw err;
+          }
+
+          const contentType = normalizeString(response.headers.get('content-type') || '') || 'audio/mpeg';
+          return {
+            bytes,
+            contentType,
+            sourceUrl: mediaUrl.toString(),
+            fileName: buildRecordingFileNameForTranscription(
+              normalizedCallId || recordingSid || `task-${Number(appointment?.id || detail?.id || 0) || 'call'}`,
+              contentType,
+              mediaUrl.toString()
+            ),
+          };
+        }
+      }
+    } catch (error) {
+      // Fall through to other recording URLs when direct Twilio fetch fails.
+    }
+  }
+
+  const baseUrl = getEffectivePublicBaseUrl(req);
+  const absoluteRecordingUrl =
+    normalizeAbsoluteHttpUrl(recordingUrl) ||
+    (recordingUrl.startsWith('/') && baseUrl ? new URL(recordingUrl, baseUrl).toString() : '');
+  if (!absoluteRecordingUrl) return null;
+
+  const { response, bytes } = await fetchBinaryWithTimeout(
+    absoluteRecordingUrl,
+    {
+      method: 'GET',
+    },
+    30000
+  );
+  if (!response.ok) {
+    const err = new Error(`Opname ophalen mislukt (${response.status}).`);
+    err.status = response.status;
+    throw err;
+  }
+
+  const contentType = normalizeString(response.headers.get('content-type') || '') || 'audio/mpeg';
+  return {
+    bytes,
+    contentType,
+    sourceUrl: absoluteRecordingUrl,
+    fileName: buildRecordingFileNameForTranscription(
+      normalizedCallId || `task-${Number(appointment?.id || detail?.id || 0) || 'call'}`,
+      contentType,
+      absoluteRecordingUrl
+    ),
+  };
+}
+
+async function transcribeConfirmationTaskRecording(req, appointment, detail, resolvedCallId = '') {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) return '';
+
+  const recording = await fetchRecordingForConfirmationTaskDetail(req, appointment, detail, resolvedCallId);
+  if (!recording?.bytes || recording.bytes.length === 0) return '';
+  if (recording.bytes.length > 24 * 1024 * 1024) {
+    throw new Error('Opname is te groot om direct te transcriberen.');
+  }
+
+  const sourceKey =
+    normalizeString(resolvedCallId || detail?.callId || appointment?.callId || '') ||
+    `task-${Number(appointment?.id || detail?.id || 0) || 'call'}`;
+  const models = getOpenAiTranscriptionModelCandidates();
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      const form = new FormData();
+      form.append(
+        'file',
+        new Blob([recording.bytes], { type: recording.contentType || 'audio/mpeg' }),
+        recording.fileName || buildRecordingFileNameForTranscription(sourceKey, recording.contentType, recording.sourceUrl)
+      );
+      form.append('model', model);
+      form.append('language', 'nl');
+      form.append('temperature', '0');
+      form.append('response_format', 'text');
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+
+      try {
+        const response = await fetch(`${OPENAI_API_BASE_URL}/audio/transcriptions`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: form,
+          signal: controller.signal,
+        });
+
+        const rawBody = await response.text();
+        if (!response.ok) {
+          const err = new Error(`OpenAI transcriptie mislukt (${response.status})`);
+          err.status = response.status;
+          err.data = parseJsonLoose(rawBody) || rawBody;
+          throw err;
+        }
+
+        const parsed = parseJsonLoose(rawBody);
+        const transcriptText =
+          normalizeString(parsed?.text || parsed?.transcript || parsed?.output_text || '') ||
+          normalizeString(rawBody);
+        if (transcriptText) {
+          return truncateText(transcriptText, 9000);
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) throw lastError;
+  return '';
+}
+
+async function enrichConfirmationTaskDetailWithConversationSummary(req, idx, appointment, detail) {
+  if (!appointment || !detail) return detail;
+
+  const resolvedCallId = normalizeString(detail?.callId || resolveAppointmentCallId(appointment));
+  const cacheKey = resolvedCallId || `task:${Number(appointment?.id || detail?.id || idx || 0)}`;
+  if (!cacheKey) return detail;
+
+  const existingConversationSummary = pickReadableConversationSummaryForLeadDetail(
+    detail?.conversationSummary,
+    appointment?.leadConversationSummary
+  );
+  const existingTranscript = normalizeString(detail?.transcript || appointment?.leadConversationTranscript || '');
+  if (existingConversationSummary && (existingTranscript || detail?.recordingUrlAvailable)) {
+    return {
+      ...detail,
+      callId: resolvedCallId || normalizeString(detail?.callId || ''),
+      conversationSummary: existingConversationSummary,
+      summary: existingConversationSummary,
+      transcript: truncateText(existingTranscript, 9000),
+      transcriptAvailable: Boolean(existingTranscript),
+    };
+  }
+
+  const existingPromise = confirmationTaskConversationPromiseByCacheKey.get(cacheKey);
+  if (existingPromise) return existingPromise;
+
+  const run = (async () => {
+    let callBackedDetail = null;
+    if (resolvedCallId) {
+      try {
+        callBackedDetail = await buildCallBackedLeadDetail(resolvedCallId);
+      } catch (error) {
+        callBackedDetail = null;
+      }
+    }
+
+    const recordingUrl = normalizeString(
+      callBackedDetail?.recordingUrl || detail?.recordingUrl || detail?.recording_url || ''
+    );
+    let transcript = normalizeString(
+      appointment?.leadConversationTranscript ||
+        callBackedDetail?.transcript ||
+        detail?.transcript ||
+        ''
+    );
+
+    if (!transcript && recordingUrl) {
+      try {
+        transcript = await transcribeConfirmationTaskRecording(
+          req,
+          appointment,
+          { ...detail, recordingUrl },
+          resolvedCallId
+        );
+      } catch (error) {
+        transcript = '';
+      }
+    }
+
+    let conversationSummary = pickReadableConversationSummaryForLeadDetail(
+      appointment?.leadConversationSummary,
+      callBackedDetail?.summary,
+      callBackedDetail?.callSummary,
+      callBackedDetail?.aiSummary,
+      detail?.conversationSummary,
+      detail?.callSummary,
+      detail?.aiSummary,
+      detail?.transcriptSnippet,
+      detail?.summary,
+      transcript
+    );
+
+    if (!conversationSummary && (transcript || callBackedDetail || detail?.callSummary || detail?.aiSummary)) {
+      conversationSummary = await buildConversationSummaryForLeadDetail(
+        {
+          summary: normalizeString(callBackedDetail?.callSummary || detail?.callSummary || ''),
+          transcriptSnippet: normalizeString(
+            callBackedDetail?.transcriptSnippet || detail?.transcriptSnippet || transcript
+          ),
+        },
+        {
+          summary: normalizeString(callBackedDetail?.aiSummary || detail?.aiSummary || ''),
+          followUpReason: normalizeString(
+            callBackedDetail?.followUpReason || detail?.whatsappInfo || appointment?.whatsappInfo || ''
+          ),
+        },
+        {
+          summary: normalizeString(appointment?.leadConversationSummary || ''),
+          whatsappInfo: normalizeString(detail?.whatsappInfo || appointment?.whatsappInfo || ''),
+        },
+        transcript
+      );
+    }
+
+    const normalizedConversationSummary = normalizeString(conversationSummary || '');
+    const normalizedTranscript = normalizeString(transcript || detail?.transcript || '');
+    const mergedDetail = {
+      ...detail,
+      callId: resolvedCallId || normalizeString(callBackedDetail?.callId || detail?.callId || ''),
+      conversationSummary: normalizedConversationSummary,
+      summary: normalizedConversationSummary || normalizeString(detail?.summary || ''),
+      transcript: truncateText(normalizedTranscript, 9000),
+      transcriptAvailable: Boolean(normalizedTranscript),
+      transcriptSnippet: truncateText(
+        normalizeString(callBackedDetail?.transcriptSnippet || detail?.transcriptSnippet || normalizedTranscript),
+        1200
+      ),
+      callSummary: normalizeString(callBackedDetail?.callSummary || detail?.callSummary || ''),
+      aiSummary: normalizeString(callBackedDetail?.aiSummary || detail?.aiSummary || ''),
+      followUpReason: normalizeString(
+        callBackedDetail?.followUpReason || detail?.followUpReason || appointment?.whatsappInfo || ''
+      ),
+      recordingUrl: recordingUrl || normalizeString(detail?.recordingUrl || ''),
+      recordingUrlAvailable: Boolean(recordingUrl || normalizeString(detail?.recordingUrl || '')),
+    };
+
+    if (
+      idx >= 0 &&
+      idx < generatedAgendaAppointments.length &&
+      (normalizedConversationSummary || normalizedTranscript || mergedDetail.callId || mergedDetail.recordingUrl)
+    ) {
+      const previousAppointment = generatedAgendaAppointments[idx] || appointment;
+      setGeneratedAgendaAppointmentAtIndex(
+        idx,
+        {
+          ...previousAppointment,
+          callId: normalizeString(mergedDetail.callId || previousAppointment?.callId || ''),
+          recordingUrl: normalizeString(mergedDetail.recordingUrl || previousAppointment?.recordingUrl || ''),
+          leadConversationSummary:
+            normalizedConversationSummary || normalizeString(previousAppointment?.leadConversationSummary || ''),
+          leadConversationTranscript:
+            normalizedTranscript || normalizeString(previousAppointment?.leadConversationTranscript || ''),
+          leadConversationUpdatedAt: new Date().toISOString(),
+        },
+        'confirmation_task_conversation_materialized'
+      );
+    }
+
+    return mergedDetail;
+  })().finally(() => {
+    confirmationTaskConversationPromiseByCacheKey.delete(cacheKey);
+  });
+
+  confirmationTaskConversationPromiseByCacheKey.set(cacheKey, run);
+  return run;
 }
 
 function ensureConfirmationEmailDraftAtIndex(idx, options = {}) {
@@ -15995,6 +16330,14 @@ async function sendConfirmationTaskDetailResponse(req, res, taskIdRaw) {
       await refreshCallUpdateFromRetellStatusApi(resolvedCallId);
     }
     detail = buildConfirmationTaskDetail(generatedAgendaAppointments[idx] || appointment);
+  }
+  if (detail) {
+    detail = await enrichConfirmationTaskDetailWithConversationSummary(
+      req,
+      idx,
+      generatedAgendaAppointments[idx] || appointment,
+      detail
+    );
   }
   if (!detail) {
     return res.status(404).json({ ok: false, error: 'Geen open bevestigingstaak voor deze afspraak' });

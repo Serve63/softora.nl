@@ -24,7 +24,7 @@
   const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
   const LEAD_DATABASE_OVERRIDES_STORAGE_KEY = 'softora_coldcalling_lead_database_overrides_json';
-  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v3';
+  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v4';
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const STATS_RESET_BASELINE_STORAGE_KEY = 'softora_stats_reset_baseline_started';
@@ -127,8 +127,11 @@
     for (const candidate of candidates) {
       const raw = String(candidate || '').trim();
       if (!raw) continue;
+      if (isGenericConversationPlaceholder(raw)) continue;
       if (looksLikeConversationTranscript(raw)) continue;
       const cleaned = sanitizeConversationSummaryCopy(raw);
+      if (isGenericConversationPlaceholder(cleaned)) continue;
+      if (looksLikeAgendaConfirmationSummary(cleaned)) continue;
       if (looksMixedLanguageConversationSummary(cleaned)) continue;
       if (cleaned) return cleaned;
     }
@@ -140,6 +143,15 @@
     if (!text) return false;
     return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie)/.test(
       text
+    );
+  }
+
+  function isGenericConversationPlaceholder(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return (
+      text === 'nog geen gesprekssamenvatting beschikbaar.' ||
+      text === 'samenvatting volgt na verwerking van het gesprek.'
     );
   }
 
@@ -171,13 +183,24 @@
     const normalizedCallId = normalizeFreeText(callId);
     if (!normalizedCallId) return '';
     const cache = readSharedCallSummaryCache();
-    return String(cache?.[normalizedCallId] || '').trim();
+    const summary = String(cache?.[normalizedCallId] || '').trim();
+    if (!summary || isGenericConversationPlaceholder(summary) || looksLikeAgendaConfirmationSummary(summary)) {
+      return '';
+    }
+    return summary;
   }
 
   function setSharedCallSummary(callId, summary) {
     const normalizedCallId = normalizeFreeText(callId);
     const normalizedSummary = normalizeFreeText(summary);
-    if (!normalizedCallId || !normalizedSummary) return;
+    if (
+      !normalizedCallId ||
+      !normalizedSummary ||
+      isGenericConversationPlaceholder(normalizedSummary) ||
+      looksLikeAgendaConfirmationSummary(normalizedSummary)
+    ) {
+      return;
+    }
     try {
       const cache = readSharedCallSummaryCache();
       if (String(cache?.[normalizedCallId] || '').trim() === normalizedSummary) return;
