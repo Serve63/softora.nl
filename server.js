@@ -9378,6 +9378,42 @@ function ensureConfirmationEmailDraftAtIndex(idx, options = {}) {
   );
 }
 
+function shouldPreserveExistingAgendaSchedule(existing) {
+  if (!existing || typeof existing !== 'object') return false;
+  const hasExistingDate = Boolean(normalizeDateYyyyMmDd(existing?.date || ''));
+  if (!hasExistingDate) return false;
+  return Boolean(
+    !toBooleanSafe(existing?.needsConfirmationEmail, toBooleanSafe(existing?.aiGenerated, false)) ||
+      existing?.confirmationEmailSent ||
+      existing?.confirmationEmailSentAt ||
+      existing?.confirmationResponseReceived ||
+      existing?.confirmationResponseReceivedAt ||
+      Number(existing?.activeOrderId || 0) > 0 ||
+      existing?.activeOrderAddedAt
+  );
+}
+
+function applyPreservedAgendaScheduleFields(existing, updated) {
+  if (!shouldPreserveExistingAgendaSchedule(existing)) return updated;
+  return {
+    ...updated,
+    date: normalizeDateYyyyMmDd(existing?.date || updated?.date || '') || '',
+    time: normalizeTimeHhMm(existing?.time || updated?.time || '') || '09:00',
+    location: sanitizeAppointmentLocation(
+      existing?.location || existing?.appointmentLocation || updated?.location || updated?.appointmentLocation || ''
+    ),
+    appointmentLocation: sanitizeAppointmentLocation(
+      existing?.appointmentLocation || existing?.location || updated?.appointmentLocation || updated?.location || ''
+    ),
+    whatsappInfo: sanitizeAppointmentWhatsappInfo(
+      existing?.whatsappInfo || existing?.whatsappNotes || updated?.whatsappInfo || updated?.whatsappNotes || ''
+    ),
+    whatsappConfirmed: toBooleanSafe(existing?.whatsappConfirmed, toBooleanSafe(updated?.whatsappConfirmed, false)),
+    summary: normalizeString(existing?.summary || updated?.summary || ''),
+    summaryFormatVersion: Number(existing?.summaryFormatVersion || updated?.summaryFormatVersion || 0) || 0,
+  };
+}
+
 function upsertGeneratedAgendaAppointment(appointment, callId) {
   if (!appointment || !callId) return null;
   clearDismissedInterestedLeadCallId(callId);
@@ -9442,14 +9478,15 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
         postCallUpdatedBy:
           normalizeString(existing?.postCallUpdatedBy || appointment?.postCallUpdatedBy || '') || null,
       };
-      if (!normalizeString(updated.confirmationEmailDraft || '')) {
-        updated.confirmationEmailDraft = buildConfirmationEmailDraftFallback(updated, updated);
-        updated.confirmationEmailDraftGeneratedAt =
-          normalizeString(updated.confirmationEmailDraftGeneratedAt || '') || new Date().toISOString();
-        updated.confirmationEmailDraftSource =
-          normalizeString(updated.confirmationEmailDraftSource || '') || 'template-auto';
+      const stabilized = applyPreservedAgendaScheduleFields(existing, updated);
+      if (!normalizeString(stabilized.confirmationEmailDraft || '')) {
+        stabilized.confirmationEmailDraft = buildConfirmationEmailDraftFallback(stabilized, stabilized);
+        stabilized.confirmationEmailDraftGeneratedAt =
+          normalizeString(stabilized.confirmationEmailDraftGeneratedAt || '') || new Date().toISOString();
+        stabilized.confirmationEmailDraftSource =
+          normalizeString(stabilized.confirmationEmailDraftSource || '') || 'template-auto';
       }
-      return setGeneratedAgendaAppointmentAtIndex(idx, updated, 'agenda_appointment_upsert');
+      return setGeneratedAgendaAppointmentAtIndex(idx, stabilized, 'agenda_appointment_upsert');
     }
   }
 
@@ -9515,14 +9552,15 @@ function upsertGeneratedAgendaAppointment(appointment, callId) {
       postCallUpdatedBy:
         normalizeString(existing?.postCallUpdatedBy || appointment?.postCallUpdatedBy || '') || null,
     };
-    if (!normalizeString(updated.confirmationEmailDraft || '')) {
-      updated.confirmationEmailDraft = buildConfirmationEmailDraftFallback(updated, updated);
-      updated.confirmationEmailDraftGeneratedAt =
-        normalizeString(updated.confirmationEmailDraftGeneratedAt || '') || new Date().toISOString();
-      updated.confirmationEmailDraftSource =
-        normalizeString(updated.confirmationEmailDraftSource || '') || 'template-auto';
+    const stabilized = applyPreservedAgendaScheduleFields(existing, updated);
+    if (!normalizeString(stabilized.confirmationEmailDraft || '')) {
+      stabilized.confirmationEmailDraft = buildConfirmationEmailDraftFallback(stabilized, stabilized);
+      stabilized.confirmationEmailDraftGeneratedAt =
+        normalizeString(stabilized.confirmationEmailDraftGeneratedAt || '') || new Date().toISOString();
+      stabilized.confirmationEmailDraftSource =
+        normalizeString(stabilized.confirmationEmailDraftSource || '') || 'template-auto';
     }
-    return setGeneratedAgendaAppointmentAtIndex(reusableIdx, updated, 'agenda_appointment_reuse_upsert');
+    return setGeneratedAgendaAppointmentAtIndex(reusableIdx, stabilized, 'agenda_appointment_reuse_upsert');
   }
 
   const createdAtIso = normalizeString(appointment?.createdAt) || new Date().toISOString();
