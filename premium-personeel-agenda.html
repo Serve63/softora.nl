@@ -244,6 +244,12 @@
             border-left: 2px solid var(--accent);
         }
 
+        .appointment.completed {
+            background: rgba(245, 158, 11, 0.16);
+            color: #d97706;
+            border-left: 2px solid #f59e0b;
+        }
+
         .appointment .apt-time {
             font-family: 'Oswald', sans-serif; font-weight: 600;
             font-size: 0.6rem; letter-spacing: 0.05em;
@@ -1498,6 +1504,8 @@
     async function markActiveAppointmentNoDeal() {
         const apt = getActiveAppointment();
         if (!apt || workspaceBusy) return;
+        const confirmed = await confirmNoDealForAppointment(apt);
+        if (!confirmed) return;
 
         workspaceBusy = true;
         refreshWorkspacePrimaryButtonLabel();
@@ -1580,7 +1588,30 @@
             }
         }
 
+        renderCalendar();
         refreshWorkspacePrimaryButtonLabel();
+    }
+
+    function isAppointmentCompleted(apt) {
+        if (!apt || typeof apt !== 'object') return false;
+        const status = String(apt?.postCallStatus || '').trim().toLowerCase();
+        if (status === 'no_deal') return true;
+        if (Number(apt?.activeOrderId || 0) > 0) return true;
+        if (String(apt?.activeOrderAddedAt || '').trim()) return true;
+        return false;
+    }
+
+    async function confirmNoDealForAppointment(apt) {
+        const company = String(apt?.company || 'deze afspraak').trim();
+        const message = `Weet je zeker dat je ${company} als geen deal wilt afronden?`;
+        if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function') {
+            return await window.SoftoraDialogs.confirm(message, {
+                title: 'Geen deal bevestigen',
+                confirmText: 'Ja, afronden',
+                cancelText: 'Annuleren',
+            });
+        }
+        return window.confirm(message);
     }
 
     async function postJsonWithFallback(urls, body, options = {}) {
@@ -2027,7 +2058,10 @@
             }
 
             dayAppointments.forEach((apt) => {
-                html += `<div class="appointment meeting magnetic" onclick="openAppointment(${apt.id})">
+                const appointmentClass = isAppointmentCompleted(apt)
+                    ? 'appointment completed magnetic'
+                    : 'appointment meeting magnetic';
+                html += `<div class="${appointmentClass}" onclick="openAppointment(${apt.id})">
                     <span class="apt-time">${apt.time}</span> ${apt.company}
                 </div>`;
             });
