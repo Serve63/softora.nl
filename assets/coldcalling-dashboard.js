@@ -134,6 +134,19 @@
     return '';
   }
 
+  async function summarizeConversationTextNl(text, options = {}) {
+    if (!window.SoftoraAI || typeof window.SoftoraAI.summarizeText !== 'function') return '';
+    const payload = {
+      text: String(text || ''),
+      style: options.style || 'medium',
+      language: 'nl',
+      maxSentences: Number(options.maxSentences || 4),
+      extraInstructions: String(options.extraInstructions || ''),
+    };
+    const result = await window.SoftoraAI.summarizeText(payload);
+    return String(result?.summary || '').trim();
+  }
+
   function normalizeBusinessMode(mode) {
     const raw = String(mode || '').trim().toLowerCase();
     if (raw === 'voice_software' || raw === 'voice software' || raw === 'voicesoftware') {
@@ -3641,6 +3654,23 @@
       sourceErrors.push(`AI-insights niet geladen (${error?.message || 'onbekende fout'}).`);
     }
 
+    let interestedLeads = [];
+    try {
+      const response = await fetchWithTimeout(
+        `/api/agenda/interested-leads?limit=500${cacheSuffix}`,
+        { method: 'GET', cache: 'no-store' },
+        15000
+      );
+      const data = await parseApiResponse(response);
+      if (response.ok && data?.ok) {
+        interestedLeads = Array.isArray(data.leads) ? data.leads : [];
+      } else if (!response.ok) {
+        sourceErrors.push(`Interesse-leads niet geladen (${response.status}).`);
+      }
+    } catch (error) {
+      sourceErrors.push(`Interesse-leads niet geladen (${error?.message || 'onbekende fout'}).`);
+    }
+
     const scopedUpdates = filterCallLikeRowsForMode(updates, allowedPhoneKeys);
     const scopedCallIds = new Set(
       scopedUpdates
@@ -3648,12 +3678,20 @@
         .filter(Boolean)
     );
     const scopedInsights = filterCallLikeRowsForMode(insights, allowedPhoneKeys, scopedCallIds);
+    const scopedInterestedLeads = (Array.isArray(interestedLeads) ? interestedLeads : []).filter((item) => {
+      const callId = normalizeFreeText(item?.callId || item?.call_id || '');
+      const normalizedPhoneKey = phoneKey(item?.phone || '');
+      if (callId && scopedCallIds.has(callId)) return true;
+      if (normalizedPhoneKey && allowedPhoneKeys.has(normalizedPhoneKey)) return true;
+      return false;
+    });
 
     const records = buildLeadDatabaseRecords(parsed.leads, scopedUpdates, scopedInsights);
     const calls = buildConversationRecordsFromUpdates(scopedUpdates);
     return {
       records,
       insights: scopedInsights,
+      interestedLeads: scopedInterestedLeads,
       updates: scopedUpdates,
       calls,
       sourceErrors,
@@ -3856,6 +3894,7 @@
       info: '',
       records: [],
       insights: [],
+      interestedLeads: [],
       calls: [],
       search: '',
       filter: 'callback',
@@ -3865,6 +3904,8 @@
       detailCallId: '',
       forceReloadAfterLoad: false,
     };
+    const callDetailSummaryByCallId = new Map();
+    const callDetailSummaryPromiseByCallId = new Map();
 
     modal = document.createElement('div');
     modal.id = 'leadDatabaseModalOverlay';
@@ -4088,15 +4129,103 @@
       return latestInsight;
     }
 
-    function getLeadDatabaseCallSummary(call) {
-      const insight = getCallInsightRecord(call?.callId || '');
-      const readableSummary = pickReadableConversationSummary(
+    function getInterestedLeadRecord(callId) {
+      const normalizedCallId = normalizeFreeText(callId);
+      if (!normalizedCallId) return null;
+      let latestLead = null;
+      (Array.isArray(state.interestedLeads) ? state.interestedLeads : []).forEach((lead) => {
+        if (normalizeFreeText(lead?.callId || lead?.call_id || '') !== normalizedCallId) return;
+        if (!latestLead || getCallLikeRecordUpdatedMs(lead) > getCallLikeRecordUpdatedMs(latestLead)) {
+          latestLead = lead;
+        }
+      });
+      return latestLead;
+    }
+
+    function buildLeadDatabaseCallSummarySourceText(call, insight, interestedLead) {
+      const appointmentDate = normalizeFreeText(interestedLead?.date || '');
+      const appointmentTime = normalizeFreeText(interestedLead?.time || '');
+      const appointmentLocation = normalizeFreeText(interestedLead?.location || '');
+      return [
+        appointmentDate || appointmentTime
+          ? `Afspraakmoment: ${[appointmentDate, appointmentTime].filter(Boolean).join(' ')}`
+          : '',
+        appointmentLocation ? `Locatie: ${appointmentLocation}` : '',
+        interestedLead?.summary,
+        interestedLead?.whatsappInfo,
         insight?.summary,
-        call?.summary,
         insight?.followUpReason,
-        call?.transcriptSnippet
+        call?.summary,
+        call?.transcriptSnippet,
+        call?.transcriptFull,
+      ]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+        .join('\n\n');
+    }
+
+    function getLeadDatabaseCallSummaryFallback(call, insight, interestedLead) {
+      const readableSummary = pickReadableConversationSummary(
+        interestedLead?.summary,
+        insight?.summary,
+        insight?.followUpReason,
+        interestedLead?.whatsappInfo,
+        call?.transcriptSnippet,
+        call?.transcriptFull
       );
-      return readableSummary || getConversationConclusion(call);
+      if (readableSummary) return readableSummary;
+      return 'Samenvatting volgt na verwerking van het gesprek.';
+    }
+
+    async function ensureLeadDatabaseCallSummary(call) {
+      const normalizedCallId = normalizeFreeText(call?.callId || '');
+      const insight = getCallInsightRecord(normalizedCallId);
+      const interestedLead = getInterestedLeadRecord(normalizedCallId);
+      const fallbackSummary = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
+      const readableLeadSummary = pickReadableConversationSummary(
+        interestedLead?.summary,
+        insight?.summary,
+        insight?.followUpReason
+      );
+      const leadSummaryLooksStrong = readableLeadSummary && readableLeadSummary.length >= 160;
+      if (leadSummaryLooksStrong) return readableLeadSummary;
+
+      const sourceText = buildLeadDatabaseCallSummarySourceText(call, insight, interestedLead);
+      const shouldRewrite =
+        !fallbackSummary ||
+        fallbackSummary === 'Samenvatting volgt na verwerking van het gesprek.' ||
+        fallbackSummary.length < 160;
+      if (!shouldRewrite || sourceText.length < 24 || !normalizedCallId) {
+        return fallbackSummary;
+      }
+
+      if (callDetailSummaryByCallId.has(normalizedCallId)) {
+        return String(callDetailSummaryByCallId.get(normalizedCallId) || '').trim() || fallbackSummary;
+      }
+      if (callDetailSummaryPromiseByCallId.has(normalizedCallId)) {
+        return callDetailSummaryPromiseByCallId.get(normalizedCallId);
+      }
+
+      const run = summarizeConversationTextNl(sourceText, {
+        style: 'medium',
+        maxSentences: 5,
+        extraInstructions:
+          'Schrijf uitsluitend in natuurlijk Nederlands. Gebruik geen Engels behalve onvermijdelijke eigennamen, merknamen, productnamen, URLs of exacte onvertaalbare termen. Schrijf voor een accountmanager van Softora. Geef een korte, efficiënte samenvatting in doorlopende tekst. Verwerk uitkomst, afspraken, datum/tijd, locatie en vervolgactie in dezelfde tekst als dat bekend is. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+      })
+        .then((summaryText) => {
+          const cleanedSummary = pickReadableConversationSummary(summaryText) || fallbackSummary;
+          if (cleanedSummary) {
+            callDetailSummaryByCallId.set(normalizedCallId, cleanedSummary);
+          }
+          return cleanedSummary || fallbackSummary;
+        })
+        .catch(() => fallbackSummary)
+        .finally(() => {
+          callDetailSummaryPromiseByCallId.delete(normalizedCallId);
+        });
+
+      callDetailSummaryPromiseByCallId.set(normalizedCallId, run);
+      return run;
     }
 
     function closeCallDetail() {
@@ -4131,11 +4260,14 @@
       const phone = formatLeadDatabasePhone(normalizeFreeText(call?.phone || ''));
       const duration = formatConversationDuration(call?.durationSeconds);
       const updatedAt = normalizeFreeText(call?.updatedAt || '');
+      const normalizedCallId = normalizeFreeText(call?.callId || '');
+      const insight = getCallInsightRecord(normalizedCallId);
+      const interestedLead = getInterestedLeadRecord(normalizedCallId);
       const metaLine = [phone || '-', duration, updatedAt ? formatConversationTimestamp(updatedAt) : 'Onbekend']
         .filter(Boolean)
         .join(' · ');
       const recordingUrl = getCallRecordingUrl(call);
-      const summaryText = getLeadDatabaseCallSummary(call);
+      const summaryText = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
 
       detailTitle.textContent = company;
       detailMeta.textContent = metaLine;
@@ -4144,6 +4276,12 @@
       detailAudio.src = recordingUrl;
       detailAudio.load();
       detailOverlay.style.display = 'flex';
+      void ensureLeadDatabaseCallSummary(call).then((nextSummary) => {
+        if (normalizeFreeText(state.detailCallId) !== normalizedCallId) return;
+        const latestSummaryEl = byId('leadDatabaseCallDetailSummary');
+        if (!latestSummaryEl) return;
+        latestSummaryEl.textContent = String(nextSummary || '').trim() || 'Nog geen samenvatting beschikbaar.';
+      });
     }
 
     function openCallDetail(callId) {
@@ -4509,8 +4647,11 @@
         });
         state.records = Array.isArray(data.records) ? data.records : [];
         state.insights = Array.isArray(data.insights) ? data.insights : [];
+        state.interestedLeads = Array.isArray(data.interestedLeads) ? data.interestedLeads : [];
         state.calls = Array.isArray(data.calls) ? data.calls : Array.isArray(data.updates) ? data.updates : [];
         state.sourceErrors = Array.isArray(data.sourceErrors) ? data.sourceErrors : [];
+        callDetailSummaryByCallId.clear();
+        callDetailSummaryPromiseByCallId.clear();
         state.lastRefreshedAt = new Date().toISOString();
         if (force) {
           state.info = `Verversd om ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}.`;
