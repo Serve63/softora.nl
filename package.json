@@ -6,7 +6,11 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "lint": "eslint server.js lib/ routes/ api/ --max-warnings 0",
+    "lint:fix": "eslint server.js lib/ routes/ api/ --fix",
+    "format": "prettier --write \"server.js\" \"lib/**/*.js\" \"api/**/*.js\"",
+    "format:check": "prettier --check \"server.js\" \"lib/**/*.js\" \"api/**/*.js\""
   },
   "engines": {
     "node": ">=18"
@@ -23,5 +27,10 @@
   },
   "overrides": {
     "path-to-regexp": "0.1.13"
+  },
+  "devDependencies": {
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1"
   }
 }
