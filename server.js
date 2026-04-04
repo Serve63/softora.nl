@@ -1,6 +1,8 @@
 const express = require('express');
 const crypto = require('crypto');
+const dns = require('dns').promises;
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
@@ -26,6 +28,8 @@ const TWILIO_API_BASE_URL = process.env.TWILIO_API_BASE_URL || 'https://api.twil
 const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || '').trim();
 const OPENAI_API_BASE_URL = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_IMAGE_MODEL =
+  process.env.OPENAI_IMAGE_MODEL || process.env.WEBSITE_PREVIEW_IMAGE_MODEL || 'gpt-image-1';
 const ANTHROPIC_API_BASE_URL = process.env.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com/v1';
 const ANTHROPIC_MODEL =
   process.env.ANTHROPIC_MODEL || process.env.CLAUDE_MODEL || 'claude-opus-4-6';
@@ -357,6 +361,104 @@ function normalizeAbsoluteHttpUrl(value) {
   } catch {
     return '';
   }
+}
+
+function normalizeWebsitePreviewTargetUrl(valueRaw) {
+  const rawValue = normalizeString(valueRaw);
+  if (!rawValue) return '';
+  const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawValue) ? rawValue : `https://${rawValue}`;
+  try {
+    const parsed = new URL(withProtocol);
+    if (!/^https?:$/i.test(parsed.protocol)) return '';
+    if (normalizeString(parsed.username) || normalizeString(parsed.password)) return '';
+    parsed.hash = '';
+    if (!parsed.pathname) parsed.pathname = '/';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
+function isPrivateIpv4Address(valueRaw) {
+  const value = normalizeIpAddress(valueRaw);
+  const parts = value.split('.').map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+  if (parts[0] === 10 || parts[0] === 127) return true;
+  if (parts[0] === 169 && parts[1] === 254) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  if (parts[0] === 0) return true;
+  return false;
+}
+
+function isPrivateIpv6Address(valueRaw) {
+  const value = normalizeIpAddress(valueRaw).toLowerCase();
+  if (!value) return false;
+  if (value === '::1') return true;
+  if (value.startsWith('fc') || value.startsWith('fd')) return true;
+  if (value.startsWith('fe80:')) return true;
+  return false;
+}
+
+function isPrivateIpAddress(valueRaw) {
+  const value = normalizeIpAddress(valueRaw);
+  const version = net.isIP(value);
+  if (version === 4) return isPrivateIpv4Address(value);
+  if (version === 6) return isPrivateIpv6Address(value);
+  return false;
+}
+
+async function assertWebsitePreviewUrlIsPublic(valueRaw) {
+  const normalizedUrl = normalizeWebsitePreviewTargetUrl(valueRaw);
+  if (!normalizedUrl) {
+    const error = new Error('Vul een geldige website-URL in, bijvoorbeeld https://voorbeeld.nl');
+    error.status = 400;
+    throw error;
+  }
+
+  const parsed = new URL(normalizedUrl);
+  const hostname = normalizeString(parsed.hostname).toLowerCase();
+  if (!hostname) {
+    const error = new Error('Kon de hostname van deze URL niet lezen.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (
+    hostname === 'localhost' ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.lan') ||
+    hostname.endsWith('.home')
+  ) {
+    const error = new Error('Lokale of interne URLs zijn niet toegestaan voor Websitepreview.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (net.isIP(hostname) && isPrivateIpAddress(hostname)) {
+    const error = new Error('Private netwerk-IP’s zijn niet toegestaan voor Websitepreview.');
+    error.status = 400;
+    throw error;
+  }
+
+  try {
+    const resolved = await dns.lookup(hostname, { all: true, verbatim: true });
+    const privateAddress = Array.isArray(resolved)
+      ? resolved.find((entry) => entry && isPrivateIpAddress(entry.address))
+      : null;
+    if (privateAddress) {
+      const error = new Error('Deze URL verwijst naar een intern netwerkadres en mag niet worden gescand.');
+      error.status = 400;
+      throw error;
+    }
+  } catch (error) {
+    if (Number(error?.status)) throw error;
+  }
+
+  return normalizedUrl;
 }
 
 function getPublicBaseUrlFromRequest(req) {
@@ -3315,6 +3417,90 @@ function extractSeoSourceFromHtml(htmlRaw) {
   };
 }
 
+function extractRepeatedTagTextEntriesFromHtml(htmlRaw, tagPattern, options = {}) {
+  const html = String(htmlRaw || '');
+  const maxItems = Math.max(1, Math.min(12, Number(options.maxItems) || 6));
+  const maxLength = Math.max(40, Math.min(600, Number(options.maxLength) || 220));
+  const regex = tagPattern instanceof RegExp ? new RegExp(tagPattern.source, 'gi') : null;
+  if (!regex) return [];
+  const out = [];
+  const seen = new Set();
+  let match;
+  while ((match = regex.exec(html))) {
+    const value = truncateText(
+      normalizeString(decodeBasicHtmlEntities(stripHtmlTags(match[1] || '')).replace(/\s+/g, ' ')),
+      maxLength
+    );
+    const dedupeKey = value.toLowerCase();
+    if (!value || seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    out.push(value);
+    if (out.length >= maxItems) break;
+  }
+  return out;
+}
+
+function extractVisibleTextSampleFromHtml(htmlRaw, maxLength = 2800) {
+  const html = String(htmlRaw || '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, ' ');
+  return truncateText(
+    normalizeString(decodeBasicHtmlEntities(stripHtmlTags(html)).replace(/\s+/g, ' ')),
+    maxLength
+  );
+}
+
+function extractWebsitePreviewScanFromHtml(htmlRaw, pageUrlRaw) {
+  const html = String(htmlRaw || '');
+  const normalizedUrl = normalizeWebsitePreviewTargetUrl(pageUrlRaw);
+  const parsedUrl = normalizedUrl ? new URL(normalizedUrl) : null;
+  const source = extractSeoSourceFromHtml(html);
+  const headings = extractRepeatedTagTextEntriesFromHtml(html, /<h[2-3]\b[^>]*>([\s\S]*?)<\/h[2-3]>/gi, {
+    maxItems: 8,
+    maxLength: 220,
+  });
+  const paragraphs = extractRepeatedTagTextEntriesFromHtml(html, /<p\b[^>]*>([\s\S]*?)<\/p>/gi, {
+    maxItems: 8,
+    maxLength: 280,
+  });
+  const images = extractImageEntriesFromHtml(html).slice(0, 8);
+  const visualCues = Array.from(
+    new Set(
+      images
+        .map((entry) => {
+          const alt = normalizeString(entry?.alt || '');
+          if (alt) return alt;
+          const src = normalizeString(entry?.src || '');
+          if (!src) return '';
+          return src
+            .split(/[/?#]/)
+            .filter(Boolean)
+            .pop()
+            .replace(/\.[a-z0-9]+$/i, '')
+            .replace(/[-_]+/g, ' ');
+        })
+        .map((value) => truncateText(normalizeString(value), 120))
+        .filter(Boolean)
+    )
+  ).slice(0, 6);
+  const bodyTextSample = extractVisibleTextSampleFromHtml(html, 3200);
+
+  return {
+    url: normalizedUrl,
+    host: parsedUrl ? parsedUrl.host : '',
+    title: source.title || source.ogTitle || '',
+    metaDescription: source.metaDescription || source.ogDescription || '',
+    h1: source.h1 || '',
+    headings,
+    paragraphs,
+    visualCues,
+    imageCount: images.length,
+    bodyTextSample,
+  };
+}
+
 function mergeSeoSourceWithOverrides(sourceRaw, overridesRaw) {
   const source = normalizeSeoPageOverridePatch(sourceRaw);
   const overrides = normalizeSeoStoredPageOverrides(overridesRaw);
@@ -5229,6 +5415,165 @@ async function generateTextSummaryWithAi(options = {}) {
     source: 'openai',
     model: OPENAI_MODEL,
     usage: data?.usage || null,
+  };
+}
+
+function buildWebsitePreviewPromptFromScan(scan = {}) {
+  const host = normalizeString(scan.host || '');
+  const title = normalizeString(scan.title || '');
+  const description = normalizeString(scan.metaDescription || '');
+  const h1 = normalizeString(scan.h1 || '');
+  const headings = Array.isArray(scan.headings) ? scan.headings.filter(Boolean).slice(0, 6) : [];
+  const paragraphs = Array.isArray(scan.paragraphs) ? scan.paragraphs.filter(Boolean).slice(0, 5) : [];
+  const visualCues = Array.isArray(scan.visualCues) ? scan.visualCues.filter(Boolean).slice(0, 6) : [];
+  const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 1800);
+
+  return [
+    'Create a single high-end desktop homepage redesign mockup as a realistic marketing screenshot.',
+    'Use the current website scan as inspiration, but make the design cleaner, more premium, more conversion-focused, and visually stronger.',
+    'This must look like a finished modern website homepage, not a wireframe, not a device mockup, not a browser window, and not a collage.',
+    'Show a strong hero, clean navigation, clear CTA buttons, supporting content sections, trust signals, refined spacing, and polished typography.',
+    'Use a modern Dutch business aesthetic: trustworthy, sharp, premium, warm, and commercial.',
+    'Avoid generic templates. Make the design feel tailored to the business context below.',
+    host ? `Brand or domain: ${host}.` : '',
+    title ? `Current page title: ${title}.` : '',
+    description ? `Current meta description: ${description}.` : '',
+    h1 ? `Primary heading on current site: ${h1}.` : '',
+    headings.length ? `Other current headings: ${headings.join(' | ')}.` : '',
+    paragraphs.length ? `Content cues from the current site: ${paragraphs.join(' | ')}.` : '',
+    visualCues.length ? `Visual cues found on the current site: ${visualCues.join(' | ')}.` : '',
+    bodyTextSample ? `Current site text sample: ${bodyTextSample}` : '',
+    'Output one single landscape image of the redesigned homepage only.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function buildWebsitePreviewBriefFromScan(scan = {}) {
+  const parts = [];
+  if (scan.title) parts.push(`Titel: ${scan.title}`);
+  if (scan.h1) parts.push(`Hoofdboodschap: ${scan.h1}`);
+  if (scan.metaDescription) parts.push(`Omschrijving: ${scan.metaDescription}`);
+  if (Array.isArray(scan.headings) && scan.headings.length) {
+    parts.push(`Secties: ${scan.headings.slice(0, 4).join(', ')}`);
+  }
+  if (Array.isArray(scan.visualCues) && scan.visualCues.length) {
+    parts.push(`Beeldreferenties: ${scan.visualCues.slice(0, 4).join(', ')}`);
+  }
+  return parts.join(' · ');
+}
+
+function buildWebsitePreviewDownloadFileName(scan = {}) {
+  const host = normalizeString(scan.host || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const fallback = host || 'websitepreview';
+  return `${fallback}-preview.png`;
+}
+
+async function generateWebsitePreviewImageWithAi(scan = {}) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) {
+    const err = new Error('OPENAI_API_KEY ontbreekt');
+    err.status = 503;
+    throw err;
+  }
+
+  const prompt = buildWebsitePreviewPromptFromScan(scan);
+  const { response, data } = await fetchJsonWithTimeout(
+    `${OPENAI_API_BASE_URL}/images/generations`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_IMAGE_MODEL,
+        prompt,
+        size: '1536x1024',
+        response_format: 'b64_json',
+      }),
+    },
+    180000
+  );
+
+  if (!response.ok) {
+    const err = new Error(`OpenAI websitepreview mislukt (${response.status})`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+
+  const imageEntry = Array.isArray(data?.data) ? data.data[0] : null;
+  const b64 = normalizeString(imageEntry?.b64_json || '');
+  if (!b64) {
+    const err = new Error('OpenAI gaf geen afbeelding terug voor de websitepreview.');
+    err.status = 502;
+    err.data = data;
+    throw err;
+  }
+
+  return {
+    prompt,
+    brief: buildWebsitePreviewBriefFromScan(scan),
+    model: OPENAI_IMAGE_MODEL,
+    mimeType: 'image/png',
+    dataUrl: `data:image/png;base64,${b64}`,
+    fileName: buildWebsitePreviewDownloadFileName(scan),
+    revisedPrompt: normalizeString(imageEntry?.revised_prompt || ''),
+    usage: data?.usage || null,
+  };
+}
+
+async function fetchWebsitePreviewScanFromUrl(targetUrlRaw) {
+  const normalizedUrl = await assertWebsitePreviewUrlIsPublic(targetUrlRaw);
+  const { response, text } = await fetchTextWithTimeout(
+    normalizedUrl,
+    {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; SoftoraWebsitePreview/1.0; +https://softora.nl)',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    },
+    25000
+  );
+
+  if (!response.ok) {
+    const err = new Error(`Kon deze website niet ophalen (${response.status}).`);
+    err.status = response.status >= 400 && response.status < 600 ? response.status : 502;
+    throw err;
+  }
+
+  const contentType = normalizeString(response.headers.get('content-type') || '').toLowerCase();
+  if (contentType && !contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
+    const err = new Error('De opgegeven URL lijkt geen HTML-webpagina te zijn.');
+    err.status = 400;
+    throw err;
+  }
+
+  const html = String(text || '');
+  if (!html) {
+    const err = new Error('Deze website gaf geen leesbare HTML terug.');
+    err.status = 502;
+    throw err;
+  }
+
+  const scan = extractWebsitePreviewScanFromHtml(html, response.url || normalizedUrl);
+  if (!scan.title && !scan.h1 && !scan.metaDescription && !scan.bodyTextSample) {
+    const err = new Error('Er kon te weinig bruikbare inhoud uit deze website worden gelezen.');
+    err.status = 422;
+    throw err;
+  }
+
+  return {
+    normalizedUrl,
+    finalUrl: normalizeWebsitePreviewTargetUrl(response.url || normalizedUrl) || normalizedUrl,
+    scan,
   };
 }
 
@@ -10004,6 +10349,19 @@ async function fetchJsonWithTimeout(url, options, timeoutMs = 15000) {
   }
 }
 
+async function fetchTextWithTimeout(url, options, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const text = await response.text();
+    return { response, text };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchBinaryWithTimeout(url, options, timeoutMs = 15000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -14086,6 +14444,97 @@ app.post('/api/ai/summarize', async (req, res) => {
       openAiEnabled: Boolean(getOpenAiApiKey()),
     });
   }
+});
+
+async function sendWebsitePreviewGenerateResponse(req, res) {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const inputUrl = normalizeString(body.url || body.websiteUrl || '');
+    if (!inputUrl) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Website-URL ontbreekt',
+        detail: 'Stuur een JSON body met { url: "https://voorbeeld.nl" }',
+      });
+    }
+
+    const fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
+    const generated = await generateWebsitePreviewImageWithAi(fetched.scan);
+
+    appendDashboardActivity(
+      {
+        type: 'website_preview_generated',
+        title: 'Websitepreview gegenereerd',
+        detail: `Nieuwe AI preview gemaakt voor ${fetched.scan.host || fetched.finalUrl}.`,
+        actor: 'api',
+        source: 'premium-websitepreview',
+      },
+      'dashboard_activity_website_preview_generated'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      site: {
+        requestedUrl: inputUrl,
+        normalizedUrl: fetched.normalizedUrl,
+        finalUrl: fetched.finalUrl,
+        host: fetched.scan.host || '',
+      },
+      scan: {
+        title: fetched.scan.title || '',
+        metaDescription: fetched.scan.metaDescription || '',
+        h1: fetched.scan.h1 || '',
+        headings: fetched.scan.headings || [],
+        paragraphs: fetched.scan.paragraphs || [],
+        visualCues: fetched.scan.visualCues || [],
+        imageCount: Number(fetched.scan.imageCount || 0) || 0,
+      },
+      brief: generated.brief,
+      prompt: generated.prompt,
+      image: {
+        dataUrl: generated.dataUrl,
+        mimeType: generated.mimeType,
+        fileName: generated.fileName,
+      },
+      model: generated.model,
+      revisedPrompt: generated.revisedPrompt || '',
+      usage: generated.usage,
+      openAiEnabled: true,
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    const safeStatus = status >= 400 && status < 600 ? status : 500;
+    const upstreamDetail = truncateText(
+      normalizeString(
+        error?.data?.error?.message ||
+          error?.data?.error?.detail ||
+          error?.data?.error ||
+          error?.data?.detail ||
+          ''
+      ),
+      500
+    );
+
+    return res.status(safeStatus).json({
+      ok: false,
+      error:
+        safeStatus === 503
+          ? 'Websitepreview AI niet beschikbaar'
+          : 'Websitepreview genereren mislukt',
+      detail: String(error?.message || 'Onbekende fout'),
+      openAiEnabled: Boolean(getOpenAiApiKey()),
+      imageModel: OPENAI_IMAGE_MODEL,
+      upstreamDetail: upstreamDetail || null,
+    });
+  }
+}
+
+app.post('/api/website-preview/generate', async (req, res) => {
+  return sendWebsitePreviewGenerateResponse(req, res);
+});
+
+app.post('/api/website-preview-generate', async (req, res) => {
+  return sendWebsitePreviewGenerateResponse(req, res);
 });
 
 async function sendAiOrderDossierResponse(req, res) {

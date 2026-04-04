@@ -372,6 +372,7 @@
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
         if (p.indexOf("/premium-mailbox") === 0) return "mailbox";
+        if (p.indexOf("/premium-websitepreview") === 0) return "websitepreview";
         if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
         if (p.indexOf("/premium-pakketten") === 0) return "packages";
         if (p.indexOf("/premium-pdfs") === 0) return "pdfs";
@@ -394,6 +395,15 @@
             ? `<span class="sidebar-notification-badge" data-sidebar-count-key="${link.key}" hidden>0</span>`
             : "";
         return `<a href="${link.href}" class="${classes}" data-sidebar-key="${link.key}">${link.icon}${labelHtml}${countBadgeHtml}</a>`;
+    }
+
+    function getWebsitePreviewSidebarLink() {
+        return {
+            key: "websitepreview",
+            href: "/premium-websitepreview",
+            label: "Websitepreview",
+            icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg>',
+        };
     }
 
     function buildUnifiedPremiumSidebarHtml(activeKey) {
@@ -449,6 +459,7 @@
                 label: "Mailbox",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
             },
+            getWebsitePreviewSidebarLink(),
             {
                 key: "seo",
                 href: "/premium-seo",
@@ -547,17 +558,56 @@
         });
     }
 
+    function ensureStaticSidebarLink(sidebar, sectionLabel, link, insertBeforeKeys) {
+        if (!sidebar || !link || typeof sidebar.querySelector !== "function") return null;
+        const existing = sidebar.querySelector(`[data-sidebar-key="${link.key}"]`);
+        if (existing) return existing;
+        const sections = Array.from(sidebar.querySelectorAll(".sidebar-section"));
+        const targetSection = sections.find(function (section) {
+            const label = section.querySelector(".sidebar-section-label");
+            return String(label && label.textContent || "").trim().toLowerCase() === String(sectionLabel || "").trim().toLowerCase();
+        });
+        if (!targetSection) return null;
+        const template = document.createElement("template");
+        template.innerHTML = renderSidebarLink(link, "");
+        const nextLink = template.content.firstElementChild;
+        if (!nextLink) return null;
+        const beforeEl = Array.isArray(insertBeforeKeys)
+            ? insertBeforeKeys
+                .map(function (key) {
+                    return targetSection.querySelector(`[data-sidebar-key="${String(key || "").trim()}"]`);
+                })
+                .find(Boolean)
+            : null;
+        if (beforeEl && beforeEl.parentNode === targetSection) {
+            targetSection.insertBefore(nextLink, beforeEl);
+        } else {
+            targetSection.appendChild(nextLink);
+        }
+        return nextLink;
+    }
+
+    function syncStaticSidebarActiveState(sidebar, activeKey) {
+        if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
+        sidebar.querySelectorAll(".sidebar-link[data-sidebar-key]").forEach(function (link) {
+            const key = String(link.getAttribute("data-sidebar-key") || "").trim();
+            link.classList.toggle("active", key === activeKey);
+        });
+    }
+
     function applyUnifiedPremiumSidebar() {
         if (!isPremiumPersonnelContext) return;
         const sidebar = document.querySelector(".sidebar");
         if (!sidebar) return;
+        const activeKey = getSidebarActiveKey(pathname);
         if (sidebar.dataset.staticSidebar === "1") {
+            ensureStaticSidebarLink(sidebar, "beheer", getWebsitePreviewSidebarLink(), ["seo", "packages", "pdfs"]);
+            syncStaticSidebarActiveState(sidebar, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
             sidebar.dataset.sidebarReady = "true";
             return;
         }
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
-        const activeKey = getSidebarActiveKey(pathname);
         // Alleen legacy/lege sidebars nog opbouwen; statische sidebars blijven onaangeroerd.
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
         pruneDeprecatedSidebarLinks(sidebar);
