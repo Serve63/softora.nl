@@ -433,13 +433,13 @@ async function assertWebsitePreviewUrlIsPublic(valueRaw) {
     hostname.endsWith('.lan') ||
     hostname.endsWith('.home')
   ) {
-    const error = new Error('Lokale of interne URLs zijn niet toegestaan voor Websitepreview.');
+    const error = new Error('Lokale of interne URLs zijn niet toegestaan voor Websitegenerator.');
     error.status = 400;
     throw error;
   }
 
   if (net.isIP(hostname) && isPrivateIpAddress(hostname)) {
-    const error = new Error('Private netwerk-IP’s zijn niet toegestaan voor Websitepreview.');
+    const error = new Error('Private netwerk-IP’s zijn niet toegestaan voor Websitegenerator.');
     error.status = 400;
     throw error;
   }
@@ -5468,7 +5468,7 @@ function buildWebsitePreviewDownloadFileName(scan = {}) {
     .toLowerCase()
     .replace(/[^a-z0-9.-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  const fallback = host || 'websitepreview';
+  const fallback = host || 'websitegenerator';
   return `${fallback}-preview.png`;
 }
 
@@ -5500,7 +5500,7 @@ async function generateWebsitePreviewImageWithAi(scan = {}) {
   );
 
   if (!response.ok) {
-    const err = new Error(`OpenAI websitepreview mislukt (${response.status})`);
+    const err = new Error(`OpenAI websitegenerator mislukt (${response.status})`);
     err.status = response.status;
     err.data = data;
     throw err;
@@ -5509,7 +5509,7 @@ async function generateWebsitePreviewImageWithAi(scan = {}) {
   const imageEntry = Array.isArray(data?.data) ? data.data[0] : null;
   const b64 = normalizeString(imageEntry?.b64_json || '');
   if (!b64) {
-    const err = new Error('OpenAI gaf geen afbeelding terug voor de websitepreview.');
+    const err = new Error('OpenAI gaf geen afbeelding terug voor de websitegenerator.');
     err.status = 502;
     err.data = data;
     throw err;
@@ -14464,10 +14464,10 @@ async function sendWebsitePreviewGenerateResponse(req, res) {
     appendDashboardActivity(
       {
         type: 'website_preview_generated',
-        title: 'Websitepreview gegenereerd',
+        title: 'Websitegenerator gegenereerd',
         detail: `Nieuwe AI preview gemaakt voor ${fetched.scan.host || fetched.finalUrl}.`,
         actor: 'api',
-        source: 'premium-websitepreview',
+        source: 'premium-websitegenerator',
       },
       'dashboard_activity_website_preview_generated'
     );
@@ -14519,8 +14519,8 @@ async function sendWebsitePreviewGenerateResponse(req, res) {
       ok: false,
       error:
         safeStatus === 503
-          ? 'Websitepreview AI niet beschikbaar'
-          : 'Websitepreview genereren mislukt',
+          ? 'Websitegenerator AI niet beschikbaar'
+          : 'Websitegenerator genereren mislukt',
       detail: String(error?.message || 'Onbekende fout'),
       openAiEnabled: Boolean(getOpenAiApiKey()),
       imageModel: OPENAI_IMAGE_MODEL,

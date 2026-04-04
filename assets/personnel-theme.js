@@ -372,7 +372,7 @@
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
         if (p.indexOf("/premium-mailbox") === 0) return "mailbox";
-        if (p.indexOf("/premium-websitepreview") === 0) return "websitepreview";
+        if (p.indexOf("/premium-websitegenerator") === 0) return "websitegenerator";
         if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
         if (p.indexOf("/premium-pakketten") === 0) return "packages";
         if (p.indexOf("/premium-pdfs") === 0) return "pdfs";
@@ -399,9 +399,9 @@
 
     function getWebsitePreviewSidebarLink() {
         return {
-            key: "websitepreview",
-            href: "/premium-websitepreview",
-            label: "Websitepreview",
+            key: "websitegenerator",
+            href: "/premium-websitegenerator",
+            label: "Websitegenerator",
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg>',
         };
     }
