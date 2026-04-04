@@ -1144,6 +1144,7 @@
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
+            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v1';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
             const leadDetailLoadPromiseById = Object.create(null);
@@ -1151,6 +1152,8 @@
             let leadDatabaseIdentityLoaded = false;
             let leadDatabaseIdentityLoadPromise = null;
             let leadDatabaseIdentityByPhone = new Map();
+            let callBackedLeadSources = null;
+            let callBackedLeadSourcesLoadPromise = null;
             let modalOpenSequence = 0;
             let loadLeadsPromise = null;
             let queuedReload = false;
@@ -1305,6 +1308,129 @@
                 return '';
             }
 
+            function readSharedCallSummaryCache() {
+                try {
+                    const raw = String(window.localStorage.getItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY) || '').trim();
+                    if (!raw) return {};
+                    const parsed = JSON.parse(raw);
+                    return parsed && typeof parsed === 'object' ? parsed : {};
+                } catch (error) {
+                    return {};
+                }
+            }
+
+            function getSharedCallSummary(callId) {
+                const normalizedCallId = String(callId || '').trim();
+                if (!normalizedCallId) return '';
+                const cache = readSharedCallSummaryCache();
+                return String(cache?.[normalizedCallId] || '').trim();
+            }
+
+            function setSharedCallSummary(callId, summary) {
+                const normalizedCallId = String(callId || '').trim();
+                const normalizedSummary = String(summary || '').trim();
+                if (!normalizedCallId || !normalizedSummary) return;
+                try {
+                    const cache = readSharedCallSummaryCache();
+                    if (String(cache?.[normalizedCallId] || '').trim() === normalizedSummary) return;
+                    cache[normalizedCallId] = normalizedSummary;
+                    window.localStorage.setItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY, JSON.stringify(cache));
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            }
+
+            function getCallBackedSourceUpdatedMs(item) {
+                const candidates = [item?.updatedAt, item?.analyzedAt, item?.endedAt, item?.startedAt, item?.createdAt];
+                for (const raw of candidates) {
+                    const timestamp = Date.parse(String(raw || '').trim());
+                    if (Number.isFinite(timestamp) && timestamp > 0) return timestamp;
+                }
+                return 0;
+            }
+
+            function getLatestCallBackedSourceItemByCallId(items, callId) {
+                const normalizedCallId = String(callId || '').trim();
+                if (!normalizedCallId) return null;
+                let latestItem = null;
+                (Array.isArray(items) ? items : []).forEach((item) => {
+                    if (String(item?.callId || item?.call_id || '').trim() !== normalizedCallId) return;
+                    if (!latestItem || getCallBackedSourceUpdatedMs(item) > getCallBackedSourceUpdatedMs(latestItem)) {
+                        latestItem = item;
+                    }
+                });
+                return latestItem;
+            }
+
+            async function ensureCallBackedLeadSources() {
+                if (callBackedLeadSources) return callBackedLeadSources;
+                if (callBackedLeadSourcesLoadPromise) return callBackedLeadSourcesLoadPromise;
+
+                callBackedLeadSourcesLoadPromise = (async () => {
+                    const results = await Promise.allSettled([
+                        fetchTasksJson('/api/agenda/interested-leads?limit=500', 8000),
+                        fetchTasksJson('/api/coldcalling/call-updates?limit=500', 8000),
+                        fetchTasksJson('/api/ai/call-insights?limit=500', 8000),
+                    ]);
+                    callBackedLeadSources = {
+                        interestedLeads:
+                            results[0]?.status === 'fulfilled' && Array.isArray(results[0]?.value?.leads)
+                                ? results[0].value.leads
+                                : [],
+                        updates:
+                            results[1]?.status === 'fulfilled' && Array.isArray(results[1]?.value?.updates)
+                                ? results[1].value.updates
+                                : [],
+                        insights:
+                            results[2]?.status === 'fulfilled' && Array.isArray(results[2]?.value?.insights)
+                                ? results[2].value.insights
+                                : [],
+                    };
+                    return callBackedLeadSources;
+                })().finally(() => {
+                    callBackedLeadSourcesLoadPromise = null;
+                });
+
+                return callBackedLeadSourcesLoadPromise;
+            }
+
+            function buildCallBackedModalSourceText(lead, interestedLead, update, insight) {
+                const appointmentDate = String(interestedLead?.date || lead?.date || '').trim();
+                const appointmentTime = normalizeTimeValue(interestedLead?.time || lead?.time || '');
+                const appointmentLocation = String(interestedLead?.location || lead?.location || '').trim();
+                return [
+                    appointmentDate || appointmentTime
+                        ? `Afspraakmoment: ${[appointmentDate, appointmentTime].filter(Boolean).join(' ')}`
+                        : '',
+                    appointmentLocation ? `Locatie: ${appointmentLocation}` : '',
+                    interestedLead?.summary,
+                    interestedLead?.whatsappInfo,
+                    insight?.summary,
+                    insight?.followUpReason,
+                    update?.summary,
+                    update?.transcriptSnippet,
+                    update?.transcriptFull,
+                    lead?.summary,
+                ]
+                    .map((value) => String(value || '').trim())
+                    .filter(Boolean)
+                    .join('\n\n');
+            }
+
+            function getCallBackedModalFallbackSummary(lead, interestedLead, update, insight) {
+                return (
+                    pickReadableSummary(
+                        interestedLead?.summary,
+                        insight?.summary,
+                        insight?.followUpReason,
+                        interestedLead?.whatsappInfo,
+                        lead?.summary,
+                        update?.transcriptSnippet,
+                        update?.transcriptFull
+                    ) || ''
+                );
+            }
+
             function buildModalSourceText(lead, detail) {
                 return [
                     detail?.transcript,
@@ -1357,6 +1483,79 @@
                 };
                 const result = await window.SoftoraAI.summarizeText(payload);
                 return String(result?.summary || '').trim();
+            }
+
+            async function ensureCallBackedModalCopy(taskId, lead) {
+                const id = Number(taskId) || 0;
+                const cacheKey = String(id || `call:${String(lead?.callId || '').trim()}`);
+                const callId = String(lead?.callId || '').trim();
+                if (!callId) return '';
+
+                if (leadAiCopyById[cacheKey]) {
+                    return String(leadAiCopyById[cacheKey]?.summaryText || '').trim();
+                }
+
+                const sharedSummary = getSharedCallSummary(callId);
+                if (sharedSummary) {
+                    leadAiCopyById[cacheKey] = { summaryText: sharedSummary };
+                    return sharedSummary;
+                }
+
+                if (leadAiCopyPromiseById[cacheKey]) {
+                    return leadAiCopyPromiseById[cacheKey];
+                }
+
+                const run = (async () => {
+                    const sources = await ensureCallBackedLeadSources();
+                    const interestedLead = getLatestCallBackedSourceItemByCallId(sources?.interestedLeads, callId);
+                    const update = getLatestCallBackedSourceItemByCallId(sources?.updates, callId);
+                    const insight = getLatestCallBackedSourceItemByCallId(sources?.insights, callId);
+                    const fallbackSummary = getCallBackedModalFallbackSummary(lead, interestedLead, update, insight);
+                    const readableLeadSummary = pickReadableSummary(
+                        interestedLead?.summary,
+                        insight?.summary,
+                        insight?.followUpReason
+                    );
+                    if (readableLeadSummary && readableLeadSummary.length >= 160) {
+                        leadAiCopyById[cacheKey] = { summaryText: readableLeadSummary };
+                        setSharedCallSummary(callId, readableLeadSummary);
+                        return readableLeadSummary;
+                    }
+
+                    const sourceText = buildCallBackedModalSourceText(lead, interestedLead, update, insight);
+                    const shouldRewrite =
+                        !fallbackSummary ||
+                        fallbackSummary === 'Samenvatting volgt na verwerking van het gesprek.' ||
+                        fallbackSummary.length < 160;
+                    if (!shouldRewrite || sourceText.length < 24) {
+                        const preferredSummary = fallbackSummary || '';
+                        if (preferredSummary) {
+                            leadAiCopyById[cacheKey] = { summaryText: preferredSummary };
+                        }
+                        return preferredSummary;
+                    }
+
+                    const mergedRaw = await summarizeWithAi(sourceText, {
+                        style: 'medium',
+                        maxSentences: 5,
+                        extraInstructions:
+                            'Schrijf uitsluitend in natuurlijk Nederlands. Gebruik geen Engels behalve onvermijdelijke eigennamen, merknamen, productnamen, URLs of exacte onvertaalbare termen. Schrijf voor een accountmanager van Softora. Geef een korte, efficiënte samenvatting in doorlopende tekst. Verwerk uitkomst, afspraken, datum/tijd, locatie en vervolgactie in dezelfde tekst als dat bekend is. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+                    });
+
+                    const summaryText = pickReadableSummary(mergedRaw) || fallbackSummary || '';
+                    if (summaryText) {
+                        leadAiCopyById[cacheKey] = { summaryText };
+                        setSharedCallSummary(callId, summaryText);
+                    }
+                    return summaryText;
+                })()
+                    .catch(() => '')
+                    .finally(() => {
+                        delete leadAiCopyPromiseById[cacheKey];
+                    });
+
+                leadAiCopyPromiseById[cacheKey] = run;
+                return run;
             }
 
             async function ensureModalCopyWithAi(taskId, lead, detail) {
@@ -1660,8 +1859,10 @@
                 };
 
                 if (!hasPersistedTask || isCallBackedLead) {
-                    renderLeadDetailsInModal(lead, null, normalizedTaskId);
-                    await ensureMinimumLoader(250);
+                    const summaryText = isCallBackedLead ? await ensureCallBackedModalCopy(normalizedTaskId, lead) : '';
+                    if (openSeq !== modalOpenSequence) return;
+                    renderLeadDetailsInModal(lead, null, normalizedTaskId, { summaryText });
+                    await ensureMinimumLoader(summaryText ? 500 : 250);
                     if (openSeq !== modalOpenSequence) return;
                     setModalLoading(false);
                     setModalBusy(false);

@@ -24,6 +24,7 @@
   const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
   const LEAD_DATABASE_OVERRIDES_STORAGE_KEY = 'softora_coldcalling_lead_database_overrides_json';
+  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v1';
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const STATS_RESET_BASELINE_STORAGE_KEY = 'softora_stats_reset_baseline_started';
@@ -145,6 +146,38 @@
     };
     const result = await window.SoftoraAI.summarizeText(payload);
     return String(result?.summary || '').trim();
+  }
+
+  function readSharedCallSummaryCache() {
+    try {
+      const raw = String(window.localStorage.getItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY) || '').trim();
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function getSharedCallSummary(callId) {
+    const normalizedCallId = normalizeFreeText(callId);
+    if (!normalizedCallId) return '';
+    const cache = readSharedCallSummaryCache();
+    return String(cache?.[normalizedCallId] || '').trim();
+  }
+
+  function setSharedCallSummary(callId, summary) {
+    const normalizedCallId = normalizeFreeText(callId);
+    const normalizedSummary = normalizeFreeText(summary);
+    if (!normalizedCallId || !normalizedSummary) return;
+    try {
+      const cache = readSharedCallSummaryCache();
+      if (String(cache?.[normalizedCallId] || '').trim() === normalizedSummary) return;
+      cache[normalizedCallId] = normalizedSummary;
+      window.localStorage.setItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY, JSON.stringify(cache));
+    } catch (error) {
+      // Ignore storage failures.
+    }
   }
 
   function normalizeBusinessMode(mode) {
@@ -4181,6 +4214,11 @@
       const normalizedCallId = normalizeFreeText(call?.callId || '');
       const insight = getCallInsightRecord(normalizedCallId);
       const interestedLead = getInterestedLeadRecord(normalizedCallId);
+      const sharedSummary = getSharedCallSummary(normalizedCallId);
+      if (sharedSummary) {
+        callDetailSummaryByCallId.set(normalizedCallId, sharedSummary);
+        return sharedSummary;
+      }
       const fallbackSummary = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
       const readableLeadSummary = pickReadableConversationSummary(
         interestedLead?.summary,
@@ -4188,7 +4226,11 @@
         insight?.followUpReason
       );
       const leadSummaryLooksStrong = readableLeadSummary && readableLeadSummary.length >= 160;
-      if (leadSummaryLooksStrong) return readableLeadSummary;
+      if (leadSummaryLooksStrong) {
+        callDetailSummaryByCallId.set(normalizedCallId, readableLeadSummary);
+        setSharedCallSummary(normalizedCallId, readableLeadSummary);
+        return readableLeadSummary;
+      }
 
       const sourceText = buildLeadDatabaseCallSummarySourceText(call, insight, interestedLead);
       const shouldRewrite =
@@ -4216,6 +4258,7 @@
           const cleanedSummary = pickReadableConversationSummary(summaryText) || fallbackSummary;
           if (cleanedSummary) {
             callDetailSummaryByCallId.set(normalizedCallId, cleanedSummary);
+            setSharedCallSummary(normalizedCallId, cleanedSummary);
           }
           return cleanedSummary || fallbackSummary;
         })
