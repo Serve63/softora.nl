@@ -211,6 +211,7 @@ const inMemoryUiStateByScope = new Map();
 const aiCallInsightsByCallId = new Map();
 const aiAnalysisFingerprintByCallId = new Map();
 const aiAnalysisInFlightCallIds = new Set();
+const callRecordingTranscriptionPromiseByCallId = new Map();
 const generatedAgendaAppointments = [];
 const agendaAppointmentIdByCallId = new Map();
 const dismissedInterestedLeadCallIds = new Set();
@@ -8488,6 +8489,328 @@ function pickReadableConversationSummaryForLeadDetail(...candidates) {
   return '';
 }
 
+function inferAudioFileExtension(contentType = '', sourceUrl = '') {
+  const normalizedType = normalizeString(contentType).toLowerCase();
+  if (normalizedType.includes('mpeg') || normalizedType.includes('mp3')) return 'mp3';
+  if (normalizedType.includes('mp4') || normalizedType.includes('m4a')) return 'm4a';
+  if (normalizedType.includes('wav') || normalizedType.includes('x-wav')) return 'wav';
+  if (normalizedType.includes('webm')) return 'webm';
+  if (normalizedType.includes('ogg')) return 'ogg';
+  if (normalizedType.includes('flac')) return 'flac';
+
+  const normalizedUrl = normalizeString(sourceUrl);
+  const match = normalizedUrl.match(/\.([a-z0-9]{2,5})(?:[?#].*)?$/i);
+  const ext = normalizeString(match?.[1] || '').toLowerCase();
+  if (/^(mp3|m4a|wav|webm|ogg|flac)$/.test(ext)) return ext;
+  return 'mp3';
+}
+
+function buildRecordingFileNameForTranscription(callId, contentType = '', sourceUrl = '') {
+  const safeCallId = normalizeString(callId).replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'call';
+  const ext = inferAudioFileExtension(contentType, sourceUrl);
+  return `${safeCallId}.${ext}`;
+}
+
+function getOpenAiTranscriptionModelCandidates() {
+  const configured = normalizeString(
+    process.env.OPENAI_TRANSCRIPTION_MODEL || process.env.OPENAI_AUDIO_TRANSCRIPTION_MODEL || ''
+  );
+  const models = [];
+  if (configured) models.push(configured);
+  ['gpt-4o-transcribe', 'whisper-1'].forEach((candidate) => {
+    if (!models.includes(candidate)) models.push(candidate);
+  });
+  return models;
+}
+
+async function fetchCallRecordingForLeadDetail(callId, callUpdate, interestedLead, aiInsight) {
+  const normalizedCallId = normalizeString(callId);
+  if (!normalizedCallId) return null;
+
+  const sources = [callUpdate, interestedLead, aiInsight].filter((item) => item && typeof item === 'object');
+  const recordingUrl = resolvePreferredRecordingUrl(
+    callUpdate,
+    interestedLead,
+    aiInsight,
+    {
+      callId: normalizedCallId,
+      provider: normalizeString(callUpdate?.provider || interestedLead?.provider || '')
+    }
+  );
+
+  let recordingSid = '';
+  for (const source of sources) {
+    recordingSid =
+      recordingSid ||
+      normalizeString(source?.recordingSid || source?.recording_sid || '') ||
+      extractTwilioRecordingSidFromUrl(
+        source?.recordingUrl ||
+          source?.recording_url ||
+          source?.recordingUrlProxy ||
+          source?.audioUrl ||
+          source?.audio_url ||
+          ''
+      );
+  }
+
+  const providerHint = normalizeString(callUpdate?.provider || interestedLead?.provider || aiInsight?.provider || '');
+  const provider = inferCallProvider(normalizedCallId, providerHint || 'retell');
+  const hasTwilioProxyReference = /\/api\/coldcalling\/recording-proxy/i.test(recordingUrl);
+
+  if ((provider === 'twilio' || recordingSid || hasTwilioProxyReference) && isTwilioStatusApiConfigured()) {
+    try {
+      if (!recordingSid) {
+        const { recordings } = await fetchTwilioRecordingsByCallId(normalizedCallId);
+        const preferred = choosePreferredTwilioRecording(recordings);
+        recordingSid = normalizeString(preferred?.sid || '');
+      }
+
+      if (recordingSid) {
+        const mediaUrl = buildTwilioRecordingMediaUrl(recordingSid);
+        if (mediaUrl) {
+          const { response, bytes } = await fetchBinaryWithTimeout(
+            mediaUrl,
+            {
+              method: 'GET',
+              headers: {
+                Authorization: getTwilioBasicAuthorizationHeader(),
+              },
+            },
+            30000
+          );
+
+          if (!response.ok) {
+            const err = new Error(`Twilio opname ophalen mislukt (${response.status}).`);
+            err.status = response.status;
+            throw err;
+          }
+
+          const contentType = normalizeString(response.headers.get('content-type') || '') || 'audio/mpeg';
+          return {
+            bytes,
+            contentType,
+            sourceUrl: mediaUrl.toString(),
+            fileName: buildRecordingFileNameForTranscription(normalizedCallId || recordingSid, contentType, mediaUrl.toString()),
+          };
+        }
+      }
+    } catch (error) {
+      // Fall through to other recording URLs when direct Twilio fetch fails.
+    }
+  }
+
+  const absoluteRecordingUrl =
+    normalizeAbsoluteHttpUrl(recordingUrl) ||
+    (recordingUrl.startsWith('/') && normalizeAbsoluteHttpUrl(PUBLIC_BASE_URL)
+      ? new URL(recordingUrl, normalizeAbsoluteHttpUrl(PUBLIC_BASE_URL)).toString()
+      : '');
+  if (!absoluteRecordingUrl) return null;
+
+  const { response, bytes } = await fetchBinaryWithTimeout(
+    absoluteRecordingUrl,
+    {
+      method: 'GET',
+    },
+    30000
+  );
+  if (!response.ok) {
+    const err = new Error(`Opname ophalen mislukt (${response.status}).`);
+    err.status = response.status;
+    throw err;
+  }
+
+  const contentType = normalizeString(response.headers.get('content-type') || '') || 'audio/mpeg';
+  return {
+    bytes,
+    contentType,
+    sourceUrl: absoluteRecordingUrl,
+    fileName: buildRecordingFileNameForTranscription(normalizedCallId, contentType, absoluteRecordingUrl),
+  };
+}
+
+async function transcribeCallRecordingForLeadDetail(callId, callUpdate, interestedLead, aiInsight) {
+  const apiKey = getOpenAiApiKey();
+  const normalizedCallId = normalizeString(callId);
+  if (!apiKey || !normalizedCallId) return '';
+
+  const recording = await fetchCallRecordingForLeadDetail(normalizedCallId, callUpdate, interestedLead, aiInsight);
+  if (!recording?.bytes || recording.bytes.length === 0) return '';
+  if (recording.bytes.length > 24 * 1024 * 1024) {
+    throw new Error('Opname is te groot om direct te transcriberen.');
+  }
+
+  const models = getOpenAiTranscriptionModelCandidates();
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      const form = new FormData();
+      form.append(
+        'file',
+        new Blob([recording.bytes], { type: recording.contentType || 'audio/mpeg' }),
+        recording.fileName || buildRecordingFileNameForTranscription(normalizedCallId, recording.contentType, recording.sourceUrl)
+      );
+      form.append('model', model);
+      form.append('language', 'nl');
+      form.append('temperature', '0');
+      form.append('response_format', 'text');
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+
+      try {
+        const response = await fetch(`${OPENAI_API_BASE_URL}/audio/transcriptions`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: form,
+          signal: controller.signal,
+        });
+
+        const rawBody = await response.text();
+        if (!response.ok) {
+          const err = new Error(`OpenAI transcriptie mislukt (${response.status})`);
+          err.status = response.status;
+          err.data = parseJsonLoose(rawBody) || rawBody;
+          throw err;
+        }
+
+        const parsed = parseJsonLoose(rawBody);
+        const transcriptText =
+          normalizeString(parsed?.text || parsed?.transcript || parsed?.output_text || '') ||
+          normalizeString(rawBody);
+        if (transcriptText) {
+          return truncateText(transcriptText, 9000);
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) throw lastError;
+  return '';
+}
+
+async function ensureTranscriptHydratedForLeadDetail(callId, callUpdate, interestedLead, aiInsight) {
+  const normalizedCallId = normalizeString(callId);
+  if (!normalizedCallId) {
+    return { callUpdate, aiInsight, transcript: '' };
+  }
+
+  const existingTranscript =
+    normalizeString(callUpdate?.transcriptFull || callUpdate?.transcriptSnippet || '') ||
+    findTranscriptFromWebhookEvents(normalizedCallId) ||
+    '';
+  if (existingTranscript) {
+    return { callUpdate, aiInsight, transcript: existingTranscript };
+  }
+
+  const existingPromise = callRecordingTranscriptionPromiseByCallId.get(normalizedCallId);
+  if (existingPromise) return existingPromise;
+
+  const run = (async () => {
+    try {
+      const transcript = await transcribeCallRecordingForLeadDetail(
+        normalizedCallId,
+        callUpdate,
+        interestedLead,
+        aiInsight
+      );
+      if (!transcript) {
+        return { callUpdate, aiInsight, transcript: '' };
+      }
+
+      const provider =
+        normalizeString(callUpdate?.provider || interestedLead?.provider || '') ||
+        inferCallProvider(normalizedCallId, 'retell');
+      const recordingUrl = resolvePreferredRecordingUrl(
+        callUpdate,
+        interestedLead,
+        aiInsight,
+        { callId: normalizedCallId, provider }
+      );
+      const nextUpdate = upsertRecentCallUpdate(
+        {
+          ...(callUpdate && typeof callUpdate === 'object' ? callUpdate : {}),
+          callId: normalizedCallId,
+          phone: normalizeString(callUpdate?.phone || interestedLead?.phone || aiInsight?.phone || ''),
+          company:
+            normalizeString(
+              callUpdate?.company || interestedLead?.company || aiInsight?.company || aiInsight?.leadCompany || ''
+            ) || '',
+          name:
+            normalizeString(
+              callUpdate?.name || interestedLead?.contact || aiInsight?.contactName || aiInsight?.leadName || ''
+            ) || '',
+          provider,
+          messageType: normalizeString(callUpdate?.messageType || 'audio.transcription'),
+          transcriptFull: transcript,
+          transcriptSnippet: truncateText(transcript.replace(/\s+/g, ' '), 450),
+          recordingUrl: normalizeString(recordingUrl || callUpdate?.recordingUrl || ''),
+          updatedAt: new Date().toISOString(),
+          updatedAtMs: Date.now(),
+        },
+        {
+          persistReason: 'call_audio_transcription',
+        }
+      );
+
+      let nextInsight =
+        ensureRuleBasedInsightAndAppointment(nextUpdate) ||
+        aiCallInsightsByCallId.get(normalizedCallId) ||
+        aiInsight ||
+        null;
+
+      try {
+        const analyzedInsight = await maybeAnalyzeCallUpdateWithAi(nextUpdate);
+        if (analyzedInsight) nextInsight = analyzedInsight;
+      } catch (error) {
+        console.warn(
+          '[Call Recording AI Analyze Failed]',
+          JSON.stringify(
+            {
+              callId: normalizedCallId,
+              message: error?.message || 'Onbekende fout',
+              status: error?.status || null,
+            },
+            null,
+            2
+          )
+        );
+      }
+
+      return {
+        callUpdate: nextUpdate,
+        aiInsight: nextInsight,
+        transcript,
+      };
+    } catch (error) {
+      console.warn(
+        '[Call Recording Transcription Failed]',
+        JSON.stringify(
+          {
+            callId: normalizedCallId,
+            message: error?.message || 'Onbekende fout',
+            status: error?.status || null,
+          },
+          null,
+          2
+        )
+      );
+      return { callUpdate, aiInsight, transcript: '' };
+    }
+  })().finally(() => {
+    callRecordingTranscriptionPromiseByCallId.delete(normalizedCallId);
+  });
+
+  callRecordingTranscriptionPromiseByCallId.set(normalizedCallId, run);
+  return run;
+}
+
 async function buildConversationSummaryForLeadDetail(callUpdate, aiInsight, interestedLead, transcriptText = '') {
   const transcript = normalizeString(transcriptText || '');
   const transcriptSnippet = normalizeString(callUpdate?.transcriptSnippet || '');
@@ -8558,7 +8881,7 @@ async function buildCallBackedLeadDetail(callId) {
   const normalizedCallId = normalizeString(callId);
   if (!normalizedCallId) return null;
 
-  const callUpdate = getLatestCallUpdateByCallId(normalizedCallId);
+  let callUpdate = getLatestCallUpdateByCallId(normalizedCallId);
   const interestedLead = findInterestedLeadRowByCallId(normalizedCallId);
   let aiInsight = aiCallInsightsByCallId.get(normalizedCallId) || null;
 
@@ -8568,10 +8891,37 @@ async function buildCallBackedLeadDetail(callId) {
     aiInsight = ensureRuleBasedInsightAndAppointment(callUpdate) || aiCallInsightsByCallId.get(normalizedCallId) || null;
   }
 
-  const transcript =
+  let transcript =
     normalizeString(callUpdate?.transcriptFull || callUpdate?.transcriptSnippet || '') ||
     findTranscriptFromWebhookEvents(normalizedCallId) ||
     '';
+
+  const existingReadableSummary = pickReadableConversationSummaryForLeadDetail(
+    callUpdate?.summary,
+    aiInsight?.summary,
+    interestedLead?.summary,
+    aiInsight?.followUpReason
+  );
+  const shouldHydrateTranscript =
+    !transcript &&
+    Boolean(resolvePreferredRecordingUrl(callUpdate, interestedLead, aiInsight)) &&
+    (!existingReadableSummary || existingReadableSummary.length < 220);
+
+  if (shouldHydrateTranscript) {
+    const hydrated = await ensureTranscriptHydratedForLeadDetail(
+      normalizedCallId,
+      callUpdate,
+      interestedLead,
+      aiInsight
+    );
+    if (hydrated?.callUpdate) callUpdate = hydrated.callUpdate;
+    if (hydrated?.aiInsight) aiInsight = hydrated.aiInsight;
+    transcript =
+      normalizeString(hydrated?.transcript || callUpdate?.transcriptFull || callUpdate?.transcriptSnippet || '') ||
+      findTranscriptFromWebhookEvents(normalizedCallId) ||
+      '';
+  }
+
   const summary = await buildConversationSummaryForLeadDetail(callUpdate, aiInsight, interestedLead, transcript);
   const recordingUrl = resolvePreferredRecordingUrl(
     callUpdate,
@@ -9183,6 +9533,19 @@ async function fetchJsonWithTimeout(url, options, timeoutMs = 15000) {
     }
 
     return { response, data };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchBinaryWithTimeout(url, options, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const bytes = Buffer.from(await response.arrayBuffer());
+    return { response, bytes };
   } finally {
     clearTimeout(timeout);
   }
