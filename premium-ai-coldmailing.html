@@ -21,7 +21,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260402-6" defer></script>
+    <script src="assets/personnel-theme.js?v=20260404-3" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -1150,6 +1150,23 @@
             let loadLeadsPromise = null;
             let queuedReload = false;
 
+            function paintLocalLeadsBadge(count) {
+                const badge = document.querySelector('[data-sidebar-count-key="leads"]');
+                if (!badge) return;
+                const safeCount = Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0;
+                if (safeCount <= 0) {
+                    badge.hidden = true;
+                    badge.dataset.countZero = '1';
+                    badge.textContent = '0';
+                    return;
+                }
+                badge.hidden = false;
+                badge.dataset.countZero = '0';
+                badge.textContent = safeCount > 99 ? '99+' : String(safeCount);
+                badge.title = `${safeCount} ${safeCount === 1 ? 'open lead' : 'open leads'}`;
+                badge.setAttribute('aria-label', badge.title);
+            }
+
             function esc(value) {
                 return String(value || '')
                     .replace(/&/g, '&amp;')
@@ -2039,6 +2056,7 @@
                     ) {
                         window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
                     }
+                    paintLocalLeadsBadge(currentLeadCount);
                     return;
                 }
 
@@ -2087,6 +2105,7 @@
                 ) {
                     window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
                 }
+                paintLocalLeadsBadge(currentLeadCount);
             }
 
             function sortByDateDesc(a, b) {
@@ -2660,6 +2679,7 @@
                 if (window.SoftoraPersonnelTheme && typeof window.SoftoraPersonnelTheme.refreshSidebarCounts === 'function') {
                     window.SoftoraPersonnelTheme.refreshSidebarCounts();
                 }
+                paintLocalLeadsBadge(Array.isArray(allLeads) ? allLeads.length : 0);
             }
 
             pollTimer = window.setInterval(() => {
@@ -2681,6 +2701,8 @@
                 }
                 if (pollTimer) window.clearInterval(pollTimer);
             });
+
+            paintLocalLeadsBadge(Array.isArray(allLeads) ? allLeads.length : 0);
         })();
     </script>
 </body>
