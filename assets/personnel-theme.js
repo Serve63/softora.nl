@@ -954,6 +954,10 @@
             phone: String((item && item.phone) || "").trim(),
             date: String((item && item.date) || "").trim(),
             time: String((item && item.time) || "").trim(),
+            callId: String((item && item.callId) || "").trim(),
+            createdAt: String((item && item.createdAt) || "").trim(),
+            confirmationTaskCreatedAt: String((item && item.confirmationTaskCreatedAt) || "").trim(),
+            updatedAt: String((item && item.updatedAt) || "").trim(),
         };
     }
 
@@ -990,6 +994,50 @@
         const contactKey = normalizeLeadFieldForCount(item && item.contact);
         if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
         return "";
+    }
+
+    function buildLeadRecencyTimestampForCount(item) {
+        if (!item || typeof item !== "object") return 0;
+        const preferred = Date.parse(
+            String(item.confirmationTaskCreatedAt || item.createdAt || item.updatedAt || "").trim()
+        );
+        if (Number.isFinite(preferred) && preferred > 0) return preferred;
+
+        const date = String(item.date || "").trim();
+        const time = String(item.time || "").trim() || "09:00";
+        const combined = date ? Date.parse(`${date}T${time}:00`) : 0;
+        if (Number.isFinite(combined) && combined > 0) return combined;
+        return 0;
+    }
+
+    function filterInterestedRowsForCount(interestedRows, existingRows) {
+        const existingLatestTsByKey = new Map();
+        (Array.isArray(existingRows) ? existingRows : []).forEach(function (row) {
+            const key = buildLeadMatchKeyForCount(row);
+            if (!key) return;
+            existingLatestTsByKey.set(
+                key,
+                Math.max(Number(existingLatestTsByKey.get(key) || 0), buildLeadRecencyTimestampForCount(row))
+            );
+        });
+
+        const seenKeys = new Set();
+        const seenCallIds = new Set();
+        return (Array.isArray(interestedRows) ? interestedRows : []).filter(function (row) {
+            const callId = String((row && row.callId) || "").trim();
+            const matchKey = buildLeadMatchKeyForCount(row);
+            if (
+                matchKey &&
+                Number(existingLatestTsByKey.get(matchKey) || 0) >= buildLeadRecencyTimestampForCount(row)
+            ) {
+                return false;
+            }
+            if (matchKey && seenKeys.has(matchKey)) return false;
+            if (callId && seenCallIds.has(callId)) return false;
+            if (matchKey) seenKeys.add(matchKey);
+            if (callId) seenCallIds.add(callId);
+            return true;
+        });
     }
 
     function buildLeadInterestSignalTextForCount(update, insight) {
@@ -1119,6 +1167,14 @@
         }
     }
 
+    async function fetchFirstJsonNoStore(urls) {
+        for (let i = 0; i < urls.length; i += 1) {
+            const data = await fetchJsonNoStore(urls[i]);
+            if (data) return data;
+        }
+        return null;
+    }
+
     function getSidebarCountBadge(countKey) {
         return document.querySelector(`[data-sidebar-count-key="${String(countKey || "").trim()}"]`);
     }
@@ -1172,12 +1228,14 @@
         if (!badge) return;
         const cachedLeadCount = readCachedSidebarCount("leads");
 
-        const responses = await Promise.all([
-            fetchJsonNoStore("/api/agenda/confirmation-tasks?limit=400"),
+        const [tasksData, interestedLeadsData] = await Promise.all([
+            fetchFirstJsonNoStore([
+                "/api/agenda/confirmation-tasks?quick=1&limit=400",
+                "/api/agenda/confirmation-tasks?fast=1&limit=400",
+                "/api/agenda/confirmation-tasks?limit=400",
+            ]),
             fetchJsonNoStore("/api/agenda/interested-leads?limit=500"),
         ]);
-        const tasksData = responses[0];
-        const interestedLeadsData = responses[1];
 
         if (!tasksData && !interestedLeadsData) {
             if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
@@ -1191,9 +1249,10 @@
         const pendingRows = Array.isArray(tasksData && tasksData.tasks)
             ? tasksData.tasks.map(normalizeLeadRowForCount)
             : [];
-        const interestedRows = Array.isArray(interestedLeadsData && interestedLeadsData.leads)
+        const interestedRowsRaw = Array.isArray(interestedLeadsData && interestedLeadsData.leads)
             ? interestedLeadsData.leads.map(normalizeLeadRowForCount)
             : [];
+        const interestedRows = filterInterestedRowsForCount(interestedRowsRaw, pendingRows);
         const total = dedupeLeadRowsForCount([].concat(pendingRows, interestedRows)).length;
         paintSidebarCount("leads", total, { singular: "open lead", plural: "open leads" });
     }
