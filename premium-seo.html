@@ -549,6 +549,7 @@ body {
   }
 }
 </style>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
 <div class="dashboard-layout">
@@ -790,11 +791,11 @@ function charCount(inputId, countId, max) {
 function startScan() {
   const btn = document.getElementById('scan-btn');
   btn.disabled = true;
-  document.getElementById('scan-result').innerHTML = `
+  document.getElementById('scan-result').innerHTML = DOMPurify.sanitize(`
     <div class="scan-loading">
       <div class="loader"></div>
       <div class="loader-text">Bezig met scannen van softora.nl…</div>
-    </div>`;
+    </div>`);
 
   setTimeout(() => {
     renderScanResult();
@@ -830,7 +831,7 @@ function renderScanResult() {
     { level: 'ok', text: 'Mobile-friendly', sub: 'Pagina reageert correct op mobiele schermen', tag: 'OK' },
   ];
 
-  document.getElementById('scan-result').innerHTML = `
+  document.getElementById('scan-result').innerHTML = DOMPurify.sanitize(`
     <div class="scan-overview">
       <div class="score-card">
         <div class="score-ring">
@@ -848,7 +849,7 @@ function renderScanResult() {
         <div class="score-verdict ${verdictClass}">${verdictText}</div>
       </div>
       <div class="metrics-grid">
-        ${metrics.map((m) => `
+        ${metrics.map((m) => `);
           <div class="metric-card">
             <div class="metric-title">${m.title}</div>
             <div class="metric-val" style="color:${m.color}">${m.val}</div>
@@ -905,9 +906,9 @@ function setStatus(id, state) {
   const el = document.getElementById(id + '-status');
   if (!el) return;
   if (state === 'loading') {
-    el.innerHTML = '<div class="ai-status loading"><div class="ai-dot"></div> Bezig…</div>';
+    el.innerHTML = DOMPurify.sanitize('<div class="ai-status loading"><div class="ai-dot"></div> Bezig…</div>');
   } else if (state === 'done') {
-    el.innerHTML = '<div class="ai-status done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Geoptimaliseerd</div>';
+    el.innerHTML = DOMPurify.sanitize('<div class="ai-status done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Geoptimaliseerd</div>');
   } else {
     el.innerHTML = '';
   }
@@ -944,7 +945,7 @@ function optimiseField(type) {
 function optimiseAll() {
   const btn = document.getElementById('btn-all');
   btn.disabled = true;
-  btn.innerHTML = '<div class="loader" style="width:16px;height:16px;border-width:2px"></div> Bezig…';
+  btn.innerHTML = DOMPurify.sanitize('<div class="loader" style="width:16px;height:16px;border-width:2px"></div> Bezig…');
   const types = ['meta', 'og', 'h', 'alt'];
   types.forEach((t, i) => {
     setStatus(t, 'loading');
@@ -952,7 +953,7 @@ function optimiseAll() {
   });
   setTimeout(() => {
     btn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Alles AI optimaliseren';
+    btn.innerHTML = DOMPurify.sanitize('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Alles AI optimaliseren');
     toast('✓ Alle SEO-velden geoptimaliseerd!');
   }, types.length * 700 + 1600);
 }
@@ -975,20 +976,20 @@ let kwData = [...keywords];
 function renderKeywords() {
   const grid = document.getElementById('kw-grid');
   const diffClass = { 'Laag': 'diff-low', 'Gemiddeld': 'diff-mid', 'Hoog': 'diff-high' };
-  grid.innerHTML = kwData.map((k) => `
+  grid.innerHTML = DOMPurify.sanitize(kwData.map((k) => `
     <div class="kw-item">
       <div class="kw-term">${k.term}</div>
       <div class="kw-meta">
         <span class="kw-vol">${k.vol}</span>
         <span class="kw-diff ${diffClass[k.diff]}">${k.diff}</span>
       </div>
-    </div>`).join('');
+    </div>`).join(''));
 }
 
 function refreshKeywords() {
   const btn = document.getElementById('keywords-refresh-btn');
   btn.disabled = true;
-  btn.innerHTML = '<div class="loader" style="width:14px;height:14px;border-width:2px"></div> Genereren…';
+  btn.innerHTML = DOMPurify.sanitize('<div class="loader" style="width:14px;height:14px;border-width:2px"></div> Genereren…');
   setTimeout(() => {
     kwData = [
       ...keywords,
@@ -997,7 +998,7 @@ function refreshKeywords() {
     ];
     renderKeywords();
     btn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> AI suggesties genereren';
+    btn.innerHTML = DOMPurify.sanitize('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> AI suggesties genereren');
     toast('✓ Keywords bijgewerkt');
   }, 1800);
 }

@@ -848,6 +848,8 @@
             .build-mode-hint { display: none; }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="assets/shared.js"></script>
 </head>
 <body>
 
@@ -1208,10 +1210,6 @@
         let buildMode = 'premium';
         let lastSelectedOrderId = null;
 
-        function getTime() {
-            return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        }
-
         function loadBuildMode() {
             return 'premium';
         }
@@ -1244,24 +1242,6 @@
             const raw = String(text || '').replace(/[^0-9]/g, '');
             const n = Number(raw);
             return Number.isFinite(n) ? n : null;
-        }
-
-        function escapeHtml(str) {
-            return String(str || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
-
-        function slugify(s) {
-            return String(s || '')
-                .toLowerCase()
-                .replace(/[^a-z0-9\s-]/g, '')
-                .trim()
-                .replace(/\s+/g, '-')
-                .replace(/-+/g, '-');
         }
 
         function deriveFeatures(desc) {
@@ -1427,11 +1407,11 @@
             let stepIndex = 0;
             const buildSteps = getBuildSteps();
 
-            btn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Verwerken...';
+            btn.innerHTML = DOMPurify.sanitize('<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Verwerken...');
 
             function nextStep() {
                 if (stepIndex >= buildSteps.length) {
-                    btn.innerHTML = '✓ Opgeleverd';
+                    btn.innerHTML = DOMPurify.sanitize('✓ Opgeleverd');
                     btn.classList.remove('running');
                     btn.classList.add('done');
 
@@ -1488,13 +1468,13 @@
             if (!orders[id].logs.length) {
                 const div = document.createElement('div');
                 div.className = 'modal-log-entry';
-                div.innerHTML = '<span class="time">[--:--:--]</span> <span class="highlight">Nog geen activiteit. Start de opdracht om voortgang te zien.</span>';
+                div.innerHTML = DOMPurify.sanitize('<span class="time">[--:--:--]</span> <span class="highlight">Nog geen activiteit. Start de opdracht om voortgang te zien.</span>');
                 log.appendChild(div);
             } else {
                 orders[id].logs.forEach(entry => {
                     const div = document.createElement('div');
                     div.className = 'modal-log-entry';
-                    div.innerHTML = `<span class="time">[${entry.time}]</span> <span class="${entry.highlight ? 'success' : 'highlight'}">${entry.msg}</span>`;
+                    div.innerHTML = DOMPurify.sanitize(`<span class="time">[${entry.time}]</span> <span class="${entry.highlight ? 'success' : 'highlight'}">${entry.msg}</span>`);
                     log.appendChild(div);
                 });
             }

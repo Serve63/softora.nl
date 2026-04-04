@@ -2545,7 +2545,7 @@ function queueRuntimeStatePersist(reason = 'unknown') {
   if (!isSupabaseConfigured()) return Promise.resolve(false);
 
   supabasePersistChain = supabasePersistChain
-    .catch(() => null)
+    .catch((error) => { console.error('[Supabase][PersistChainReset]', error?.message || error); return null; })
     .then(() => persistRuntimeStateToSupabase(reason))
     .catch((error) => {
       console.error('[Supabase][PersistQueueError]', error?.message || error);
@@ -2659,7 +2659,7 @@ function queueCallUpdateRowPersist(callUpdate, reason = 'call_update_row') {
   if (!callId || callId.startsWith('demo-')) return Promise.resolve(false);
 
   supabaseCallUpdatePersistChain = supabaseCallUpdatePersistChain
-    .catch(() => null)
+    .catch((error) => { console.error('[Supabase][CallUpdateChainReset]', error?.message || error); return null; })
     .then(() => persistSingleCallUpdateRowToSupabase(callUpdate, reason))
     .catch((error) => {
       supabaseLastCallUpdatePersistError = truncateText(error?.message || String(error), 500);
@@ -12827,12 +12827,7 @@ async function sendPremiumDashboardChatResponse(req, res) {
   }
 }
 
-app.post('/api/ai/dashboard-chat', async (req, res) => {
-  return sendPremiumDashboardChatResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ai-dashboard-chat', async (req, res) => {
+app.post(['/api/ai/dashboard-chat', '/api/ai-dashboard-chat'], async (req, res) => {
   return sendPremiumDashboardChatResponse(req, res);
 });
 
@@ -12968,12 +12963,7 @@ async function sendAiOrderDossierResponse(req, res) {
   }
 }
 
-app.post('/api/ai/order-dossier', async (req, res) => {
-  return sendAiOrderDossierResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ai-order-dossier', async (req, res) => {
+app.post(['/api/ai/order-dossier', '/api/ai-order-dossier'], async (req, res) => {
   return sendAiOrderDossierResponse(req, res);
 });
 
@@ -13049,12 +13039,7 @@ async function sendAiTranscriptToPromptResponse(req, res) {
   }
 }
 
-app.post('/api/ai/transcript-to-prompt', async (req, res) => {
-  return sendAiTranscriptToPromptResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ai-transcript-to-prompt', async (req, res) => {
+app.post(['/api/ai/transcript-to-prompt', '/api/ai-transcript-to-prompt'], async (req, res) => {
   return sendAiTranscriptToPromptResponse(req, res);
 });
 
@@ -13135,12 +13120,7 @@ async function sendAiNotesImageToTextResponse(req, res) {
   }
 }
 
-app.post('/api/ai/notes-image-to-text', async (req, res) => {
-  return sendAiNotesImageToTextResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ai-notes-image-to-text', async (req, res) => {
+app.post(['/api/ai/notes-image-to-text', '/api/ai-notes-image-to-text'], async (req, res) => {
   return sendAiNotesImageToTextResponse(req, res);
 });
 
@@ -13240,12 +13220,7 @@ async function sendActiveOrderGenerateSiteResponse(req, res) {
   }
 }
 
-app.post('/api/active-orders/generate-site', async (req, res) => {
-  return sendActiveOrderGenerateSiteResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/active-order-generate-site', async (req, res) => {
+app.post(['/api/active-orders/generate-site', '/api/active-order-generate-site'], async (req, res) => {
   return sendActiveOrderGenerateSiteResponse(req, res);
 });
 
@@ -13303,12 +13278,7 @@ async function sendActiveOrderLaunchSiteResponse(req, res) {
   }
 }
 
-app.post('/api/active-orders/launch-site', async (req, res) => {
-  return sendActiveOrderLaunchSiteResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/active-order-launch-site', async (req, res) => {
+app.post(['/api/active-orders/launch-site', '/api/active-order-launch-site'], async (req, res) => {
   return sendActiveOrderLaunchSiteResponse(req, res);
 });
 
@@ -13765,16 +13735,21 @@ app.post('/api/dashboard/activity', (req, res) => {
 });
 
 app.get('/api/agenda/appointments', async (req, res) => {
+  const quickMode = toBooleanSafe(req.query.quick, false) || toBooleanSafe(req.query.fast, false);
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
-  if (isImapMailConfigured()) {
+  if (!quickMode && isImapMailConfigured()) {
     await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
   }
   backfillInsightsAndAppointmentsFromRecentCallUpdates();
-  await refreshAgendaAppointmentCallSourcesIfNeeded();
+  if (!quickMode) {
+    await refreshAgendaAppointmentCallSourcesIfNeeded();
+  }
   backfillGeneratedAgendaAppointmentsMetadataIfNeeded();
-  await refreshGeneratedAgendaSummariesIfNeeded();
+  if (!quickMode) {
+    await refreshGeneratedAgendaSummariesIfNeeded();
+  }
   const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 200)));
   const sorted = generatedAgendaAppointments
     .filter(isGeneratedAppointmentVisibleForAgenda)
@@ -16241,6 +16216,13 @@ function seedDemoConfirmationTaskForUiTesting() {
 
   console.log('[Startup] Demo bevestigingstaak toegevoegd voor UI-testen.');
 }
+
+// Global error handler — vangt onverwachte fouten op zonder stack trace te lekken
+app.use((err, req, res, _next) => {
+  console.error('[UnhandledError]', err?.message || err, { path: req?.path, method: req?.method });
+  if (res.headersSent) return;
+  res.status(500).json({ ok: false, error: 'Er is een onverwachte fout opgetreden.' });
+});
 
 // In serverless (zoals Vercel) wordt startServer() niet aangeroepen, dus seed de
 // demo-taak ook bij module-load. De functie is idempotent op basis van callId.

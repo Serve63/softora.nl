@@ -788,6 +788,8 @@
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="assets/shared.js"></script>
 </head>
 <body>
 
@@ -1020,15 +1022,6 @@
             pollTimer: null,
         };
 
-        function escapeHtml(str) {
-            return String(str || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
-
         function formatTaskDateTimeLabel(task) {
             if (task?.datetimeLabel) return String(task.datetimeLabel);
             const date = String(task?.date || '');
@@ -1054,11 +1047,11 @@
             countEl.textContent = `${tasks.length} ${tasks.length === 1 ? 'taak' : 'taken'}`;
 
             if (!tasks.length) {
-                listEl.innerHTML = '<div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>';
+                listEl.innerHTML = DOMPurify.sanitize('<div class="confirm-task-empty">Geen open taken voor bevestigingsmails.</div>');
                 return;
             }
 
-            listEl.innerHTML = tasks.map((task) => {
+            listEl.innerHTML = DOMPurify.sanitize(tasks.map((task) => {
                 const company = escapeHtml(task.company || 'Onbekende lead');
                 const contact = escapeHtml(task.contact || 'Onbekend');
                 const timeLabel = escapeHtml(formatTaskDateTimeLabel(task));
@@ -1073,7 +1066,7 @@
                         <button type="button" class="confirm-task-action magnetic" data-complete-task-id="${Number(task.id) || 0}">Gedaan</button>
                     </div>
                 `;
-            }).join('');
+            }).join(''));
 
             listEl.querySelectorAll('[data-complete-task-id]').forEach((btn) => {
                 btn.addEventListener('click', async (e) => {
@@ -1125,13 +1118,13 @@
                 if (activityList && data.appointment) {
                     const item = document.createElement('div');
                     item.className = 'activity-item';
-                    item.innerHTML = `
+                    item.innerHTML = DOMPurify.sanitize(`
                         <div class="activity-dot" style="background: var(--green);"></div>
                         <div>
                             <div class="activity-text"><strong>Bevestigingsmail verstuurd</strong> naar ${escapeHtml(data.appointment.company || 'lead')}</div>
                             <div class="activity-time">Zojuist</div>
                         </div>
-                    `;
+                    `);
                     activityList.prepend(item);
                     while (activityList.children.length > 6) {
                         activityList.removeChild(activityList.lastElementChild);

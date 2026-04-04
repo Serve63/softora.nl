@@ -1367,6 +1367,8 @@
             .claim-order-actions .modal-btn { width: 100%; min-width: 0; }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="assets/shared.js"></script>
 </head>
 <body>
 
@@ -1689,63 +1691,6 @@
             ]
         };
 
-        function getTime() {
-            return new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        }
-
-        async function fetchUiStateGetWithFallback(scope) {
-            const encodedScope = encodeURIComponent(String(scope || ''));
-            const urls = [
-                `/api/ui-state-get?scope=${encodedScope}`,
-                `/api/ui-state/${encodedScope}`
-            ];
-            let lastError = null;
-
-            for (const url of urls) {
-                try {
-                    const res = await fetch(url, {
-                        method: 'GET',
-                        cache: 'no-store'
-                    });
-                    if (!res.ok) {
-                        throw new Error(`UI-state GET mislukt (${res.status})`);
-                    }
-                    return await res.json().catch(() => ({}));
-                } catch (error) {
-                    lastError = error;
-                }
-            }
-
-            throw lastError || new Error('UI-state GET mislukt');
-        }
-
-        async function fetchUiStateSetWithFallback(scope, body) {
-            const encodedScope = encodeURIComponent(String(scope || ''));
-            const urls = [
-                `/api/ui-state-set?scope=${encodedScope}`,
-                `/api/ui-state/${encodedScope}`
-            ];
-            let lastError = null;
-
-            for (const url of urls) {
-                try {
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(body || {})
-                    });
-                    if (!res.ok) {
-                        throw new Error(`UI-state POST mislukt (${res.status})`);
-                    }
-                    return await res.json().catch(() => ({}));
-                } catch (error) {
-                    lastError = error;
-                }
-            }
-
-            throw lastError || new Error('UI-state POST mislukt');
-        }
-
         async function loadRemoteUiState() {
             if (remoteUiStateLoaded) return true;
             if (remoteUiStateLoadPromise) return remoteUiStateLoadPromise;
@@ -1858,15 +1803,6 @@
             if (typeof value === 'string' && value.trim() === '') return null;
             const n = Number(value);
             return Number.isFinite(n) ? n : null;
-        }
-
-        function escapeHtml(str) {
-            return String(str || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
         }
 
         function normalizeDataUrlImage(value) {
@@ -2023,15 +1959,6 @@
             if (!deleteBtn) return;
             deleteBtn.textContent = label || 'Project uit systeem halen';
             deleteBtn.disabled = Boolean(disabled);
-        }
-
-        function slugify(s) {
-            return String(s || '')
-                .toLowerCase()
-                .replace(/[^a-z0-9\s-]/g, '')
-                .trim()
-                .replace(/\s+/g, '-')
-                .replace(/-+/g, '-');
         }
 
         function deriveFeatures(desc) {
@@ -2622,7 +2549,7 @@
                 } else {
                     btnEl.classList.remove('claimed');
                 }
-                btnEl.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h18M5.25 7.5v10.5A1.5 1.5 0 0 0 6.75 19.5h10.5a1.5 1.5 0 0 0 1.5-1.5V7.5M9 7.5V6a3 3 0 1 1 6 0v1.5"></path></svg> Open dossier';
+                btnEl.innerHTML = DOMPurify.sanitize('<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h18M5.25 7.5v10.5A1.5 1.5 0 0 0 6.75 19.5h10.5a1.5 1.5 0 0 0 1.5-1.5V7.5M9 7.5V6a3 3 0 1 1 6 0v1.5"></path></svg> Open dossier');
             }
 
             if (completeBtnEl) {
@@ -2838,7 +2765,7 @@
             ensureOrderRuntimeState(record);
 
             const wrapper = document.createElement('div');
-            wrapper.innerHTML = renderCustomOrderCardHtml(record).trim();
+            wrapper.innerHTML = DOMPurify.sanitize(renderCustomOrderCardHtml(record).trim());
             const card = wrapper.firstElementChild;
             if (!card) return null;
 
@@ -3616,7 +3543,7 @@
             if (Number(currentModalId) !== Number(id)) return;
             const overview = document.getElementById('modalOverview');
             if (overview) {
-                overview.innerHTML = renderModalOverviewHtml(id);
+                overview.innerHTML = DOMPurify.sanitize(renderModalOverviewHtml(id));
             }
         }
 
@@ -3918,7 +3845,7 @@
             if (!modal || !summaryEl || !input || !orders[activeId]) return;
 
             currentClaimOrderId = activeId;
-            summaryEl.innerHTML = renderClaimOrderSummary(activeId);
+            summaryEl.innerHTML = DOMPurify.sanitize(renderClaimOrderSummary(activeId));
             input.value = '';
             setClaimOrderMessage('', '');
 

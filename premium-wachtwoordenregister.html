@@ -401,6 +401,7 @@ body {
   }
 }
 </style>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
 <div class="dashboard-layout">
@@ -607,9 +608,9 @@ let activeCat = 'Alle';
 const visible = {};
 
 function renderCats() {
-  document.getElementById('cat-bar').innerHTML = cats.map((c) =>
+  document.getElementById('cat-bar').innerHTML = DOMPurify.sanitize(cats.map((c) =>
     `<button class="cat-pill ${c === activeCat ? 'active' : ''}" onclick="setCat('${c}')">${c}</button>`
-  ).join('');
+  ).join(''));
 }
 
 function setCat(c) {
@@ -627,10 +628,10 @@ function render() {
   });
   const list = document.getElementById('list');
   if (!filtered.length) {
-    list.innerHTML = '<div class="empty">Geen resultaten gevonden.</div>';
+    list.innerHTML = DOMPurify.sanitize('<div class="empty">Geen resultaten gevonden.</div>');
     return;
   }
-  list.innerHTML = filtered.map((e) => {
+  list.innerHTML = DOMPurify.sanitize(filtered.map((e) => {
     const show = visible[e.id];
     return `<div class="t-row">
       <div class="t-name">
@@ -654,7 +655,7 @@ function render() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
       </button>
     </div>`;
-  }).join('');
+  }).join(''));
 }
 
 function toggleVis(id) {

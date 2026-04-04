@@ -348,6 +348,7 @@
             .modal-details { grid-template-columns: 1fr; }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
 
@@ -601,7 +602,7 @@
             html += '</div>';
         }
 
-        grid.innerHTML = html;
+        grid.innerHTML = DOMPurify.sanitize(html);
         document.querySelectorAll('.appointment.magnetic').forEach((elem) => {
             elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
             elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));

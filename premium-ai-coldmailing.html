@@ -943,6 +943,7 @@
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
 
@@ -1457,7 +1458,7 @@
                 const person = resolveLeadContactPerson(lead, detail) || 'Onbekend';
                 const company = resolveLeadCompanyName(lead, detail) || 'Onbekend';
                 const phone = resolveLeadPhoneNumber(lead, detail) || 'Niet ingevuld';
-                modalContactMeta.innerHTML = `
+                modalContactMeta.innerHTML = DOMPurify.sanitize(`
                     <div class="lead-modal-meta-item">
                         <div class="lead-modal-meta-label">Naam</div>
                         <div class="lead-modal-meta-value">${esc(person)}</div>
@@ -1470,7 +1471,7 @@
                         <div class="lead-modal-meta-label">Telefoon</div>
                         <div class="lead-modal-meta-value">${esc(phone)}</div>
                     </div>
-                `;
+                `);
             }
 
             function setModalLoading(nextLoading, message) {
@@ -2049,7 +2050,7 @@
                 const currentLeadCount = Array.isArray(allLeads) ? allLeads.length : 0;
                 window.__softoraLeadsPageCount = currentLeadCount;
                 if (!allLeads.length) {
-                    listEl.innerHTML = '<div class="lead-empty">Nog geen leads gevonden.</div>';
+                    listEl.innerHTML = DOMPurify.sanitize('<div class="lead-empty">Nog geen leads gevonden.</div>');
                     if (
                         window.SoftoraPersonnelTheme &&
                         typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
@@ -2060,7 +2061,7 @@
                     return;
                 }
 
-                listEl.innerHTML = allLeads.map((item) => {
+                listEl.innerHTML = DOMPurify.sanitize(allLeads.map((item) => {
                     const companyRaw = String(item.company || 'Onbekende lead').trim() || 'Onbekende lead';
                     const company = esc(companyRaw);
                     const leadTypeClass = leadTypeToClass(resolveLeadType(item));
@@ -2085,7 +2086,7 @@
                             <span class="lead-chip ${chipClass}">${chipLabel}</span>
                         </article>
                     `;
-                }).join('');
+                }).join(''));
 
                 listEl.querySelectorAll('[data-lead-open]').forEach((itemEl) => {
                     const taskId = Number(itemEl.getAttribute('data-lead-open')) || 0;

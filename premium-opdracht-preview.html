@@ -458,6 +458,8 @@
       }
     }
   </style>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="assets/shared.js"></script>
 </head>
 <body data-preview-mode="fallback">
   <div class="card" id="fallback">
@@ -508,24 +510,8 @@
         hideOverlayOnNextReady: false
       }
 
-      function safeJsonParse(raw, fallback) {
-        try {
-          return JSON.parse(raw);
-        } catch (_) {
-          return fallback;
-        }
-      }
-
       function getPreviewStorageKey(orderId) {
         return PREVIEW_HTML_PREFIX + String(orderId);
-      }
-
-      function getTime() {
-        return new Date().toLocaleTimeString('nl-NL', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        });
       }
 
       function copyText(text) {
@@ -552,55 +538,6 @@
             reject(error);
           }
         });
-      }
-
-      async function fetchUiStateGetWithFallback(scope) {
-        const encodedScope = encodeURIComponent(String(scope || ''));
-        const urls = [
-          '/api/ui-state-get?scope=' + encodedScope,
-          '/api/ui-state/' + encodedScope
-        ];
-        let lastError = null;
-
-        for (const url of urls) {
-          try {
-            const res = await fetch(url, {
-              method: 'GET',
-              cache: 'no-store'
-            });
-            if (!res.ok) throw new Error('UI-state GET mislukt (' + res.status + ')');
-            return await res.json().catch(function () { return {}; });
-          } catch (error) {
-            lastError = error;
-          }
-        }
-
-        throw lastError || new Error('UI-state GET mislukt');
-      }
-
-      async function fetchUiStateSetWithFallback(scope, body) {
-        const encodedScope = encodeURIComponent(String(scope || ''));
-        const urls = [
-          '/api/ui-state-set?scope=' + encodedScope,
-          '/api/ui-state/' + encodedScope
-        ];
-        let lastError = null;
-
-        for (const url of urls) {
-          try {
-            const res = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body || {})
-            });
-            if (!res.ok) throw new Error('UI-state POST mislukt (' + res.status + ')');
-            return await res.json().catch(function () { return {}; });
-          } catch (error) {
-            lastError = error;
-          }
-        }
-
-        throw lastError || new Error('UI-state POST mislukt');
       }
 
       async function postGenerateSiteRequest(payload) {
@@ -1218,12 +1155,12 @@
           await copyText(state.currentHtml);
           state.copyBtn.textContent = 'HTML gekopieerd';
           window.setTimeout(function () {
-            state.copyBtn.innerHTML = originalLabel;
+            state.copyBtn.innerHTML = DOMPurify.sanitize(originalLabel);
           }, 1800);
         } catch (_) {
           state.copyBtn.textContent = 'Kopieren mislukt';
           window.setTimeout(function () {
-            state.copyBtn.innerHTML = originalLabel;
+            state.copyBtn.innerHTML = DOMPurify.sanitize(originalLabel);
           }, 1800);
         }
       }

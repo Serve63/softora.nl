@@ -663,6 +663,8 @@
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="assets/shared.js"></script>
 </head>
 <body>
     <div class="dashboard-layout">
@@ -740,15 +742,6 @@
                     .replace(/'/g, '&#039;');
             }
 
-            function safeJsonParse(value, fallback) {
-                try {
-                    const parsed = JSON.parse(String(value || ''));
-                    return parsed === null || parsed === undefined ? fallback : parsed;
-                } catch (_) {
-                    return fallback;
-                }
-            }
-
             function normalizeText(value) {
                 return String(value || '')
                     .replace(/\r/g, '\n')
@@ -822,11 +815,11 @@
             }
 
             function renderError(message) {
-                root.innerHTML = `<div class="error">${esc(message || 'Uitvoerdossier niet gevonden.')}</div>`;
+                root.innerHTML = DOMPurify.sanitize(`<div class="error">${esc(message || 'Uitvoerdossier niet gevonden.')}</div>`);
             }
 
             function renderLoading(title, description) {
-                root.innerHTML = `
+                root.innerHTML = DOMPurify.sanitize(`
                     <div class="loading loading-shell">
                         <div class="loading-inner">
                             <div class="loader-spinner" aria-hidden="true"></div>
@@ -835,7 +828,7 @@
                             ${description ? `<p class="loading-copy">${esc(description)}</p>` : ''}
                         </div>
                     </div>
-                `;
+                `);
             }
 
             function buildBaseOrderData(orderId, customOrder, runtimeOrder) {
@@ -1162,7 +1155,7 @@
 
                 document.title = `Softora | Uitvoerdossier #${orderId}`;
 
-                root.innerHTML = `
+                root.innerHTML = DOMPurify.sanitize(`
                     <div class="paper-shell" id="paperShell">
                     <div class="page-toolbar screen-only" id="pageToolbar">
                         <div class="toolbar-meta">
@@ -1208,7 +1201,7 @@
                     </article>
                     </div>
                     </div>
-                `;
+                `);
 
                 const printBtn = document.getElementById('printBtn');
                 if (printBtn) {
