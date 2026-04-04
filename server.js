@@ -13332,26 +13332,7 @@ app.post(['/api/active-orders/launch-site', '/api/active-order-launch-site'], as
 });
 
 
-// ==============================================================================
-// SECTIE: Routes — Dashboard
-// ==============================================================================
-app.get('/api/dashboard/activity', (req, res) => {
-  const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
-  return res.status(200).json({
-    ok: true,
-    count: Math.min(limit, recentDashboardActivities.length),
-    activities: recentDashboardActivities.slice(0, limit),
-  });
-});
-
-app.get('/api/security/audit-log', requireRuntimeDebugAccess, (req, res) => {
-  const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
-  return res.status(200).json({
-    ok: true,
-    count: Math.min(limit, recentSecurityAuditEvents.length),
-    events: recentSecurityAuditEvents.slice(0, limit),
-  });
-});
+// Dashboard & security routes → routes/dashboard.js
 
 async function sendUiStateGetResponse(req, res, scopeRaw) {
   const scope = normalizeUiStateScope(scopeRaw);
@@ -13377,70 +13358,7 @@ async function sendUiStateGetResponse(req, res, scopeRaw) {
 }
 
 
-// ==============================================================================
-// SECTIE: Routes — UI State
-// ==============================================================================
-app.get('/api/ui-state/:scope', async (req, res) => {
-  return sendUiStateGetResponse(req, res, req.params.scope);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.get('/api/ui-state-get', async (req, res) => {
-  return sendUiStateGetResponse(req, res, req.query.scope);
-});
-
-async function sendUiStateSetResponse(req, res, scopeRaw) {
-  const scope = normalizeUiStateScope(scopeRaw);
-  if (!scope) {
-    return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
-  }
-
-  const patchProvided = req.body && typeof req.body === 'object' && req.body.patch && typeof req.body.patch === 'object';
-  let valuesToSave;
-
-  if (patchProvided) {
-    const current = await getUiStateValues(scope);
-    if (!current) {
-      return res.status(503).json({
-        ok: false,
-        error: 'Kon UI state patch niet laden zonder geldige Supabase-opslag.',
-      });
-    }
-    const currentValues = current && current.values && typeof current.values === 'object' ? current.values : {};
-    const patchValues = sanitizeUiStateValues(req.body.patch);
-    valuesToSave = { ...currentValues, ...patchValues };
-  } else {
-    valuesToSave = sanitizeUiStateValues(req.body?.values || {});
-  }
-
-  const state = await setUiStateValues(scope, valuesToSave, {
-    source: normalizeString(req.body?.source || 'frontend'),
-    actor: normalizeString(req.body?.actor || ''),
-  });
-  if (!state) {
-    return res.status(503).json({
-      ok: false,
-      error: 'Kon UI state niet opslaan zonder geldige Supabase-opslag.',
-    });
-  }
-
-  return res.status(200).json({
-    ok: true,
-    scope,
-    values: state.values || {},
-    source: state.source || 'supabase',
-    updatedAt: state.updatedAt || null,
-  });
-}
-
-app.post('/api/ui-state/:scope', async (req, res) => {
-  return sendUiStateSetResponse(req, res, req.params.scope);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ui-state-set', async (req, res) => {
-  return sendUiStateSetResponse(req, res, req.query.scope);
-});
+// UI State routes → routes/ui-state.js
 
 
 // ==============================================================================
@@ -13779,21 +13697,7 @@ app.post('/api/seo/automation', async (req, res) => {
   }
 });
 
-app.post('/api/dashboard/activity', (req, res) => {
-  const entry = appendDashboardActivity(
-    {
-      ...req.body,
-      source: normalizeString(req.body?.source || 'premium-personeel-dashboard'),
-      actor: normalizeString(req.body?.actor || ''),
-    },
-    'dashboard_activity_manual'
-  );
-
-  return res.status(201).json({
-    ok: true,
-    activity: entry,
-  });
-});
+// POST /api/dashboard/activity → routes/dashboard.js
 
 
 // ==============================================================================
@@ -15876,232 +15780,7 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
 // ==============================================================================
 // SECTIE: Routes — System (healthz, robots, debug)
 // ==============================================================================
-app.get('/healthz', (_req, res) => {
-  res.status(200).json({
-    ok: true,
-    service: 'softora-retell-coldcalling-backend',
-    supabase: {
-      enabled: isSupabaseConfigured(),
-      hydrated: supabaseStateHydrated,
-      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
-      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
-    },
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// Alias voor serverless setups waar de backend onder /api/* hangt (zoals Vercel).
-app.get('/api/healthz', (_req, res) => {
-  res.status(200).json({
-    ok: true,
-    service: 'softora-retell-coldcalling-backend',
-    supabase: {
-      enabled: isSupabaseConfigured(),
-      hydrated: supabaseStateHydrated,
-      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
-      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
-    },
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.get('/robots.txt', (_req, res) => {
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  return res.status(200).send(
-    [
-      'User-agent: *',
-      'Allow: /',
-      'Disallow: /api/',
-      'Disallow: /premium-',
-      'Disallow: /personeel-',
-      'Disallow: /actieve-opdrachten',
-      'Disallow: /ai-coldmailing',
-      'Disallow: /ai-lead-generator',
-      'Disallow: /seo-crm-system',
-      '',
-    ].join('\n')
-  );
-});
-
-app.get('/.well-known/security.txt', (req, res) => {
-  const publicBaseUrl = getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  return res.status(200).send(
-    [
-      `Contact: mailto:${SECURITY_CONTACT_EMAIL || 'info@softora.nl'}`,
-      `Expires: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()}`,
-      `Canonical: ${publicBaseUrl}/.well-known/security.txt`,
-      `Preferred-Languages: nl, en`,
-      '',
-    ].join('\n')
-  );
-});
-
-function sendRuntimeHealthDebug(_req, res) {
-  return res.status(200).json({
-    ok: true,
-    timestamp: new Date().toISOString(),
-    runtime: {
-      webhookEvents: recentWebhookEvents.length,
-      callUpdates: recentCallUpdates.length,
-      aiCallInsights: recentAiCallInsights.length,
-      securityAuditEvents: recentSecurityAuditEvents.length,
-      appointments: generatedAgendaAppointments.length,
-      realCallUpdates: recentCallUpdates.filter((item) => {
-        const callId = normalizeString(item?.callId || '');
-        return callId && !callId.startsWith('demo-');
-      }).length,
-    },
-    supabase: {
-      enabled: isSupabaseConfigured(),
-      hydrated: supabaseStateHydrated,
-      hydrateRetryNotBeforeMs: supabaseHydrateRetryNotBeforeMs,
-      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
-      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
-      host: redactSupabaseUrlForDebug(SUPABASE_URL),
-      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
-      lastHydrateError: supabaseLastHydrateError || null,
-      lastPersistError: supabaseLastPersistError || null,
-      lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
-      callUpdateStateKeyPrefix: SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX,
-    },
-    mail: {
-      smtpConfigured: isSmtpMailConfigured(),
-      imapConfigured: isImapMailConfigured(),
-      imapMailbox: isImapMailConfigured() ? MAIL_IMAP_MAILBOX : null,
-      imapPollCooldownMs: MAIL_IMAP_POLL_COOLDOWN_MS,
-      imapNextPollAfterMs: inboundConfirmationMailSyncNotBeforeMs,
-      imapLastSync: inboundConfirmationMailSyncLastResult || null,
-    },
-  });
-}
-
-app.get('/api/debug/runtime-health', requireRuntimeDebugAccess, sendRuntimeHealthDebug);
-app.get('/api/runtime-health', requireRuntimeDebugAccess, sendRuntimeHealthDebug);
-
-/* app.get('/api/debug/runtime-health', (_req, res) => {
-  res.status(200).json({
-    ok: true,
-    timestamp: new Date().toISOString(),
-    runtime: {
-      webhookEvents: recentWebhookEvents.length,
-      callUpdates: recentCallUpdates.length,
-      aiCallInsights: recentAiCallInsights.length,
-      appointments: generatedAgendaAppointments.length,
-      realCallUpdates: recentCallUpdates.filter((item) => {
-        const callId = normalizeString(item?.callId || '');
-        return callId && !callId.startsWith('demo-');
-      }).length,
-    },
-    supabase: {
-      enabled: isSupabaseConfigured(),
-      hydrated: supabaseStateHydrated,
-      hydrateRetryNotBeforeMs: supabaseHydrateRetryNotBeforeMs,
-      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
-      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
-      host: redactSupabaseUrlForDebug(SUPABASE_URL),
-      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
-      lastHydrateError: supabaseLastHydrateError || null,
-      lastPersistError: supabaseLastPersistError || null,
-    },
-  });
-}); */
-
-app.get('/api/supabase-probe', requireRuntimeDebugAccess, async (_req, res) => {
-  if (!isSupabaseConfigured()) {
-    return res.status(200).json({
-      ok: false,
-      configured: false,
-      error: 'Supabase niet geconfigureerd.',
-    });
-  }
-
-  const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/${encodeURIComponent(
-    SUPABASE_STATE_TABLE
-  )}?select=state_key&limit=1`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    });
-
-    const text = await response.text();
-    let body = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = truncateText(text, 800);
-    }
-
-    return res.status(200).json({
-      ok: response.ok,
-      configured: true,
-      status: response.status,
-      supabaseHost: redactSupabaseUrlForDebug(SUPABASE_URL),
-      table: SUPABASE_STATE_TABLE,
-      stateKey: SUPABASE_STATE_KEY,
-      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
-      body,
-    });
-  } catch (error) {
-    return res.status(200).json({
-      ok: false,
-      configured: true,
-      status: null,
-      supabaseHost: redactSupabaseUrlForDebug(SUPABASE_URL),
-      table: SUPABASE_STATE_TABLE,
-      stateKey: SUPABASE_STATE_KEY,
-      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
-      error: truncateText(error?.message || String(error), 500),
-    });
-  }
-});
-
-app.post('/api/runtime-sync-now', requireRuntimeDebugAccess, async (_req, res) => {
-  const before = {
-    hydrated: supabaseStateHydrated,
-    lastHydrateError: supabaseLastHydrateError || null,
-    lastPersistError: supabaseLastPersistError || null,
-    lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
-  };
-
-  const persistOk = await persistRuntimeStateToSupabase('debug_runtime_sync_now');
-
-  // Forceer een nieuwe hydrate-attempt op deze instance voor directe diagnose.
-  supabaseStateHydrated = false;
-  supabaseHydrateRetryNotBeforeMs = 0;
-
-  const hydratedOk = await ensureRuntimeStateHydratedFromSupabase();
-
-  return res.status(200).json({
-    ok: Boolean(persistOk && hydratedOk),
-    before,
-    after: {
-      hydrated: supabaseStateHydrated,
-      lastHydrateError: supabaseLastHydrateError || null,
-      lastPersistError: supabaseLastPersistError || null,
-      lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
-      counts: {
-        webhookEvents: recentWebhookEvents.length,
-        callUpdates: recentCallUpdates.length,
-        aiCallInsights: recentAiCallInsights.length,
-        appointments: generatedAgendaAppointments.length,
-      },
-    },
-    persistOk,
-    hydratedOk,
-    supabase: {
-      host: redactSupabaseUrlForDebug(SUPABASE_URL),
-      table: SUPABASE_STATE_TABLE,
-      stateKey: SUPABASE_STATE_KEY,
-    },
-  });
-});
-
+// System routes (healthz, robots, security.txt, debug) → routes/system.js
 // API routes eerst, daarna statische frontend assets/html serveren.
 
 // ==============================================================================
@@ -16290,6 +15969,60 @@ function seedDemoConfirmationTaskForUiTesting() {
   console.log('[Startup] Demo bevestigingstaak toegevoegd voor UI-testen.');
 }
 
+
+// ==============================================================================
+// SECTIE: Route modules registreren
+// ==============================================================================
+// Context-object met alle gedeelde functies en state voor route-modules.
+// Let-variabelen worden via getters/setters doorgegeven zodat route-modules
+// altijd de actuele waarde lezen, niet een snapshot.
+const routeCtx = {
+  // Utilities (lib/utils.js)
+  parseIntSafe, parseNumberSafe, normalizeString, escapeHtml, truncateText, clipText,
+
+  // State collections (lib/state.js)
+  recentWebhookEvents, recentCallUpdates, callUpdatesById, retellCallStatusRefreshByCallId,
+  recentAiCallInsights, aiCallInsightsByCallId, aiAnalysisFingerprintByCallId, aiAnalysisInFlightCallIds,
+  recentDashboardActivities, recentSecurityAuditEvents, inMemoryUiStateByScope,
+  generatedAgendaAppointments, agendaAppointmentIdByCallId,
+  dismissedInterestedLeadCallIds, dismissedInterestedLeadKeys, leadOwnerAssignmentsByCallId,
+  sequentialDispatchQueues, sequentialDispatchQueueIdByCallId,
+
+  // Supabase functies
+  isSupabaseConfigured, getSupabaseClient,
+  fetchSupabaseRowByKeyViaRest, upsertSupabaseRowViaRest,
+
+  // Supabase constanten
+  SUPABASE_STATE_TABLE, SUPABASE_STATE_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX, UI_STATE_SCOPE_PREFIX,
+
+  // UI State functies
+  normalizeUiStateScope, sanitizeUiStateValues, getUiStateValues, setUiStateValues,
+
+  // Server functies
+  appendDashboardActivity, requireRuntimeDebugAccess,
+  getEffectivePublicBaseUrl, redactSupabaseUrlForDebug,
+  isSmtpMailConfigured, isImapMailConfigured,
+  persistRuntimeStateToSupabase, ensureRuntimeStateHydratedFromSupabase,
+
+  // Constanten
+  SECURITY_CONTACT_EMAIL, MAIL_IMAP_MAILBOX, MAIL_IMAP_POLL_COOLDOWN_MS,
+
+  // Getters/setters voor mutable let-variabelen
+  getSupabaseStateHydrated: () => supabaseStateHydrated,
+  setSupabaseStateHydrated: (v) => { supabaseStateHydrated = v; },
+  getSupabaseHydrateRetryNotBeforeMs: () => supabaseHydrateRetryNotBeforeMs,
+  setSupabaseHydrateRetryNotBeforeMs: (v) => { supabaseHydrateRetryNotBeforeMs = v; },
+  getSupabaseLastHydrateError: () => supabaseLastHydrateError,
+  getSupabaseLastPersistError: () => supabaseLastPersistError,
+  getSupabaseLastCallUpdatePersistError: () => supabaseLastCallUpdatePersistError,
+  getInboundConfirmationMailSyncNotBeforeMs: () => inboundConfirmationMailSyncNotBeforeMs,
+  getInboundConfirmationMailSyncLastResult: () => inboundConfirmationMailSyncLastResult,
+};
+
+require('./routes/ui-state')(app, routeCtx);
+require('./routes/dashboard')(app, routeCtx);
+require('./routes/system')(app, routeCtx);
 
 // ==============================================================================
 // SECTIE: Global Error Handler
