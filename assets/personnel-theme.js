@@ -1227,6 +1227,19 @@
         const badge = getSidebarCountBadge("leads");
         if (!badge) return;
         const cachedLeadCount = readCachedSidebarCount("leads");
+        const pathName = String((window.location && window.location.pathname) || "").trim().toLowerCase();
+        const liveLeadsPageCount = Number(window.__softoraLeadsPageCount);
+        if (
+            pathName.indexOf("/premium-ai-coldmailing") === 0 &&
+            Number.isFinite(liveLeadsPageCount) &&
+            liveLeadsPageCount >= 0
+        ) {
+            paintSidebarCount("leads", Math.floor(liveLeadsPageCount), {
+                singular: "open lead",
+                plural: "open leads",
+            });
+            return;
+        }
 
         const [tasksData, interestedLeadsData] = await Promise.all([
             fetchFirstJsonNoStore([

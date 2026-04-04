@@ -2029,8 +2029,16 @@
             }
 
             function renderList() {
+                const currentLeadCount = Array.isArray(allLeads) ? allLeads.length : 0;
+                window.__softoraLeadsPageCount = currentLeadCount;
                 if (!allLeads.length) {
                     listEl.innerHTML = '<div class="lead-empty">Nog geen leads gevonden.</div>';
+                    if (
+                        window.SoftoraPersonnelTheme &&
+                        typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
+                    ) {
+                        window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
+                    }
                     return;
                 }
 
@@ -2073,6 +2081,12 @@
                         openLeadModal(taskId);
                     });
                 });
+                if (
+                    window.SoftoraPersonnelTheme &&
+                    typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
+                ) {
+                    window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
+                }
             }
 
             function sortByDateDesc(a, b) {
@@ -2660,6 +2674,11 @@
             });
 
             window.addEventListener('beforeunload', () => {
+                try {
+                    delete window.__softoraLeadsPageCount;
+                } catch (error) {
+                    window.__softoraLeadsPageCount = undefined;
+                }
                 if (pollTimer) window.clearInterval(pollTimer);
             });
         })();
