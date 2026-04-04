@@ -4282,7 +4282,7 @@
         style: 'medium',
         maxSentences: 4,
         extraInstructions:
-          'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de afgesproken vervolgstap als die er is. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+          'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de vervolgstap als die er is; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
       })
         .then((summaryText) => {
           const rewrittenSummary = pickReadableConversationSummary(summaryText);
@@ -4290,7 +4290,7 @@
             (rewrittenSummary && !looksLikeAgendaConfirmationSummary(rewrittenSummary)
               ? rewrittenSummary
               : '') || fallbackSummary;
-          if (cleanedSummary) {
+          if (cleanedSummary && !isGenericConversationPlaceholder(cleanedSummary)) {
             callDetailSummaryByCallId.set(normalizedCallId, cleanedSummary);
             setSharedCallSummary(normalizedCallId, cleanedSummary);
           }

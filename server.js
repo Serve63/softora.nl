@@ -8845,12 +8845,11 @@ async function buildConversationSummaryForLeadDetail(callUpdate, aiInsight, inte
 
   const sourceText = [
     transcript ? `Transcript van het gesprek:\n${truncateText(transcript, 9000)}` : '',
-    transcriptSnippet ? `Korte transcript-snippet:\n${truncateText(transcriptSnippet, 1200)}` : '',
-    callSummary && !looksLikeAgendaConfirmationSummary(callSummary)
-      ? `Bestaande call-samenvatting:\n${truncateText(callSummary, 1800)}`
-      : '',
-    aiSummary && !looksLikeAgendaConfirmationSummary(aiSummary)
-      ? `Bestaande AI-samenvatting:\n${truncateText(aiSummary, 1800)}`
+    transcriptSnippet && transcriptSnippet !== transcript ? `Korte transcript-snippet:\n${truncateText(transcriptSnippet, 1200)}` : '',
+    callSummary ? `Bestaande call-samenvatting:\n${truncateText(callSummary, 1800)}` : '',
+    aiSummary ? `Bestaande AI-samenvatting:\n${truncateText(aiSummary, 1800)}` : '',
+    interestedSummary && interestedSummary !== callSummary && interestedSummary !== aiSummary
+      ? `Aanvullende context:\n${truncateText(interestedSummary, 900)}`
       : '',
     followUpReason ? `Vervolgactie of context:\n${truncateText(followUpReason, 900)}` : '',
   ]
@@ -8871,13 +8870,19 @@ async function buildConversationSummaryForLeadDetail(callUpdate, aiInsight, inte
         extraInstructions: [
           'Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging.',
           'Benoem de behoefte of vraag van de prospect, de reactie van de prospect en eventuele bezwaren of context.',
-          'Noem alleen aan het einde een vervolgstap of afspraak als die echt in het gesprek naar voren kwam.',
+          'Noem alleen aan het einde een vervolgstap als die echt in het gesprek naar voren kwam; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland".',
           'Schrijf nadrukkelijk niet als agenda-item, afspraakbevestiging of bevestigingsbericht.',
           'Gebruik geen koppen, bullets of labels zoals user:, bot:, agent: of klant:.',
         ].join(' '),
       });
-      const rewrittenSummary = pickReadableConversationSummaryForLeadDetail(result?.summary || '');
-      if (rewrittenSummary) return rewrittenSummary;
+      const rewrittenSummary = normalizeString(result?.summary || '');
+      if (
+        rewrittenSummary &&
+        !isGenericConversationSummaryPlaceholder(rewrittenSummary) &&
+        !summaryContainsEnglishMarkers(rewrittenSummary)
+      ) {
+        return rewrittenSummary;
+      }
     } catch (error) {
       // Fall back to available local sources.
     }
@@ -9275,10 +9280,10 @@ async function enrichConfirmationTaskDetailWithConversationSummary(req, idx, app
       transcript
     );
 
-    if (!conversationSummary && (transcript || callBackedDetail || detail?.callSummary || detail?.aiSummary)) {
+    if (!conversationSummary && (transcript || callBackedDetail || detail?.callSummary || detail?.aiSummary || detail?.summary || appointment?.summary)) {
       conversationSummary = await buildConversationSummaryForLeadDetail(
         {
-          summary: normalizeString(callBackedDetail?.callSummary || detail?.callSummary || ''),
+          summary: normalizeString(callBackedDetail?.callSummary || detail?.callSummary || detail?.summary || appointment?.summary || ''),
           transcriptSnippet: normalizeString(
             callBackedDetail?.transcriptSnippet || detail?.transcriptSnippet || transcript
           ),
