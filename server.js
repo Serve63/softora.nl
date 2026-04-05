@@ -13,7 +13,16 @@ const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-js');
 const { createPremiumUsersStore } = require('./lib/premium-users-store');
+const { FEATURE_FLAGS, getPublicFeatureFlags } = require('./server/config/feature-flags');
+const routeManifest = require('./server/routes/manifest');
+const { buildRuntimeBackupEnvelope } = require('./server/services/runtime-backup');
+const { registerHealthAndOpsRoutes } = require('./server/routes/health');
 require('dotenv').config();
+const { version: APP_VERSION = '0.0.0' } = require('./package.json');
+const isServerlessRuntime =
+  Boolean(process.env.VERCEL) ||
+  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+  Boolean(process.env.LAMBDA_TASK_ROOT);
 
 function normalizeLoginEmailValue(value) {
   return String(value || '').trim().toLowerCase();
@@ -1327,6 +1336,8 @@ function isPremiumPublicApiRequest(req) {
 
   const publicExactMatches = new Set([
     '/api/healthz',
+    '/api/health/baseline',
+    '/api/health/dependencies',
     '/api/auth/login',
     '/api/auth/logout',
     '/api/auth/session',
@@ -1344,6 +1355,8 @@ function isSameOriginProtectionExemptRequest(req) {
   const requestPath = normalizeString(getRequestPathname(req) || '');
   return (
     requestPath === '/api/healthz' ||
+    requestPath === '/api/health/baseline' ||
+    requestPath === '/api/health/dependencies' ||
     requestPath === '/api/twilio/voice' ||
     requestPath === '/api/twilio/status' ||
     requestPath === '/api/retell/webhook'
@@ -1998,6 +2011,22 @@ function buildRuntimeStateSnapshotPayloadWithLimits(options = {}) {
     nextLeadOwnerRotationIndex,
     nextGeneratedAgendaAppointmentId,
   };
+}
+
+function buildRuntimeBackupForOps(options = {}) {
+  const snapshotOptions =
+    options && typeof options.snapshotOptions === 'object' && options.snapshotOptions
+      ? options.snapshotOptions
+      : options;
+  return buildRuntimeBackupEnvelope({
+    appName: 'softora-retell-coldcalling-backend',
+    appVersion: APP_VERSION,
+    featureFlags: getPublicFeatureFlags(),
+    routeManifest,
+    snapshotPayload: buildRuntimeStateSnapshotPayloadWithLimits(snapshotOptions || {}),
+    metadata:
+      options && typeof options.metadata === 'object' && options.metadata ? options.metadata : {},
+  });
 }
 
 function buildRuntimeStateSnapshotPayload() {
@@ -17485,34 +17514,61 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
   });
 });
 
-// Simpele healthcheck voor hosting platforms (Render/Railway).
-app.get('/healthz', (_req, res) => {
-  res.status(200).json({
-    ok: true,
-    service: 'softora-retell-coldcalling-backend',
-    supabase: {
-      enabled: isSupabaseConfigured(),
-      hydrated: supabaseStateHydrated,
-      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
-      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
-    },
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// Alias voor serverless setups waar de backend onder /api/* hangt (zoals Vercel).
-app.get('/api/healthz', (_req, res) => {
-  res.status(200).json({
-    ok: true,
-    service: 'softora-retell-coldcalling-backend',
-    supabase: {
-      enabled: isSupabaseConfigured(),
-      hydrated: supabaseStateHydrated,
-      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
-      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
-    },
-    timestamp: new Date().toISOString(),
-  });
+registerHealthAndOpsRoutes(app, {
+  appName: 'softora-retell-coldcalling-backend',
+  appVersion: APP_VERSION,
+  featureFlags: FEATURE_FLAGS,
+  getPublicFeatureFlags,
+  routeManifest,
+  requireRuntimeDebugAccess,
+  buildRuntimeStateSnapshotPayloadWithLimits,
+  buildRuntimeBackupForOps,
+  isProduction: IS_PRODUCTION,
+  isServerlessRuntime,
+  isSupabaseConfigured,
+  getSupabaseStatus: () => ({
+    enabled: isSupabaseConfigured(),
+    hydrated: supabaseStateHydrated,
+    table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
+    stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
+    lastHydrateError: supabaseLastHydrateError || null,
+    lastPersistError: supabaseLastPersistError || null,
+    lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
+  }),
+  getMailStatus: () => ({
+    smtpConfigured: isSmtpMailConfigured(),
+    imapConfigured: isImapMailConfigured(),
+    imapMailbox: isImapMailConfigured() ? MAIL_IMAP_MAILBOX : null,
+    imapPollCooldownMs: MAIL_IMAP_POLL_COOLDOWN_MS,
+    imapNextPollAfterMs: inboundConfirmationMailSyncNotBeforeMs,
+    imapLastSync: inboundConfirmationMailSyncLastResult || null,
+  }),
+  getAiStatus: () => ({
+    coldcallingProvider: getColdcallingProvider(),
+    openaiConfigured: Boolean(normalizeString(process.env.OPENAI_API_KEY)),
+    anthropicConfigured: Boolean(normalizeString(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY)),
+    retellConfigured: Boolean(normalizeString(process.env.RETELL_API_KEY)),
+    twilioConfigured: Boolean(
+      normalizeString(process.env.TWILIO_ACCOUNT_SID) && normalizeString(process.env.TWILIO_AUTH_TOKEN)
+    ),
+    missingProviderEnv: getMissingEnvVars(getColdcallingProvider()),
+  }),
+  getSessionStatus: () => ({
+    configured: Boolean(PREMIUM_SESSION_SECRET),
+    cookieName: PREMIUM_SESSION_COOKIE_NAME,
+    mfaConfigured: isPremiumMfaConfigured(),
+  }),
+  getRuntimeStatus: () => ({
+    webhookEvents: recentWebhookEvents.length,
+    callUpdates: recentCallUpdates.length,
+    aiCallInsights: recentAiCallInsights.length,
+    securityAuditEvents: recentSecurityAuditEvents.length,
+    appointments: generatedAgendaAppointments.length,
+    realCallUpdates: recentCallUpdates.filter((item) => {
+      const callId = normalizeString(item?.callId || '');
+      return callId && !callId.startsWith('demo-');
+    }).length,
+  }),
 });
 
 app.get('/robots.txt', (_req, res) => {
@@ -17546,76 +17602,6 @@ app.get('/.well-known/security.txt', (req, res) => {
     ].join('\n')
   );
 });
-
-function sendRuntimeHealthDebug(_req, res) {
-  return res.status(200).json({
-    ok: true,
-    timestamp: new Date().toISOString(),
-    runtime: {
-      webhookEvents: recentWebhookEvents.length,
-      callUpdates: recentCallUpdates.length,
-      aiCallInsights: recentAiCallInsights.length,
-      securityAuditEvents: recentSecurityAuditEvents.length,
-      appointments: generatedAgendaAppointments.length,
-      realCallUpdates: recentCallUpdates.filter((item) => {
-        const callId = normalizeString(item?.callId || '');
-        return callId && !callId.startsWith('demo-');
-      }).length,
-    },
-    supabase: {
-      enabled: isSupabaseConfigured(),
-      hydrated: supabaseStateHydrated,
-      hydrateRetryNotBeforeMs: supabaseHydrateRetryNotBeforeMs,
-      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
-      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
-      host: redactSupabaseUrlForDebug(SUPABASE_URL),
-      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
-      lastHydrateError: supabaseLastHydrateError || null,
-      lastPersistError: supabaseLastPersistError || null,
-      lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
-      callUpdateStateKeyPrefix: SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX,
-    },
-    mail: {
-      smtpConfigured: isSmtpMailConfigured(),
-      imapConfigured: isImapMailConfigured(),
-      imapMailbox: isImapMailConfigured() ? MAIL_IMAP_MAILBOX : null,
-      imapPollCooldownMs: MAIL_IMAP_POLL_COOLDOWN_MS,
-      imapNextPollAfterMs: inboundConfirmationMailSyncNotBeforeMs,
-      imapLastSync: inboundConfirmationMailSyncLastResult || null,
-    },
-  });
-}
-
-app.get('/api/debug/runtime-health', requireRuntimeDebugAccess, sendRuntimeHealthDebug);
-app.get('/api/runtime-health', requireRuntimeDebugAccess, sendRuntimeHealthDebug);
-
-/* app.get('/api/debug/runtime-health', (_req, res) => {
-  res.status(200).json({
-    ok: true,
-    timestamp: new Date().toISOString(),
-    runtime: {
-      webhookEvents: recentWebhookEvents.length,
-      callUpdates: recentCallUpdates.length,
-      aiCallInsights: recentAiCallInsights.length,
-      appointments: generatedAgendaAppointments.length,
-      realCallUpdates: recentCallUpdates.filter((item) => {
-        const callId = normalizeString(item?.callId || '');
-        return callId && !callId.startsWith('demo-');
-      }).length,
-    },
-    supabase: {
-      enabled: isSupabaseConfigured(),
-      hydrated: supabaseStateHydrated,
-      hydrateRetryNotBeforeMs: supabaseHydrateRetryNotBeforeMs,
-      table: isSupabaseConfigured() ? SUPABASE_STATE_TABLE : null,
-      stateKey: isSupabaseConfigured() ? SUPABASE_STATE_KEY : null,
-      host: redactSupabaseUrlForDebug(SUPABASE_URL),
-      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
-      lastHydrateError: supabaseLastHydrateError || null,
-      lastPersistError: supabaseLastPersistError || null,
-    },
-  });
-}); */
 
 app.get('/api/supabase-probe', requireRuntimeDebugAccess, async (_req, res) => {
   if (!isSupabaseConfigured()) {
@@ -17923,11 +17909,6 @@ function startServer() {
   });
 }
 
-const isServerlessRuntime =
-  Boolean(process.env.VERCEL) ||
-  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
-  Boolean(process.env.LAMBDA_TASK_ROOT);
-
 if (require.main === module && !isServerlessRuntime) {
   startServer();
 }
@@ -17936,3 +17917,5 @@ module.exports = app;
 module.exports.app = app;
 module.exports.normalizeNlPhoneToE164 = normalizeNlPhoneToE164;
 module.exports.startServer = startServer;
+module.exports.buildRuntimeStateSnapshotPayloadWithLimits = buildRuntimeStateSnapshotPayloadWithLimits;
+module.exports.buildRuntimeBackupForOps = buildRuntimeBackupForOps;

@@ -2,7 +2,7 @@ let appHandler = null;
 let bootError = null;
 
 try {
-  const loaded = require('../server');
+  const loaded = require('../server/app');
   appHandler = loaded && (loaded.app || loaded);
   if (typeof appHandler !== 'function') {
     throw new Error('Express app export niet gevonden in server.js');
