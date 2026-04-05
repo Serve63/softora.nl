@@ -17,7 +17,9 @@ const { FEATURE_FLAGS, getPublicFeatureFlags } = require('./server/config/featur
 const routeManifest = require('./server/routes/manifest');
 const { buildRuntimeBackupEnvelope } = require('./server/services/runtime-backup');
 const { registerHealthAndOpsRoutes } = require('./server/routes/health');
+const { createAgendaReadCoordinator } = require('./server/services/agenda-read');
 const { registerAgendaMutationRoutes } = require('./server/routes/agenda');
+const { registerAgendaReadRoutes } = require('./server/routes/agenda-read');
 require('dotenv').config();
 const { version: APP_VERSION = '0.0.0' } = require('./package.json');
 const isServerlessRuntime =
@@ -15428,32 +15430,6 @@ app.post('/api/dashboard/activity', (req, res) => {
   });
 });
 
-app.get('/api/agenda/appointments', async (req, res) => {
-  if (isSupabaseConfigured() && !supabaseStateHydrated) {
-    await forceHydrateRuntimeStateWithRetries(3);
-  }
-  if (isSupabaseConfigured()) {
-    await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
-  }
-  if (isImapMailConfigured()) {
-    await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
-  }
-  backfillInsightsAndAppointmentsFromRecentCallUpdates();
-  await refreshAgendaAppointmentCallSourcesIfNeeded();
-  backfillGeneratedAgendaAppointmentsMetadataIfNeeded();
-  await refreshGeneratedAgendaSummariesIfNeeded();
-  const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 200)));
-  const sorted = generatedAgendaAppointments
-    .filter(isGeneratedAppointmentVisibleForAgenda)
-    .slice()
-    .sort(compareAgendaAppointments);
-  return res.status(200).json({
-    ok: true,
-    count: Math.min(limit, sorted.length),
-    appointments: sorted.slice(0, limit),
-  });
-});
-
 function normalizePostCallStatus(value) {
   const raw = normalizeString(value).toLowerCase();
   if (!raw) return 'customer_wants_to_proceed';
@@ -16393,111 +16369,6 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
   });
 }
 
-app.get('/api/agenda/confirmation-tasks', async (req, res) => {
-  const includeDemo = /^(1|true|yes)$/i.test(String(req.query.includeDemo || ''));
-  const quickMode = /^(1|true|yes)$/i.test(String(req.query.quick || req.query.fast || ''));
-  const countOnly = /^(1|true|yes)$/i.test(String(req.query.countOnly || req.query.count_only || ''));
-
-  if (isSupabaseConfigured() && !supabaseStateHydrated) {
-    await forceHydrateRuntimeStateWithRetries(3);
-  }
-  await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
-  if (!quickMode && isImapMailConfigured()) {
-    await syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
-  }
-  backfillInsightsAndAppointmentsFromRecentCallUpdates();
-  if (!quickMode) {
-    generatedAgendaAppointments.forEach((appointment, idx) => {
-      if (!appointment) return;
-      if (!mapAppointmentToConfirmationTask(appointment)) return;
-      ensureConfirmationEmailDraftAtIndex(idx, { reason: 'confirmation_task_list_auto_draft' });
-    });
-  }
-
-  const tasks = generatedAgendaAppointments
-    .filter((appointment) => {
-      if (includeDemo) return true;
-      if (DEMO_CONFIRMATION_TASK_ENABLED) return true;
-      const callId = normalizeString(appointment?.callId || '');
-      return !callId.startsWith('demo-');
-    })
-    .map(mapAppointmentToConfirmationTask)
-    .filter(Boolean);
-
-  if (countOnly) {
-    const dedupe = new Set();
-    tasks.forEach((task) => {
-      const key = [
-        normalizeString(task?.company || '')
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .trim(),
-        normalizeString(task?.contact || '')
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .trim(),
-        normalizeString(task?.phone || '')
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .trim(),
-        normalizeString(task?.date || '')
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .trim(),
-        normalizeString(task?.time || '')
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .trim(),
-      ].join('|');
-      dedupe.add(key);
-    });
-    return res.status(200).json({
-      ok: true,
-      count: dedupe.size,
-    });
-  }
-
-  const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 100)));
-  tasks.sort(compareConfirmationTasks);
-
-  return res.status(200).json({
-    ok: true,
-    count: Math.min(limit, tasks.length),
-    tasks: tasks.slice(0, limit),
-  });
-});
-
-app.get('/api/agenda/interested-leads', async (req, res) => {
-  const countOnly = /^(1|true|yes)$/i.test(String(req.query.countOnly || req.query.count_only || ''));
-
-  if (isSupabaseConfigured() && !supabaseStateHydrated) {
-    await forceHydrateRuntimeStateWithRetries(3);
-  }
-  await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS });
-  backfillInsightsAndAppointmentsFromRecentCallUpdates();
-
-  const interestedLeads = buildAllInterestedLeadRows();
-
-  if (countOnly) {
-    return res.status(200).json({
-      ok: true,
-      count: interestedLeads.length,
-    });
-  }
-
-  const limit = Math.max(1, Math.min(1000, parseIntSafe(req.query.limit, 100)));
-  return res.status(200).json({
-    ok: true,
-    count: Math.min(limit, interestedLeads.length),
-    leads: interestedLeads.slice(0, limit),
-  });
-});
-
 function buildMaterializedInterestedLeadAppointment(callId, requestBody = {}) {
   const normalizedCallId = normalizeString(callId);
   if (!normalizedCallId) return null;
@@ -16927,15 +16798,6 @@ async function sendConfirmationTaskDetailResponse(req, res, taskIdRaw) {
     task: detail,
   });
 }
-
-app.get('/api/agenda/confirmation-tasks/:id', async (req, res) => {
-  return sendConfirmationTaskDetailResponse(req, res, req.params.id);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.get('/api/agenda/confirmation-task', async (req, res) => {
-  return sendConfirmationTaskDetailResponse(req, res, req.query.taskId);
-});
 
 async function sendConfirmationTaskDraftEmailResponse(req, res, taskIdRaw) {
   const idx = getGeneratedAppointmentIndexById(taskIdRaw);
@@ -17446,6 +17308,34 @@ function completeConfirmationTaskById(req, res, taskIdRaw) {
     appointment: updatedAppointment,
   });
 }
+
+const agendaReadCoordinator = createAgendaReadCoordinator({
+  runtimeSyncCooldownMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS,
+  demoConfirmationTaskEnabled: DEMO_CONFIRMATION_TASK_ENABLED,
+  isSupabaseConfigured,
+  getSupabaseStateHydrated: () => supabaseStateHydrated,
+  forceHydrateRuntimeStateWithRetries,
+  syncRuntimeStateFromSupabaseIfNewer,
+  isImapMailConfigured,
+  syncInboundConfirmationEmailsFromImap,
+  backfillInsightsAndAppointmentsFromRecentCallUpdates,
+  refreshAgendaAppointmentCallSourcesIfNeeded,
+  backfillGeneratedAgendaAppointmentsMetadataIfNeeded,
+  refreshGeneratedAgendaSummariesIfNeeded,
+  getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
+  isGeneratedAppointmentVisibleForAgenda,
+  compareAgendaAppointments,
+  mapAppointmentToConfirmationTask,
+  ensureConfirmationEmailDraftAtIndex,
+  compareConfirmationTasks,
+  buildAllInterestedLeadRows,
+  normalizeString,
+});
+
+registerAgendaReadRoutes(app, {
+  readCoordinator: agendaReadCoordinator,
+  sendConfirmationTaskDetailResponse,
+});
 
 registerAgendaMutationRoutes(app, {
   updateAgendaAppointmentPostCallDataById,
