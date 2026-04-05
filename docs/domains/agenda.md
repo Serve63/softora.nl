@@ -13,3 +13,7 @@ Agenda is een kernflow. Datum, tijd, locatie en afrondingsstatus mogen niet onbe
 - Handmatige afspraakwijzigingen hebben voorrang op afgeleide call-data.
 - Nieuwe mutaties moeten rollbackbaar zijn.
 - Alle UI’s moeten op dezelfde afspraakbron uitkomen.
+
+## Huidige fase
+- Fase 2A: de agenda write-routes lopen via [server/routes/agenda.js](/Users/servecreusen/softora.nl-12/server/routes/agenda.js) met centrale payload-normalisatie in [server/schemas/agenda.js](/Users/servecreusen/softora.nl-12/server/schemas/agenda.js).
+- De businesslogica leeft nog deels in [server.js](/Users/servecreusen/softora.nl-12/server.js), maar route-definities voor mutaties horen vanaf nu niet meer rechtstreeks daar toegevoegd te worden.

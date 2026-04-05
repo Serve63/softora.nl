@@ -17,6 +17,7 @@ const { FEATURE_FLAGS, getPublicFeatureFlags } = require('./server/config/featur
 const routeManifest = require('./server/routes/manifest');
 const { buildRuntimeBackupEnvelope } = require('./server/services/runtime-backup');
 const { registerHealthAndOpsRoutes } = require('./server/routes/health');
+const { registerAgendaMutationRoutes } = require('./server/routes/agenda');
 require('dotenv').config();
 const { version: APP_VERSION = '0.0.0' } = require('./package.json');
 const isServerlessRuntime =
@@ -16392,24 +16393,6 @@ async function addAgendaAppointmentToPremiumActiveOrders(req, res, appointmentId
   });
 }
 
-app.post('/api/agenda/appointments/:id/post-call', (req, res) => {
-  return updateAgendaAppointmentPostCallDataById(req, res, req.params.id);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/agenda/appointment-post-call', (req, res) => {
-  return updateAgendaAppointmentPostCallDataById(req, res, req.query.appointmentId);
-});
-
-app.post('/api/agenda/appointments/:id/add-active-order', async (req, res) => {
-  return addAgendaAppointmentToPremiumActiveOrders(req, res, req.params.id);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/agenda/add-active-order', async (req, res) => {
-  return addAgendaAppointmentToPremiumActiveOrders(req, res, req.query.appointmentId);
-});
-
 app.get('/api/agenda/confirmation-tasks', async (req, res) => {
   const includeDemo = /^(1|true|yes)$/i.test(String(req.query.includeDemo || ''));
   const quickMode = /^(1|true|yes)$/i.test(String(req.query.quick || req.query.fast || ''));
@@ -16835,14 +16818,6 @@ async function setInterestedLeadInAgendaResponse(req, res) {
   });
 }
 
-app.post('/api/agenda/interested-leads/set-in-agenda', async (req, res) => {
-  return setInterestedLeadInAgendaResponse(req, res);
-});
-
-app.post('/api/agenda/interested-lead-set-in-agenda', async (req, res) => {
-  return setInterestedLeadInAgendaResponse(req, res);
-});
-
 async function dismissInterestedLeadResponse(req, res) {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
@@ -16890,15 +16865,7 @@ async function dismissInterestedLeadResponse(req, res) {
   });
 }
 
-app.post('/api/agenda/interested-leads/dismiss', async (req, res) => {
-  return dismissInterestedLeadResponse(req, res);
-});
-
-app.post('/api/agenda/interested-lead-dismiss', async (req, res) => {
-  return dismissInterestedLeadResponse(req, res);
-});
-
-app.post('/api/agenda/confirmation-mail-sync', async (req, res) => {
+async function syncConfirmationMailResponse(req, res) {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
     await forceHydrateRuntimeStateWithRetries(3);
   }
@@ -16910,7 +16877,7 @@ app.post('/api/agenda/confirmation-mail-sync', async (req, res) => {
     ok: result?.ok !== false,
     sync: result || null,
   });
-});
+}
 
 async function sendConfirmationTaskDetailResponse(req, res, taskIdRaw) {
   if (isSupabaseConfigured() && !supabaseStateHydrated) {
@@ -17042,14 +17009,6 @@ async function sendConfirmationTaskDraftEmailResponse(req, res, taskIdRaw) {
   }
 }
 
-app.post('/api/agenda/confirmation-tasks/:id/draft-email', async (req, res) => {
-  return sendConfirmationTaskDraftEmailResponse(req, res, req.params.id);
-});
-
-app.post('/api/agenda/confirmation-task-draft-email', async (req, res) => {
-  return sendConfirmationTaskDraftEmailResponse(req, res, req.query.taskId);
-});
-
 async function sendConfirmationTaskEmailResponse(req, res, taskIdRaw) {
   const idx = getGeneratedAppointmentIndexById(taskIdRaw);
   if (idx < 0) {
@@ -17169,16 +17128,8 @@ async function sendConfirmationTaskEmailResponse(req, res, taskIdRaw) {
   }
 }
 
-app.post('/api/agenda/confirmation-tasks/:id/send-email', async (req, res) => {
-  return sendConfirmationTaskEmailResponse(req, res, req.params.id);
-});
-
-app.post('/api/agenda/confirmation-task-send-email', async (req, res) => {
-  return sendConfirmationTaskEmailResponse(req, res, req.query.taskId);
-});
-
-app.post('/api/agenda/confirmation-tasks/:id/mark-sent', (req, res) => {
-  const idx = getGeneratedAppointmentIndexById(req.params.id);
+function markConfirmationTaskSentById(req, res, taskIdRaw) {
+  const idx = getGeneratedAppointmentIndexById(taskIdRaw);
   if (idx < 0) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
   }
@@ -17220,7 +17171,7 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-sent', (req, res) => {
     taskUpdated: true,
     task: buildConfirmationTaskDetail(updatedAppointment),
   });
-});
+}
 
 async function setLeadTaskInAgendaById(req, res, taskIdRaw) {
   const idx = getGeneratedAppointmentIndexById(taskIdRaw);
@@ -17334,17 +17285,8 @@ async function setLeadTaskInAgendaById(req, res, taskIdRaw) {
   });
 }
 
-app.post('/api/agenda/confirmation-tasks/:id/set-in-agenda', async (req, res) => {
-  return setLeadTaskInAgendaById(req, res, req.params.id);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/agenda/lead-to-agenda', async (req, res) => {
-  return setLeadTaskInAgendaById(req, res, req.query.taskId);
-});
-
-app.post('/api/agenda/confirmation-tasks/:id/mark-response-received', (req, res) => {
-  const idx = getGeneratedAppointmentIndexById(req.params.id);
+function markConfirmationTaskResponseReceivedById(req, res, taskIdRaw) {
+  const idx = getGeneratedAppointmentIndexById(taskIdRaw);
   if (idx < 0) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
   }
@@ -17392,7 +17334,7 @@ app.post('/api/agenda/confirmation-tasks/:id/mark-response-received', (req, res)
     taskCompleted: true,
     appointment: updatedAppointment,
   });
-});
+}
 
 function markLeadTaskCancelledById(req, res, taskIdRaw) {
   const idx = getGeneratedAppointmentIndexById(taskIdRaw);
@@ -17452,18 +17394,9 @@ function markLeadTaskCancelledById(req, res, taskIdRaw) {
   });
 }
 
-app.post('/api/agenda/confirmation-tasks/:id/mark-cancelled', (req, res) => {
-  return markLeadTaskCancelledById(req, res, req.params.id);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/agenda/confirmation-task-mark-cancelled', (req, res) => {
-  return markLeadTaskCancelledById(req, res, req.query.taskId);
-});
-
-app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
-  const taskId = Number(req.params.id);
-  const idx = getGeneratedAppointmentIndexById(taskId);
+function completeConfirmationTaskById(req, res, taskIdRaw) {
+  const taskId = Number(taskIdRaw);
+  const idx = getGeneratedAppointmentIndexById(taskIdRaw);
   if (idx < 0) {
     return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
   }
@@ -17512,6 +17445,21 @@ app.post('/api/agenda/confirmation-tasks/:id/complete', (req, res) => {
     taskId,
     appointment: updatedAppointment,
   });
+}
+
+registerAgendaMutationRoutes(app, {
+  updateAgendaAppointmentPostCallDataById,
+  addAgendaAppointmentToPremiumActiveOrders,
+  setInterestedLeadInAgendaResponse,
+  dismissInterestedLeadResponse,
+  syncConfirmationMailResponse,
+  sendConfirmationTaskDraftEmailResponse,
+  sendConfirmationTaskEmailResponse,
+  markConfirmationTaskSentById,
+  setLeadTaskInAgendaById,
+  markConfirmationTaskResponseReceivedById,
+  markLeadTaskCancelledById,
+  completeConfirmationTaskById,
 });
 
 registerHealthAndOpsRoutes(app, {
