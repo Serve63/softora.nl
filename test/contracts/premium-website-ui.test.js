@@ -49,3 +49,21 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.match(source, /<footer id="contact">/);
   assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
 });
+
+test('premium website gebruikt een compactere herohoogte zodat de foto minder ver doorloopt', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(
+    source,
+    /\.hero\s*\{[\s\S]*min-height:\s*clamp\(680px,\s*86vh,\s*860px\);/s
+  );
+  assert.match(
+    source,
+    /\.hero-image\s*\{[\s\S]*height:\s*clamp\(680px,\s*86vh,\s*860px\);/s
+  );
+  assert.match(
+    source,
+    /\.hero-image img\s*\{[\s\S]*object-position:\s*center 24%;/s
+  );
+});
