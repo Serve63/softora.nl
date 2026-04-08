@@ -340,6 +340,39 @@ test('agenda confirmation routes keep their auth boundaries and stable error con
   }
 });
 
+test('agenda post-call routes keep their auth boundaries and stable error contracts', async () => {
+  const authState = await getJson('/api/auth/session');
+  const configured = Boolean(authState.body?.configured);
+
+  const postCallResult = await postJson('/api/agenda/appointments/999999/post-call', {
+    prompt: 'Contract test prompt',
+  });
+  if (!configured) {
+    assert.equal(postCallResult.response.status, 503);
+    assert.equal(postCallResult.body.ok, false);
+  } else {
+    assert.ok([401, 404].includes(postCallResult.response.status));
+    if (postCallResult.response.status === 404) {
+      assert.equal(postCallResult.body.ok, false);
+      assert.equal(postCallResult.body.error, 'Afspraak niet gevonden');
+    }
+  }
+
+  const addOrderResult = await postJson('/api/agenda/appointments/999999/add-active-order', {
+    prompt: 'Contract test prompt',
+  });
+  if (!configured) {
+    assert.equal(addOrderResult.response.status, 503);
+    assert.equal(addOrderResult.body.ok, false);
+  } else {
+    assert.ok([401, 404].includes(addOrderResult.response.status));
+    if (addOrderResult.response.status === 404) {
+      assert.equal(addOrderResult.body.ok, false);
+      assert.equal(addOrderResult.body.error, 'Afspraak niet gevonden');
+    }
+  }
+});
+
 test('coldcalling endpoints keep their contract boundaries', async () => {
   const updatesResult = await getProtectedApiExpectation('/api/coldcalling/call-updates?limit=3');
   if (updatesResult.response.status === 200) {
