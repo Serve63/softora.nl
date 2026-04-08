@@ -37,9 +37,11 @@ Gebruik voor deze domeinen altijd eerst:
 - [assets](../assets): gedeelde frontend JS/CSS en themabestanden.
 
 ## Tests en safety net
+- [scripts/check-agent-guardrails.js](../scripts/check-agent-guardrails.js): snelle architectuur- en workflow-guardrails voor AI/developers.
 - [scripts/verify-critical.js](../scripts/verify-critical.js): draait de minimale kritieke verificatieset.
 - [test/contracts](../test/contracts): API- en schema-contracten.
 - [test/smoke](../test/smoke): pagina-smokechecks.
+- [.github/workflows/agent-guardrails.yml](../.github/workflows/agent-guardrails.yml): snelle CI-poort voor guardrails.
 - [.github/workflows/verify-critical.yml](../.github/workflows/verify-critical.yml): CI voor kritieke checks.
 
 ## Werkafspraken
@@ -47,6 +49,7 @@ Gebruik voor deze domeinen altijd eerst:
 - Voeg geen nieuwe bron van waarheid toe naast database of formele repositories.
 - Nieuwe backendlogica niet verder ophopen in `server.js` als het ook in `server/` kan.
 - Nieuwe frontendlogica niet inline in HTML als een los assetbestand redelijk is.
+- High-risk wijzigingen eerst backuppen en daarna pas verifiëren.
 
 ## Praktische startpunten
 - Nieuwe route of API-fix: begin in [server/routes](../server/routes) en [server/services](../server/services).

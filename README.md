@@ -17,6 +17,8 @@ Coldcalling backend + statische dashboardpagina's met stack-routing:
 - De huidige runtime start in [server.js](server.js).
 - Nieuwe backendlogica hoort bij voorkeur onder `server/routes`, `server/services`, `server/schemas`.
 - Agenda, leads, call-insights en auth zijn high-risk domeinen en vragen extra voorzichtigheid.
+- Gebruik `npm run check:guardrails` voor snelle architectuur- en AI-workflow checks; die draait ook mee in `npm run verify:critical`.
+- Draai bij high-risk wijzigingen eerst `npm run backup:runtime`.
 
 ## Vereiste env vars
 

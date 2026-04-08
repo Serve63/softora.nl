@@ -1,0 +1,86 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {
+  buildGuardrailViolations,
+  countAddedServerJsFunctions,
+  countDiffLines,
+  isAllowedNewServerPath,
+  isHighRiskPath,
+} = require('../../scripts/lib/agent-guardrails-core');
+
+test('agent guardrails detect high-risk changes without tests and recent backup', () => {
+  const violations = buildGuardrailViolations({
+    changedFiles: ['server.js', 'server/services/agenda-read.js'],
+    addedFiles: [],
+    changedTests: [],
+    highRiskFiles: ['server.js', 'server/services/agenda-read.js'],
+    behaviorFiles: ['server.js', 'server/services/agenda-read.js'],
+    newestBackupAgeMs: 16 * 60 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 7200,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(violations.length, 2);
+  assert.match(violations[0], /Productiecode aangepast zonder testwijziging/i);
+  assert.match(violations[1], /runtime-backup is 16 uur oud|runtime-backup is 16\.0 uur oud/i);
+});
+
+test('agent guardrails detect server.js growth and new helper functions', () => {
+  const diffText = [
+    '@@ -10,0 +11,4 @@',
+    '+function newServerSideHelper() {',
+    '+  return true;',
+    '+}',
+    '+const untouched = 1;',
+  ].join('\n');
+
+  const diffCounts = countDiffLines(diffText);
+  assert.deepEqual(diffCounts, { additions: 4, deletions: 0 });
+  assert.equal(countAddedServerJsFunctions(diffText), 1);
+
+  const violations = buildGuardrailViolations({
+    changedFiles: ['server.js', 'test/contracts/example.test.js'],
+    addedFiles: [],
+    changedTests: ['test/contracts/example.test.js'],
+    highRiskFiles: ['server.js'],
+    behaviorFiles: ['server.js'],
+    newestBackupAgeMs: 10 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 7601,
+    maxServerJsLines: 7500,
+    serverJsNetGrowth: 41,
+    maxServerJsNetGrowth: 25,
+    addedServerJsFunctions: countAddedServerJsFunctions(diffText),
+  });
+
+  assert.equal(violations.length, 3);
+  assert.match(violations[0], /server\.js telt nu 7601 regels/i);
+  assert.match(violations[1], /groeide netto met 41 regels/i);
+  assert.match(violations[2], /Nieuwe function-declaraties in server\.js/i);
+});
+
+test('agent guardrails block nonstandard new server files and new root js files', () => {
+  const violations = buildGuardrailViolations({
+    changedFiles: ['server/helpers/legacy.js', 'dashboard-helper.js', 'test/contracts/example.test.js'],
+    addedFiles: ['server/helpers/legacy.js', 'dashboard-helper.js'],
+    changedTests: ['test/contracts/example.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: ['server/helpers/legacy.js'],
+    newestBackupAgeMs: null,
+    isCi: false,
+    serverJsLineCount: 7200,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(violations.length, 2);
+  assert.match(violations[0], /Nieuwe server-files buiten toegestane architectuurmappen/i);
+  assert.match(violations[1], /Nieuwe root-JS files gedetecteerd/i);
+});
+
+test('agent guardrails helpers recognize approved and high-risk paths', () => {
+  assert.equal(isAllowedNewServerPath('server/services/new-service.js'), true);
+  assert.equal(isAllowedNewServerPath('server/helpers/new-helper.js'), false);
+  assert.equal(isHighRiskPath('server/services/agenda-metadata.js'), true);
+  assert.equal(isHighRiskPath('docs/repo-map.md'), false);
+});
