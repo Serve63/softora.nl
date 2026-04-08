@@ -110,6 +110,10 @@
     {
       "source": "/api/ai/order-dossier",
       "destination": "/api/ai-order-dossier"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api"
     }
   ]
 }
