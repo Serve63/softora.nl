@@ -67,3 +67,22 @@ test('premium website gebruikt een compactere herohoogte zodat de foto minder ve
     /\.hero-image img\s*\{[\s\S]*object-position:\s*center 24%;/s
   );
 });
+
+test('premium website whatsapp-widget gebruikt een verfijnde stijl en opent het juiste nummer', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /\.whatsapp-widget-label\s*\{/);
+  assert.match(source, /box-shadow:\s*0 16px 34px rgba\(20, 22, 34, 0\.12\);/);
+  assert.match(source, /backdrop-filter:\s*blur\(18px\);/);
+  assert.match(
+    source,
+    /\.whatsapp-widget-btn\s*\{[\s\S]*width:\s*64px;[\s\S]*height:\s*64px;[\s\S]*background:\s*linear-gradient\(145deg,\s*#30df6c 0%,\s*#19bf57 100%\);/s
+  );
+  assert.match(source, /\.whatsapp-widget-btn::before\s*\{/);
+  assert.match(
+    source,
+    /href="https:\/\/wa\.me\/31629917185\?text=Hoi%20Softora%2C%20ik%20wil%20graag%20meer%20informatie\."/
+  );
+  assert.match(source, /aria-label="Open WhatsApp chat met Softora op 06 29 91 71 85"/);
+});
