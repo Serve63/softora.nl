@@ -377,6 +377,19 @@ test('agenda interested-lead routes keep their auth boundaries and stable error 
   const authState = await getJson('/api/auth/session');
   const configured = Boolean(authState.body?.configured);
 
+  const listResult = await getJson('/api/agenda/interested-leads?limit=2');
+  if (!configured) {
+    assert.equal(listResult.response.status, 503);
+    assert.equal(listResult.body.ok, false);
+  } else {
+    assert.ok([200, 401].includes(listResult.response.status));
+    if (listResult.response.status === 200) {
+      assert.equal(listResult.body.ok, true);
+      assert.equal(typeof listResult.body.count, 'number');
+      assert.ok(Array.isArray(listResult.body.leads));
+    }
+  }
+
   const setInAgendaResult = await postJson('/api/agenda/interested-leads/set-in-agenda', {
     callId: 'missing-call',
     appointmentDate: '2026-04-10',
