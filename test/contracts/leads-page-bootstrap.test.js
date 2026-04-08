@@ -65,6 +65,7 @@ test('leads page bootstrap merges confirmation tasks, interested leads and lead 
   });
 
   const payload = await service.buildLeadsBootstrapPayload();
+  const htmlReplacements = service.buildLeadsPageHtmlReplacements(payload);
 
   assert.equal(payload.ok, true);
   assert.equal(Array.isArray(payload.leads), true);
@@ -74,6 +75,9 @@ test('leads page bootstrap merges confirmation tasks, interested leads and lead 
   assert.equal(payload.leads[0].website, 'softora.nl');
   assert.equal(payload.leads[0].id, 12);
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
+  assert.match(String(htmlReplacements.SOFTORA_LEADS_STATUS || ''), /^Laatste update: /);
+  assert.match(String(htmlReplacements.SOFTORA_LEADS_LIST || ''), /lead-item/);
+  assert.match(String(htmlReplacements.SOFTORA_LEADS_LIST || ''), /Softora\.nl/);
 });
 
 test('leads page bootstrap falls back safely when no data is available', async () => {
@@ -90,7 +94,10 @@ test('leads page bootstrap falls back safely when no data is available', async (
   });
 
   const payload = await service.buildLeadsBootstrapPayload();
+  const htmlReplacements = service.buildLeadsPageHtmlReplacements(payload);
 
   assert.equal(payload.ok, true);
   assert.deepEqual(payload.leads, []);
+  assert.equal(htmlReplacements.SOFTORA_LEADS_STATUS, 'Nog geen leads gevonden.');
+  assert.match(String(htmlReplacements.SOFTORA_LEADS_LIST || ''), /lead-empty/);
 });

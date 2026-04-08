@@ -75,6 +75,9 @@ function createFixture() {
       return {
         marker: 'SOFTORA_AGENDA_BOOTSTRAP',
         scriptId: 'softoraAgendaBootstrap',
+        htmlReplacements: {
+          SOFTORA_AGENDA_STATUS: '<div class="status">Klaar</div>',
+        },
         data: {
           appointments: [{ id: 11, company: 'Softora', date: '2026-04-08', time: '14:00' }],
         },
@@ -209,7 +212,7 @@ test('html page coordinator injects bootstrap json into html markers for dynamic
   const { coordinator, pagesDir } = createFixture();
   fs.writeFileSync(
     path.join(pagesDir, 'premium-personeel-agenda.html'),
-    '<!DOCTYPE html><html><body><!-- SOFTORA_AGENDA_BOOTSTRAP --><main>Agenda</main></body></html>'
+    '<!DOCTYPE html><html><body><!-- SOFTORA_AGENDA_STATUS --><!-- SOFTORA_AGENDA_BOOTSTRAP --><main>Agenda</main></body></html>'
   );
 
   const req = { originalUrl: '/premium-personeel-agenda' };
@@ -218,6 +221,7 @@ test('html page coordinator injects bootstrap json into html markers for dynamic
   await coordinator.sendSeoManagedHtmlPageResponse(req, res, () => {}, 'premium-personeel-agenda.html');
 
   assert.equal(res.statusCode, 200);
+  assert.match(res.body, /<div class="status">Klaar<\/div>/);
   assert.match(res.body, /id="softoraAgendaBootstrap"/);
   assert.match(res.body, /"appointments":\[\{"id":11,"company":"Softora"/);
 });

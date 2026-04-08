@@ -55,6 +55,28 @@ function createHtmlPageCoordinator(options = {}) {
     return `${sourceHtml}\n${scriptTag}`;
   }
 
+  function injectHtmlMarkerReplacements(html, bootstrapData) {
+    let renderedHtml = String(html || '');
+    if (!bootstrapData || typeof bootstrapData !== 'object') return renderedHtml;
+
+    const replacements = bootstrapData.htmlReplacements;
+    if (!replacements || typeof replacements !== 'object') return renderedHtml;
+
+    const entries = Array.isArray(replacements)
+      ? replacements
+      : Object.entries(replacements).map(([marker, value]) => ({ marker, html: value }));
+
+    entries.forEach((entry) => {
+      const marker = normalizeString(entry?.marker || '');
+      if (!marker) return;
+      const markerToken = `<!-- ${marker} -->`;
+      if (!renderedHtml.includes(markerToken)) return;
+      renderedHtml = renderedHtml.split(markerToken).join(String(entry?.html || ''));
+    });
+
+    return renderedHtml;
+  }
+
   async function readHtmlPageContent(fileNameRaw) {
     const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
     if (!fileName) return '';
@@ -92,6 +114,7 @@ function createHtmlPageCoordinator(options = {}) {
       let rendered = applySeoOverridesToHtml(fileName, html, config);
       try {
         const bootstrapData = await getPageBootstrapData(req, fileName);
+        rendered = injectHtmlMarkerReplacements(rendered, bootstrapData);
         rendered = injectPageBootstrapHtml(rendered, bootstrapData);
       } catch (error) {
         logger.error('[HTML][BootstrapError]', fileName, error?.message || error);

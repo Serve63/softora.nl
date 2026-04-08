@@ -17,6 +17,15 @@ function createLeadsPageBootstrapService(deps = {}) {
       .trim();
   }
 
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function isGenericConversationPlaceholder(value) {
     const text = normalize(String(value || ''));
     if (!text) return true;
@@ -271,6 +280,174 @@ function createLeadsPageBootstrapService(deps = {}) {
     return bTs - aTs;
   }
 
+  function mapLeadModeToLabel(value) {
+    const raw = normalize(value).replace(/[\s-]+/g, '_');
+    if (!raw) return '';
+    if (raw === 'voice_software' || raw === 'voice' || raw === 'voicesoftware') return 'Voicesoftware';
+    if (raw === 'business_software' || raw === 'business' || raw === 'bedrijfssoftware') return 'Bedrijfssoftware';
+    if (raw === 'website' || raw === 'websites' || raw === 'web') return 'Website';
+    return '';
+  }
+
+  function inferLeadTypeFromText(value) {
+    const text = normalize(value);
+    if (!text) return '';
+    if (/(voice\s*software|voice\s*agent|spraaksoftware|belsoftware)/.test(text)) return 'Voicesoftware';
+    if (/(bedrijfssoftware|business\s*software|crm|erp)/.test(text)) return 'Bedrijfssoftware';
+    if (/(website|web\s*site|webshop|webdesign)/.test(text)) return 'Website';
+    return '';
+  }
+
+  function resolveLeadType(item) {
+    const modeFields = [
+      item?.leadType,
+      item?.lead_type,
+      item?.productType,
+      item?.product_type,
+      item?.businessMode,
+      item?.business_mode,
+      item?.serviceType,
+      item?.service_type,
+      item?.offerType,
+      item?.offer_type,
+    ];
+
+    for (const field of modeFields) {
+      const byMode = mapLeadModeToLabel(field);
+      if (byMode) return byMode;
+      const byText = inferLeadTypeFromText(field);
+      if (byText) return byText;
+    }
+
+    const hintText = [item?.summary, item?.source, item?.location, item?.whatsappInfo].join(' ');
+    return inferLeadTypeFromText(hintText) || 'Website';
+  }
+
+  function leadTypeToClass(typeLabel) {
+    const normalizedType = normalize(typeLabel).replace(/[\s_-]+/g, ' ').trim();
+    if (!normalizedType) return 'type-website';
+    if (normalizedType.includes('voicesoftware') || normalizedType.includes('voice')) {
+      return 'type-voice-software';
+    }
+    if (
+      normalizedType.includes('bedrijfssoftware') ||
+      normalizedType.includes('business software') ||
+      normalizedType.includes('business')
+    ) {
+      return 'type-bedrijfssoftware';
+    }
+    return 'type-website';
+  }
+
+  function resolveLeadOrigin(item) {
+    const sourceText = normalize([item?.source, item?.summary, item?.whatsappInfo, item?.location].join(' '));
+    if (
+      /(coldmail|cold mail|coldmailing|mailing|email|e-mail|imap|mailbox|inbox|bevestigingsmail|confirmation[_\s-]?mail)/.test(
+        sourceText
+      )
+    ) {
+      return 'Coldmailing';
+    }
+    return 'Coldcalling';
+  }
+
+  function resolveLeadProvider(item) {
+    const directLabel = String(item?.providerLabel || item?.coldcallingStackLabel || item?.stackLabel || '').trim();
+    if (directLabel) return directLabel;
+
+    const stackRaw = normalize(
+      item?.coldcallingStack || item?.stack || item?.callingStack || item?.callingEngine
+    ).replace(/[\s-]+/g, '_');
+    if (stackRaw === 'retell_ai') return 'Retell AI';
+    if (stackRaw === 'gemini_flash_3_1_live' || stackRaw === 'gemini_3_1_live' || stackRaw === 'gemini') {
+      return 'Gemini 3.1 Live';
+    }
+    if (stackRaw === 'openai_realtime_1_5' || stackRaw === 'openai_realtime' || stackRaw === 'openai') {
+      return 'Meer volgt...';
+    }
+    if (stackRaw === 'hume_evi_3' || stackRaw === 'hume_evi' || stackRaw === 'hume') {
+      return 'Meer volgt...';
+    }
+
+    const providerRaw = normalize(item?.provider || '');
+    if (providerRaw === 'retell') return 'Retell AI';
+    if (providerRaw === 'twilio') return 'Twilio';
+
+    const sourceText = normalize(
+      [
+        item?.source,
+        item?.summary,
+        item?.whatsappInfo,
+        item?.location,
+        item?.coldcallingStackLabel,
+        item?.coldcallingStack,
+      ].join(' ')
+    );
+    if (/gemini/.test(sourceText)) return 'Gemini 3.1 Live';
+    if (/openai|realtime/.test(sourceText)) return 'Meer volgt...';
+    if (/hume/.test(sourceText)) return 'Meer volgt...';
+    if (/retell/.test(sourceText)) return 'Retell AI';
+    if (/twilio/.test(sourceText)) return 'Twilio';
+
+    return 'Onbekend';
+  }
+
+  function renderLeadListHtml(rows) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    if (!safeRows.length) {
+      return '<div class="lead-empty">Nog geen leads gevonden.</div>';
+    }
+
+    return safeRows
+      .map((item) => {
+        const company = escapeHtml(String(item?.company || 'Onbekende lead').trim() || 'Onbekende lead');
+        const leadTypeClass = leadTypeToClass(resolveLeadType(item));
+        const leadOrigin = escapeHtml(resolveLeadOrigin(item));
+        const leadProvider = escapeHtml(resolveLeadProvider(item));
+        const chipClass = normalize(item?.leadChipClass || '') === 'confirmed' ? 'confirmed' : 'pending';
+        const chipLabel = escapeHtml(
+          String(item?.leadOwnerFullName || item?.leadOwnerName || item?.leadChipLabel || 'LEAD').trim() || 'LEAD'
+        );
+        const taskId = Number(item?.id) || 0;
+        const openAttrs = taskId
+          ? ` class="lead-item ${leadTypeClass} clickable" data-lead-open="${taskId}" role="button" tabindex="0"`
+          : ` class="lead-item ${leadTypeClass}"`;
+
+        return `
+                        <article${openAttrs}>
+                            <div>
+                                <div class="lead-name">${company}</div>
+                                <div class="lead-meta"><span class="lead-meta-label">Bron:</span> ${leadOrigin}</div>
+                                <div class="lead-meta"><span class="lead-meta-label">Provider:</span> ${leadProvider}</div>
+                            </div>
+                            <span class="lead-chip ${chipClass}">${chipLabel}</span>
+                        </article>
+                    `;
+      })
+      .join('');
+  }
+
+  function renderLeadStatusHtml(payload) {
+    const leads = Array.isArray(payload?.leads) ? payload.leads : [];
+    if (!leads.length) {
+      return 'Nog geen leads gevonden.';
+    }
+
+    const loadedAt = new Date(String(payload?.loadedAt || '').trim());
+    const safeDate = Number.isNaN(loadedAt.getTime()) ? new Date() : loadedAt;
+    return `Laatste update: ${safeDate.toLocaleTimeString('nl-NL', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`;
+  }
+
+  function buildLeadsPageHtmlReplacements(payload) {
+    return {
+      SOFTORA_LEADS_STATUS: renderLeadStatusHtml(payload),
+      SOFTORA_LEADS_LIST: renderLeadListHtml(payload?.leads),
+    };
+  }
+
   function normalizeLeadDatabaseRow(item) {
     return {
       company: String(item?.company || '').trim(),
@@ -381,6 +558,7 @@ function createLeadsPageBootstrapService(deps = {}) {
 
   return {
     buildLeadsBootstrapPayload,
+    buildLeadsPageHtmlReplacements,
   };
 }
 

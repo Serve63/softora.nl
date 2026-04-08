@@ -6965,10 +6965,12 @@ getRuntimeHtmlPageBootstrapData = async (_req, fileName) => {
   }
 
   if (fileName === 'premium-ai-coldmailing.html') {
+    const leadsPayload = await leadsPageBootstrapService.buildLeadsBootstrapPayload();
     return {
       marker: 'SOFTORA_LEADS_BOOTSTRAP',
       scriptId: 'softoraLeadsBootstrap',
-      data: await leadsPageBootstrapService.buildLeadsBootstrapPayload(),
+      data: leadsPayload,
+      htmlReplacements: leadsPageBootstrapService.buildLeadsPageHtmlReplacements(leadsPayload),
     };
   }
 
