@@ -893,6 +893,10 @@
             }
         });
 
+        premiumProfileModalRef.cancelBtn.addEventListener("click", function () {
+            closePremiumProfileModal();
+        });
+
         premiumProfileModalRef.uploadBtn.addEventListener("click", function () {
             premiumProfileModalRef.fileInput.click();
         });
