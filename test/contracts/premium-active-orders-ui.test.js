@@ -15,4 +15,7 @@ test('premium actieve opdrachten renderen de claim-badge alleen met de naam', ()
   assert.match(source, /\.order-card\.has-claim\s+\.order-main\s*\{[\s\S]*padding-top:\s*3\.55rem;/);
   assert.match(source, /\.order-claim\s*\{[\s\S]*position:\s*absolute;[\s\S]*top:\s*0\.95rem;[\s\S]*left:\s*50%;[\s\S]*transform:\s*translateX\(-50%\);/);
   assert.match(source, /<div class="order-card has-claim[\s\S]*\$\{claimHtml\}[\s\S]*<div class="order-main">/);
+  assert.match(source, /leadOwnerName: String\(item\?\.leadOwnerName \|\| item\?\.leadOwnerFullName \|\| ''\)\.trim\(\),/);
+  assert.match(source, /const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder\(customOrder\);[\s\S]*const claimedBy = normalizeClaimEmployeeName\(customOrder\.claimedBy \|\| runtime\.claimedBy \|\| linkedLeadOwnerName \|\| ''\);/);
+  assert.match(source, /claimedBy: linkedLeadOwnerName \|\| null,/);
 });

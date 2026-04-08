@@ -65,6 +65,7 @@ function createFixture(overrides = {}) {
         company: 'Softora',
         contact: 'Serve Creusen',
         callId: 'call-42',
+        leadOwnerName: 'Servé Creusen',
         summary: 'Lead wil een website en vroeg om een vervolgstap.',
         value: 'EUR 3.500',
         postCallStatus: 'nieuw',
@@ -216,6 +217,7 @@ test('agenda post-call coordinator adds a new active order and links it back to 
   assert.equal(res.body.alreadyExisted, false);
   assert.equal(res.body.order.id, 1);
   assert.equal(res.body.order.sourceAppointmentId, 42);
+  assert.equal(res.body.order.claimedBy, 'Servé Creusen');
   assert.equal(appointments[0].activeOrderId, 1);
   assert.equal(appointments[0].activeOrderAddedBy, 'Serve');
   assert.equal(uiStateWrites.length, 1);

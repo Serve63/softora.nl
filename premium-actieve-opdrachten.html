@@ -2209,6 +2209,24 @@
             return idx >= 0 ? customOrders[idx] : null;
         }
 
+        function resolveLinkedLeadOwnerNameForOrder(orderLike) {
+            if (!orderLike || typeof orderLike !== 'object') return '';
+
+            const sourceAppointmentId = Number(orderLike?.sourceAppointmentId);
+            const sourceCallId = String(orderLike?.sourceCallId || '').trim();
+            if ((!Number.isFinite(sourceAppointmentId) || sourceAppointmentId <= 0) && !sourceCallId) return '';
+
+            const linkedLead = agendaLeadOptions.find((item) => {
+                if (!item || typeof item !== 'object') return false;
+                if (Number.isFinite(sourceAppointmentId) && sourceAppointmentId > 0 && Number(item?.id) === sourceAppointmentId) {
+                    return true;
+                }
+                return Boolean(sourceCallId) && String(item?.callId || '').trim() === sourceCallId;
+            });
+
+            return normalizeClaimEmployeeName(linkedLead?.leadOwnerName || linkedLead?.leadOwnerFullName || '');
+        }
+
         function updateCustomOrderById(id, patch = {}) {
             const idx = getCustomOrderIndexById(id);
             if (idx < 0) return null;
@@ -2927,6 +2945,8 @@
                 value: String(item?.value || '').trim(),
                 postCallPrompt: String(item?.postCallPrompt || '').trim(),
                 postCallNotesTranscript: String(item?.postCallNotesTranscript || '').trim(),
+                leadOwnerName: String(item?.leadOwnerName || item?.leadOwnerFullName || '').trim(),
+                leadOwnerFullName: String(item?.leadOwnerFullName || item?.leadOwnerName || '').trim(),
                 activeOrderId: Number(item?.activeOrderId) || null,
                 callId: callId || null
             };
@@ -2965,6 +2985,7 @@
                         .filter(Boolean)
                         .sort(compareAgendaLeadOptions);
                     agendaLeadOptionsLoadedAt = Date.now();
+                    syncOrderClaimsFromAgendaOwners();
                 } catch (_) {
                     if (!agendaLeadOptions.length) {
                         agendaLeadOptions = [];
@@ -2999,6 +3020,42 @@
             if (!lead) return '';
             const dateLabel = formatAgendaLeadDateTimeLabel(lead.date, lead.time);
             return `#${lead.id} · ${lead.company}${dateLabel ? ` · ${dateLabel}` : ''}`;
+        }
+
+        function syncOrderClaimsFromAgendaOwners() {
+            if (!customOrders.length || !agendaLeadOptions.length) return;
+
+            let changed = false;
+
+            customOrders.forEach((record) => {
+                if (!record || typeof record !== 'object') return;
+
+                const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder(record);
+                if (!linkedLeadOwnerName) return;
+
+                const currentClaimedBy = normalizeClaimEmployeeName(record.claimedBy || '');
+                if (!currentClaimedBy) {
+                    record.claimedBy = linkedLeadOwnerName;
+                    changed = true;
+                }
+
+                const activeId = Number(record.id);
+                if (!Number.isFinite(activeId) || activeId <= 0) return;
+                if (!orders[activeId]) return;
+
+                const runtimeClaimedBy = normalizeClaimEmployeeName(orders[activeId].claimedBy || '');
+                if (!runtimeClaimedBy) {
+                    orders[activeId].claimedBy = linkedLeadOwnerName;
+                    orders[activeId].updatedAt = Date.now();
+                    changed = true;
+                }
+            });
+
+            if (!changed) return;
+
+            persistCustomOrders();
+            persistOrdersRuntime();
+            Object.keys(orders).forEach((id) => applyOrderUiStateToCard(Number(id)));
         }
 
         function renderCreateOrderAgendaLeadOptions(selectedId) {
@@ -3176,6 +3233,7 @@
                 : null;
             const linkedPrompt = String(linkedLead?.postCallPrompt || '').trim();
             const linkedTranscript = String(linkedLead?.postCallNotesTranscript || '').trim();
+            const linkedLeadOwnerName = normalizeClaimEmployeeName(linkedLead?.leadOwnerName || linkedLead?.leadOwnerFullName || '');
             const status = 'wacht';
 
             if (!companyName || !contactPerson || !title || !description || !deliveryTime) {
@@ -3219,7 +3277,7 @@
                 launchDomainStatus: null,
                 launchDomainMessage: null,
                 launchedAt: null,
-                claimedBy: null,
+                claimedBy: linkedLeadOwnerName || null,
                 claimedAt: null,
                 referenceImages: [],
                 sourceAppointmentId,
@@ -3368,7 +3426,8 @@
             const activeId = selectActiveOrderId(id);
             const runtime = orders[activeId] || {};
             const customOrder = getCustomOrderById(activeId) || {};
-            const claimedBy = normalizeClaimEmployeeName(customOrder.claimedBy || runtime.claimedBy || '');
+            const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder(customOrder);
+            const claimedBy = normalizeClaimEmployeeName(customOrder.claimedBy || runtime.claimedBy || linkedLeadOwnerName || '');
             const claimedAtRaw = String(customOrder.claimedAt || runtime.claimedAt || '').trim();
             const claimedAt = claimedAtRaw || null;
             return {
@@ -4359,6 +4418,7 @@
             loadCustomOrderCards();
             restoreOrdersRuntimeFromState();
             refreshOrderSummaryCards();
+            void fetchAgendaLeadOptions().catch(() => {});
         }
 
         void initializeActiveOrdersPageState();

@@ -107,6 +107,11 @@ function createAgendaPostCallHelpers(deps = {}) {
   function buildActiveOrderRecordFromAppointment(appointment, input = {}, nextId = 1) {
     const company = truncateText(normalizeString(appointment?.company || ''), 160) || 'Nieuwe lead';
     const contact = truncateText(normalizeString(appointment?.contact || ''), 160);
+    const claimedBy =
+      truncateText(
+        normalizeString(appointment?.leadOwnerName || appointment?.leadOwnerFullName || ''),
+        80
+      ) || null;
     const prompt = sanitizePostCallText(input.prompt || appointment?.postCallPrompt || '', 25000);
     const transcript = sanitizePostCallText(
       input.transcript || appointment?.postCallNotesTranscript || '',
@@ -142,6 +147,7 @@ function createAgendaPostCallHelpers(deps = {}) {
       source: 'agenda_post_call_prompt',
       sourceAppointmentId: Number(appointment?.id) || null,
       sourceCallId: normalizeString(appointment?.callId || '') || null,
+      claimedBy,
       contact,
       referenceImages,
       prompt,
