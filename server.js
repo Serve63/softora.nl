@@ -51,6 +51,7 @@ const { createAiHelpers } = require('./server/services/ai-helpers');
 const { createActiveOrderAutomationService } = require('./server/services/active-order-automation');
 const { createAgendaConfirmationCoordinator } = require('./server/services/agenda-confirmation');
 const { createAgendaInterestedLeadReadService } = require('./server/services/agenda-interested-lead-read');
+const { createAgendaInterestedLeadStateService } = require('./server/services/agenda-interested-lead-state');
 const { createAgendaInterestedLeadsCoordinator } = require('./server/services/agenda-interested-leads');
 const { createAgendaPostCallCoordinator, createAgendaPostCallHelpers } = require('./server/services/agenda-post-call');
 const { createAgendaReadCoordinator } = require('./server/services/agenda-read');
@@ -1163,87 +1164,6 @@ function queueRuntimeStatePersist(reason = 'unknown') {
 
 function buildRuntimeStateSnapshotPayload() {
   return buildRuntimeStateSnapshotPayloadWithLimits();
-}
-
-function isInterestedLeadDismissed(callId) {
-  const normalizedCallId = normalizeString(callId);
-  if (normalizedCallId && dismissedInterestedLeadCallIds.has(normalizedCallId)) return true;
-  return false;
-}
-
-function isInterestedLeadDismissedByKey(leadKey) {
-  const normalizedLeadKey = normalizeString(leadKey);
-  return Boolean(normalizedLeadKey && dismissedInterestedLeadKeys.has(normalizedLeadKey));
-}
-
-function isInterestedLeadDismissedForRow(callId, rowLike) {
-  if (isInterestedLeadDismissed(callId)) return true;
-  const leadKey = buildLeadFollowUpCandidateKey(rowLike || {});
-  return isInterestedLeadDismissedByKey(leadKey);
-}
-
-function dismissInterestedLeadCallId(callId, reason = 'interested_lead_dismissed') {
-  const normalizedCallId = normalizeString(callId);
-  if (!normalizedCallId || dismissedInterestedLeadCallIds.has(normalizedCallId)) return false;
-  dismissedInterestedLeadCallIds.add(normalizedCallId);
-  queueRuntimeStatePersist(reason);
-  return true;
-}
-
-function dismissInterestedLeadKey(leadKey, reason = 'interested_lead_dismissed') {
-  const normalizedLeadKey = normalizeString(leadKey);
-  if (!normalizedLeadKey || dismissedInterestedLeadKeys.has(normalizedLeadKey)) return false;
-  dismissedInterestedLeadKeys.add(normalizedLeadKey);
-  queueRuntimeStatePersist(reason);
-  return true;
-}
-
-function dismissInterestedLeadIdentity(callId, rowLike, reason = 'interested_lead_dismissed') {
-  const normalizedCallId = normalizeString(callId || '');
-  const leadKey = buildLeadFollowUpCandidateKey(rowLike || {});
-  const byCall = normalizedCallId ? dismissInterestedLeadCallId(normalizedCallId, reason) : false;
-  const byKey = leadKey ? dismissInterestedLeadKey(leadKey, reason) : false;
-  return Boolean(byCall || byKey);
-}
-
-function clearDismissedInterestedLeadCallId(callId) {
-  const normalizedCallId = normalizeString(callId);
-  if (!normalizedCallId) return false;
-  return dismissedInterestedLeadCallIds.delete(normalizedCallId);
-}
-
-function cancelOpenLeadFollowUpTasksByIdentity(callId, rowLike, actor = '', reason = 'interested_lead_dismissed_manual_cancel') {
-  const normalizedCallId = normalizeString(callId || '');
-  const identityKey = buildLeadFollowUpCandidateKey(rowLike || {});
-  if (!normalizedCallId && !identityKey) return 0;
-
-  const nowIso = new Date().toISOString();
-  let cancelledCount = 0;
-  generatedAgendaAppointments.forEach((appointment, idx) => {
-    if (!appointment || !mapAppointmentToConfirmationTask(appointment)) return;
-    const appointmentCallId = normalizeString(appointment?.callId || '');
-    const appointmentKey = buildLeadFollowUpCandidateKey(appointment);
-    const matchesCallId = Boolean(normalizedCallId && appointmentCallId && appointmentCallId === normalizedCallId);
-    const matchesKey = Boolean(identityKey && appointmentKey && appointmentKey === identityKey);
-    if (!matchesCallId && !matchesKey) return;
-
-    setGeneratedAgendaAppointmentAtIndex(
-      idx,
-      {
-        ...appointment,
-        confirmationResponseReceived: false,
-        confirmationResponseReceivedAt: null,
-        confirmationResponseReceivedBy: null,
-        confirmationAppointmentCancelled: true,
-        confirmationAppointmentCancelledAt: nowIso,
-        confirmationAppointmentCancelledBy: actor || null,
-      },
-      reason
-    );
-    cancelledCount += 1;
-  });
-
-  return cancelledCount;
 }
 
 const uiStateStore = createUiStateStore({
@@ -8117,7 +8037,28 @@ async function syncConfirmationMailResponse(req, res) {
   });
 }
 
-const agendaInterestedLeadReadService = createAgendaInterestedLeadReadService({
+let agendaInterestedLeadReadService = null;
+
+const agendaInterestedLeadStateService = createAgendaInterestedLeadStateService({
+  dismissedInterestedLeadCallIds,
+  dismissedInterestedLeadKeys,
+  normalizeString,
+  buildLeadFollowUpCandidateKey: (...args) =>
+    agendaInterestedLeadReadService?.buildLeadFollowUpCandidateKey(...args) || '',
+  queueRuntimeStatePersist,
+  getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
+  mapAppointmentToConfirmationTask,
+  setGeneratedAgendaAppointmentAtIndex,
+});
+
+const {
+  cancelOpenLeadFollowUpTasksByIdentity,
+  clearDismissedInterestedLeadCallId,
+  dismissInterestedLeadIdentity,
+  isInterestedLeadDismissedForRow,
+} = agendaInterestedLeadStateService;
+
+agendaInterestedLeadReadService = createAgendaInterestedLeadReadService({
   getRecentCallUpdates: () => recentCallUpdates,
   getRecentAiCallInsights: () => recentAiCallInsights,
   getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
@@ -8138,7 +8079,8 @@ const agendaInterestedLeadReadService = createAgendaInterestedLeadReadService({
   sanitizeAppointmentLocation,
   sanitizeAppointmentWhatsappInfo,
   resolveAgendaLocationValue,
-  isInterestedLeadDismissedForRow,
+  isInterestedLeadDismissedForRow: (...args) =>
+    agendaInterestedLeadStateService.isInterestedLeadDismissedForRow(...args),
   hasNegativeInterestSignal,
   hasPositiveInterestSignal,
 });
