@@ -18,3 +18,15 @@ test('premium actieve opdrachten renderen de claim-badge alleen met de naam', ()
   assert.match(source, /const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder\(customOrder\);[\s\S]*const claimedBy = normalizeClaimEmployeeName\(customOrder\.claimedBy \|\| runtime\.claimedBy \|\| linkedLeadOwnerName \|\| ''\);/);
   assert.match(source, /claimedBy: linkedLeadOwnerName \|\| null,/);
 });
+
+test('premium actieve opdrachten tonen create-order modal zonder sample-design en domeinvelden', () => {
+  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.doesNotMatch(source, /Voorbeelddesign meenemen als basis/);
+  assert.doesNotMatch(source, /Gebruik dit als je de stijl\/richting van het voorbeelddesign wilt doorzetten in de echte build\./);
+  assert.doesNotMatch(source, /Domeinnaam \(voor live launch\)/);
+  assert.doesNotMatch(source, /Optioneel, maar nodig als je ook domein-koppeling\/registratie wilt automatiseren\./);
+  assert.doesNotMatch(source, /id="newOrderIncludeSampleDesign"/);
+  assert.doesNotMatch(source, /id="newOrderDomain"/);
+});

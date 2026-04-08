@@ -1413,16 +1413,6 @@
             </div>
             <form class="create-order-form" id="createOrderForm">
                 <div class="create-order-grid">
-                    <div class="create-order-field full">
-                        <label class="create-order-label" for="newOrderIncludeSampleDesign">Voorbeelddesign meenemen als basis</label>
-                        <div class="create-order-select-wrap">
-                            <select class="create-order-select" id="newOrderIncludeSampleDesign" name="includeSampleDesign">
-                                <option value="no" selected>Nee, bouw vanaf briefing</option>
-                                <option value="yes">Ja, gebruik voorbeelddesign als basis</option>
-                            </select>
-                        </div>
-                        <div class="create-order-hint">Gebruik dit als je de stijl/richting van het voorbeelddesign wilt doorzetten in de echte build.</div>
-                    </div>
                     <div class="create-order-field">
                         <label class="create-order-label" for="newOrderCompany">Bedrijfsnaam</label>
                         <input class="create-order-input" id="newOrderCompany" name="companyName" type="text" placeholder="Bijv. Salon Nova B.V." required>
@@ -1442,11 +1432,6 @@
                     <div class="create-order-field full">
                         <label class="create-order-label" for="newOrderDeliveryTime">Oplevertijd</label>
                         <input class="create-order-input" id="newOrderDeliveryTime" name="deliveryTime" type="text" placeholder="Bijv. Binnen 3 weken" required>
-                    </div>
-                    <div class="create-order-field full">
-                        <label class="create-order-label" for="newOrderDomain">Domeinnaam (voor live launch)</label>
-                        <input class="create-order-input" id="newOrderDomain" name="domainName" type="text" placeholder="Bijv. salonnova.nl">
-                        <div class="create-order-hint">Optioneel, maar nodig als je ook domein-koppeling/registratie wilt automatiseren.</div>
                     </div>
                     <div class="create-order-field full">
                         <label class="create-order-label" for="newOrderAmount">Bedrag (€)</label>
@@ -3171,7 +3156,6 @@
                 'newOrderTitle',
                 'newOrderDesc',
                 'newOrderDeliveryTime',
-                'newOrderDomain',
                 'newOrderAmount'
             ].forEach((fieldId) => {
                 const field = document.getElementById(fieldId);
