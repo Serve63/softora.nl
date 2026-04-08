@@ -1170,6 +1170,7 @@
             let modalOpenSequence = 0;
             let loadLeadsPromise = null;
             let queuedReload = false;
+            let lastLeadStatusTimestamp = 0;
 
             function paintLocalLeadsBadge(count) {
                 const badge = document.querySelector('[data-sidebar-count-key="leads"]');
@@ -1299,6 +1300,7 @@
             function setStatusLastUpdatedNow(dateValue = new Date()) {
                 const timestamp = dateValue instanceof Date ? dateValue : new Date(dateValue);
                 const safeDate = Number.isNaN(timestamp.getTime()) ? new Date() : timestamp;
+                lastLeadStatusTimestamp = safeDate.getTime();
                 setStatus(
                     `Laatste update: ${safeDate.toLocaleTimeString('nl-NL', {
                         hour: '2-digit',
@@ -3354,7 +3356,12 @@
                     .catch((error) => {
                         const message = String(error?.message || error || 'onbekende fout');
                         if (allLeads.length > 0) {
-                            setStatus(`Live verversen mislukt, laatste data blijft zichtbaar (${message})`, 'error');
+                            console.warn('[softora-leads] Live refresh overgeslagen; zichtbare leads blijven staan.', message);
+                            if (lastLeadStatusTimestamp > 0) {
+                                setStatusLastUpdatedNow(new Date(lastLeadStatusTimestamp));
+                            } else {
+                                setStatus('Leads staan klaar.', '');
+                            }
                             return;
                         }
                         const cached = loadCachedLeads();

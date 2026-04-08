@@ -17,4 +17,10 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   );
   assert.match(pageSource, /window\.localStorage\.setItem\(\s*LEADS_CACHE_KEY,/);
   assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
+  assert.match(pageSource, /let lastLeadStatusTimestamp = 0;/);
+  assert.match(pageSource, /lastLeadStatusTimestamp = safeDate\.getTime\(\);/);
+  assert.match(
+    pageSource,
+    /if \(allLeads\.length > 0\) \{[\s\S]*console\.warn\('\[softora-leads\] Live refresh overgeslagen; zichtbare leads blijven staan\.', message\);[\s\S]*setStatusLastUpdatedNow\(new Date\(lastLeadStatusTimestamp\)\);/
+  );
 });
