@@ -32,10 +32,13 @@
   const CAMPAIGN_AMOUNT_CUSTOM_STORAGE_KEY = 'softora_campaign_amount_custom';
   const CAMPAIGN_BRANCHE_STORAGE_KEY = 'softora_campaign_branche';
   const CAMPAIGN_REGIO_STORAGE_KEY = 'softora_campaign_regio';
+  const CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY = 'softora_campaign_regio_custom_km';
   const CAMPAIGN_MIN_PRICE_STORAGE_KEY = 'softora_campaign_min_price';
   const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
   const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
   const CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY = 'softora_campaign_coldcalling_stack';
+  const DEFAULT_CAMPAIGN_REGIO_VALUE = 'unlimited';
+  const CUSTOM_CAMPAIGN_REGIO_VALUE = 'custom';
   const REMOTE_UI_STATE_SCOPE_BASE = 'coldcalling';
   const BUSINESS_MODE_ORDER = ['websites', 'voice_software', 'business_software'];
   let activeBusinessMode = 'websites';
@@ -506,6 +509,73 @@
     return parsed;
   }
 
+  function getCampaignRegioOption(selectEl, value) {
+    if (!(selectEl instanceof HTMLSelectElement)) return null;
+    return Array.from(selectEl.options || []).find((option) => String(option.value) === String(value)) || null;
+  }
+
+  function formatCampaignCustomRegioLabel(km) {
+    const normalizedKm = Math.max(1, Math.round(Number(km) || 1));
+    return `Aangepast (${normalizedKm} km)`;
+  }
+
+  function applyCampaignRegioSelection(selectEl, selectedValue, customKm = null) {
+    if (!(selectEl instanceof HTMLSelectElement)) return;
+
+    const customOption = getCampaignRegioOption(selectEl, CUSTOM_CAMPAIGN_REGIO_VALUE);
+    if (customOption) {
+      customOption.textContent =
+        Number.isFinite(customKm) && customKm > 0
+          ? formatCampaignCustomRegioLabel(customKm)
+          : 'Aangepast';
+    }
+
+    const safeValue = getCampaignRegioOption(selectEl, selectedValue)
+      ? String(selectedValue)
+      : DEFAULT_CAMPAIGN_REGIO_VALUE;
+
+    selectEl.value = safeValue;
+    selectEl.dataset.lastValue = safeValue;
+    syncCustomSelectUi(selectEl);
+  }
+
+  async function promptForCustomCampaignRegioKm(initialValue = '') {
+    const normalizedInitialValue = String(initialValue || '').trim();
+    const validateCustomKm = (rawValue) => {
+      const normalizedValue = String(rawValue || '').trim().replace(',', '.');
+      const parsed = Math.round(Number(normalizedValue));
+      if (!Number.isFinite(parsed) || parsed < 1) {
+        return 'Vul een geldig aantal kilometers in.';
+      }
+      return '';
+    };
+
+    if (typeof window.openSiteInputDialog === 'function') {
+      const rawValue = await window.openSiteInputDialog({
+        title: 'Aangepaste straal',
+        message: 'Vul het aantal kilometer in voor deze campagne.',
+        initialValue: normalizedInitialValue,
+        placeholder: 'Bijv. 35',
+        confirmLabel: 'Opslaan',
+        cancelLabel: 'Annuleren',
+        validate: validateCustomKm,
+      });
+      if (rawValue == null) return null;
+      return Math.round(Number(String(rawValue).trim().replace(',', '.')));
+    }
+
+    const fallbackValue = window.prompt('Vul het aantal kilometer in voor deze campagne.', normalizedInitialValue);
+    if (fallbackValue == null) return null;
+    const validationMessage = validateCustomKm(fallbackValue);
+    if (validationMessage) {
+      if (typeof window.alert === 'function') {
+        window.alert(validationMessage);
+      }
+      return null;
+    }
+    return Math.round(Number(String(fallbackValue).trim().replace(',', '.')));
+  }
+
   function restoreCampaignFormStateFromStorage() {
     const sliderIndexRaw = readStorage(CAMPAIGN_AMOUNT_SLIDER_INDEX_STORAGE_KEY).trim();
     const sliderIndex = Math.round(Number(sliderIndexRaw));
@@ -541,8 +611,15 @@
     }
 
     const savedRegio = readStorage(CAMPAIGN_REGIO_STORAGE_KEY).trim();
-    if (regioEl && savedRegio && Array.from(regioEl.options || []).some((opt) => String(opt.value) === savedRegio)) {
-      regioEl.value = savedRegio;
+    const savedCustomRegioKm = readPositiveIntStorage(CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY, null);
+    if (regioEl) {
+      if (savedRegio === CUSTOM_CAMPAIGN_REGIO_VALUE && Number.isFinite(savedCustomRegioKm) && savedCustomRegioKm > 0) {
+        applyCampaignRegioSelection(regioEl, CUSTOM_CAMPAIGN_REGIO_VALUE, savedCustomRegioKm);
+      } else if (savedRegio && Array.from(regioEl.options || []).some((opt) => String(opt.value) === savedRegio)) {
+        applyCampaignRegioSelection(regioEl, savedRegio, savedCustomRegioKm);
+      } else {
+        applyCampaignRegioSelection(regioEl, DEFAULT_CAMPAIGN_REGIO_VALUE, savedCustomRegioKm);
+      }
     }
 
     const savedMinPrice = readStorage(CAMPAIGN_MIN_PRICE_STORAGE_KEY);
@@ -627,8 +704,30 @@
       brancheEl.addEventListener('change', () => writeStorage(CAMPAIGN_BRANCHE_STORAGE_KEY, brancheEl.value));
     }
     if (regioEl) {
-      regioEl.addEventListener('change', () => {
-        writeStorage(CAMPAIGN_REGIO_STORAGE_KEY, regioEl.value);
+      regioEl.addEventListener('change', async () => {
+        const selectedValue = String(regioEl.value || '').trim() || DEFAULT_CAMPAIGN_REGIO_VALUE;
+        const previousValue = String(regioEl.dataset.lastValue || DEFAULT_CAMPAIGN_REGIO_VALUE).trim() || DEFAULT_CAMPAIGN_REGIO_VALUE;
+        const previousCustomKm = readPositiveIntStorage(CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY, null);
+
+        if (selectedValue === CUSTOM_CAMPAIGN_REGIO_VALUE) {
+          const initialCustomKm = Number.isFinite(previousCustomKm) && previousCustomKm > 0 ? String(previousCustomKm) : '';
+          const customKm = await promptForCustomCampaignRegioKm(initialCustomKm);
+
+          if (Number.isFinite(customKm) && customKm > 0) {
+            writeStorage(CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY, String(customKm));
+            writeStorage(CAMPAIGN_REGIO_STORAGE_KEY, CUSTOM_CAMPAIGN_REGIO_VALUE);
+            applyCampaignRegioSelection(regioEl, CUSTOM_CAMPAIGN_REGIO_VALUE, customKm);
+          } else {
+            applyCampaignRegioSelection(regioEl, previousValue, previousCustomKm);
+            writeStorage(CAMPAIGN_REGIO_STORAGE_KEY, previousValue);
+          }
+
+          updateLeadListHint();
+          return;
+        }
+
+        writeStorage(CAMPAIGN_REGIO_STORAGE_KEY, selectedValue);
+        applyCampaignRegioSelection(regioEl, selectedValue, previousCustomKm);
         updateLeadListHint();
       });
     }
@@ -950,6 +1049,15 @@
     if (!el) return '';
     const option = el.options[el.selectedIndex];
     return option ? option.text.trim() : String(el.value || '').trim();
+  }
+
+  function normalizeCampaignRegionPromptValue(value) {
+    const normalized = normalizeFreeText(value);
+    if (!normalized) return '';
+    if (/^geen limiet$/i.test(normalized)) return '';
+    if (/^aangepast\b/i.test(normalized)) return '';
+    if (/^\d+\s*km$/i.test(normalized)) return '';
+    return normalized;
   }
 
   function ensureStatusMessageElement() {
@@ -2445,7 +2553,7 @@
       }
     );
 
-    const selectedRegion = getSelectedText('regio');
+    const selectedRegion = normalizeCampaignRegionPromptValue(getSelectedText('regio'));
     const region = await promptManualLeadInput(
       'Regio (optioneel).',
       normalizeFreeText(defaults.region || selectedRegion),

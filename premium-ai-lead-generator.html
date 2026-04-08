@@ -1769,8 +1769,9 @@
 
                     <div class="form-group form-group--regio">
                         <label class="form-label">Omstreken Oisterwijk</label>
-                        <select class="form-select magnetic" id="regio">
-                            <option value="10km" selected>10 km</option>
+                        <select class="form-select magnetic" id="regio" data-force-change-value="custom">
+                            <option value="unlimited" selected>Geen limiet</option>
+                            <option value="10km">10 km</option>
                             <option value="20km">20 km</option>
                             <option value="50km">50 km</option>
                             <option value="75km">75 km</option>
@@ -1924,8 +1925,12 @@
                 optionButton.tabIndex = -1;
                 if (!option.disabled) {
                     optionButton.addEventListener('click', () => {
+                        const forceChangeValue = String(select.dataset.forceChangeValue || '').trim();
+                        const shouldForceChange = forceChangeValue && option.value === forceChangeValue;
                         if (select.value !== option.value) {
                             select.value = option.value;
+                            select.dispatchEvent(new Event('change', { bubbles: true }));
+                        } else if (shouldForceChange) {
                             select.dispatchEvent(new Event('change', { bubbles: true }));
                         }
                         syncFromSelect();
@@ -2125,6 +2130,8 @@
                 });
             });
         }
+
+        window.openSiteInputDialog = openSiteInputDialog;
 
         initCustomFormSelects();
 
