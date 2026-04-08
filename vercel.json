@@ -113,7 +113,7 @@
     },
     {
       "source": "/",
-      "destination": "/api"
+      "destination": "/premium-website"
     },
     {
       "source": "/(.*)",
