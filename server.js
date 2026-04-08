@@ -465,7 +465,7 @@ const premiumAdminAllowedIpSet = new Set(
     .filter(Boolean)
 );
 
-const { isPremiumAdminIpAllowed, isSameOriginApiRequest } = createRequestSecurityContext({
+const { getStateChangingApiProtectionDecision, isPremiumAdminIpAllowed, isSameOriginApiRequest } = createRequestSecurityContext({
   enforceSameOriginRequests: PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS,
   getEffectivePublicBaseUrl,
   premiumAdminAllowedIpSet,
@@ -591,11 +591,12 @@ app.use('/api', (req, res, next) => {
 });
 
 app.use('/api', (req, res, next) => {
-  if (isSameOriginApiRequest(req)) return next();
+  const protectionDecision = getStateChangingApiProtectionDecision(req);
+  if (protectionDecision.allowed) return next();
 
   appendSecurityAuditEvent(
     {
-      type: 'csrf_origin_blocked',
+      type: protectionDecision.reason || 'csrf_origin_blocked',
       severity: 'warning',
       success: false,
       email: getPremiumAuthState(req)?.email || '',
@@ -603,14 +604,14 @@ app.use('/api', (req, res, next) => {
       path: getRequestPathname(req),
       origin: getRequestOriginFromHeaders(req),
       userAgent: req.get('user-agent'),
-      detail: 'State-changing API request geweigerd door same-origin bescherming.',
+      detail: protectionDecision.detail || 'State-changing API request geweigerd door API-beveiliging.',
     },
-    'security_same_origin_blocked'
+    `security_${protectionDecision.reason || 'same_origin_blocked'}`
   );
 
   return res.status(403).json({
     ok: false,
-    error: 'Verzoek geweigerd door same-origin beveiliging.',
+    error: protectionDecision.publicMessage || 'Verzoek geweigerd door API-beveiliging.',
   });
 });
 

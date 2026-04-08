@@ -7,6 +7,7 @@ Zakelijk sterke beveiliging zonder de bestaande site te breken.
 - `helmet`
 - rate limiting
 - same-origin bescherming voor API-mutaties
+- Fetch Metadata en content-type guards voor state-changing API-calls
 - premium sessiecookies
 - MFA-haakjes
 
