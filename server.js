@@ -50,6 +50,7 @@ const { registerActiveOrderRoutes } = require('./server/routes/active-orders');
 const { createAiHelpers } = require('./server/services/ai-helpers');
 const { createActiveOrderAutomationService } = require('./server/services/active-order-automation');
 const { createAgendaConfirmationCoordinator } = require('./server/services/agenda-confirmation');
+const { createAgendaPageBootstrapService } = require('./server/services/agenda-page-bootstrap');
 const { createAgendaAppointmentStateService } = require('./server/services/agenda-appointment-state');
 const { createAgendaAppointmentUpsertService } = require('./server/services/agenda-appointment-upsert');
 const { createAgendaLeadFollowUpService } = require('./server/services/agenda-lead-follow-up');
@@ -1314,6 +1315,8 @@ async function persistSeoConfig(config, meta = {}) {
   return normalizedConfig;
 }
 
+let getRuntimeHtmlPageBootstrapData = async () => null;
+
 const { readHtmlPageContent, resolveSeoPageFileFromRequest, sendSeoManagedHtmlPageResponse } =
   createHtmlPageCoordinator({
     pagesDir: __dirname,
@@ -1324,6 +1327,7 @@ const { readHtmlPageContent, resolveSeoPageFileFromRequest, sendSeoManagedHtmlPa
     resolvePremiumHtmlPageAccess,
     getSeoConfigCached,
     applySeoOverridesToHtml,
+    getPageBootstrapData: (req, fileName) => getRuntimeHtmlPageBootstrapData(req, fileName),
   });
 
 const seoReadCoordinator = createSeoReadCoordinator({
@@ -7864,6 +7868,25 @@ const agendaReadCoordinator = createAgendaReadCoordinator({
   buildAllInterestedLeadRows,
   normalizeString,
 });
+
+const agendaPageBootstrapService = createAgendaPageBootstrapService({
+  isSupabaseConfigured,
+  getSupabaseStateHydrated: () => supabaseStateHydrated,
+  forceHydrateRuntimeStateWithRetries,
+  getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
+  isGeneratedAppointmentVisibleForAgenda,
+  compareAgendaAppointments,
+});
+
+getRuntimeHtmlPageBootstrapData = async (_req, fileName) => {
+  if (fileName !== 'premium-personeel-agenda.html') return null;
+
+  return {
+    marker: 'SOFTORA_AGENDA_BOOTSTRAP',
+    scriptId: 'softoraAgendaBootstrap',
+    data: await agendaPageBootstrapService.buildAgendaBootstrapPayload({ limit: 250 }),
+  };
+};
 
 registerAgendaReadRoutes(app, {
   readCoordinator: agendaReadCoordinator,

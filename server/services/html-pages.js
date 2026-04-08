@@ -15,7 +15,45 @@ function createHtmlPageCoordinator(options = {}) {
     }),
     getSeoConfigCached = async () => ({}),
     applySeoOverridesToHtml = (_fileName, html) => String(html || ''),
+    getPageBootstrapData = async () => null,
   } = options;
+
+  function escapeJsonForInlineHtml(value) {
+    return JSON.stringify(value === undefined ? null : value)
+      .replace(/</g, '\\u003c')
+      .replace(/>/g, '\\u003e')
+      .replace(/&/g, '\\u0026')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029');
+  }
+
+  function injectPageBootstrapHtml(html, bootstrapData) {
+    const sourceHtml = String(html || '');
+    if (!bootstrapData || typeof bootstrapData !== 'object') return sourceHtml;
+
+    const scriptId = normalizeString(bootstrapData.scriptId || '');
+    if (!scriptId) return sourceHtml;
+
+    const marker = normalizeString(bootstrapData.marker || '');
+    const serialized =
+      typeof bootstrapData.serialized === 'string'
+        ? bootstrapData.serialized
+        : escapeJsonForInlineHtml(bootstrapData.data);
+    const scriptTag = `<script id="${scriptId}" type="application/json">${serialized}</script>`;
+
+    if (marker) {
+      const markerToken = `<!-- ${marker} -->`;
+      if (sourceHtml.includes(markerToken)) {
+        return sourceHtml.replace(markerToken, scriptTag);
+      }
+    }
+
+    if (/<\/body>/i.test(sourceHtml)) {
+      return sourceHtml.replace(/<\/body>/i, `${scriptTag}\n</body>`);
+    }
+
+    return `${sourceHtml}\n${scriptTag}`;
+  }
 
   async function readHtmlPageContent(fileNameRaw) {
     const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
@@ -51,7 +89,13 @@ function createHtmlPageCoordinator(options = {}) {
       const html = await readHtmlPageContent(fileName);
       if (!html) return next();
       const config = await getSeoConfigCached();
-      const rendered = applySeoOverridesToHtml(fileName, html, config);
+      let rendered = applySeoOverridesToHtml(fileName, html, config);
+      try {
+        const bootstrapData = await getPageBootstrapData(req, fileName);
+        rendered = injectPageBootstrapHtml(rendered, bootstrapData);
+      } catch (error) {
+        logger.error('[HTML][BootstrapError]', fileName, error?.message || error);
+      }
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       return res.status(200).send(rendered);
     } catch (error) {

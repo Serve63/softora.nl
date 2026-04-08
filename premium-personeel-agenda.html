@@ -919,12 +919,25 @@
     </div>
 </div>
 
+<!-- SOFTORA_AGENDA_BOOTSTRAP -->
 <script>
     // Appointments data
+    function readAgendaBootstrapPayload() {
+        const element = document.getElementById('softoraAgendaBootstrap');
+        if (!element) return { appointments: [] };
+        try {
+            const parsed = JSON.parse(String(element.textContent || '{}'));
+            return parsed && typeof parsed === 'object' ? parsed : { appointments: [] };
+        } catch (_) {
+            return { appointments: [] };
+        }
+    }
+
+    const agendaBootstrapPayload = readAgendaBootstrapPayload();
     const appointments = [];
 
     // State
-    let currentDate = appointments.length ? new Date(`${appointments[0].date}T00:00:00`) : new Date();
+    let currentDate = new Date();
     const today = new Date();
 
     const monthNames = ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'];
@@ -1297,6 +1310,55 @@
             activeOrderAddedAt: String(item.activeOrderAddedAt || ''),
             referenceImages: normalizeReferenceImageList(item.referenceImages || item.attachments || []),
         };
+    }
+
+    function mergeServerAppointments(items) {
+        if (!Array.isArray(items) || !items.length) return false;
+
+        let changed = false;
+        const existingFingerprints = new Set(appointments.map(appointmentFingerprint));
+        const indexById = new Map(
+            appointments
+                .map((item, idx) => ({ id: Number(item?.id || 0), idx }))
+                .filter((entry) => Number.isFinite(entry.id) && entry.id > 0)
+                .map((entry) => [entry.id, entry.idx])
+        );
+
+        items.forEach((item) => {
+            const apt = normalizeServerAppointment(item);
+            if (!apt) return;
+
+            const aptId = Number(apt.id || 0);
+            if (Number.isFinite(aptId) && aptId > 0 && indexById.has(aptId)) {
+                const existingIndex = indexById.get(aptId);
+                const previous = appointments[existingIndex];
+                const merged = {
+                    ...previous,
+                    ...apt
+                };
+                if (JSON.stringify(previous) !== JSON.stringify(merged)) {
+                    appointments[existingIndex] = merged;
+                    changed = true;
+                }
+                return;
+            }
+
+            const fingerprint = appointmentFingerprint(apt);
+            if (existingFingerprints.has(fingerprint)) return;
+            existingFingerprints.add(fingerprint);
+            appointments.push(apt);
+            changed = true;
+        });
+
+        if (changed) {
+            appointments.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+        }
+
+        return changed;
+    }
+
+    function applyInitialAgendaBootstrap() {
+        mergeServerAppointments(agendaBootstrapPayload?.appointments);
     }
 
     function setWorkspaceStatus(message, variant = '') {
@@ -1965,35 +2027,9 @@
                 const response = await fetch('/api/agenda/appointments?limit=250', { cache: 'no-store' });
                 const data = await response.json();
                 if (!response.ok || !data?.ok || !Array.isArray(data.appointments)) return;
-
-                const existing = new Set(appointments.map(appointmentFingerprint));
-                const indexById = new Map(
-                    appointments
-                        .map((item, idx) => ({ id: Number(item?.id || 0), idx }))
-                        .filter((entry) => Number.isFinite(entry.id) && entry.id > 0)
-                        .map((entry) => [entry.id, entry.idx])
-                );
-
-                data.appointments.forEach((item) => {
-                    const apt = normalizeServerAppointment(item);
-                    if (!apt) return;
-                    const aptId = Number(apt.id || 0);
-                    if (Number.isFinite(aptId) && aptId > 0 && indexById.has(aptId)) {
-                        const existingIndex = indexById.get(aptId);
-                        appointments[existingIndex] = {
-                            ...appointments[existingIndex],
-                            ...apt
-                        };
-                        return;
-                    }
-                    const fp = appointmentFingerprint(apt);
-                    if (existing.has(fp)) return;
-                    existing.add(fp);
-                    appointments.push(apt);
-                });
-
-                appointments.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
-                renderCalendar();
+                if (mergeServerAppointments(data.appointments)) {
+                    renderCalendar();
+                }
             } catch {
                 // Zonder backend blijft de agenda leeg tot echte afspraken binnenkomen.
             } finally {
@@ -2173,6 +2209,7 @@
     workspaceTranscriptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);
 
     // Init
+    applyInitialAgendaBootstrap();
     renderCalendar();
     renderWorkspaceReferenceImages();
     void refreshKnownActiveOrdersIndex();

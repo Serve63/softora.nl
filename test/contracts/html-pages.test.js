@@ -70,6 +70,16 @@ function createFixture() {
       }
       return String(html || '');
     },
+    getPageBootstrapData: async (_req, fileName) => {
+      if (fileName !== 'premium-personeel-agenda.html') return null;
+      return {
+        marker: 'SOFTORA_AGENDA_BOOTSTRAP',
+        scriptId: 'softoraAgendaBootstrap',
+        data: {
+          appointments: [{ id: 11, company: 'Softora', date: '2026-04-08', time: '14:00' }],
+        },
+      };
+    },
   });
 
   return {
@@ -193,4 +203,21 @@ test('html page coordinator falls back to sendFile when rendering throws', async
   assert.equal(nextCalled, false);
   assert.equal(res.headers['Cache-Control'], 'no-store, private');
   assert.equal(res.sendFilePath, pagePath);
+});
+
+test('html page coordinator injects bootstrap json into html markers for dynamic pages', async () => {
+  const { coordinator, pagesDir } = createFixture();
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-personeel-agenda.html'),
+    '<!DOCTYPE html><html><body><!-- SOFTORA_AGENDA_BOOTSTRAP --><main>Agenda</main></body></html>'
+  );
+
+  const req = { originalUrl: '/premium-personeel-agenda' };
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(req, res, () => {}, 'premium-personeel-agenda.html');
+
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /id="softoraAgendaBootstrap"/);
+  assert.match(res.body, /"appointments":\[\{"id":11,"company":"Softora"/);
 });
