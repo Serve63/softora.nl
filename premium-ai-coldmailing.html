@@ -1084,8 +1084,20 @@
         </div>
     </div>
 
+    <!-- SOFTORA_LEADS_BOOTSTRAP -->
     <script>
         (function initLeadsOverview() {
+            function readLeadsBootstrapPayload() {
+                const element = document.getElementById('softoraLeadsBootstrap');
+                if (!element) return { leads: [], loadedAt: '' };
+                try {
+                    const parsed = JSON.parse(String(element.textContent || '{}'));
+                    return parsed && typeof parsed === 'object' ? parsed : { leads: [], loadedAt: '' };
+                } catch (error) {
+                    return { leads: [], loadedAt: '' };
+                }
+            }
+
             const listEl = document.getElementById('leadList');
             const statusEl = document.getElementById('leadStatus');
             const modalOverlay = document.getElementById('leadModalOverlay');
@@ -1140,6 +1152,7 @@
             let pollTimer = null;
             let activeTaskId = 0;
             let modalBusy = false;
+            const leadsBootstrapPayload = readLeadsBootstrapPayload();
             const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v2';
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
@@ -3191,11 +3204,63 @@
             }
 
             function loadCachedLeads() {
-                return { leads: [], savedAt: 0 };
+                const bootstrapLeads = Array.isArray(leadsBootstrapPayload?.leads)
+                    ? leadsBootstrapPayload.leads.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                    : [];
+                const bootstrapSavedAt = Date.parse(String(leadsBootstrapPayload?.loadedAt || '').trim()) || 0;
+                if (bootstrapLeads.length > 0) {
+                    return {
+                        leads: bootstrapLeads,
+                        savedAt: bootstrapSavedAt || Date.now(),
+                    };
+                }
+
+                try {
+                    const raw = String(window.localStorage.getItem(LEADS_CACHE_KEY) || '').trim();
+                    if (!raw) return { leads: [], savedAt: 0 };
+                    const parsed = JSON.parse(raw);
+                    const savedAt = Number(parsed?.savedAt) || 0;
+                    if (!savedAt || Date.now() - savedAt > LEADS_CACHE_MAX_AGE_MS) {
+                        return { leads: [], savedAt: 0 };
+                    }
+                    const leads = Array.isArray(parsed?.leads)
+                        ? parsed.leads.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                        : [];
+                    return {
+                        leads,
+                        savedAt,
+                    };
+                } catch (error) {
+                    return { leads: [], savedAt: 0 };
+                }
             }
 
             function persistCachedLeads(rows) {
-                return;
+                try {
+                    const safeRows = Array.isArray(rows)
+                        ? rows.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                        : [];
+                    window.localStorage.setItem(
+                        LEADS_CACHE_KEY,
+                        JSON.stringify({
+                            savedAt: Date.now(),
+                            leads: safeRows,
+                        })
+                    );
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            }
+
+            function serializeLeadRows(rows) {
+                const safeRows = Array.isArray(rows)
+                    ? rows.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                    : [];
+                return JSON.stringify(safeRows);
+            }
+
+            function leadRowsDiffer(a, b) {
+                return serializeLeadRows(a) !== serializeLeadRows(b);
             }
 
             async function fetchTasksJson(url, timeoutMs) {
@@ -3274,8 +3339,11 @@
                 }
                 loadLeadsPromise = (async () => {
                     const freshLeads = await fetchLeadRows();
+                    const shouldRerender = leadRowsDiffer(allLeads, freshLeads);
                     allLeads = freshLeads;
-                    renderList();
+                    if (shouldRerender || !allLeads.length) {
+                        renderList();
+                    }
                     persistCachedLeads(allLeads);
                     if (allLeads.length > 0) {
                         setStatusLastUpdatedNow();

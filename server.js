@@ -67,6 +67,7 @@ const { createAiDashboardCoordinator } = require('./server/services/ai-dashboard
 const { createAiToolsCoordinator } = require('./server/services/ai-tools');
 const { createCustomersPageBootstrapService } = require('./server/services/customers-page-bootstrap');
 const { createHtmlPageCoordinator } = require('./server/services/html-pages');
+const { createLeadsPageBootstrapService } = require('./server/services/leads-page-bootstrap');
 const { registerAgendaMutationRoutes } = require('./server/routes/agenda');
 const { registerPremiumAuthRoutes } = require('./server/routes/premium-auth');
 const { registerAgendaReadRoutes } = require('./server/routes/agenda-read');
@@ -6938,6 +6939,14 @@ const customersPageBootstrapService = createCustomersPageBootstrapService({
   orderKey: PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY,
 });
 
+const leadsPageBootstrapService = createLeadsPageBootstrapService({
+  agendaReadCoordinator,
+  getUiStateValues,
+  normalizeString,
+  leadDatabaseUiScope: 'coldcalling',
+  leadDatabaseRowsStorageKey: 'softora_coldcalling_lead_rows_json',
+});
+
 getRuntimeHtmlPageBootstrapData = async (_req, fileName) => {
   if (fileName === 'premium-personeel-agenda.html') {
     return {
@@ -6952,6 +6961,14 @@ getRuntimeHtmlPageBootstrapData = async (_req, fileName) => {
       marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
       scriptId: 'softoraCustomersBootstrap',
       data: await customersPageBootstrapService.buildCustomersBootstrapPayload(),
+    };
+  }
+
+  if (fileName === 'premium-ai-coldmailing.html') {
+    return {
+      marker: 'SOFTORA_LEADS_BOOTSTRAP',
+      scriptId: 'softoraLeadsBootstrap',
+      data: await leadsPageBootstrapService.buildLeadsBootstrapPayload(),
     };
   }
 

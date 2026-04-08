@@ -1,0 +1,20 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+
+test('premium leads page bootstraps leads before async refresh starts', () => {
+  const pagePath = path.join(__dirname, '../../premium-ai-coldmailing.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /<!-- SOFTORA_LEADS_BOOTSTRAP -->/);
+  assert.match(pageSource, /function readLeadsBootstrapPayload\(\)/);
+  assert.match(pageSource, /document\.getElementById\('softoraLeadsBootstrap'\)/);
+  assert.match(pageSource, /const leadsBootstrapPayload = readLeadsBootstrapPayload\(\);/);
+  assert.match(
+    pageSource,
+    /function loadCachedLeads\(\) \{[\s\S]*const bootstrapLeads = Array\.isArray\(leadsBootstrapPayload\?\.leads\)/
+  );
+  assert.match(pageSource, /window\.localStorage\.setItem\(\s*LEADS_CACHE_KEY,/);
+  assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
+});
