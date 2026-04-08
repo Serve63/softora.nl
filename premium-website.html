@@ -453,6 +453,51 @@
             margin-bottom: 6rem;
         }
 
+        .diensten-shell {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .diensten-arrow-wrap {
+            position: absolute;
+            left: clamp(0rem, 6vw, 5.5rem);
+            top: -9.5rem;
+            width: min(44vw, 540px);
+            height: 220px;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.92;
+        }
+
+        .diensten-arrow-svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            filter: drop-shadow(0 10px 20px rgba(139, 34, 82, 0.08));
+        }
+
+        .diensten-arrow-trail {
+            fill: none;
+            stroke: rgba(139, 34, 82, 0.16);
+            stroke-width: 7;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .diensten-arrow-path,
+        .diensten-arrow-head {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 2.75;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .diensten-arrow-dot {
+            fill: rgba(139, 34, 82, 0.18);
+        }
+
         .section-header h2 {
             margin-top: 1rem;
             position: relative;
@@ -1154,6 +1199,7 @@
             nav, section, footer { padding-left: 2rem; padding-right: 2rem; }
             body { cursor: auto; }
             .cursor, .cursor-dot { display: none; }
+            .diensten-arrow-wrap { display: none; }
         }
 
         @media (max-width: 768px) {
@@ -1220,7 +1266,16 @@
 
     <!-- DIENSTEN -->
     <section id="diensten" style="padding: 3rem 4rem 10rem;">
-        <div style="max-width: 1200px; margin: 0 auto;">
+        <div class="diensten-shell">
+            <div class="diensten-arrow-wrap" aria-hidden="true">
+                <svg class="diensten-arrow-svg" viewBox="0 0 560 240" role="presentation" focusable="false">
+                    <circle class="diensten-arrow-dot" cx="60" cy="34" r="9"></circle>
+                    <path class="diensten-arrow-trail" d="M 60 34 C 18 34, 14 92, 68 96 C 126 100, 154 46, 200 60 C 248 75, 243 142, 318 174 C 390 205, 480 205, 530 176"></path>
+                    <path class="diensten-arrow-path" d="M 60 34 C 18 34, 14 92, 68 96 C 126 100, 154 46, 200 60 C 248 75, 243 142, 318 174 C 390 205, 480 205, 530 176"></path>
+                    <path class="diensten-arrow-head" d="M 498 155 C 516 161, 525 167, 530 176"></path>
+                    <path class="diensten-arrow-head" d="M 503 192 C 520 186, 527 181, 530 176"></path>
+                </svg>
+            </div>
             <div class="section-header is-centered fade-up">
                 <h2 class="diensten-title"><span class="title-mark">Wat</span> We Bouwen</h2>
                 <p>Drie losse producten. Of één sterk geheel. Jij kiest waar we beginnen.</p>

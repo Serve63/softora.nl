@@ -27,3 +27,14 @@ test('premium website werkwijze stats gebruiken een vaste paarse lijn zonder hov
   assert.doesNotMatch(source, /\.stat-item:hover::before\s*\{/);
   assert.doesNotMatch(source, /\.stat-item:hover \.stat-number\s*\{/);
 });
+
+test('premium website toont een speelse krulpijl van hero richting wat we bouwen', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /<div class="diensten-arrow-wrap" aria-hidden="true">/);
+  assert.match(source, /<svg class="diensten-arrow-svg" viewBox="0 0 560 240"/);
+  assert.match(source, /\.diensten-arrow-wrap\s*\{[\s\S]*top:\s*-9\.5rem;[\s\S]*width:\s*min\(44vw,\s*540px\);[\s\S]*pointer-events:\s*none;/s);
+  assert.match(source, /\.diensten-arrow-path,\s*\.diensten-arrow-head\s*\{[\s\S]*stroke:\s*var\(--accent\);/s);
+  assert.match(source, /@media \(max-width: 1024px\)\s*\{[\s\S]*\.diensten-arrow-wrap \{ display: none; \}/s);
+});
