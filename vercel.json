@@ -112,6 +112,10 @@
       "destination": "/api/ai-order-dossier"
     },
     {
+      "source": "/",
+      "destination": "/api"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api"
     }
