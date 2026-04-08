@@ -216,9 +216,7 @@ body {
 .status-line.success { color: #17693a; }
 
 .workspace {
-  display: grid;
-  grid-template-columns: 380px minmax(0, 1fr);
-  gap: 1.35rem;
+  display: block;
 }
 
 .scan-card,
@@ -421,43 +419,6 @@ body {
       </section>
 
       <section class="workspace">
-        <article class="scan-card">
-          <h2 class="panel-kicker">Scanresultaat</h2>
-          <div id="website-preview-scan-empty" class="scan-empty">
-            Nog geen website gescand. Na het genereren zie je hier welke titel, boodschap en visuele cues AI uit de huidige site heeft gehaald.
-          </div>
-          <div id="website-preview-scan" class="scan-grid" hidden>
-            <div class="scan-block">
-              <span class="scan-block-label">Doelwebsite</span>
-              <div id="website-preview-host" class="scan-block-value"></div>
-            </div>
-            <div class="scan-block">
-              <span class="scan-block-label">Pagina titel</span>
-              <div id="website-preview-title" class="scan-block-value"></div>
-            </div>
-            <div class="scan-block">
-              <span class="scan-block-label">Meta omschrijving</span>
-              <div id="website-preview-description" class="scan-block-value"></div>
-            </div>
-            <div class="scan-block">
-              <span class="scan-block-label">Hoofdkop</span>
-              <div id="website-preview-h1" class="scan-block-value"></div>
-            </div>
-            <div class="scan-block">
-              <span class="scan-block-label">AI brief</span>
-              <div id="website-preview-brief" class="scan-block-value"></div>
-            </div>
-            <div class="scan-block">
-              <span class="scan-block-label">Gevonden secties</span>
-              <div id="website-preview-headings" class="tag-list"></div>
-            </div>
-            <div class="scan-block">
-              <span class="scan-block-label">Visuele cues</span>
-              <div id="website-preview-cues" class="tag-list"></div>
-            </div>
-          </div>
-        </article>
-
         <article class="preview-card">
           <div class="preview-head">
             <div>
@@ -488,15 +449,6 @@ body {
   const urlInput = document.getElementById("website-preview-url");
   const generateButton = document.getElementById("website-preview-generate");
   const statusEl = document.getElementById("website-preview-status");
-  const scanEmptyEl = document.getElementById("website-preview-scan-empty");
-  const scanEl = document.getElementById("website-preview-scan");
-  const hostEl = document.getElementById("website-preview-host");
-  const titleEl = document.getElementById("website-preview-title");
-  const descriptionEl = document.getElementById("website-preview-description");
-  const h1El = document.getElementById("website-preview-h1");
-  const briefEl = document.getElementById("website-preview-brief");
-  const headingsEl = document.getElementById("website-preview-headings");
-  const cuesEl = document.getElementById("website-preview-cues");
   const metaEl = document.getElementById("website-preview-meta");
   const stageEl = document.getElementById("website-preview-stage");
   const emptyEl = document.getElementById("website-preview-empty");
@@ -509,24 +461,6 @@ body {
     if (tone) statusEl.classList.add(tone);
   }
 
-  function fillTagList(container, values) {
-    container.innerHTML = "";
-    const items = Array.isArray(values) ? values.filter(Boolean) : [];
-    if (!items.length) {
-      const span = document.createElement("span");
-      span.className = "scan-block-value";
-      span.textContent = "Geen duidelijke items gevonden.";
-      container.appendChild(span);
-      return;
-    }
-    items.forEach(function (value) {
-      const tag = document.createElement("span");
-      tag.className = "tag";
-      tag.textContent = String(value);
-      container.appendChild(tag);
-    });
-  }
-
   function setBusy(isBusy, message) {
     generateButton.disabled = isBusy;
     urlInput.disabled = isBusy;
@@ -537,20 +471,7 @@ body {
 
   function renderResult(payload) {
     const site = payload && payload.site && typeof payload.site === "object" ? payload.site : {};
-    const scan = payload && payload.scan && typeof payload.scan === "object" ? payload.scan : {};
     const image = payload && payload.image && typeof payload.image === "object" ? payload.image : {};
-
-    scanEmptyEl.hidden = true;
-    scanEl.hidden = false;
-
-    hostEl.textContent = String(site.finalUrl || site.normalizedUrl || site.requestedUrl || scan.host || "Onbekend");
-    titleEl.textContent = String(scan.title || "Geen titel gevonden");
-    descriptionEl.textContent = String(scan.metaDescription || "Geen meta omschrijving gevonden");
-    h1El.textContent = String(scan.h1 || "Geen H1 gevonden");
-    briefEl.textContent = String(payload.brief || "Geen extra AI-brief beschikbaar");
-
-    fillTagList(headingsEl, scan.headings || []);
-    fillTagList(cuesEl, scan.visualCues || []);
 
     const imageDataUrl = String(image.dataUrl || "");
     if (imageDataUrl) {
