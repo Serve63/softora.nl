@@ -2,43 +2,56 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/index.js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/agenda/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/auth/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/ai/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/coldcalling/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/dashboard/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/retell/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/twilio/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/debug/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/seo/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/ui-state/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     },
     "api/premium-users/[...path].js": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "includeFiles": "*.html"
     }
   },
   "headers": [
