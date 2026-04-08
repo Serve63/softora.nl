@@ -634,6 +634,10 @@
             min-height: 188px;
         }
 
+        .order-card.has-claim .order-main {
+            padding-top: 3.55rem;
+        }
+
         .order-info {
             min-width: 0;
             display: flex;
@@ -701,9 +705,9 @@
 
         .order-claim {
             position: absolute;
-            top: 50%;
+            top: 0.95rem;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
             z-index: 2;
             pointer-events: none;
             display: inline-flex;
@@ -2758,7 +2762,7 @@
             const claimHtml = `<div class="order-claim" aria-hidden="true"><span class="order-claim-name">${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</span></div>`;
 
             return `
-                <div class="order-card ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
+                <div class="order-card has-claim ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
                     ${claimHtml}
                     <div class="order-main">
                         <div class="order-info">
