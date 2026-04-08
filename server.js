@@ -50,6 +50,7 @@ const { registerActiveOrderRoutes } = require('./server/routes/active-orders');
 const { createAiHelpers } = require('./server/services/ai-helpers');
 const { createActiveOrderAutomationService } = require('./server/services/active-order-automation');
 const { createAgendaConfirmationCoordinator } = require('./server/services/agenda-confirmation');
+const { createAgendaLeadFollowUpService } = require('./server/services/agenda-lead-follow-up');
 const { createAgendaInterestedLeadReadService } = require('./server/services/agenda-interested-lead-read');
 const { createAgendaInterestedLeadStateService } = require('./server/services/agenda-interested-lead-state');
 const { createAgendaInterestedLeadsCoordinator } = require('./server/services/agenda-interested-leads');
@@ -3843,91 +3844,6 @@ function backfillInsightsAndAppointmentsFromRecentCallUpdates() {
   return touched;
 }
 
-function backfillOpenLeadFollowUpAppointmentsFromLatestCalls() {
-  const latestRowsByKey = buildLatestInterestedLeadRowsByKey();
-  if (!latestRowsByKey.size) return 0;
-
-  let touched = 0;
-
-  generatedAgendaAppointments.forEach((appointment, idx) => {
-    if (!isOpenLeadFollowUpAppointment(appointment)) return;
-
-    const key = buildLeadFollowUpCandidateKey(appointment);
-    if (!key) return;
-
-    const latestRow = latestRowsByKey.get(key);
-    if (!latestRow) return;
-
-    const latestTs = getLeadLikeRecencyTimestamp(latestRow);
-    const currentTs = getLeadLikeRecencyTimestamp(appointment);
-    if (latestTs <= currentTs) return;
-
-    const updated = {
-      ...appointment,
-      company: normalizeString(latestRow?.company || appointment?.company || '') || 'Onbekende lead',
-      contact: normalizeString(latestRow?.contact || appointment?.contact || '') || 'Onbekend',
-      phone: normalizeString(latestRow?.phone || appointment?.phone || ''),
-      date: normalizeDateYyyyMmDd(latestRow?.date || appointment?.date || '') || '',
-      time: normalizeTimeHhMm(latestRow?.time || appointment?.time || '') || '09:00',
-      source: normalizeString(latestRow?.source || appointment?.source || ''),
-      summary: truncateText(normalizeString(latestRow?.summary || appointment?.summary || ''), 4000),
-      createdAt:
-        normalizeString(latestRow?.createdAt || latestRow?.confirmationTaskCreatedAt || appointment?.createdAt || '') ||
-        new Date().toISOString(),
-      confirmationTaskCreatedAt:
-        normalizeString(
-          latestRow?.confirmationTaskCreatedAt ||
-            latestRow?.createdAt ||
-            appointment?.confirmationTaskCreatedAt ||
-            appointment?.createdAt ||
-            ''
-        ) || new Date().toISOString(),
-      callId: normalizeString(latestRow?.callId || appointment?.callId || ''),
-      location: resolveAppointmentLocation(latestRow, appointment),
-      durationSeconds: resolveCallDurationSeconds(latestRow, appointment),
-      whatsappInfo: sanitizeAppointmentWhatsappInfo(latestRow?.whatsappInfo || appointment?.whatsappInfo || ''),
-      recordingUrl: resolvePreferredRecordingUrl(latestRow, appointment),
-      provider: normalizeString(latestRow?.provider || appointment?.provider || ''),
-      coldcallingStack: normalizeColdcallingStack(
-        latestRow?.coldcallingStack || appointment?.coldcallingStack || ''
-      ),
-      coldcallingStackLabel: normalizeString(
-        latestRow?.coldcallingStackLabel || appointment?.coldcallingStackLabel || latestRow?.providerLabel || ''
-      ),
-      leadType: normalizeString(latestRow?.leadType || appointment?.leadType || ''),
-      leadOwnerKey: normalizeString(latestRow?.leadOwnerKey || appointment?.leadOwnerKey || ''),
-      leadOwnerName: normalizeString(latestRow?.leadOwnerName || appointment?.leadOwnerName || ''),
-      leadOwnerFullName: normalizeString(latestRow?.leadOwnerFullName || appointment?.leadOwnerFullName || ''),
-      leadOwnerUserId: normalizeString(latestRow?.leadOwnerUserId || appointment?.leadOwnerUserId || ''),
-      leadOwnerEmail: normalizeString(latestRow?.leadOwnerEmail || appointment?.leadOwnerEmail || ''),
-    };
-
-    const previousCallId = normalizeString(appointment?.callId || '');
-    const nextCallId = normalizeString(updated?.callId || '');
-    generatedAgendaAppointments[idx] = updated;
-
-    const appointmentId = Number(updated?.id || 0) || 0;
-    if (previousCallId && previousCallId !== nextCallId) {
-      const mappedId = agendaAppointmentIdByCallId.get(previousCallId);
-      if (Number(mappedId || 0) === appointmentId) {
-        agendaAppointmentIdByCallId.delete(previousCallId);
-      }
-    }
-    if (appointmentId > 0 && nextCallId) {
-      agendaAppointmentIdByCallId.set(nextCallId, appointmentId);
-      clearDismissedInterestedLeadCallId(nextCallId);
-    }
-
-    touched += 1;
-  });
-
-  if (touched > 0) {
-    queueRuntimeStatePersist('lead_follow_up_latest_call_backfill');
-  }
-
-  return touched;
-}
-
 function compareAgendaAppointments(a, b) {
   const aKey = `${normalizeDateYyyyMmDd(a?.date)}T${normalizeTimeHhMm(a?.time) || '00:00'}`;
   const bKey = `${normalizeDateYyyyMmDd(b?.date)}T${normalizeTimeHhMm(b?.time) || '00:00'}`;
@@ -4604,41 +4520,6 @@ function repairAgendaAppointmentsFromDashboardActivities() {
   }
 
   return touched;
-}
-
-function isOpenLeadFollowUpAppointment(appointment) {
-  if (!appointment || typeof appointment !== 'object') return false;
-  const taskType = normalizeString(
-    appointment?.confirmationTaskType || appointment?.taskType || appointment?.type || ''
-  ).toLowerCase();
-  if (taskType !== 'lead_follow_up') return false;
-  return Boolean(mapAppointmentToConfirmationTask(appointment));
-}
-
-function findReusableLeadFollowUpAppointmentIndex(appointment, callId) {
-  const key = buildLeadFollowUpCandidateKey(appointment);
-  const normalizedCallId = normalizeString(callId || appointment?.callId || '');
-  if (!key) return -1;
-
-  let bestIdx = -1;
-  let bestTs = -1;
-
-  generatedAgendaAppointments.forEach((item, idx) => {
-    if (!isOpenLeadFollowUpAppointment(item)) return;
-
-    const itemKey = buildLeadFollowUpCandidateKey(item);
-    const itemCallId = normalizeString(item?.callId || '');
-    if (!itemKey || itemKey !== key) return;
-    if (normalizedCallId && itemCallId === normalizedCallId) return;
-
-    const itemTs = getLeadLikeRecencyTimestamp(item);
-    if (itemTs > bestTs) {
-      bestTs = itemTs;
-      bestIdx = idx;
-    }
-  });
-
-  return bestIdx;
 }
 
 function getLatestCallUpdateByCallId(callId) {
@@ -8093,6 +7974,31 @@ const {
   getLeadLikeRecencyTimestamp,
   normalizeLeadLikePhoneKey,
 } = agendaInterestedLeadReadService;
+
+const agendaLeadFollowUpService = createAgendaLeadFollowUpService({
+  getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
+  agendaAppointmentIdByCallId,
+  mapAppointmentToConfirmationTask,
+  normalizeString,
+  buildLeadFollowUpCandidateKey,
+  getLeadLikeRecencyTimestamp,
+  buildLatestInterestedLeadRowsByKey,
+  normalizeDateYyyyMmDd,
+  normalizeTimeHhMm,
+  truncateText,
+  resolveAppointmentLocation,
+  resolveCallDurationSeconds,
+  sanitizeAppointmentWhatsappInfo,
+  resolvePreferredRecordingUrl,
+  normalizeColdcallingStack,
+  clearDismissedInterestedLeadCallId,
+  queueRuntimeStatePersist,
+});
+
+const {
+  backfillOpenLeadFollowUpAppointmentsFromLatestCalls,
+  findReusableLeadFollowUpAppointmentIndex,
+} = agendaLeadFollowUpService;
 
 const agendaInterestedLeadsCoordinator = createAgendaInterestedLeadsCoordinator({
   isSupabaseConfigured,
