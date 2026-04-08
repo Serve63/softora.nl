@@ -24,7 +24,7 @@ Gebruik voor deze domeinen altijd eerst:
 - [server/routes](../server/routes): route-registratie voor gemigreerde domeinen.
   Agenda, active orders, AI dashboard, AI tools, premium auth, SEO read/write, runtime debug ops, runtime ops, health en premium user-management routes landen hier.
 - [server/services](../server/services): businesslogica en coördinatie.
-  Active orders, active-order automation, AI dashboard, AI helper/core utilities, AI tools, agenda-read, premium auth, premium user-management, runtime backup/debug ops, runtime state sync, runtime ops, SEO core/read/write, UI state, website-input helpers en HTML page-rendering logica zijn al apart ondergebracht.
+  Active orders, active-order automation, AI dashboard, AI helper/core utilities, AI tools, agenda-read, premium auth, premium user-management, runtime backup/debug ops, runtime state sync, runtime Supabase state access, runtime ops, SEO core/read/write, UI state, website-input helpers en HTML page-rendering logica zijn al apart ondergebracht.
 - [server/schemas](../server/schemas): formele payload-normalisatie en contracts.
 - [server/config](../server/config): gedeelde configuratie en feature flags.
 - [server/security](../server/security): security-gerichte helpers en guards.

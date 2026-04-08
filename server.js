@@ -6,7 +6,6 @@ const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
-const { createClient } = require('@supabase/supabase-js');
 const { createPremiumUsersStore } = require('./lib/premium-users-store');
 const { FEATURE_FLAGS, getPublicFeatureFlags } = require('./server/config/feature-flags');
 const {
@@ -45,6 +44,7 @@ const routeManifest = require('./server/routes/manifest');
 const { registerRuntimeDebugOpsRoutes } = require('./server/routes/runtime-debug-ops');
 const { createRuntimeBackupCoordinator } = require('./server/services/runtime-backup');
 const { createRuntimeDebugOpsCoordinator } = require('./server/services/runtime-debug-ops');
+const { createSupabaseStateStore } = require('./server/services/supabase-state');
 const { createRuntimeStateSyncCoordinator } = require('./server/services/runtime-state-sync');
 const { registerAiDashboardRoutes } = require('./server/routes/ai-dashboard');
 const { registerAiToolRoutes } = require('./server/routes/ai-tools');
@@ -291,7 +291,6 @@ let nextGeneratedAgendaAppointmentId = 100000;
 const sequentialDispatchQueues = new Map();
 const sequentialDispatchQueueIdByCallId = new Map();
 let nextSequentialDispatchQueueId = 1;
-let supabaseClient = null;
 let smtpTransporter = null;
 let inboundConfirmationMailSyncPromise = null;
 let inboundConfirmationMailSyncNotBeforeMs = 0;
@@ -632,6 +631,30 @@ function normalizeString(value, fallback = '') {
   return String(value).trim();
 }
 
+const supabaseStateStore = createSupabaseStateStore({
+  supabaseUrl: SUPABASE_URL,
+  supabaseServiceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+  supabaseStateTable: SUPABASE_STATE_TABLE,
+  supabaseStateKey: SUPABASE_STATE_KEY,
+  supabaseCallUpdateStateKeyPrefix: SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX,
+  supabaseCallUpdateRowsFetchLimit: SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT,
+  normalizeString,
+  truncateText,
+});
+
+const {
+  buildSupabaseCallUpdateStateKey,
+  extractCallIdFromSupabaseCallUpdateStateKey,
+  fetchSupabaseCallUpdateRowsViaRest,
+  fetchSupabaseRowByKeyViaRest,
+  fetchSupabaseStateRowViaRest,
+  getSupabaseClient,
+  isSupabaseConfigured,
+  redactSupabaseUrlForDebug,
+  upsertSupabaseRowViaRest,
+  upsertSupabaseStateRowViaRest,
+} = supabaseStateStore;
+
 function isPremiumAuthConfigured() {
   return premiumUsersStore.hasConfiguredUsers();
 }
@@ -962,250 +985,6 @@ const { sanitizeReferenceImages, sanitizeLaunchDomainName, slugifyAutomationText
     normalizeString,
     truncateText,
   });
-
-function isSupabaseConfigured() {
-  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
-}
-
-function redactSupabaseUrlForDebug(url) {
-  const raw = normalizeString(url || '');
-  if (!raw) return '';
-  try {
-    const parsed = new URL(raw);
-    return `${parsed.protocol}//${parsed.host}`;
-  } catch {
-    return truncateText(raw, 80);
-  }
-}
-
-async function fetchSupabaseStateRowViaRest(selectColumns = 'payload,updated_at') {
-  if (!isSupabaseConfigured()) return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
-
-  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
-  const url =
-    `${baseUrl}/rest/v1/${encodeURIComponent(SUPABASE_STATE_TABLE)}` +
-    `?select=${encodeURIComponent(selectColumns)}` +
-    `&state_key=eq.${encodeURIComponent(SUPABASE_STATE_KEY)}` +
-    '&limit=1';
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    });
-
-    const text = await response.text();
-    let body = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = text;
-    }
-
-    return { ok: response.ok, status: response.status, body, error: null };
-  } catch (error) {
-    return {
-      ok: false,
-      status: null,
-      body: null,
-      error: truncateText(error?.message || String(error), 500),
-    };
-  }
-}
-
-async function upsertSupabaseStateRowViaRest(row) {
-  if (!isSupabaseConfigured()) return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
-
-  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
-  const url = `${baseUrl}/rest/v1/${encodeURIComponent(
-    SUPABASE_STATE_TABLE
-  )}?on_conflict=state_key`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      },
-      body: JSON.stringify([row]),
-    });
-
-    const text = await response.text();
-    let body = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = text;
-    }
-
-    return { ok: response.ok, status: response.status, body, error: null };
-  } catch (error) {
-    return {
-      ok: false,
-      status: null,
-      body: null,
-      error: truncateText(error?.message || String(error), 500),
-    };
-  }
-}
-
-async function fetchSupabaseRowByKeyViaRest(rowKey, selectColumns = 'payload,updated_at') {
-  const normalizedRowKey = normalizeString(rowKey);
-  if (!normalizedRowKey) {
-    return { ok: false, status: null, body: null, error: 'Ongeldige state key.' };
-  }
-  if (!isSupabaseConfigured()) {
-    return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
-  }
-
-  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
-  const url =
-    `${baseUrl}/rest/v1/${encodeURIComponent(SUPABASE_STATE_TABLE)}` +
-    `?select=${encodeURIComponent(selectColumns)}` +
-    `&state_key=eq.${encodeURIComponent(normalizedRowKey)}` +
-    '&limit=1';
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    });
-
-    const text = await response.text();
-    let body = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = text;
-    }
-
-    return { ok: response.ok, status: response.status, body, error: null };
-  } catch (error) {
-    return {
-      ok: false,
-      status: null,
-      body: null,
-      error: truncateText(error?.message || String(error), 500),
-    };
-  }
-}
-
-async function upsertSupabaseRowViaRest(row) {
-  const stateKey = normalizeString(row?.state_key || '');
-  if (!stateKey) {
-    return { ok: false, status: null, body: null, error: 'Ongeldige state key.' };
-  }
-  if (!isSupabaseConfigured()) {
-    return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
-  }
-
-  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
-  const url = `${baseUrl}/rest/v1/${encodeURIComponent(SUPABASE_STATE_TABLE)}?on_conflict=state_key`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      },
-      body: JSON.stringify([row]),
-    });
-
-    const text = await response.text();
-    let body = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = text;
-    }
-
-    return { ok: response.ok, status: response.status, body, error: null };
-  } catch (error) {
-    return {
-      ok: false,
-      status: null,
-      body: null,
-      error: truncateText(error?.message || String(error), 500),
-    };
-  }
-}
-
-function buildSupabaseCallUpdateStateKey(callId) {
-  const normalizedCallId = normalizeString(callId || '');
-  if (!normalizedCallId) return '';
-  return `${SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX}${normalizedCallId}`;
-}
-
-function extractCallIdFromSupabaseCallUpdateStateKey(stateKey) {
-  const normalizedStateKey = normalizeString(stateKey || '');
-  if (!normalizedStateKey) return '';
-  if (!normalizedStateKey.startsWith(SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX)) return '';
-  return normalizeString(normalizedStateKey.slice(SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX.length));
-}
-
-async function fetchSupabaseCallUpdateRowsViaRest(limit = SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT) {
-  if (!isSupabaseConfigured()) {
-    return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
-  }
-
-  const safeLimit = Math.max(1, Math.min(2000, Number(limit) || SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT));
-  const baseUrl = SUPABASE_URL.replace(/\/+$/, '');
-  const likePattern = `${SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX}%`;
-  const url =
-    `${baseUrl}/rest/v1/${encodeURIComponent(SUPABASE_STATE_TABLE)}` +
-    `?select=${encodeURIComponent('state_key,payload,updated_at')}` +
-    `&state_key=like.${encodeURIComponent(likePattern)}` +
-    '&order=updated_at.desc' +
-    `&limit=${safeLimit}`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    });
-
-    const text = await response.text();
-    let body = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = text;
-    }
-
-    return { ok: response.ok, status: response.status, body, error: null };
-  } catch (error) {
-    return {
-      ok: false,
-      status: null,
-      body: null,
-      error: truncateText(error?.message || String(error), 500),
-    };
-  }
-}
-
-function getSupabaseClient() {
-  if (!isSupabaseConfigured()) return null;
-  if (supabaseClient) return supabaseClient;
-  supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return supabaseClient;
-}
 
 const runtimeBackupCoordinator = createRuntimeBackupCoordinator({
   normalizeString,
