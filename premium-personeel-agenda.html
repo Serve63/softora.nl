@@ -1461,12 +1461,9 @@
         modalWorkspaceMode = Boolean(enabled);
         modalOverviewElement.classList.toggle('hide', modalWorkspaceMode);
         modalWorkspaceElement.classList.toggle('show', modalWorkspaceMode);
-        modalNoDealBtn.hidden = modalWorkspaceMode;
-        modalNoDealBtn.disabled = workspaceBusy || modalWorkspaceMode;
         if (modalPdfBtn) modalPdfBtn.hidden = modalWorkspaceMode;
         if (modalAudioBlock) modalAudioBlock.hidden = modalWorkspaceMode;
         refreshWorkspacePrimaryButtonLabel();
-        modalSecondaryBtn.textContent = modalWorkspaceMode ? 'Terug' : 'Sluiten';
     }
 
     function syncAppointmentAudio(apt) {
@@ -1515,27 +1512,10 @@
         return String(workspaceTranscriptEl.value || '').trim().length >= 10;
     }
 
-    function hasWorkspaceLinkedOrder() {
-        const apt = getActiveAppointment();
-        if (!apt) return false;
-
-        const orderId = Number(apt?.activeOrderId || 0);
-        if (Number.isFinite(orderId) && orderId > 0 && knownActiveOrderIds.has(orderId)) {
-            return true;
-        }
-
-        const appointmentId = Number(apt?.id || 0);
-        if (Number.isFinite(appointmentId) && appointmentId > 0 && knownActiveOrderByAppointmentId.has(appointmentId)) {
-            return true;
-        }
-
-        return false;
-    }
-
     function getLinkedOrderIdForAppointment(apt) {
         if (!apt) return null;
         const orderId = Number(apt?.activeOrderId || 0);
-        if (Number.isFinite(orderId) && orderId > 0 && knownActiveOrderIds.has(orderId)) {
+        if (Number.isFinite(orderId) && orderId > 0) {
             return orderId;
         }
         const appointmentId = Number(apt?.id || 0);
@@ -1545,17 +1525,57 @@
         return null;
     }
 
+    function hasWorkspaceLinkedOrder() {
+        return Boolean(getLinkedOrderIdForAppointment(getActiveAppointment()));
+    }
+
+    function getLinkedOrderDossierUrl(apt) {
+        const orderId = Number(getLinkedOrderIdForAppointment(apt) || 0);
+        if (!Number.isFinite(orderId) || orderId <= 0) return '';
+        const params = new URLSearchParams();
+        params.set('id', String(orderId));
+        return `/premium-opdracht-dossier?${params.toString()}`;
+    }
+
+    function openLinkedOrderDossierForAppointment(apt) {
+        const url = getLinkedOrderDossierUrl(apt);
+        if (!url) return false;
+        window.location.assign(url);
+        return true;
+    }
+
     function refreshWorkspacePrimaryButtonLabel() {
+        const apt = getActiveAppointment();
+        const linkedOrderId = Number(getLinkedOrderIdForAppointment(apt) || 0) || null;
+
         if (!modalWorkspaceMode) {
+            if (linkedOrderId) {
+                modalPrimaryBtn.hidden = false;
+                modalPrimaryBtn.textContent = 'Open dossier';
+                modalPrimaryBtn.disabled = workspaceBusy;
+                modalNoDealBtn.hidden = true;
+                modalNoDealBtn.disabled = true;
+                modalSecondaryBtn.textContent = 'Sluiten';
+                return;
+            }
+
+            modalPrimaryBtn.hidden = false;
             modalPrimaryBtn.textContent = 'Akkoord';
             modalPrimaryBtn.disabled = workspaceBusy;
+            modalNoDealBtn.hidden = false;
             modalNoDealBtn.disabled = workspaceBusy;
+            modalSecondaryBtn.textContent = 'Sluiten';
             return;
         }
 
-        if (hasWorkspaceLinkedOrder()) {
-            modalPrimaryBtn.textContent = 'Opdracht aangemaakt';
-            modalPrimaryBtn.disabled = true;
+        modalPrimaryBtn.hidden = false;
+        modalNoDealBtn.hidden = true;
+        modalNoDealBtn.disabled = true;
+        modalSecondaryBtn.textContent = 'Terug';
+
+        if (linkedOrderId) {
+            modalPrimaryBtn.textContent = 'Open dossier';
+            modalPrimaryBtn.disabled = workspaceBusy;
             return;
         }
 
@@ -1611,11 +1631,8 @@
         setWorkspaceReferenceImages(apt?.referenceImages || []);
         const updatedAt = String(apt?.postCallUpdatedAt || '');
         const linkedOrderId = getLinkedOrderIdForAppointment(apt);
-        const appointmentOrderId = Number(apt?.activeOrderId || 0) || null;
         if (linkedOrderId) {
             setWorkspaceStatus(`Opdracht al aangemaakt (opdracht #${linkedOrderId}).`, 'success');
-        } else if (appointmentOrderId) {
-            setWorkspaceStatus('Gekoppelde opdracht niet meer gevonden. Je kunt opnieuw opdracht aanmaken.', 'error');
         } else if (updatedAt) {
             setWorkspaceStatus(`Laatst opgeslagen: ${new Date(updatedAt).toLocaleString('nl-NL')}`);
         } else {
@@ -2162,11 +2179,22 @@
     }
 
     function handleModalPrimaryAction() {
+        const apt = getActiveAppointment();
+        if (!apt) return;
+
         if (!modalWorkspaceMode) {
+            if (getLinkedOrderIdForAppointment(apt)) {
+                openLinkedOrderDossierForAppointment(apt);
+                return;
+            }
             applyWorkspaceMode(true);
             window.setTimeout(() => {
                 workspaceTranscriptEl.focus();
             }, 30);
+            return;
+        }
+        if (getLinkedOrderIdForAppointment(apt)) {
+            openLinkedOrderDossierForAppointment(apt);
             return;
         }
         void addActiveOrderForActiveAppointment({ autoGeneratePrompt: true });
