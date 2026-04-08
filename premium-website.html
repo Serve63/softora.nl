@@ -605,30 +605,8 @@
 
         .stat-item {
             padding: 2rem;
-            border-left: 4px solid var(--border);
-            transition: all 0.4s var(--ease-out-expo);
+            border-left: 4px solid var(--accent);
             position: relative;
-            overflow: hidden;
-        }
-
-        .stat-item::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 4px;
-            height: 0;
-            background: var(--accent);
-            transition: height 0.4s var(--ease-out-expo);
-        }
-
-        .stat-item:hover {
-            background: linear-gradient(90deg, rgba(139,34,82,0.05), transparent);
-            padding-left: 3rem;
-        }
-
-        .stat-item:hover::before {
-            height: 100%;
         }
 
         .stat-number {
@@ -639,12 +617,6 @@
             display: block;
             margin-bottom: 0.5rem;
             line-height: 1;
-            transition: transform 0.4s;
-        }
-
-        .stat-item:hover .stat-number {
-            transform: translateX(10px);
-            text-shadow: 0 0 20px var(--accent-glow);
         }
 
         .stat-label {
