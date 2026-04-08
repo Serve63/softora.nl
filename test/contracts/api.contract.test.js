@@ -309,6 +309,37 @@ test('agenda appointments contract remains readable', async () => {
   }
 });
 
+test('agenda confirmation routes keep their auth boundaries and stable error contracts', async () => {
+  const authState = await getJson('/api/auth/session');
+  const configured = Boolean(authState.body?.configured);
+
+  const detailResult = await getJson('/api/agenda/confirmation-tasks/999999');
+  if (!configured) {
+    assert.equal(detailResult.response.status, 503);
+    assert.equal(detailResult.body.ok, false);
+  } else {
+    assert.ok([401, 404].includes(detailResult.response.status));
+    if (detailResult.response.status === 404) {
+      assert.equal(detailResult.body.ok, false);
+      assert.equal(detailResult.body.error, 'Taak of afspraak niet gevonden');
+    }
+  }
+
+  const sendResult = await postJson('/api/agenda/confirmation-tasks/999999/send-email', {
+    recipientEmail: 'contract@softora.nl',
+  });
+  if (!configured) {
+    assert.equal(sendResult.response.status, 503);
+    assert.equal(sendResult.body.ok, false);
+  } else {
+    assert.ok([401, 404].includes(sendResult.response.status));
+    if (sendResult.response.status === 404) {
+      assert.equal(sendResult.body.ok, false);
+      assert.equal(sendResult.body.error, 'Taak of afspraak niet gevonden');
+    }
+  }
+});
+
 test('coldcalling endpoints keep their contract boundaries', async () => {
   const updatesResult = await getProtectedApiExpectation('/api/coldcalling/call-updates?limit=3');
   if (updatesResult.response.status === 200) {
