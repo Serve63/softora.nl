@@ -65,6 +65,7 @@ const { createAgendaReadCoordinator } = require('./server/services/agenda-read')
 const { createActiveOrdersCoordinator } = require('./server/services/active-orders');
 const { createAiDashboardCoordinator } = require('./server/services/ai-dashboard');
 const { createAiToolsCoordinator } = require('./server/services/ai-tools');
+const { createCustomersPageBootstrapService } = require('./server/services/customers-page-bootstrap');
 const { createHtmlPageCoordinator } = require('./server/services/html-pages');
 const { registerAgendaMutationRoutes } = require('./server/routes/agenda');
 const { registerPremiumAuthRoutes } = require('./server/routes/premium-auth');
@@ -6928,14 +6929,33 @@ const agendaPageBootstrapService = createAgendaPageBootstrapService({
   compareAgendaAppointments,
 });
 
-getRuntimeHtmlPageBootstrapData = async (_req, fileName) => {
-  if (fileName !== 'premium-personeel-agenda.html') return null;
+const customersPageBootstrapService = createCustomersPageBootstrapService({
+  getUiStateValues,
+  normalizeString,
+  customerScope: PREMIUM_CUSTOMERS_SCOPE,
+  customerKey: PREMIUM_CUSTOMERS_KEY,
+  orderScope: PREMIUM_ACTIVE_ORDERS_SCOPE,
+  orderKey: PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY,
+});
 
-  return {
-    marker: 'SOFTORA_AGENDA_BOOTSTRAP',
-    scriptId: 'softoraAgendaBootstrap',
-    data: await agendaPageBootstrapService.buildAgendaBootstrapPayload({ limit: 250 }),
-  };
+getRuntimeHtmlPageBootstrapData = async (_req, fileName) => {
+  if (fileName === 'premium-personeel-agenda.html') {
+    return {
+      marker: 'SOFTORA_AGENDA_BOOTSTRAP',
+      scriptId: 'softoraAgendaBootstrap',
+      data: await agendaPageBootstrapService.buildAgendaBootstrapPayload({ limit: 250 }),
+    };
+  }
+
+  if (fileName === 'premium-klanten.html') {
+    return {
+      marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
+      scriptId: 'softoraCustomersBootstrap',
+      data: await customersPageBootstrapService.buildCustomersBootstrapPayload(),
+    };
+  }
+
+  return null;
 };
 
 registerAgendaReadRoutes(app, {

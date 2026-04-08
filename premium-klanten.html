@@ -1087,11 +1087,25 @@
         </div>
     </div>
 
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
         const ORDER_SCOPE = "premium_active_orders";
         const ORDER_KEY = "softora_custom_orders_premium_v1";
+
+        function readCustomersBootstrapPayload() {
+            const element = document.getElementById("softoraCustomersBootstrap");
+            if (!element) return { customers: [] };
+            try {
+                const parsed = JSON.parse(String(element.textContent || "{}"));
+                return parsed && typeof parsed === "object" ? parsed : { customers: [] };
+            } catch (error) {
+                return { customers: [] };
+            }
+        }
+
+        const customersBootstrapPayload = readCustomersBootstrapPayload();
 
         const state = {
             klanten: [],
@@ -1507,6 +1521,26 @@
             return sortCustomers(Array.from(seen.values()));
         }
 
+        function resolveBootstrapCustomers() {
+            const rawCustomers = Array.isArray(customersBootstrapPayload && customersBootstrapPayload.customers)
+                ? customersBootstrapPayload.customers
+                : [];
+
+            return sortCustomers(rawCustomers.map(function (item, index) {
+                return normalizeCustomer(item, "klant-bootstrap-" + index);
+            }));
+        }
+
+        function serializeCustomerList(customers) {
+            return JSON.stringify(sortCustomers((customers || []).map(function (item, index) {
+                return normalizeCustomer(item, "klant-compare-" + index);
+            })));
+        }
+
+        function customerListsDiffer(nextCustomers) {
+            return serializeCustomerList(state.klanten) !== serializeCustomerList(nextCustomers);
+        }
+
         async function persistCustomerList(customers) {
             const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
                 return normalizeCustomer(item, "klant-save-" + index);
@@ -1797,15 +1831,22 @@
         }
 
         async function bootstrapCustomers() {
-            setStatusMessage("Klantenbestand laden...", "info");
+            const hadBootstrapCustomers = state.klanten.length > 0;
+
+            if (!hadBootstrapCustomers) {
+                setStatusMessage("Klantenbestand laden...", "info");
+            }
 
             try {
                 const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
                 const remoteCustomers = parseCustomers(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
 
                 if (remoteCustomers.length) {
+                    const shouldRerender = customerListsDiffer(remoteCustomers);
                     state.klanten = remoteCustomers;
-                    renderPage();
+                    if (shouldRerender || !hadBootstrapCustomers) {
+                        renderPage();
+                    }
                     setStatusMessage("");
                     return;
                 }
@@ -1818,15 +1859,27 @@
                 const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
                 const importedCustomers = deriveCustomersFromOrders(orders);
 
+                const shouldRerender = customerListsDiffer(importedCustomers);
                 state.klanten = importedCustomers;
-                renderPage();
+                if (shouldRerender || !hadBootstrapCustomers) {
+                    renderPage();
+                }
 
                 if (importedCustomers.length) {
                     const persistResult = await persistCustomerList(importedCustomers);
                     if (persistResult.ok) {
-                        setStatusMessage("Klanten uit actieve opdrachten geimporteerd.", "success", true);
+                        if (!hadBootstrapCustomers) {
+                            setStatusMessage("Klanten uit actieve opdrachten geimporteerd.", "success", true);
+                        } else {
+                            setStatusMessage("");
+                        }
                     } else {
-                        setStatusMessage("Klanten geimporteerd, maar Supabase-opslag mislukte.", "error");
+                        if (!hadBootstrapCustomers) {
+                            setStatusMessage("Klanten geimporteerd, maar Supabase-opslag mislukte.", "error");
+                        } else {
+                            console.error("Klanten bootstrap persist in Supabase mislukt:", persistResult.error);
+                            setStatusMessage("");
+                        }
                     }
                     return;
                 }
@@ -1834,10 +1887,19 @@
                 /* ignore import errors */
             }
 
+            const shouldRerender = customerListsDiffer([]);
             state.klanten = [];
-            renderPage();
+            if (shouldRerender || !hadBootstrapCustomers) {
+                renderPage();
+            }
             setStatusMessage("");
         }
+
+        const initialBootstrapCustomers = resolveBootstrapCustomers();
+        if (initialBootstrapCustomers.length) {
+            state.klanten = initialBootstrapCustomers;
+        }
+        renderPage();
 
         nodes.search.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
