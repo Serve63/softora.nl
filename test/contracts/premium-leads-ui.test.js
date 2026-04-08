@@ -25,4 +25,8 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
     pageSource,
     /if \(allLeads\.length > 0\) \{[\s\S]*console\.warn\('\[softora-leads\] Live refresh overgeslagen; zichtbare leads blijven staan\.', message\);[\s\S]*setStatusLastUpdatedNow\(new Date\(lastLeadStatusTimestamp\)\);/
   );
+  assert.match(pageSource, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
+  assert.match(pageSource, /<label class="lead-modal-label" for="leadModalDate">Datum van afspraak<\/label>/);
+  assert.match(pageSource, /function formatLeadIncomingDateLabel\(lead, detail\)/);
+  assert.match(pageSource, /<div class="lead-modal-meta-label">Datum<\/div>/);
 });

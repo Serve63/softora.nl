@@ -613,7 +613,7 @@
 
         .lead-modal-contact-meta {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 0.4rem;
         }
 
@@ -1048,7 +1048,7 @@
 
                     <div class="lead-modal-grid">
                         <div class="lead-modal-field">
-                            <label class="lead-modal-label" for="leadModalDate">Datum</label>
+                            <label class="lead-modal-label" for="leadModalDate">Datum van afspraak</label>
                             <input class="lead-modal-input" id="leadModalDate" type="date">
                         </div>
                         <div class="lead-modal-field">
@@ -1898,10 +1898,48 @@
                 );
             }
 
+            function resolveLeadIncomingTimestamp(lead, detail) {
+                const candidates = [
+                    detail?.createdAt,
+                    detail?.confirmationTaskCreatedAt,
+                    detail?.updatedAt,
+                    detail?.analyzedAt,
+                    detail?.endedAt,
+                    detail?.startedAt,
+                    lead?.createdAt,
+                    lead?.confirmationTaskCreatedAt,
+                    lead?.updatedAt,
+                    lead?.analyzedAt,
+                    lead?.endedAt,
+                    lead?.startedAt,
+                ];
+
+                for (const candidate of candidates) {
+                    const raw = String(candidate || '').trim();
+                    const timestamp = Date.parse(raw);
+                    if (raw && Number.isFinite(timestamp)) {
+                        return timestamp;
+                    }
+                }
+                return 0;
+            }
+
+            function formatLeadIncomingDateLabel(lead, detail) {
+                const timestamp = resolveLeadIncomingTimestamp(lead, detail);
+                if (!timestamp) return 'Onbekend';
+                return new Intl.DateTimeFormat('nl-NL', {
+                    timeZone: 'Europe/Amsterdam',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                }).format(new Date(timestamp));
+            }
+
             function renderLeadContactMeta(lead, detail) {
                 const person = resolveLeadContactPerson(lead, detail) || 'Onbekend';
                 const company = resolveLeadCompanyName(lead, detail) || 'Onbekend';
                 const phone = resolveLeadPhoneNumber(lead, detail) || 'Niet ingevuld';
+                const incomingDate = formatLeadIncomingDateLabel(lead, detail);
                 modalContactMeta.innerHTML = `
                     <div class="lead-modal-meta-item">
                         <div class="lead-modal-meta-label">Naam</div>
@@ -1914,6 +1952,10 @@
                     <div class="lead-modal-meta-item">
                         <div class="lead-modal-meta-label">Telefoon</div>
                         <div class="lead-modal-meta-value">${esc(phone)}</div>
+                    </div>
+                    <div class="lead-modal-meta-item">
+                        <div class="lead-modal-meta-label">Datum</div>
+                        <div class="lead-modal-meta-value">${esc(incomingDate)}</div>
                     </div>
                 `;
             }
