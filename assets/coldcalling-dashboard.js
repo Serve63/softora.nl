@@ -2134,52 +2134,55 @@
   }
 
   function ensureLeadListPanel() {
-    let button = byId('openLeadListModalBtn');
-    if (button) return button;
-
     const regioSelect = byId('regio');
     const regioGroup = regioSelect ? regioSelect.closest('.form-group') : null;
     const targetParent = regioGroup?.parentElement || document.querySelector('.generator-grid .panel');
     if (!targetParent) return null;
 
-    const controlWrap = document.createElement('div');
-    controlWrap.className = 'form-group';
-    controlWrap.id = 'leadListControlWrap';
     const modeUi = getBusinessModeUiConfig();
-    controlWrap.innerHTML = [
-      `<label class="form-label" id="leadListControlLabel">${escapeHtml(modeUi.leadListGroup)}</label>`,
-      '<button type="button" class="form-input magnetic" id="openLeadListModalBtn" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">',
-      `  <span id="leadListOpenLabel">${escapeHtml(modeUi.leadListLabel)}</span>`,
-      '</button>',
-      '<div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85; display:none;"></div>',
-    ].join('');
+    let controlWrap = byId('leadListControlWrap');
+    if (!controlWrap) {
+      controlWrap = document.createElement('div');
+      controlWrap.className = 'form-group form-group--lead-list';
+      controlWrap.id = 'leadListControlWrap';
+      controlWrap.innerHTML = [
+        `<label class="form-label" id="leadListControlLabel">${escapeHtml(modeUi.leadListGroup)}</label>`,
+        '<button type="button" class="form-input magnetic" id="openLeadListModalBtn" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">',
+        `  <span id="leadListOpenLabel">${escapeHtml(modeUi.leadListLabel)}</span>`,
+        '</button>',
+        '<div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85; display:none;"></div>',
+      ].join('');
 
-    if (regioGroup) {
-      regioGroup.insertAdjacentElement('beforebegin', controlWrap);
-    } else {
-      targetParent.appendChild(controlWrap);
+      if (regioGroup) {
+        regioGroup.insertAdjacentElement('beforebegin', controlWrap);
+      } else {
+        targetParent.appendChild(controlWrap);
+      }
     }
 
-    const dispatchWrap = document.createElement('div');
-    dispatchWrap.className = 'form-group';
-    dispatchWrap.id = 'callDispatchControlWrap';
-    dispatchWrap.style.marginTop = '12px';
-    dispatchWrap.innerHTML = [
-      '<label class="form-label" for="callDispatchMode">Belstrategie</label>',
-      '<select class="form-select magnetic" id="callDispatchMode">',
-      '  <option value="parallel">Alles tegelijk</option>',
-      '  <option value="sequential">1 voor 1</option>',
-      '</select>',
-      '<div id="callDispatchDelayWrap" style="margin-top:10px; display:none;">',
-      '  <label class="form-label" for="callDispatchDelaySeconds">Wachttijd tussen starts (seconden)</label>',
-      '  <input type="number" class="form-input magnetic" id="callDispatchDelaySeconds" min="0" step="1" value="5" placeholder="5">',
-      '</div>',
-    ].join('');
+    let dispatchWrap = byId('callDispatchControlWrap');
+    if (!dispatchWrap) {
+      dispatchWrap = document.createElement('div');
+      dispatchWrap.className = 'form-group form-group--dispatch';
+      dispatchWrap.id = 'callDispatchControlWrap';
+      dispatchWrap.style.marginTop = '12px';
+      dispatchWrap.innerHTML = [
+        '<label class="form-label" for="callDispatchMode">Belstrategie</label>',
+        '<select class="form-select magnetic" id="callDispatchMode">',
+        '  <option value="parallel">Alles tegelijk</option>',
+        '  <option value="sequential">1 voor 1</option>',
+        '</select>',
+        '<div id="callDispatchDelayWrap" style="margin-top:10px; display:none;">',
+        '  <label class="form-label" for="callDispatchDelaySeconds">Wachttijd tussen starts (seconden)</label>',
+        '  <input type="number" class="form-input magnetic" id="callDispatchDelaySeconds" min="0" step="1" value="5" placeholder="5">',
+        '</div>',
+      ].join('');
 
-    if (regioGroup) {
-      regioGroup.insertAdjacentElement('afterend', dispatchWrap);
-    } else {
-      controlWrap.insertAdjacentElement('afterend', dispatchWrap);
+      if (regioGroup) {
+        regioGroup.insertAdjacentElement('afterend', dispatchWrap);
+      } else {
+        controlWrap.insertAdjacentElement('afterend', dispatchWrap);
+      }
     }
 
     // In de single-panel campagne-layout willen we 2 nette rijen:

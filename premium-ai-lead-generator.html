@@ -412,6 +412,31 @@
             grid-column: 1 / -1;
         }
 
+        .generator-grid > .panel:only-child .form-group--slider {
+            grid-column: 1 / -1;
+            grid-row: 2;
+        }
+
+        .generator-grid > .panel:only-child .form-group--lead-list {
+            grid-column: 1;
+            grid-row: 3;
+        }
+
+        .generator-grid > .panel:only-child .form-group--branche {
+            grid-column: 2;
+            grid-row: 3;
+        }
+
+        .generator-grid > .panel:only-child .form-group--dispatch {
+            grid-column: 1;
+            grid-row: 4;
+        }
+
+        .generator-grid > .panel:only-child .form-group--regio {
+            grid-column: 2;
+            grid-row: 4;
+        }
+
         .generator-grid > .panel:only-child .panel-header,
         .generator-grid > .panel:only-child .form-group {
             margin-bottom: 0;
@@ -1690,7 +1715,7 @@
                         <span class="panel-badge">Configuratie</span>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group form-group--slider">
                         <div class="slider-container">
                             <div class="slider-header">
                                 <label class="form-label" style="margin-bottom: 0;">Hoeveel mensen bellen</label>
@@ -1707,7 +1732,15 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group form-group--lead-list" id="leadListControlWrap">
+                        <label class="form-label" id="leadListControlLabel">Database</label>
+                        <button type="button" class="form-input magnetic" id="openLeadListModalBtn" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">
+                            <span id="leadListOpenLabel">Bedrijvenregister</span>
+                        </button>
+                        <div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85; display:none;"></div>
+                    </div>
+
+                    <div class="form-group form-group--branche">
                         <label class="form-label">Doelgroep / Branche</label>
                         <select class="form-select magnetic" id="branche">
                             <option value="all" selected>Alles</option>
@@ -1722,7 +1755,19 @@
                         </select>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group form-group--dispatch" id="callDispatchControlWrap">
+                        <label class="form-label" for="callDispatchMode">Belstrategie</label>
+                        <select class="form-select magnetic" id="callDispatchMode">
+                            <option value="parallel">Alles tegelijk</option>
+                            <option value="sequential" selected>1 voor 1</option>
+                        </select>
+                        <div id="callDispatchDelayWrap" style="margin-top:10px; display:none;">
+                            <label class="form-label" for="callDispatchDelaySeconds">Wachttijd tussen starts (seconden)</label>
+                            <input type="number" class="form-input magnetic" id="callDispatchDelaySeconds" min="0" step="1" value="5" placeholder="5">
+                        </div>
+                    </div>
+
+                    <div class="form-group form-group--regio">
                         <label class="form-label">Omstreken Oisterwijk</label>
                         <select class="form-select magnetic" id="regio">
                             <option value="10km" selected>10 km</option>
