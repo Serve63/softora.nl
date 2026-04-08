@@ -11870,6 +11870,10 @@ app.get('/:slug', async (req, res, next) => {
 });
 
 app.use((req, res) => {
+  const requestPath = String(req.path || req.originalUrl || req.url || '');
+  if (requestPath === '/' || requestPath === '') {
+    return res.redirect(302, '/premium-website');
+  }
   res.status(404).json({ ok: false, error: 'Niet gevonden' });
 });
 
