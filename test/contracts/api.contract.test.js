@@ -373,6 +373,43 @@ test('agenda post-call routes keep their auth boundaries and stable error contra
   }
 });
 
+test('agenda interested-lead routes keep their auth boundaries and stable error contracts', async () => {
+  const authState = await getJson('/api/auth/session');
+  const configured = Boolean(authState.body?.configured);
+
+  const setInAgendaResult = await postJson('/api/agenda/interested-leads/set-in-agenda', {
+    callId: 'missing-call',
+    appointmentDate: '2026-04-10',
+    appointmentTime: '14:30',
+    location: 'Amsterdam',
+  });
+  if (!configured) {
+    assert.equal(setInAgendaResult.response.status, 503);
+    assert.equal(setInAgendaResult.body.ok, false);
+  } else {
+    assert.ok([401, 404].includes(setInAgendaResult.response.status));
+    if (setInAgendaResult.response.status === 404) {
+      assert.equal(setInAgendaResult.body.ok, false);
+      assert.equal(setInAgendaResult.body.error, 'Lead of call niet gevonden.');
+    }
+  }
+
+  const dismissResult = await postJson('/api/agenda/interested-leads/dismiss', {
+    callId: 'missing-call',
+  });
+  if (!configured) {
+    assert.equal(dismissResult.response.status, 503);
+    assert.equal(dismissResult.body.ok, false);
+  } else {
+    assert.ok([200, 401].includes(dismissResult.response.status));
+    if (dismissResult.response.status === 200) {
+      assert.equal(dismissResult.body.ok, true);
+      assert.equal(dismissResult.body.dismissed, true);
+      assert.equal(dismissResult.body.callId, 'missing-call');
+    }
+  }
+});
+
 test('coldcalling endpoints keep their contract boundaries', async () => {
   const updatesResult = await getProtectedApiExpectation('/api/coldcalling/call-updates?limit=3');
   if (updatesResult.response.status === 200) {
