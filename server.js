@@ -11870,6 +11870,8 @@ app.get('/:slug', async (req, res, next) => {
 });
 
 app.use((req, res) => {
+  res.setHeader('X-Softora-Request-Path', String(req.originalUrl || req.url || req.path || ''));
+  res.setHeader('X-Softora-Known-Html-Count', String(knownHtmlPageFiles.size));
   res.status(404).json({ ok: false, error: 'Niet gevonden' });
 });
 
