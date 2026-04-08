@@ -9,7 +9,9 @@ test('premium actieve opdrachten renderen de claim-badge alleen met de naam', ()
 
   assert.match(
     source,
-    /const claimHtml = `<div class="order-claim"><span class="order-claim-name">\$\{escapeHtml\(claimInfo\.by \|\| 'Nog niet geclaimd'\)\}<\/span><\/div>`;/
+    /const claimHtml = `<div class="order-claim" aria-hidden="true"><span class="order-claim-name">\$\{escapeHtml\(claimInfo\.by \|\| 'Nog niet geclaimd'\)\}<\/span><\/div>`;/
   );
   assert.doesNotMatch(source, /<strong>Geclaimd door<\/strong>/);
+  assert.match(source, /\.order-claim\s*\{[\s\S]*position:\s*absolute;[\s\S]*top:\s*50%;[\s\S]*left:\s*50%;[\s\S]*transform:\s*translate\(-50%, -50%\);/);
+  assert.match(source, /<div class="order-card[\s\S]*\$\{claimHtml\}[\s\S]*<div class="order-main">/);
 });

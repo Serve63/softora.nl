@@ -700,17 +700,22 @@
         }
 
         .order-claim {
-            margin-top: 0.78rem;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            pointer-events: none;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 176px;
-            min-height: 42px;
-            max-width: 100%;
-            padding: 0.55rem 1rem;
-            border: 1px solid rgba(193, 55, 106, 0.2);
-            background: linear-gradient(180deg, rgba(193, 55, 106, 0.06), rgba(193, 55, 106, 0.02));
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+            min-width: 96px;
+            max-width: min(180px, calc(100% - 3rem));
+            min-height: 30px;
+            padding: 0.3rem 0.8rem;
+            border: 1px solid rgba(193, 55, 106, 0.22);
+            background: rgba(255, 248, 252, 0.92);
+            box-shadow: 0 10px 24px rgba(139, 34, 82, 0.08);
         }
 
         .order-claim-name {
@@ -718,9 +723,9 @@
             width: 100%;
             text-align: center;
             font-family: 'Oswald', sans-serif;
-            font-size: 0.78rem;
+            font-size: 0.72rem;
             font-weight: 500;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.06em;
             text-transform: uppercase;
             color: var(--accent-light);
             white-space: nowrap;
@@ -2750,17 +2755,17 @@
             const title = String(record.title || 'Opdracht').trim() || 'Opdracht';
             const description = String(record.description || 'Geen extra omschrijving.').trim() || 'Geen extra omschrijving.';
             const deliveryHtml = `<div class="order-delivery"><strong>Oplevertijd</strong>${escapeHtml(deliveryLabel)}</div>`;
-            const claimHtml = `<div class="order-claim"><span class="order-claim-name">${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</span></div>`;
+            const claimHtml = `<div class="order-claim" aria-hidden="true"><span class="order-claim-name">${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</span></div>`;
 
             return `
                 <div class="order-card ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
+                    ${claimHtml}
                     <div class="order-main">
                         <div class="order-info">
                             <div class="order-client">${escapeHtml(clientLine || 'Nieuwe opdracht')}</div>
                             <div class="order-title">${escapeHtml(title)}</div>
                             <div class="order-desc">${escapeHtml(description)}</div>
                             ${deliveryHtml}
-                            ${claimHtml}
                         </div>
                         <div class="order-price">
                             <div class="order-price-label">Bedrag</div>
