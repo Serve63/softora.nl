@@ -1,11 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const dns = require('dns').promises;
-const fs = require('fs');
-const net = require('net');
 const path = require('path');
-const os = require('os');
-const { spawn } = require('child_process');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
@@ -14,12 +9,69 @@ const { simpleParser } = require('mailparser');
 const { createClient } = require('@supabase/supabase-js');
 const { createPremiumUsersStore } = require('./lib/premium-users-store');
 const { FEATURE_FLAGS, getPublicFeatureFlags } = require('./server/config/feature-flags');
+const {
+  createKnownPrettyPageSlugToFile,
+  getKnownHtmlPageFiles,
+  resolveLegacyPrettyPageRedirect,
+  toPrettyPagePathFromHtmlFile,
+} = require('./server/config/page-routing');
+const { timingSafeEqualStrings } = require('./server/security/crypto-utils');
+const {
+  appendQueryParamsToUrl,
+  assertWebsitePreviewUrlIsPublic,
+  getEffectivePublicBaseUrl: resolveEffectivePublicBaseUrl,
+  normalizeAbsoluteHttpUrl,
+  normalizeWebsitePreviewTargetUrl,
+} = require('./server/security/public-url');
+const { createPremiumHtmlPageAccessController } = require('./server/security/premium-pages');
+const {
+  createPremiumApiAccessGuard,
+  createPremiumAuthStateManager,
+} = require('./server/security/premium-auth');
+const { createPremiumSessionManager } = require('./server/security/premium-session');
+const {
+  createRequestSecurityContext,
+  getClientIpFromRequest,
+  getRequestOriginFromHeaders,
+  getRequestPathname,
+  isSecureHttpRequest,
+  normalizeIpAddress,
+  normalizeOrigin,
+} = require('./server/security/request-context');
+const { createRuntimeDebugAccessGuard } = require('./server/security/runtime-debug');
+const { createRuntimeEventStore } = require('./server/security/runtime-events');
+const { createTotpManager } = require('./server/security/totp');
 const routeManifest = require('./server/routes/manifest');
-const { buildRuntimeBackupEnvelope } = require('./server/services/runtime-backup');
+const { registerRuntimeDebugOpsRoutes } = require('./server/routes/runtime-debug-ops');
+const { createRuntimeBackupCoordinator } = require('./server/services/runtime-backup');
+const { createRuntimeDebugOpsCoordinator } = require('./server/services/runtime-debug-ops');
+const { createRuntimeStateSyncCoordinator } = require('./server/services/runtime-state-sync');
+const { registerAiDashboardRoutes } = require('./server/routes/ai-dashboard');
+const { registerAiToolRoutes } = require('./server/routes/ai-tools');
 const { registerHealthAndOpsRoutes } = require('./server/routes/health');
+const { registerActiveOrderRoutes } = require('./server/routes/active-orders');
+const { createAiHelpers } = require('./server/services/ai-helpers');
+const { createActiveOrderAutomationService } = require('./server/services/active-order-automation');
 const { createAgendaReadCoordinator } = require('./server/services/agenda-read');
+const { createActiveOrdersCoordinator } = require('./server/services/active-orders');
+const { createAiDashboardCoordinator } = require('./server/services/ai-dashboard');
+const { createAiToolsCoordinator } = require('./server/services/ai-tools');
+const { createHtmlPageCoordinator } = require('./server/services/html-pages');
 const { registerAgendaMutationRoutes } = require('./server/routes/agenda');
+const { registerPremiumAuthRoutes } = require('./server/routes/premium-auth');
 const { registerAgendaReadRoutes } = require('./server/routes/agenda-read');
+const { registerPremiumUserManagementRoutes } = require('./server/routes/premium-users');
+const { registerRuntimeOpsRoutes } = require('./server/routes/runtime-ops');
+const { registerSeoReadRoutes } = require('./server/routes/seo-read');
+const { registerSeoWriteRoutes } = require('./server/routes/seo-write');
+const { createPremiumAuthRouteCoordinator } = require('./server/services/premium-auth');
+const { createPremiumUserManagementCoordinator } = require('./server/services/premium-users');
+const { createRuntimeOpsCoordinator } = require('./server/services/runtime-ops');
+const { createSeoCore } = require('./server/services/seo-core');
+const { createSeoReadCoordinator } = require('./server/services/seo-read');
+const { createSeoWriteCoordinator } = require('./server/services/seo-write');
+const { createUiStateStore } = require('./server/services/ui-state');
+const { createWebsiteInputHelpers } = require('./server/services/website-inputs');
 require('dotenv').config();
 const { version: APP_VERSION = '0.0.0' } = require('./package.json');
 const isServerlessRuntime =
@@ -255,6 +307,86 @@ let supabaseLastCallUpdatePersistError = '';
 let runtimeStateObservedAtMs = 0;
 let runtimeStateLastSupabaseSyncCheckMs = 0;
 let supabaseCallUpdatesLastSyncCheckMs = 0;
+const runtimeStateSyncState = {
+  get supabaseStateHydrationPromise() {
+    return supabaseStateHydrationPromise;
+  },
+  set supabaseStateHydrationPromise(value) {
+    supabaseStateHydrationPromise = value;
+  },
+  get supabaseStateHydrated() {
+    return supabaseStateHydrated;
+  },
+  set supabaseStateHydrated(value) {
+    supabaseStateHydrated = Boolean(value);
+  },
+  get supabasePersistChain() {
+    return supabasePersistChain;
+  },
+  set supabasePersistChain(value) {
+    supabasePersistChain = value;
+  },
+  get supabaseCallUpdatePersistChain() {
+    return supabaseCallUpdatePersistChain;
+  },
+  set supabaseCallUpdatePersistChain(value) {
+    supabaseCallUpdatePersistChain = value;
+  },
+  get supabaseHydrateRetryNotBeforeMs() {
+    return supabaseHydrateRetryNotBeforeMs;
+  },
+  set supabaseHydrateRetryNotBeforeMs(value) {
+    supabaseHydrateRetryNotBeforeMs = Number(value) || 0;
+  },
+  get supabaseLastHydrateError() {
+    return supabaseLastHydrateError;
+  },
+  set supabaseLastHydrateError(value) {
+    supabaseLastHydrateError = String(value || '');
+  },
+  get supabaseLastPersistError() {
+    return supabaseLastPersistError;
+  },
+  set supabaseLastPersistError(value) {
+    supabaseLastPersistError = String(value || '');
+  },
+  get supabaseLastCallUpdatePersistError() {
+    return supabaseLastCallUpdatePersistError;
+  },
+  set supabaseLastCallUpdatePersistError(value) {
+    supabaseLastCallUpdatePersistError = String(value || '');
+  },
+  get runtimeStateObservedAtMs() {
+    return runtimeStateObservedAtMs;
+  },
+  set runtimeStateObservedAtMs(value) {
+    runtimeStateObservedAtMs = Number(value) || 0;
+  },
+  get runtimeStateLastSupabaseSyncCheckMs() {
+    return runtimeStateLastSupabaseSyncCheckMs;
+  },
+  set runtimeStateLastSupabaseSyncCheckMs(value) {
+    runtimeStateLastSupabaseSyncCheckMs = Number(value) || 0;
+  },
+  get supabaseCallUpdatesLastSyncCheckMs() {
+    return supabaseCallUpdatesLastSyncCheckMs;
+  },
+  set supabaseCallUpdatesLastSyncCheckMs(value) {
+    supabaseCallUpdatesLastSyncCheckMs = Number(value) || 0;
+  },
+  get nextLeadOwnerRotationIndex() {
+    return nextLeadOwnerRotationIndex;
+  },
+  set nextLeadOwnerRotationIndex(value) {
+    nextLeadOwnerRotationIndex = Number(value) || 0;
+  },
+  get nextGeneratedAgendaAppointmentId() {
+    return nextGeneratedAgendaAppointmentId;
+  },
+  set nextGeneratedAgendaAppointmentId(value) {
+    nextGeneratedAgendaAppointmentId = Number(value) || 0;
+  },
+};
 const RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS = 4000;
 const RUNTIME_STATE_REMOTE_NEWER_THRESHOLD_MS = 250;
 const UI_STATE_SCOPE_PREFIX = 'ui_state:';
@@ -300,56 +432,8 @@ const DEMO_CONFIRMATION_TASK_ENABLED = /^(1|true|yes)$/i.test(
   String(process.env.ENABLE_DEMO_CONFIRMATION_TASK || '')
 );
 
-// Vercel bundelt dynamische sendFile-doelen niet altijd mee. Door de root-dir
-// één keer te scannen op .html bestanden worden die files traceable voor de
-// serverless bundle en blijven pagina-links zoals /premium-website.html werken.
-function getKnownHtmlPageFiles() {
-  try {
-    return new Set(
-      fs
-        .readdirSync(__dirname, { withFileTypes: true })
-        .filter((entry) => entry && entry.isFile() && /\.html$/i.test(entry.name))
-        .map((entry) => entry.name)
-    );
-  } catch (error) {
-    console.warn('[Startup] Kon HTML-pagina lijst niet lezen:', error?.message || error);
-    return new Set(['index.html']);
-  }
-}
-
-const knownHtmlPageFiles = getKnownHtmlPageFiles();
-const knownPrettyPageSlugToFile = new Map(
-  Array.from(knownHtmlPageFiles)
-    .filter((file) => /\.html$/i.test(file))
-    .map((file) => [file.replace(/\.html$/i, ''), file])
-);
-
-// Alleen premium personeelservaring blijft actief. Legacy/dubbele routes
-// sturen we hard door naar de premium varianten.
-const legacyPrettyPageRedirects = new Map([
-  ['personeel-dashboard', 'premium-personeel-dashboard'],
-  ['personeel-agenda', 'premium-personeel-agenda'],
-  ['personeel-login', 'premium-personeel-login'],
-  ['actieve-opdrachten', 'premium-actieve-opdrachten'],
-  ['ai-coldmailing', 'premium-ai-coldmailing'],
-  ['ai-lead-generator', 'premium-ai-lead-generator'],
-  ['seo-crm-system', 'premium-seo-crm-system'],
-  ['opdracht-preview', 'premium-opdracht-preview'],
-]);
-
-function toPrettyPagePathFromHtmlFile(fileName) {
-  const base = String(fileName || '').replace(/\.html$/i, '');
-  if (!base || base === 'index') return '/';
-  return `/${base}`;
-}
-
-function resolveLegacyPrettyPageRedirect(slug) {
-  const normalizedSlug = String(slug || '')
-    .trim()
-    .toLowerCase();
-  if (!normalizedSlug) return '';
-  return legacyPrettyPageRedirects.get(normalizedSlug) || '';
-}
+const knownHtmlPageFiles = getKnownHtmlPageFiles(__dirname, console);
+const knownPrettyPageSlugToFile = createKnownPrettyPageSlugToFile(knownHtmlPageFiles);
 
 function appendOriginalQuery(pathname, originalUrl) {
   const basePath = String(pathname || '').trim() || '/';
@@ -360,150 +444,21 @@ function appendOriginalQuery(pathname, originalUrl) {
   return `${basePath}${query}`;
 }
 
-function normalizeAbsoluteHttpUrl(value) {
-  const raw = normalizeString(value);
-  if (!raw) return '';
-  try {
-    const parsed = new URL(raw);
-    if (!/^https?:$/i.test(parsed.protocol)) return '';
-    parsed.hash = '';
-    const normalizedPath = parsed.pathname.replace(/\/+$/, '');
-    parsed.pathname = normalizedPath || '';
-    return parsed.toString().replace(/\/$/, '');
-  } catch {
-    return '';
-  }
-}
-
-function normalizeWebsitePreviewTargetUrl(valueRaw) {
-  const rawValue = normalizeString(valueRaw);
-  if (!rawValue) return '';
-  const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawValue) ? rawValue : `https://${rawValue}`;
-  try {
-    const parsed = new URL(withProtocol);
-    if (!/^https?:$/i.test(parsed.protocol)) return '';
-    if (normalizeString(parsed.username) || normalizeString(parsed.password)) return '';
-    parsed.hash = '';
-    if (!parsed.pathname) parsed.pathname = '/';
-    return parsed.toString();
-  } catch {
-    return '';
-  }
-}
-
-function isPrivateIpv4Address(valueRaw) {
-  const value = normalizeIpAddress(valueRaw);
-  const parts = value.split('.').map((part) => Number(part));
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
-    return false;
-  }
-  if (parts[0] === 10 || parts[0] === 127) return true;
-  if (parts[0] === 169 && parts[1] === 254) return true;
-  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-  if (parts[0] === 192 && parts[1] === 168) return true;
-  if (parts[0] === 0) return true;
-  return false;
-}
-
-function isPrivateIpv6Address(valueRaw) {
-  const value = normalizeIpAddress(valueRaw).toLowerCase();
-  if (!value) return false;
-  if (value === '::1') return true;
-  if (value.startsWith('fc') || value.startsWith('fd')) return true;
-  if (value.startsWith('fe80:')) return true;
-  return false;
-}
-
-function isPrivateIpAddress(valueRaw) {
-  const value = normalizeIpAddress(valueRaw);
-  const version = net.isIP(value);
-  if (version === 4) return isPrivateIpv4Address(value);
-  if (version === 6) return isPrivateIpv6Address(value);
-  return false;
-}
-
-async function assertWebsitePreviewUrlIsPublic(valueRaw) {
-  const normalizedUrl = normalizeWebsitePreviewTargetUrl(valueRaw);
-  if (!normalizedUrl) {
-    const error = new Error('Vul een geldige website-URL in, bijvoorbeeld https://voorbeeld.nl');
-    error.status = 400;
-    throw error;
-  }
-
-  const parsed = new URL(normalizedUrl);
-  const hostname = normalizeString(parsed.hostname).toLowerCase();
-  if (!hostname) {
-    const error = new Error('Kon de hostname van deze URL niet lezen.');
-    error.status = 400;
-    throw error;
-  }
-
-  if (
-    hostname === 'localhost' ||
-    hostname.endsWith('.local') ||
-    hostname.endsWith('.internal') ||
-    hostname.endsWith('.lan') ||
-    hostname.endsWith('.home')
-  ) {
-    const error = new Error('Lokale of interne URLs zijn niet toegestaan voor Websitegenerator.');
-    error.status = 400;
-    throw error;
-  }
-
-  if (net.isIP(hostname) && isPrivateIpAddress(hostname)) {
-    const error = new Error('Private netwerk-IP’s zijn niet toegestaan voor Websitegenerator.');
-    error.status = 400;
-    throw error;
-  }
-
-  try {
-    const resolved = await dns.lookup(hostname, { all: true, verbatim: true });
-    const privateAddress = Array.isArray(resolved)
-      ? resolved.find((entry) => entry && isPrivateIpAddress(entry.address))
-      : null;
-    if (privateAddress) {
-      const error = new Error('Deze URL verwijst naar een intern netwerkadres en mag niet worden gescand.');
-      error.status = 400;
-      throw error;
-    }
-  } catch (error) {
-    if (Number(error?.status)) throw error;
-  }
-
-  return normalizedUrl;
-}
-
-function getPublicBaseUrlFromRequest(req) {
-  const forwardedProto = normalizeString(req?.get('x-forwarded-proto')).split(',')[0].trim();
-  const forwardedHost = normalizeString(req?.get('x-forwarded-host')).split(',')[0].trim();
-  const host = forwardedHost || normalizeString(req?.get('host'));
-  const proto = forwardedProto || (req?.secure ? 'https' : 'http');
-  if (!host || !proto) return '';
-  return normalizeAbsoluteHttpUrl(`${proto}://${host}`);
-}
-
 function getEffectivePublicBaseUrl(req = null, overrideValue = '') {
-  const explicit = normalizeAbsoluteHttpUrl(overrideValue || PUBLIC_BASE_URL);
-  if (explicit) return explicit;
-  if (req) return getPublicBaseUrlFromRequest(req);
-  return '';
+  return resolveEffectivePublicBaseUrl(req, overrideValue, PUBLIC_BASE_URL);
 }
 
-function appendQueryParamsToUrl(rawUrl, params = {}) {
-  const raw = normalizeString(rawUrl);
-  if (!raw) return '';
-  try {
-    const parsed = new URL(raw);
-    Object.entries(params || {}).forEach(([key, value]) => {
-      const normalizedValue = normalizeString(value);
-      if (!normalizeString(key) || !normalizedValue) return;
-      parsed.searchParams.set(key, normalizedValue);
-    });
-    return parsed.toString();
-  } catch {
-    return raw;
-  }
-}
+const premiumAdminAllowedIpSet = new Set(
+  PREMIUM_ADMIN_IP_ALLOWLIST.split(/[\s,]+/)
+    .map((value) => normalizeIpAddress(value))
+    .filter(Boolean)
+);
+
+const { isPremiumAdminIpAllowed, isSameOriginApiRequest } = createRequestSecurityContext({
+  enforceSameOriginRequests: PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS,
+  getEffectivePublicBaseUrl,
+  premiumAdminAllowedIpSet,
+});
 
 app.disable('x-powered-by');
 
@@ -677,251 +632,31 @@ function normalizeString(value, fallback = '') {
   return String(value).trim();
 }
 
-function getRequestPathname(req) {
-  const rawUrl = normalizeString(req?.originalUrl || req?.url || req?.path || '/');
-  const questionMarkIndex = rawUrl.indexOf('?');
-  return questionMarkIndex >= 0 ? rawUrl.slice(0, questionMarkIndex) : rawUrl;
-}
-
-function normalizeIpAddress(value) {
-  const raw = normalizeString(value);
-  if (!raw) return '';
-  const noZone = raw.replace(/%.+$/, '');
-  const ipv4Mapped = noZone.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
-  if (ipv4Mapped) return ipv4Mapped[1];
-  if (noZone === '::1') return '127.0.0.1';
-  return noZone;
-}
-
-const premiumAdminAllowedIpSet = new Set(
-  PREMIUM_ADMIN_IP_ALLOWLIST.split(/[\s,]+/)
-    .map((value) => normalizeIpAddress(value))
-    .filter(Boolean)
-);
-
-function getClientIpFromRequest(req) {
-  const forwardedFor = normalizeString(req?.get?.('x-forwarded-for') || '');
-  if (forwardedFor) {
-    const first = forwardedFor.split(',')[0];
-    const normalized = normalizeIpAddress(first);
-    if (normalized) return normalized;
-  }
-
-  return normalizeIpAddress(req?.ip || req?.socket?.remoteAddress || '');
-}
-
-function isPremiumAdminIpAllowed(req) {
-  if (premiumAdminAllowedIpSet.size === 0) return true;
-  const clientIp = getClientIpFromRequest(req);
-  return clientIp ? premiumAdminAllowedIpSet.has(clientIp) : false;
-}
-
-function normalizeOrigin(value) {
-  const raw = normalizeString(value);
-  if (!raw) return '';
-  try {
-    return new URL(raw).origin.toLowerCase();
-  } catch {
-    return '';
-  }
-}
-
-function getAllowedSameOriginSet(req) {
-  const allowed = new Set();
-  const publicBaseUrl = normalizeAbsoluteHttpUrl(getEffectivePublicBaseUrl(req));
-  if (publicBaseUrl) {
-    try {
-      allowed.add(new URL(publicBaseUrl).origin.toLowerCase());
-    } catch {}
-  }
-
-  const host = normalizeString(req?.get?.('host') || '');
-  const protocol = isSecureHttpRequest(req) ? 'https' : 'http';
-  if (host) {
-    allowed.add(`${protocol}://${host}`.toLowerCase());
-  }
-
-  return allowed;
-}
-
-function getRequestOriginFromHeaders(req) {
-  const originHeader = normalizeOrigin(req?.get?.('origin') || '');
-  if (originHeader) return originHeader;
-  const refererHeader = normalizeOrigin(req?.get?.('referer') || '');
-  if (refererHeader) return refererHeader;
-  return '';
-}
-
-function toBase64Url(value) {
-  return Buffer.from(String(value || ''), 'utf8')
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
-}
-
-function fromBase64Url(value) {
-  const normalized = normalizeString(value);
-  if (!normalized) return '';
-  const padded = normalized.replace(/-/g, '+').replace(/_/g, '/');
-  const remainder = padded.length % 4;
-  const suffix = remainder === 0 ? '' : '='.repeat(4 - remainder);
-  return Buffer.from(`${padded}${suffix}`, 'base64').toString('utf8');
-}
-
-function createHmacSha256Base64Url(value, secret) {
-  return crypto
-    .createHmac('sha256', String(secret || ''))
-    .update(String(value || ''))
-    .digest('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
-}
-
-function timingSafeEqualStrings(left, right) {
-  const leftValue = String(left || '');
-  const rightValue = String(right || '');
-  const leftBuffer = Buffer.from(leftValue, 'utf8');
-  const rightBuffer = Buffer.from(rightValue, 'utf8');
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-function decodeBase32Secret(value) {
-  const normalized = normalizeString(value)
-    .toUpperCase()
-    .replace(/[^A-Z2-7]/g, '');
-  if (!normalized) return null;
-
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  for (const char of normalized) {
-    const index = alphabet.indexOf(char);
-    if (index < 0) return null;
-    bits += index.toString(2).padStart(5, '0');
-  }
-
-  const bytes = [];
-  for (let offset = 0; offset + 8 <= bits.length; offset += 8) {
-    bytes.push(Number.parseInt(bits.slice(offset, offset + 8), 2));
-  }
-  return bytes.length > 0 ? Buffer.from(bytes) : null;
-}
-
-let premiumMfaSecretBufferCache = undefined;
-
-function getPremiumMfaSecretBuffer() {
-  if (premiumMfaSecretBufferCache !== undefined) {
-    return premiumMfaSecretBufferCache;
-  }
-
-  if (!PREMIUM_MFA_TOTP_SECRET) {
-    premiumMfaSecretBufferCache = null;
-    return premiumMfaSecretBufferCache;
-  }
-
-  const base32Decoded = decodeBase32Secret(PREMIUM_MFA_TOTP_SECRET);
-  premiumMfaSecretBufferCache =
-    base32Decoded && base32Decoded.length > 0
-      ? base32Decoded
-      : Buffer.from(PREMIUM_MFA_TOTP_SECRET, 'utf8');
-  return premiumMfaSecretBufferCache;
-}
-
-function isPremiumMfaConfigured() {
-  const buffer = getPremiumMfaSecretBuffer();
-  return Boolean(buffer && buffer.length > 0);
-}
-
-function generateTotpCodeForTime(secretBuffer, timestampMs = Date.now(), digits = 6, stepSeconds = 30) {
-  if (!secretBuffer || !secretBuffer.length) return '';
-  const counter = Math.floor(Number(timestampMs) / 1000 / stepSeconds);
-  const counterBuffer = Buffer.alloc(8);
-  counterBuffer.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
-  counterBuffer.writeUInt32BE(counter >>> 0, 4);
-  const digest = crypto.createHmac('sha1', secretBuffer).update(counterBuffer).digest();
-  const offset = digest[digest.length - 1] & 0x0f;
-  const binary =
-    ((digest[offset] & 0x7f) << 24) |
-    ((digest[offset + 1] & 0xff) << 16) |
-    ((digest[offset + 2] & 0xff) << 8) |
-    (digest[offset + 3] & 0xff);
-  const modulo = 10 ** digits;
-  return String(binary % modulo).padStart(digits, '0');
-}
-
-function isPremiumMfaCodeValid(codeRaw) {
-  if (!isPremiumMfaConfigured()) return true;
-  const normalizedCode = normalizeString(codeRaw).replace(/\s+/g, '');
-  if (!/^\d{6}$/.test(normalizedCode)) return false;
-
-  const secretBuffer = getPremiumMfaSecretBuffer();
-  const nowMs = Date.now();
-  for (const offset of [-1, 0, 1]) {
-    const candidate = generateTotpCodeForTime(secretBuffer, nowMs + offset * 30_000);
-    if (candidate && timingSafeEqualStrings(candidate, normalizedCode)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function buildCookieMap(req) {
-  const headerValue = normalizeString(req?.headers?.cookie || '');
-  const map = new Map();
-  if (!headerValue) return map;
-
-  headerValue.split(/;\s*/).forEach((entry) => {
-    const separatorIndex = entry.indexOf('=');
-    if (separatorIndex <= 0) return;
-    const key = normalizeString(entry.slice(0, separatorIndex));
-    if (!key) return;
-    const rawValue = entry.slice(separatorIndex + 1);
-    try {
-      map.set(key, decodeURIComponent(rawValue));
-    } catch {
-      map.set(key, rawValue);
-    }
-  });
-
-  return map;
-}
-
-function isSecureHttpRequest(req) {
-  if (req?.secure) return true;
-  const forwardedProto = normalizeString(req?.get?.('x-forwarded-proto') || '')
-    .split(',')[0]
-    .trim()
-    .toLowerCase();
-  return forwardedProto === 'https';
-}
-
-function buildSetCookieHeader(name, value, options = {}) {
-  const parts = [`${name}=${encodeURIComponent(normalizeString(value))}`];
-  const pathValue = normalizeString(options.path || '/');
-  if (pathValue) parts.push(`Path=${pathValue}`);
-  parts.push('HttpOnly');
-  parts.push(`SameSite=${normalizeString(options.sameSite || 'Lax') || 'Lax'}`);
-
-  if (options.secure) parts.push('Secure');
-
-  if (Number.isFinite(Number(options.maxAgeSeconds))) {
-    const maxAgeSeconds = Math.max(0, Math.floor(Number(options.maxAgeSeconds)));
-    parts.push(`Max-Age=${maxAgeSeconds}`);
-    const expiresAt = new Date(Date.now() + maxAgeSeconds * 1000);
-    parts.push(`Expires=${expiresAt.toUTCString()}`);
-  }
-
-  return parts.join('; ');
-}
-
 function isPremiumAuthConfigured() {
   return premiumUsersStore.hasConfiguredUsers();
 }
 
 function normalizePremiumSessionEmail(value) {
   return normalizeString(value).toLowerCase();
+}
+
+let premiumMfaManager = null;
+
+function getPremiumMfaManager() {
+  if (premiumMfaManager) return premiumMfaManager;
+  premiumMfaManager = createTotpManager({
+    secret: PREMIUM_MFA_TOTP_SECRET,
+    normalizeString,
+  });
+  return premiumMfaManager;
+}
+
+function isPremiumMfaConfigured() {
+  return getPremiumMfaManager().isConfigured();
+}
+
+function isPremiumMfaCodeValid(codeRaw) {
+  return getPremiumMfaManager().isCodeValid(codeRaw);
 }
 
 const premiumUsersStore = createPremiumUsersStore({
@@ -1092,111 +827,56 @@ function buildLeadOwnerFields(callId, existingValue = null) {
   };
 }
 
+let premiumSessionManager = null;
+
+function getPremiumSessionManager() {
+  if (premiumSessionManager) return premiumSessionManager;
+  premiumSessionManager = createPremiumSessionManager({
+    sessionSecret: PREMIUM_SESSION_SECRET,
+    sessionCookieName: PREMIUM_SESSION_COOKIE_NAME,
+    defaultSessionTtlMs: PREMIUM_SESSION_TTL_HOURS * 60 * 60 * 1000,
+    isProduction: IS_PRODUCTION,
+    isAuthConfigured: isPremiumAuthConfigured,
+    isSecureHttpRequest,
+    normalizeString,
+    truncateText,
+    normalizeSessionEmail: normalizePremiumSessionEmail,
+  });
+  return premiumSessionManager;
+}
+
 function createPremiumSessionToken({ email, maxAgeMs, userId = '', role = '' }) {
-  if (!isPremiumAuthConfigured()) return '';
-  const ttlMs = Math.max(60_000, Number(maxAgeMs) || PREMIUM_SESSION_TTL_HOURS * 60 * 60 * 1000);
-  const payload = {
-    email: normalizePremiumSessionEmail(email),
-    uid: truncateText(normalizeString(userId || ''), 120),
-    role: truncateText(normalizeString(role || ''), 40).toLowerCase(),
-    iat: Date.now(),
-    exp: Date.now() + ttlMs,
-  };
-  const encodedPayload = toBase64Url(JSON.stringify(payload));
-  const signature = createHmacSha256Base64Url(encodedPayload, PREMIUM_SESSION_SECRET);
-  return `${encodedPayload}.${signature}`;
+  return getPremiumSessionManager().createSessionToken({ email, maxAgeMs, userId, role });
 }
 
 function readPremiumSessionTokenFromRequest(req) {
-  const cookies = buildCookieMap(req);
-  return normalizeString(cookies.get(PREMIUM_SESSION_COOKIE_NAME) || '');
+  return getPremiumSessionManager().readSessionTokenFromRequest(req);
 }
 
 function verifyPremiumSessionToken(token) {
-  const rawToken = normalizeString(token);
-  if (!rawToken || !PREMIUM_SESSION_SECRET) {
-    return {
-      ok: false,
-      expired: false,
-      payload: null,
-    };
-  }
-
-  const separatorIndex = rawToken.lastIndexOf('.');
-  if (separatorIndex <= 0) {
-    return { ok: false, expired: false, payload: null };
-  }
-
-  const encodedPayload = rawToken.slice(0, separatorIndex);
-  const signature = rawToken.slice(separatorIndex + 1);
-  const expectedSignature = createHmacSha256Base64Url(encodedPayload, PREMIUM_SESSION_SECRET);
-  if (!timingSafeEqualStrings(signature, expectedSignature)) {
-    return { ok: false, expired: false, payload: null };
-  }
-
-  try {
-    const payload = JSON.parse(fromBase64Url(encodedPayload));
-    const email = normalizePremiumSessionEmail(payload?.email);
-    const userId = truncateText(normalizeString(payload?.uid || ''), 120);
-    const role = truncateText(normalizeString(payload?.role || ''), 40).toLowerCase();
-    const expiresAtMs = Number(payload?.exp || 0);
-    if (!email || !Number.isFinite(expiresAtMs)) {
-      return { ok: false, expired: false, payload: null };
-    }
-    if (expiresAtMs <= Date.now()) {
-      return { ok: false, expired: true, payload: payload || null };
-    }
-    return {
-      ok: true,
-      expired: false,
-      payload: {
-        ...payload,
-        email,
-        uid: userId,
-        role,
-      },
-    };
-  } catch {
-    return { ok: false, expired: false, payload: null };
-  }
+  return getPremiumSessionManager().verifySessionToken(token);
 }
 
-function getPremiumAuthState(req) {
-  const configured = Boolean(PREMIUM_SESSION_SECRET);
-  if (!configured) {
-    return {
-      configured: false,
-      authenticated: false,
-      expired: false,
-      email: '',
-      userId: '',
-      role: '',
-      expiresAt: null,
-      token: '',
-    };
-  }
-
-  const token = readPremiumSessionTokenFromRequest(req);
-  const verification = verifyPremiumSessionToken(token);
-  return {
-    configured: true,
-    authenticated: Boolean(verification.ok),
-    expired: Boolean(verification.expired),
-    email: normalizePremiumSessionEmail(verification?.payload?.email || ''),
-    userId: truncateText(normalizeString(verification?.payload?.uid || ''), 120),
-    role: truncateText(normalizeString(verification?.payload?.role || ''), 40).toLowerCase(),
-    expiresAt: Number(verification?.payload?.exp || 0) || null,
-    token,
-  };
-}
+const {
+  buildPremiumAuthSessionPayload,
+  getPremiumAuthState,
+  getResolvedPremiumAuthState,
+  getSafePremiumRedirectPath,
+  isPremiumPublicApiRequest,
+} = createPremiumAuthStateManager({
+  sessionSecret: PREMIUM_SESSION_SECRET,
+  normalizeString,
+  truncateText,
+  normalizeSessionEmail: normalizePremiumSessionEmail,
+  readSessionTokenFromRequest: readPremiumSessionTokenFromRequest,
+  verifySessionToken: verifyPremiumSessionToken,
+  premiumUsersStore,
+  isPremiumMfaConfigured,
+  getRequestPathname,
+});
 
 function buildPremiumSessionCookieHeader(req, token, maxAgeMs) {
-  return buildSetCookieHeader(PREMIUM_SESSION_COOKIE_NAME, token, {
-    path: '/',
-    sameSite: 'Lax',
-    secure: isSecureHttpRequest(req) || IS_PRODUCTION,
-    maxAgeSeconds: Math.max(1, Math.floor(Number(maxAgeMs || 0) / 1000)),
-  });
+  return getPremiumSessionManager().buildSessionCookieHeader(req, token, maxAgeMs);
 }
 
 function setPremiumSessionCookie(req, res, token, maxAgeMs) {
@@ -1204,228 +884,55 @@ function setPremiumSessionCookie(req, res, token, maxAgeMs) {
 }
 
 function clearPremiumSessionCookie(req, res) {
-  res.append(
-    'Set-Cookie',
-    buildSetCookieHeader(PREMIUM_SESSION_COOKIE_NAME, '', {
-      path: '/',
-      sameSite: 'Lax',
-      secure: isSecureHttpRequest(req) || IS_PRODUCTION,
-      maxAgeSeconds: 0,
-    })
-  );
+  res.append('Set-Cookie', getPremiumSessionManager().buildClearedSessionCookieHeader(req));
 }
 
-async function getResolvedPremiumAuthState(req) {
-  const basicAuthState = getPremiumAuthState(req);
-  const hydrated = await premiumUsersStore.ensureUsersHydrated();
-  const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
-  const configured = Boolean(
-    PREMIUM_SESSION_SECRET &&
-    hydrated?.source === 'supabase' &&
-    users.length > 0
-  );
+const runtimeEventStore = createRuntimeEventStore({
+  recentDashboardActivities,
+  recentSecurityAuditEvents,
+  queueRuntimeStatePersist,
+  normalizeString,
+  truncateText,
+  normalizePremiumSessionEmail,
+  normalizeIpAddress,
+  normalizeOrigin,
+});
 
-  if (!configured) {
-    return {
-      ...basicAuthState,
-      configured: false,
-      authenticated: false,
-      expired: false,
-      userId: '',
-      role: '',
-      isAdmin: false,
-      revoked: false,
-      user: null,
-      displayName: '',
-    };
-  }
+const { appendDashboardActivity, appendSecurityAuditEvent } = runtimeEventStore;
 
-  if (!basicAuthState.authenticated) {
-    return {
-      ...basicAuthState,
-      configured: true,
-      authenticated: false,
-      userId: '',
-      role: '',
-      isAdmin: false,
-      revoked: false,
-      user: null,
-      displayName: '',
-    };
-  }
+const { requirePremiumAdminApiAccess, requirePremiumApiAccess } = createPremiumApiAccessGuard({
+  isPremiumPublicApiRequest,
+  getResolvedPremiumAuthState,
+  isPremiumAdminIpAllowed,
+  appendSecurityAuditEvent,
+  getClientIpFromRequest,
+  getRequestPathname,
+  getRequestOriginFromHeaders,
+  clearPremiumSessionCookie,
+});
 
-  const user =
-    premiumUsersStore.findUserById(users, basicAuthState.userId) ||
-    premiumUsersStore.findUserByEmail(users, basicAuthState.email);
+const { resolvePremiumHtmlPageAccess } = createPremiumHtmlPageAccessController({
+  premiumPublicHtmlFiles: PREMIUM_PUBLIC_HTML_FILES,
+  noindexHeaderValue: NOINDEX_HEADER_VALUE,
+  getResolvedPremiumAuthState,
+  getSafePremiumRedirectPath,
+  clearPremiumSessionCookie,
+  isPremiumAdminIpAllowed,
+  appendSecurityAuditEvent,
+  getClientIpFromRequest,
+  getRequestOriginFromHeaders,
+});
 
-  if (!user || premiumUsersStore.normalizeUserStatus(user.status) !== 'active') {
-    return {
-      ...basicAuthState,
-      configured: true,
-      authenticated: false,
-      role: '',
-      isAdmin: false,
-      revoked: true,
-      user: null,
-      displayName: '',
-    };
-  }
-
-  return {
-    ...basicAuthState,
-    configured: true,
-    authenticated: true,
-    email: user.email,
-    userId: user.id,
-    role: user.role,
-    isAdmin: premiumUsersStore.isAdminRole(user.role),
-    revoked: false,
-    user,
-    displayName: premiumUsersStore.buildUserDisplayName(user),
-    firstName: normalizeString(user.firstName || ''),
-    lastName: normalizeString(user.lastName || ''),
-    avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(user.avatarDataUrl || ''),
-  };
-}
-
-function buildPremiumAuthSessionPayload(authState) {
-  return {
-    ok: true,
-    configured: authState.configured,
-    authenticated: authState.authenticated,
-    mfaEnabled: isPremiumMfaConfigured(),
-    email: authState.authenticated ? authState.email : '',
-    userId: authState.authenticated ? authState.userId : '',
-    role: authState.authenticated ? authState.role : '',
-    firstName: authState.authenticated ? normalizeString(authState.firstName || authState.user?.firstName || '') : '',
-    lastName: authState.authenticated ? normalizeString(authState.lastName || authState.user?.lastName || '') : '',
-    displayName: authState.authenticated ? authState.displayName : '',
-    avatarDataUrl: authState.authenticated
-      ? premiumUsersStore.sanitizeAvatarDataUrl(authState.avatarDataUrl || authState.user?.avatarDataUrl || '')
-      : '',
-    canManageUsers: Boolean(authState.authenticated && authState.isAdmin),
-    expiresAt: authState.authenticated ? authState.expiresAt : null,
-  };
-}
-
-function parsePremiumProfileDisplayName(value) {
-  const displayName = truncateText(normalizeString(value || ''), 160);
-  if (!displayName) return { firstName: '', lastName: '' };
-  const parts = displayName.split(/\s+/).filter(Boolean);
-  const firstName = truncateText(parts.shift() || '', 80);
-  const lastName = truncateText(parts.join(' '), 80);
-  return { firstName, lastName };
-}
-
-function getSafePremiumRedirectPath(rawTarget, fallback = '/premium-personeel-dashboard') {
-  const target = normalizeString(rawTarget);
-  if (!target) return fallback;
-  if (!target.startsWith('/')) return fallback;
-  if (target.startsWith('//')) return fallback;
-  if (target.includes('://')) return fallback;
-  return target;
-}
-
-function isPremiumProtectedHtmlFile(fileNameRaw) {
-  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
-  if (!fileName) return false;
-  return /^premium-/i.test(fileName) && !PREMIUM_PUBLIC_HTML_FILES.has(fileName);
-}
-
-function isPremiumPublicApiRequest(req) {
-  const method = normalizeString(req?.method || 'GET').toUpperCase();
-  const requestPath = normalizeString(getRequestPathname(req) || '');
-  if (!requestPath.startsWith('/')) return false;
-
-  const publicExactMatches = new Set([
-    '/api/healthz',
-    '/api/health/baseline',
-    '/api/health/dependencies',
-    '/api/auth/login',
-    '/api/auth/logout',
-    '/api/auth/session',
-    '/api/twilio/voice',
-    '/api/twilio/status',
-    '/api/retell/webhook',
-  ]);
-
-  if (publicExactMatches.has(requestPath)) return true;
-  if (requestPath === '/api/twilio/voice' && (method === 'GET' || method === 'POST')) return true;
-  return false;
-}
-
-function isSameOriginProtectionExemptRequest(req) {
-  const requestPath = normalizeString(getRequestPathname(req) || '');
-  return (
-    requestPath === '/api/healthz' ||
-    requestPath === '/api/health/baseline' ||
-    requestPath === '/api/health/dependencies' ||
-    requestPath === '/api/twilio/voice' ||
-    requestPath === '/api/twilio/status' ||
-    requestPath === '/api/retell/webhook'
-  );
-}
-
-function isSafeHttpMethod(methodRaw) {
-  const method = normalizeString(methodRaw || '').toUpperCase();
-  return method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
-}
-
-function isSameOriginApiRequest(req) {
-  if (!PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS) return true;
-  if (isSafeHttpMethod(req?.method)) return true;
-  if (isSameOriginProtectionExemptRequest(req)) return true;
-
-  const requestOrigin = getRequestOriginFromHeaders(req);
-  if (!requestOrigin) return false;
-
-  const allowedOrigins = getAllowedSameOriginSet(req);
-  return allowedOrigins.has(requestOrigin);
-}
-
-function isRuntimeDebugRouteEnabled() {
-  return !IS_PRODUCTION || PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES;
-}
-
-function requireRuntimeDebugAccess(req, res, next) {
-  if (!isRuntimeDebugRouteEnabled()) {
-    appendSecurityAuditEvent(
-      {
-        type: 'debug_route_blocked',
-        severity: 'warning',
-        success: false,
-        email: getPremiumAuthState(req)?.email || '',
-        ip: getClientIpFromRequest(req),
-        path: getRequestPathname(req),
-        origin: getRequestOriginFromHeaders(req),
-        userAgent: req.get('user-agent'),
-        detail: 'Runtime debug route geblokkeerd in productie.',
-      },
-      'security_debug_route_blocked'
-    );
-    return res.status(404).json({ ok: false, error: 'Niet gevonden' });
-  }
-
-  if (!isPremiumAdminIpAllowed(req)) {
-    appendSecurityAuditEvent(
-      {
-        type: 'admin_ip_blocked',
-        severity: 'warning',
-        success: false,
-        email: getPremiumAuthState(req)?.email || '',
-        ip: getClientIpFromRequest(req),
-        path: getRequestPathname(req),
-        origin: getRequestOriginFromHeaders(req),
-        userAgent: req.get('user-agent'),
-        detail: 'Runtime debug route geweigerd door admin IP allowlist.',
-      },
-      'security_admin_ip_blocked'
-    );
-    return res.status(403).json({ ok: false, error: 'Toegang geweigerd.' });
-  }
-
-  return next();
-}
+const { requireRuntimeDebugAccess } = createRuntimeDebugAccessGuard({
+  isProduction: IS_PRODUCTION,
+  enableRuntimeDebugRoutes: PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES,
+  getPremiumAuthState,
+  isPremiumAdminIpAllowed,
+  appendSecurityAuditEvent,
+  getClientIpFromRequest,
+  getRequestPathname,
+  getRequestOriginFromHeaders,
+});
 
 function escapeHtml(value) {
   return normalizeString(value)
@@ -1449,6 +956,12 @@ function clipText(value, maxLength = 500) {
   const limit = Math.floor(Number(maxLength));
   return text.length > limit ? text.slice(0, limit) : text;
 }
+
+const { sanitizeReferenceImages, sanitizeLaunchDomainName, slugifyAutomationText } =
+  createWebsiteInputHelpers({
+    normalizeString,
+    truncateText,
+  });
 
 function isSupabaseConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
@@ -1694,705 +1207,115 @@ function getSupabaseClient() {
   return supabaseClient;
 }
 
-function compactRuntimeSnapshotText(value, maxLength = 500) {
-  return truncateText(normalizeString(value || ''), Math.max(40, Number(maxLength) || 500));
-}
+const runtimeBackupCoordinator = createRuntimeBackupCoordinator({
+  normalizeString,
+  truncateText,
+  parseNumberSafe,
+  toBooleanSafe,
+  normalizeDateYyyyMmDd,
+  normalizeTimeHhMm,
+  resolveCallDurationSeconds,
+  normalizeLeadOwnerRecord,
+  recentWebhookEvents,
+  recentCallUpdates,
+  recentAiCallInsights,
+  recentDashboardActivities,
+  recentSecurityAuditEvents,
+  generatedAgendaAppointments,
+  dismissedInterestedLeadCallIds,
+  dismissedInterestedLeadKeys,
+  leadOwnerAssignmentsByCallId,
+  getNextLeadOwnerRotationIndex: () => nextLeadOwnerRotationIndex,
+  getNextGeneratedAgendaAppointmentId: () => nextGeneratedAgendaAppointmentId,
+  appName: 'softora-retell-coldcalling-backend',
+  appVersion: APP_VERSION,
+  getPublicFeatureFlags,
+  routeManifest,
+});
 
-function compactRuntimeSnapshotWebhookEvent(event) {
-  return {
-    receivedAt: normalizeString(event?.receivedAt || ''),
-    messageType: compactRuntimeSnapshotText(event?.messageType, 120),
-    callId: compactRuntimeSnapshotText(event?.callId, 120),
-    callStatus: compactRuntimeSnapshotText(event?.callStatus, 80),
-    // Geen rauwe payloads opslaan; call updates bevatten de relevante details al.
-    payload: null,
-  };
-}
-
-function compactRuntimeSnapshotCallUpdate(item) {
-  const durationSeconds = Number(item?.durationSeconds);
-  const updatedAtMs = Number(item?.updatedAtMs || 0);
-  return {
-    callId: compactRuntimeSnapshotText(item?.callId, 140),
-    phone: compactRuntimeSnapshotText(item?.phone, 80),
-    company: compactRuntimeSnapshotText(item?.company, 180),
-    branche: compactRuntimeSnapshotText(item?.branche, 120),
-    region: compactRuntimeSnapshotText(item?.region, 120),
-    province: compactRuntimeSnapshotText(item?.province, 120),
-    address: compactRuntimeSnapshotText(item?.address, 220),
-    name: compactRuntimeSnapshotText(item?.name, 140),
-    status: compactRuntimeSnapshotText(item?.status, 80),
-    messageType: compactRuntimeSnapshotText(item?.messageType, 120),
-    summary: compactRuntimeSnapshotText(item?.summary, 1400),
-    transcriptSnippet: compactRuntimeSnapshotText(item?.transcriptSnippet, 900),
-    transcriptFull: compactRuntimeSnapshotText(item?.transcriptFull, 2200),
-    endedReason: compactRuntimeSnapshotText(item?.endedReason, 120),
-    startedAt: normalizeString(item?.startedAt || ''),
-    endedAt: normalizeString(item?.endedAt || ''),
-    durationSeconds:
-      Number.isFinite(durationSeconds) && durationSeconds > 0 ? Math.round(durationSeconds) : null,
-    recordingUrl: compactRuntimeSnapshotText(item?.recordingUrl, 1200),
-    recordingSid: compactRuntimeSnapshotText(item?.recordingSid, 120),
-    recordingUrlProxy: compactRuntimeSnapshotText(item?.recordingUrlProxy, 260),
-    updatedAt: normalizeString(item?.updatedAt || ''),
-    updatedAtMs: Number.isFinite(updatedAtMs) && updatedAtMs > 0 ? Math.round(updatedAtMs) : 0,
-    provider: compactRuntimeSnapshotText(item?.provider, 40),
-    direction: compactRuntimeSnapshotText(item?.direction, 40),
-    stack: compactRuntimeSnapshotText(item?.stack, 80),
-    stackLabel: compactRuntimeSnapshotText(item?.stackLabel, 80),
-    businessMode: compactRuntimeSnapshotText(item?.businessMode, 80),
-    business_mode: compactRuntimeSnapshotText(item?.business_mode, 80),
-    serviceType: compactRuntimeSnapshotText(item?.serviceType, 80),
-    service_type: compactRuntimeSnapshotText(item?.service_type, 80),
-  };
-}
-
-function buildSupabaseCallUpdatePayload(callUpdate, reason = 'call_update_row') {
-  const compact = compactRuntimeSnapshotCallUpdate(callUpdate || {});
-  if (!normalizeString(compact?.callId || '')) return null;
-  const persistedAtIso = new Date().toISOString();
-  return {
-    version: 1,
-    type: 'call_update',
-    reason: compactRuntimeSnapshotText(reason, 80),
-    savedAt: persistedAtIso,
-    callUpdate: compact,
-  };
-}
+const {
+  buildRuntimeBackupForOps,
+  buildRuntimeStateSnapshotPayloadWithLimits,
+  buildSupabaseCallUpdatePayload,
+  compactRuntimeSnapshotAiInsight,
+  compactRuntimeSnapshotCallUpdate,
+  compactRuntimeSnapshotDashboardActivity,
+  compactRuntimeSnapshotGeneratedAgendaAppointment,
+  compactRuntimeSnapshotSecurityAuditEvent,
+  compactRuntimeSnapshotText,
+  compactRuntimeSnapshotWebhookEvent,
+  extractSupabaseCallUpdateFromRow: extractSupabaseCallUpdateFromRowFromSnapshot,
+} = runtimeBackupCoordinator;
 
 function extractSupabaseCallUpdateFromRow(row) {
-  if (!row || typeof row !== 'object') return null;
-  const rowCallId = extractCallIdFromSupabaseCallUpdateStateKey(row?.state_key || row?.stateKey || '');
-  const payload = row?.payload && typeof row.payload === 'object' ? row.payload : null;
-  const candidate =
-    payload && payload.callUpdate && typeof payload.callUpdate === 'object'
-      ? payload.callUpdate
-      : payload && payload.update && typeof payload.update === 'object'
-        ? payload.update
-        : payload && payload.type === 'call_update'
-          ? payload
-          : null;
-  const compact = compactRuntimeSnapshotCallUpdate({
-    ...(candidate && typeof candidate === 'object' ? candidate : {}),
-    callId:
-      normalizeString(candidate?.callId || candidate?.call_id || '') ||
-      rowCallId,
-    updatedAt:
-      normalizeString(candidate?.updatedAt || candidate?.updated_at || '') ||
-      normalizeString(row?.updated_at || row?.updatedAt || ''),
-    updatedAtMs:
-      Number(candidate?.updatedAtMs || candidate?.updated_at_ms || 0) ||
-      Date.parse(
-        normalizeString(candidate?.updatedAt || candidate?.updated_at || row?.updated_at || row?.updatedAt || '')
-      ) ||
-      0,
+  return extractSupabaseCallUpdateFromRowFromSnapshot(row, {
+    extractCallIdFromStateKey: extractCallIdFromSupabaseCallUpdateStateKey,
   });
-  if (!normalizeString(compact?.callId || '')) return null;
-  return compact;
 }
 
-async function fetchSupabaseCallUpdateRows(limit = SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT) {
-  if (!isSupabaseConfigured()) {
-    return { ok: false, status: null, rows: [], error: 'Supabase niet geconfigureerd.' };
-  }
+const runtimeStateSyncCoordinator = createRuntimeStateSyncCoordinator({
+  isSupabaseConfigured,
+  getSupabaseClient,
+  fetchSupabaseStateRowViaRest,
+  upsertSupabaseStateRowViaRest,
+  fetchSupabaseCallUpdateRowsViaRest,
+  upsertSupabaseRowViaRest,
+  supabaseStateTable: SUPABASE_STATE_TABLE,
+  supabaseStateKey: SUPABASE_STATE_KEY,
+  supabaseCallUpdateStateKeyPrefix: SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX,
+  supabaseCallUpdateRowsFetchLimit: SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT,
+  runtimeStateSupabaseSyncCooldownMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS,
+  runtimeStateRemoteNewerThresholdMs: RUNTIME_STATE_REMOTE_NEWER_THRESHOLD_MS,
+  normalizeString,
+  truncateText,
+  parseNumberSafe,
+  buildSupabaseCallUpdateStateKey,
+  extractSupabaseCallUpdateFromRow,
+  buildSupabaseCallUpdatePayload,
+  buildRuntimeStateSnapshotPayloadWithLimits,
+  compactRuntimeSnapshotWebhookEvent,
+  compactRuntimeSnapshotCallUpdate,
+  compactRuntimeSnapshotAiInsight,
+  compactRuntimeSnapshotDashboardActivity,
+  compactRuntimeSnapshotSecurityAuditEvent,
+  compactRuntimeSnapshotGeneratedAgendaAppointment,
+  normalizeLeadOwnerRecord,
+  recentWebhookEvents,
+  recentCallUpdates,
+  callUpdatesById,
+  recentAiCallInsights,
+  aiCallInsightsByCallId,
+  recentDashboardActivities,
+  recentSecurityAuditEvents,
+  generatedAgendaAppointments,
+  agendaAppointmentIdByCallId,
+  dismissedInterestedLeadCallIds,
+  dismissedInterestedLeadKeys,
+  leadOwnerAssignmentsByCallId,
+  upsertRecentCallUpdate,
+  logger: console,
+  runtimeState: runtimeStateSyncState,
+});
 
-  const safeLimit = Math.max(1, Math.min(2000, Number(limit) || SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT));
-  const client = getSupabaseClient();
-  if (client) {
-    try {
-      const { data, error } = await client
-        .from(SUPABASE_STATE_TABLE)
-        .select('state_key,payload,updated_at')
-        .like('state_key', `${SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX}%`)
-        .order('updated_at', { ascending: false })
-        .limit(safeLimit);
-      if (!error) {
-        return {
-          ok: true,
-          status: 200,
-          rows: Array.isArray(data) ? data : [],
-          error: null,
-        };
-      }
-    } catch {
-      // Val terug op REST wanneer client query faalt.
-    }
-  }
+const {
+  applyRuntimeStateSnapshotPayload,
+  buildCallUpdateRowPersistMeta,
+  ensureRuntimeStateHydratedFromSupabase,
+  forceHydrateRuntimeStateWithRetries,
+  persistRuntimeStateToSupabase,
+  queueCallUpdateRowPersist,
+  syncCallUpdatesFromSupabaseRows,
+  syncRuntimeStateFromSupabaseIfNewer,
+  waitForQueuedCallUpdateRowPersist,
+  waitForQueuedRuntimeStatePersist,
+} = runtimeStateSyncCoordinator;
 
-  const fallback = await fetchSupabaseCallUpdateRowsViaRest(safeLimit);
-  return {
-    ok: Boolean(fallback.ok),
-    status: fallback.status,
-    rows: Array.isArray(fallback.body) ? fallback.body : [],
-    error: fallback.error || null,
-  };
-}
-
-function compactRuntimeSnapshotAiInsight(item) {
-  const estimatedValueEur = parseNumberSafe(item?.estimatedValueEur ?? item?.estimated_value_eur, null);
-  return {
-    callId: compactRuntimeSnapshotText(item?.callId, 140),
-    company: compactRuntimeSnapshotText(item?.company, 180),
-    leadCompany: compactRuntimeSnapshotText(item?.leadCompany, 180),
-    contactName: compactRuntimeSnapshotText(item?.contactName, 140),
-    leadName: compactRuntimeSnapshotText(item?.leadName, 140),
-    phone: compactRuntimeSnapshotText(item?.phone, 80),
-    branche: compactRuntimeSnapshotText(item?.branche, 120),
-    summary: compactRuntimeSnapshotText(item?.summary, 1400),
-    appointmentBooked: toBooleanSafe(item?.appointmentBooked ?? item?.appointment_booked, false),
-    appointmentDate: normalizeDateYyyyMmDd(item?.appointmentDate || item?.appointment_date || ''),
-    appointmentTime: normalizeTimeHhMm(item?.appointmentTime || item?.appointment_time || ''),
-    estimatedValueEur: Number.isFinite(estimatedValueEur) ? estimatedValueEur : null,
-    followUpRequired: toBooleanSafe(item?.followUpRequired ?? item?.follow_up_required, false),
-    followUpReason: compactRuntimeSnapshotText(item?.followUpReason || item?.follow_up_reason, 900),
-    source: compactRuntimeSnapshotText(item?.source, 40),
-    model: compactRuntimeSnapshotText(item?.model, 80),
-    analyzedAt: normalizeString(item?.analyzedAt || ''),
-    agendaAppointmentId: Number(item?.agendaAppointmentId || 0) || null,
-    provider: compactRuntimeSnapshotText(item?.provider, 40),
-    coldcallingStack: compactRuntimeSnapshotText(item?.coldcallingStack || item?.stack, 80),
-    coldcallingStackLabel: compactRuntimeSnapshotText(item?.coldcallingStackLabel || item?.stackLabel, 80),
-    businessMode: compactRuntimeSnapshotText(item?.businessMode || item?.business_mode, 80),
-    serviceType: compactRuntimeSnapshotText(item?.serviceType || item?.service_type, 80),
-    contactEmail: compactRuntimeSnapshotText(item?.contactEmail || item?.email || item?.leadEmail, 180),
-    region: compactRuntimeSnapshotText(item?.region || item?.leadRegion, 120),
-    province: compactRuntimeSnapshotText(item?.province || item?.leadProvince, 120),
-    address: compactRuntimeSnapshotText(item?.address || item?.leadAddress, 220),
-  };
-}
-
-function compactRuntimeSnapshotDashboardActivity(item) {
-  return {
-    id: compactRuntimeSnapshotText(item?.id, 140),
-    type: compactRuntimeSnapshotText(item?.type, 80),
-    title: compactRuntimeSnapshotText(item?.title, 200),
-    detail: compactRuntimeSnapshotText(item?.detail || item?.message, 1200),
-    company: compactRuntimeSnapshotText(item?.company, 180),
-    actor: compactRuntimeSnapshotText(item?.actor, 120),
-    taskId: Number(item?.taskId || 0) || null,
-    callId: compactRuntimeSnapshotText(item?.callId, 140),
-    source: compactRuntimeSnapshotText(item?.source, 120),
-    createdAt: normalizeString(item?.createdAt || ''),
-    updatedAt: normalizeString(item?.updatedAt || ''),
-    updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
-  };
-}
-
-function compactRuntimeSnapshotSecurityAuditEvent(item) {
-  return {
-    id: compactRuntimeSnapshotText(item?.id, 140),
-    type: compactRuntimeSnapshotText(item?.type, 120),
-    severity: compactRuntimeSnapshotText(item?.severity, 20),
-    success: toBooleanSafe(item?.success, false),
-    email: compactRuntimeSnapshotText(item?.email, 180),
-    ip: compactRuntimeSnapshotText(item?.ip, 80),
-    path: compactRuntimeSnapshotText(item?.path, 220),
-    origin: compactRuntimeSnapshotText(item?.origin, 220),
-    detail: compactRuntimeSnapshotText(item?.detail || item?.message, 600),
-    userAgent: compactRuntimeSnapshotText(item?.userAgent, 300),
-    createdAt: normalizeString(item?.createdAt || ''),
-    updatedAt: normalizeString(item?.updatedAt || ''),
-    updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
-  };
-}
-
-function compactRuntimeSnapshotGeneratedAgendaAppointment(item) {
-  if (!item || typeof item !== 'object') return null;
-  return {
-    id: Number(item?.id || 0) || 0,
-    type: compactRuntimeSnapshotText(item?.type, 60),
-    company: compactRuntimeSnapshotText(item?.company, 180),
-    contact: compactRuntimeSnapshotText(item?.contact, 140),
-    phone: compactRuntimeSnapshotText(item?.phone, 80),
-    date: normalizeDateYyyyMmDd(item?.date || ''),
-    time: normalizeTimeHhMm(item?.time || ''),
-    value: compactRuntimeSnapshotText(item?.value, 80),
-    branche: compactRuntimeSnapshotText(item?.branche, 120),
-    source: compactRuntimeSnapshotText(item?.source, 140),
-    summary: compactRuntimeSnapshotText(item?.summary, 1800),
-    aiGenerated: toBooleanSafe(item?.aiGenerated, false),
-    callId: compactRuntimeSnapshotText(item?.callId, 140),
-    createdAt: normalizeString(item?.createdAt || ''),
-    needsConfirmationEmail: toBooleanSafe(item?.needsConfirmationEmail, false),
-    confirmationTaskType: compactRuntimeSnapshotText(item?.confirmationTaskType, 60),
-    provider: compactRuntimeSnapshotText(item?.provider, 40),
-    coldcallingStack: compactRuntimeSnapshotText(item?.coldcallingStack, 80),
-    coldcallingStackLabel: compactRuntimeSnapshotText(item?.coldcallingStackLabel, 80),
-    location: compactRuntimeSnapshotText(item?.location || item?.appointmentLocation, 220),
-    whatsappInfo: compactRuntimeSnapshotText(item?.whatsappInfo || item?.whatsappNotes || item?.whatsapp, 1200),
-    whatsappConfirmed: toBooleanSafe(item?.whatsappConfirmed, false),
-    durationSeconds: resolveCallDurationSeconds(item),
-    recordingUrl: compactRuntimeSnapshotText(item?.recordingUrl, 1200),
-    contactEmail: compactRuntimeSnapshotText(item?.contactEmail || item?.email, 180),
-    confirmationEmailSent: toBooleanSafe(item?.confirmationEmailSent, false),
-    confirmationEmailSentAt: normalizeString(item?.confirmationEmailSentAt || ''),
-    confirmationEmailSentBy: compactRuntimeSnapshotText(item?.confirmationEmailSentBy, 120),
-    confirmationResponseReceived: toBooleanSafe(item?.confirmationResponseReceived, false),
-    confirmationResponseReceivedAt: normalizeString(item?.confirmationResponseReceivedAt || ''),
-    confirmationResponseReceivedBy: compactRuntimeSnapshotText(item?.confirmationResponseReceivedBy, 120),
-    confirmationAppointmentCancelled: toBooleanSafe(item?.confirmationAppointmentCancelled, false),
-    confirmationAppointmentCancelledAt: normalizeString(item?.confirmationAppointmentCancelledAt || ''),
-    confirmationAppointmentCancelledBy: compactRuntimeSnapshotText(item?.confirmationAppointmentCancelledBy, 120),
-    confirmationEmailDraft: compactRuntimeSnapshotText(item?.confirmationEmailDraft, 1800),
-    confirmationEmailDraftGeneratedAt: normalizeString(item?.confirmationEmailDraftGeneratedAt || ''),
-    confirmationEmailDraftSource: compactRuntimeSnapshotText(item?.confirmationEmailDraftSource, 60),
-    confirmationEmailLastError: compactRuntimeSnapshotText(item?.confirmationEmailLastError, 600),
-    confirmationEmailLastSentMessageId: compactRuntimeSnapshotText(item?.confirmationEmailLastSentMessageId, 180),
-    confirmationTaskCreatedAt: normalizeString(item?.confirmationTaskCreatedAt || ''),
-    postCallStatus: compactRuntimeSnapshotText(item?.postCallStatus, 60),
-    postCallNotesTranscript: compactRuntimeSnapshotText(item?.postCallNotesTranscript, 1800),
-    postCallPrompt: compactRuntimeSnapshotText(item?.postCallPrompt, 1200),
-    postCallDomainName: compactRuntimeSnapshotText(item?.postCallDomainName || item?.domainName, 220),
-    postCallUpdatedAt: normalizeString(item?.postCallUpdatedAt || ''),
-    postCallUpdatedBy: compactRuntimeSnapshotText(item?.postCallUpdatedBy, 120),
-    activeOrderId: Number(item?.activeOrderId || 0) || null,
-    activeOrderAddedAt: normalizeString(item?.activeOrderAddedAt || ''),
-    activeOrderAddedBy: compactRuntimeSnapshotText(item?.activeOrderAddedBy, 120),
-    activeOrderReferenceImageCount: Number(item?.activeOrderReferenceImageCount || 0) || 0,
-    leadOwnerKey: compactRuntimeSnapshotText(item?.leadOwnerKey, 160),
-    leadOwnerName: compactRuntimeSnapshotText(item?.leadOwnerName, 140),
-    leadOwnerFullName: compactRuntimeSnapshotText(item?.leadOwnerFullName, 180),
-    leadOwnerUserId: compactRuntimeSnapshotText(item?.leadOwnerUserId, 120),
-    leadOwnerEmail: compactRuntimeSnapshotText(item?.leadOwnerEmail, 180),
-    updatedAt: normalizeString(item?.updatedAt || ''),
-    updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
-  };
-}
-
-function buildRuntimeStateSnapshotPayloadWithLimits(options = {}) {
-  const maxWebhookEvents = Math.max(10, Math.min(200, Number(options?.maxWebhookEvents || 80) || 80));
-  const maxCallUpdates = Math.max(20, Math.min(500, Number(options?.maxCallUpdates || 500) || 500));
-  const maxAiCallInsights = Math.max(20, Math.min(500, Number(options?.maxAiCallInsights || 500) || 500));
-  const maxDashboardActivities = Math.max(20, Math.min(500, Number(options?.maxDashboardActivities || 500) || 500));
-  const maxSecurityAuditEvents = Math.max(20, Math.min(500, Number(options?.maxSecurityAuditEvents || 500) || 500));
-  const maxAgendaAppointments = Math.max(40, Math.min(5000, Number(options?.maxAgendaAppointments || 5000) || 5000));
-  const maxDismissedCallIds = Math.max(100, Math.min(2000, Number(options?.maxDismissedCallIds || 1000) || 1000));
-  const maxDismissedLeadKeys = Math.max(100, Math.min(4000, Number(options?.maxDismissedLeadKeys || 2000) || 2000));
-  const maxLeadOwnerAssignments = Math.max(200, Math.min(5000, Number(options?.maxLeadOwnerAssignments || 5000) || 5000));
-
-  return {
-    version: 5,
-    savedAt: new Date().toISOString(),
-    recentWebhookEvents: recentWebhookEvents
-      .slice(0, maxWebhookEvents)
-      .map(compactRuntimeSnapshotWebhookEvent),
-    recentCallUpdates: recentCallUpdates
-      .slice(0, maxCallUpdates)
-      .map(compactRuntimeSnapshotCallUpdate)
-      .filter((item) => normalizeString(item?.callId || '')),
-    recentAiCallInsights: recentAiCallInsights
-      .slice(0, maxAiCallInsights)
-      .map(compactRuntimeSnapshotAiInsight)
-      .filter((item) => normalizeString(item?.callId || '')),
-    recentDashboardActivities: recentDashboardActivities
-      .slice(0, maxDashboardActivities)
-      .map(compactRuntimeSnapshotDashboardActivity)
-      .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || '')),
-    recentSecurityAuditEvents: recentSecurityAuditEvents
-      .slice(0, maxSecurityAuditEvents)
-      .map(compactRuntimeSnapshotSecurityAuditEvent)
-      .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || '')),
-    generatedAgendaAppointments: generatedAgendaAppointments
-      .slice(0, maxAgendaAppointments)
-      .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
-      .filter(Boolean),
-    dismissedInterestedLeadCallIds: Array.from(dismissedInterestedLeadCallIds)
-      .slice(0, maxDismissedCallIds)
-      .map((item) => normalizeString(item))
-      .filter(Boolean),
-    dismissedInterestedLeadKeys: Array.from(dismissedInterestedLeadKeys)
-      .slice(0, maxDismissedLeadKeys)
-      .map((item) => normalizeString(item))
-      .filter(Boolean),
-    leadOwnerAssignments: Array.from(leadOwnerAssignmentsByCallId.entries())
-      .slice(0, maxLeadOwnerAssignments)
-      .map(([callId, owner]) => ({
-        callId: normalizeString(callId),
-        owner: normalizeLeadOwnerRecord(owner),
-      }))
-      .filter((item) => item.callId && item.owner),
-    nextLeadOwnerRotationIndex,
-    nextGeneratedAgendaAppointmentId,
-  };
-}
-
-function buildRuntimeBackupForOps(options = {}) {
-  const snapshotOptions =
-    options && typeof options.snapshotOptions === 'object' && options.snapshotOptions
-      ? options.snapshotOptions
-      : options;
-  return buildRuntimeBackupEnvelope({
-    appName: 'softora-retell-coldcalling-backend',
-    appVersion: APP_VERSION,
-    featureFlags: getPublicFeatureFlags(),
-    routeManifest,
-    snapshotPayload: buildRuntimeStateSnapshotPayloadWithLimits(snapshotOptions || {}),
-    metadata:
-      options && typeof options.metadata === 'object' && options.metadata ? options.metadata : {},
-  });
+function queueRuntimeStatePersist(reason = 'unknown') {
+  return runtimeStateSyncCoordinator.queueRuntimeStatePersist(reason);
 }
 
 function buildRuntimeStateSnapshotPayload() {
   return buildRuntimeStateSnapshotPayloadWithLimits();
-}
-
-function getRuntimeSnapshotItemTimestampMs(item) {
-  const explicitMs = Number(item?.updatedAtMs || 0);
-  if (Number.isFinite(explicitMs) && explicitMs > 0) return explicitMs;
-
-  const candidateFields = [
-    item?.updatedAt,
-    item?.analyzedAt,
-    item?.receivedAt,
-    item?.endedAt,
-    item?.startedAt,
-    item?.createdAt,
-    item?.confirmationEmailSentAt,
-    item?.confirmationResponseReceivedAt,
-    item?.confirmationAppointmentCancelledAt,
-    item?.postCallUpdatedAt,
-  ];
-
-  for (const candidate of candidateFields) {
-    const parsedMs = Date.parse(normalizeString(candidate || ''));
-    if (Number.isFinite(parsedMs) && parsedMs > 0) return parsedMs;
-  }
-
-  return 0;
-}
-
-function chooseRuntimeSnapshotValue(primaryValue, fallbackValue) {
-  if (primaryValue === undefined || primaryValue === null) return fallbackValue;
-  if (typeof primaryValue === 'string') {
-    return primaryValue.trim() ? primaryValue : fallbackValue;
-  }
-  if (Array.isArray(primaryValue)) {
-    return primaryValue.length > 0 ? primaryValue.slice() : Array.isArray(fallbackValue) ? fallbackValue.slice() : primaryValue.slice();
-  }
-  return primaryValue;
-}
-
-function mergeRuntimeSnapshotObjects(primary, fallback) {
-  const safePrimary = primary && typeof primary === 'object' ? primary : {};
-  const safeFallback = fallback && typeof fallback === 'object' ? fallback : {};
-  const merged = { ...safeFallback };
-  const keys = new Set([...Object.keys(safeFallback), ...Object.keys(safePrimary)]);
-  keys.forEach((key) => {
-    merged[key] = chooseRuntimeSnapshotValue(safePrimary[key], safeFallback[key]);
-  });
-  return merged;
-}
-
-function mergeRuntimeSnapshotArraysByKey(localItems, remoteItems, keyFn, limit = 500) {
-  const mergedByKey = new Map();
-  const append = (items) => {
-    (Array.isArray(items) ? items : []).forEach((item) => {
-      if (!item || typeof item !== 'object') return;
-      const key = normalizeString(keyFn(item) || '');
-      if (!key) return;
-      const existing = mergedByKey.get(key) || null;
-      if (!existing) {
-        mergedByKey.set(key, item);
-        return;
-      }
-      const existingTs = getRuntimeSnapshotItemTimestampMs(existing);
-      const incomingTs = getRuntimeSnapshotItemTimestampMs(item);
-      const primary = incomingTs >= existingTs ? item : existing;
-      const fallback = incomingTs >= existingTs ? existing : item;
-      mergedByKey.set(key, mergeRuntimeSnapshotObjects(primary, fallback));
-    });
-  };
-
-  append(remoteItems);
-  append(localItems);
-
-  return Array.from(mergedByKey.values())
-    .sort((a, b) => getRuntimeSnapshotItemTimestampMs(b) - getRuntimeSnapshotItemTimestampMs(a))
-    .slice(0, limit);
-}
-
-function mergeRuntimeSnapshotPayloads(localPayload, remotePayload) {
-  const safeLocal = localPayload && typeof localPayload === 'object' ? localPayload : {};
-  const safeRemote = remotePayload && typeof remotePayload === 'object' ? remotePayload : {};
-  const localLeadOwnerAssignments = (Array.isArray(safeLocal.leadOwnerAssignments) ? safeLocal.leadOwnerAssignments : [])
-    .map((item) => ({
-      callId: normalizeString(item?.callId || ''),
-      owner: normalizeLeadOwnerRecord(item?.owner || {}),
-    }))
-    .filter((item) => item.callId && item.owner);
-  const remoteLeadOwnerAssignments = (Array.isArray(safeRemote.leadOwnerAssignments) ? safeRemote.leadOwnerAssignments : [])
-    .map((item) => ({
-      callId: normalizeString(item?.callId || ''),
-      owner: normalizeLeadOwnerRecord(item?.owner || {}),
-    }))
-    .filter((item) => item.callId && item.owner);
-  const localGeneratedAgendaAppointments = (Array.isArray(safeLocal.generatedAgendaAppointments) ? safeLocal.generatedAgendaAppointments : [])
-    .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
-    .filter(Boolean);
-  const remoteGeneratedAgendaAppointments = (Array.isArray(safeRemote.generatedAgendaAppointments) ? safeRemote.generatedAgendaAppointments : [])
-    .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
-    .filter(Boolean);
-  const localWebhookEvents = (Array.isArray(safeLocal.recentWebhookEvents) ? safeLocal.recentWebhookEvents : [])
-    .map(compactRuntimeSnapshotWebhookEvent);
-  const remoteWebhookEvents = (Array.isArray(safeRemote.recentWebhookEvents) ? safeRemote.recentWebhookEvents : [])
-    .map(compactRuntimeSnapshotWebhookEvent);
-  const localCallUpdates = (Array.isArray(safeLocal.recentCallUpdates) ? safeLocal.recentCallUpdates : [])
-    .map(compactRuntimeSnapshotCallUpdate)
-    .filter((item) => normalizeString(item?.callId || ''));
-  const remoteCallUpdates = (Array.isArray(safeRemote.recentCallUpdates) ? safeRemote.recentCallUpdates : [])
-    .map(compactRuntimeSnapshotCallUpdate)
-    .filter((item) => normalizeString(item?.callId || ''));
-  const localAiCallInsights = (Array.isArray(safeLocal.recentAiCallInsights) ? safeLocal.recentAiCallInsights : [])
-    .map(compactRuntimeSnapshotAiInsight)
-    .filter((item) => normalizeString(item?.callId || ''));
-  const remoteAiCallInsights = (Array.isArray(safeRemote.recentAiCallInsights) ? safeRemote.recentAiCallInsights : [])
-    .map(compactRuntimeSnapshotAiInsight)
-    .filter((item) => normalizeString(item?.callId || ''));
-  const localDashboardActivities = (Array.isArray(safeLocal.recentDashboardActivities) ? safeLocal.recentDashboardActivities : [])
-    .map(compactRuntimeSnapshotDashboardActivity)
-    .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
-  const remoteDashboardActivities = (Array.isArray(safeRemote.recentDashboardActivities) ? safeRemote.recentDashboardActivities : [])
-    .map(compactRuntimeSnapshotDashboardActivity)
-    .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
-  const localSecurityAuditEvents = (Array.isArray(safeLocal.recentSecurityAuditEvents) ? safeLocal.recentSecurityAuditEvents : [])
-    .map(compactRuntimeSnapshotSecurityAuditEvent)
-    .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
-  const remoteSecurityAuditEvents = (Array.isArray(safeRemote.recentSecurityAuditEvents) ? safeRemote.recentSecurityAuditEvents : [])
-    .map(compactRuntimeSnapshotSecurityAuditEvent)
-    .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
-  const remoteDismissedCallIds = (Array.isArray(safeRemote.dismissedInterestedLeadCallIds) ? safeRemote.dismissedInterestedLeadCallIds : [])
-    .map((item) => normalizeString(item))
-    .filter(Boolean);
-  const localDismissedCallIds = (Array.isArray(safeLocal.dismissedInterestedLeadCallIds) ? safeLocal.dismissedInterestedLeadCallIds : [])
-    .map((item) => normalizeString(item))
-    .filter(Boolean);
-  const remoteDismissedLeadKeys = (Array.isArray(safeRemote.dismissedInterestedLeadKeys) ? safeRemote.dismissedInterestedLeadKeys : [])
-    .map((item) => normalizeString(item))
-    .filter(Boolean);
-  const localDismissedLeadKeys = (Array.isArray(safeLocal.dismissedInterestedLeadKeys) ? safeLocal.dismissedInterestedLeadKeys : [])
-    .map((item) => normalizeString(item))
-    .filter(Boolean);
-
-  const leadOwnerAssignments = mergeRuntimeSnapshotArraysByKey(
-    localLeadOwnerAssignments,
-    remoteLeadOwnerAssignments,
-    (item) => item?.callId || '',
-    5000
-  );
-
-  const generatedAgendaAppointments = mergeRuntimeSnapshotArraysByKey(
-    localGeneratedAgendaAppointments,
-    remoteGeneratedAgendaAppointments,
-    (item) => String(item?.id || item?.callId || ''),
-    5000
-  );
-
-  const recentWebhookEvents = mergeRuntimeSnapshotArraysByKey(
-    localWebhookEvents,
-    remoteWebhookEvents,
-    (item) => `${normalizeString(item?.receivedAt || '')}|${normalizeString(item?.messageType || '')}|${normalizeString(item?.callId || '')}`,
-    80
-  );
-
-  const recentCallUpdates = mergeRuntimeSnapshotArraysByKey(
-    localCallUpdates,
-    remoteCallUpdates,
-    (item) => item?.callId || '',
-    500
-  );
-
-  const recentAiCallInsights = mergeRuntimeSnapshotArraysByKey(
-    localAiCallInsights,
-    remoteAiCallInsights,
-    (item) => item?.callId || '',
-    500
-  );
-
-  const recentDashboardActivities = mergeRuntimeSnapshotArraysByKey(
-    localDashboardActivities,
-    remoteDashboardActivities,
-    (item) => item?.id || '',
-    500
-  );
-
-  const recentSecurityAuditEvents = mergeRuntimeSnapshotArraysByKey(
-    localSecurityAuditEvents,
-    remoteSecurityAuditEvents,
-    (item) => item?.id || '',
-    500
-  );
-
-  const dismissedInterestedLeadCallIds = Array.from(
-    new Set([
-      ...remoteDismissedCallIds,
-      ...localDismissedCallIds,
-    ].filter(Boolean))
-  ).slice(0, 1000);
-  const dismissedInterestedLeadKeys = Array.from(
-    new Set([
-      ...remoteDismissedLeadKeys,
-      ...localDismissedLeadKeys,
-    ].filter(Boolean))
-  ).slice(0, 2000);
-
-  return {
-    version: Math.max(Number(safeLocal.version || 0), Number(safeRemote.version || 0), 5),
-    savedAt: new Date().toISOString(),
-    recentWebhookEvents,
-    recentCallUpdates,
-    recentAiCallInsights,
-    recentDashboardActivities,
-    recentSecurityAuditEvents,
-    generatedAgendaAppointments,
-    dismissedInterestedLeadCallIds,
-    dismissedInterestedLeadKeys,
-    leadOwnerAssignments,
-    nextLeadOwnerRotationIndex: Math.max(
-      0,
-      Number(safeLocal.nextLeadOwnerRotationIndex || 0),
-      Number(safeRemote.nextLeadOwnerRotationIndex || 0)
-    ),
-    nextGeneratedAgendaAppointmentId: Math.max(
-      100000,
-      Number(safeLocal.nextGeneratedAgendaAppointmentId || 0),
-      Number(safeRemote.nextGeneratedAgendaAppointmentId || 0),
-      ...generatedAgendaAppointments.map((item) => Number(item?.id || 0) + 1).filter((value) => Number.isFinite(value) && value > 0)
-    ),
-  };
-}
-
-function resolveRuntimeStateVersionMs(updatedAt = '', payload = null) {
-  const candidates = [normalizeString(updatedAt), normalizeString(payload?.savedAt || '')];
-  for (const candidate of candidates) {
-    const parsedMs = Date.parse(candidate);
-    if (Number.isFinite(parsedMs) && parsedMs > 0) {
-      return parsedMs;
-    }
-  }
-  return 0;
-}
-
-function markRuntimeStateObserved(atMs = Date.now()) {
-  const nextMs = Number(atMs);
-  runtimeStateObservedAtMs =
-    Number.isFinite(nextMs) && nextMs > 0 ? Math.max(runtimeStateObservedAtMs, nextMs) : Math.max(runtimeStateObservedAtMs, Date.now());
-}
-
-function markRuntimeStateSynced(atMs = Date.now()) {
-  runtimeStateObservedAtMs = Number.isFinite(Number(atMs)) && Number(atMs) > 0 ? Number(atMs) : Date.now();
-  runtimeStateLastSupabaseSyncCheckMs = Date.now();
-}
-
-function applyRuntimeStateSnapshotPayload(payload, options = {}) {
-  if (!payload || typeof payload !== 'object') return false;
-
-  const nextWebhookEvents = Array.isArray(payload.recentWebhookEvents)
-    ? payload.recentWebhookEvents.slice(0, 200).map(compactRuntimeSnapshotWebhookEvent)
-    : [];
-  const nextCallUpdates = Array.isArray(payload.recentCallUpdates)
-    ? payload.recentCallUpdates
-        .slice(0, 500)
-        .map(compactRuntimeSnapshotCallUpdate)
-        .filter((item) => normalizeString(item?.callId || ''))
-    : [];
-  const nextAiCallInsights = Array.isArray(payload.recentAiCallInsights)
-    ? payload.recentAiCallInsights
-        .slice(0, 500)
-        .map(compactRuntimeSnapshotAiInsight)
-        .filter((item) => normalizeString(item?.callId || ''))
-    : [];
-  const nextDashboardActivities = Array.isArray(payload.recentDashboardActivities)
-    ? payload.recentDashboardActivities
-        .slice(0, 500)
-        .map(compactRuntimeSnapshotDashboardActivity)
-        .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''))
-    : [];
-  const nextSecurityAuditEvents = Array.isArray(payload.recentSecurityAuditEvents)
-    ? payload.recentSecurityAuditEvents
-        .slice(0, 500)
-        .map(compactRuntimeSnapshotSecurityAuditEvent)
-        .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''))
-    : [];
-  const nextAppointments = Array.isArray(payload.generatedAgendaAppointments)
-    ? payload.generatedAgendaAppointments
-        .slice()
-        .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
-        .filter(Boolean)
-    : [];
-  const nextDismissedInterestedLeadCallIds = Array.isArray(payload.dismissedInterestedLeadCallIds)
-    ? payload.dismissedInterestedLeadCallIds.slice(0, 1000)
-    : [];
-  const nextDismissedInterestedLeadKeys = Array.isArray(payload.dismissedInterestedLeadKeys)
-    ? payload.dismissedInterestedLeadKeys.slice(0, 2000)
-    : [];
-  const nextLeadOwnerAssignments = Array.isArray(payload.leadOwnerAssignments)
-    ? payload.leadOwnerAssignments.slice(0, 5000)
-    : [];
-
-  recentWebhookEvents.splice(0, recentWebhookEvents.length, ...nextWebhookEvents);
-
-  recentCallUpdates.splice(0, recentCallUpdates.length, ...nextCallUpdates);
-  callUpdatesById.clear();
-  recentCallUpdates.forEach((item) => {
-    const callId = normalizeString(item?.callId || '');
-    if (callId) {
-      callUpdatesById.set(callId, item);
-    }
-  });
-
-  recentAiCallInsights.splice(0, recentAiCallInsights.length, ...nextAiCallInsights);
-  aiCallInsightsByCallId.clear();
-  recentAiCallInsights.forEach((item) => {
-    const callId = normalizeString(item?.callId || '');
-    if (callId) {
-      aiCallInsightsByCallId.set(callId, item);
-    }
-  });
-
-  recentDashboardActivities.splice(0, recentDashboardActivities.length, ...nextDashboardActivities);
-  recentSecurityAuditEvents.splice(0, recentSecurityAuditEvents.length, ...nextSecurityAuditEvents);
-
-  generatedAgendaAppointments.splice(0, generatedAgendaAppointments.length, ...nextAppointments);
-  agendaAppointmentIdByCallId.clear();
-  dismissedInterestedLeadCallIds.clear();
-  dismissedInterestedLeadKeys.clear();
-  leadOwnerAssignmentsByCallId.clear();
-  nextDismissedInterestedLeadCallIds.forEach((item) => {
-    const callId = normalizeString(item);
-    if (callId) dismissedInterestedLeadCallIds.add(callId);
-  });
-  nextDismissedInterestedLeadKeys.forEach((item) => {
-    const leadKey = normalizeString(item);
-    if (leadKey) dismissedInterestedLeadKeys.add(leadKey);
-  });
-  nextLeadOwnerAssignments.forEach((item) => {
-    const callId = normalizeString(item?.callId || '');
-    const owner = normalizeLeadOwnerRecord(item?.owner || item);
-    if (callId && owner) {
-      leadOwnerAssignmentsByCallId.set(callId, owner);
-    }
-  });
-  let maxAppointmentId = 99999;
-  generatedAgendaAppointments.forEach((item) => {
-    const id = Number(item?.id);
-    const callId = normalizeString(item?.callId || '');
-    if (Number.isFinite(id) && id > maxAppointmentId) maxAppointmentId = id;
-    if (Number.isFinite(id) && callId) {
-      agendaAppointmentIdByCallId.set(callId, id);
-    }
-  });
-
-  const payloadNextId = Number(payload.nextGeneratedAgendaAppointmentId);
-  const payloadLeadOwnerRotationIndex = Number(payload.nextLeadOwnerRotationIndex);
-  nextLeadOwnerRotationIndex = Number.isFinite(payloadLeadOwnerRotationIndex)
-    ? Math.max(0, payloadLeadOwnerRotationIndex)
-    : 0;
-  nextGeneratedAgendaAppointmentId = Number.isFinite(payloadNextId)
-    ? Math.max(payloadNextId, maxAppointmentId + 1)
-    : maxAppointmentId + 1;
-  markRuntimeStateSynced(resolveRuntimeStateVersionMs(options?.updatedAt || '', payload));
-
-  return true;
 }
 
 function isInterestedLeadDismissed(callId) {
@@ -2476,816 +1399,78 @@ function cancelOpenLeadFollowUpTasksByIdentity(callId, rowLike, actor = '', reas
   return cancelledCount;
 }
 
-async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
-  const force = Boolean(options && options.force);
-  if (!isSupabaseConfigured()) return false;
-  if (supabaseStateHydrated) return true;
-  if (supabaseStateHydrationPromise) return supabaseStateHydrationPromise;
-  if (!force && Date.now() < supabaseHydrateRetryNotBeforeMs) return false;
-
-  supabaseStateHydrationPromise = (async () => {
-    try {
-      const client = getSupabaseClient();
-      if (!client) return false;
-
-      const { data, error } = await client
-        .from(SUPABASE_STATE_TABLE)
-        .select('payload, updated_at')
-        .eq('state_key', SUPABASE_STATE_KEY)
-        .maybeSingle();
-
-      if (error) {
-        const fallback = await fetchSupabaseStateRowViaRest('payload,updated_at');
-        if (!fallback.ok) {
-          console.error('[Supabase][HydrateError]', error.message || error);
-          const fallbackMsg = fallback.error
-            ? ` | REST fallback: ${fallback.error}`
-            : fallback.status
-              ? ` | REST fallback status: ${fallback.status}`
-              : '';
-          supabaseLastHydrateError = truncateText(`${error.message || String(error)}${fallbackMsg}`, 500);
-          supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
-          return false;
-        }
-
-        const row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
-        if (row && row.payload && typeof row.payload === 'object') {
-          applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
-        }
-        await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
-        supabaseStateHydrated = true;
-        supabaseLastHydrateError = '';
-        supabaseHydrateRetryNotBeforeMs = 0;
-        return true;
-      }
-
-      if (data && data.payload && typeof data.payload === 'object') {
-        applyRuntimeStateSnapshotPayload(data.payload, { updatedAt: data.updated_at || '' });
-        console.log(
-          '[Supabase] Runtime state geladen',
-          JSON.stringify({
-            table: SUPABASE_STATE_TABLE,
-            stateKey: SUPABASE_STATE_KEY,
-            updatedAt: data.updated_at || null,
-            callUpdates: recentCallUpdates.length,
-            insights: recentAiCallInsights.length,
-            dashboardActivities: recentDashboardActivities.length,
-            appointments: generatedAgendaAppointments.length,
-          })
-        );
-      }
-
-      await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
-
-      supabaseStateHydrated = true;
-      supabaseLastHydrateError = '';
-      supabaseHydrateRetryNotBeforeMs = 0;
-      return true;
-    } catch (error) {
-      console.error('[Supabase][HydrateCrash]', error?.message || error);
-      supabaseLastHydrateError = truncateText(error?.message || String(error), 500);
-      supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
-      return false;
-    } finally {
-      supabaseStateHydrationPromise = null;
-    }
-  })();
-
-  return supabaseStateHydrationPromise;
-}
-
-async function forceHydrateRuntimeStateWithRetries(maxAttempts = 3) {
-  if (!isSupabaseConfigured()) return false;
-  if (supabaseStateHydrated) return true;
-
-  const attempts = Math.max(1, Math.min(5, Number(maxAttempts) || 1));
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    supabaseHydrateRetryNotBeforeMs = 0;
-    const ok = await ensureRuntimeStateHydratedFromSupabase({ force: true });
-    if (ok) return true;
-    if (attempt < attempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
-    }
-  }
-  return false;
-}
-
-async function persistRuntimeStateToSupabase(reason = 'unknown') {
-  if (!isSupabaseConfigured()) return false;
-  try {
-    const client = getSupabaseClient();
-    if (!client) return false;
-
-    async function persistRow(row) {
-      const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
-        onConflict: 'state_key',
-      });
-
-      if (!error) {
-        return { ok: true, source: 'client', error: null };
-      }
-
-      const fallback = await upsertSupabaseStateRowViaRest(row);
-      if (fallback.ok) {
-        return { ok: true, source: 'rest', error: null };
-      }
-
-      const fallbackMsg = fallback.error
-        ? ` | REST fallback: ${fallback.error}`
-        : fallback.status
-          ? ` | REST fallback status: ${fallback.status}`
-          : '';
-      return {
-        ok: false,
-        source: 'none',
-        error: truncateText(`${error.message || String(error)}${fallbackMsg}`, 500),
-      };
-    }
-
-    let payload = buildRuntimeStateSnapshotPayloadWithLimits();
-    const remoteSnapshot = await fetchSupabaseStateRowViaRest('payload,updated_at');
-    if (remoteSnapshot.ok) {
-      const remoteRow = Array.isArray(remoteSnapshot.body) ? remoteSnapshot.body[0] || null : remoteSnapshot.body;
-      if (remoteRow?.payload && typeof remoteRow.payload === 'object') {
-        payload = mergeRuntimeSnapshotPayloads(payload, remoteRow.payload);
-      }
-    }
-    const row = {
-      state_key: SUPABASE_STATE_KEY,
-      payload,
-      updated_at: new Date().toISOString(),
-      meta: {
-        reason,
-        counts: {
-          webhookEvents: recentWebhookEvents.length,
-          callUpdates: recentCallUpdates.length,
-          aiCallInsights: recentAiCallInsights.length,
-          dashboardActivities: recentDashboardActivities.length,
-          securityAuditEvents: recentSecurityAuditEvents.length,
-          appointments: generatedAgendaAppointments.length,
-        },
-      },
-    };
-
-    const primaryPersist = await persistRow(row);
-    if (primaryPersist.ok) {
-      supabaseLastPersistError = '';
-      supabaseStateHydrated = true;
-      markRuntimeStateSynced(resolveRuntimeStateVersionMs(row.updated_at, row.payload));
-      return true;
-    }
-
-    const compactPayload = buildRuntimeStateSnapshotPayloadWithLimits({
-      maxWebhookEvents: 40,
-      maxCallUpdates: 180,
-      maxAiCallInsights: 180,
-      maxDashboardActivities: 220,
-      maxSecurityAuditEvents: 200,
-      maxAgendaAppointments: 1200,
-      maxDismissedCallIds: 700,
-      maxLeadOwnerAssignments: 2000,
-    });
-    const compactRow = {
-      ...row,
-      payload: compactPayload,
-      updated_at: new Date().toISOString(),
-      meta: {
-        ...(row.meta && typeof row.meta === 'object' ? row.meta : {}),
-        reason: `${reason}:compact_retry`,
-      },
-    };
-    const compactPersist = await persistRow(compactRow);
-    if (compactPersist.ok) {
-      supabaseLastPersistError = '';
-      supabaseStateHydrated = true;
-      markRuntimeStateSynced(resolveRuntimeStateVersionMs(compactRow.updated_at, compactRow.payload));
-      return true;
-    }
-
-    const combinedError = truncateText(
-      `primary=${primaryPersist.error || 'onbekend'} | compact=${compactPersist.error || 'onbekend'}`,
-      500
-    );
-    console.error('[Supabase][PersistError]', combinedError);
-    supabaseLastPersistError = combinedError;
-    return false;
-  } catch (error) {
-    console.error('[Supabase][PersistCrash]', error?.message || error);
-    supabaseLastPersistError = truncateText(error?.message || String(error), 500);
-    return false;
-  }
-}
-
-function queueRuntimeStatePersist(reason = 'unknown') {
-  markRuntimeStateObserved();
-  if (!isSupabaseConfigured()) return Promise.resolve(false);
-
-  supabasePersistChain = supabasePersistChain
-    .catch(() => null)
-    .then(() => persistRuntimeStateToSupabase(reason))
-    .catch((error) => {
-      console.error('[Supabase][PersistQueueError]', error?.message || error);
-      return false;
-    });
-
-  return supabasePersistChain;
-}
-
-async function waitForQueuedRuntimeStatePersist() {
-  if (!isSupabaseConfigured()) return false;
-  try {
-    const runtimePersistOk = Boolean(await supabasePersistChain);
-    const callUpdatePersistOk = Boolean(await supabaseCallUpdatePersistChain);
-    return runtimePersistOk && callUpdatePersistOk;
-  } catch (error) {
-    console.error('[Supabase][PersistAwaitError]', error?.message || error);
-    return false;
-  }
-}
-
-function buildCallUpdateRowPersistMeta(callUpdate, reason = 'call_update_row') {
-  return {
-    reason: truncateText(normalizeString(reason || ''), 80) || 'call_update_row',
-    callId: truncateText(normalizeString(callUpdate?.callId || ''), 140),
-    status: truncateText(normalizeString(callUpdate?.status || ''), 80),
-    provider: truncateText(normalizeString(callUpdate?.provider || ''), 40),
-    updatedAt: normalizeString(callUpdate?.updatedAt || '') || new Date().toISOString(),
-  };
-}
-
-async function persistSingleCallUpdateRowToSupabase(callUpdate, reason = 'call_update_row') {
-  if (!isSupabaseConfigured()) return false;
-  const compact = compactRuntimeSnapshotCallUpdate(callUpdate || {});
-  const callId = normalizeString(compact?.callId || '');
-  if (!callId || callId.startsWith('demo-')) return false;
-
-  const stateKey = buildSupabaseCallUpdateStateKey(callId);
-  if (!stateKey) return false;
-
-  const payload = buildSupabaseCallUpdatePayload(compact, reason);
-  if (!payload) return false;
-
-  const updatedAt = normalizeString(compact?.updatedAt || '') || new Date().toISOString();
-  const row = {
-    state_key: stateKey,
-    payload,
-    updated_at: updatedAt,
-    meta: buildCallUpdateRowPersistMeta(compact, reason),
-  };
-
-  const client = getSupabaseClient();
-  if (client) {
-    try {
-      const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
-        onConflict: 'state_key',
-      });
-      if (!error) {
-        supabaseLastCallUpdatePersistError = '';
-        return true;
-      }
-      const fallback = await upsertSupabaseRowViaRest(row);
-      if (fallback.ok) {
-        supabaseLastCallUpdatePersistError = '';
-        return true;
-      }
-      const fallbackMsg = fallback.error
-        ? ` | REST fallback: ${fallback.error}`
-        : fallback.status
-          ? ` | REST fallback status: ${fallback.status}`
-          : '';
-      supabaseLastCallUpdatePersistError = truncateText(
-        `${error.message || String(error)}${fallbackMsg}`,
-        500
-      );
-      return false;
-    } catch (error) {
-      const fallback = await upsertSupabaseRowViaRest(row);
-      if (fallback.ok) {
-        supabaseLastCallUpdatePersistError = '';
-        return true;
-      }
-      const fallbackMsg = fallback.error
-        ? ` | REST fallback: ${fallback.error}`
-        : fallback.status
-          ? ` | REST fallback status: ${fallback.status}`
-          : '';
-      supabaseLastCallUpdatePersistError = truncateText(
-        `${error?.message || String(error)}${fallbackMsg}`,
-        500
-      );
-      return false;
-    }
-  }
-
-  const fallback = await upsertSupabaseRowViaRest(row);
-  if (fallback.ok) {
-    supabaseLastCallUpdatePersistError = '';
-    return true;
-  }
-  supabaseLastCallUpdatePersistError = truncateText(
-    fallback.error || `REST fallback status: ${fallback.status || 'onbekend'}`,
-    500
-  );
-  return false;
-}
-
-function queueCallUpdateRowPersist(callUpdate, reason = 'call_update_row') {
-  if (!isSupabaseConfigured()) return Promise.resolve(false);
-  const callId = normalizeString(callUpdate?.callId || '');
-  if (!callId || callId.startsWith('demo-')) return Promise.resolve(false);
-
-  supabaseCallUpdatePersistChain = supabaseCallUpdatePersistChain
-    .catch(() => null)
-    .then(() => persistSingleCallUpdateRowToSupabase(callUpdate, reason))
-    .catch((error) => {
-      supabaseLastCallUpdatePersistError = truncateText(error?.message || String(error), 500);
-      return false;
-    });
-
-  return supabaseCallUpdatePersistChain;
-}
-
-async function waitForQueuedCallUpdateRowPersist() {
-  if (!isSupabaseConfigured()) return false;
-  try {
-    return Boolean(await supabaseCallUpdatePersistChain);
-  } catch (error) {
-    console.error('[Supabase][CallUpdatePersistAwaitError]', error?.message || error);
-    return false;
-  }
-}
-
-function mergeCallUpdatesFromSupabaseRows(rows = []) {
-  let touched = 0;
-  (Array.isArray(rows) ? rows : []).forEach((row) => {
-    const callUpdate = extractSupabaseCallUpdateFromRow(row);
-    if (!callUpdate) return;
-    const before = callUpdatesById.get(callUpdate.callId) || null;
-    const after = upsertRecentCallUpdate(callUpdate, {
-      persistRuntimeState: false,
-      persistCallUpdateRow: false,
-    });
-    if (!after) return;
-    const beforeMs = getRuntimeSnapshotItemTimestampMs(before || {});
-    const afterMs = getRuntimeSnapshotItemTimestampMs(after || {});
-    if (!before || afterMs > beforeMs) {
-      touched += 1;
-    }
-  });
-  return touched;
-}
-
-async function syncCallUpdatesFromSupabaseRows(options = {}) {
-  if (!isSupabaseConfigured()) return false;
-
-  const force = Boolean(options?.force);
-  const maxAgeMs = Math.max(
-    0,
-    parseNumberSafe(options?.maxAgeMs, RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS) ||
-      RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS
-  );
-  const nowMs = Date.now();
-
-  if (
-    !force &&
-    supabaseCallUpdatesLastSyncCheckMs > 0 &&
-    nowMs - supabaseCallUpdatesLastSyncCheckMs < maxAgeMs
-  ) {
-    return false;
-  }
-
-  await waitForQueuedCallUpdateRowPersist();
-  const rowsResult = await fetchSupabaseCallUpdateRows(SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT);
-  supabaseCallUpdatesLastSyncCheckMs = Date.now();
-  if (!rowsResult.ok) {
-    if (rowsResult.error) {
-      supabaseLastHydrateError = truncateText(rowsResult.error, 500);
-    }
-    return false;
-  }
-
-  const touched = mergeCallUpdatesFromSupabaseRows(rowsResult.rows || []);
-  return touched > 0;
-}
-
-async function syncRuntimeStateFromSupabaseIfNewer(options = {}) {
-  if (!isSupabaseConfigured()) return false;
-
-  const force = Boolean(options?.force);
-  const maxAgeMs = Math.max(
-    0,
-    parseNumberSafe(options?.maxAgeMs, RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS) || RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS
-  );
-
-  if (supabaseStateHydrationPromise) {
-    try {
-      await supabaseStateHydrationPromise;
-    } catch {
-      // Hydrate fouten worden al elders gelogd; hier alleen door.
-    }
-  }
-
-  if (!force && !supabaseStateHydrated) {
-    return forceHydrateRuntimeStateWithRetries(3);
-  }
-
-  const nowMs = Date.now();
-  if (
-    !force &&
-    runtimeStateLastSupabaseSyncCheckMs > 0 &&
-    nowMs - runtimeStateLastSupabaseSyncCheckMs < maxAgeMs
-  ) {
-    return false;
-  }
-
-  await waitForQueuedRuntimeStatePersist();
-  runtimeStateLastSupabaseSyncCheckMs = Date.now();
-
-  const snapshot = await fetchSupabaseStateRowViaRest('payload,updated_at');
-  if (!snapshot.ok) {
-    if (snapshot.error) {
-      supabaseLastHydrateError = truncateText(snapshot.error, 500);
-    }
-    return false;
-  }
-
-  const row = Array.isArray(snapshot.body) ? snapshot.body[0] || null : snapshot.body;
-  if (!row || !row.payload || typeof row.payload !== 'object') {
-    supabaseStateHydrated = true;
-    supabaseLastHydrateError = '';
-    return false;
-  }
-
-  const remoteVersionMs = resolveRuntimeStateVersionMs(row.updated_at || '', row.payload);
-  const shouldApply =
-    force ||
-    !supabaseStateHydrated ||
-    (Number.isFinite(remoteVersionMs) &&
-      remoteVersionMs > runtimeStateObservedAtMs + RUNTIME_STATE_REMOTE_NEWER_THRESHOLD_MS);
-
-  supabaseStateHydrated = true;
-  supabaseLastHydrateError = '';
-
-  if (!shouldApply) {
-    await syncCallUpdatesFromSupabaseRows({ force, maxAgeMs });
-    return false;
-  }
-
-  const applied = applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
-  await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
-  return applied;
-}
-
-function createSecurityAuditEvent(input) {
-  const nowIso = new Date().toISOString();
-  const entryId = `sec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return {
-    id: normalizeString(input?.id || entryId),
-    type: truncateText(normalizeString(input?.type || 'security_event'), 120) || 'security_event',
-    severity: truncateText(normalizeString(input?.severity || 'info'), 20) || 'info',
-    success: Boolean(input?.success),
-    email: truncateText(normalizePremiumSessionEmail(input?.email || ''), 180),
-    ip: truncateText(normalizeIpAddress(input?.ip || ''), 80),
-    path: truncateText(normalizeString(input?.path || ''), 200),
-    origin: truncateText(normalizeOrigin(input?.origin || ''), 200),
-    detail: truncateText(normalizeString(input?.detail || input?.message || ''), 500),
-    userAgent: truncateText(normalizeString(input?.userAgent || ''), 280),
-    createdAt: normalizeString(input?.createdAt || nowIso) || nowIso,
-  };
-}
-
-function appendSecurityAuditEvent(input, reason = 'security_audit') {
-  const entry = createSecurityAuditEvent(input);
-  recentSecurityAuditEvents.unshift(entry);
-  if (recentSecurityAuditEvents.length > 500) {
-    recentSecurityAuditEvents.length = 500;
-  }
-  queueRuntimeStatePersist(reason);
-  return entry;
-}
-
-function createDashboardActivityEntry(input) {
-  const nowIso = new Date().toISOString();
-  const entryId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return {
-    id: normalizeString(input?.id || entryId),
-    type: normalizeString(input?.type || input?.action || 'dashboard_action'),
-    title: truncateText(normalizeString(input?.title || ''), 200) || 'Dashboard actie',
-    detail: truncateText(normalizeString(input?.detail || input?.description || ''), 500),
-    company: truncateText(normalizeString(input?.company || ''), 120),
-    source: truncateText(normalizeString(input?.source || 'premium-personeel-dashboard'), 80),
-    actor: truncateText(normalizeString(input?.actor || ''), 120),
-    taskId: Number.isFinite(Number(input?.taskId)) ? Number(input.taskId) : null,
-    callId: truncateText(normalizeString(input?.callId || ''), 120),
-    createdAt: normalizeString(input?.createdAt || nowIso) || nowIso,
-  };
-}
-
-function appendDashboardActivity(input, reason = 'dashboard_activity') {
-  const entry = createDashboardActivityEntry(input);
-  recentDashboardActivities.unshift(entry);
-  if (recentDashboardActivities.length > 500) {
-    recentDashboardActivities.length = 500;
-  }
-  queueRuntimeStatePersist(reason);
-  return entry;
-}
-
-function normalizeUiStateScope(scope) {
-  const value = normalizeString(scope || '').toLowerCase();
-  if (!/^[a-z0-9:_-]{1,80}$/.test(value)) return '';
-  return value;
-}
-
-function getUiStateRowKey(scope) {
-  const normalizedScope = normalizeUiStateScope(scope);
-  return normalizedScope ? `${UI_STATE_SCOPE_PREFIX}${normalizedScope}` : '';
-}
-
-function sanitizeUiStateValues(values) {
-  if (!values || typeof values !== 'object' || Array.isArray(values)) return {};
-  const out = {};
-  for (const [rawKey, rawValue] of Object.entries(values)) {
-    const key = normalizeString(rawKey);
-    if (!key || key.length > 120) continue;
-    if (rawValue === undefined) continue;
-    if (rawValue === null) {
-      out[key] = '';
-      continue;
-    }
-    out[key] = truncateText(String(rawValue), 200000);
-  }
-  return out;
-}
-
-async function getUiStateValues(scope) {
-  const normalizedScope = normalizeUiStateScope(scope);
-  if (!normalizedScope) return null;
-
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
-  try {
-    const rowKey = getUiStateRowKey(normalizedScope);
-    const client = getSupabaseClient();
-    let row = null;
-
-    if (client) {
-      const { data, error } = await client
-        .from(SUPABASE_STATE_TABLE)
-        .select('payload, updated_at')
-        .eq('state_key', rowKey)
-        .maybeSingle();
-
-      if (!error) {
-        row = data || null;
-      } else {
-        const fallback = await fetchSupabaseRowByKeyViaRest(rowKey, 'payload,updated_at');
-        if (!fallback.ok) {
-          console.error('[UI State][Supabase][GetError]', error.message || error);
-          return null;
-        }
-        row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
-      }
-    } else {
-      const fallback = await fetchSupabaseRowByKeyViaRest(rowKey, 'payload,updated_at');
-      if (!fallback.ok) {
-        console.error('[UI State][Supabase][GetError]', 'Supabase client ontbreekt en REST fallback faalde.');
-        return null;
-      }
-      row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
-    }
-
-    const values = sanitizeUiStateValues(row?.payload?.values || {});
-    inMemoryUiStateByScope.set(normalizedScope, values);
-    return {
-      values: { ...values },
-      updatedAt: normalizeString(row?.updated_at || '') || null,
-      source: 'supabase',
-    };
-  } catch (error) {
-    console.error('[UI State][Supabase][GetCrash]', error?.message || error);
-    return null;
-  }
-}
-
-async function setUiStateValues(scope, values, meta = {}) {
-  const normalizedScope = normalizeUiStateScope(scope);
-  if (!normalizedScope) return null;
-
-  const sanitizedValues = sanitizeUiStateValues(values);
-  const updatedAt = new Date().toISOString();
-
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-
-  try {
-    const client = getSupabaseClient();
-    const rowKey = getUiStateRowKey(normalizedScope);
-    const row = {
-      state_key: rowKey,
-      payload: {
-        scope: normalizedScope,
-        values: sanitizedValues,
-      },
-      meta: {
-        type: 'ui_state',
-        scope: normalizedScope,
-        source: normalizeString(meta.source || 'frontend'),
-        actor: normalizeString(meta.actor || ''),
-      },
-      updated_at: updatedAt,
-    };
-
-    let upsertError = null;
-    if (client) {
-      const { error } = await client.from(SUPABASE_STATE_TABLE).upsert(row, {
-        onConflict: 'state_key',
-      });
-      upsertError = error || null;
-    } else {
-      upsertError = new Error('Supabase client ontbreekt.');
-    }
-
-    if (upsertError) {
-      const fallback = await upsertSupabaseRowViaRest(row);
-      if (!fallback.ok) {
-        console.error('[UI State][Supabase][SetError]', upsertError.message || upsertError);
-        return null;
-      }
-    }
-
-    inMemoryUiStateByScope.set(normalizedScope, sanitizedValues);
-    return { values: { ...sanitizedValues }, source: 'supabase', updatedAt };
-  } catch (error) {
-    console.error('[UI State][Supabase][SetCrash]', error?.message || error);
-    return null;
-  }
-}
-
-function getDefaultSeoConfig() {
-  return {
-    version: 2,
-    pages: {},
-    images: {},
-    automation: getDefaultSeoAutomationSettings(),
-  };
-}
-
-function normalizeSeoModelPreset(valueRaw) {
-  const raw = normalizeString(valueRaw || '')
-    .toLowerCase()
-    .replace(/[\s_]+/g, '-');
-  if (!raw) return 'gpt-5.1';
-  if (raw === 'gpt-5.1' || raw === 'gpt51' || raw === 'gpt-5') return 'gpt-5.1';
-  if (
-    raw === 'claude-opus-4.6' ||
-    raw === 'opus-4.6' ||
-    raw === 'opus46' ||
-    raw === 'claude-opus-46' ||
-    raw === 'claude-opus'
-  ) {
-    return 'claude-opus-4.6';
-  }
-  if (raw === 'gpt-5-mini' || raw === 'gpt5mini') return 'gpt-5-mini';
-  return SEO_MODEL_PRESETS.some((item) => item.value === raw) ? raw : 'gpt-5.1';
-}
-
-function normalizeSeoBlogCadence(valueRaw) {
-  const raw = normalizeString(valueRaw || '')
-    .toLowerCase()
-    .replace(/[\s_]+/g, '_');
-  if (!raw) return 'weekly';
-  if (raw === 'daily' || raw === 'dagelijks' || raw === 'elke_dag') return 'daily';
-  if (raw === 'weekdays' || raw === 'werkdagen') return 'weekdays';
-  if (raw === 'three_per_week' || raw === 'drie_per_week' || raw === '3x_per_week') return 'three_per_week';
-  if (raw === 'weekly' || raw === 'wekelijks') return 'weekly';
-  if (raw === 'manual' || raw === 'handmatig') return 'manual';
-  return 'weekly';
-}
-
-function getDefaultSeoAutomationSettings() {
-  return {
-    preferredModel: 'gpt-5.1',
-    blogAutomationEnabled: false,
-    blogCadence: 'weekly',
-    blogModel: 'gpt-5.1',
-    blogAutoImages: true,
-    searchConsoleConnected: false,
-    analyticsConnected: false,
-    updatedAt: '',
-  };
-}
-
-function normalizeSeoAutomationSettings(raw) {
-  const defaults = getDefaultSeoAutomationSettings();
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return defaults;
-  return {
-    preferredModel: normalizeSeoModelPreset(raw.preferredModel || raw.model || defaults.preferredModel),
-    blogAutomationEnabled: toBooleanSafe(raw.blogAutomationEnabled ?? raw.blogEnabled, defaults.blogAutomationEnabled),
-    blogCadence: normalizeSeoBlogCadence(raw.blogCadence || raw.blogFrequency || defaults.blogCadence),
-    blogModel: normalizeSeoModelPreset(raw.blogModel || raw.blog_model || defaults.blogModel),
-    blogAutoImages: toBooleanSafe(raw.blogAutoImages ?? raw.blogImages, defaults.blogAutoImages),
-    searchConsoleConnected: toBooleanSafe(raw.searchConsoleConnected, defaults.searchConsoleConnected),
-    analyticsConnected: toBooleanSafe(raw.analyticsConnected, defaults.analyticsConnected),
-    updatedAt: normalizeString(raw.updatedAt || ''),
-  };
-}
-
-function sanitizeKnownHtmlFileName(fileNameRaw) {
-  const fileName = normalizeString(fileNameRaw);
-  if (!fileName || !/^[a-zA-Z0-9._-]+\.html$/.test(fileName)) return '';
-  if (!knownHtmlPageFiles.has(fileName)) return '';
-  return fileName;
-}
-
-function normalizeSeoFieldValue(value, maxLength = 1000) {
-  return truncateText(normalizeString(value), maxLength);
-}
-
-function normalizeSeoPageOverridePatch(raw) {
-  const patch = {};
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return patch;
-
-  for (const field of SEO_PAGE_FIELD_DEFS) {
-    if (!Object.prototype.hasOwnProperty.call(raw, field.key)) continue;
-    patch[field.key] = normalizeSeoFieldValue(raw[field.key], field.maxLength);
-  }
-  return patch;
-}
-
-function normalizeSeoImageOverridePatch(raw) {
-  const patch = {};
-  if (!raw) return patch;
-
-  if (Array.isArray(raw)) {
-    for (const entry of raw) {
-      if (!entry || typeof entry !== 'object') continue;
-      const src = truncateText(normalizeString(entry.src), 1800);
-      if (!src) continue;
-      patch[src] = truncateText(normalizeString(entry.alt), 1200);
-    }
-    return patch;
-  }
-
-  if (typeof raw !== 'object') return patch;
-
-  for (const [srcRaw, altRaw] of Object.entries(raw)) {
-    const src = truncateText(normalizeString(srcRaw), 1800);
-    if (!src) continue;
-    patch[src] = truncateText(normalizeString(altRaw), 1200);
-  }
-  return patch;
-}
-
-function normalizeSeoStoredPageOverrides(raw) {
-  const patch = normalizeSeoPageOverridePatch(raw);
-  const stored = {};
-  for (const [key, value] of Object.entries(patch)) {
-    if (!value) continue;
-    stored[key] = value;
-  }
-  return stored;
-}
-
-function normalizeSeoStoredImageOverrides(raw) {
-  const patch = normalizeSeoImageOverridePatch(raw);
-  const stored = {};
-  for (const [src, alt] of Object.entries(patch)) {
-    if (!alt) continue;
-    stored[src] = alt;
-  }
-  return stored;
-}
-
-function normalizeSeoConfig(raw) {
-  const base = getDefaultSeoConfig();
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base;
-  base.version = Math.max(2, parseIntSafe(raw.version, 2));
-  base.automation = normalizeSeoAutomationSettings(raw.automation);
-
-  const pagesRaw = raw.pages && typeof raw.pages === 'object' ? raw.pages : {};
-  for (const [fileNameRaw, pageOverridesRaw] of Object.entries(pagesRaw)) {
-    const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
-    if (!fileName) continue;
-    const pageOverrides = normalizeSeoStoredPageOverrides(pageOverridesRaw);
-    if (Object.keys(pageOverrides).length === 0) continue;
-    base.pages[fileName] = pageOverrides;
-  }
-
-  const imagesRaw = raw.images && typeof raw.images === 'object' ? raw.images : {};
-  for (const [fileNameRaw, imageOverridesRaw] of Object.entries(imagesRaw)) {
-    const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
-    if (!fileName) continue;
-    const imageOverrides = normalizeSeoStoredImageOverrides(imageOverridesRaw);
-    if (Object.keys(imageOverrides).length === 0) continue;
-    base.images[fileName] = imageOverrides;
-  }
-
-  return base;
-}
+const uiStateStore = createUiStateStore({
+  uiStateScopePrefix: UI_STATE_SCOPE_PREFIX,
+  inMemoryUiStateByScope,
+  isSupabaseConfigured,
+  getSupabaseClient,
+  supabaseStateTable: SUPABASE_STATE_TABLE,
+  fetchSupabaseRowByKeyViaRest,
+  upsertSupabaseRowViaRest,
+  normalizeString,
+  truncateText,
+  logger: console,
+});
+
+const { getUiStateValues, normalizeUiStateScope, sanitizeUiStateValues, setUiStateValues } =
+  uiStateStore;
+
+const seoCore = createSeoCore({
+  knownHtmlPageFiles,
+  normalizeAbsoluteHttpUrl,
+  normalizeString,
+  normalizeWebsitePreviewTargetUrl,
+  parseIntSafe,
+  seoDefaultSiteOrigin: SEO_DEFAULT_SITE_ORIGIN,
+  seoMaxImagesPerPage: SEO_MAX_IMAGES_PER_PAGE,
+  seoModelPresets: SEO_MODEL_PRESETS,
+  seoPageFieldDefs: SEO_PAGE_FIELD_DEFS,
+  toBooleanSafe,
+  truncateText,
+});
+
+const {
+  applySeoAuditSuggestionsToConfig,
+  applySeoOverridesToHtml,
+  buildSeoPageAuditEntry,
+  extractImageEntriesFromHtml,
+  extractSeoSourceFromHtml,
+  extractWebsitePreviewScanFromHtml,
+  getDefaultSeoConfig,
+  getSeoEditableHtmlFiles,
+  getSeoModelPresetOptions,
+  mergeSeoSourceWithOverrides,
+  normalizeSeoAutomationSettings,
+  normalizeSeoConfig,
+  normalizeSeoImageOverridePatch,
+  normalizeSeoModelPreset,
+  normalizeSeoPageOverridePatch,
+  normalizeSeoStoredImageOverrides,
+  normalizeSeoStoredPageOverrides,
+  sanitizeKnownHtmlFileName,
+} = seoCore;
+
+const aiHelpers = createAiHelpers({
+  anthropicModel: ANTHROPIC_MODEL,
+  env: process.env,
+  normalizeString,
+  openAiModel: OPENAI_MODEL,
+  truncateText,
+});
+
+const {
+  estimateAnthropicTextCost,
+  estimateAnthropicUsageCost,
+  estimateOpenAiTextCost,
+  estimateOpenAiUsageCost,
+  extractAnthropicTextContent,
+  extractOpenAiTextContent,
+  extractRetellTranscriptText,
+  extractTranscriptFull,
+  extractTranscriptSnippet,
+  extractTranscriptText,
+  parseJsonLoose,
+} = aiHelpers;
 
 async function readSeoConfigFromUiState() {
   const state = await getUiStateValues(SEO_UI_STATE_SCOPE);
@@ -3335,1109 +1520,192 @@ async function persistSeoConfig(config, meta = {}) {
   return normalizedConfig;
 }
 
-function getSeoEditableHtmlFiles() {
-  return Array.from(knownHtmlPageFiles)
-    .filter((fileName) => fileName !== 'premium-seo.html')
-    .sort((a, b) => a.localeCompare(b));
-}
-
-function decodeBasicHtmlEntities(valueRaw) {
-  const value = String(valueRaw || '');
-  return value
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-function stripHtmlTags(valueRaw) {
-  return String(valueRaw || '').replace(/<[^>]*>/g, ' ');
-}
-
-function parseHtmlTagAttributes(tagRaw) {
-  const tag = String(tagRaw || '');
-  const attrs = {};
-  const pattern = /([^\s=/>]+)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/g;
-  let match;
-  while ((match = pattern.exec(tag))) {
-    const key = normalizeString(match[1]).toLowerCase();
-    const value = decodeBasicHtmlEntities(match[3] || match[4] || match[5] || '');
-    if (!key) continue;
-    attrs[key] = value;
-  }
-  return attrs;
-}
-
-function extractTitleFromHtml(htmlRaw) {
-  const html = String(htmlRaw || '');
-  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  if (!match) return '';
-  return truncateText(normalizeString(decodeBasicHtmlEntities(stripHtmlTags(match[1]))), 300);
-}
-
-function extractMetaContentFromHtml(htmlRaw, selectorAttr, selectorValue) {
-  const html = String(htmlRaw || '');
-  const tagPattern = /<meta\b[^>]*>/gi;
-  const attrName = normalizeString(selectorAttr).toLowerCase();
-  const attrValue = normalizeString(selectorValue).toLowerCase();
-  let match;
-  while ((match = tagPattern.exec(html))) {
-    const attrs = parseHtmlTagAttributes(match[0]);
-    const selectedValue = normalizeString(attrs[attrName]).toLowerCase();
-    if (selectedValue !== attrValue) continue;
-    return truncateText(normalizeString(attrs.content || ''), 1200);
-  }
-  return '';
-}
-
-function extractCanonicalHrefFromHtml(htmlRaw) {
-  const html = String(htmlRaw || '');
-  const tagPattern = /<link\b[^>]*>/gi;
-  let match;
-  while ((match = tagPattern.exec(html))) {
-    const attrs = parseHtmlTagAttributes(match[0]);
-    const rel = normalizeString(attrs.rel || '').toLowerCase();
-    if (!rel.split(/\s+/).includes('canonical')) continue;
-    return truncateText(normalizeString(attrs.href || ''), 1200);
-  }
-  return '';
-}
-
-function extractFirstH1FromHtml(htmlRaw) {
-  const html = String(htmlRaw || '');
-  const match = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
-  if (!match) return '';
-  return truncateText(normalizeString(decodeBasicHtmlEntities(stripHtmlTags(match[1]))), 300);
-}
-
-function extractImageEntriesFromHtml(htmlRaw) {
-  const html = String(htmlRaw || '');
-  const out = [];
-  const seen = new Set();
-  const pattern = /<img\b[^>]*>/gi;
-  let match;
-  while ((match = pattern.exec(html))) {
-    if (out.length >= SEO_MAX_IMAGES_PER_PAGE) break;
-    const attrs = parseHtmlTagAttributes(match[0]);
-    const src = truncateText(normalizeString(attrs.src || attrs['data-src'] || ''), 1800);
-    if (!src || seen.has(src)) continue;
-    seen.add(src);
-    out.push({
-      src,
-      alt: truncateText(normalizeString(attrs.alt || ''), 1200),
-    });
-  }
-  return out;
-}
-
-function extractSeoSourceFromHtml(htmlRaw) {
-  const html = String(htmlRaw || '');
-  return {
-    title: extractTitleFromHtml(html),
-    metaDescription: extractMetaContentFromHtml(html, 'name', 'description'),
-    metaKeywords: extractMetaContentFromHtml(html, 'name', 'keywords'),
-    canonical: extractCanonicalHrefFromHtml(html),
-    robots: extractMetaContentFromHtml(html, 'name', 'robots'),
-    ogTitle: extractMetaContentFromHtml(html, 'property', 'og:title'),
-    ogDescription: extractMetaContentFromHtml(html, 'property', 'og:description'),
-    ogImage: extractMetaContentFromHtml(html, 'property', 'og:image'),
-    twitterTitle: extractMetaContentFromHtml(html, 'name', 'twitter:title'),
-    twitterDescription: extractMetaContentFromHtml(html, 'name', 'twitter:description'),
-    twitterImage: extractMetaContentFromHtml(html, 'name', 'twitter:image'),
-    h1: extractFirstH1FromHtml(html),
-  };
-}
-
-function extractRepeatedTagTextEntriesFromHtml(htmlRaw, tagPattern, options = {}) {
-  const html = String(htmlRaw || '');
-  const maxItems = Math.max(1, Math.min(12, Number(options.maxItems) || 6));
-  const maxLength = Math.max(40, Math.min(600, Number(options.maxLength) || 220));
-  const regex = tagPattern instanceof RegExp ? new RegExp(tagPattern.source, 'gi') : null;
-  if (!regex) return [];
-  const out = [];
-  const seen = new Set();
-  let match;
-  while ((match = regex.exec(html))) {
-    const value = truncateText(
-      normalizeString(decodeBasicHtmlEntities(stripHtmlTags(match[1] || '')).replace(/\s+/g, ' ')),
-      maxLength
-    );
-    const dedupeKey = value.toLowerCase();
-    if (!value || seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-    out.push(value);
-    if (out.length >= maxItems) break;
-  }
-  return out;
-}
-
-function extractVisibleTextSampleFromHtml(htmlRaw, maxLength = 2800) {
-  const html = String(htmlRaw || '')
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
-    .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, ' ');
-  return truncateText(
-    normalizeString(decodeBasicHtmlEntities(stripHtmlTags(html)).replace(/\s+/g, ' ')),
-    maxLength
-  );
-}
-
-function extractWebsitePreviewScanFromHtml(htmlRaw, pageUrlRaw) {
-  const html = String(htmlRaw || '');
-  const normalizedUrl = normalizeWebsitePreviewTargetUrl(pageUrlRaw);
-  const parsedUrl = normalizedUrl ? new URL(normalizedUrl) : null;
-  const source = extractSeoSourceFromHtml(html);
-  const headings = extractRepeatedTagTextEntriesFromHtml(html, /<h[2-3]\b[^>]*>([\s\S]*?)<\/h[2-3]>/gi, {
-    maxItems: 8,
-    maxLength: 220,
-  });
-  const paragraphs = extractRepeatedTagTextEntriesFromHtml(html, /<p\b[^>]*>([\s\S]*?)<\/p>/gi, {
-    maxItems: 8,
-    maxLength: 280,
-  });
-  const images = extractImageEntriesFromHtml(html).slice(0, 8);
-  const visualCues = Array.from(
-    new Set(
-      images
-        .map((entry) => {
-          const alt = normalizeString(entry?.alt || '');
-          if (alt) return alt;
-          const src = normalizeString(entry?.src || '');
-          if (!src) return '';
-          return src
-            .split(/[/?#]/)
-            .filter(Boolean)
-            .pop()
-            .replace(/\.[a-z0-9]+$/i, '')
-            .replace(/[-_]+/g, ' ');
-        })
-        .map((value) => truncateText(normalizeString(value), 120))
-        .filter(Boolean)
-    )
-  ).slice(0, 6);
-  const bodyTextSample = extractVisibleTextSampleFromHtml(html, 3200);
-
-  return {
-    url: normalizedUrl,
-    host: parsedUrl ? parsedUrl.host : '',
-    title: source.title || source.ogTitle || '',
-    metaDescription: source.metaDescription || source.ogDescription || '',
-    h1: source.h1 || '',
-    headings,
-    paragraphs,
-    visualCues,
-    imageCount: images.length,
-    bodyTextSample,
-  };
-}
-
-function mergeSeoSourceWithOverrides(sourceRaw, overridesRaw) {
-  const source = normalizeSeoPageOverridePatch(sourceRaw);
-  const overrides = normalizeSeoStoredPageOverrides(overridesRaw);
-  const merged = {};
-  for (const field of SEO_PAGE_FIELD_DEFS) {
-    merged[field.key] = overrides[field.key] || source[field.key] || '';
-  }
-  return merged;
-}
-
-function getSeoModelPresetOptions() {
-  return SEO_MODEL_PRESETS.map((item) => ({ ...item }));
-}
-
-function getSeoPathFromFileName(fileNameRaw) {
-  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
-  if (!fileName) return '/';
-  const slug = fileName.replace(/\.html$/i, '');
-  return slug === 'index' ? '/' : `/${slug}`;
-}
-
-function stripSeoBrandTokens(valueRaw) {
-  return normalizeString(valueRaw || '')
-    .replace(/\bsoftora(?:\.nl)?\b/gi, ' ')
-    .replace(/[|·]+/g, ' ')
-    .replace(/\s+[—-]\s+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function humanizeSeoToken(tokenRaw) {
-  const token = normalizeString(tokenRaw || '').toLowerCase();
-  if (!token) return '';
-  if (token === 'ai') return 'AI';
-  if (token === 'seo') return 'SEO';
-  if (token === 'crm') return 'CRM';
-  if (token === 'pdfs' || token === 'pdf') return "PDF's";
-  if (token === 'ga') return 'GA';
-  return token.charAt(0).toUpperCase() + token.slice(1);
-}
-
-function humanizeSeoPathSegment(segmentRaw) {
-  return normalizeString(segmentRaw || '')
-    .split(/[-_/]+/)
-    .map(humanizeSeoToken)
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-}
-
-function buildSeoTopicLabel(fileName, effectiveSeoRaw = {}) {
-  const effectiveSeo = effectiveSeoRaw && typeof effectiveSeoRaw === 'object' ? effectiveSeoRaw : {};
-  const candidates = [
-    stripSeoBrandTokens(effectiveSeo.h1 || ''),
-    stripSeoBrandTokens(effectiveSeo.title || ''),
-    humanizeSeoPathSegment(getSeoPathFromFileName(fileName).replace(/^\//, '')),
-  ].filter(Boolean);
-
-  for (const candidate of candidates) {
-    const cleaned = normalizeString(candidate).replace(/\s+/g, ' ').trim();
-    if (cleaned && cleaned.length >= 3) return cleaned;
-  }
-
-  return 'Softora website';
-}
-
-function buildSeoPathKeywords(pathNameRaw, topicRaw) {
-  const pathName = normalizeString(pathNameRaw || '');
-  const topic = normalizeString(topicRaw || '');
-  const source = `${pathName.replace(/[\/_-]+/g, ' ')} ${topic}`;
-  const parts = source
-    .toLowerCase()
-    .split(/\s+/)
-    .map((item) => item.replace(/[^a-z0-9à-ÿ]/gi, ''))
-    .filter(Boolean)
-    .filter((item) => item.length >= 3);
-  const unique = [];
-  const seen = new Set();
-  parts.forEach((part) => {
-    if (seen.has(part)) return;
-    seen.add(part);
-    unique.push(part);
-  });
-  return unique.slice(0, 6);
-}
-
-function buildSeoSuggestedTitle(fileName, effectiveSeoRaw = {}) {
-  const pathName = getSeoPathFromFileName(fileName);
-  if (pathName === '/') return 'Softora | Websites, Bedrijfssoftware & Voicesoftware';
-  const topic = buildSeoTopicLabel(fileName, effectiveSeoRaw);
-  const withBrand = `${topic} | Softora`;
-  return truncateText(withBrand, 60);
-}
-
-function buildSeoSuggestedMetaDescription(fileName, effectiveSeoRaw = {}) {
-  const pathName = getSeoPathFromFileName(fileName);
-  const topic = buildSeoTopicLabel(fileName, effectiveSeoRaw);
-  const keywordBits = buildSeoPathKeywords(pathName, topic);
-  const keywordTail = keywordBits.length ? ` met focus op ${keywordBits.slice(0, 3).join(', ')}` : '';
-
-  if (pathName === '/') {
-    return truncateText(
-      'Softora bouwt websites, bedrijfssoftware en voicesoftware die direct bijdragen aan groei, conversie en slimmere processen.',
-      160
-    );
-  }
-
-  return truncateText(
-    `${topic} van Softora. Ontdek wat deze pagina oplevert, hoe de oplossing werkt en waarom dit relevant is voor jouw bedrijf${keywordTail}.`,
-    160
-  );
-}
-
-function buildSeoSuggestedMetaKeywords(fileName, effectiveSeoRaw = {}) {
-  const pathName = getSeoPathFromFileName(fileName);
-  const topic = buildSeoTopicLabel(fileName, effectiveSeoRaw);
-  const keywords = ['softora'];
-  const topicWords = topic
-    .toLowerCase()
-    .split(/\s+/)
-    .map((item) => item.replace(/[^a-z0-9à-ÿ]/gi, ''))
-    .filter((item) => item.length >= 3);
-  keywords.push(...topicWords);
-  keywords.push(...buildSeoPathKeywords(pathName, topic));
-  return Array.from(new Set(keywords)).slice(0, 8).join(', ');
-}
-
-function buildSeoSuggestedCanonical(fileName) {
-  const pathName = getSeoPathFromFileName(fileName);
-  return pathName === '/' ? SEO_DEFAULT_SITE_ORIGIN : `${SEO_DEFAULT_SITE_ORIGIN}${pathName}`;
-}
-
-function buildSeoSuggestedH1(fileName, effectiveSeoRaw = {}) {
-  return truncateText(buildSeoTopicLabel(fileName, effectiveSeoRaw), 80);
-}
-
-function buildSeoSuggestedAltText(fileName, imageIndex, effectiveSeoRaw = {}) {
-  const topic = buildSeoTopicLabel(fileName, effectiveSeoRaw);
-  return truncateText(`Visual van ${topic} - Softora`, 120);
-}
-
-function isSeoTitleHealthy(valueRaw) {
-  const length = normalizeString(valueRaw || '').length;
-  return length >= 28 && length <= 65;
-}
-
-function isSeoDescriptionHealthy(valueRaw) {
-  const length = normalizeString(valueRaw || '').length;
-  return length >= 110 && length <= 170;
-}
-
-function isSeoCanonicalHealthy(valueRaw, fileName) {
-  const value = normalizeAbsoluteHttpUrl(valueRaw || '');
-  if (!value) return false;
-  return value === buildSeoSuggestedCanonical(fileName);
-}
-
-function isSeoRobotsHealthy(valueRaw) {
-  const value = normalizeString(valueRaw || '').toLowerCase();
-  if (!value) return true;
-  return /index/.test(value) && /follow/.test(value);
-}
-
-function buildSeoPageAuditEntry(fileName, sourceSeo, pageOverrides, effectiveSeo, images) {
-  const normalizedImages = Array.isArray(images) ? images : [];
-  const imageAltMissing = normalizedImages.filter((image) => !normalizeString(image?.effectiveAlt || image?.alt || '')).length;
-  const totalImages = normalizedImages.length;
-  const altCoverage = totalImages === 0 ? 100 : Math.round(((totalImages - imageAltMissing) / totalImages) * 100);
-
-  const titleHealthy = isSeoTitleHealthy(effectiveSeo?.title || '');
-  const descriptionHealthy = isSeoDescriptionHealthy(effectiveSeo?.metaDescription || '');
-  const h1Healthy = normalizeString(effectiveSeo?.h1 || '').length >= 4;
-  const canonicalHealthy = isSeoCanonicalHealthy(effectiveSeo?.canonical || '', fileName);
-  const robotsHealthy = isSeoRobotsHealthy(effectiveSeo?.robots || '');
-  const ogTitleHealthy = normalizeString(effectiveSeo?.ogTitle || '').length >= 4;
-  const ogDescriptionHealthy = normalizeString(effectiveSeo?.ogDescription || '').length >= 30;
-  const twitterTitleHealthy = normalizeString(effectiveSeo?.twitterTitle || '').length >= 4;
-  const twitterDescriptionHealthy = normalizeString(effectiveSeo?.twitterDescription || '').length >= 30;
-
-  const score =
-    (titleHealthy ? 18 : 0) +
-    (descriptionHealthy ? 18 : 0) +
-    (h1Healthy ? 12 : 0) +
-    (canonicalHealthy ? 12 : 0) +
-    (robotsHealthy ? 8 : 0) +
-    (ogTitleHealthy ? 8 : 0) +
-    (ogDescriptionHealthy ? 8 : 0) +
-    (twitterTitleHealthy ? 5 : 0) +
-    (twitterDescriptionHealthy ? 5 : 0) +
-    Math.round((Math.max(0, Math.min(100, altCoverage)) / 100) * 6);
-
-  const strengths = [];
-  const improvements = [];
-
-  if (titleHealthy) strengths.push('Meta title staat op goede lengte.');
-  else improvements.push('Meta title kan scherper of compacter.');
-  if (descriptionHealthy) strengths.push('Meta description is bruikbaar voor zoekresultaten.');
-  else improvements.push('Meta description mist of kan duidelijker.');
-  if (canonicalHealthy) strengths.push('Canonical URL staat goed.');
-  else improvements.push('Canonical URL ontbreekt of wijst nog niet strak naar deze pagina.');
-  if (altCoverage >= 90) strengths.push('Afbeeldingen zijn grotendeels voorzien van alt-tekst.');
-  else if (totalImages > 0) improvements.push('Niet alle afbeeldingen hebben een goede alt-tekst.');
-  if (ogTitleHealthy && ogDescriptionHealthy) strengths.push('Social sharing basis is aanwezig.');
-  else improvements.push('Open Graph velden kunnen vollediger.');
-  if (twitterTitleHealthy && twitterDescriptionHealthy) strengths.push('Twitter/X velden zijn ingevuld.');
-  else improvements.push('Twitter/X velden kunnen vollediger.');
-
-  const suggestedPageOverrides = {};
-  if (!titleHealthy) suggestedPageOverrides.title = buildSeoSuggestedTitle(fileName, effectiveSeo);
-  if (!descriptionHealthy) suggestedPageOverrides.metaDescription = buildSeoSuggestedMetaDescription(fileName, effectiveSeo);
-  if (!normalizeString(effectiveSeo?.metaKeywords || '')) {
-    suggestedPageOverrides.metaKeywords = buildSeoSuggestedMetaKeywords(fileName, effectiveSeo);
-  }
-  if (!canonicalHealthy) suggestedPageOverrides.canonical = buildSeoSuggestedCanonical(fileName);
-  if (!robotsHealthy) suggestedPageOverrides.robots = 'index, follow';
-  if (!ogTitleHealthy) suggestedPageOverrides.ogTitle = suggestedPageOverrides.title || normalizeString(effectiveSeo?.title || '') || buildSeoSuggestedTitle(fileName, effectiveSeo);
-  if (!ogDescriptionHealthy) {
-    suggestedPageOverrides.ogDescription =
-      suggestedPageOverrides.metaDescription ||
-      normalizeString(effectiveSeo?.metaDescription || '') ||
-      buildSeoSuggestedMetaDescription(fileName, effectiveSeo);
-  }
-  if (!twitterTitleHealthy) {
-    suggestedPageOverrides.twitterTitle =
-      suggestedPageOverrides.ogTitle ||
-      suggestedPageOverrides.title ||
-      normalizeString(effectiveSeo?.title || '') ||
-      buildSeoSuggestedTitle(fileName, effectiveSeo);
-  }
-  if (!twitterDescriptionHealthy) {
-    suggestedPageOverrides.twitterDescription =
-      suggestedPageOverrides.ogDescription ||
-      suggestedPageOverrides.metaDescription ||
-      normalizeString(effectiveSeo?.metaDescription || '') ||
-      buildSeoSuggestedMetaDescription(fileName, effectiveSeo);
-  }
-  if (!h1Healthy) suggestedPageOverrides.h1 = buildSeoSuggestedH1(fileName, effectiveSeo);
-
-  const suggestedImageOverrides = {};
-  normalizedImages.forEach((image, index) => {
-    const currentAlt = normalizeString(image?.effectiveAlt || image?.alt || '');
-    if (currentAlt) return;
-    const src = truncateText(normalizeString(image?.src || ''), 1800);
-    if (!src) return;
-    suggestedImageOverrides[src] = buildSeoSuggestedAltText(fileName, index + 1, effectiveSeo);
+const { readHtmlPageContent, resolveSeoPageFileFromRequest, sendSeoManagedHtmlPageResponse } =
+  createHtmlPageCoordinator({
+    pagesDir: __dirname,
+    logger: console,
+    sanitizeKnownHtmlFileName,
+    normalizeString,
+    knownPrettyPageSlugToFile,
+    resolvePremiumHtmlPageAccess,
+    getSeoConfigCached,
+    applySeoOverridesToHtml,
   });
 
-  const changeCount = Object.keys(suggestedPageOverrides).length + Object.keys(suggestedImageOverrides).length;
-  const pathName = getSeoPathFromFileName(fileName);
+const seoReadCoordinator = createSeoReadCoordinator({
+  logger: console,
+  getSeoConfigCached,
+  normalizeSeoConfig,
+  getSeoEditableHtmlFiles,
+  readHtmlPageContent,
+  extractSeoSourceFromHtml,
+  normalizeSeoStoredPageOverrides,
+  normalizeSeoStoredImageOverrides,
+  mergeSeoSourceWithOverrides,
+  extractImageEntriesFromHtml,
+  normalizeString,
+  resolveSeoPageFileFromRequest,
+  buildSeoPageAuditEntry,
+  getSeoModelPresetOptions,
+  normalizeSeoAutomationSettings,
+});
 
-  return {
-    file: fileName,
-    path: pathName,
-    title: normalizeString(effectiveSeo?.title || sourceSeo?.title || pathName || fileName),
-    topic: buildSeoTopicLabel(fileName, effectiveSeo),
-    score: Math.max(0, Math.min(100, score)),
-    strengths: strengths.slice(0, 3),
-    improvements: improvements.slice(0, 4),
-    imageCount: totalImages,
-    missingAltCount: imageAltMissing,
-    pageOverrideCount: Object.keys(pageOverrides || {}).length,
-    imageOverrideCount: Object.keys(suggestedImageOverrides || {}).length,
-    current: effectiveSeo,
-    suggestedPageOverrides,
-    suggestedImageOverrides,
-    changeCount,
-    health: {
-      titleHealthy,
-      descriptionHealthy,
-      h1Healthy,
-      canonicalHealthy,
-      robotsHealthy,
-      ogTitleHealthy,
-      ogDescriptionHealthy,
-      twitterTitleHealthy,
-      twitterDescriptionHealthy,
-      altCoverage,
+const seoWriteCoordinator = createSeoWriteCoordinator({
+  logger: console,
+  resolveSeoPageFileFromRequest,
+  normalizeSeoPageOverridePatch,
+  normalizeSeoImageOverridePatch,
+  getSeoConfigCached,
+  normalizeSeoConfig,
+  seoPageFieldDefs: SEO_PAGE_FIELD_DEFS,
+  normalizeString,
+  persistSeoConfig,
+  appendDashboardActivity,
+  normalizeSeoModelPreset,
+  applySeoAuditSuggestionsToConfig,
+  seoReadCoordinator,
+  normalizeSeoAutomationSettings,
+  getSeoModelPresetOptions,
+});
+
+const runtimeOpsCoordinator = createRuntimeOpsCoordinator({
+  parseIntSafe,
+  recentDashboardActivities,
+  recentSecurityAuditEvents,
+  normalizeString,
+  appendDashboardActivity,
+  normalizeUiStateScope,
+  getUiStateValues,
+  sanitizeUiStateValues,
+  setUiStateValues,
+});
+
+const runtimeDebugOpsCoordinator = createRuntimeDebugOpsCoordinator({
+  isSupabaseConfigured,
+  supabaseUrl: SUPABASE_URL,
+  supabaseStateTable: SUPABASE_STATE_TABLE,
+  supabaseStateKey: SUPABASE_STATE_KEY,
+  supabaseServiceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+  redactSupabaseUrlForDebug,
+  truncateText,
+  fetchImpl: fetch,
+  getBeforeState: () => ({
+    hydrated: supabaseStateHydrated,
+    lastHydrateError: supabaseLastHydrateError || null,
+    lastPersistError: supabaseLastPersistError || null,
+    lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
+  }),
+  persistRuntimeStateToSupabase,
+  resetHydrationState: () => {
+    supabaseStateHydrated = false;
+    supabaseHydrateRetryNotBeforeMs = 0;
+  },
+  ensureRuntimeStateHydratedFromSupabase,
+  getAfterState: () => ({
+    hydrated: supabaseStateHydrated,
+    lastHydrateError: supabaseLastHydrateError || null,
+    lastPersistError: supabaseLastPersistError || null,
+    lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
+    counts: {
+      webhookEvents: recentWebhookEvents.length,
+      callUpdates: recentCallUpdates.length,
+      aiCallInsights: recentAiCallInsights.length,
+      appointments: generatedAgendaAppointments.length,
     },
-  };
-}
+  }),
+});
 
-async function buildSeoSiteAudit(configRaw = null) {
-  const config = normalizeSeoConfig(configRaw || (await getSeoConfigCached()));
-  const pages = [];
-  const files = getSeoEditableHtmlFiles();
+const { runActiveOrderLaunchPipeline } = createActiveOrderAutomationService({
+  automationEnabled: ACTIVE_ORDER_AUTOMATION_ENABLED,
+  githubToken: ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN,
+  githubOwner: ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER,
+  githubPrivate: ACTIVE_ORDER_AUTOMATION_GITHUB_PRIVATE,
+  githubOwnerIsOrg: ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER_IS_ORG,
+  githubRepoPrefix: ACTIVE_ORDER_AUTOMATION_GITHUB_REPO_PREFIX,
+  githubDefaultBranch: ACTIVE_ORDER_AUTOMATION_GITHUB_DEFAULT_BRANCH,
+  vercelToken: ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN,
+  vercelScope: ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE,
+  stratoCommand: ACTIVE_ORDER_AUTOMATION_STRATO_COMMAND,
+  stratoWebhookUrl: ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_URL,
+  stratoWebhookToken: ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_TOKEN,
+  normalizeString,
+  truncateText,
+  sanitizeLaunchDomainName,
+  slugifyAutomationText,
+  logger: console,
+});
 
-  for (const fileName of files) {
-    const html = await readHtmlPageContent(fileName);
-    if (!html) continue;
-    const sourceSeo = extractSeoSourceFromHtml(html);
-    const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
-    const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
-    const effectiveSeo = mergeSeoSourceWithOverrides(sourceSeo, pageOverrides);
-    const images = extractImageEntriesFromHtml(html).map((entry) => ({
-      ...entry,
-      effectiveAlt: normalizeString(imageOverrides[entry.src] || entry.alt || ''),
-    }));
-    pages.push(buildSeoPageAuditEntry(fileName, sourceSeo, pageOverrides, effectiveSeo, images));
-  }
+const activeOrdersCoordinator = createActiveOrdersCoordinator({
+  normalizeString,
+  truncateText,
+  sanitizeReferenceImages,
+  sanitizeLaunchDomainName,
+  generateWebsiteHtmlWithAi,
+  runActiveOrderLaunchPipeline,
+  appendDashboardActivity,
+  getOpenAiApiKey,
+  getAnthropicApiKey,
+  getWebsiteGenerationProvider,
+  getWebsiteAnthropicModel,
+  openAiModel: OPENAI_MODEL,
+  websiteGenerationStrictAnthropic: WEBSITE_GENERATION_STRICT_ANTHROPIC,
+  websiteGenerationStrictHtml: WEBSITE_GENERATION_STRICT_HTML,
+});
 
-  const sortedPages = pages.slice().sort((a, b) => a.score - b.score || a.path.localeCompare(b.path));
-  const pageCount = sortedPages.length;
-  const totalImages = sortedPages.reduce((sum, page) => sum + Number(page.imageCount || 0), 0);
-  const totalMissingAltImages = sortedPages.reduce((sum, page) => sum + Number(page.missingAltCount || 0), 0);
-  const titleHealthyCount = sortedPages.filter((page) => page.health.titleHealthy).length;
-  const descriptionHealthyCount = sortedPages.filter((page) => page.health.descriptionHealthy).length;
-  const canonicalHealthyCount = sortedPages.filter((page) => page.health.canonicalHealthy).length;
-  const socialHealthyCount = sortedPages.filter(
-    (page) => page.health.ogTitleHealthy && page.health.ogDescriptionHealthy && page.health.twitterTitleHealthy && page.health.twitterDescriptionHealthy
-  ).length;
-  const pagesNeedingAttention = sortedPages.filter((page) => page.score < 80).length;
-  const overallScore =
-    pageCount > 0
-      ? Math.round(sortedPages.reduce((sum, page) => sum + Number(page.score || 0), 0) / pageCount)
-      : 0;
+const aiToolsCoordinator = createAiToolsCoordinator({
+  normalizeString,
+  truncateText,
+  fetchWebsitePreviewScanFromUrl,
+  generateWebsitePreviewImageWithAi,
+  appendDashboardActivity,
+  getOpenAiApiKey,
+  openAiImageModel: OPENAI_IMAGE_MODEL,
+  buildOrderDossierInput,
+  generateDynamicOrderDossierWithAnthropic,
+  buildOrderDossierFallbackLayout,
+  getAnthropicApiKey,
+  getDossierAnthropicModel,
+  generateWebsitePromptFromTranscriptWithAi,
+  buildWebsitePromptFallback,
+  extractMeetingNotesFromImageWithAi,
+  logger: console,
+});
 
-  const metrics = [
-    {
-      key: 'titles',
-      label: 'Meta titles',
-      count: titleHealthyCount,
-      total: pageCount,
-      percent: pageCount > 0 ? Math.round((titleHealthyCount / pageCount) * 100) : 0,
-    },
-    {
-      key: 'descriptions',
-      label: 'Descriptions',
-      count: descriptionHealthyCount,
-      total: pageCount,
-      percent: pageCount > 0 ? Math.round((descriptionHealthyCount / pageCount) * 100) : 0,
-    },
-    {
-      key: 'canonicals',
-      label: 'Canonicals',
-      count: canonicalHealthyCount,
-      total: pageCount,
-      percent: pageCount > 0 ? Math.round((canonicalHealthyCount / pageCount) * 100) : 0,
-    },
-    {
-      key: 'social',
-      label: 'Social tags',
-      count: socialHealthyCount,
-      total: pageCount,
-      percent: pageCount > 0 ? Math.round((socialHealthyCount / pageCount) * 100) : 0,
-    },
-    {
-      key: 'image_alt',
-      label: 'Afbeelding alt',
-      count: totalImages - totalMissingAltImages,
-      total: totalImages,
-      percent: totalImages > 0 ? Math.round(((totalImages - totalMissingAltImages) / totalImages) * 100) : 100,
-    },
-  ];
-
-  const strengths = [];
-  const improvements = [];
-  if (metrics[0].percent >= 80) strengths.push('De meeste pagina\'s hebben al een sterke meta title.');
-  else improvements.push('Een deel van de pagina\'s kan een scherpere meta title gebruiken.');
-  if (metrics[1].percent >= 75) strengths.push('Veel meta descriptions zijn al goed bruikbaar.');
-  else improvements.push('Meerdere meta descriptions missen of zijn nog te generiek.');
-  if (metrics[2].percent >= 80) strengths.push('Canonical URL\'s zijn op veel pagina\'s al netjes afgedekt.');
-  else improvements.push('Canonical URL\'s mogen consistenter naar de live pagina wijzen.');
-  if (metrics[4].percent >= 85) strengths.push('Afbeeldingen hebben op veel plekken al een goede alt-tekst.');
-  else improvements.push('Er ontbreken nog alt-teksten op een deel van de afbeeldingen.');
-  if (pagesNeedingAttention === 0 && pageCount > 0) strengths.push('Geen directe rode vlaggen in de huidige SEO-basis.');
-  if (pagesNeedingAttention > 0) {
-    improvements.push(`${pagesNeedingAttention} pagina${pagesNeedingAttention === 1 ? '' : '\'s'} vragen nog om extra aandacht.`);
-  }
-
-  return {
-    ok: true,
-    auditedAt: new Date().toISOString(),
-    overallScore,
-    totals: {
-      pages: pageCount,
-      pagesNeedingAttention,
-      images: totalImages,
-      missingAltImages: totalMissingAltImages,
-    },
-    metrics,
-    strengths: strengths.slice(0, 4),
-    improvements: improvements.slice(0, 5),
-    pages: sortedPages,
-    modelOptions: getSeoModelPresetOptions(),
-    automation: normalizeSeoAutomationSettings(config.automation),
-  };
-}
-
-function applySeoAuditSuggestionsToConfig(configRaw, auditRaw, modelRaw) {
-  const nextConfig = normalizeSeoConfig(configRaw);
-  const audit = auditRaw && typeof auditRaw === 'object' ? auditRaw : {};
-  const pages = Array.isArray(audit.pages) ? audit.pages : [];
-  const preferredModel = normalizeSeoModelPreset(modelRaw || nextConfig.automation?.preferredModel || 'gpt-5.1');
-
-  let appliedPageFieldCount = 0;
-  let appliedImageAltCount = 0;
-  const changedPages = [];
-
-  pages.forEach((page) => {
-    const fileName = sanitizeKnownHtmlFileName(page?.file);
-    if (!fileName) return;
-
-    const pagePatch = normalizeSeoStoredPageOverrides(page?.suggestedPageOverrides || {});
-    const imagePatch = normalizeSeoStoredImageOverrides(page?.suggestedImageOverrides || {});
-    const pageFieldCount = Object.keys(pagePatch).length;
-    const imageFieldCount = Object.keys(imagePatch).length;
-    if (pageFieldCount === 0 && imageFieldCount === 0) return;
-
-    nextConfig.pages[fileName] = {
-      ...(nextConfig.pages[fileName] || {}),
-      ...pagePatch,
-    };
-
-    nextConfig.images[fileName] = {
-      ...(nextConfig.images[fileName] || {}),
-      ...imagePatch,
-    };
-
-    if (Object.keys(nextConfig.pages[fileName]).length === 0) delete nextConfig.pages[fileName];
-    if (Object.keys(nextConfig.images[fileName]).length === 0) delete nextConfig.images[fileName];
-
-    appliedPageFieldCount += pageFieldCount;
-    appliedImageAltCount += imageFieldCount;
-
-    changedPages.push({
-      file: fileName,
-      path: normalizeString(page?.path || getSeoPathFromFileName(fileName)),
-      title: normalizeString(page?.title || page?.topic || fileName),
-      topic: normalizeString(page?.topic || ''),
-      scoreBefore: Math.max(0, Math.min(100, parseIntSafe(page?.score, 0))),
-      appliedPageFieldCount: pageFieldCount,
-      appliedImageAltCount: imageFieldCount,
-      pageOverrides: pagePatch,
-      imageOverrides: imagePatch,
-    });
-  });
-
-  nextConfig.automation = normalizeSeoAutomationSettings({
-    ...(nextConfig.automation || {}),
-    preferredModel,
-    updatedAt: new Date().toISOString(),
-  });
-
-  return {
-    nextConfig,
-    preferredModel,
-    changedPages,
-    appliedPageFieldCount,
-    appliedImageAltCount,
-  };
-}
-
-function escapeHtmlAttribute(valueRaw) {
-  return String(valueRaw || '')
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function escapeHtmlText(valueRaw) {
-  return String(valueRaw || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function escapeRegex(valueRaw) {
-  return String(valueRaw || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function setOrUpdateTagAttribute(tagRaw, attrNameRaw, valueRaw) {
-  const tag = String(tagRaw || '');
-  const attrName = normalizeString(attrNameRaw).toLowerCase();
-  if (!attrName) return tag;
-  const escapedValue = escapeHtmlAttribute(valueRaw);
-  const attrPattern = new RegExp(`\\s${escapeRegex(attrName)}\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)`, 'i');
-
-  if (attrPattern.test(tag)) {
-    return tag.replace(attrPattern, ` ${attrName}="${escapedValue}"`);
-  }
-
-  if (tag.endsWith('/>')) {
-    return tag.replace(/\/>$/, ` ${attrName}="${escapedValue}" />`);
-  }
-
-  return tag.replace(/>$/, ` ${attrName}="${escapedValue}">`);
-}
-
-function upsertTitleInHtml(htmlRaw, title) {
-  const html = String(htmlRaw || '');
-  const value = normalizeSeoFieldValue(title, 300);
-  if (!value) return html;
-
-  if (/<title\b[^>]*>[\s\S]*?<\/title>/i.test(html)) {
-    return html.replace(
-      /<title\b[^>]*>[\s\S]*?<\/title>/i,
-      `<title>${escapeHtmlText(value)}</title>`
-    );
-  }
-
-  if (/<\/head>/i.test(html)) {
-    return html.replace(/<\/head>/i, `    <title>${escapeHtmlText(value)}</title>\n</head>`);
-  }
-
-  return html;
-}
-
-function upsertMetaInHtml(htmlRaw, selectorAttrRaw, selectorValueRaw, contentRaw) {
-  const html = String(htmlRaw || '');
-  const selectorAttr = normalizeString(selectorAttrRaw).toLowerCase();
-  const selectorValue = normalizeString(selectorValueRaw);
-  const content = normalizeString(contentRaw);
-
-  if (!selectorAttr || !selectorValue || !content) return html;
-
-  const tagPattern = new RegExp(
-    `<meta\\b[^>]*${escapeRegex(selectorAttr)}\\s*=\\s*["']${escapeRegex(selectorValue)}["'][^>]*>`,
-    'i'
-  );
-
-  if (tagPattern.test(html)) {
-    return html.replace(tagPattern, (tag) => setOrUpdateTagAttribute(tag, 'content', content));
-  }
-
-  const newTag = `    <meta ${selectorAttr}="${escapeHtmlAttribute(selectorValue)}" content="${escapeHtmlAttribute(content)}">`;
-  if (/<\/head>/i.test(html)) {
-    return html.replace(/<\/head>/i, `${newTag}\n</head>`);
-  }
-  return html;
-}
-
-function upsertCanonicalInHtml(htmlRaw, canonicalRaw) {
-  const html = String(htmlRaw || '');
-  const canonical = normalizeString(canonicalRaw);
-  if (!canonical) return html;
-
-  const tagPattern = /<link\b[^>]*rel\s*=\s*["']canonical["'][^>]*>/i;
-  if (tagPattern.test(html)) {
-    return html.replace(tagPattern, (tag) => setOrUpdateTagAttribute(tag, 'href', canonical));
-  }
-
-  const newTag = `    <link rel="canonical" href="${escapeHtmlAttribute(canonical)}">`;
-  if (/<\/head>/i.test(html)) {
-    return html.replace(/<\/head>/i, `${newTag}\n</head>`);
-  }
-  return html;
-}
-
-function upsertFirstH1InHtml(htmlRaw, h1Raw) {
-  const html = String(htmlRaw || '');
-  const h1 = normalizeSeoFieldValue(h1Raw, 300);
-  if (!h1) return html;
-
-  return html.replace(/<h1\b([^>]*)>[\s\S]*?<\/h1>/i, `<h1$1>${escapeHtmlText(h1)}</h1>`);
-}
-
-function applyImageAltOverridesToHtml(htmlRaw, imageOverridesRaw) {
-  const html = String(htmlRaw || '');
-  const imageOverrides = normalizeSeoStoredImageOverrides(imageOverridesRaw);
-  if (Object.keys(imageOverrides).length === 0) return html;
-
-  return html.replace(/<img\b[^>]*>/gi, (tag) => {
-    const attrs = parseHtmlTagAttributes(tag);
-    const src = truncateText(normalizeString(attrs.src || attrs['data-src'] || ''), 1800);
-    if (!src) return tag;
-    const alt = imageOverrides[src];
-    if (!alt) return tag;
-    return setOrUpdateTagAttribute(tag, 'alt', alt);
-  });
-}
-
-function applySeoOverridesToHtml(fileNameRaw, htmlRaw, configRaw) {
-  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
-  const html = String(htmlRaw || '');
-  if (!fileName || !html) return html;
-
-  const config = normalizeSeoConfig(configRaw || {});
-  const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
-  const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
-
-  let nextHtml = html;
-  if (pageOverrides.title) nextHtml = upsertTitleInHtml(nextHtml, pageOverrides.title);
-  if (pageOverrides.metaDescription) {
-    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'description', pageOverrides.metaDescription);
-  }
-  if (pageOverrides.metaKeywords) {
-    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'keywords', pageOverrides.metaKeywords);
-  }
-  if (pageOverrides.canonical) nextHtml = upsertCanonicalInHtml(nextHtml, pageOverrides.canonical);
-  if (pageOverrides.robots) {
-    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'robots', pageOverrides.robots);
-  }
-  if (pageOverrides.ogTitle) {
-    nextHtml = upsertMetaInHtml(nextHtml, 'property', 'og:title', pageOverrides.ogTitle);
-  }
-  if (pageOverrides.ogDescription) {
-    nextHtml = upsertMetaInHtml(nextHtml, 'property', 'og:description', pageOverrides.ogDescription);
-  }
-  if (pageOverrides.ogImage) {
-    nextHtml = upsertMetaInHtml(nextHtml, 'property', 'og:image', pageOverrides.ogImage);
-  }
-  if (pageOverrides.twitterTitle) {
-    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'twitter:title', pageOverrides.twitterTitle);
-  }
-  if (pageOverrides.twitterDescription) {
-    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'twitter:description', pageOverrides.twitterDescription);
-  }
-  if (pageOverrides.twitterImage) {
-    nextHtml = upsertMetaInHtml(nextHtml, 'name', 'twitter:image', pageOverrides.twitterImage);
-  }
-  if (pageOverrides.h1) {
-    nextHtml = upsertFirstH1InHtml(nextHtml, pageOverrides.h1);
-  }
-  if (Object.keys(imageOverrides).length > 0) {
-    nextHtml = applyImageAltOverridesToHtml(nextHtml, imageOverrides);
-  }
-  return nextHtml;
-}
-
-async function readHtmlPageContent(fileNameRaw) {
-  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
-  if (!fileName) return '';
-  try {
-    return await fs.promises.readFile(path.join(__dirname, fileName), 'utf8');
-  } catch (error) {
-    console.error('[SEO][ReadPageError]', fileName, error?.message || error);
-    return '';
-  }
-}
-
-function resolveSeoPageFileFromRequest(fileRaw, slugRaw = '') {
-  const directFile = sanitizeKnownHtmlFileName(fileRaw);
-  if (directFile) return directFile;
-
-  const slug = normalizeString(slugRaw).toLowerCase();
-  if (!slug || !/^[a-z0-9_-]+$/.test(slug)) return '';
-
-  const mappedFile = knownPrettyPageSlugToFile.get(slug);
-  return sanitizeKnownHtmlFileName(mappedFile);
-}
-
-async function sendSeoManagedHtmlPageResponse(req, res, next, fileNameRaw) {
-  const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
-  if (!fileName) return next();
-
-  const isLoginPage = fileName === 'premium-personeel-login.html';
-  const isProtectedPremiumPage = isPremiumProtectedHtmlFile(fileName);
-  const authState = isLoginPage || isProtectedPremiumPage ? await getResolvedPremiumAuthState(req) : null;
-  const logoutRequested = isLoginPage && /^(1|true|yes)$/i.test(String(req.query?.logout || ''));
-  const requestedPath = getSafePremiumRedirectPath(req.originalUrl || req.url || req.path || '/');
-
-  if (logoutRequested) {
-    clearPremiumSessionCookie(req, res);
-  }
-
-  if (isLoginPage) {
-    res.setHeader('Cache-Control', 'no-store, private');
-    res.setHeader('X-Robots-Tag', NOINDEX_HEADER_VALUE);
-    if (!logoutRequested && authState.authenticated) {
-      const nextPath = getSafePremiumRedirectPath(req.query?.next || '', '/premium-personeel-dashboard');
-      return res.redirect(302, nextPath);
+const aiDashboardCoordinator = createAiDashboardCoordinator({
+  normalizeString,
+  truncateText,
+  parseJsonLoose,
+  parseNumberSafe,
+  normalizeDateYyyyMmDd,
+  normalizeTimeHhMm,
+  toBooleanSafe,
+  resolvePreferredRecordingUrl,
+  getUiStateValues,
+  premiumActiveOrdersScope: PREMIUM_ACTIVE_ORDERS_SCOPE,
+  premiumCustomersScope: PREMIUM_CUSTOMERS_SCOPE,
+  premiumActiveCustomOrdersKey: PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY,
+  premiumActiveRuntimeKey: PREMIUM_ACTIVE_RUNTIME_KEY,
+  premiumCustomersKey: PREMIUM_CUSTOMERS_KEY,
+  parseCustomOrdersFromUiState,
+  recentCallUpdates,
+  generatedAgendaAppointments,
+  recentAiCallInsights,
+  recentDashboardActivities,
+  getOpenAiApiKey,
+  fetchJsonWithTimeout,
+  openAiApiBaseUrl: OPENAI_API_BASE_URL,
+  openAiModel: OPENAI_MODEL,
+  extractOpenAiTextContent,
+  ensureDashboardChatRuntimeReady: async () => {
+    if (isSupabaseConfigured() && !supabaseStateHydrated) {
+      await forceHydrateRuntimeStateWithRetries(3);
     }
-  }
-
-  if (isProtectedPremiumPage) {
-    res.setHeader('Cache-Control', 'no-store, private');
-    res.setHeader('X-Robots-Tag', NOINDEX_HEADER_VALUE);
-
-    if (!authState.configured) {
-      const setupRedirect = `/premium-personeel-login?setup=1&next=${encodeURIComponent(requestedPath)}`;
-      return res.redirect(302, setupRedirect);
-    }
-
-    if (!authState.authenticated) {
-      if (authState.expired || authState.revoked) {
-        clearPremiumSessionCookie(req, res);
-      }
-      const loginRedirect = `/premium-personeel-login?next=${encodeURIComponent(requestedPath)}`;
-      return res.redirect(302, loginRedirect);
-    }
-
-    if (!isPremiumAdminIpAllowed(req)) {
-      appendSecurityAuditEvent(
-        {
-          type: 'admin_ip_blocked',
-          severity: 'warning',
-          success: false,
-          email: authState.email || '',
-          ip: getClientIpFromRequest(req),
-          path: requestedPath,
-          origin: getRequestOriginFromHeaders(req),
-          userAgent: req.get('user-agent'),
-          detail: 'Protected premium pagina geweigerd door admin IP allowlist.',
-        },
-        'security_admin_ip_blocked'
-      );
-      clearPremiumSessionCookie(req, res);
-      return res.redirect(302, '/premium-personeel-login?blocked=1');
-    }
-  }
-
-  try {
-    const html = await readHtmlPageContent(fileName);
-    if (!html) return next();
-    const config = await getSeoConfigCached();
-    const rendered = applySeoOverridesToHtml(fileName, html, config);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(rendered);
-  } catch (error) {
-    console.error('[SEO][RenderPageError]', fileName, error?.message || error);
-    if (isLoginPage || isProtectedPremiumPage) {
-      res.setHeader('Cache-Control', 'no-store, private');
-    }
-    return res.sendFile(path.join(__dirname, fileName), (sendErr) => {
-      if (sendErr) next();
-    });
-  }
-}
-
-function getByPath(obj, path) {
-  return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
-}
-
-function collectStringValuesByKey(root, keyRegex, options = {}) {
-  const maxDepth = options.maxDepth ?? 8;
-  const maxItems = options.maxItems ?? 10;
-  const minLength = options.minLength ?? 1;
-  const out = [];
-  const seen = new Set();
-
-  function walk(node, depth) {
-    if (out.length >= maxItems) return;
-    if (depth > maxDepth) return;
-    if (!node || typeof node !== 'object') return;
-
-    if (Array.isArray(node)) {
-      for (const item of node) {
-        walk(item, depth + 1);
-        if (out.length >= maxItems) return;
-      }
-      return;
-    }
-
-    for (const [key, value] of Object.entries(node)) {
-      if (typeof value === 'string' && keyRegex.test(key)) {
-        const normalized = normalizeString(value);
-        if (normalized.length >= minLength && !seen.has(normalized)) {
-          seen.add(normalized);
-          out.push(normalized);
-          if (out.length >= maxItems) return;
-        }
-      }
-
-      if (value && typeof value === 'object') {
-        walk(value, depth + 1);
-        if (out.length >= maxItems) return;
-      }
-    }
-  }
-
-  walk(root, 0);
-  return out;
-}
-
-function formatTranscriptPartsFromEntries(entries, options = {}) {
-  if (!Array.isArray(entries)) return '';
-  const preferFull = options.preferFull !== false;
-  const maxLength = Number.isFinite(options.maxLength) ? options.maxLength : 4000;
-
-  const parts = entries
-    .map((entry) => {
-      if (!entry) return '';
-      if (typeof entry === 'string') return normalizeString(entry);
-      if (typeof entry !== 'object') return '';
-
-      const speaker = normalizeString(
-        entry.role ||
-          entry.speaker ||
-          entry.name ||
-          entry.from ||
-          entry.participant ||
-          entry.channel ||
-          entry.actor
-      );
-
-      const nestedMessage =
-        (entry.message && typeof entry.message === 'object' ? entry.message : null) ||
-        (entry.content && typeof entry.content === 'object' ? entry.content : null);
-
-      const text = normalizeString(
-        entry.text ||
-          entry.content ||
-          entry.message ||
-          entry.utterance ||
-          entry.transcript ||
-          entry.value ||
-          nestedMessage?.text ||
-          nestedMessage?.content ||
-          nestedMessage?.message
-      );
-      if (!text) return '';
-      return speaker ? `${speaker}: ${text}` : text;
-    })
-    .filter(Boolean);
-
-  if (parts.length === 0) return '';
-  const joined = preferFull ? parts.join('\n') : parts.slice(-6).join(' | ');
-  return truncateText(joined, maxLength);
-}
-
-function extractTranscriptText(payload, options = {}) {
-  const maxLength = Number.isFinite(options.maxLength) ? Math.max(80, options.maxLength) : 4000;
-  const preferFull = options.preferFull !== false;
-  const transcriptCandidates = [
-    getByPath(payload, 'message.call.transcript'),
-    getByPath(payload, 'message.call.artifact.transcript'),
-    getByPath(payload, 'message.artifact.transcript'),
-    getByPath(payload, 'call.artifact.transcript'),
-    getByPath(payload, 'message.transcript'),
-    getByPath(payload, 'call.transcript'),
-    getByPath(payload, 'transcript'),
-    getByPath(payload, 'message.call.artifact.messages'),
-    getByPath(payload, 'message.artifact.messages'),
-    getByPath(payload, 'call.artifact.messages'),
-    getByPath(payload, 'message.call.messages'),
-    getByPath(payload, 'message.messages'),
-    getByPath(payload, 'call.messages'),
-    getByPath(payload, 'message.call.conversation'),
-    getByPath(payload, 'message.conversation'),
-    getByPath(payload, 'call.conversation'),
-    getByPath(payload, 'message.call.utterances'),
-    getByPath(payload, 'message.utterances'),
-    getByPath(payload, 'call.utterances'),
-  ];
-
-  for (const candidate of transcriptCandidates) {
-    if (!candidate) continue;
-
-    if (typeof candidate === 'string') {
-      return truncateText(candidate, maxLength);
-    }
-
-    if (Array.isArray(candidate)) {
-      const formatted = formatTranscriptPartsFromEntries(candidate, { preferFull, maxLength });
-      if (formatted) return formatted;
-    }
-
-    if (candidate && typeof candidate === 'object') {
-      const nestedArrays = [
-        candidate.messages,
-        candidate.items,
-        candidate.utterances,
-        candidate.turns,
-        candidate.entries,
-        candidate.segments,
-        candidate.transcript,
-      ];
-      for (const nested of nestedArrays) {
-        if (!Array.isArray(nested)) continue;
-        const formatted = formatTranscriptPartsFromEntries(nested, { preferFull, maxLength });
-        if (formatted) return formatted;
-      }
-    }
-  }
-
-  const utteranceCandidates = collectStringValuesByKey(payload, /utterance|transcript/i, {
-    maxItems: preferFull ? 40 : 8,
-    minLength: 8,
-  });
-  if (utteranceCandidates.length > 0) {
-    return truncateText(
-      preferFull ? utteranceCandidates.join('\n') : utteranceCandidates.slice(-4).join(' | '),
-      maxLength
-    );
-  }
-
-  return '';
-}
-
-function extractTranscriptSnippet(payload) {
-  return extractTranscriptText(payload, { maxLength: 450, preferFull: false });
-}
-
-function extractTranscriptFull(payload) {
-  return extractTranscriptText(payload, { maxLength: 8000, preferFull: true });
-}
-
-function extractRetellTranscriptText(call, options = {}) {
-  const maxLength = Number.isFinite(options.maxLength) ? Math.max(80, options.maxLength) : 8000;
-  const preferFull = options.preferFull !== false;
-  if (!call || typeof call !== 'object') return '';
-
-  const transcript = normalizeString(call?.transcript || '');
-  if (transcript) return truncateText(transcript, maxLength);
-
-  const transcriptCandidates = [call?.transcript_with_tool_calls, call?.transcript_object];
-  for (const candidate of transcriptCandidates) {
-    if (!Array.isArray(candidate)) continue;
-    const formatted = formatTranscriptPartsFromEntries(candidate, { preferFull, maxLength });
-    if (formatted) return formatted;
-  }
-
-  return '';
-}
+    backfillInsightsAndAppointmentsFromRecentCallUpdates();
+  },
+  normalizeAiSummaryStyle,
+  generateTextSummaryWithAi,
+  parseIntSafe,
+});
 
 function extractCallUpdateFromRetellPayload(payload) {
   const event = normalizeString(payload?.event || payload?.type || 'retell.webhook.unknown');
@@ -5173,43 +2441,6 @@ function formatEuroLabel(amount) {
   }
 }
 
-function parseJsonLoose(text) {
-  const raw = normalizeString(text);
-  if (!raw) return null;
-
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced ? fenced[1].trim() : raw;
-
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    return null;
-  }
-}
-
-function extractOpenAiTextContent(content) {
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (!part) return '';
-        if (typeof part === 'string') return part;
-        return normalizeString(part.text || part.content || part.output_text || '');
-      })
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  if (content && typeof content === 'object') {
-    return normalizeString(content.text || content.content || '');
-  }
-
-  return '';
-}
-
 function getOpenAiApiKey() {
   return normalizeString(process.env.OPENAI_API_KEY);
 }
@@ -5261,32 +2492,6 @@ function getAnthropicDossierMaxTokens() {
     2000,
     Math.min(24000, Number(process.env.ANTHROPIC_DOSSIER_MAX_TOKENS || fallback) || fallback)
   );
-}
-
-function extractAnthropicTextContent(content) {
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (!part) return '';
-        if (typeof part === 'string') return part;
-        if (Array.isArray(part.content)) return extractAnthropicTextContent(part.content);
-        if (part.type === 'text') return normalizeString(part.text || '');
-        return normalizeString(part.text || part.content || '');
-      })
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  if (content && typeof content === 'object') {
-    if (Array.isArray(content.content)) return extractAnthropicTextContent(content.content);
-    return normalizeString(content.text || content.content || '');
-  }
-
-  return '';
 }
 
 function normalizeAiSummaryStyle(value) {
@@ -6238,198 +3443,6 @@ function isLikelyUsableWebsiteHtml(html) {
   const textLen = extractVisibleTextFromHtml(raw).length;
 
   return semanticCount >= 3 && ctaCount >= 2 && headingCount >= 2 && textLen >= 180;
-}
-
-function getOpenAiModelCostRates(model) {
-  const explicitInput = Number(process.env.OPENAI_COST_INPUT_PER_1M || '');
-  const explicitOutput = Number(process.env.OPENAI_COST_OUTPUT_PER_1M || '');
-  if (Number.isFinite(explicitInput) && Number.isFinite(explicitOutput) && explicitInput >= 0 && explicitOutput >= 0) {
-    return { inputPer1mUsd: explicitInput, outputPer1mUsd: explicitOutput, source: 'env' };
-  }
-
-  const key = normalizeString(model || OPENAI_MODEL).toLowerCase();
-  if (key.includes('gpt-5-mini')) return { inputPer1mUsd: 0.25, outputPer1mUsd: 2.0, source: 'default-mini' };
-  if (key.includes('gpt-5-nano')) return { inputPer1mUsd: 0.05, outputPer1mUsd: 0.4, source: 'default-nano' };
-  if (key.includes('gpt-5')) return { inputPer1mUsd: 1.25, outputPer1mUsd: 10.0, source: 'default-gpt5' };
-  if (key.includes('gpt-4.1-mini')) return { inputPer1mUsd: 0.4, outputPer1mUsd: 1.6, source: 'default-4.1-mini' };
-  if (key.includes('gpt-4.1')) return { inputPer1mUsd: 2.0, outputPer1mUsd: 8.0, source: 'default-4.1' };
-  if (key.includes('gpt-4o-mini')) return { inputPer1mUsd: 0.15, outputPer1mUsd: 0.6, source: 'default-4o-mini' };
-  return { inputPer1mUsd: 1.0, outputPer1mUsd: 4.0, source: 'default-generic' };
-}
-
-function buildOpenAiCostEstimate({ promptTokens, completionTokens, totalTokens, model, method = 'usage' }) {
-  if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens) || promptTokens < 0 || completionTokens < 0) {
-    return null;
-  }
-
-  const rates = getOpenAiModelCostRates(model);
-  const usdToEur = Number(process.env.OPENAI_COST_USD_TO_EUR || 0.92);
-  const safeUsdToEur = Number.isFinite(usdToEur) && usdToEur > 0 ? usdToEur : 0.92;
-
-  const inputUsd = (promptTokens / 1_000_000) * rates.inputPer1mUsd;
-  const outputUsd = (completionTokens / 1_000_000) * rates.outputPer1mUsd;
-  const totalUsd = inputUsd + outputUsd;
-  const totalEur = totalUsd * safeUsdToEur;
-
-  return {
-    model: normalizeString(model || OPENAI_MODEL),
-    promptTokens: Math.round(promptTokens),
-    completionTokens: Math.round(completionTokens),
-    totalTokens: Number.isFinite(totalTokens)
-      ? Math.round(totalTokens)
-      : Math.round(promptTokens + completionTokens),
-    usd: Number(totalUsd.toFixed(8)),
-    eur: Number(totalEur.toFixed(8)),
-    rates,
-    usdToEur: safeUsdToEur,
-    estimated: true,
-    method,
-  };
-}
-
-function estimateTokenCountFromText(value) {
-  const text = normalizeString(value || '');
-  if (!text) return 0;
-  return Math.max(1, Math.ceil(text.length / 4));
-}
-
-function estimateOpenAiUsageCost(usage, model) {
-  if (!usage || typeof usage !== 'object') return null;
-  const hasTokenSignal = [
-    usage.prompt_tokens,
-    usage.input_tokens,
-    usage.promptTokens,
-    usage.inputTokens,
-    usage.completion_tokens,
-    usage.output_tokens,
-    usage.completionTokens,
-    usage.outputTokens,
-    usage.total_tokens,
-    usage.totalTokens,
-  ].some((value) => Number.isFinite(Number(value)));
-  if (!hasTokenSignal) return null;
-
-  const promptTokens = Number(
-    usage.prompt_tokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.inputTokens ?? 0
-  );
-  const completionTokens = Number(
-    usage.completion_tokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.outputTokens ?? 0
-  );
-  const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? promptTokens + completionTokens);
-  if (
-    !Number.isFinite(promptTokens) ||
-    !Number.isFinite(completionTokens) ||
-    promptTokens < 0 ||
-    completionTokens < 0
-  ) {
-    return null;
-  }
-
-  return buildOpenAiCostEstimate({
-    promptTokens,
-    completionTokens,
-    totalTokens,
-    model,
-    method: 'usage',
-  });
-}
-
-function estimateOpenAiTextCost(inputText, outputText, model) {
-  const promptTokens = estimateTokenCountFromText(inputText);
-  const completionTokens = estimateTokenCountFromText(outputText);
-  if (promptTokens <= 0 && completionTokens <= 0) return null;
-  return buildOpenAiCostEstimate({
-    promptTokens,
-    completionTokens,
-    totalTokens: promptTokens + completionTokens,
-    model,
-    method: 'text-fallback',
-  });
-}
-
-function getAnthropicModelCostRates(model) {
-  const explicitInput = Number(process.env.ANTHROPIC_COST_INPUT_PER_1M || '');
-  const explicitOutput = Number(process.env.ANTHROPIC_COST_OUTPUT_PER_1M || '');
-  if (Number.isFinite(explicitInput) && Number.isFinite(explicitOutput) && explicitInput >= 0 && explicitOutput >= 0) {
-    return { inputPer1mUsd: explicitInput, outputPer1mUsd: explicitOutput, source: 'env' };
-  }
-
-  const key = normalizeString(model || ANTHROPIC_MODEL).toLowerCase();
-  if (key.includes('claude-opus-4-6')) {
-    return { inputPer1mUsd: 5, outputPer1mUsd: 25, source: 'default-opus-4.6' };
-  }
-  if (key.includes('claude-opus')) return { inputPer1mUsd: 15, outputPer1mUsd: 75, source: 'default-opus' };
-  if (key.includes('claude-sonnet')) return { inputPer1mUsd: 3, outputPer1mUsd: 15, source: 'default-sonnet' };
-  if (key.includes('claude-haiku')) return { inputPer1mUsd: 0.8, outputPer1mUsd: 4, source: 'default-haiku' };
-  return null;
-}
-
-function buildAnthropicCostEstimate({ promptTokens, completionTokens, totalTokens, model, method = 'usage' }) {
-  if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens) || promptTokens < 0 || completionTokens < 0) {
-    return null;
-  }
-
-  const rates = getAnthropicModelCostRates(model);
-  if (!rates) return null;
-
-  const usdToEur = Number(process.env.AI_COST_USD_TO_EUR || process.env.OPENAI_COST_USD_TO_EUR || 0.92);
-  const safeUsdToEur = Number.isFinite(usdToEur) && usdToEur > 0 ? usdToEur : 0.92;
-
-  const inputUsd = (promptTokens / 1_000_000) * rates.inputPer1mUsd;
-  const outputUsd = (completionTokens / 1_000_000) * rates.outputPer1mUsd;
-  const totalUsd = inputUsd + outputUsd;
-  const totalEur = totalUsd * safeUsdToEur;
-
-  return {
-    model: normalizeString(model || ANTHROPIC_MODEL),
-    promptTokens: Math.round(promptTokens),
-    completionTokens: Math.round(completionTokens),
-    totalTokens: Number.isFinite(totalTokens)
-      ? Math.round(totalTokens)
-      : Math.round(promptTokens + completionTokens),
-    usd: Number(totalUsd.toFixed(8)),
-    eur: Number(totalEur.toFixed(8)),
-    rates,
-    usdToEur: safeUsdToEur,
-    estimated: true,
-    method,
-  };
-}
-
-function estimateAnthropicUsageCost(usage, model) {
-  if (!usage || typeof usage !== 'object') return null;
-  const promptTokens = Number(usage.input_tokens ?? usage.prompt_tokens ?? usage.inputTokens ?? 0);
-  const completionTokens = Number(usage.output_tokens ?? usage.completion_tokens ?? usage.outputTokens ?? 0);
-  const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? promptTokens + completionTokens);
-  if (
-    !Number.isFinite(promptTokens) ||
-    !Number.isFinite(completionTokens) ||
-    promptTokens < 0 ||
-    completionTokens < 0
-  ) {
-    return null;
-  }
-
-  return buildAnthropicCostEstimate({
-    promptTokens,
-    completionTokens,
-    totalTokens,
-    model,
-    method: 'usage',
-  });
-}
-
-function estimateAnthropicTextCost(inputText, outputText, model) {
-  const promptTokens = estimateTokenCountFromText(inputText);
-  const completionTokens = estimateTokenCountFromText(outputText);
-  if (promptTokens <= 0 && completionTokens <= 0) return null;
-  return buildAnthropicCostEstimate({
-    promptTokens,
-    completionTokens,
-    totalTokens: promptTokens + completionTokens,
-    model,
-    method: 'text-fallback',
-  });
 }
 
 function inferWebsiteIndustryProfile(context = {}) {
@@ -12809,622 +9822,49 @@ app.get('/api/twilio/voice', handleTwilioInboundVoice);
 app.post('/api/twilio/voice', express.urlencoded({ extended: false }), handleTwilioInboundVoice);
 app.post('/api/twilio/status', express.urlencoded({ extended: false }), handleTwilioStatusWebhook);
 
-app.use('/api/auth/login', premiumLoginRateLimiter);
-
-app.get('/api/auth/session', async (req, res) => {
-  const authState = await getResolvedPremiumAuthState(req);
-  res.setHeader('Cache-Control', 'no-store, private');
-  if (authState.revoked) {
-    clearPremiumSessionCookie(req, res);
-  }
-  return res.status(200).json(buildPremiumAuthSessionPayload(authState));
+const premiumAuthRouteCoordinator = createPremiumAuthRouteCoordinator({
+  sessionSecret: PREMIUM_SESSION_SECRET,
+  premiumSessionTtlHours: PREMIUM_SESSION_TTL_HOURS,
+  premiumSessionRememberTtlDays: PREMIUM_SESSION_REMEMBER_TTL_DAYS,
+  premiumUsersStore,
+  normalizePremiumSessionEmail,
+  normalizeString,
+  isPremiumMfaConfigured,
+  isPremiumMfaCodeValid,
+  getSafePremiumRedirectPath,
+  getResolvedPremiumAuthState,
+  buildPremiumAuthSessionPayload,
+  isPremiumAdminIpAllowed,
+  createPremiumSessionToken,
+  setPremiumSessionCookie,
+  clearPremiumSessionCookie,
+  appendSecurityAuditEvent,
+  getClientIpFromRequest,
+  getRequestPathname,
+  getRequestOriginFromHeaders,
 });
 
-app.post('/api/auth/login', async (req, res) => {
-  const email = normalizePremiumSessionEmail(req.body?.email || '');
-  const password = String(req.body?.password || '');
-  const otp = normalizeString(req.body?.otp || '').replace(/\s+/g, '');
-  const remember = /^(1|true|yes|on)$/i.test(String(req.body?.remember || ''));
-  const nextPath = getSafePremiumRedirectPath(req.body?.next || req.query?.next || '');
-  const clientIp = getClientIpFromRequest(req);
-  const requestPath = getRequestPathname(req);
-  const requestOrigin = getRequestOriginFromHeaders(req);
-  const userAgent = normalizeString(req.get('user-agent') || '');
-
-  res.setHeader('Cache-Control', 'no-store, private');
-
-  const hydrated = await premiumUsersStore.ensureUsersHydrated();
-  const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
-
-  if (!PREMIUM_SESSION_SECRET || hydrated?.source !== 'supabase' || users.length === 0) {
-    appendSecurityAuditEvent(
-      {
-        type: 'login_rejected',
-        severity: 'warning',
-        success: false,
-        email,
-        ip: clientIp,
-        path: requestPath,
-        origin: requestOrigin,
-        userAgent,
-        detail: 'Premium login niet geconfigureerd op de server.',
-      },
-      'security_login_rejected'
-    );
-    return res.status(503).json({
-      ok: false,
-      error:
-        'Premium login is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase en zet PREMIUM_SESSION_SECRET.',
-    });
-  }
-
-  if (!isPremiumAdminIpAllowed(req)) {
-    appendSecurityAuditEvent(
-      {
-        type: 'login_ip_blocked',
-        severity: 'warning',
-        success: false,
-        email,
-        ip: clientIp,
-        path: requestPath,
-        origin: requestOrigin,
-        userAgent,
-        detail: 'Login geweigerd door admin IP allowlist.',
-      },
-      'security_login_ip_blocked'
-    );
-    return res.status(403).json({
-      ok: false,
-      error: 'Inloggen is vanaf dit IP-adres niet toegestaan.',
-    });
-  }
-
-  if (!email || !password) {
-    appendSecurityAuditEvent(
-      {
-        type: 'login_failed',
-        severity: 'warning',
-        success: false,
-        email,
-        ip: clientIp,
-        path: requestPath,
-        origin: requestOrigin,
-        userAgent,
-        detail: 'E-mailadres of wachtwoord ontbreekt.',
-      },
-      'security_login_failed'
-    );
-    return res.status(400).json({
-      ok: false,
-      error: 'Vul je e-mailadres en wachtwoord in.',
-    });
-  }
-
-  const matchedUser = premiumUsersStore.findUserByEmail(users, email);
-  const isPasswordValid = matchedUser
-    ? premiumUsersStore.verifyPasswordHash(password, matchedUser.passwordHash)
-    : false;
-  if (!matchedUser || !isPasswordValid) {
-    appendSecurityAuditEvent(
-      {
-        type: 'login_failed',
-        severity: 'warning',
-        success: false,
-        email,
-        ip: clientIp,
-        path: requestPath,
-        origin: requestOrigin,
-        userAgent,
-        detail: 'Ongeldige inloggegevens.',
-      },
-      'security_login_failed'
-    );
-    return res.status(401).json({
-      ok: false,
-      error: 'Ongeldige inloggegevens.',
-    });
-  }
-
-  if (premiumUsersStore.normalizeUserStatus(matchedUser.status) !== 'active') {
-    appendSecurityAuditEvent(
-      {
-        type: 'login_failed',
-        severity: 'warning',
-        success: false,
-        email,
-        ip: clientIp,
-        path: requestPath,
-        origin: requestOrigin,
-        userAgent,
-        detail: 'Inloggen geweigerd omdat het account inactief is.',
-      },
-      'security_login_failed'
-    );
-    return res.status(403).json({
-      ok: false,
-      error: 'Dit account is gedeactiveerd.',
-    });
-  }
-
-  if (isPremiumMfaConfigured() && !isPremiumMfaCodeValid(otp)) {
-    appendSecurityAuditEvent(
-      {
-        type: 'login_mfa_failed',
-        severity: 'warning',
-        success: false,
-        email,
-        ip: clientIp,
-        path: requestPath,
-        origin: requestOrigin,
-        userAgent,
-        detail: '2FA-code ongeldig of ontbreekt.',
-      },
-      'security_login_mfa_failed'
-    );
-    return res.status(401).json({
-      ok: false,
-      error: 'Ongeldige of ontbrekende 2FA-code.',
-      mfaRequired: true,
-    });
-  }
-
-  const sessionMaxAgeMs = remember
-    ? PREMIUM_SESSION_REMEMBER_TTL_DAYS * 24 * 60 * 60 * 1000
-    : PREMIUM_SESSION_TTL_HOURS * 60 * 60 * 1000;
-  const sessionToken = createPremiumSessionToken({
-    email,
-    maxAgeMs: sessionMaxAgeMs,
-    userId: matchedUser.id,
-    role: matchedUser.role,
-  });
-  setPremiumSessionCookie(req, res, sessionToken, sessionMaxAgeMs);
-  appendSecurityAuditEvent(
-    {
-      type: 'login_success',
-      severity: 'info',
-      success: true,
-      email,
-      ip: clientIp,
-      path: requestPath,
-      origin: requestOrigin,
-      userAgent,
-      detail: remember
-        ? 'Premium login succesvol met verlengde sessie.'
-        : 'Premium login succesvol.',
-    },
-    'security_login_success'
-  );
-
-  return res.status(200).json({
-    ok: true,
-    authenticated: true,
-    role: matchedUser.role,
-    next: nextPath,
-  });
+registerPremiumAuthRoutes(app, {
+  coordinator: premiumAuthRouteCoordinator,
+  premiumLoginRateLimiter,
 });
 
-app.post('/api/auth/logout', async (req, res) => {
-  const authState = await getResolvedPremiumAuthState(req);
-  res.setHeader('Cache-Control', 'no-store, private');
-  clearPremiumSessionCookie(req, res);
-  appendSecurityAuditEvent(
-    {
-      type: 'logout',
-      severity: 'info',
-      success: true,
-      email: authState.email || '',
-      ip: getClientIpFromRequest(req),
-      path: getRequestPathname(req),
-      origin: getRequestOriginFromHeaders(req),
-      userAgent: req.get('user-agent'),
-      detail: 'Premium sessie uitgelogd.',
-    },
-    'security_logout'
-  );
-  return res.status(200).json({ ok: true, authenticated: false });
+app.use('/api', requirePremiumApiAccess);
+
+const premiumUserManagementCoordinator = createPremiumUserManagementCoordinator({
+  premiumUsersStore,
+  buildPremiumAuthSessionPayload,
+  normalizeString,
+  truncateText,
+  appendSecurityAuditEvent,
+  getClientIpFromRequest,
+  getRequestPathname,
+  getRequestOriginFromHeaders,
 });
 
-app.use('/api', async (req, res, next) => {
-  if (isPremiumPublicApiRequest(req)) return next();
-
-  const authState = await getResolvedPremiumAuthState(req);
-  res.setHeader('Cache-Control', 'no-store, private');
-
-  if (!authState.configured) {
-    return res.status(503).json({
-      ok: false,
-      error:
-        'Premium auth is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase en zet PREMIUM_SESSION_SECRET.',
-    });
-  }
-
-  if (authState.authenticated) {
-    if (!isPremiumAdminIpAllowed(req)) {
-      appendSecurityAuditEvent(
-        {
-          type: 'admin_ip_blocked',
-          severity: 'warning',
-          success: false,
-          email: authState.email || '',
-          ip: getClientIpFromRequest(req),
-          path: getRequestPathname(req),
-          origin: getRequestOriginFromHeaders(req),
-          userAgent: req.get('user-agent'),
-          detail: 'Ingelogde API-request geweigerd door admin IP allowlist.',
-        },
-        'security_admin_ip_blocked'
-      );
-      clearPremiumSessionCookie(req, res);
-      return res.status(403).json({
-        ok: false,
-        error: 'Toegang vanaf dit IP-adres is niet toegestaan.',
-      });
-    }
-    req.premiumAuth = authState;
-    return next();
-  }
-
-  if (authState.expired || authState.revoked) {
-    clearPremiumSessionCookie(req, res);
-  }
-
-  return res.status(401).json({
-    ok: false,
-    error: 'Niet ingelogd.',
-  });
-});
-
-function requirePremiumAdminApiAccess(req, res, next) {
-  const authState = req.premiumAuth || null;
-  if (!authState || !authState.authenticated) {
-    return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
-  }
-  if (!authState.isAdmin) {
-    return res.status(403).json({ ok: false, error: 'Alleen administrators hebben toegang.' });
-  }
-  return next();
-}
-
-app.get('/api/auth/profile', async (req, res) => {
-  const authState = req.premiumAuth || null;
-  if (!authState || !authState.authenticated) {
-    return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
-  }
-
-  return res.status(200).json({
-    ok: true,
-    user: premiumUsersStore.sanitizeUserForClient(authState.user),
-    session: buildPremiumAuthSessionPayload(authState),
-  });
-});
-
-app.patch('/api/auth/profile', async (req, res) => {
-  const authState = req.premiumAuth || null;
-  if (!authState || !authState.authenticated) {
-    return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
-  }
-
-  const users =
-    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
-    premiumUsersStore.getCachedUsers();
-  const existingUser =
-    premiumUsersStore.findUserById(users, authState.userId) ||
-    premiumUsersStore.findUserByEmail(users, authState.email);
-
-  if (!existingUser) {
-    return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
-  }
-
-  const hasDisplayNameInput =
-    req.body?.displayName !== undefined || req.body?.naam !== undefined || req.body?.fullName !== undefined;
-  const avatarInputProvided = req.body?.avatarDataUrl !== undefined || req.body?.avatar !== undefined;
-  const removeAvatar = /^(1|true|yes|on)$/i.test(String(req.body?.removeAvatar || ''));
-
-  let nextFirstName = existingUser.firstName;
-  let nextLastName = existingUser.lastName;
-  if (hasDisplayNameInput) {
-    const parsedNames = parsePremiumProfileDisplayName(
-      req.body?.displayName || req.body?.naam || req.body?.fullName || ''
-    );
-    if (!parsedNames.firstName) {
-      return res.status(400).json({ ok: false, error: 'Voer een geldige naam in.' });
-    }
-    nextFirstName = parsedNames.firstName;
-    nextLastName = parsedNames.lastName;
-  }
-
-  let nextAvatarDataUrl = premiumUsersStore.sanitizeAvatarDataUrl(existingUser.avatarDataUrl || '');
-  if (removeAvatar) {
-    nextAvatarDataUrl = '';
-  } else if (avatarInputProvided) {
-    nextAvatarDataUrl = premiumUsersStore.sanitizeAvatarDataUrl(req.body?.avatarDataUrl || req.body?.avatar || '');
-    const providedAvatarValue = normalizeString(req.body?.avatarDataUrl || req.body?.avatar || '');
-    if (providedAvatarValue && !nextAvatarDataUrl) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Profielfoto moet een geldige PNG, JPG, WEBP of GIF data-url zijn.',
-      });
-    }
-  }
-
-  const nextUsers = users.map((user) => {
-    if (user.id !== existingUser.id) return user;
-    return premiumUsersStore.sanitizeUserRecord({
-      ...user,
-      firstName: nextFirstName,
-      lastName: nextLastName,
-      avatarDataUrl: nextAvatarDataUrl,
-      updatedAt: new Date().toISOString(),
-      source: 'self_service_profile',
-    });
-  });
-
-  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
-    source: 'premium_profile_update',
-    reason: 'premium_profile_updated',
-    actorEmail: authState.email,
-  });
-  if (!saved || saved.source !== 'supabase') {
-    return res.status(503).json({
-      ok: false,
-      error: 'Profiel kon niet worden opgeslagen zonder geldige Supabase-opslag.',
-    });
-  }
-  const updatedUser =
-    premiumUsersStore.findUserById(saved.users, existingUser.id) ||
-    premiumUsersStore.findUserByEmail(saved.users, authState.email);
-
-  appendSecurityAuditEvent(
-    {
-      type: 'premium_profile_updated',
-      severity: 'info',
-      success: true,
-      email: authState.email || '',
-      ip: getClientIpFromRequest(req),
-      path: getRequestPathname(req),
-      origin: getRequestOriginFromHeaders(req),
-      userAgent: req.get('user-agent'),
-      detail: 'Premium gebruiker heeft eigen profiel bijgewerkt.',
-    },
-    'security_premium_profile_updated'
-  );
-
-  const refreshedAuthState = {
-    ...authState,
-    user: updatedUser,
-    firstName: normalizeString(updatedUser?.firstName || ''),
-    lastName: normalizeString(updatedUser?.lastName || ''),
-    displayName: premiumUsersStore.buildUserDisplayName(updatedUser),
-    avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(updatedUser?.avatarDataUrl || ''),
-  };
-
-  return res.status(200).json({
-    ok: true,
-    user: premiumUsersStore.sanitizeUserForClient(updatedUser),
-    session: buildPremiumAuthSessionPayload(refreshedAuthState),
-  });
-});
-
-app.get('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) => {
-  const hydrated = await premiumUsersStore.ensureUsersHydrated({ force: true });
-  const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
-  return res.status(200).json({
-    ok: true,
-    users: users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
-    updatedAt: hydrated?.updatedAt || premiumUsersStore.getUsersUpdatedAt() || null,
-  });
-});
-
-app.post('/api/premium-users', requirePremiumAdminApiAccess, async (req, res) => {
-  const authState = req.premiumAuth;
-  const users =
-    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
-    premiumUsersStore.getCachedUsers();
-  const email = premiumUsersStore.validateUserEmail(req.body?.email || '');
-  const password = String(req.body?.password || '');
-  const { firstName, lastName } = premiumUsersStore.normalizeUserInputNames(req.body || {});
-  const role = premiumUsersStore.normalizeUserRole(req.body?.rol || req.body?.role || 'medewerker');
-
-  if (!email || !password) {
-    return res.status(400).json({ ok: false, error: 'E-mail en wachtwoord zijn verplicht.' });
-  }
-  if (password.length < 8) {
-    return res.status(400).json({ ok: false, error: 'Wachtwoord moet minimaal 8 tekens bevatten.' });
-  }
-  if (premiumUsersStore.findUserByEmail(users, email)) {
-    return res.status(409).json({ ok: false, error: 'Dit e-mailadres bestaat al.' });
-  }
-
-  const nowIso = new Date().toISOString();
-  const nextUsers = users.concat([
-    premiumUsersStore.sanitizeUserRecord({
-      firstName,
-      lastName,
-      email,
-      role,
-      status: 'active',
-      passwordHash: premiumUsersStore.createPasswordHash(password),
-      source: 'managed_ui',
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    }),
-  ]);
-
-  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
-    source: 'premium_users_api_create',
-    reason: 'premium_user_created',
-    actorEmail: authState.email,
-  });
-  if (!saved || saved.source !== 'supabase') {
-    return res.status(503).json({
-      ok: false,
-      error: 'Gebruiker kon niet worden opgeslagen zonder geldige Supabase-opslag.',
-    });
-  }
-  const createdUser = premiumUsersStore.findUserByEmail(saved.users, email);
-  appendSecurityAuditEvent(
-    {
-      type: 'premium_user_created',
-      severity: 'info',
-      success: true,
-      email: authState.email || '',
-      ip: getClientIpFromRequest(req),
-      path: getRequestPathname(req),
-      origin: getRequestOriginFromHeaders(req),
-      userAgent: req.get('user-agent'),
-      detail: `Premium gebruiker toegevoegd: ${email}.`,
-    },
-    'security_premium_user_created'
-  );
-
-  return res.status(201).json({
-    ok: true,
-    user: premiumUsersStore.sanitizeUserForClient(createdUser),
-    users: saved.users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
-  });
-});
-
-app.patch('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, res) => {
-  const authState = req.premiumAuth;
-  const userId = truncateText(normalizeString(req.params?.id || ''), 120);
-  const users =
-    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
-    premiumUsersStore.getCachedUsers();
-  const existingUser = premiumUsersStore.findUserById(users, userId);
-  if (!existingUser) {
-    return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
-  }
-
-  const emailRaw = req.body?.email;
-  const password = String(req.body?.password || '');
-  const role = premiumUsersStore.normalizeUserRole(req.body?.rol || req.body?.role || existingUser.role);
-  const status = premiumUsersStore.normalizeUserStatus(req.body?.status || existingUser.status);
-  const nextEmail =
-    emailRaw === undefined ? existingUser.email : premiumUsersStore.validateUserEmail(emailRaw);
-  const { firstName, lastName } = premiumUsersStore.normalizeUserInputNames({
-    firstName: req.body?.firstName === undefined ? existingUser.firstName : req.body?.firstName,
-    lastName: req.body?.lastName === undefined ? existingUser.lastName : req.body?.lastName,
-    voornaam: req.body?.voornaam,
-    achternaam: req.body?.achternaam,
-  });
-
-  if (!nextEmail) {
-    return res.status(400).json({ ok: false, error: 'Voer een geldig e-mailadres in.' });
-  }
-  if (password && password.length < 8) {
-    return res.status(400).json({ ok: false, error: 'Wachtwoord moet minimaal 8 tekens bevatten.' });
-  }
-  if (users.some((item) => item.id !== userId && item.email === nextEmail)) {
-    return res.status(409).json({ ok: false, error: 'Dit e-mailadres is al in gebruik.' });
-  }
-
-  const nextUsers = users.map((user) => {
-    if (user.id !== userId) return user;
-    return premiumUsersStore.sanitizeUserRecord({
-      ...user,
-      firstName,
-      lastName,
-      email: nextEmail,
-      role,
-      status,
-      passwordHash: password ? premiumUsersStore.createPasswordHash(password) : user.passwordHash,
-      source: 'managed_ui',
-      updatedAt: new Date().toISOString(),
-    });
-  });
-
-  if (premiumUsersStore.countActiveAdmins(nextUsers) < 1) {
-    return res.status(400).json({
-      ok: false,
-      error: 'Er moet altijd minimaal één actieve administrator overblijven.',
-    });
-  }
-
-  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
-    source: 'premium_users_api_update',
-    reason: 'premium_user_updated',
-    actorEmail: authState.email,
-  });
-  if (!saved || saved.source !== 'supabase') {
-    return res.status(503).json({
-      ok: false,
-      error: 'Gebruiker kon niet worden bijgewerkt zonder geldige Supabase-opslag.',
-    });
-  }
-  const updatedUser = premiumUsersStore.findUserById(saved.users, userId);
-
-  appendSecurityAuditEvent(
-    {
-      type: 'premium_user_updated',
-      severity: 'info',
-      success: true,
-      email: authState.email || '',
-      ip: getClientIpFromRequest(req),
-      path: getRequestPathname(req),
-      origin: getRequestOriginFromHeaders(req),
-      userAgent: req.get('user-agent'),
-      detail: `Premium gebruiker bijgewerkt: ${nextEmail}.`,
-    },
-    'security_premium_user_updated'
-  );
-
-  return res.status(200).json({
-    ok: true,
-    user: premiumUsersStore.sanitizeUserForClient(updatedUser),
-    users: saved.users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
-  });
-});
-
-app.delete('/api/premium-users/:id', requirePremiumAdminApiAccess, async (req, res) => {
-  const authState = req.premiumAuth;
-  const userId = truncateText(normalizeString(req.params?.id || ''), 120);
-  const users =
-    (await premiumUsersStore.ensureUsersHydrated({ force: true }))?.users ||
-    premiumUsersStore.getCachedUsers();
-  const existingUser = premiumUsersStore.findUserById(users, userId);
-  if (!existingUser) {
-    return res.status(404).json({ ok: false, error: 'Gebruiker niet gevonden.' });
-  }
-
-  const nextUsers = users.filter((user) => user.id !== userId);
-  if (premiumUsersStore.countActiveAdmins(nextUsers) < 1) {
-    return res.status(400).json({
-      ok: false,
-      error: 'Er moet altijd minimaal één actieve administrator overblijven.',
-    });
-  }
-
-  const saved = await premiumUsersStore.persistUsersCollection(nextUsers, {
-    source: 'premium_users_api_delete',
-    reason: 'premium_user_deleted',
-    actorEmail: authState.email,
-  });
-  if (!saved || saved.source !== 'supabase') {
-    return res.status(503).json({
-      ok: false,
-      error: 'Gebruiker kon niet worden verwijderd zonder geldige Supabase-opslag.',
-    });
-  }
-
-  appendSecurityAuditEvent(
-    {
-      type: 'premium_user_deleted',
-      severity: 'info',
-      success: true,
-      email: authState.email || '',
-      ip: getClientIpFromRequest(req),
-      path: getRequestPathname(req),
-      origin: getRequestOriginFromHeaders(req),
-      userAgent: req.get('user-agent'),
-      detail: `Premium gebruiker verwijderd: ${existingUser.email}.`,
-    },
-    'security_premium_user_deleted'
-  );
-
-  return res.status(200).json({
-    ok: true,
-    users: saved.users.map((user) => premiumUsersStore.sanitizeUserForClient(user)),
-  });
+registerPremiumUserManagementRoutes(app, {
+  coordinator: premiumUserManagementCoordinator,
+  requirePremiumAdminApiAccess,
 });
 
 
@@ -13921,1513 +10361,33 @@ app.get('/api/ai/call-insights', async (req, res) => {
   });
 });
 
-function normalizeDashboardChatHistory(historyRaw) {
-  if (!Array.isArray(historyRaw)) return [];
-  return historyRaw
-    .map((item) => {
-      if (!item || typeof item !== 'object') return null;
-      const roleRaw = normalizeString(item.role || '').toLowerCase();
-      const role = roleRaw === 'assistant' ? 'assistant' : 'user';
-      const content = truncateText(normalizeString(item.content || ''), 3000);
-      if (!content) return null;
-      return { role, content };
-    })
-    .filter(Boolean)
-    .slice(-12);
-}
-
-function parseDashboardChatRuntimeByOrderId(rawValue) {
-  const parsed = parseJsonLoose(rawValue);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-
-  const out = {};
-  for (const [rawId, rawRuntime] of Object.entries(parsed)) {
-    const id = Number(rawId);
-    if (!Number.isFinite(id) || id <= 0) continue;
-    if (!rawRuntime || typeof rawRuntime !== 'object' || Array.isArray(rawRuntime)) continue;
-    out[String(id)] = {
-      statusKey: normalizeString(rawRuntime.statusKey || ''),
-      progressPct: parseNumberSafe(rawRuntime.progressPct, null),
-      paidAt: normalizeString(rawRuntime.paidAt || ''),
-      updatedAt: parseNumberSafe(rawRuntime.updatedAt, 0),
-    };
-  }
-  return out;
-}
-
-function parseDashboardChatCustomers(rawValue) {
-  const parsed = parseJsonLoose(rawValue);
-  if (!Array.isArray(parsed)) return [];
-
-  return parsed
-    .map((item, index) => {
-      if (!item || typeof item !== 'object') return null;
-
-      const legacyAmount = parseNumberSafe(item.bedrag, null);
-      const type = truncateText(normalizeString(item.type || 'Website'), 80) || 'Website';
-      const websiteRaw = parseNumberSafe(item.websiteBedrag, null);
-      const maintenanceRaw = parseNumberSafe(item.onderhoudPerMaand, null);
-
-      const websiteBedrag = Number.isFinite(websiteRaw)
-        ? Math.max(0, Math.round(websiteRaw))
-        : ((type === 'Website' || type === 'Website + onderhoud') && Number.isFinite(legacyAmount)
-            ? Math.max(0, Math.round(legacyAmount))
-            : null);
-
-      const onderhoudPerMaand = Number.isFinite(maintenanceRaw)
-        ? Math.max(0, Math.round(maintenanceRaw))
-        : (type === 'Onderhoud' && Number.isFinite(legacyAmount)
-            ? Math.max(0, Math.round(legacyAmount))
-            : null);
-
-      const statusRaw = normalizeString(item.status || '').toLowerCase();
-      const status = statusRaw === 'open' ? 'Open' : 'Betaald';
-
-      return {
-        id: normalizeString(item.id || '') || `dashboard-customer-${index + 1}`,
-        naam: truncateText(normalizeString(item.naam || ''), 160) || 'Onbekend',
-        bedrijf: truncateText(normalizeString(item.bedrijf || ''), 160) || '-',
-        telefoon: truncateText(normalizeString(item.telefoon || ''), 80) || '-',
-        website: truncateText(normalizeString(item.website || ''), 220) || '-',
-        type,
-        status,
-        datum: normalizeDateYyyyMmDd(item.datum || ''),
-        websiteBedrag,
-        onderhoudPerMaand,
-      };
-    })
-    .filter(Boolean);
-}
-
-function buildDashboardChatStatusCounts(rows, fieldName, fallback = 'Onbekend') {
-  const counts = {};
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const key = truncateText(normalizeString(row?.[fieldName] || ''), 80) || fallback;
-    counts[key] = (counts[key] || 0) + 1;
-  }
-  return counts;
-}
-
-function trimDashboardChatContextForModel(rawContext, maxChars = 52000) {
-  const context = rawContext && typeof rawContext === 'object' ? rawContext : {};
-  const cloned = JSON.parse(JSON.stringify(context));
-
-  const listTargets = [
-    ['orders', 'items', 24],
-    ['customers', 'items', 30],
-    ['calls', 'items', 24],
-    ['agenda', 'items', 24],
-    ['aiCallInsights', 'items', 24],
-    ['recentActivities', null, 24],
-  ];
-
-  const safeStringify = () => {
-    try {
-      return JSON.stringify(cloned);
-    } catch {
-      return '{}';
-    }
-  };
-
-  let serialized = safeStringify();
-  if (serialized.length <= maxChars) return cloned;
-
-  for (const [section, key, minCount] of listTargets) {
-    const current =
-      key === null
-        ? (Array.isArray(cloned?.[section]) ? cloned[section] : null)
-        : (Array.isArray(cloned?.[section]?.[key]) ? cloned[section][key] : null);
-    if (!current || current.length <= minCount) continue;
-
-    const reduced = current.slice(0, Math.max(minCount, Math.floor(current.length / 2)));
-    if (key === null) cloned[section] = reduced;
-    else cloned[section][key] = reduced;
-
-    serialized = safeStringify();
-    if (serialized.length <= maxChars) return cloned;
-  }
-
-  for (const [section, key, minCount] of listTargets) {
-    const current =
-      key === null
-        ? (Array.isArray(cloned?.[section]) ? cloned[section] : null)
-        : (Array.isArray(cloned?.[section]?.[key]) ? cloned[section][key] : null);
-    if (!current || current.length <= minCount) continue;
-    const reduced = current.slice(0, minCount);
-    if (key === null) cloned[section] = reduced;
-    else cloned[section][key] = reduced;
-  }
-
-  serialized = safeStringify();
-  if (serialized.length <= maxChars) return cloned;
-
-  for (const [section, key] of listTargets) {
-    if (key === null) cloned[section] = [];
-    else if (cloned?.[section] && typeof cloned[section] === 'object') cloned[section][key] = [];
-  }
-
-  return cloned;
-}
-
-async function buildPremiumDashboardChatContext() {
-  const [orderState, customerState] = await Promise.all([
-    getUiStateValues(PREMIUM_ACTIVE_ORDERS_SCOPE),
-    getUiStateValues(PREMIUM_CUSTOMERS_SCOPE),
-  ]);
-
-  const orderValues = orderState?.values && typeof orderState.values === 'object' ? orderState.values : {};
-  const customerValues =
-    customerState?.values && typeof customerState.values === 'object' ? customerState.values : {};
-
-  const customOrders = parseCustomOrdersFromUiState(orderValues[PREMIUM_ACTIVE_CUSTOM_ORDERS_KEY]);
-  const runtimeByOrderId = parseDashboardChatRuntimeByOrderId(orderValues[PREMIUM_ACTIVE_RUNTIME_KEY]);
-  const customers = parseDashboardChatCustomers(customerValues[PREMIUM_CUSTOMERS_KEY]);
-
-  const orders = customOrders
-    .map((item) => {
-      const runtime = runtimeByOrderId[String(item.id)] || {};
-      const paidAt = normalizeString(runtime.paidAt || item.paidAt || '');
-      const updatedAtRaw =
-        (Number.isFinite(Number(runtime.updatedAt)) && Number(runtime.updatedAt) > 0
-          ? Number(runtime.updatedAt)
-          : Date.parse(normalizeString(item.updatedAt || item.createdAt || ''))) || 0;
-      return {
-        id: Number(item.id) || null,
-        klant: truncateText(normalizeString(item.clientName || ''), 160),
-        titel: truncateText(normalizeString(item.title || ''), 220),
-        locatie: truncateText(normalizeString(item.location || ''), 160),
-        status: truncateText(normalizeString(runtime.statusKey || item.status || ''), 80) || 'wacht',
-        bedragEur: Math.max(0, Math.round(Number(item.amount) || 0)),
-        betaaldOp: paidAt ? paidAt.slice(0, 10) : '',
-        laatstBijgewerkt: normalizeString(item.updatedAt || item.createdAt || ''),
-        updatedAtMs: Number(updatedAtRaw) || 0,
-      };
-    })
-    .sort((a, b) => (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
-
-  const callUpdates = recentCallUpdates
-    .map((item) => {
-      const updatedAt =
-        normalizeString(item?.updatedAt || item?.createdAt || '') || new Date().toISOString();
-      const updatedAtMs =
-        (Number.isFinite(Number(item?.updatedAtMs)) && Number(item.updatedAtMs) > 0
-          ? Number(item.updatedAtMs)
-          : Date.parse(updatedAt)) || 0;
-      const recordingUrl = resolvePreferredRecordingUrl(item);
-      const hasRecording =
-        Boolean(recordingUrl) ||
-        toBooleanSafe(item?.recorded, false) ||
-        toBooleanSafe(item?.hasRecording, false);
-
-      return {
-        callId: truncateText(normalizeString(item?.callId || ''), 160),
-        bedrijf: truncateText(normalizeString(item?.company || ''), 160) || 'Onbekend',
-        contactpersoon: truncateText(normalizeString(item?.name || ''), 160),
-        telefoon: truncateText(normalizeString(item?.phone || ''), 80),
-        status: truncateText(normalizeString(item?.status || item?.messageType || ''), 80) || 'onbekend',
-        duur: truncateText(normalizeString(item?.durationLabel || ''), 40),
-        hasRecording,
-        samenvatting: truncateText(normalizeString(item?.summary || ''), 220),
-        transcriptSnippet: truncateText(normalizeString(item?.transcriptSnippet || ''), 220),
-        updatedAt,
-        updatedAtMs,
-      };
-    })
-    .sort((a, b) => (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
-
-  const agenda = generatedAgendaAppointments
-    .map((item) => {
-      const createdAt = normalizeString(item?.createdAt || '');
-      const updatedAt = normalizeString(item?.updatedAt || createdAt);
-      const updatedAtMs = Date.parse(updatedAt || createdAt || '') || 0;
-      return {
-        id: Number(item?.id) || null,
-        bedrijf: truncateText(normalizeString(item?.company || item?.leadCompany || ''), 160) || 'Onbekend',
-        contactpersoon: truncateText(
-          normalizeString(item?.contactName || item?.leadName || item?.name || ''),
-          160
-        ),
-        telefoon: truncateText(normalizeString(item?.phone || item?.leadPhone || ''), 80),
-        datum: normalizeDateYyyyMmDd(item?.date || item?.appointmentDate || ''),
-        tijd: normalizeTimeHhMm(item?.time || item?.appointmentTime || ''),
-        status: truncateText(
-          normalizeString(item?.status || item?.postCallStatus || item?.confirmationStatus || ''),
-          80
-        ) || 'onbekend',
-        notitie: truncateText(normalizeString(item?.summary || item?.notes || ''), 500),
-        updatedAt,
-        updatedAtMs,
-      };
-    })
-    .sort((a, b) => (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
-
-  const aiInsights = recentAiCallInsights
-    .map((item) => ({
-      callId: truncateText(normalizeString(item?.callId || ''), 160),
-      bedrijf: truncateText(normalizeString(item?.company || ''), 160) || 'Onbekend',
-      contactpersoon: truncateText(normalizeString(item?.contactName || ''), 160),
-      telefoon: truncateText(normalizeString(item?.phone || ''), 80),
-      branche: truncateText(normalizeString(item?.branche || ''), 120),
-      afspraakIngepland: toBooleanSafe(item?.appointmentBooked, false),
-      afspraakDatum: normalizeDateYyyyMmDd(item?.appointmentDate || ''),
-      afspraakTijd: normalizeTimeHhMm(item?.appointmentTime || ''),
-      followUpNodig: toBooleanSafe(item?.followUpRequired, false),
-      followUpReden: truncateText(normalizeString(item?.followUpReason || ''), 120),
-      samenvatting: truncateText(normalizeString(item?.summary || ''), 220),
-      analyzedAt: normalizeString(item?.analyzedAt || ''),
-    }))
-    .sort((a, b) => {
-      const aTs = Date.parse(a.analyzedAt || '') || 0;
-      const bTs = Date.parse(b.analyzedAt || '') || 0;
-      return bTs - aTs;
-    });
-
-  const activities = recentDashboardActivities
-    .map((item) => ({
-      tijd: normalizeString(item?.createdAt || ''),
-      titel: truncateText(normalizeString(item?.title || ''), 200),
-      detail: truncateText(normalizeString(item?.detail || ''), 180),
-      bedrijf: truncateText(normalizeString(item?.company || ''), 160),
-      bron: truncateText(normalizeString(item?.source || ''), 80),
-      actor: truncateText(normalizeString(item?.actor || ''), 120),
-    }))
-    .sort((a, b) => {
-      const aTs = Date.parse(a.tijd || '') || 0;
-      const bTs = Date.parse(b.tijd || '') || 0;
-      return bTs - aTs;
-    });
-
-  const orderTotalValueEur = orders.reduce((sum, item) => sum + (Number(item?.bedragEur) || 0), 0);
-  const orderPaidCount = orders.reduce((sum, item) => sum + (item?.betaaldOp ? 1 : 0), 0);
-  const customerPaidCount = customers.reduce(
-    (sum, item) => sum + (normalizeString(item?.status) === 'Betaald' ? 1 : 0),
-    0
-  );
-  const customerOpenCount = customers.length - customerPaidCount;
-  const customerWebsiteRevenueEur = customers.reduce(
-    (sum, item) => sum + (Number.isFinite(Number(item?.websiteBedrag)) ? Number(item.websiteBedrag) : 0),
-    0
-  );
-  const customerMaintenanceMonthlyEur = customers.reduce(
-    (sum, item) =>
-      sum + (Number.isFinite(Number(item?.onderhoudPerMaand)) ? Number(item.onderhoudPerMaand) : 0),
-    0
-  );
-
-  return {
-    generatedAt: new Date().toISOString(),
-    workspace: 'softora-premium-personeel-dashboard',
-    overview: {
-      totaalOpdrachten: orders.length,
-      totaalKlanten: customers.length,
-      totaalCalls: callUpdates.length,
-      totaalAgendaItems: agenda.length,
-      totaalAiInsights: aiInsights.length,
-      totaalActiviteiten: activities.length,
-    },
-    orders: {
-      total: orders.length,
-      paidCount: orderPaidCount,
-      statusCounts: buildDashboardChatStatusCounts(orders, 'status'),
-      totalValueEur: orderTotalValueEur,
-      items: orders.slice(0, 60),
-    },
-    customers: {
-      total: customers.length,
-      paidCount: customerPaidCount,
-      openCount: customerOpenCount,
-      websiteRevenueEur: customerWebsiteRevenueEur,
-      monthlyMaintenanceEur: customerMaintenanceMonthlyEur,
-      statusCounts: buildDashboardChatStatusCounts(customers, 'status'),
-      items: customers.slice(0, 80),
-    },
-    calls: {
-      total: callUpdates.length,
-      statusCounts: buildDashboardChatStatusCounts(callUpdates, 'status'),
-      withRecordingCount: callUpdates.reduce((sum, item) => sum + (item?.hasRecording ? 1 : 0), 0),
-      items: callUpdates.slice(0, 60),
-    },
-    agenda: {
-      total: agenda.length,
-      statusCounts: buildDashboardChatStatusCounts(agenda, 'status'),
-      items: agenda.slice(0, 60),
-    },
-    aiCallInsights: {
-      total: aiInsights.length,
-      appointmentsBooked: aiInsights.reduce(
-        (sum, item) => sum + (toBooleanSafe(item?.afspraakIngepland, false) ? 1 : 0),
-        0
-      ),
-      followUpsRequired: aiInsights.reduce(
-        (sum, item) => sum + (toBooleanSafe(item?.followUpNodig, false) ? 1 : 0),
-        0
-      ),
-      items: aiInsights.slice(0, 60),
-    },
-    recentActivities: activities.slice(0, 60),
-  };
-}
-
-async function generatePremiumDashboardChatReplyWithAi(options = {}) {
-  const apiKey = getOpenAiApiKey();
-  if (!apiKey) {
-    const err = new Error('OPENAI_API_KEY ontbreekt');
-    err.status = 503;
-    throw err;
-  }
-
-  const question = truncateText(normalizeString(options.question || ''), 4000);
-  if (!question) {
-    const err = new Error('Vraag ontbreekt');
-    err.status = 400;
-    throw err;
-  }
-
-  const history = normalizeDashboardChatHistory(options.history);
-  const context = options.context && typeof options.context === 'object' ? options.context : {};
-  const trimmedContext = trimDashboardChatContextForModel(context, 52000);
-  const contextJson = JSON.stringify(trimmedContext);
-
-  const systemPrompt = [
-    'Je bent de interne Softora AI-assistent voor het personeel-dashboard.',
-    'Je antwoordt altijd in duidelijk Nederlands.',
-    'Gebruik uitsluitend de aangeleverde dashboard-context.',
-    'Als data ontbreekt of niet zeker is, zeg dat expliciet en verzin niets.',
-    'Als de gebruiker vraagt om "alles", geef een compact overzicht per domein: omzet/opdrachten, klanten, calls, agenda en recente activiteiten.',
-    'Geef concrete aantallen en namen als die in de context staan.',
-    'Noem geen technische interne details (zoals API keys of serverconfiguratie).',
-  ].join('\n');
-
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    { role: 'system', content: `DASHBOARD_CONTEXT_JSON:\n${contextJson}` },
-    ...history,
-    { role: 'user', content: question },
-  ];
-
-  const { response, data } = await fetchJsonWithTimeout(
-    `${OPENAI_API_BASE_URL}/chat/completions`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        temperature: 0.15,
-        messages,
-      }),
-    },
-    65000
-  );
-
-  if (!response.ok) {
-    const err = new Error(`OpenAI dashboard-chat mislukt (${response.status})`);
-    err.status = response.status;
-    err.data = data;
-    throw err;
-  }
-
-  const content = data?.choices?.[0]?.message?.content;
-  const answer = truncateText(normalizeString(extractOpenAiTextContent(content)), 12000);
-  if (!answer) {
-    const err = new Error('AI gaf geen antwoord terug.');
-    err.status = 502;
-    err.data = data;
-    throw err;
-  }
-
-  return {
-    answer,
-    model: OPENAI_MODEL,
-    usage: data?.usage || null,
-  };
-}
-
-async function sendPremiumDashboardChatResponse(req, res) {
-  try {
-    if (isSupabaseConfigured() && !supabaseStateHydrated) {
-      await forceHydrateRuntimeStateWithRetries(3);
-    }
-    backfillInsightsAndAppointmentsFromRecentCallUpdates();
-
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const question = normalizeString(body.question || body.message || body.prompt || '');
-    if (!question) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Vraag ontbreekt',
-        detail: 'Stuur JSON met { question: "..." }',
-      });
-    }
-    if (question.length > 4000) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Vraag te lang',
-        detail: 'Gebruik maximaal 4000 tekens.',
-      });
-    }
-
-    const context = await buildPremiumDashboardChatContext();
-    const result = await generatePremiumDashboardChatReplyWithAi({
-      question,
-      history: body.history,
-      context,
-    });
-
-    return res.status(200).json({
-      ok: true,
-      answer: result.answer,
-      model: result.model,
-      usage: result.usage,
-      contextMeta: {
-        generatedAt: context.generatedAt || null,
-        totals: context.overview || {},
-      },
-      openAiEnabled: true,
-    });
-  } catch (error) {
-    const status = Number(error?.status) || 500;
-    const safeStatus = status >= 400 && status < 600 ? status : 500;
-    return res.status(safeStatus).json({
-      ok: false,
-      error:
-        safeStatus === 503
-          ? 'AI dashboard assistent niet beschikbaar'
-          : 'AI dashboard assistent mislukt',
-      detail: String(error?.message || 'Onbekende fout'),
-      openAiEnabled: Boolean(getOpenAiApiKey()),
-    });
-  }
-}
-
-app.post('/api/ai/dashboard-chat', async (req, res) => {
-  return sendPremiumDashboardChatResponse(req, res);
+registerAiDashboardRoutes(app, {
+  coordinator: aiDashboardCoordinator,
 });
 
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ai-dashboard-chat', async (req, res) => {
-  return sendPremiumDashboardChatResponse(req, res);
+registerAiToolRoutes(app, {
+  coordinator: aiToolsCoordinator,
 });
 
-app.post('/api/ai/summarize', async (req, res) => {
-  try {
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const text = normalizeString(body.text || '');
-    const style = normalizeAiSummaryStyle(body.style);
-    const language = normalizeString(body.language || 'nl') || 'nl';
-    const extraInstructions = normalizeString(body.extraInstructions || '');
-    const maxSentences = Math.max(1, Math.min(12, parseIntSafe(body.maxSentences, 4)));
-
-    if (!text) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Tekst ontbreekt',
-        detail: 'Stuur een JSON body met { text: "..." }',
-      });
-    }
-
-    if (text.length > 50000) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Tekst te lang',
-        detail: 'Maximaal 50.000 tekens per request.',
-      });
-    }
-
-    if (body.style !== undefined && !style) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Ongeldige stijl',
-        detail: 'Gebruik: short, medium, long of bullets',
-      });
-    }
-
-    const result = await generateTextSummaryWithAi({
-      text,
-      style: style || 'medium',
-      language,
-      maxSentences,
-      extraInstructions,
-    });
-
-    return res.status(200).json({
-      ok: true,
-      summary: result.summary,
-      style: result.style,
-      language: result.language,
-      maxSentences: result.maxSentences,
-      source: result.source,
-      model: result.model,
-      usage: result.usage,
-      openAiEnabled: true,
-    });
-  } catch (error) {
-    const status = Number(error?.status) || 500;
-    const safeStatus = status >= 400 && status < 600 ? status : 500;
-    return res.status(safeStatus).json({
-      ok: false,
-      error:
-        safeStatus === 503
-          ? 'AI samenvatting niet beschikbaar'
-          : 'AI samenvatting mislukt',
-      detail: String(error?.message || 'Onbekende fout'),
-      openAiEnabled: Boolean(getOpenAiApiKey()),
-    });
-  }
+registerActiveOrderRoutes(app, {
+  coordinator: activeOrdersCoordinator,
 });
 
-async function sendWebsitePreviewGenerateResponse(req, res) {
-  try {
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const inputUrl = normalizeString(body.url || body.websiteUrl || '');
-    if (!inputUrl) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Website-URL ontbreekt',
-        detail: 'Stuur een JSON body met { url: "https://voorbeeld.nl" }',
-      });
-    }
-
-    const fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
-    const generated = await generateWebsitePreviewImageWithAi(fetched.scan);
-
-    appendDashboardActivity(
-      {
-        type: 'website_preview_generated',
-        title: 'Websitegenerator gegenereerd',
-        detail: `Nieuwe AI preview gemaakt voor ${fetched.scan.host || fetched.finalUrl}.`,
-        actor: 'api',
-        source: 'premium-websitegenerator',
-      },
-      'dashboard_activity_website_preview_generated'
-    );
-
-    return res.status(200).json({
-      ok: true,
-      site: {
-        requestedUrl: inputUrl,
-        normalizedUrl: fetched.normalizedUrl,
-        finalUrl: fetched.finalUrl,
-        host: fetched.scan.host || '',
-      },
-      scan: {
-        title: fetched.scan.title || '',
-        metaDescription: fetched.scan.metaDescription || '',
-        h1: fetched.scan.h1 || '',
-        headings: fetched.scan.headings || [],
-        paragraphs: fetched.scan.paragraphs || [],
-        visualCues: fetched.scan.visualCues || [],
-        imageCount: Number(fetched.scan.imageCount || 0) || 0,
-      },
-      brief: generated.brief,
-      prompt: generated.prompt,
-      image: {
-        dataUrl: generated.dataUrl,
-        mimeType: generated.mimeType,
-        fileName: generated.fileName,
-      },
-      model: generated.model,
-      revisedPrompt: generated.revisedPrompt || '',
-      usage: generated.usage,
-      openAiEnabled: true,
-    });
-  } catch (error) {
-    const status = Number(error?.status) || 500;
-    const safeStatus = status >= 400 && status < 600 ? status : 500;
-    const upstreamDetail = truncateText(
-      normalizeString(
-        error?.data?.error?.message ||
-          error?.data?.error?.detail ||
-          error?.data?.error ||
-          error?.data?.detail ||
-          ''
-      ),
-      500
-    );
-
-    return res.status(safeStatus).json({
-      ok: false,
-      error:
-        safeStatus === 503
-          ? 'Websitegenerator AI niet beschikbaar'
-          : 'Websitegenerator genereren mislukt',
-      detail: String(error?.message || 'Onbekende fout'),
-      openAiEnabled: Boolean(getOpenAiApiKey()),
-      imageModel: OPENAI_IMAGE_MODEL,
-      upstreamDetail: upstreamDetail || null,
-    });
-  }
-}
-
-app.post('/api/website-preview/generate', async (req, res) => {
-  return sendWebsitePreviewGenerateResponse(req, res);
+registerRuntimeOpsRoutes(app, {
+  coordinator: runtimeOpsCoordinator,
+  requireRuntimeDebugAccess,
 });
 
-app.post('/api/website-preview-generate', async (req, res) => {
-  return sendWebsitePreviewGenerateResponse(req, res);
+registerRuntimeDebugOpsRoutes(app, {
+  coordinator: runtimeDebugOpsCoordinator,
+  requireRuntimeDebugAccess,
 });
 
-async function sendAiOrderDossierResponse(req, res) {
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const input = buildOrderDossierInput({
-    orderId: body.orderId,
-    title: body.title,
-    company: body.company,
-    contact: body.contact,
-    domainName: body.domainName,
-    deliveryTime: body.deliveryTime,
-    claimedBy: body.claimedBy,
-    claimedAt: body.claimedAt,
-    description: body.description,
-    transcript: body.transcript,
-    sourceAppointmentLabel: body.sourceAppointmentLabel,
-    language: body.language || 'nl',
-  });
-
-  if (!input.orderId && !normalizeString(input.title) && !normalizeString(input.company)) {
-    return res.status(400).json({
-      ok: false,
-      error: 'Onvoldoende dossierinformatie',
-      detail: 'Stuur minimaal orderId en basisprojectdata mee.',
-    });
-  }
-
-  try {
-    const result = await generateDynamicOrderDossierWithAnthropic(input);
-    return res.status(200).json({
-      ok: true,
-      layout: result.layout,
-      source: result.source,
-      model: result.model,
-      usage: result.usage,
-      anthropicEnabled: true,
-    });
-  } catch (error) {
-    const fallbackLayout = buildOrderDossierFallbackLayout(input);
-    console.error(
-      '[AI][OrderDossier][Fallback]',
-      JSON.stringify(
-        {
-          reason: String(error?.message || 'Onbekende fout'),
-          status: Number(error?.status || 0) || null,
-          anthropicEnabled: Boolean(getAnthropicApiKey()),
-          model: getDossierAnthropicModel(),
-          orderId: input.orderId || null,
-        },
-        null,
-        2
-      )
-    );
-
-    return res.status(200).json({
-      ok: true,
-      layout: fallbackLayout,
-      source: 'template-fallback',
-      model: null,
-      usage: null,
-      warning: 'Claude dossier generatie faalde, template-fallback gebruikt.',
-      detail: String(error?.message || 'Onbekende fout'),
-      anthropicEnabled: Boolean(getAnthropicApiKey()),
-    });
-  }
-}
-
-app.post('/api/ai/order-dossier', async (req, res) => {
-  return sendAiOrderDossierResponse(req, res);
+registerSeoReadRoutes(app, {
+  readCoordinator: seoReadCoordinator,
 });
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ai-order-dossier', async (req, res) => {
-  return sendAiOrderDossierResponse(req, res);
-});
-
-async function sendAiTranscriptToPromptResponse(req, res) {
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const transcript = normalizeString(body.transcript || body.text || '');
-  const language = normalizeString(body.language || 'nl') || 'nl';
-  const context = normalizeString(body.context || '');
-
-  if (!transcript) {
-    return res.status(400).json({
-      ok: false,
-      error: 'Transcript ontbreekt',
-      detail: 'Stuur een JSON body met { transcript: "..." }',
-    });
-  }
-
-  if (transcript.length > 50000) {
-    return res.status(400).json({
-      ok: false,
-      error: 'Transcript te lang',
-      detail: 'Maximaal 50.000 tekens per request.',
-    });
-  }
-
-  try {
-    const result = await generateWebsitePromptFromTranscriptWithAi({
-      transcript,
-      language,
-      context,
-    });
-
-    return res.status(200).json({
-      ok: true,
-      prompt: result.prompt,
-      source: result.source,
-      model: result.model,
-      usage: result.usage,
-      language: result.language,
-      openAiEnabled: true,
-    });
-  } catch (error) {
-    const fallbackPrompt = buildWebsitePromptFallback({
-      transcript,
-      language,
-      context,
-    });
-
-    console.error(
-      '[AI][TranscriptToPrompt][Fallback]',
-      JSON.stringify(
-        {
-          reason: String(error?.message || 'Onbekende fout'),
-          status: Number(error?.status || 0) || null,
-          openAiEnabled: Boolean(getOpenAiApiKey()),
-        },
-        null,
-        2
-      )
-    );
-
-    return res.status(200).json({
-      ok: true,
-      prompt: fallbackPrompt,
-      source: 'template-fallback',
-      model: null,
-      usage: null,
-      language,
-      warning: 'AI prompt generatie faalde, template fallback gebruikt.',
-      detail: String(error?.message || 'Onbekende fout'),
-      openAiEnabled: Boolean(getOpenAiApiKey()),
-    });
-  }
-}
-
-app.post('/api/ai/transcript-to-prompt', async (req, res) => {
-  return sendAiTranscriptToPromptResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ai-transcript-to-prompt', async (req, res) => {
-  return sendAiTranscriptToPromptResponse(req, res);
-});
-
-async function sendAiNotesImageToTextResponse(req, res) {
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const imageDataUrl = normalizeString(body.imageDataUrl || body.image || '').replace(/\s+/g, '');
-  const language = normalizeString(body.language || 'nl') || 'nl';
-  const context = normalizeString(body.context || '');
-
-  if (!imageDataUrl) {
-    return res.status(400).json({
-      ok: false,
-      error: 'Afbeelding ontbreekt',
-      detail: 'Stuur een JSON body met { imageDataUrl: "data:image/...;base64,..." }',
-    });
-  }
-
-  if (imageDataUrl.length > 900000) {
-    return res.status(413).json({
-      ok: false,
-      error: 'Afbeelding te groot',
-      detail: 'Lever een compactere afbeelding aan (max ~700KB geadviseerd).',
-    });
-  }
-
-  try {
-    const extraction = await extractMeetingNotesFromImageWithAi({
-      imageDataUrl,
-      language,
-    });
-
-    let promptResult = null;
-    try {
-      promptResult = await generateWebsitePromptFromTranscriptWithAi({
-        transcript: extraction.transcript,
-        language,
-        context,
-      });
-    } catch (promptError) {
-      promptResult = {
-        prompt: buildWebsitePromptFallback({
-          transcript: extraction.transcript,
-          language,
-          context,
-        }),
-        source: 'template-fallback',
-        model: null,
-        usage: null,
-      };
-    }
-
-    return res.status(200).json({
-      ok: true,
-      transcript: extraction.transcript,
-      prompt: String(promptResult?.prompt || '').trim(),
-      source: extraction.source,
-      model: extraction.model,
-      promptSource: String(promptResult?.source || ''),
-      usage: {
-        extraction: extraction.usage || null,
-        prompt: promptResult?.usage || null,
-      },
-      language,
-      openAiEnabled: true,
-    });
-  } catch (error) {
-    const status = Number(error?.status) || 500;
-    const safeStatus = status >= 400 && status < 600 ? status : 500;
-    return res.status(safeStatus).json({
-      ok: false,
-      error:
-        safeStatus === 503
-          ? 'AI notitie-herkenning niet beschikbaar'
-          : 'AI notitie-herkenning mislukt',
-      detail: String(error?.message || 'Onbekende fout'),
-      openAiEnabled: Boolean(getOpenAiApiKey()),
-    });
-  }
-}
-
-app.post('/api/ai/notes-image-to-text', async (req, res) => {
-  return sendAiNotesImageToTextResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ai-notes-image-to-text', async (req, res) => {
-  return sendAiNotesImageToTextResponse(req, res);
-});
-
-async function sendActiveOrderGenerateSiteResponse(req, res) {
-  try {
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const prompt = normalizeString(body.prompt || '');
-    const company = truncateText(normalizeString(body.company || body.clientName || ''), 160);
-    const title = truncateText(normalizeString(body.title || ''), 200);
-    const description = truncateText(normalizeString(body.description || ''), 3000);
-    const language = normalizeString(body.language || 'nl') || 'nl';
-    const orderId = Number(body.orderId) || null;
-    const buildMode = normalizeString(body.buildMode || '') || null;
-    const referenceImages = sanitizeReferenceImages(body.referenceImages || body.attachments || [], {
-      maxItems: 6,
-      maxBytesPerImage: 550 * 1024,
-      maxTotalBytes: 3 * 1024 * 1024,
-    });
-
-    if (!prompt) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Prompt ontbreekt',
-        detail: 'Stuur een body met minimaal { prompt: "..." }',
-      });
-    }
-
-    const generated = await generateWebsiteHtmlWithAi({
-      prompt,
-      company,
-      title,
-      description,
-      language,
-      referenceImages,
-    });
-
-    appendDashboardActivity(
-      {
-        type: 'active_order_generated',
-        title: 'AI website gegenereerd',
-        detail: `HTML-opzet gegenereerd${company ? ` voor ${company}` : ''}${referenceImages.length ? ` met ${referenceImages.length} referentiebeeld(en)` : ''}.`,
-        company,
-        actor: 'api',
-        taskId: Number.isFinite(orderId) ? orderId : null,
-        source: 'premium-actieve-opdrachten',
-      },
-      'dashboard_activity_active_order_generated'
-    );
-
-    return res.status(200).json({
-      ok: true,
-      html: generated.html,
-      source: generated.source,
-      model: generated.model,
-      generator: {
-        strictAnthropic: WEBSITE_GENERATION_STRICT_ANTHROPIC,
-        strictHtml: WEBSITE_GENERATION_STRICT_HTML,
-      },
-      usage: generated.usage,
-      apiCost: generated.apiCost,
-      order: {
-        orderId,
-        company,
-        title,
-        buildMode,
-        referenceImageCount: referenceImages.length,
-        generatedAt: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    const status = Number(error?.status) || 500;
-    const safeStatus = status >= 400 && status < 600 ? status : 500;
-    const upstreamDetail = truncateText(
-      normalizeString(
-        error?.data?.error?.message ||
-          error?.data?.error?.detail ||
-          error?.data?.error ||
-          error?.data?.detail ||
-          ''
-      ),
-      500
-    );
-    return res.status(safeStatus).json({
-      ok: false,
-      error:
-        safeStatus === 503
-          ? 'AI website generatie niet beschikbaar'
-          : 'AI website generatie mislukt',
-      detail: String(error?.message || 'Onbekende fout'),
-      openAiEnabled: Boolean(getOpenAiApiKey()),
-      anthropicEnabled: Boolean(getAnthropicApiKey()),
-      websiteGenerationProvider: getWebsiteGenerationProvider(),
-      websiteGenerationModel:
-        getWebsiteGenerationProvider() === 'anthropic' ? getWebsiteAnthropicModel() : OPENAI_MODEL,
-      upstreamDetail: upstreamDetail || null,
-    });
-  }
-}
-
-app.post('/api/active-orders/generate-site', async (req, res) => {
-  return sendActiveOrderGenerateSiteResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/active-order-generate-site', async (req, res) => {
-  return sendActiveOrderGenerateSiteResponse(req, res);
-});
-
-async function sendActiveOrderLaunchSiteResponse(req, res) {
-  try {
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const html = String(body.html || '');
-    const orderId = Number(body.orderId) || null;
-    const company = truncateText(normalizeString(body.company || body.clientName || ''), 160);
-    const title = truncateText(normalizeString(body.title || ''), 200);
-    const description = truncateText(normalizeString(body.description || ''), 3000);
-    const deliveryTime = truncateText(normalizeString(body.deliveryTime || ''), 200);
-    const domainName = sanitizeLaunchDomainName(body.domainName || body.domain || '');
-
-    if (!html.trim()) {
-      return res.status(400).json({
-        ok: false,
-        error: 'HTML ontbreekt',
-        detail: 'Stuur een body met minimaal { html: "..." }.'
-      });
-    }
-
-    const launchResult = await runActiveOrderLaunchPipeline({
-      orderId,
-      company,
-      title,
-      description,
-      deliveryTime,
-      domainName,
-      html
-    });
-
-    appendDashboardActivity(
-      {
-        type: 'active_order_automation_completed',
-        title: 'Case automatisch gelanceerd',
-        detail: `${company || 'Case'} is doorgezet naar GitHub en Vercel.`,
-        company,
-        actor: 'api',
-        taskId: Number.isFinite(orderId) ? orderId : null,
-        source: 'premium-actieve-opdrachten'
-      },
-      'dashboard_activity_active_order_launch'
-    );
-
-    return res.status(200).json(launchResult);
-  } catch (error) {
-    const detail = String(error?.message || 'Onbekende launch fout');
-    const status = /ontbreekt|missing|niet compleet|staat uit|verwacht/i.test(detail) ? 400 : 500;
-    return res.status(status).json({
-      ok: false,
-      error: 'Launch pipeline mislukt',
-      detail
-    });
-  }
-}
-
-app.post('/api/active-orders/launch-site', async (req, res) => {
-  return sendActiveOrderLaunchSiteResponse(req, res);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/active-order-launch-site', async (req, res) => {
-  return sendActiveOrderLaunchSiteResponse(req, res);
-});
-
-app.get('/api/dashboard/activity', (req, res) => {
-  const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
-  return res.status(200).json({
-    ok: true,
-    count: Math.min(limit, recentDashboardActivities.length),
-    activities: recentDashboardActivities.slice(0, limit),
-  });
-});
-
-app.get('/api/security/audit-log', requireRuntimeDebugAccess, (req, res) => {
-  const limit = Math.max(1, Math.min(500, parseIntSafe(req.query.limit, 100)));
-  return res.status(200).json({
-    ok: true,
-    count: Math.min(limit, recentSecurityAuditEvents.length),
-    events: recentSecurityAuditEvents.slice(0, limit),
-  });
-});
-
-async function sendUiStateGetResponse(req, res, scopeRaw) {
-  const scope = normalizeUiStateScope(scopeRaw);
-  if (!scope) {
-    return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
-  }
-
-  const state = await getUiStateValues(scope);
-  if (!state) {
-    return res.status(503).json({
-      ok: false,
-      error: 'Kon UI state niet laden zonder geldige Supabase-opslag.',
-    });
-  }
-
-  return res.status(200).json({
-    ok: true,
-    scope,
-    values: state.values || {},
-    source: state.source || 'supabase',
-    updatedAt: state.updatedAt || null,
-  });
-}
-
-app.get('/api/ui-state/:scope', async (req, res) => {
-  return sendUiStateGetResponse(req, res, req.params.scope);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.get('/api/ui-state-get', async (req, res) => {
-  return sendUiStateGetResponse(req, res, req.query.scope);
-});
-
-async function sendUiStateSetResponse(req, res, scopeRaw) {
-  const scope = normalizeUiStateScope(scopeRaw);
-  if (!scope) {
-    return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
-  }
-
-  const patchProvided = req.body && typeof req.body === 'object' && req.body.patch && typeof req.body.patch === 'object';
-  let valuesToSave;
-
-  if (patchProvided) {
-    const current = await getUiStateValues(scope);
-    if (!current) {
-      return res.status(503).json({
-        ok: false,
-        error: 'Kon UI state patch niet laden zonder geldige Supabase-opslag.',
-      });
-    }
-    const currentValues = current && current.values && typeof current.values === 'object' ? current.values : {};
-    const patchValues = sanitizeUiStateValues(req.body.patch);
-    valuesToSave = { ...currentValues, ...patchValues };
-  } else {
-    valuesToSave = sanitizeUiStateValues(req.body?.values || {});
-  }
-
-  const state = await setUiStateValues(scope, valuesToSave, {
-    source: normalizeString(req.body?.source || 'frontend'),
-    actor: normalizeString(req.body?.actor || ''),
-  });
-  if (!state) {
-    return res.status(503).json({
-      ok: false,
-      error: 'Kon UI state niet opslaan zonder geldige Supabase-opslag.',
-    });
-  }
-
-  return res.status(200).json({
-    ok: true,
-    scope,
-    values: state.values || {},
-    source: state.source || 'supabase',
-    updatedAt: state.updatedAt || null,
-  });
-}
-
-app.post('/api/ui-state/:scope', async (req, res) => {
-  return sendUiStateSetResponse(req, res, req.params.scope);
-});
-
-// Vercel fallback voor diepe API-paths in sommige regio's.
-app.post('/api/ui-state-set', async (req, res) => {
-  return sendUiStateSetResponse(req, res, req.query.scope);
-});
-
-app.get('/api/seo/pages', async (req, res) => {
-  const files = getSeoEditableHtmlFiles();
-  const query = normalizeString(req.query.q || '').toLowerCase();
-
-  try {
-    const config = await getSeoConfigCached();
-    const pages = [];
-
-    for (const fileName of files) {
-      const html = await readHtmlPageContent(fileName);
-      if (!html) continue;
-      const source = extractSeoSourceFromHtml(html);
-      const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
-      const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
-      const effective = mergeSeoSourceWithOverrides(source, pageOverrides);
-      const images = extractImageEntriesFromHtml(html);
-      const slug = String(fileName).replace(/\.html$/i, '');
-      const pathName = slug === 'index' ? '/' : `/${slug}`;
-      const searchIndex = `${fileName} ${pathName} ${effective.title || ''}`.toLowerCase();
-
-      if (query && !searchIndex.includes(query)) continue;
-
-      pages.push({
-        file: fileName,
-        slug,
-        path: pathName,
-        title: effective.title || source.title || slug,
-        metaDescription: effective.metaDescription || source.metaDescription || '',
-        imageCount: images.length,
-        pageOverrideCount: Object.keys(pageOverrides).length,
-        imageOverrideCount: Object.keys(imageOverrides).length,
-      });
-    }
-
-    return res.status(200).json({
-      ok: true,
-      count: pages.length,
-      pages,
-    });
-  } catch (error) {
-    console.error('[SEO][PagesError]', error?.message || error);
-    return res.status(500).json({
-      ok: false,
-      error: 'Kon SEO pagina-overzicht niet ophalen.',
-    });
-  }
-});
-
-app.get('/api/seo/page', async (req, res) => {
-  const fileName = resolveSeoPageFileFromRequest(req.query.file, req.query.slug);
-  if (!fileName) {
-    return res.status(400).json({ ok: false, error: 'Ongeldig of onbekend HTML-bestand.' });
-  }
-
-  const html = await readHtmlPageContent(fileName);
-  if (!html) {
-    return res.status(404).json({ ok: false, error: 'Pagina niet gevonden of onleesbaar.' });
-  }
-
-  try {
-    const config = await getSeoConfigCached();
-    const source = extractSeoSourceFromHtml(html);
-    const pageOverrides = normalizeSeoStoredPageOverrides(config.pages[fileName] || {});
-    const effective = mergeSeoSourceWithOverrides(source, pageOverrides);
-    const imageOverrides = normalizeSeoStoredImageOverrides(config.images[fileName] || {});
-    const images = extractImageEntriesFromHtml(html).map((entry) => {
-      const overrideAlt = normalizeString(imageOverrides[entry.src] || '');
-      return {
-        src: entry.src,
-        sourceAlt: entry.alt || '',
-        overrideAlt,
-        effectiveAlt: overrideAlt || entry.alt || '',
-      };
-    });
-
-    return res.status(200).json({
-      ok: true,
-      file: fileName,
-      slug: String(fileName).replace(/\.html$/i, ''),
-      seo: {
-        source,
-        overrides: pageOverrides,
-        effective,
-      },
-      imageCount: images.length,
-      images,
-    });
-  } catch (error) {
-    console.error('[SEO][PageError]', error?.message || error);
-    return res.status(500).json({
-      ok: false,
-      error: 'Kon SEO data voor deze pagina niet ophalen.',
-    });
-  }
-});
-
-app.post('/api/seo/page', async (req, res) => {
-  const fileName = resolveSeoPageFileFromRequest(req.body?.file, req.body?.slug);
-  if (!fileName) {
-    return res.status(400).json({ ok: false, error: 'Ongeldig of onbekend HTML-bestand.' });
-  }
-
-  const pageOverridePatch = normalizeSeoPageOverridePatch(req.body?.pageOverrides || req.body?.page || {});
-  const imageOverridePatch = normalizeSeoImageOverridePatch(
-    req.body?.imageAltOverrides || req.body?.imageOverrides || req.body?.images || {}
-  );
-
-  try {
-    const currentConfig = await getSeoConfigCached(true);
-    const nextConfig = normalizeSeoConfig(currentConfig);
-
-    const nextPageOverrides = {
-      ...(nextConfig.pages[fileName] || {}),
-    };
-    for (const field of SEO_PAGE_FIELD_DEFS) {
-      if (!Object.prototype.hasOwnProperty.call(pageOverridePatch, field.key)) continue;
-      const value = normalizeString(pageOverridePatch[field.key]);
-      if (!value) {
-        delete nextPageOverrides[field.key];
-        continue;
-      }
-      nextPageOverrides[field.key] = value;
-    }
-    if (Object.keys(nextPageOverrides).length > 0) {
-      nextConfig.pages[fileName] = nextPageOverrides;
-    } else {
-      delete nextConfig.pages[fileName];
-    }
-
-    const nextImageOverrides = {
-      ...(nextConfig.images[fileName] || {}),
-    };
-    for (const [src, altRaw] of Object.entries(imageOverridePatch)) {
-      const alt = normalizeString(altRaw);
-      if (!alt) {
-        delete nextImageOverrides[src];
-        continue;
-      }
-      nextImageOverrides[src] = alt;
-    }
-    if (Object.keys(nextImageOverrides).length > 0) {
-      nextConfig.images[fileName] = nextImageOverrides;
-    } else {
-      delete nextConfig.images[fileName];
-    }
-
-    const saved = await persistSeoConfig(nextConfig, {
-      source: 'seo-dashboard',
-      actor: normalizeString(req.body?.actor || 'dashboard'),
-    });
-    if (!saved) {
-      return res.status(500).json({ ok: false, error: 'Kon SEO wijzigingen niet opslaan.' });
-    }
-
-    appendDashboardActivity(
-      {
-        type: 'seo_page_updated',
-        title: 'SEO-instellingen opgeslagen',
-        detail: `SEO updates opgeslagen voor ${fileName}.`,
-        source: 'premium-seo',
-        actor: normalizeString(req.body?.actor || 'dashboard'),
-      },
-      'dashboard_activity_seo_updated'
-    );
-
-    return res.status(200).json({
-      ok: true,
-      file: fileName,
-      saved: {
-        pageOverrideCount: Object.keys(saved.pages[fileName] || {}).length,
-        imageOverrideCount: Object.keys(saved.images[fileName] || {}).length,
-      },
-    });
-  } catch (error) {
-    console.error('[SEO][SaveError]', error?.message || error);
-    return res.status(500).json({
-      ok: false,
-      error: 'SEO wijzigingen opslaan mislukt.',
-    });
-  }
-});
-
-app.get('/api/seo/site-audit', async (_req, res) => {
-  try {
-    const audit = await buildSeoSiteAudit();
-    return res.status(200).json(audit);
-  } catch (error) {
-    console.error('[SEO][SiteAuditError]', error?.message || error);
-    return res.status(500).json({
-      ok: false,
-      error: 'Kon de volledige SEO-scan niet uitvoeren.',
-    });
-  }
-});
-
-app.post('/api/seo/site-optimize', async (req, res) => {
-  try {
-    const preferredModel = normalizeSeoModelPreset(req.body?.model || req.body?.preferredModel || 'gpt-5.1');
-    const currentConfig = await getSeoConfigCached(true);
-    const currentAudit = await buildSeoSiteAudit(currentConfig);
-    const optimization = applySeoAuditSuggestionsToConfig(currentConfig, currentAudit, preferredModel);
-
-    if (optimization.changedPages.length === 0) {
-      let savedConfig = currentConfig;
-      if (normalizeSeoModelPreset(currentConfig?.automation?.preferredModel || '') !== preferredModel) {
-        const saved = await persistSeoConfig(optimization.nextConfig, {
-          source: 'seo-dashboard',
-          actor: normalizeString(req.body?.actor || 'site-optimize'),
-        });
-        if (saved) savedConfig = saved;
-      }
-      const audit = await buildSeoSiteAudit(savedConfig);
-      return res.status(200).json({
-        ok: true,
-        optimizedAt: new Date().toISOString(),
-        preferredModel,
-        changedPages: [],
-        appliedPageFieldCount: 0,
-        appliedImageAltCount: 0,
-        audit,
-        message: 'Er waren geen extra SEO-aanpassingen nodig.',
-      });
-    }
-
-    const saved = await persistSeoConfig(optimization.nextConfig, {
-      source: 'seo-dashboard',
-      actor: normalizeString(req.body?.actor || 'site-optimize'),
-    });
-    if (!saved) {
-      return res.status(500).json({
-        ok: false,
-        error: 'Kon de AI SEO-optimalisatie niet opslaan.',
-      });
-    }
-
-    appendDashboardActivity(
-      {
-        type: 'seo_site_optimized',
-        title: 'SEO site-optimalisatie uitgevoerd',
-        detail: `${optimization.changedPages.length} pagina's geoptimaliseerd met ${preferredModel}.`,
-        source: 'premium-seo',
-        actor: normalizeString(req.body?.actor || 'site-optimize'),
-      },
-      'dashboard_activity_seo_site_optimized'
-    );
-
-    const audit = await buildSeoSiteAudit(saved);
-    return res.status(200).json({
-      ok: true,
-      optimizedAt: new Date().toISOString(),
-      preferredModel,
-      changedPages: optimization.changedPages,
-      appliedPageFieldCount: optimization.appliedPageFieldCount,
-      appliedImageAltCount: optimization.appliedImageAltCount,
-      audit,
-      message: `${optimization.changedPages.length} pagina's automatisch bijgewerkt.`,
-    });
-  } catch (error) {
-    console.error('[SEO][SiteOptimizeError]', error?.message || error);
-    return res.status(500).json({
-      ok: false,
-      error: 'Kon de AI SEO-optimalisatie niet uitvoeren.',
-    });
-  }
-});
-
-app.post('/api/seo/automation', async (req, res) => {
-  try {
-    const currentConfig = await getSeoConfigCached(true);
-    const nextConfig = normalizeSeoConfig(currentConfig);
-    const automationPatch = {
-      ...(nextConfig.automation || {}),
-      updatedAt: new Date().toISOString(),
-    };
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'preferredModel') || Object.prototype.hasOwnProperty.call(req.body || {}, 'model')) {
-      automationPatch.preferredModel = req.body?.preferredModel ?? req.body?.model;
-    }
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogAutomationEnabled')) {
-      automationPatch.blogAutomationEnabled = req.body?.blogAutomationEnabled;
-    }
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogCadence')) {
-      automationPatch.blogCadence = req.body?.blogCadence;
-    }
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogModel')) {
-      automationPatch.blogModel = req.body?.blogModel;
-    }
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blogAutoImages')) {
-      automationPatch.blogAutoImages = req.body?.blogAutoImages;
-    }
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'searchConsoleConnected')) {
-      automationPatch.searchConsoleConnected = req.body?.searchConsoleConnected;
-    }
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'analyticsConnected')) {
-      automationPatch.analyticsConnected = req.body?.analyticsConnected;
-    }
-    nextConfig.automation = normalizeSeoAutomationSettings(automationPatch);
-
-    const saved = await persistSeoConfig(nextConfig, {
-      source: 'seo-dashboard',
-      actor: normalizeString(req.body?.actor || 'automation'),
-    });
-    if (!saved) {
-      return res.status(500).json({
-        ok: false,
-        error: 'Kon de SEO automatisering niet opslaan.',
-      });
-    }
-
-    appendDashboardActivity(
-      {
-        type: 'seo_automation_updated',
-        title: 'SEO automatisering bijgewerkt',
-        detail: `Voorkeursmodel ${saved.automation.preferredModel}, blogschema ${saved.automation.blogCadence}.`,
-        source: 'premium-seo',
-        actor: normalizeString(req.body?.actor || 'automation'),
-      },
-      'dashboard_activity_seo_automation_updated'
-    );
-
-    return res.status(200).json({
-      ok: true,
-      automation: normalizeSeoAutomationSettings(saved.automation),
-      modelOptions: getSeoModelPresetOptions(),
-    });
-  } catch (error) {
-    console.error('[SEO][AutomationSaveError]', error?.message || error);
-    return res.status(500).json({
-      ok: false,
-      error: 'Kon de SEO automatisering niet opslaan.',
-    });
-  }
-});
-
-app.post('/api/dashboard/activity', (req, res) => {
-  const entry = appendDashboardActivity(
-    {
-      ...req.body,
-      source: normalizeString(req.body?.source || 'premium-personeel-dashboard'),
-      actor: normalizeString(req.body?.actor || ''),
-    },
-    'dashboard_activity_manual'
-  );
-
-  return res.status(201).json({
-    ok: true,
-    activity: entry,
-  });
+registerSeoWriteRoutes(app, {
+  writeCoordinator: seoWriteCoordinator,
 });
 
 function normalizePostCallStatus(value) {
@@ -15440,597 +10400,6 @@ function normalizePostCallStatus(value) {
 
 function sanitizePostCallText(value, maxLen = 20000) {
   return truncateText(normalizeString(value || ''), maxLen);
-}
-
-function parseImageDataUrl(rawValue) {
-  const raw = normalizeString(rawValue || '').replace(/\s+/g, '');
-  if (!raw) return null;
-  const match = raw.match(/^data:(image\/(?:png|jpe?g|webp));base64,([a-z0-9+/=]+)$/i);
-  if (!match) return null;
-
-  const mimeType = String(match[1] || '').toLowerCase();
-  const base64Payload = String(match[2] || '');
-  if (!base64Payload) return null;
-
-  let sizeBytes = 0;
-  try {
-    sizeBytes = Buffer.from(base64Payload, 'base64').length;
-  } catch {
-    return null;
-  }
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return null;
-
-  return {
-    mimeType,
-    base64Payload,
-    sizeBytes,
-    dataUrl: `data:${mimeType};base64,${base64Payload}`,
-  };
-}
-
-function sanitizeReferenceImages(input, options = {}) {
-  const maxItems = Math.max(0, Math.min(12, Number(options.maxItems || 8) || 8));
-  const maxBytesPerImage = Math.max(
-    50 * 1024,
-    Math.min(2 * 1024 * 1024, Number(options.maxBytesPerImage || 550 * 1024) || 550 * 1024)
-  );
-  const maxTotalBytes = Math.max(
-    maxBytesPerImage,
-    Math.min(8 * 1024 * 1024, Number(options.maxTotalBytes || 3 * 1024 * 1024) || 3 * 1024 * 1024)
-  );
-
-  const source = Array.isArray(input) ? input : [];
-  const out = [];
-  let totalBytes = 0;
-
-  for (let i = 0; i < source.length; i += 1) {
-    if (out.length >= maxItems) break;
-    const item = source[i];
-    if (!item || typeof item !== 'object') continue;
-
-    const parsed = parseImageDataUrl(item.dataUrl || item.imageDataUrl || item.url || '');
-    if (!parsed) continue;
-    if (parsed.sizeBytes > maxBytesPerImage) continue;
-    if (totalBytes + parsed.sizeBytes > maxTotalBytes) continue;
-
-    const name = truncateText(normalizeString(item.name || item.fileName || `bijlage-${i + 1}`), 140) || `bijlage-${i + 1}`;
-    const id =
-      truncateText(normalizeString(item.id || ''), 80) ||
-      `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-    out.push({
-      id,
-      name,
-      mimeType: parsed.mimeType,
-      sizeBytes: parsed.sizeBytes,
-      dataUrl: parsed.dataUrl,
-    });
-    totalBytes += parsed.sizeBytes;
-  }
-
-  return out;
-}
-
-function slugifyAutomationText(value, fallback = 'project') {
-  const ascii = String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '');
-  const slug = ascii
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/-{2,}/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80);
-  return slug || fallback;
-}
-
-function sanitizeLaunchDomainName(value) {
-  const raw = normalizeString(value || '')
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
-    .replace(/\/.*$/, '')
-    .trim();
-  if (!raw) return '';
-  if (!raw.includes('.')) return '';
-  if (!/^[a-z0-9][a-z0-9.-]{1,251}[a-z0-9]$/.test(raw)) return '';
-  if (raw.includes('..')) return '';
-  return raw;
-}
-
-async function runCommandWithOutput(command, args = [], options = {}) {
-  const cwd = options.cwd || process.cwd();
-  const timeoutMs = Math.max(1_000, Math.min(900_000, Number(options.timeoutMs || 300_000)));
-  const env = {
-    ...process.env,
-    ...(options.env && typeof options.env === 'object' ? options.env : {})
-  };
-
-  return await new Promise((resolve, reject) => {
-    const child = spawn(command, Array.isArray(args) ? args : [], {
-      cwd,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false
-    });
-
-    let stdout = '';
-    let stderr = '';
-    let done = false;
-
-    const finish = (error, result) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      if (error) reject(error);
-      else resolve(result);
-    };
-
-    const timer = setTimeout(() => {
-      try {
-        child.kill('SIGKILL');
-      } catch (_) {
-        // ignore kill errors
-      }
-      const error = new Error(`Command timeout na ${Math.round(timeoutMs / 1000)}s: ${command}`);
-      error.code = 'COMMAND_TIMEOUT';
-      error.stdout = stdout;
-      error.stderr = stderr;
-      finish(error);
-    }, timeoutMs);
-
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk || '');
-      if (stdout.length > 200_000) stdout = stdout.slice(-200_000);
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk || '');
-      if (stderr.length > 200_000) stderr = stderr.slice(-200_000);
-    });
-
-    child.on('error', (error) => {
-      error.stdout = stdout;
-      error.stderr = stderr;
-      finish(error);
-    });
-    child.on('close', (code, signal) => {
-      const exitCode = Number(code);
-      if (Number.isFinite(exitCode) && exitCode === 0) {
-        finish(null, {
-          code: exitCode,
-          signal: signal || null,
-          stdout,
-          stderr
-        });
-        return;
-      }
-      const error = new Error(`Command faalde (${command}) met code ${Number.isFinite(exitCode) ? exitCode : 'onbekend'}`);
-      error.code = 'COMMAND_FAILED';
-      error.exitCode = Number.isFinite(exitCode) ? exitCode : null;
-      error.signal = signal || null;
-      error.stdout = stdout;
-      error.stderr = stderr;
-      finish(error);
-    });
-  });
-}
-
-function parseFirstVercelUrl(text) {
-  const match = String(text || '').match(/https:\/\/[a-z0-9-]+(?:-[a-z0-9-]+)*\.vercel\.app/gi);
-  if (!match || !match.length) return '';
-  return String(match[match.length - 1] || '').trim();
-}
-
-async function fetchGitHubApi(pathname, options = {}) {
-  const token = String(options.token || ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN || '').trim();
-  if (!token) {
-    throw new Error('ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN ontbreekt.');
-  }
-
-  const method = String(options.method || 'GET').toUpperCase();
-  const endpoint = `https://api.github.com${pathname}`;
-  const headers = {
-    Accept: 'application/vnd.github+json',
-    Authorization: `Bearer ${token}`,
-    'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'softora-automation'
-  };
-  if (method !== 'GET' && method !== 'HEAD') {
-    headers['Content-Type'] = 'application/json';
-  }
-  const response = await fetch(endpoint, {
-    method,
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined
-  });
-  const text = await response.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch (_) {
-    data = null;
-  }
-  return {
-    ok: response.ok,
-    status: Number(response.status) || 0,
-    data,
-    text
-  };
-}
-
-async function ensureGitHubRepository(owner, repoName) {
-  const lookup = await fetchGitHubApi(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`);
-  if (lookup.ok) {
-    const htmlUrl = normalizeString(lookup?.data?.html_url || '');
-    return {
-      owner,
-      repo: repoName,
-      htmlUrl: htmlUrl || `https://github.com/${owner}/${repoName}`,
-      created: false
-    };
-  }
-  if (lookup.status !== 404) {
-    throw new Error(`GitHub repository check mislukt (${lookup.status}).`);
-  }
-
-  const payload = {
-    name: repoName,
-    private: ACTIVE_ORDER_AUTOMATION_GITHUB_PRIVATE,
-    auto_init: false,
-    description: 'Automatisch gegenereerde Softora website case'
-  };
-  const createPath = ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER_IS_ORG
-    ? `/orgs/${encodeURIComponent(owner)}/repos`
-    : '/user/repos';
-  const createRes = await fetchGitHubApi(createPath, {
-    method: 'POST',
-    body: payload
-  });
-  if (!createRes.ok) {
-    const detail = normalizeString(createRes?.data?.message || createRes?.text || '');
-    throw new Error(`GitHub repository aanmaken mislukt (${createRes.status})${detail ? `: ${detail}` : ''}`);
-  }
-  const htmlUrl = normalizeString(createRes?.data?.html_url || '');
-  return {
-    owner,
-    repo: repoName,
-    htmlUrl: htmlUrl || `https://github.com/${owner}/${repoName}`,
-    created: true
-  };
-}
-
-async function upsertGitHubFile(owner, repo, filePath, content, message) {
-  const encodedPath = String(filePath || '')
-    .split('/')
-    .map((part) => encodeURIComponent(part))
-    .join('/');
-  let sha = null;
-  const current = await fetchGitHubApi(
-    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}?ref=${encodeURIComponent(ACTIVE_ORDER_AUTOMATION_GITHUB_DEFAULT_BRANCH)}`
-  );
-  if (current.ok && current?.data?.sha) {
-    sha = String(current.data.sha);
-  } else if (!current.ok && current.status !== 404) {
-    throw new Error(`GitHub bestand lezen mislukt (${filePath})`);
-  }
-
-  const body = {
-    message: String(message || `Update ${filePath}`),
-    content: Buffer.from(String(content || ''), 'utf8').toString('base64'),
-    branch: ACTIVE_ORDER_AUTOMATION_GITHUB_DEFAULT_BRANCH
-  };
-  if (sha) body.sha = sha;
-
-  const save = await fetchGitHubApi(
-    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}`,
-    {
-      method: 'PUT',
-      body
-    }
-  );
-  if (!save.ok) {
-    const detail = normalizeString(save?.data?.message || save?.text || '');
-    throw new Error(`GitHub bestand opslaan mislukt (${filePath})${detail ? `: ${detail}` : ''}`);
-  }
-  return save?.data?.content || null;
-}
-
-async function runStratoAutomationHook({ domainName, projectDir, deploymentUrl }) {
-  const domain = sanitizeLaunchDomainName(domainName);
-  if (!domain) {
-    return {
-      status: 'skipped',
-      message: 'Geen domein opgegeven; Strato stap overgeslagen.'
-    };
-  }
-
-  if (ACTIVE_ORDER_AUTOMATION_STRATO_COMMAND) {
-    const escapedDomain = domain.replace(/'/g, `'\\''`);
-    const escapedProjectDir = String(projectDir || '').replace(/'/g, `'\\''`);
-    const escapedDeploymentUrl = String(deploymentUrl || '').replace(/'/g, `'\\''`);
-    const command = ACTIVE_ORDER_AUTOMATION_STRATO_COMMAND
-      .replace(/\{\{domain\}\}/g, escapedDomain)
-      .replace(/\{\{projectDir\}\}/g, escapedProjectDir)
-      .replace(/\{\{deploymentUrl\}\}/g, escapedDeploymentUrl);
-    const result = await runCommandWithOutput('bash', ['-lc', command], {
-      cwd: projectDir || process.cwd(),
-      timeoutMs: 300000
-    });
-    const info = parseFirstVercelUrl(result.stdout || '') || normalizeString(result.stdout || result.stderr || '');
-    return {
-      status: 'ok',
-      message: info ? truncateText(info, 220) : 'Strato command uitgevoerd.'
-    };
-  }
-
-  if (ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_URL) {
-    const response = await fetch(ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_TOKEN
-          ? { Authorization: `Bearer ${ACTIVE_ORDER_AUTOMATION_STRATO_WEBHOOK_TOKEN}` }
-          : {})
-      },
-      body: JSON.stringify({
-        domain: domain,
-        deploymentUrl: String(deploymentUrl || ''),
-        projectDir: String(projectDir || '')
-      })
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new Error(`Strato webhook faalde (${response.status})${text ? `: ${truncateText(text, 180)}` : ''}`);
-    }
-    return {
-      status: 'ok',
-      message: 'Strato webhook uitgevoerd.'
-    };
-  }
-
-  throw new Error('Strato automatisering niet geconfigureerd (set ACTIVE_ORDER_AUTOMATION_STRATO_COMMAND of _WEBHOOK_URL).');
-}
-
-async function runActiveOrderLaunchPipeline(input = {}) {
-  if (!ACTIVE_ORDER_AUTOMATION_ENABLED) {
-    return {
-      ok: true,
-      startedAt: new Date().toISOString(),
-      finishedAt: new Date().toISOString(),
-      outputs: {
-        domainStatus: 'skipped',
-        domainMessage: 'Automation disabled'
-      },
-      steps: [
-        {
-          id: 'automation_toggle',
-          label: 'Automation',
-          status: 'skipped',
-          message: 'ACTIVE_ORDER_AUTOMATION_ENABLED staat uit.'
-        }
-      ]
-    };
-  }
-
-  const orderId = Number(input.orderId) || null;
-  const company = truncateText(normalizeString(input.company || input.clientName || ''), 160) || 'Softora Case';
-  const title = truncateText(normalizeString(input.title || ''), 200) || 'Website';
-  const description = truncateText(normalizeString(input.description || ''), 2000);
-  const deliveryTime = truncateText(normalizeString(input.deliveryTime || ''), 200);
-  const html = String(input.html || '');
-  const domainName = sanitizeLaunchDomainName(input.domainName || input.domain || '');
-
-  if (!html.trim()) {
-    throw new Error('Launch pipeline verwacht HTML in body.html.');
-  }
-
-  if (!ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN || !ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER) {
-    throw new Error('GitHub automation niet compleet: set ACTIVE_ORDER_AUTOMATION_GITHUB_TOKEN en ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER.');
-  }
-  if (!ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN) {
-    throw new Error('Vercel automation niet compleet: set ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN.');
-  }
-
-  const steps = [];
-  const outputs = {};
-  const startedAt = new Date().toISOString();
-
-  const projectBase = domainName
-    ? slugifyAutomationText(domainName.replace(/\.[^.]+$/, ''), 'project')
-    : slugifyAutomationText(`${company}-${title}`, 'project');
-  const projectFolderLabel = orderId ? `${projectBase}-${orderId}` : `${projectBase}-${Date.now()}`;
-  const projectDir = await fs.promises.mkdtemp(
-    path.join(os.tmpdir(), `${slugifyAutomationText(projectFolderLabel, 'softora-case')}-`)
-  );
-
-  steps.push({
-    id: 'temporary_workspace',
-    label: 'Tijdelijke build-workspace',
-    status: 'ok',
-    message: 'Tijdelijke workspace klaargezet voor deploy.'
-  });
-
-  try {
-    const meta = {
-      orderId,
-      company,
-      title,
-      description,
-      deliveryTime,
-      domainName: domainName || null,
-      generatedAt: startedAt
-    };
-    await fs.promises.writeFile(path.join(projectDir, 'index.html'), html, 'utf8');
-    await fs.promises.writeFile(path.join(projectDir, 'softora-case.json'), JSON.stringify(meta, null, 2), 'utf8');
-    await fs.promises.writeFile(
-      path.join(projectDir, 'README.md'),
-      [
-        `# ${title}`,
-        '',
-        `- Bedrijf: ${company}`,
-        `- Order: ${orderId || 'n/a'}`,
-        domainName ? `- Domein: ${domainName}` : '- Domein: niet opgegeven',
-        `- Gegenereerd: ${startedAt}`,
-        '',
-        'Deze tijdelijke workspace is automatisch aangemaakt door Softora Active Order Automation.'
-      ].join('\n'),
-      'utf8'
-    );
-
-    const repoName = `${ACTIVE_ORDER_AUTOMATION_GITHUB_REPO_PREFIX}${projectBase}${orderId ? `-${orderId}` : ''}`.slice(0, 95);
-    const repoInfo = await ensureGitHubRepository(ACTIVE_ORDER_AUTOMATION_GITHUB_OWNER, repoName);
-    await upsertGitHubFile(
-      repoInfo.owner,
-      repoInfo.repo,
-      'index.html',
-      html,
-      `Publish case ${orderId || ''}`.trim()
-    );
-    await upsertGitHubFile(
-      repoInfo.owner,
-      repoInfo.repo,
-      'softora-case.json',
-      JSON.stringify(meta, null, 2),
-      `Update case metadata ${orderId || ''}`.trim()
-    );
-    await upsertGitHubFile(
-      repoInfo.owner,
-      repoInfo.repo,
-      'README.md',
-      [
-        `# ${title}`,
-        '',
-        `Automatisch gepubliceerd vanuit Softora Active Opdrachten.`,
-        '',
-        `- Bedrijf: ${company}`,
-        `- Order ID: ${orderId || 'n/a'}`,
-        domainName ? `- Domein: ${domainName}` : '- Domein: niet opgegeven',
-        `- Laatste update: ${new Date().toISOString()}`
-      ].join('\n'),
-      `Update README ${orderId || ''}`.trim()
-    );
-    outputs.githubRepoUrl = repoInfo.htmlUrl;
-    steps.push({
-      id: 'github',
-      label: 'GitHub push',
-      status: 'ok',
-      message: repoInfo.created
-        ? `Repo aangemaakt + bestanden gepusht (${repoInfo.htmlUrl})`
-        : `Bestanden gepusht (${repoInfo.htmlUrl})`
-    });
-
-    const vercelArgs = [
-      '--yes',
-      'vercel',
-      'deploy',
-      projectDir,
-      '--prod',
-      '--yes',
-      '--token',
-      ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN
-    ];
-    if (ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE) {
-      vercelArgs.push('--scope', ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE);
-    }
-    const vercelResult = await runCommandWithOutput('npx', vercelArgs, {
-      cwd: projectDir,
-      timeoutMs: 600000,
-      env: {
-        HOME: process.env.HOME || os.homedir()
-      }
-    });
-    const deploymentUrl = parseFirstVercelUrl(`${vercelResult.stdout}\n${vercelResult.stderr}`);
-    if (!deploymentUrl) {
-      throw new Error('Vercel deploy uitgevoerd, maar deployment URL niet gevonden in output.');
-    }
-    outputs.deploymentUrl = deploymentUrl;
-    steps.push({
-      id: 'vercel',
-      label: 'Vercel deploy',
-      status: 'ok',
-      message: deploymentUrl
-    });
-
-    if (domainName) {
-      const stratoResult = await runStratoAutomationHook({
-        domainName,
-        projectDir,
-        deploymentUrl
-      });
-      outputs.domainStatus = stratoResult.status;
-      outputs.domainMessage = stratoResult.message || '';
-      steps.push({
-        id: 'strato',
-        label: 'Strato domein',
-        status: stratoResult.status === 'ok' ? 'ok' : 'skipped',
-        message: stratoResult.message || (stratoResult.status === 'ok' ? 'Domeinstap gereed.' : 'Overgeslagen.')
-      });
-
-      try {
-        const aliasArgs = [
-          '--yes',
-          'vercel',
-          'alias',
-          'set',
-          deploymentUrl,
-          domainName,
-          '--token',
-          ACTIVE_ORDER_AUTOMATION_VERCEL_TOKEN
-        ];
-        if (ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE) {
-          aliasArgs.push('--scope', ACTIVE_ORDER_AUTOMATION_VERCEL_SCOPE);
-        }
-        await runCommandWithOutput('npx', aliasArgs, {
-          cwd: projectDir,
-          timeoutMs: 180000,
-          env: {
-            HOME: process.env.HOME || os.homedir()
-          }
-        });
-        outputs.domainStatus = 'ok';
-        outputs.domainMessage = `Domein alias gezet op ${domainName}`;
-        steps.push({
-          id: 'vercel_domain_alias',
-          label: 'Vercel domein alias',
-          status: 'ok',
-          message: domainName
-        });
-      } catch (error) {
-        const message = truncateText(normalizeString(error?.stderr || error?.message || ''), 220) || 'Alias mislukt.';
-        outputs.domainStatus = outputs.domainStatus || 'pending';
-        outputs.domainMessage = outputs.domainMessage || message;
-        steps.push({
-          id: 'vercel_domain_alias',
-          label: 'Vercel domein alias',
-          status: 'skipped',
-          message
-        });
-      }
-    } else {
-      outputs.domainStatus = 'skipped';
-      outputs.domainMessage = 'Geen domein opgegeven.';
-      steps.push({
-        id: 'strato',
-        label: 'Strato domein',
-        status: 'skipped',
-        message: 'Geen domein opgegeven; stap overgeslagen.'
-      });
-    }
-
-    return {
-      ok: true,
-      startedAt,
-      finishedAt: new Date().toISOString(),
-      outputs,
-      steps
-    };
-  } finally {
-    try {
-      await fs.promises.rm(projectDir, { recursive: true, force: true });
-    } catch (cleanupError) {
-      console.error('[ActiveOrderAutomation][CleanupError]', cleanupError?.message || cleanupError);
-    }
-  }
 }
 
 function buildPostCallPayload(body = {}) {
@@ -17439,101 +11808,6 @@ app.get('/.well-known/security.txt', (req, res) => {
       '',
     ].join('\n')
   );
-});
-
-app.get('/api/supabase-probe', requireRuntimeDebugAccess, async (_req, res) => {
-  if (!isSupabaseConfigured()) {
-    return res.status(200).json({
-      ok: false,
-      configured: false,
-      error: 'Supabase niet geconfigureerd.',
-    });
-  }
-
-  const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/${encodeURIComponent(
-    SUPABASE_STATE_TABLE
-  )}?select=state_key&limit=1`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    });
-
-    const text = await response.text();
-    let body = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = truncateText(text, 800);
-    }
-
-    return res.status(200).json({
-      ok: response.ok,
-      configured: true,
-      status: response.status,
-      supabaseHost: redactSupabaseUrlForDebug(SUPABASE_URL),
-      table: SUPABASE_STATE_TABLE,
-      stateKey: SUPABASE_STATE_KEY,
-      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
-      body,
-    });
-  } catch (error) {
-    return res.status(200).json({
-      ok: false,
-      configured: true,
-      status: null,
-      supabaseHost: redactSupabaseUrlForDebug(SUPABASE_URL),
-      table: SUPABASE_STATE_TABLE,
-      stateKey: SUPABASE_STATE_KEY,
-      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
-      error: truncateText(error?.message || String(error), 500),
-    });
-  }
-});
-
-app.post('/api/runtime-sync-now', requireRuntimeDebugAccess, async (_req, res) => {
-  const before = {
-    hydrated: supabaseStateHydrated,
-    lastHydrateError: supabaseLastHydrateError || null,
-    lastPersistError: supabaseLastPersistError || null,
-    lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
-  };
-
-  const persistOk = await persistRuntimeStateToSupabase('debug_runtime_sync_now');
-
-  // Forceer een nieuwe hydrate-attempt op deze instance voor directe diagnose.
-  supabaseStateHydrated = false;
-  supabaseHydrateRetryNotBeforeMs = 0;
-
-  const hydratedOk = await ensureRuntimeStateHydratedFromSupabase();
-
-  return res.status(200).json({
-    ok: Boolean(persistOk && hydratedOk),
-    before,
-    after: {
-      hydrated: supabaseStateHydrated,
-      lastHydrateError: supabaseLastHydrateError || null,
-      lastPersistError: supabaseLastPersistError || null,
-      lastCallUpdatePersistError: supabaseLastCallUpdatePersistError || null,
-      counts: {
-        webhookEvents: recentWebhookEvents.length,
-        callUpdates: recentCallUpdates.length,
-        aiCallInsights: recentAiCallInsights.length,
-        appointments: generatedAgendaAppointments.length,
-      },
-    },
-    persistOk,
-    hydratedOk,
-    supabase: {
-      host: redactSupabaseUrlForDebug(SUPABASE_URL),
-      table: SUPABASE_STATE_TABLE,
-      stateKey: SUPABASE_STATE_KEY,
-    },
-  });
 });
 
 // API routes eerst, daarna statische frontend assets/html serveren.

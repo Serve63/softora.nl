@@ -10,6 +10,14 @@ Coldcalling backend + statische dashboardpagina's met stack-routing:
 - Frontend: statische HTML/CSS/JS
 - Providers: Retell + Twilio
 
+## Repo wegwijzer
+
+- Start bij [docs/repo-map.md](docs/repo-map.md) voor de snelste oriëntatie.
+- Kritieke flows staan in [server/routes/manifest.js](server/routes/manifest.js).
+- De huidige runtime start in [server.js](server.js).
+- Nieuwe backendlogica hoort bij voorkeur onder `server/routes`, `server/services`, `server/schemas`.
+- Agenda, leads, call-insights en auth zijn high-risk domeinen en vragen extra voorzichtigheid.
+
 ## Vereiste env vars
 
 ```env

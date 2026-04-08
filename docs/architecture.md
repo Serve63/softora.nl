@@ -14,7 +14,12 @@
 - `assets/pages/` voor paginalogica buiten HTML
 
 ## Niet-breekbare flows
-Zie [server/routes/manifest.js](/Users/servecreusen/softora.nl-12/server/routes/manifest.js).
+Zie [server/routes/manifest.js](../server/routes/manifest.js).
+
+## Navigatie
+- Start oriëntatie in [docs/repo-map.md](repo-map.md).
+- Runtime entrypoint blijft voorlopig [server.js](../server.js).
+- Vercel gebruikt [api/_app-handler.js](../api/_app-handler.js) als bootstrap naar dezelfde Express app.
 
 ## Werkvolgorde
 1. Safety net en rollback

@@ -20,6 +20,40 @@ async function getJson(pathname) {
   return { response, body };
 }
 
+async function postJson(pathname, payload = {}) {
+  const response = await fetch(`${serverRef.baseUrl}${pathname}`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      'content-type': 'application/json',
+      origin: new URL(serverRef.baseUrl).origin,
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => ({}));
+  return { response, body };
+}
+
+async function postProtectedApiExpectation(pathname, payload = {}, options = {}) {
+  const authState = await getJson('/api/auth/session');
+  const result = await postJson(pathname, payload);
+  const configured = Boolean(authState.body?.configured);
+  const successStatuses =
+    Array.isArray(options.successStatuses) && options.successStatuses.length > 0
+      ? options.successStatuses
+      : [200];
+  if (!configured) {
+    assert.equal(result.response.status, 503, pathname);
+    assert.equal(result.body.ok, false, pathname);
+    return result;
+  }
+  assert.ok(
+    successStatuses.includes(result.response.status) || result.response.status === 401,
+    `${pathname} gaf onverwachte status ${result.response.status}`
+  );
+  return result;
+}
+
 async function getProtectedApiExpectation(pathname) {
   const authState = await getJson('/api/auth/session');
   const result = await getJson(pathname);
@@ -70,6 +104,202 @@ test('auth session contract is stable for anonymous requests', async () => {
   assert.equal(typeof body.displayName, 'string');
 });
 
+test('premium profile and user management routes keep their auth boundaries', async () => {
+  const authState = await getJson('/api/auth/session');
+  const configured = Boolean(authState.body?.configured);
+
+  const profileResult = await getJson('/api/auth/profile');
+  if (!configured) {
+    assert.equal(profileResult.response.status, 503);
+    assert.equal(profileResult.body.ok, false);
+  } else {
+    assert.ok([200, 401].includes(profileResult.response.status));
+    if (profileResult.response.status === 200) {
+      assert.equal(profileResult.body.ok, true);
+      assert.equal(typeof profileResult.body.user, 'object');
+      assert.equal(typeof profileResult.body.session, 'object');
+    }
+  }
+
+  const usersResult = await getJson('/api/premium-users');
+  if (!configured) {
+    assert.equal(usersResult.response.status, 503);
+    assert.equal(usersResult.body.ok, false);
+    return;
+  }
+
+  assert.ok([200, 401, 403].includes(usersResult.response.status));
+  if (usersResult.response.status === 200) {
+    assert.equal(usersResult.body.ok, true);
+    assert.ok(Array.isArray(usersResult.body.users));
+  }
+});
+
+test('auth logout contract stays stable for public callers', async () => {
+  const { response, body } = await postJson('/api/auth/logout', {});
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.authenticated, false);
+});
+
+test('seo read routes keep their auth boundaries', async () => {
+  const pagesResult = await getProtectedApiExpectation('/api/seo/pages');
+  if (pagesResult.response.status === 200) {
+    assert.equal(pagesResult.body.ok, true);
+    assert.equal(typeof pagesResult.body.count, 'number');
+    assert.ok(Array.isArray(pagesResult.body.pages));
+  }
+
+  const pageResult = await getProtectedApiExpectation('/api/seo/page?file=premium-website.html');
+  if (pageResult.response.status === 200) {
+    assert.equal(pageResult.body.ok, true);
+    assert.equal(typeof pageResult.body.file, 'string');
+    assert.equal(typeof pageResult.body.seo, 'object');
+  }
+
+  const auditResult = await getProtectedApiExpectation('/api/seo/site-audit');
+  if (auditResult.response.status === 200) {
+    assert.equal(auditResult.body.ok, true);
+    assert.equal(typeof auditResult.body.overallScore, 'number');
+    assert.ok(Array.isArray(auditResult.body.pages));
+  }
+});
+
+test('seo write routes keep their auth boundaries', async () => {
+  const pageSaveResult = await postProtectedApiExpectation('/api/seo/page', {
+    file: 'premium-website.html',
+    pageOverrides: { title: 'Contract test' },
+  });
+  if (pageSaveResult.response.status === 200) {
+    assert.equal(pageSaveResult.body.ok, true);
+    assert.equal(typeof pageSaveResult.body.file, 'string');
+  }
+
+  const automationResult = await postProtectedApiExpectation('/api/seo/automation', {
+    preferredModel: 'gpt-5.1',
+  });
+  if (automationResult.response.status === 200) {
+    assert.equal(automationResult.body.ok, true);
+    assert.equal(typeof automationResult.body.automation, 'object');
+  }
+});
+
+test('runtime ops routes keep their auth boundaries', async () => {
+  const activityResult = await getProtectedApiExpectation('/api/dashboard/activity?limit=2');
+  if (activityResult.response.status === 200) {
+    assert.equal(activityResult.body.ok, true);
+    assert.equal(typeof activityResult.body.count, 'number');
+    assert.ok(Array.isArray(activityResult.body.activities));
+  }
+
+  const createResult = await postProtectedApiExpectation(
+    '/api/dashboard/activity',
+    {
+      type: 'contract_test',
+      title: 'Contract test activity',
+    },
+    { successStatuses: [201] }
+  );
+  if (createResult.response.status === 201) {
+    assert.equal(createResult.body.ok, true);
+    assert.equal(typeof createResult.body.activity, 'object');
+    assert.equal(typeof createResult.body.activity.title, 'string');
+  }
+
+  const uiStateResult = await getProtectedApiExpectation('/api/ui-state-get?scope=contract_test');
+  if (uiStateResult.response.status === 200) {
+    assert.equal(uiStateResult.body.ok, true);
+    assert.equal(uiStateResult.body.scope, 'contract_test');
+    assert.equal(typeof uiStateResult.body.values, 'object');
+  }
+});
+
+test('active order routes keep their auth boundaries and validation contracts', async () => {
+  const generateResult = await postProtectedApiExpectation(
+    '/api/active-orders/generate-site',
+    {},
+    { successStatuses: [400] }
+  );
+  if (generateResult.response.status === 400) {
+    assert.equal(generateResult.body.ok, false);
+    assert.equal(generateResult.body.error, 'Prompt ontbreekt');
+  }
+
+  const launchResult = await postProtectedApiExpectation(
+    '/api/active-orders/launch-site',
+    {},
+    { successStatuses: [400] }
+  );
+  if (launchResult.response.status === 400) {
+    assert.equal(launchResult.body.ok, false);
+    assert.equal(launchResult.body.error, 'HTML ontbreekt');
+  }
+});
+
+test('ai utility routes keep their auth boundaries and validation contracts', async () => {
+  const previewResult = await postProtectedApiExpectation(
+    '/api/website-preview/generate',
+    {},
+    { successStatuses: [400] }
+  );
+  if (previewResult.response.status === 400) {
+    assert.equal(previewResult.body.ok, false);
+    assert.equal(previewResult.body.error, 'Website-URL ontbreekt');
+  }
+
+  const dossierResult = await postProtectedApiExpectation(
+    '/api/ai/order-dossier',
+    {},
+    { successStatuses: [400] }
+  );
+  if (dossierResult.response.status === 400) {
+    assert.equal(dossierResult.body.ok, false);
+    assert.equal(dossierResult.body.error, 'Onvoldoende dossierinformatie');
+  }
+
+  const transcriptResult = await postProtectedApiExpectation(
+    '/api/ai/transcript-to-prompt',
+    {},
+    { successStatuses: [400] }
+  );
+  if (transcriptResult.response.status === 400) {
+    assert.equal(transcriptResult.body.ok, false);
+    assert.equal(transcriptResult.body.error, 'Transcript ontbreekt');
+  }
+
+  const notesResult = await postProtectedApiExpectation(
+    '/api/ai/notes-image-to-text',
+    {},
+    { successStatuses: [400] }
+  );
+  if (notesResult.response.status === 400) {
+    assert.equal(notesResult.body.ok, false);
+    assert.equal(notesResult.body.error, 'Afbeelding ontbreekt');
+  }
+});
+
+test('ai dashboard routes keep their auth boundaries and validation contracts', async () => {
+  const chatResult = await postProtectedApiExpectation(
+    '/api/ai/dashboard-chat',
+    {},
+    { successStatuses: [400] }
+  );
+  if (chatResult.response.status === 400) {
+    assert.equal(chatResult.body.ok, false);
+    assert.equal(chatResult.body.error, 'Vraag ontbreekt');
+  }
+
+  const summarizeResult = await postProtectedApiExpectation(
+    '/api/ai/summarize',
+    {},
+    { successStatuses: [400] }
+  );
+  if (summarizeResult.response.status === 400) {
+    assert.equal(summarizeResult.body.ok, false);
+    assert.equal(summarizeResult.body.error, 'Tekst ontbreekt');
+  }
+});
+
 test('agenda appointments contract remains readable', async () => {
   const result = await getProtectedApiExpectation('/api/agenda/appointments?limit=3');
   if (result.response.status === 200) {
@@ -104,5 +334,21 @@ test('runtime backup route is available in non-production verification mode', as
     assert.equal(body.ok, true);
     assert.equal(typeof body.snapshot, 'object');
     assert.equal(typeof body.rollback, 'object');
+  }
+});
+
+test('runtime debug routes keep their auth boundaries', async () => {
+  const probeResult = await getProtectedApiExpectation('/api/supabase-probe');
+  if (probeResult.response.status === 200) {
+    assert.equal(typeof probeResult.body.configured, 'boolean');
+    assert.equal(typeof probeResult.body.hasServiceRoleKey, 'boolean');
+  }
+
+  const syncResult = await postProtectedApiExpectation('/api/runtime-sync-now', {}, { successStatuses: [200] });
+  if (syncResult.response.status === 200) {
+    assert.equal(syncResult.body.ok === true || syncResult.body.ok === false, true);
+    assert.equal(typeof syncResult.body.before, 'object');
+    assert.equal(typeof syncResult.body.after, 'object');
+    assert.equal(typeof syncResult.body.supabase, 'object');
   }
 });

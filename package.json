@@ -10,6 +10,7 @@
     "test:contracts": "node --test test/contracts/*.test.js",
     "test:smoke": "node --test test/smoke/*.test.js",
     "check:secrets": "node scripts/check-tracked-secrets.js",
+    "check:repo-hygiene": "bash scripts/check-repo-hygiene.sh",
     "check:deps": "npm audit --omit=dev",
     "verify:critical": "node scripts/verify-critical.js",
     "verify:security": "npm run check:secrets && npm run check:deps",

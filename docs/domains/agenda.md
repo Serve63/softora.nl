@@ -15,6 +15,6 @@ Agenda is een kernflow. Datum, tijd, locatie en afrondingsstatus mogen niet onbe
 - Alle UI’s moeten op dezelfde afspraakbron uitkomen.
 
 ## Huidige fase
-- Fase 2A: de agenda write-routes lopen via [server/routes/agenda.js](/Users/servecreusen/softora.nl-12/server/routes/agenda.js) met centrale payload-normalisatie in [server/schemas/agenda.js](/Users/servecreusen/softora.nl-12/server/schemas/agenda.js).
-- Fase 2B: de agenda read-routes lopen via [server/routes/agenda-read.js](/Users/servecreusen/softora.nl-12/server/routes/agenda-read.js) en delen één voorbereidingspad via [server/services/agenda-read.js](/Users/servecreusen/softora.nl-12/server/services/agenda-read.js).
-- De businesslogica leeft nog deels in [server.js](/Users/servecreusen/softora.nl-12/server.js), maar route-definities voor reads en mutaties horen vanaf nu niet meer rechtstreeks daar toegevoegd te worden.
+- Fase 2A: de agenda write-routes lopen via [server/routes/agenda.js](../../server/routes/agenda.js) met centrale payload-normalisatie in [server/schemas/agenda.js](../../server/schemas/agenda.js).
+- Fase 2B: de agenda read-routes lopen via [server/routes/agenda-read.js](../../server/routes/agenda-read.js) en delen één voorbereidingspad via [server/services/agenda-read.js](../../server/services/agenda-read.js).
+- De businesslogica leeft nog deels in [server.js](../../server.js), maar route-definities voor reads en mutaties horen vanaf nu niet meer rechtstreeks daar toegevoegd te worden.

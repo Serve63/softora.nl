@@ -4,6 +4,13 @@ const fs = require('fs');
 const path = require('path');
 
 const repoRoot = path.resolve(__dirname, '..');
+const ignoredDirNames = new Set([
+  '.git',
+  '.vercel',
+  'backups',
+  'node_modules',
+  'output',
+]);
 const ignoreFileNames = new Set([
   '.env.example',
   'package-lock.json',
@@ -22,20 +29,63 @@ function isLikelyBinary(filePath) {
   return /\.(png|jpe?g|gif|webp|ico|pdf|zip|gz|mp3|mp4|woff2?)$/i.test(filePath);
 }
 
+function shouldIgnoreFile(filePath) {
+  const baseName = path.basename(filePath);
+  if (ignoreFileNames.has(baseName)) return true;
+  if (/^\.env(\..+)?$/i.test(baseName) && baseName !== '.env.example') return true;
+  return isLikelyBinary(filePath);
+}
+
+function tryListTrackedFilesFromGit() {
+  try {
+    return execFileSync('git', ['ls-files'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  } catch (error) {
+    const stderr = String(error?.stderr || error?.message || '').toLowerCase();
+    if (stderr.includes('not a git repository')) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function listFilesFromFilesystem(rootDir, relativeDir = '') {
+  const currentDir = path.join(rootDir, relativeDir);
+  const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+  const collectedFiles = [];
+
+  entries.forEach((entry) => {
+    if (!entry) return;
+    const relativePath = path.join(relativeDir, entry.name);
+    if (entry.isDirectory()) {
+      if (ignoredDirNames.has(entry.name)) return;
+      collectedFiles.push(...listFilesFromFilesystem(rootDir, relativePath));
+      return;
+    }
+    if (!entry.isFile()) return;
+    collectedFiles.push(relativePath);
+  });
+
+  return collectedFiles;
+}
+
 function main() {
-  const trackedFiles = execFileSync('git', ['ls-files'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  })
-    .split('\n')
-    .map((line) => line.trim())
+  const gitTrackedFiles = tryListTrackedFilesFromGit();
+  const sourceLabel = gitTrackedFiles ? 'tracked files' : 'repo files (filesystem fallback)';
+  const candidateFiles = (gitTrackedFiles || listFilesFromFilesystem(repoRoot))
+    .map((filePath) => filePath.split(path.sep).join('/'))
     .filter(Boolean)
-    .filter((filePath) => !ignoreFileNames.has(path.basename(filePath)))
-    .filter((filePath) => !isLikelyBinary(filePath));
+    .filter((filePath) => !shouldIgnoreFile(filePath));
 
   const findings = [];
 
-  trackedFiles.forEach((relativePath) => {
+  candidateFiles.forEach((relativePath) => {
     const absolutePath = path.join(repoRoot, relativePath);
     let content = '';
     try {
@@ -52,14 +102,14 @@ function main() {
   });
 
   if (findings.length > 0) {
-    console.error('Verdachte secrets gevonden in tracked files:');
+    console.error(`Verdachte secrets gevonden in ${sourceLabel}:`);
     findings.forEach((finding) => {
       console.error(`- ${finding.file}: ${finding.label}`);
     });
     process.exit(1);
   }
 
-  console.log(`Geen verdachte secrets gevonden in ${trackedFiles.length} tracked files.`);
+  console.log(`Geen verdachte secrets gevonden in ${candidateFiles.length} ${sourceLabel}.`);
 }
 
 main();

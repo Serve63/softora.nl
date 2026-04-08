@@ -6,7 +6,7 @@
 3. Controleer `npm run verify:critical`
 
 ## Direct rollbacken wanneer
-- een kritieke flow uit [server/routes/manifest.js](/Users/servecreusen/softora.nl-12/server/routes/manifest.js) faalt
+- een kritieke flow uit [server/routes/manifest.js](../server/routes/manifest.js) faalt
 - afspraakdata terugvalt of verschuift
 - leadaudio of gesprekssamenvatting verdwijnt
 - auth/session routes onstabiel worden

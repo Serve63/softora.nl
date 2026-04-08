@@ -4,12 +4,12 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 
 ## Altijd eerst
 - Draai `npm run verify:critical` voor je afrondt.
-- Gebruik [server/routes/manifest.js](/Users/servecreusen/softora.nl-12/server/routes/manifest.js) als lijst van kritieke flows.
+- Gebruik [server/routes/manifest.js](server/routes/manifest.js) als lijst van kritieke flows.
 - Behandel agenda, leads, call-insights en auth als hoog-risico domeinen.
 
 ## Bron van waarheid
 - Database en formele repositories zijn leidend zodra een pad is gemigreerd.
-- In-memory state in [server.js](/Users/servecreusen/softora.nl-12/server.js) is legacy en mag niet verder worden uitgebouwd als business-truth.
+- In-memory state in [server.js](server.js) is legacy en mag niet verder worden uitgebouwd als business-truth.
 - Voeg geen nieuwe parallelle opslagpaden toe zonder expliciete compat-flag of rollback-pad.
 
 ## Wijzigen zonder regressies
