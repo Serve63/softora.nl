@@ -38,3 +38,14 @@ test('premium website toont een speelse krulpijl van hero richting wat we bouwen
   assert.match(source, /\.diensten-arrow-path,\s*\.diensten-arrow-head\s*\{[\s\S]*stroke:\s*var\(--accent\);/s);
   assert.match(source, /@media \(max-width: 1024px\)\s*\{[\s\S]*\.diensten-arrow-wrap \{ display: none; \}/s);
 });
+
+test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op de footer landen', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.doesNotMatch(source, /<section id="contact" class="cta-section">/);
+  assert.doesNotMatch(source, /\.cta-section\s*\{/);
+  assert.doesNotMatch(source, /Klaar voor de <span class="text-accent">volgende stap<\/span>\?/);
+  assert.match(source, /<footer id="contact">/);
+  assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
+});
