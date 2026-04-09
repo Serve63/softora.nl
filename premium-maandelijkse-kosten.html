@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260402-6">
 <script>
   (function () {
@@ -40,6 +40,8 @@ body {
   background: var(--bg);
   color: var(--text-dark);
   min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
 }
 .dashboard-layout {
   display: flex;
@@ -57,8 +59,7 @@ body {
   margin-left: 280px;
   width: calc(100% - 280px);
   min-height: 100vh;
-  padding: 48px;
-  font-family: 'Barlow', sans-serif;
+  padding: 3rem 3rem 1.8rem;
 }
 .page-shell {
   width: min(1260px, 100%);
@@ -72,21 +73,28 @@ body {
   gap: 16px;
 }
 .logo {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 1px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--crimson);
   margin-bottom: 6px;
 }
 .page-title {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: 1px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 3rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
+  line-height: 1;
 }
-.page-sub { font-size: 13px; color: var(--text-light); margin-top: 3px; }
+.page-sub {
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  font-weight: 300;
+  margin-top: 0.35rem;
+}
 
 .totals-row {
   display: grid;
@@ -102,22 +110,28 @@ body {
 }
 .totaal-card.accent { border-color: var(--crimson); border-width: 2px; }
 .totaal-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-light);
   margin-bottom: 8px;
 }
 .totaal-amount {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 34px;
-  font-weight: 800;
+  font-family: 'Oswald', sans-serif;
+  font-size: 3rem;
+  font-weight: 600;
   color: var(--text-dark);
+  line-height: 1;
 }
 .totaal-amount.red { color: var(--red); }
 .totaal-amount.green { color: var(--green); }
-.totaal-note { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+.totaal-note {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  margin-top: 0.45rem;
+}
 
 .category {
   background: var(--card);
@@ -135,10 +149,10 @@ body {
   justify-content: space-between;
 }
 .category-title {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dark);
   display: flex;
@@ -146,10 +160,11 @@ body {
   gap: 10px;
 }
 .category-total {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 15px;
-  font-weight: 800;
+  font-family: 'Oswald', sans-serif;
+  font-size: 2rem;
+  font-weight: 600;
   color: var(--text-dark);
+  line-height: 1;
 }
 
 .cost-row {
@@ -169,22 +184,30 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .cost-row.head span {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-light);
 }
 
-.cost-name { font-size: 13px; font-weight: 600; color: var(--text-dark); }
-.cost-note { font-size: 11px; color: var(--text-light); margin-top: 2px; }
-.cost-freq { font-size: 11px; color: var(--text-light); }
-.cost-amount { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-dark); }
+.cost-name { font-size: 1rem; font-weight: 600; color: var(--text-dark); }
+.cost-note { font-size: 0.9rem; color: var(--text-tertiary); margin-top: 2px; }
+.cost-freq { font-size: 0.9rem; color: var(--text-tertiary); }
+.cost-amount {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1;
+}
 .cost-status { justify-self: end; }
 .status-pill {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   padding: 3px 9px;
   border-radius: 20px;
@@ -210,8 +233,8 @@ body {
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: 'Barlow', sans-serif;
-  font-size: 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
   color: var(--text-dark);
   background: var(--bg);
   outline: none;
@@ -226,10 +249,10 @@ body {
   color: #fff;
   border: none;
   border-radius: 4px;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background .15s;
@@ -396,21 +419,8 @@ let data = {
     { id:2, naam:'softora.nl domein', note:'Jaarlijkse verlenging', freq:'jaarlijks', bedrag:1.25, status:'yearly' },
     { id:3, naam:'TransIP backup', note:'Extra opslag', freq:'maandelijks', bedrag:3.00, status:'active' },
   ],
-  'Software & Tools': [
-    { id:4, naam:'Adobe Creative Cloud', note:'Photoshop, Illustrator', freq:'maandelijks', bedrag:59.99, status:'active' },
-    { id:5, naam:'ChatGPT Plus', note:'AI assistent', freq:'maandelijks', bedrag:20.00, status:'active' },
-    { id:6, naam:'Figma Pro', note:'Design tool', freq:'maandelijks', bedrag:15.00, status:'active' },
-    { id:7, naam:'Notion', note:'Project management', freq:'maandelijks', bedrag:8.00, status:'pause' },
-  ],
-  'Marketing & SEO': [
-    { id:8, naam:'Google Workspace', note:'Gmail, Drive, Docs', freq:'maandelijks', bedrag:6.00, status:'active' },
-    { id:9, naam:'Ubersuggest', note:'SEO tool', freq:'maandelijks', bedrag:12.00, status:'active' },
-  ],
-  'Overig': [
-    { id:10, naam:'Boekhoudpakket', note:'Administratie software', freq:'maandelijks', bedrag:18.00, status:'active' },
-  ],
 };
-let nextId = 20;
+let nextId = 4;
 
 const freqLabel = { maandelijks:'Maandelijks', jaarlijks:'Jaarlijks', kwartaal:'Per kwartaal' };
 const statusLabel = { active:'Actief', pause:'Gepauzeerd', yearly:'Jaarlijks' };
