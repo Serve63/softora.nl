@@ -88,7 +88,7 @@ test('premium website whatsapp-widget gebruikt een verfijnde stijl en opent het 
     source,
     /\.whatsapp-widget-btn\s*\{[\s\S]*width:\s*64px;[\s\S]*height:\s*64px;[\s\S]*background:\s*linear-gradient\(145deg,\s*#30df6c 0%,\s*#19bf57 100%\);/s
   );
-  assert.match(source, /\.whatsapp-widget-btn::before\s*\{/);
+  assert.doesNotMatch(source, /\.whatsapp-widget-btn::before\s*\{/);
   assert.match(
     source,
     /href="https:\/\/wa\.me\/31629917185\?text=Hoi%20Softora%2C%20ik%20wil%20graag%20meer%20informatie\."/
