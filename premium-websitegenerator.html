@@ -126,6 +126,10 @@ body {
   margin-bottom: 1.35rem;
 }
 
+.publish-card {
+  margin-bottom: 1.35rem;
+}
+
 .input-label {
   display: block;
   margin-bottom: 0.65rem;
@@ -214,6 +218,104 @@ body {
 
 .status-line.error { color: #b42318; }
 .status-line.success { color: #17693a; }
+
+.publish-copy {
+  margin: 0 0 1rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.publish-grid {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.slug-input-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 58px;
+  border: 1px solid rgba(24, 26, 44, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  overflow: hidden;
+}
+
+.slug-prefix {
+  padding: 0.95rem 0.95rem 0.95rem 1rem;
+  border-right: 1px solid rgba(24, 26, 44, 0.08);
+  color: var(--text-secondary);
+  font-size: 0.96rem;
+  white-space: nowrap;
+}
+
+.slug-input {
+  min-width: 0;
+  width: 100%;
+  min-height: 56px;
+  padding: 0.95rem 1rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1rem;
+  outline: none;
+}
+
+.code-input {
+  width: 100%;
+  min-height: 250px;
+  padding: 1rem;
+  border: 1px solid rgba(24, 26, 44, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.code-input:focus,
+.slug-input-shell:focus-within {
+  border-color: rgba(139, 34, 82, 0.42);
+  box-shadow: 0 0 0 4px rgba(139, 34, 82, 0.12);
+  transform: translateY(-1px);
+}
+
+.publish-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 1rem;
+}
+
+.publish-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 1rem;
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  border: 1px solid rgba(24, 26, 44, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.publish-result-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.publish-result-link {
+  color: var(--accent);
+  font-weight: 600;
+  word-break: break-all;
+}
 
 .workspace {
   display: block;
@@ -418,6 +520,51 @@ body {
         <div id="website-preview-status" class="status-line">Vul een URL in en laat AI een nieuwe visuele websitevoorstel maken.</div>
       </section>
 
+      <section class="toolbar-card publish-card">
+        <label class="input-label" for="website-link-slug">Websitelink aanmaken</label>
+        <p class="publish-copy">
+          Plak HTML-code en publiceer direct een publieke pagina op je domein. Optioneel kun je zelf het pad kiezen;
+          anders maken we automatisch een nette link voor je aan.
+        </p>
+
+        <div class="publish-grid">
+          <div>
+            <label class="input-label" for="website-link-slug">Link pad op je domein (optioneel)</label>
+            <div class="slug-input-shell">
+              <span class="slug-prefix">softora.nl/</span>
+              <input
+                id="website-link-slug"
+                class="slug-input"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="bijv. campagne-pagina"
+              >
+            </div>
+          </div>
+
+          <div>
+            <label class="input-label" for="website-link-html">HTML code</label>
+            <textarea
+              id="website-link-html"
+              class="code-input"
+              placeholder="Plak hier de HTML-code van je pagina..."
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="publish-actions">
+          <button id="website-link-create" class="primary-btn" type="button">Websitelink aanmaken</button>
+        </div>
+        <div id="website-link-status" class="status-line">Plak HTML-code en maak direct een publieke link op je domein.</div>
+        <div id="website-link-result" class="publish-result" hidden>
+          <span class="publish-result-label">Aangemaakte link</span>
+          <a id="website-link-url" class="publish-result-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+          <button id="website-link-copy" class="secondary-btn" type="button">Kopieer link</button>
+        </div>
+      </section>
+
       <section class="workspace">
         <article class="preview-card">
           <div class="preview-head">
@@ -454,11 +601,24 @@ body {
   const emptyEl = document.getElementById("website-preview-empty");
   const imageEl = document.getElementById("website-preview-image");
   const downloadEl = document.getElementById("website-preview-download");
+  const websiteLinkSlugEl = document.getElementById("website-link-slug");
+  const websiteLinkHtmlEl = document.getElementById("website-link-html");
+  const websiteLinkCreateEl = document.getElementById("website-link-create");
+  const websiteLinkStatusEl = document.getElementById("website-link-status");
+  const websiteLinkResultEl = document.getElementById("website-link-result");
+  const websiteLinkUrlEl = document.getElementById("website-link-url");
+  const websiteLinkCopyEl = document.getElementById("website-link-copy");
 
   function setStatus(message, tone) {
     statusEl.textContent = String(message || "");
     statusEl.classList.remove("error", "success");
     if (tone) statusEl.classList.add(tone);
+  }
+
+  function setWebsiteLinkStatus(message, tone) {
+    websiteLinkStatusEl.textContent = String(message || "");
+    websiteLinkStatusEl.classList.remove("error", "success");
+    if (tone) websiteLinkStatusEl.classList.add(tone);
   }
 
   function setBusy(isBusy, message) {
@@ -467,6 +627,14 @@ body {
     generateButton.textContent = isBusy ? "Bezig..." : "Genereer preview";
     stageEl.classList.toggle("loading", Boolean(isBusy));
     if (message) setStatus(message);
+  }
+
+  function setWebsiteLinkBusy(isBusy, message) {
+    websiteLinkCreateEl.disabled = isBusy;
+    websiteLinkSlugEl.disabled = isBusy;
+    websiteLinkHtmlEl.disabled = isBusy;
+    websiteLinkCreateEl.textContent = isBusy ? "Bezig..." : "Websitelink aanmaken";
+    if (message) setWebsiteLinkStatus(message);
   }
 
   function renderResult(payload) {
@@ -493,6 +661,21 @@ body {
       ? `Nieuwe visuele homepage-preview voor ${site.host}`
       : "Nieuwe visuele homepage-preview gegenereerd";
     setStatus("Websitegenerator klaar. Je kunt de afbeelding nu downloaden.", "success");
+  }
+
+  function renderWebsiteLinkResult(payload) {
+    const url = String(payload && payload.url ? payload.url : "");
+    if (!url) {
+      websiteLinkResultEl.hidden = true;
+      websiteLinkUrlEl.removeAttribute("href");
+      websiteLinkUrlEl.textContent = "";
+      return;
+    }
+
+    websiteLinkUrlEl.href = url;
+    websiteLinkUrlEl.textContent = url;
+    websiteLinkResultEl.hidden = false;
+    setWebsiteLinkStatus("Websitelink aangemaakt. Je pagina staat nu live op je domein.", "success");
   }
 
   async function generatePreview() {
@@ -535,11 +718,65 @@ body {
     }
   }
 
+  async function createWebsiteLink() {
+    const html = String(websiteLinkHtmlEl.value || "").trim();
+    const slug = String(websiteLinkSlugEl.value || "").trim();
+
+    if (!html) {
+      setWebsiteLinkStatus("Plak eerst HTML-code in het veld.", "error");
+      websiteLinkHtmlEl.focus();
+      return;
+    }
+
+    setWebsiteLinkBusy(true, "HTML wordt opgeslagen en je nieuwe websitelink wordt aangemaakt...");
+
+    try {
+      const response = await fetch("/api/website-links/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ html, slug }),
+      });
+      const data = await response.json().catch(function () {
+        return {};
+      });
+
+      if (!response.ok || !data || data.ok === false) {
+        throw new Error(String((data && (data.detail || data.error)) || "Websitelink aanmaken mislukt"));
+      }
+
+      if (data.autoGeneratedSlug && data.slug) {
+        websiteLinkSlugEl.value = data.slug;
+      }
+      renderWebsiteLinkResult(data);
+    } catch (error) {
+      websiteLinkResultEl.hidden = true;
+      websiteLinkUrlEl.removeAttribute("href");
+      websiteLinkUrlEl.textContent = "";
+      setWebsiteLinkStatus(String(error && error.message ? error.message : "Websitelink aanmaken mislukt"), "error");
+    } finally {
+      setWebsiteLinkBusy(false);
+    }
+  }
+
   generateButton.addEventListener("click", generatePreview);
   urlInput.addEventListener("keydown", function (event) {
     if (event.key === "Enter") {
       event.preventDefault();
       generatePreview();
+    }
+  });
+
+  websiteLinkCreateEl.addEventListener("click", createWebsiteLink);
+  websiteLinkCopyEl.addEventListener("click", async function () {
+    const url = String(websiteLinkUrlEl.href || "").trim();
+    if (!url) return;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(url);
+        setWebsiteLinkStatus("Link gekopieerd naar je klembord.", "success");
+      }
+    } catch (_) {
+      setWebsiteLinkStatus("Kopiëren mislukt. Open de link en kopieer hem handmatig.", "error");
     }
   });
 })();

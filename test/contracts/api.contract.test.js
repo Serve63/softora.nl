@@ -247,6 +247,16 @@ test('ai utility routes keep their auth boundaries and validation contracts', as
     assert.equal(previewResult.body.error, 'Website-URL ontbreekt');
   }
 
+  const linkCreateResult = await postProtectedApiExpectation(
+    '/api/website-links/create',
+    {},
+    { successStatuses: [400, 503] }
+  );
+  if (linkCreateResult.response.status === 400) {
+    assert.equal(linkCreateResult.body.ok, false);
+    assert.equal(linkCreateResult.body.error, 'HTML code ontbreekt');
+  }
+
   const dossierResult = await postProtectedApiExpectation(
     '/api/ai/order-dossier',
     {},

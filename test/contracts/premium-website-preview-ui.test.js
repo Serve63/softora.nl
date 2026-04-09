@@ -24,3 +24,13 @@ const path = require('path');
     assert.match(source, /\.workspace\s*\{[\s\S]*display:\s*block;/);
   });
 });
+
+test('premium websitegenerator biedt een websitelink-aanmaken flow met html input', () => {
+  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /Websitelink aanmaken/);
+  assert.match(source, /id="website-link-html"/);
+  assert.match(source, /id="website-link-slug"/);
+  assert.match(source, /\/api\/website-links\/create/);
+});

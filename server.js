@@ -45,6 +45,7 @@ const { createSupabaseStateStore } = require('./server/services/supabase-state')
 const { createRuntimeStateSyncCoordinator } = require('./server/services/runtime-state-sync');
 const { registerAiDashboardRoutes } = require('./server/routes/ai-dashboard');
 const { registerAiToolRoutes } = require('./server/routes/ai-tools');
+const { registerWebsiteLinkRoutes } = require('./server/routes/website-links');
 const { registerHealthAndOpsRoutes } = require('./server/routes/health');
 const { registerActiveOrderRoutes } = require('./server/routes/active-orders');
 const { createAiHelpers } = require('./server/services/ai-helpers');
@@ -85,6 +86,7 @@ const { createSeoReadCoordinator } = require('./server/services/seo-read');
 const { createSeoWriteCoordinator } = require('./server/services/seo-write');
 const { createUiStateStore } = require('./server/services/ui-state');
 const { createWebsiteGenerationHelpers } = require('./server/services/website-generation');
+const { createWebsiteLinkCoordinator } = require('./server/services/website-links');
 const { createWebsiteInputHelpers } = require('./server/services/website-inputs');
 require('dotenv').config();
 const { version: APP_VERSION = '0.0.0' } = require('./package.json');
@@ -1595,6 +1597,13 @@ const aiToolsCoordinator = createAiToolsCoordinator({
   buildWebsitePromptFallback,
   extractMeetingNotesFromImageWithAi,
   logger: console,
+});
+
+const websiteLinkCoordinator = createWebsiteLinkCoordinator({
+  logger: console, normalizeString, truncateText, slugifyAutomationText, isSupabaseConfigured,
+  fetchSupabaseRowByKeyViaRest, upsertSupabaseRowViaRest,
+  websiteLinkStateKeyPrefix: `${SUPABASE_STATE_KEY}:website_link:`, knownPrettyPageSlugToFile,
+  resolveLegacyPrettyPageRedirect, getPublicBaseUrlFromRequest: getEffectivePublicBaseUrl, appendDashboardActivity,
 });
 
 const rubenAssistant = createRubenAssistant({
@@ -6625,6 +6634,8 @@ registerAiToolRoutes(app, {
   coordinator: aiToolsCoordinator,
 });
 
+registerWebsiteLinkRoutes(app, { coordinator: websiteLinkCoordinator });
+
 registerActiveOrderRoutes(app, {
   coordinator: activeOrdersCoordinator,
 });
@@ -7147,6 +7158,8 @@ app.get('/:slug', async (req, res, next) => {
   if (legacyTarget) {
     return res.redirect(301, appendOriginalQuery(`/${legacyTarget}`, req.originalUrl));
   }
+
+  if (await websiteLinkCoordinator.sendPublishedWebsiteLinkResponse(req, res, slug)) return undefined;
 
   const fileName = knownPrettyPageSlugToFile.get(slug);
   if (!fileName) {
