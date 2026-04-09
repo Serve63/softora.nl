@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260402-6">
 <script>
   (function () {
@@ -39,6 +39,8 @@ body {
   background: var(--bg);
   color: var(--text-dark);
   min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
 }
 .dashboard-layout {
   display: flex;
@@ -56,11 +58,10 @@ body {
   margin-left: 280px;
   width: calc(100% - 280px);
   min-height: 100vh;
-  padding: 32px;
+  padding: 3rem 3rem 1.8rem;
   display: flex;
   align-items: stretch;
   justify-content: center;
-  font-family: 'Barlow', sans-serif;
 }
 .register-shell {
   width: min(1000px, 100%);
@@ -105,16 +106,16 @@ body {
 }
 .pin-icon svg { width: 24px; height: 24px; color: var(--crimson); }
 .pin-title {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 22px;
-  font-weight: 800;
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.7rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.08em;
   margin-bottom: 8px;
 }
 .pin-sub {
-  font-size: 14px;
-  color: var(--text-light);
+  font-size: 0.95rem;
+  color: var(--text-tertiary);
   margin-bottom: 26px;
   text-align: center;
   line-height: 1.55;
@@ -151,9 +152,9 @@ body {
   border: 1px solid rgba(22, 25, 44, 0.1);
   border-radius: 14px;
   background: rgba(255,255,255,0.72);
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 21px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-dark);
   cursor: pointer;
   transition: all .12s ease;
@@ -186,31 +187,29 @@ body {
   justify-content: space-between;
   margin-bottom: 32px;
 }
-.reg-logo {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: var(--crimson);
-  margin-bottom: 4px;
-}
 .reg-title {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 28px;
-  font-weight: 800;
+  font-family: 'Oswald', sans-serif;
+  font-size: 3rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.02em;
+  line-height: 1;
 }
-.reg-sub { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+.reg-sub {
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  font-weight: 300;
+  margin-top: 0.35rem;
+}
 
 .lock-btn {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-light);
   background: none;
@@ -225,29 +224,6 @@ body {
 .lock-btn:hover { border-color: var(--crimson); color: var(--crimson); }
 .lock-btn svg { width: 12px; height: 12px; }
 
-.cat-bar {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-.cat-pill {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  padding: 5px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text-light);
-  cursor: pointer;
-  transition: all .15s;
-}
-.cat-pill:hover { border-color: rgba(155,35,85,.3); color: var(--text-dark); }
-.cat-pill.active { background: var(--crimson); border-color: var(--crimson); color: #fff; }
-
 .search-row {
   position: relative;
   margin-bottom: 16px;
@@ -257,8 +233,8 @@ body {
   padding: 10px 14px 10px 36px;
   border: 1px solid var(--border);
   border-radius: 5px;
-  font-family: 'Barlow', sans-serif;
-  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
   background: var(--card);
   color: var(--text-dark);
   outline: none;
@@ -284,22 +260,23 @@ body {
 }
 .t-head {
   display: grid;
-  grid-template-columns: 2fr 2fr 2.5fr 32px;
+  grid-template-columns: 2fr 2fr 2.5fr 96px;
   gap: 0;
   padding: 8px 20px;
   background: var(--tag);
   border-bottom: 1px solid var(--border);
 }
 .t-head span {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-light);
 }
 .t-row {
   display: grid;
-  grid-template-columns: 2fr 2fr 2.5fr 32px;
+  grid-template-columns: 2fr 2fr 2.5fr 96px;
   gap: 0;
   align-items: center;
   padding: 13px 20px;
@@ -319,21 +296,21 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 12px;
-  font-weight: 800;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
   color: var(--crimson);
   flex-shrink: 0;
 }
-.t-label { font-size: 13px; font-weight: 600; color: var(--text-dark); }
-.t-url { font-size: 11px; color: var(--text-light); margin-top: 1px; }
-.t-user { font-size: 12px; color: var(--text-mid); }
+.t-label { font-size: 1rem; font-weight: 600; color: var(--text-dark); }
+.t-url { font-size: 0.9rem; color: var(--text-tertiary); margin-top: 1px; }
+.t-user { font-size: 0.95rem; color: var(--text-mid); }
 
 .t-pw-wrap { display: flex; align-items: center; gap: 6px; }
-.t-pw { font-family: monospace; font-size: 13px; color: var(--text-dark); }
+.t-pw { font-family: monospace; font-size: 0.95rem; color: var(--text-dark); }
 .t-pw.hidden { color: var(--text-light); letter-spacing: 2px; }
 
-.btn-copy {
+.btn-icon {
   width: 28px;
   height: 28px;
   border: 1px solid var(--border);
@@ -347,9 +324,175 @@ body {
   transition: all .15s;
   flex-shrink: 0;
 }
-.btn-copy:hover { border-color: var(--crimson); color: var(--crimson); }
-.btn-copy svg { width: 13px; height: 13px; }
-.btn-copy.copied { border-color: var(--green); color: var(--green); }
+.btn-icon:hover { border-color: var(--crimson); color: var(--crimson); }
+.btn-icon svg { width: 13px; height: 13px; }
+.btn-icon.copied { border-color: var(--green); color: var(--green); }
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.entry-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 15, 23, 0.5);
+  backdrop-filter: blur(3px);
+  z-index: 1600;
+}
+
+.entry-modal-backdrop[hidden] {
+  display: none;
+}
+
+.entry-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(640px, calc(100vw - 32px));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(12, 15, 28, 0.2);
+  padding: 1.4rem;
+  z-index: 1601;
+}
+
+.entry-modal[hidden] {
+  display: none;
+}
+
+.entry-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.entry-modal-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.entry-modal-sub {
+  font-size: 0.95rem;
+  color: var(--text-tertiary);
+  margin-top: 0.25rem;
+}
+
+.entry-modal-close {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.entry-modal-close:hover {
+  border-color: var(--crimson);
+  color: var(--crimson);
+}
+
+.entry-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.entry-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.entry-field.full {
+  grid-column: 1 / -1;
+}
+
+.entry-field label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.entry-field input {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  background: var(--bg);
+  color: var(--text-dark);
+  outline: none;
+  transition: border-color .15s;
+}
+
+.entry-field input:focus {
+  border-color: var(--crimson);
+}
+
+.entry-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  margin-top: 1.4rem;
+}
+
+.entry-modal-btn {
+  min-width: 138px;
+  padding: 0.95rem 1.3rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dark);
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.entry-modal-btn.primary {
+  border-color: var(--crimson);
+  background: var(--crimson);
+  color: #fff;
+}
+
+.entry-modal-btn:hover {
+  border-color: var(--crimson);
+  color: var(--crimson);
+}
+
+.entry-modal-btn.primary:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-light);
+  color: #fff;
+}
+
+.register-status {
+  margin-bottom: 1rem;
+  font-size: 0.92rem;
+  color: var(--text-tertiary);
+}
 
 .empty { padding: 48px; text-align: center; color: var(--text-light); font-size: 13px; }
 
@@ -396,7 +539,7 @@ body {
   }
   .t-head,
   .t-row {
-    grid-template-columns: 1.4fr 1fr 1.2fr 32px;
+    grid-template-columns: 1.4fr 1fr 1.2fr 84px;
     padding-inline: 14px;
   }
 }
@@ -484,7 +627,6 @@ body {
       <div id="screen-register">
         <div class="reg-header">
           <div>
-            <div class="reg-logo">SOFTORA.NL</div>
             <div class="reg-title">Wachtwoordenregister</div>
             <div class="reg-sub">Beveiligd overzicht van inloggegevens</div>
           </div>
@@ -494,11 +636,11 @@ body {
           </button>
         </div>
 
-        <div class="cat-bar" id="cat-bar"></div>
+        <div class="register-status" id="register-status"></div>
 
         <div class="search-row">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="search" placeholder="Zoeken op naam, gebruikersnaam…" oninput="render()">
+          <input type="text" id="search" placeholder="Zoeken op naam, website of gebruikersnaam…" oninput="render()">
         </div>
 
         <div class="table-wrap">
@@ -513,6 +655,44 @@ body {
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="entry-modal-backdrop" id="entry-modal-backdrop" hidden></div>
+<div class="entry-modal" id="entry-modal" hidden>
+  <div class="entry-modal-header">
+    <div>
+      <div class="entry-modal-title">Inloggegevens wijzigen</div>
+      <div class="entry-modal-sub">Pas naam, website, gebruikersnaam en wachtwoord aan.</div>
+    </div>
+    <button type="button" class="entry-modal-close" id="entry-modal-close" aria-label="Sluiten">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 6l12 12M18 6 6 18"></path>
+      </svg>
+    </button>
+  </div>
+  <form id="entry-form">
+    <div class="entry-form-grid">
+      <div class="entry-field">
+        <label for="entry-name">Naam</label>
+        <input id="entry-name" name="name" type="text" autocomplete="off" required>
+      </div>
+      <div class="entry-field">
+        <label for="entry-url">Website</label>
+        <input id="entry-url" name="url" type="text" autocomplete="off" required>
+      </div>
+      <div class="entry-field full">
+        <label for="entry-user">Gebruikersnaam</label>
+        <input id="entry-user" name="user" type="text" autocomplete="off" required>
+      </div>
+      <div class="entry-field full">
+        <label for="entry-password">Wachtwoord</label>
+        <input id="entry-password" name="password" type="text" autocomplete="off" required>
+      </div>
+    </div>
+    <div class="entry-modal-actions">
+      <button type="button" class="entry-modal-btn" id="entry-cancel">Annuleren</button>
+      <button type="submit" class="entry-modal-btn primary" id="entry-save">Opslaan</button>
+    </div>
+  </form>
+</div>
 
 <script>
 const PIN = '123456';
@@ -544,12 +724,9 @@ function check() {
   if (input === PIN) {
     dots('success');
     setTimeout(() => {
-      document.getElementById('screen-pin').style.display = 'none';
-      document.getElementById('screen-register').style.display = 'block';
-      input = '';
-      attempts = 0;
-      dots();
-      document.getElementById('pin-msg').textContent = '';
+      unlockRegister().catch(() => {
+        document.getElementById('pin-msg').textContent = 'Laden mislukt';
+      });
     }, 350);
   } else {
     attempts++;
@@ -587,6 +764,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 function lock() {
+  closeEditModal();
   document.getElementById('screen-register').style.display = 'none';
   document.getElementById('screen-pin').style.display = 'flex';
   input = '';
@@ -594,65 +772,287 @@ function lock() {
   document.getElementById('pin-msg').textContent = '';
 }
 
-const entries = [
-  { id:1, naam:'Hostinger', url:'hostinger.com', user:'beheer@softora.nl', pw:'H0st!nger24', cat:'Hosting' },
-  { id:2, naam:'TransIP', url:'transip.nl', user:'admin@softora.nl', pw:'Tr@nsIP2026!', cat:'Hosting' },
-  { id:3, naam:'Google Workspace', url:'workspace.google.com', user:'info@softora.nl', pw:'G00gl3Work!', cat:'Tools' },
-  { id:4, naam:'Instagram', url:'instagram.com', user:'@softora.nl', pw:'Insta$oft24', cat:'Socials' },
-  { id:5, naam:'LinkedIn', url:'linkedin.com', user:'info@softora.nl', pw:'Link3dIn!26', cat:'Socials' },
+const PASSWORD_REGISTER_SCOPE = 'premium_password_register';
+const PASSWORD_REGISTER_ENTRIES_KEY = 'entries_json';
+const DEFAULT_PASSWORD_ENTRIES = [
+  { id: 1, naam: 'Hostinger', url: 'hostinger.com', user: 'beheer@softora.nl', pw: 'H0st!nger24', cat: 'Hosting' },
+  { id: 2, naam: 'TransIP', url: 'transip.nl', user: 'admin@softora.nl', pw: 'Tr@nsIP2026!', cat: 'Hosting' },
+  { id: 3, naam: 'Google Workspace', url: 'workspace.google.com', user: 'info@softora.nl', pw: 'G00gl3Work!', cat: 'Tools' },
+  { id: 4, naam: 'Instagram', url: 'instagram.com', user: '@softora.nl', pw: 'Insta$oft24', cat: 'Socials' },
+  { id: 5, naam: 'LinkedIn', url: 'linkedin.com', user: 'info@softora.nl', pw: 'Link3dIn!26', cat: 'Socials' },
 ];
 
-const cats = ['Alle', ...new Set(entries.map((e) => e.cat))];
-let activeCat = 'Alle';
+let entries = [];
 const visible = {};
+let passwordEntriesLoaded = false;
+let passwordEntriesLoadPromise = null;
+let currentEditEntryId = null;
 
-function renderCats() {
-  document.getElementById('cat-bar').innerHTML = cats.map((c) =>
-    `<button class="cat-pill ${c === activeCat ? 'active' : ''}" onclick="setCat('${c}')">${c}</button>`
-  ).join('');
+const registerStatusEl = document.getElementById('register-status');
+const searchInputEl = document.getElementById('search');
+const entryModalBackdrop = document.getElementById('entry-modal-backdrop');
+const entryModalEl = document.getElementById('entry-modal');
+const entryModalCloseEl = document.getElementById('entry-modal-close');
+const entryCancelEl = document.getElementById('entry-cancel');
+const entryFormEl = document.getElementById('entry-form');
+const entryNameEl = document.getElementById('entry-name');
+const entryUrlEl = document.getElementById('entry-url');
+const entryUserEl = document.getElementById('entry-user');
+const entryPasswordEl = document.getElementById('entry-password');
+
+function normalizeString(value) {
+  return String(value == null ? '' : value).trim();
 }
 
-function setCat(c) {
-  activeCat = c;
-  renderCats();
-  render();
+function sanitizePasswordEntry(entry, index) {
+  const safeIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
+  const safeId = Number(entry && entry.id);
+  const name = normalizeString(entry && entry.naam) || `Inlog ${safeIndex + 1}`;
+  const url = normalizeString(entry && entry.url) || 'onbekend';
+  const user = normalizeString(entry && entry.user);
+  const pw = normalizeString(entry && entry.pw);
+  const cat = normalizeString(entry && entry.cat) || 'Overig';
+
+  return {
+    id: Number.isFinite(safeId) && safeId > 0 ? safeId : safeIndex + 1,
+    naam: name,
+    url,
+    user,
+    pw,
+    cat,
+  };
+}
+
+function sanitizePasswordEntries(rawEntries) {
+  if (!Array.isArray(rawEntries)) {
+    return DEFAULT_PASSWORD_ENTRIES.map((entry, index) => sanitizePasswordEntry(entry, index));
+  }
+
+  const dedupedIds = new Set();
+  const sanitized = rawEntries
+    .map((entry, index) => sanitizePasswordEntry(entry, index))
+    .filter((entry) => {
+      if (dedupedIds.has(entry.id)) return false;
+      dedupedIds.add(entry.id);
+      return true;
+    });
+
+  if (sanitized.length) return sanitized;
+  return DEFAULT_PASSWORD_ENTRIES.map((entry, index) => sanitizePasswordEntry(entry, index));
+}
+
+function getNextPasswordEntryId() {
+  return entries.reduce((maxId, entry) => Math.max(maxId, Number(entry && entry.id) || 0), 0) + 1;
+}
+
+function setRegisterStatus(message, tone = '') {
+  if (!registerStatusEl) return;
+  registerStatusEl.textContent = normalizeString(message);
+  registerStatusEl.style.color = tone === 'warning' ? 'var(--red)' : 'var(--text-tertiary)';
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+async function fetchUiStateGetWithFallback(scope) {
+  const encodedScope = encodeURIComponent(String(scope || ''));
+  const urls = [`/api/ui-state-get?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(
+        url,
+        {
+          method: 'GET',
+          cache: 'no-store',
+        },
+        12000
+      );
+      if (!response.ok) {
+        throw new Error(`UI state GET mislukt (${response.status})`);
+      }
+      return await response.json().catch(() => ({}));
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('UI state GET mislukt');
+}
+
+async function fetchUiStateSetWithFallback(scope, body) {
+  const encodedScope = encodeURIComponent(String(scope || ''));
+  const urls = [`/api/ui-state-set?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body || {}),
+        },
+        12000
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(normalizeString(data && data.error) || `UI state POST mislukt (${response.status})`);
+      }
+      return data;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('UI state POST mislukt');
+}
+
+async function persistPasswordEntries(actor = 'save') {
+  const sanitized = sanitizePasswordEntries(entries).map((entry) => ({ ...entry }));
+  entries = sanitized;
+  const payload = {
+    patch: {
+      [PASSWORD_REGISTER_ENTRIES_KEY]: JSON.stringify(sanitized),
+      updated_at: new Date().toISOString(),
+      updated_by: String(actor || 'save'),
+    },
+  };
+  const result = await fetchUiStateSetWithFallback(PASSWORD_REGISTER_SCOPE, payload);
+  const source = normalizeString(result && result.source);
+  if (source === 'supabase') {
+    setRegisterStatus('Wijzigingen zijn opgeslagen in Supabase.');
+  } else {
+    setRegisterStatus('Wijzigingen zijn tijdelijk opgeslagen, maar nog niet bevestigd vanuit Supabase.', 'warning');
+  }
+  return result;
+}
+
+async function ensurePasswordEntriesLoaded() {
+  if (passwordEntriesLoaded) return entries;
+  if (passwordEntriesLoadPromise) return passwordEntriesLoadPromise;
+
+  passwordEntriesLoadPromise = (async () => {
+    try {
+      const result = await fetchUiStateGetWithFallback(PASSWORD_REGISTER_SCOPE);
+      let remoteEntries = null;
+      const serializedEntries = normalizeString(
+        result && result.values && result.values[PASSWORD_REGISTER_ENTRIES_KEY]
+      );
+
+      if (serializedEntries) {
+        try {
+          const parsedEntries = JSON.parse(serializedEntries);
+          if (Array.isArray(parsedEntries)) {
+            remoteEntries = parsedEntries;
+          }
+        } catch (_) {
+          remoteEntries = null;
+        }
+      }
+
+      if (remoteEntries && remoteEntries.length) {
+        entries = sanitizePasswordEntries(remoteEntries);
+        const source = normalizeString(result && result.source);
+        if (source === 'supabase') {
+          setRegisterStatus('Inloggegevens geladen vanuit Supabase.');
+        } else {
+          setRegisterStatus('Inloggegevens geladen uit fallback-opslag.');
+        }
+      } else {
+        entries = sanitizePasswordEntries(DEFAULT_PASSWORD_ENTRIES);
+        try {
+          await persistPasswordEntries('bootstrap');
+        } catch (_) {
+          setRegisterStatus('Standaardgegevens geladen. Opslaan in Supabase is nog niet bevestigd.', 'warning');
+        }
+      }
+    } catch (_) {
+      entries = sanitizePasswordEntries(DEFAULT_PASSWORD_ENTRIES);
+      setRegisterStatus('Kon Supabase niet laden, tijdelijke fallback actief.', 'warning');
+    }
+
+    passwordEntriesLoaded = true;
+    passwordEntriesLoadPromise = null;
+    return entries;
+  })();
+
+  return passwordEntriesLoadPromise;
+}
+
+function getEntryById(id) {
+  return entries.find((entry) => Number(entry && entry.id) === Number(id)) || null;
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function render() {
-  const q = document.getElementById('search').value.toLowerCase();
-  const filtered = entries.filter((e) => {
-    const matchCat = activeCat === 'Alle' || e.cat === activeCat;
-    const matchQ = !q || e.naam.toLowerCase().includes(q) || e.user.toLowerCase().includes(q);
-    return matchCat && matchQ;
+  const q = normalizeString(searchInputEl && searchInputEl.value).toLowerCase();
+  const filtered = entries.filter((entry) => {
+    if (!q) return true;
+    return [entry.naam, entry.url, entry.user].some((value) =>
+      normalizeString(value).toLowerCase().includes(q)
+    );
   });
+
   const list = document.getElementById('list');
   if (!filtered.length) {
     list.innerHTML = '<div class="empty">Geen resultaten gevonden.</div>';
     return;
   }
-  list.innerHTML = filtered.map((e) => {
-    const show = visible[e.id];
+
+  list.innerHTML = filtered.map((entry) => {
+    const show = Boolean(visible[entry.id]);
+    const safeName = escapeHtml(entry.naam);
+    const safeUrl = escapeHtml(entry.url);
+    const safeUser = escapeHtml(entry.user);
+    const passwordMarkup = show ? escapeHtml(entry.pw) : '••••••••••';
+    const initials = escapeHtml((entry.naam || '?').charAt(0).toUpperCase());
+
     return `<div class="t-row">
       <div class="t-name">
-        <div class="t-favicon">${e.naam[0].toUpperCase()}</div>
+        <div class="t-favicon">${initials}</div>
         <div>
-          <div class="t-label">${e.naam}</div>
-          <div class="t-url">${e.url}</div>
+          <div class="t-label">${safeName}</div>
+          <div class="t-url">${safeUrl}</div>
         </div>
       </div>
-      <div class="t-user">${e.user}</div>
+      <div class="t-user">${safeUser}</div>
       <div class="t-pw-wrap">
-        <span class="t-pw ${show ? '' : 'hidden'}" id="pw-${e.id}">${show ? e.pw : '••••••••••'}</span>
-        <button class="btn-copy" onclick="toggleVis(${e.id})" title="${show ? 'Verbergen' : 'Tonen'}">
+        <span class="t-pw ${show ? '' : 'hidden'}" id="pw-${entry.id}">${passwordMarkup}</span>
+        <button class="btn-icon" type="button" onclick="toggleVis(${entry.id})" title="${show ? 'Verbergen' : 'Tonen'}" aria-label="${show ? 'Wachtwoord verbergen' : 'Wachtwoord tonen'}">
           ${show
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
             : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
           }
         </button>
       </div>
-      <button class="btn-copy" id="copy-${e.id}" onclick="copy(${e.id})" title="Kopieer wachtwoord">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-      </button>
+      <div class="row-actions">
+        <button class="btn-icon" type="button" onclick="openEditModal(${entry.id})" title="Bewerken" aria-label="Inloggegevens bewerken">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>
+        </button>
+        <button class="btn-icon" type="button" id="copy-${entry.id}" onclick="copy(${entry.id})" title="Kopieer wachtwoord" aria-label="Wachtwoord kopiëren">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -662,17 +1062,101 @@ function toggleVis(id) {
   render();
 }
 
-function copy(id) {
-  const e = entries.find((entry) => entry.id === id);
-  if (!e) return;
-  navigator.clipboard.writeText(e.pw).then(() => {
+async function copy(id) {
+  const entry = getEntryById(id);
+  if (!entry) return;
+
+  try {
+    await navigator.clipboard.writeText(entry.pw);
     const btn = document.getElementById(`copy-${id}`);
     if (btn) {
       btn.classList.add('copied');
       setTimeout(() => btn.classList.remove('copied'), 1200);
     }
     toast('✓ Wachtwoord gekopieerd');
-  });
+  } catch (_) {
+    toast('Kopiëren mislukt');
+  }
+}
+
+function openEditModal(id) {
+  const entry = getEntryById(id);
+  if (!entry) return;
+
+  currentEditEntryId = entry.id;
+  entryNameEl.value = entry.naam;
+  entryUrlEl.value = entry.url;
+  entryUserEl.value = entry.user;
+  entryPasswordEl.value = entry.pw;
+  entryModalBackdrop.hidden = false;
+  entryModalEl.hidden = false;
+  entryNameEl.focus();
+}
+
+function closeEditModal() {
+  currentEditEntryId = null;
+  entryModalBackdrop.hidden = true;
+  entryModalEl.hidden = true;
+  entryFormEl.reset();
+}
+
+async function saveEntryFromModal(event) {
+  event.preventDefault();
+  if (!currentEditEntryId) return;
+
+  const existingEntry = getEntryById(currentEditEntryId);
+  if (!existingEntry) {
+    closeEditModal();
+    return;
+  }
+
+  const updatedEntry = sanitizePasswordEntry(
+    {
+      id: existingEntry.id,
+      naam: entryNameEl.value,
+      url: entryUrlEl.value,
+      user: entryUserEl.value,
+      pw: entryPasswordEl.value,
+      cat: existingEntry.cat,
+    },
+    entries.findIndex((entry) => entry.id === existingEntry.id)
+  );
+
+  entries = entries.map((entry) => (entry.id === updatedEntry.id ? updatedEntry : entry));
+
+  try {
+    await persistPasswordEntries('edit');
+    closeEditModal();
+    render();
+    toast('✓ Inloggegevens opgeslagen');
+  } catch (_) {
+    entries = entries.map((entry) => (entry.id === existingEntry.id ? existingEntry : entry));
+    render();
+    toast('Opslaan mislukt');
+    setRegisterStatus('Opslaan in Supabase mislukt. Probeer het opnieuw.', 'warning');
+  }
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !entryModalEl.hidden) {
+    closeEditModal();
+  }
+});
+
+entryModalBackdrop.addEventListener('click', closeEditModal);
+entryModalCloseEl.addEventListener('click', closeEditModal);
+entryCancelEl.addEventListener('click', closeEditModal);
+entryFormEl.addEventListener('submit', saveEntryFromModal);
+
+async function unlockRegister() {
+  document.getElementById('screen-pin').style.display = 'none';
+  document.getElementById('screen-register').style.display = 'block';
+  input = '';
+  attempts = 0;
+  dots();
+  document.getElementById('pin-msg').textContent = '';
+  await ensurePasswordEntriesLoaded();
+  render();
 }
 
 function toast(msg) {
@@ -682,7 +1166,6 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-renderCats();
 render();
 </script>
 </body>
