@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createAiDashboardCoordinator } = require('../../server/services/ai-dashboard');
+const { createRubenAssistant } = require('../../server/services/ruben-assistant');
 
 function createResponseRecorder() {
   return {
@@ -95,7 +96,40 @@ function createFixture(overrides = {}) {
           ]),
       },
     },
+    ruben_nijhuis_memory: {
+      source: 'supabase',
+      updatedAt: '2026-04-07T13:00:00.000Z',
+      values: {
+        mission: 'Ruben bewaakt de samenhang tussen leads, agenda, opdrachten en klanten.',
+        notes: JSON.stringify([
+          {
+            id: 'rule-1',
+            category: 'workflow',
+            title: 'Niet geïnteresseerde lead niet opnieuw bellen',
+            detail: 'Als een lead dismissed of niet geïnteresseerd is, mag die niet opnieuw terug de bellijst in.',
+            why: 'Dat voorkomt onnodige irritatie en houdt het systeem schoon.',
+            createdAt: '2026-04-07T12:00:00.000Z',
+          },
+        ]),
+      },
+    },
   };
+
+  const rubenAssistant = createRubenAssistant({
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength),
+    parseJsonLoose: (value) => {
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return null;
+        }
+      }
+      return value ?? null;
+    },
+    getUiStateValues: async (scope) => stateByScope[scope] || null,
+  });
 
   const coordinator = createAiDashboardCoordinator({
     normalizeString: (value) => String(value || '').trim(),
@@ -246,6 +280,7 @@ function createFixture(overrides = {}) {
       const parsed = Number.parseInt(value, 10);
       return Number.isFinite(parsed) ? parsed : fallback;
     },
+    rubenAssistant,
   });
 
   return {
@@ -355,8 +390,9 @@ test('ai dashboard coordinator calls OpenAI with normalized question, history an
   assert.equal(fetchCalls[0].url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(requestBody.model, 'gpt-5.1-mini');
   assert.equal(requestBody.messages.at(-1).content, 'Hoeveel klanten hebben we?');
-  assert.match(requestBody.messages[0].content, /Softora AI-assistent/);
-  assert.match(requestBody.messages[1].content, /DASHBOARD_CONTEXT_JSON/);
+  assert.match(requestBody.messages[0].content, /Ruben Nijhuis/);
+  assert.match(requestBody.messages[1].content, /RUBEN_ASSISTANT_CONTEXT_JSON/);
+  assert.match(requestBody.messages[2].content, /DASHBOARD_CONTEXT_JSON/);
 });
 
 test('ai dashboard coordinator reports missing OpenAI config and empty upstream replies safely', async () => {
@@ -427,6 +463,7 @@ test('ai dashboard coordinator validates dashboard chat input and returns stable
   assert.equal(successRes.body.ok, true);
   assert.equal(typeof successRes.body.answer, 'string');
   assert.equal(successRes.body.contextMeta.totals.totaalKlanten, 2);
+  assert.equal(successRes.body.assistant.name, 'Ruben Nijhuis');
   assert.equal(successRes.body.openAiEnabled, true);
   assert.equal(runtimeReadyCalls.length, 3);
 });

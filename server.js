@@ -64,6 +64,7 @@ const { createAgendaPostCallCoordinator, createAgendaPostCallHelpers } = require
 const { createAgendaReadCoordinator } = require('./server/services/agenda-read');
 const { createActiveOrdersCoordinator } = require('./server/services/active-orders');
 const { createAiDashboardCoordinator } = require('./server/services/ai-dashboard');
+const { createRubenAssistant } = require('./server/services/ruben-assistant');
 const { createAiToolsCoordinator } = require('./server/services/ai-tools');
 const { createCustomersPageBootstrapService } = require('./server/services/customers-page-bootstrap');
 const { createHtmlPageCoordinator } = require('./server/services/html-pages');
@@ -1596,6 +1597,15 @@ const aiToolsCoordinator = createAiToolsCoordinator({
   logger: console,
 });
 
+const rubenAssistant = createRubenAssistant({
+  normalizeString,
+  truncateText,
+  parseJsonLoose,
+  getUiStateValues,
+  assistantMemoryScope: 'ruben_nijhuis_memory',
+  assistantName: 'Ruben Nijhuis',
+});
+
 const aiDashboardCoordinator = createAiDashboardCoordinator({
   normalizeString,
   truncateText,
@@ -1630,6 +1640,7 @@ const aiDashboardCoordinator = createAiDashboardCoordinator({
   normalizeAiSummaryStyle,
   generateTextSummaryWithAi,
   parseIntSafe,
+  rubenAssistant,
 });
 
 function extractCallUpdateFromRetellPayload(payload) {

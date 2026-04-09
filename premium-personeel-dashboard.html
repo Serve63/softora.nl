@@ -1525,13 +1525,13 @@
     <div class="dashboard-ai-chat" id="dashboardAiChat" data-open="false">
         <button type="button" class="dashboard-ai-chat-toggle" id="dashboardAiChatToggle" aria-expanded="false" aria-controls="dashboardAiChatPanel">
             <span class="dashboard-ai-chat-toggle-dot"></span>
-            <span>AI Chat</span>
+            <span>Ruben</span>
         </button>
         <section class="dashboard-ai-chat-panel" id="dashboardAiChatPanel" hidden>
             <div class="dashboard-ai-chat-head">
                 <div class="dashboard-ai-chat-head-title">
-                    <strong>AI Assistent</strong>
-                    <span>Vraag alles over je bedrijf en dashboarddata.</span>
+                    <strong>Ruben Nijhuis</strong>
+                    <span>Je Softora-collega voor context, keuzes en overzicht in de software.</span>
                 </div>
                 <button type="button" class="dashboard-ai-chat-close" id="dashboardAiChatClose" aria-label="Sluiten">×</button>
             </div>
@@ -1539,7 +1539,7 @@
             <div class="dashboard-ai-chat-foot">
                 <div class="dashboard-ai-chat-status" id="dashboardAiChatStatus"></div>
                 <form class="dashboard-ai-chat-form" id="dashboardAiChatForm">
-                    <textarea class="dashboard-ai-chat-input" id="dashboardAiChatInput" placeholder="Typ je vraag..." rows="1"></textarea>
+                    <textarea class="dashboard-ai-chat-input" id="dashboardAiChatInput" placeholder="Vraag het aan Ruben..." rows="1"></textarea>
                     <button type="submit" class="dashboard-ai-chat-send" id="dashboardAiChatSend">Verstuur</button>
                 </form>
             </div>
@@ -2658,7 +2658,7 @@
                 return;
             }
 
-            const CHAT_ENDPOINTS = ['/api/ai/dashboard-chat', '/api/ai-dashboard-chat'];
+            const CHAT_ENDPOINTS = ['/api/ai/ruben-chat', '/api/ai/dashboard-chat', '/api/ai-dashboard-chat'];
             const MAX_MESSAGES = 30;
             const state = {
                 open: false,
@@ -2719,7 +2719,7 @@
 
                     const bubble = document.createElement('div');
                     bubble.className = 'dashboard-ai-chat-bubble';
-                    bubble.textContent = 'AI denkt na...';
+                    bubble.textContent = 'Ruben denkt na...';
 
                     row.appendChild(bubble);
                     messagesEl.appendChild(row);
@@ -2795,7 +2795,7 @@
                 input.value = '';
                 appendMessage('user', question);
                 renderMessages(true);
-                formatStatus('AI verwerkt je vraag...', '');
+                formatStatus('Ruben verwerkt je vraag...', '');
                 setSending(true);
 
                 try {
@@ -2832,7 +2832,7 @@
             if (!state.messages.length) {
                 appendMessage(
                     'assistant',
-                    'Hoi, ik ben je AI-assistent. Je kunt me hier alles vragen over omzet, klanten, actieve opdrachten, agenda, calls en recente activiteiten.'
+                    'Hoi, ik ben Ruben Nijhuis. Ik ben je digitale Softora-collega en help je met klanten, opdrachten, agenda, calls, AI-insights en recente software-activiteit.'
                 );
             }
             renderMessages(false);

@@ -1,4 +1,7 @@
 function registerAiDashboardRoutes(app, deps) {
+  app.post('/api/ai/ruben-chat', (req, res) =>
+    deps.coordinator.sendPremiumDashboardChatResponse(req, res)
+  );
   app.post('/api/ai/dashboard-chat', (req, res) =>
     deps.coordinator.sendPremiumDashboardChatResponse(req, res)
   );

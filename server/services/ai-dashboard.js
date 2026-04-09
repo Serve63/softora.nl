@@ -50,6 +50,7 @@ function createAiDashboardCoordinator(deps = {}) {
       const parsed = Number.parseInt(value, 10);
       return Number.isFinite(parsed) ? parsed : fallback;
     },
+    rubenAssistant = null,
   } = deps;
 
   function normalizeDashboardChatHistory(historyRaw) {
@@ -422,21 +423,34 @@ function createAiDashboardCoordinator(deps = {}) {
 
     const history = normalizeDashboardChatHistory(options.history);
     const context = options.context && typeof options.context === 'object' ? options.context : {};
+    let assistantContext =
+      options.assistantContext && typeof options.assistantContext === 'object'
+        ? options.assistantContext
+        : null;
+    if (!assistantContext && rubenAssistant && typeof rubenAssistant.buildAssistantContext === 'function') {
+      assistantContext = await rubenAssistant.buildAssistantContext({ dashboardContext: context });
+    }
     const trimmedContext = trimDashboardChatContextForModel(context, 52000);
     const contextJson = JSON.stringify(trimmedContext);
 
-    const systemPrompt = [
-      'Je bent de interne Softora AI-assistent voor het personeel-dashboard.',
-      'Je antwoordt altijd in duidelijk Nederlands.',
-      'Gebruik uitsluitend de aangeleverde dashboard-context.',
-      'Als data ontbreekt of niet zeker is, zeg dat expliciet en verzin niets.',
-      'Als de gebruiker vraagt om "alles", geef een compact overzicht per domein: omzet/opdrachten, klanten, calls, agenda en recente activiteiten.',
-      'Geef concrete aantallen en namen als die in de context staan.',
-      'Noem geen technische interne details (zoals API keys of serverconfiguratie).',
-    ].join('\n');
+    const systemPrompt =
+      rubenAssistant && typeof rubenAssistant.buildAssistantSystemPrompt === 'function'
+        ? rubenAssistant.buildAssistantSystemPrompt({ assistantContext })
+        : [
+            'Je bent de interne Softora AI-assistent voor het personeel-dashboard.',
+            'Je antwoordt altijd in duidelijk Nederlands.',
+            'Gebruik uitsluitend de aangeleverde dashboard-context.',
+            'Als data ontbreekt of niet zeker is, zeg dat expliciet en verzin niets.',
+            'Als de gebruiker vraagt om "alles", geef een compact overzicht per domein: omzet/opdrachten, klanten, calls, agenda en recente activiteiten.',
+            'Geef concrete aantallen en namen als die in de context staan.',
+            'Noem geen technische interne details (zoals API keys of serverconfiguratie).',
+          ].join('\n');
 
     const messages = [
       { role: 'system', content: systemPrompt },
+      ...(assistantContext
+        ? [{ role: 'system', content: `RUBEN_ASSISTANT_CONTEXT_JSON:\n${JSON.stringify(assistantContext)}` }]
+        : []),
       { role: 'system', content: `DASHBOARD_CONTEXT_JSON:\n${contextJson}` },
       ...history,
       { role: 'user', content: question },
@@ -504,10 +518,15 @@ function createAiDashboardCoordinator(deps = {}) {
       }
 
       const context = await buildPremiumDashboardChatContext();
+      const assistantContext =
+        rubenAssistant && typeof rubenAssistant.buildAssistantContext === 'function'
+          ? await rubenAssistant.buildAssistantContext({ dashboardContext: context })
+          : null;
       const result = await generatePremiumDashboardChatReplyWithAi({
         question,
         history: body.history,
         context,
+        assistantContext,
       });
 
       return res.status(200).json({
@@ -519,6 +538,10 @@ function createAiDashboardCoordinator(deps = {}) {
           generatedAt: context.generatedAt || null,
           totals: context.overview || {},
         },
+        assistant:
+          rubenAssistant && typeof rubenAssistant.buildAssistantIdentity === 'function'
+            ? rubenAssistant.buildAssistantIdentity()
+            : null,
         openAiEnabled: true,
       });
     } catch (error) {
