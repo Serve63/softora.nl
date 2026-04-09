@@ -18,6 +18,7 @@ test('premium website werkwijze stats gebruiken een vaste paarse lijn zonder hov
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
+  assert.match(source, /4-8<span style="font-size: 1\.5rem; color: var\(--text-tertiary\);"> weken<\/span>/);
   assert.match(
     source,
     /\.stat-item\s*\{[\s\S]*border-left:\s*4px solid var\(--accent\);/s
