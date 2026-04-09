@@ -65,6 +65,26 @@
     return document.getElementById(id);
   }
 
+  function openLeadDatabaseFromCampaignControl() {
+    const dbModal = ensureLeadDatabaseModal();
+    if (!dbModal || typeof dbModal.openLeadDatabaseModal !== 'function') return false;
+    dbModal.openLeadDatabaseModal();
+    return true;
+  }
+
+  function bindLeadDatabaseOpenControl() {
+    window.openLeadDatabaseModalFromCampaign = openLeadDatabaseFromCampaignControl;
+    const button = byId('openLeadListModalBtn');
+    if (button && button.dataset.dbOpenBound !== '1') {
+      button.dataset.dbOpenBound = '1';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        openLeadDatabaseFromCampaignControl();
+      });
+    }
+    return button;
+  }
+
   function escapeHtml(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -2473,21 +2493,7 @@
     }
     updateDispatchDelayVisibility();
 
-    const openLeadDatabaseFromCampaignControl = () => {
-      const dbModal = ensureLeadDatabaseModal();
-      if (!dbModal || typeof dbModal.openLeadDatabaseModal !== 'function') return;
-      dbModal.openLeadDatabaseModal();
-    };
-    window.openLeadDatabaseModalFromCampaign = openLeadDatabaseFromCampaignControl;
-
-    let button = byId('openLeadListModalBtn');
-    if (button && button.dataset.dbOpenBound !== '1') {
-      button.dataset.dbOpenBound = '1';
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        openLeadDatabaseFromCampaignControl();
-      });
-    }
+    const button = bindLeadDatabaseOpenControl();
 
     restoreCampaignFormStateFromStorage();
     if (typeof window.initCustomFormSelects === 'function') {
@@ -5972,5 +5978,6 @@
     updateLogCountLabel();
   }
 
+  bindLeadDatabaseOpenControl();
   void bootstrapColdcallingUi();
 })();
