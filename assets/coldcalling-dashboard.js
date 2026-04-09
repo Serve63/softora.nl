@@ -37,9 +37,11 @@
   const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
   const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
   const CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY = 'softora_campaign_coldcalling_stack';
+  const BUSINESS_MODE_STORAGE_KEY = 'softora_business_mode';
   const DEFAULT_CAMPAIGN_REGIO_VALUE = 'unlimited';
   const CUSTOM_CAMPAIGN_REGIO_VALUE = 'custom';
   const REMOTE_UI_STATE_SCOPE_BASE = 'coldcalling';
+  const REMOTE_UI_STATE_SCOPE_PREFERENCES = 'coldcalling_preferences';
   const BUSINESS_MODE_ORDER = ['websites', 'voice_software', 'business_software'];
   let activeBusinessMode = 'websites';
   let remoteUiStateCache = Object.create(null);
@@ -50,7 +52,14 @@
   let remoteUiStatePendingPatch = Object.create(null);
   let remoteUiStateLastSource = '';
   let remoteUiStateLastError = '';
-  let latestStatsSummary = { started: 0 };
+  let dashboardStatsPollTimer = null;
+  let dashboardStatsRefreshPromise = null;
+  let latestStatsSummary = {
+    started: 0,
+    answered: 0,
+    interested: 0,
+    conversionPct: 0,
+  };
 
   function byId(id) {
     return document.getElementById(id);
@@ -886,6 +895,35 @@
     throw lastError || new Error('UI state POST mislukt');
   }
 
+  async function loadSavedStatusPillModeFromSupabase() {
+    try {
+      const data = await fetchUiStateGetWithFallback(REMOTE_UI_STATE_SCOPE_PREFERENCES);
+      const source = String(data?.source || '').trim();
+      if (!data?.ok || source !== 'supabase') {
+        return 'websites';
+      }
+      return normalizeBusinessMode(data?.values?.[BUSINESS_MODE_STORAGE_KEY] || 'websites');
+    } catch (error) {
+      return 'websites';
+    }
+  }
+
+  async function persistStatusPillModeToSupabase(mode) {
+    const normalizedMode = normalizeBusinessMode(mode);
+    const data = await fetchUiStateSetWithFallback(REMOTE_UI_STATE_SCOPE_PREFERENCES, {
+      patch: {
+        [BUSINESS_MODE_STORAGE_KEY]: normalizedMode,
+      },
+      source: 'assets/coldcalling-dashboard.js',
+      actor: 'browser',
+    });
+    const source = String(data?.source || '').trim();
+    if (!data?.ok || source !== 'supabase') {
+      throw new Error('Geselecteerde service is niet in Supabase opgeslagen.');
+    }
+    return normalizedMode;
+  }
+
   function readStorage(key) {
     if (!key) return '';
     return String(remoteUiStateCache[key] ?? '');
@@ -938,7 +976,16 @@
 
     const patch = remoteUiStatePendingPatch;
     const patchKeys = Object.keys(patch);
-    if (patchKeys.length === 0) return { ok: true, source: remoteUiStateLastSource || 'supabase' };
+    if (patchKeys.length === 0) {
+      if (remoteUiStateLoaded && remoteUiStateLastSource === 'supabase') {
+        return { ok: true, source: 'supabase' };
+      }
+      return {
+        ok: false,
+        source: remoteUiStateLastSource || 'unloaded',
+        error: remoteUiStateLastError || 'Dashboardconfiguratie is nog niet vanuit Supabase geladen.',
+      };
+    }
 
     remoteUiStatePendingPatch = Object.create(null);
 
@@ -1200,11 +1247,11 @@
   }
 
   function getSavedStatusPillMode() {
-    return 'websites';
+    return normalizeBusinessMode(activeBusinessMode || 'websites');
   }
 
   function saveStatusPillMode(mode) {
-    return;
+    activeBusinessMode = normalizeBusinessMode(mode);
   }
 
   function applyStatusPillMode(mode) {
@@ -1342,7 +1389,27 @@
     const notebookModal = byId('aiNotebookModalOverlay');
 
     if (remoteUiStateLoaded) {
-      await persistRemoteUiStateNow();
+      const saveResult = await persistRemoteUiStateNow();
+      if (!saveResult?.ok || String(saveResult?.source || '').trim() !== 'supabase') {
+        setStatusPill('error', 'Opslaan mislukt');
+        setStatusMessage(
+          'error',
+          saveResult?.error || 'Huidige dashboardwijzigingen staan nog niet veilig in Supabase.'
+        );
+        applyStatusPillMode(currentMode);
+        applyBusinessModeUi();
+        return;
+      }
+    }
+
+    try {
+      await persistStatusPillModeToSupabase(nextMode);
+    } catch (error) {
+      setStatusPill('error', 'Opslaan mislukt');
+      setStatusMessage('error', error?.message || 'Geselecteerde service kon niet in Supabase opgeslagen worden.');
+      applyStatusPillMode(currentMode);
+      applyBusinessModeUi();
+      return;
     }
 
     if (leadModal && leadModal.style.display !== 'none' && typeof leadModal.closeLeadListModal === 'function') {
@@ -1373,6 +1440,7 @@
     updateAiNotebookHint();
     applyStatusPillMode(nextMode);
     applyBusinessModeUi();
+    void refreshDashboardStatsFromSupabase({ force: true, silent: true });
   }
 
   function updateLogCountLabel() {
@@ -1407,35 +1475,71 @@
     }
   }
 
-  function getStatsResetBaselineStarted() {
+  function normalizeStatsSummaryValue(value) {
+    const parsed = Math.round(Number(value) || 0);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  }
+
+  function getStatsResetBaselineState() {
     const raw = readStorage(STATS_RESET_BASELINE_STORAGE_KEY).trim();
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      return 0;
+    if (!raw) {
+      return { started: 0, answered: 0, interested: 0 };
     }
-    return Math.round(parsed);
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          started: normalizeStatsSummaryValue(parsed.started),
+          answered: normalizeStatsSummaryValue(parsed.answered),
+          interested: normalizeStatsSummaryValue(parsed.interested),
+        };
+      }
+    } catch (error) {
+      const legacyStarted = normalizeStatsSummaryValue(raw);
+      if (legacyStarted > 0) {
+        return { started: legacyStarted, answered: 0, interested: 0 };
+      }
+    }
+
+    return { started: 0, answered: 0, interested: 0 };
   }
 
-  function setStatsResetBaselineStarted(value) {
-    const parsed = Number(value);
-    const normalized = Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0;
-    writeStorage(STATS_RESET_BASELINE_STORAGE_KEY, String(normalized));
+  function setStatsResetBaselineState(summary) {
+    const normalized = {
+      started: normalizeStatsSummaryValue(summary?.started),
+      answered: normalizeStatsSummaryValue(summary?.answered),
+      interested: normalizeStatsSummaryValue(summary?.interested),
+    };
+    if (!normalized.started && !normalized.answered && !normalized.interested) {
+      writeStorage(STATS_RESET_BASELINE_STORAGE_KEY, '');
+      return;
+    }
+    writeStorage(STATS_RESET_BASELINE_STORAGE_KEY, JSON.stringify(normalized));
   }
 
-  function resetStatsRowToZero() {
-    const latestStarted = Math.max(0, Math.round(Number(latestStatsSummary?.started || 0)));
-    setStatsResetBaselineStarted(latestStarted);
-
-    const statInterested = byId('statInterested');
-    const statBooked = byId('statBooked');
-    const statConversion = byId('statConversion');
-
-    if (statInterested) statInterested.textContent = '0';
-    if (statBooked) statBooked.textContent = '0';
-    if (statConversion) statConversion.textContent = '0%';
-
+  async function resetStatsRowToZero() {
+    const previousBaseline = getStatsResetBaselineState();
+    setStatsResetBaselineState(latestStatsSummary);
     updateStats(latestStatsSummary);
-    addUiLog('skip', '<strong>Dashboard</strong> - Statistiekrij is gereset.');
+    const saveResult = await persistRemoteUiStateNow();
+
+    if (!saveResult?.ok || String(saveResult?.source || '').trim() !== 'supabase') {
+      setStatsResetBaselineState(previousBaseline);
+      updateStats(latestStatsSummary);
+      setStatusPill('error', 'Reset mislukt');
+      setStatusMessage(
+        'error',
+        saveResult?.error || 'Dashboard-reset kon niet in Supabase opgeslagen worden.'
+      );
+      addUiLog('skip', '<strong>Dashboard</strong> - Reset afgewezen omdat Supabase-opslag mislukte.');
+      return false;
+    }
+
+    setStatusPill('success', 'Reset opgeslagen');
+    setStatusMessage('success', 'Dashboard-reset is opgeslagen in Supabase.');
+    addUiLog('skip', '<strong>Dashboard</strong> - Statistiekrij is gereset en opgeslagen in Supabase.');
+    return true;
   }
 
   function setupStatsResetButton() {
@@ -1443,10 +1547,20 @@
     if (!button || button.dataset.statsResetReady === '1') return;
 
     button.dataset.statsResetReady = '1';
-    button.addEventListener('click', (event) => {
+    button.addEventListener('click', async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      resetStatsRowToZero();
+      if (button.disabled) return;
+      button.disabled = true;
+      button.style.opacity = '0.7';
+      button.style.cursor = 'progress';
+      try {
+        await resetStatsRowToZero();
+      } finally {
+        button.disabled = false;
+        button.style.opacity = '1';
+        button.style.cursor = 'pointer';
+      }
     });
   }
 
@@ -1456,18 +1570,33 @@
     const statBooked = byId('statBooked');
     const statConversion = byId('statConversion');
     const safeSummary = summary && typeof summary === 'object' ? summary : {};
-    const startedRaw = Math.max(0, Math.round(Number(safeSummary.started ?? 0)));
+    const previousSummary = latestStatsSummary && typeof latestStatsSummary === 'object' ? latestStatsSummary : {};
+    const hasOwn = (key) => Object.prototype.hasOwnProperty.call(safeSummary, key);
+    const startedRaw = hasOwn('started')
+      ? normalizeStatsSummaryValue(safeSummary.started)
+      : normalizeStatsSummaryValue(previousSummary.started);
+    const answeredRaw = hasOwn('answered')
+      ? normalizeStatsSummaryValue(safeSummary.answered)
+      : normalizeStatsSummaryValue(previousSummary.answered);
+    const interestedRaw = hasOwn('interested')
+      ? normalizeStatsSummaryValue(safeSummary.interested)
+      : normalizeStatsSummaryValue(previousSummary.interested);
     latestStatsSummary = {
-      ...safeSummary,
       started: startedRaw,
+      answered: answeredRaw,
+      interested: interestedRaw,
+      conversionPct: startedRaw > 0 ? Math.round((Math.min(interestedRaw, startedRaw) / startedRaw) * 100) : 0,
     };
-    const startedBaseline = getStatsResetBaselineStarted();
-    const startedDisplay = Math.max(0, startedRaw - startedBaseline);
+    const baseline = getStatsResetBaselineState();
+    const startedDisplay = Math.max(0, startedRaw - normalizeStatsSummaryValue(baseline.started));
+    const answeredDisplay = Math.max(0, answeredRaw - normalizeStatsSummaryValue(baseline.answered));
+    const interestedDisplay = Math.max(0, interestedRaw - normalizeStatsSummaryValue(baseline.interested));
+    const conversionDisplay = startedDisplay > 0 ? Math.round((Math.min(interestedDisplay, startedDisplay) / startedDisplay) * 100) : 0;
 
     if (statCalled) statCalled.textContent = String(startedDisplay);
-    if (statInterested) statInterested.textContent = '0';
-    if (statBooked) statBooked.textContent = '0';
-    if (statConversion) statConversion.textContent = '0%';
+    if (statInterested) statInterested.textContent = String(interestedDisplay);
+    if (statBooked) statBooked.textContent = String(answeredDisplay);
+    if (statConversion) statConversion.textContent = `${conversionDisplay}%`;
   }
 
   function getDefaultLeadRow() {
@@ -4064,6 +4193,80 @@
     ];
   }
 
+  function getDashboardStatIdentity(item) {
+    const callId = normalizeFreeText(item?.callId || item?.call_id || '');
+    if (callId) return `call:${callId}`;
+    const normalizedPhoneKey = phoneKey(item?.phone || item?.lead?.phone || item?.lead?.phoneE164 || '');
+    if (normalizedPhoneKey) return `phone:${normalizedPhoneKey}`;
+    return '';
+  }
+
+  function buildDashboardStatsSummaryFromPersistedSources(data) {
+    const records = Array.isArray(data?.records) ? data.records : [];
+    const calls = (Array.isArray(data?.calls) ? data.calls : []).filter((call) => isQualifiedPhoneConversation(call));
+    const interestedLeads = Array.isArray(data?.interestedLeads) ? data.interestedLeads : [];
+    const callIntentByCallId = buildCallIntentByCallId(records);
+    const interestedKeys = new Set();
+
+    calls.forEach((call) => {
+      if (inferPhoneConversationIntent(call, callIntentByCallId) !== 'interesse') return;
+      const identity = getDashboardStatIdentity(call);
+      if (identity) interestedKeys.add(identity);
+    });
+
+    interestedLeads.forEach((lead) => {
+      const identity = getDashboardStatIdentity(lead);
+      if (identity) interestedKeys.add(identity);
+    });
+
+    const started = Math.max(0, calls.length);
+    const answered = Math.max(
+      0,
+      calls.filter((call) => inferConversationAnswered(call) === true).length
+    );
+    const interested = Math.min(started, Math.max(0, interestedKeys.size));
+
+    return {
+      started,
+      answered,
+      interested,
+      conversionPct: started > 0 ? Math.round((interested / started) * 100) : 0,
+    };
+  }
+
+  async function refreshDashboardStatsFromSupabase(options = {}) {
+    const silent = Boolean(options?.silent);
+    const force = Boolean(options?.force);
+
+    if (dashboardStatsRefreshPromise) return dashboardStatsRefreshPromise;
+
+    dashboardStatsRefreshPromise = (async () => {
+      try {
+        const data = await fetchLeadDatabaseRecords({
+          cacheBust: force ? String(Date.now()) : '',
+        });
+        const summary = buildDashboardStatsSummaryFromPersistedSources(data);
+        updateStats(summary);
+        return { ok: true, summary };
+      } catch (error) {
+        if (!silent) {
+          setStatusMessage(
+            'error',
+            normalizeFreeText(error?.message || '') || 'Dashboardstatistieken konden niet uit Supabase geladen worden.'
+          );
+        }
+        return {
+          ok: false,
+          error: normalizeFreeText(error?.message || '') || 'Dashboardstatistieken konden niet geladen worden.',
+        };
+      } finally {
+        dashboardStatsRefreshPromise = null;
+      }
+    })();
+
+    return dashboardStatsRefreshPromise;
+  }
+
   function ensureLeadDatabaseModal() {
     let modal = byId('leadDatabaseModalOverlay');
     if (modal) return modal;
@@ -5472,6 +5675,13 @@
     callUpdatePollTimer = window.setInterval(() => {
       void pollCallUpdatesOnce();
     }, 1500);
+
+    if (!dashboardStatsPollTimer) {
+      void refreshDashboardStatsFromSupabase({ silent: true });
+      dashboardStatsPollTimer = window.setInterval(() => {
+        void refreshDashboardStatsFromSupabase({ silent: true });
+      }, 12000);
+    }
   }
 
   async function getOrAskTestLeadPhone() {
@@ -5579,6 +5789,13 @@
     }
 
     try {
+      const stateSaveResult = await persistRemoteUiStateNow();
+      if (!stateSaveResult?.ok || String(stateSaveResult?.source || '').trim() !== 'supabase') {
+        throw new Error(
+          stateSaveResult?.error || 'Dashboardconfiguratie staat nog niet veilig in Supabase.'
+        );
+      }
+
       const campaign = collectCampaignFormData();
       const stackLabel = campaign.coldcallingStackLabel || getColdcallingStackLabel(campaign.coldcallingStack);
       const leadSelection = await getManualLeadsFromDashboard(campaign.amount);
@@ -5716,6 +5933,7 @@
           `Geen calls gestart. Controleer outbound-configuratie en logs.${failMessage}${failCause}`
         );
       }
+      void refreshDashboardStatsFromSupabase({ silent: true, force: true });
     } catch (error) {
       setStatusPill('error', 'Fout');
       setStatusMessage('error', `Fout bij starten campagne: ${error.message}`);
@@ -5732,14 +5950,23 @@
   };
 
   async function bootstrapColdcallingUi() {
-    activeBusinessMode = getSavedStatusPillMode();
+    activeBusinessMode = await loadSavedStatusPillModeFromSupabase();
     applyStatusPillMode(activeBusinessMode);
-    await loadRemoteUiState();
+    const uiStateLoaded = await loadRemoteUiState();
     setupStatsResetButton();
     ensureLeadListPanel();
     setupStatusPillModeToggle();
     applyBusinessModeUi();
     startCallUpdatePolling();
+    if (!uiStateLoaded || remoteUiStateLastSource !== 'supabase') {
+      setStatusPill('error', 'Supabase vereist');
+      setStatusMessage(
+        'error',
+        remoteUiStateLastError || 'Dashboardconfiguratie kon niet uit Supabase geladen worden.'
+      );
+    } else {
+      void refreshDashboardStatsFromSupabase({ force: true, silent: true });
+    }
 
     // Zorg dat het loglabel direct "calls" toont in plaats van "mails".
     updateLogCountLabel();

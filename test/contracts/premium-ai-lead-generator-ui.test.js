@@ -35,3 +35,20 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /savedRegio === CUSTOM_CAMPAIGN_REGIO_VALUE[\s\S]*applyCampaignRegioSelection\(regioEl, CUSTOM_CAMPAIGN_REGIO_VALUE, savedCustomRegioKm\);/);
   assert.match(dashboardSource, /if \(selectedValue === CUSTOM_CAMPAIGN_REGIO_VALUE\) \{[\s\S]*const customKm = await promptForCustomCampaignRegioKm\(initialCustomKm\);/);
 });
+
+test('premium ai lead generator persists dashboard config and stats through Supabase-only flows', () => {
+  const dashboardPath = path.join(__dirname, '../../assets/coldcalling-dashboard.js');
+  const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
+
+  assert.match(dashboardSource, /const BUSINESS_MODE_STORAGE_KEY = 'softora_business_mode';/);
+  assert.match(dashboardSource, /const REMOTE_UI_STATE_SCOPE_PREFERENCES = 'coldcalling_preferences';/);
+  assert.match(dashboardSource, /async function loadSavedStatusPillModeFromSupabase\(\) \{[\s\S]*fetchUiStateGetWithFallback\(REMOTE_UI_STATE_SCOPE_PREFERENCES\)[\s\S]*source !== 'supabase'/);
+  assert.match(dashboardSource, /async function persistStatusPillModeToSupabase\(mode\) \{[\s\S]*fetchUiStateSetWithFallback\(REMOTE_UI_STATE_SCOPE_PREFERENCES[\s\S]*source !== 'supabase'/);
+  assert.match(dashboardSource, /if \(patchKeys\.length === 0\) \{[\s\S]*remoteUiStateLastSource === 'supabase'[\s\S]*Dashboardconfiguratie is nog niet vanuit Supabase geladen\./);
+  assert.match(dashboardSource, /async function resetStatsRowToZero\(\) \{[\s\S]*setStatsResetBaselineState\(latestStatsSummary\)[\s\S]*const saveResult = await persistRemoteUiStateNow\(\)[\s\S]*Dashboard-reset is opgeslagen in Supabase\./);
+  assert.match(dashboardSource, /button\.addEventListener\('click', async \(event\) => \{[\s\S]*await resetStatsRowToZero\(\);/);
+  assert.match(dashboardSource, /function buildDashboardStatsSummaryFromPersistedSources\(data\) \{/);
+  assert.match(dashboardSource, /if \(!dashboardStatsPollTimer\) \{[\s\S]*refreshDashboardStatsFromSupabase\(\{ silent: true \}\)[\s\S]*12000/);
+  assert.match(dashboardSource, /const stateSaveResult = await persistRemoteUiStateNow\(\);[\s\S]*Dashboardconfiguratie staat nog niet veilig in Supabase\./);
+  assert.match(dashboardSource, /async function bootstrapColdcallingUi\(\) \{[\s\S]*activeBusinessMode = await loadSavedStatusPillModeFromSupabase\(\);[\s\S]*const uiStateLoaded = await loadRemoteUiState\(\);[\s\S]*remoteUiStateLastSource !== 'supabase'[\s\S]*Dashboardconfiguratie kon niet uit Supabase geladen worden\./);
+});
