@@ -56,7 +56,7 @@ function goTo(id) {
 function renderAccessDenied() {
   document.getElementById('list-count').textContent = '';
   document.getElementById('tegel-count').textContent = 'Geen toegang';
-  document.getElementById('personeel-list').innerHTML = '<div class="empty-state">Alleen administrators kunnen gebruikers beheren.</div>';
+  document.getElementById('personeel-list').innerHTML = '<div class="empty-state">Alleen Full Acces-accounts kunnen gebruikers beheren.</div>';
   document.querySelectorAll('#screen-personeel input, #screen-personeel select, #screen-personeel button').forEach(function (element) {
     if (element.classList.contains('modal-x') || element.classList.contains('btn-cancel')) return;
     element.disabled = true;
@@ -81,7 +81,7 @@ function render() {
       + '<div class="status-dot ' + persoon.status + '"></div>'
       + '<div class="person-avatar" style="background:' + getColor(persoon.id) + '">' + initials(persoon.voornaam || '', persoon.achternaam || '', persoon.email || '') + '</div>'
       + '<div class="person-info"><div class="person-name">' + escapeHtml(getDisplayName(persoon)) + '</div><div class="person-email">' + escapeHtml(persoon.email) + '</div></div>'
-      + '<span class="role-badge role-' + persoon.rol + '">' + (persoon.rol === 'admin' ? 'Admin' : 'Medewerker') + '</span>'
+      + '<span class="role-badge role-' + persoon.rol + '">' + (persoon.rol === 'admin' ? 'Full Acces' : 'Medewerker') + '</span>'
       + '<div class="person-actions">'
       + '<button class="btn-icon" onclick="openEdit(\'' + escapeJsString(persoon.id) + '\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
       + '<button class="btn-icon del" onclick="openDelete(\'' + escapeJsString(persoon.id) + '\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>'
@@ -111,7 +111,7 @@ async function addPersoneel() {
     return document.getElementById(id).value.trim();
   }
   if (!canManageUsers) {
-    return showToast('Alleen administrators kunnen gebruikers beheren');
+    return showToast('Alleen Full Acces-accounts kunnen gebruikers beheren');
   }
   var voornaam = value('new-voornaam');
   var email = value('new-email');
@@ -165,7 +165,7 @@ function openEdit(id) {
 
 async function saveEdit() {
   if (!canManageUsers) {
-    return showToast('Alleen administrators kunnen gebruikers beheren');
+    return showToast('Alleen Full Acces-accounts kunnen gebruikers beheren');
   }
   var id = document.getElementById('edit-id').value.trim();
   var email = document.getElementById('edit-email').value.trim();

@@ -357,7 +357,7 @@ test('premium user coordinator prevents removing the last active administrator',
   await coordinator.updatePremiumUserResponse(req, res, 'usr_admin');
 
   assert.equal(res.statusCode, 400);
-  assert.equal(res.body.error, 'Er moet altijd minimaal één actieve administrator overblijven.');
+  assert.equal(res.body.error, 'Er moet altijd minimaal één actief Full Acces-account overblijven.');
 });
 
 test('premium user coordinator deletes users and returns sanitized collection', async () => {

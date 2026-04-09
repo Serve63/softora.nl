@@ -247,7 +247,7 @@ function createPremiumApiAccessGuard(options = {}) {
       return res.status(401).json({ ok: false, error: 'Niet ingelogd.' });
     }
     if (!authState.isAdmin) {
-      return res.status(403).json({ ok: false, error: 'Alleen administrators hebben toegang.' });
+      return res.status(403).json({ ok: false, error: 'Alleen Full Acces-accounts hebben toegang.' });
     }
     return next();
   }

@@ -27,7 +27,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     const authState = requireAuthenticatedPremiumAuthState(req, res);
     if (!authState) return null;
     if (!authState.isAdmin) {
-      res.status(403).json({ ok: false, error: 'Alleen administrators hebben toegang.' });
+      res.status(403).json({ ok: false, error: 'Alleen Full Acces-accounts hebben toegang.' });
       return null;
     }
     return authState;
@@ -309,7 +309,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     if (premiumUsersStore.countActiveAdmins(nextUsers) < 1) {
       return res.status(400).json({
         ok: false,
-        error: 'Er moet altijd minimaal één actieve administrator overblijven.',
+        error: 'Er moet altijd minimaal één actief Full Acces-account overblijven.',
       });
     }
 
@@ -360,7 +360,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
     if (premiumUsersStore.countActiveAdmins(nextUsers) < 1) {
       return res.status(400).json({
         ok: false,
-        error: 'Er moet altijd minimaal één actieve administrator overblijven.',
+        error: 'Er moet altijd minimaal één actief Full Acces-account overblijven.',
       });
     }
 
