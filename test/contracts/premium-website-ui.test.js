@@ -48,6 +48,8 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.doesNotMatch(source, /\.cta-section\s*\{/);
   assert.doesNotMatch(source, /Klaar voor de <span class="text-accent">volgende stap<\/span>\?/);
   assert.match(source, /<footer id="contact">/);
+  assert.match(source, /\.footer-shell\s*\{[\s\S]*max-width:\s*900px;[\s\S]*margin:\s*0 auto;/s);
+  assert.match(source, /<div class="footer-shell">/);
   assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
 });
 
