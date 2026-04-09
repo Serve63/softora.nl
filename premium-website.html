@@ -992,6 +992,7 @@
         .footer-shell {
             max-width: 900px;
             margin: 0 auto;
+            transform: translateX(clamp(2rem, 4vw, 4rem));
         }
 
         .footer-grid {
@@ -1156,6 +1157,7 @@
             .image-side { clip-path: none; height: 400px; }
             .image-text-frame { --content-overlap: 0px; }
             .content-side { --content-panel-padding-x: 2rem; padding: 4rem 2rem; }
+            .footer-shell { transform: none; }
             .footer-grid { grid-template-columns: minmax(0, 1.1fr) minmax(240px, 1fr); gap: 2.5rem; }
             .pricing-card.featured { transform: none; order: -1; }
             nav, section, footer { padding-left: 2rem; padding-right: 2rem; }
