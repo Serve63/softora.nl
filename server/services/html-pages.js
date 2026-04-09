@@ -1,6 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 
+const LOCAL_FONT_VERSION = '20260409a';
+const LOCAL_FONT_STYLESHEET_HREF = `/assets/fonts.css?v=${LOCAL_FONT_VERSION}`;
+const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
+  `<link rel="preload" href="/assets/fonts/inter-latin.woff2?v=${LOCAL_FONT_VERSION}" as="font" type="font/woff2" crossorigin>`,
+  `<link rel="preload" href="/assets/fonts/oswald-latin.woff2?v=${LOCAL_FONT_VERSION}" as="font" type="font/woff2" crossorigin>`,
+  `<link rel="stylesheet" href="${LOCAL_FONT_STYLESHEET_HREF}">`,
+].join('\n');
+const HOMEPAGE_HERO_IMAGE_PRELOAD = [
+  '<link rel="preload" as="image"',
+  `href="/assets/hero-workspace-1254.jpg?v=${LOCAL_FONT_VERSION}"`,
+  `imagesrcset="/assets/hero-workspace-640.jpg?v=${LOCAL_FONT_VERSION} 640w, /assets/hero-workspace-960.jpg?v=${LOCAL_FONT_VERSION} 960w, /assets/hero-workspace-1254.jpg?v=${LOCAL_FONT_VERSION} 1254w"`,
+  'imagesizes="(max-width: 980px) 92vw, 46vw">',
+].join(' ');
+
 function createHtmlPageCoordinator(options = {}) {
   const {
     pagesDir = process.cwd(),
@@ -77,6 +91,36 @@ function createHtmlPageCoordinator(options = {}) {
     return renderedHtml;
   }
 
+  function injectSnippetBeforeHeadClose(html, snippet) {
+    const sourceHtml = String(html || '');
+    if (!snippet || sourceHtml.includes(snippet)) return sourceHtml;
+    if (/<\/head>/i.test(sourceHtml)) {
+      return sourceHtml.replace(/<\/head>/i, `${snippet}\n</head>`);
+    }
+    return `${snippet}\n${sourceHtml}`;
+  }
+
+  function optimizeHtmlDelivery(html, fileName) {
+    let renderedHtml = String(html || '')
+      .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.googleapis\.com"[^>]*>\s*/gim, '')
+      .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.gstatic\.com"[^>]*>\s*/gim, '');
+
+    if (renderedHtml.includes('fonts.googleapis.com/css2')) {
+      renderedHtml = renderedHtml.replace(
+        /<link[^>]+href="https:\/\/fonts\.googleapis\.com\/css2\?[^"]+"[^>]*>\s*/i,
+        `${LOCAL_FONT_PRELOAD_AND_STYLESHEET}\n`
+      );
+    } else if (!renderedHtml.includes(LOCAL_FONT_STYLESHEET_HREF)) {
+      renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, LOCAL_FONT_PRELOAD_AND_STYLESHEET);
+    }
+
+    if (fileName === 'premium-website.html') {
+      renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, HOMEPAGE_HERO_IMAGE_PRELOAD);
+    }
+
+    return renderedHtml;
+  }
+
   async function readHtmlPageContent(fileNameRaw) {
     const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
     if (!fileName) return '';
@@ -119,7 +163,14 @@ function createHtmlPageCoordinator(options = {}) {
       } catch (error) {
         logger.error('[HTML][BootstrapError]', fileName, error?.message || error);
       }
+      rendered = optimizeHtmlDelivery(rendered, fileName);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader(
+        'Cache-Control',
+        isLoginPage || isProtectedPremiumPage
+          ? 'no-store, private'
+          : 'public, max-age=300, stale-while-revalidate=900'
+      );
       return res.status(200).send(rendered);
     } catch (error) {
       logger.error('[SEO][RenderPageError]', fileName, error?.message || error);

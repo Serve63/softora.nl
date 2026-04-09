@@ -165,7 +165,12 @@ test('html page coordinator renders SEO-managed html and respects handled premiu
   assert.equal(nextCalled, false);
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Content-Type'], 'text/html; charset=utf-8');
+  assert.equal(res.headers['Cache-Control'], 'public, max-age=300, stale-while-revalidate=900');
   assert.match(res.body, /Softora \| SEO Test/);
+  assert.match(res.body, /href="\/assets\/fonts\.css\?v=20260409a"/);
+  assert.match(res.body, /href="\/assets\/fonts\/inter-latin\.woff2\?v=20260409a"/);
+  assert.doesNotMatch(res.body, /fonts\.googleapis\.com/);
+  assert.doesNotMatch(res.body, /fonts\.gstatic\.com/);
 });
 
 test('html page coordinator falls back to sendFile when rendering throws', async () => {

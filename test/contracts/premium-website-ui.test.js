@@ -66,6 +66,12 @@ test('premium website gebruikt een compactere herohoogte zodat de foto minder ve
     source,
     /\.hero-image img\s*\{[\s\S]*object-position:\s*center 24%;/s
   );
+  assert.match(
+    source,
+    /src="assets\/hero-workspace-1254\.jpg\?v=20260409a"[\s\S]*srcset="assets\/hero-workspace-640\.jpg\?v=20260409a 640w,\s*assets\/hero-workspace-960\.jpg\?v=20260409a 960w,\s*assets\/hero-workspace-1254\.jpg\?v=20260409a 1254w"/s
+  );
+  assert.match(source, /\.perf-deferred-section\s*\{[\s\S]*content-visibility:\s*auto;[\s\S]*contain-intrinsic-size:\s*920px;/s);
+  assert.match(source, /<section id="diensten" class="perf-deferred-section"/);
 });
 
 test('premium website whatsapp-widget gebruikt een verfijnde stijl en opent het juiste nummer', () => {

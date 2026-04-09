@@ -379,6 +379,11 @@
             filter: none;
         }
 
+        .perf-deferred-section {
+            content-visibility: auto;
+            contain-intrinsic-size: 920px;
+        }
+
         .hero-image::after {
             content: '';
             position: absolute;
@@ -1226,12 +1231,12 @@
             </div>
         </div>
         <div class="hero-image">
-            <img src="assets/7ABBFB63-F46F-4DE7-A3B0-4879B211BEE2.PNG" alt="Creatieve design-workspace" width="1254" height="1254" loading="eager" decoding="async" fetchpriority="high">
+            <img src="assets/hero-workspace-1254.jpg?v=20260409a" srcset="assets/hero-workspace-640.jpg?v=20260409a 640w, assets/hero-workspace-960.jpg?v=20260409a 960w, assets/hero-workspace-1254.jpg?v=20260409a 1254w" sizes="(max-width: 980px) 92vw, 46vw" alt="Creatieve design-workspace" width="1254" height="1254" loading="eager" decoding="async" fetchpriority="high">
         </div>
     </section>
 
     <!-- DIENSTEN -->
-    <section id="diensten" style="padding: 3rem 4rem 10rem;">
+    <section id="diensten" class="perf-deferred-section" style="padding: 3rem 4rem 10rem;">
         <div class="diensten-shell">
             <div class="diensten-arrow-wrap" aria-hidden="true">
                 <svg class="diensten-arrow-svg" viewBox="0 0 560 240" role="presentation" focusable="false">
@@ -1276,7 +1281,7 @@
     </section>
 
     <!-- OVER + IMAGE -->
-    <section class="image-text-section" id="over" style="padding: 1rem 4rem 3.5rem;">
+    <section class="image-text-section perf-deferred-section" id="over" style="padding: 1rem 4rem 3.5rem;">
         <div class="image-text-frame">
             <div class="image-side">
                 <img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1000&q=80" srcset="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=480&q=75 480w, https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=768&q=75 768w, https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1000&q=80 1000w, https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1400&q=80 1400w" sizes="(max-width: 980px) 92vw, 46vw" alt="Developer at work" width="1000" height="667" loading="lazy" decoding="async" fetchpriority="low">
@@ -1296,7 +1301,7 @@
     </section>
 
     <!-- WERKWIJZE -->
-    <section id="werkwijze" style="background: var(--bg-primary); padding: 0.5rem 4rem 8rem;">
+    <section id="werkwijze" class="perf-deferred-section" style="background: var(--bg-primary); padding: 0.5rem 4rem 8rem;">
         <div style="max-width: 1200px; margin: 0 auto;">
             <div class="grid-2 werkwijze-grid">
                 <div class="fade-up werkwijze-copy">
@@ -1337,7 +1342,7 @@
     </section>
 
     <!-- DIENSTEN OVERZICHT -->
-    <section id="diensten-overzicht" style="padding-top: 0;">
+    <section id="diensten-overzicht" class="perf-deferred-section" style="padding-top: 0;">
         <div style="max-width: 1200px; margin: 0 auto;">
             <div class="section-header fade-up" style="text-align: center; margin: 0 auto 6rem; display: flex; flex-direction: column; align-items: center;">
                 <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">Onze Diensten</span>
@@ -1397,7 +1402,7 @@
     </section>
 
     <!-- FAQ -->
-    <section id="faq" style="background: var(--bg-secondary); padding: 2.5rem 4rem 5.5rem;">
+    <section id="faq" class="perf-deferred-section" style="background: var(--bg-secondary); padding: 2.5rem 4rem 5.5rem;">
         <div style="max-width: 900px; margin: 0 auto;">
             <div class="section-header fade-up" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
                 <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">FAQ</span>

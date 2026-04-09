@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const crypto = require('crypto');
 const path = require('path');
 const helmet = require('helmet');
@@ -521,6 +522,15 @@ app.use(
           preload: true,
         }
       : false,
+  })
+);
+
+app.use(
+  compression({
+    threshold: 1024,
+    filter(req, res) {
+      return !String(res.getHeader('Cache-Control') || '').includes('no-transform') && compression.filter(req, res);
+    },
   })
 );
 
@@ -7113,8 +7123,15 @@ app.use(
   '/assets',
   express.static(path.join(__dirname, 'assets'), {
     maxAge: '7d',
-    setHeaders(res) {
-      res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+    setHeaders(res, assetPath) {
+      const originalUrl = String(res.req?.originalUrl || '');
+      if (/\.(woff2?|ttf|otf|eot|svg|png|jpe?g|webp|avif)$/i.test(assetPath)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (originalUrl.includes('?v=')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+      }
     },
   })
 );
