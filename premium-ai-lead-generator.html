@@ -695,6 +695,21 @@
             flex: 0 0 8px;
         }
 
+        .topbar-right .site-select--pill[data-dot-color="accent"] .site-select-trigger::before {
+            background: var(--accent-light);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .topbar-right .site-select--pill[data-dot-color="green"] .site-select-trigger::before {
+            background: var(--green);
+            box-shadow: 0 0 10px var(--green-glow);
+        }
+
+        .topbar-right .site-select--pill[data-dot-color="blue"] .site-select-trigger::before {
+            background: #2563eb;
+            box-shadow: 0 0 10px rgba(37, 99, 235, 0.28);
+        }
+
         .topbar-right .site-select--pill .site-select-value {
             white-space: nowrap;
             overflow: hidden;
@@ -1690,10 +1705,10 @@
                 <div class="topbar-right">
                     <div class="topbar-select-group">
                         <span class="topbar-select-label">Service</span>
-                        <select class="form-select magnetic" id="statusPill" data-select-variant="pill" aria-label="Business modus">
-                            <option value="websites" selected>Website's</option>
-                            <option value="voice_software" disabled>🔒 Voicesoftware</option>
-                            <option value="business_software" disabled>🔒 Bedrijfssoftware</option>
+                        <select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">
+                            <option value="websites" data-dot-color="accent" selected>Website's</option>
+                            <option value="voice_software" data-dot-color="green" disabled>🔒 Voicesoftware</option>
+                            <option value="business_software" data-dot-color="blue" disabled>🔒 Bedrijfssoftware</option>
                         </select>
                     </div>
                     <div class="topbar-select-group">
@@ -1907,6 +1922,16 @@
             function syncFromSelect() {
                 const selectedOption = select.options[select.selectedIndex] || select.options[0];
                 valueEl.textContent = selectedOption ? selectedOption.textContent : '';
+                const activeDotColor = String(
+                    selectedOption?.dataset?.dotColor ||
+                    select.dataset.dotColor ||
+                    ''
+                ).trim().toLowerCase();
+                if (activeDotColor) {
+                    wrapper.dataset.dotColor = activeDotColor;
+                } else {
+                    delete wrapper.dataset.dotColor;
+                }
                 optionButtons.forEach((button) => {
                     const isSelected = button.dataset.value === select.value;
                     button.classList.toggle('is-selected', isSelected);

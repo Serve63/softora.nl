@@ -17,9 +17,15 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<div class="form-group form-group--dispatch" id="callDispatchControlWrap">/);
   assert.match(pageSource, /<select class="form-select magnetic" id="callDispatchMode">/);
   assert.match(pageSource, /<select class="form-select magnetic" id="regio" data-force-change-value="custom">/);
+  assert.match(pageSource, /<select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">/);
+  assert.match(pageSource, /<option value="websites" data-dot-color="accent" selected>Website's<\/option>/);
+  assert.match(pageSource, /<option value="voice_software" data-dot-color="green" disabled>🔒 Voicesoftware<\/option>/);
+  assert.match(pageSource, /<option value="business_software" data-dot-color="blue" disabled>🔒 Bedrijfssoftware<\/option>/);
   assert.match(pageSource, /<option value="unlimited" selected>Geen limiet<\/option>/);
   assert.match(pageSource, /<option value="custom">Aangepast<\/option>/);
   assert.match(pageSource, /window\.openSiteInputDialog = openSiteInputDialog;/);
+  assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="accent"\] \.site-select-trigger::before \{[\s\S]*background:\s*var\(--accent-light\);/);
+  assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="blue"\] \.site-select-trigger::before \{[\s\S]*background:\s*#2563eb;/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--lead-list\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*3;/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--dispatch\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*4;/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--branche\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*3;/);
@@ -34,6 +40,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /async function promptForCustomCampaignRegioKm\(initialValue = ''\) \{/);
   assert.match(dashboardSource, /savedRegio === CUSTOM_CAMPAIGN_REGIO_VALUE[\s\S]*applyCampaignRegioSelection\(regioEl, CUSTOM_CAMPAIGN_REGIO_VALUE, savedCustomRegioKm\);/);
   assert.match(dashboardSource, /if \(selectedValue === CUSTOM_CAMPAIGN_REGIO_VALUE\) \{[\s\S]*const customKm = await promptForCustomCampaignRegioKm\(initialCustomKm\);/);
+  assert.match(pageSource, /const activeDotColor = String\([\s\S]*selectedOption\?\.dataset\?\.dotColor[\s\S]*wrapper\.dataset\.dotColor = activeDotColor;/);
 });
 
 test('premium ai lead generator persists dashboard config and stats through Supabase-only flows', () => {
