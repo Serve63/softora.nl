@@ -724,6 +724,7 @@
         }
 
         .content-side {
+            --content-panel-padding-x: 4.25rem;
             padding: 4rem 4.25rem;
             display: flex;
             flex-direction: column;
@@ -731,9 +732,13 @@
             background: var(--bg-secondary);
             position: relative;
             z-index: 1;
+            box-sizing: border-box;
         }
 
         .content-side.about-panel {
+            width: calc(100% + var(--content-overlap));
+            margin-left: calc(-1 * var(--content-overlap));
+            padding-left: calc(var(--content-panel-padding-x) + var(--content-overlap));
             border: 1px solid var(--accent);
             border-top: 3px solid var(--accent);
             box-shadow: 0 0 0 1px var(--accent);
@@ -752,17 +757,6 @@
         .content-side.about-panel > * {
             position: relative;
             z-index: 1;
-        }
-
-        .content-side::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: calc(-1 * var(--content-overlap));
-            width: var(--content-overlap);
-            background: var(--bg-secondary);
-            pointer-events: none;
         }
 
         .pricing-grid {
@@ -1160,7 +1154,7 @@
             .werkwijze-copy, .werkwijze-stats { width: 100%; }
             .image-side { clip-path: none; height: 400px; }
             .image-text-frame { --content-overlap: 0px; }
-            .content-side { padding: 4rem 2rem; }
+            .content-side { --content-panel-padding-x: 2rem; padding: 4rem 2rem; }
             .footer-grid { grid-template-columns: minmax(0, 1.1fr) minmax(240px, 1fr); gap: 2.5rem; }
             .pricing-card.featured { transform: none; order: -1; }
             nav, section, footer { padding-left: 2rem; padding-right: 2rem; }

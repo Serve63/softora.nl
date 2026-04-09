@@ -10,8 +10,10 @@ test('premium website over-ons paneel gebruikt dezelfde accentrand-taal als wat 
   assert.match(source, /<div class="content-side about-panel fade-up">/);
   assert.match(
     source,
-    /\.content-side\.about-panel\s*\{[\s\S]*border:\s*1px solid var\(--accent\);[\s\S]*border-top:\s*3px solid var\(--accent\);[\s\S]*box-shadow:\s*0 0 0 1px var\(--accent\);[\s\S]*clip-path:\s*polygon\(0 0,\s*calc\(100% - 20px\) 0,\s*100% 20px,\s*100% 100%,\s*20px 100%,\s*0 calc\(100% - 20px\)\);/s
+    /\.content-side\.about-panel\s*\{[\s\S]*width:\s*calc\(100% \+ var\(--content-overlap\)\);[\s\S]*margin-left:\s*calc\(-1 \* var\(--content-overlap\)\);[\s\S]*padding-left:\s*calc\(var\(--content-panel-padding-x\) \+ var\(--content-overlap\)\);[\s\S]*border:\s*1px solid var\(--accent\);[\s\S]*border-top:\s*3px solid var\(--accent\);[\s\S]*box-shadow:\s*0 0 0 1px var\(--accent\);[\s\S]*clip-path:\s*polygon\(0 0,\s*calc\(100% - 20px\) 0,\s*100% 20px,\s*100% 100%,\s*20px 100%,\s*0 calc\(100% - 20px\)\);/s
   );
+  assert.match(source, /\.content-side\s*\{[\s\S]*--content-panel-padding-x:\s*4\.25rem;/s);
+  assert.doesNotMatch(source, /\.content-side::before\s*\{/);
 });
 
 test('premium website werkwijze stats gebruiken een vaste paarse lijn zonder hover-effect', () => {
