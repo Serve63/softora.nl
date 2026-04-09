@@ -1189,7 +1189,6 @@
         .dashboard-ai-chat-head-title {
             display: flex;
             flex-direction: column;
-            gap: 0.14rem;
         }
 
         .dashboard-ai-chat-head-title strong {
@@ -1199,11 +1198,6 @@
             text-transform: uppercase;
             color: var(--text-primary);
             line-height: 1.05;
-        }
-
-        .dashboard-ai-chat-head-title span {
-            font-size: 0.72rem;
-            color: var(--text-secondary);
         }
 
         .dashboard-ai-chat-close {
@@ -1250,13 +1244,48 @@
             padding: 0.62rem 0.74rem;
             font-size: 0.82rem;
             line-height: 1.5;
-            white-space: pre-wrap;
             word-break: break-word;
+        }
+
+        .dashboard-ai-chat-bubble h2,
+        .dashboard-ai-chat-bubble h3,
+        .dashboard-ai-chat-bubble h4 {
+            margin: 0 0 0.5rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.92rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            line-height: 1.15;
+            color: var(--text-primary);
+        }
+
+        .dashboard-ai-chat-bubble p {
+            margin: 0;
+        }
+
+        .dashboard-ai-chat-bubble p + p {
+            margin-top: 0.6rem;
+        }
+
+        .dashboard-ai-chat-bubble ul,
+        .dashboard-ai-chat-bubble ol {
+            margin: 0.45rem 0 0.1rem 1rem;
+            padding: 0;
+        }
+
+        .dashboard-ai-chat-bubble li + li {
+            margin-top: 0.28rem;
+        }
+
+        .dashboard-ai-chat-bubble strong {
+            color: #fff;
+            font-weight: 600;
         }
 
         .dashboard-ai-chat-message.is-user .dashboard-ai-chat-bubble {
             border-color: rgba(139, 34, 82, 0.4);
             background: rgba(139, 34, 82, 0.18);
+            white-space: pre-wrap;
         }
 
         .dashboard-ai-chat-message.is-assistant .dashboard-ai-chat-bubble {
@@ -1525,13 +1554,12 @@
     <div class="dashboard-ai-chat" id="dashboardAiChat" data-open="false">
         <button type="button" class="dashboard-ai-chat-toggle" id="dashboardAiChatToggle" aria-expanded="false" aria-controls="dashboardAiChatPanel">
             <span class="dashboard-ai-chat-toggle-dot"></span>
-            <span>Ruben</span>
+            <span>Ruben Nijhuis</span>
         </button>
         <section class="dashboard-ai-chat-panel" id="dashboardAiChatPanel" hidden>
             <div class="dashboard-ai-chat-head">
                 <div class="dashboard-ai-chat-head-title">
                     <strong>Ruben Nijhuis</strong>
-                    <span>Je Softora-collega voor context, keuzes en overzicht in de software.</span>
                 </div>
                 <button type="button" class="dashboard-ai-chat-close" id="dashboardAiChatClose" aria-label="Sluiten">×</button>
             </div>
@@ -1539,7 +1567,7 @@
             <div class="dashboard-ai-chat-foot">
                 <div class="dashboard-ai-chat-status" id="dashboardAiChatStatus"></div>
                 <form class="dashboard-ai-chat-form" id="dashboardAiChatForm">
-                    <textarea class="dashboard-ai-chat-input" id="dashboardAiChatInput" placeholder="Vraag het aan Ruben..." rows="1"></textarea>
+                    <textarea class="dashboard-ai-chat-input" id="dashboardAiChatInput" placeholder="Vraag het aan Ruben Nijhuis..." rows="1"></textarea>
                     <button type="submit" class="dashboard-ai-chat-send" id="dashboardAiChatSend">Verstuur</button>
                 </form>
             </div>
@@ -2694,6 +2722,113 @@
                 statusEl.classList.toggle('is-error', tone === 'error');
             }
 
+            function escapeChatHtml(value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function renderChatInlineMarkdown(text) {
+                return String(text || '')
+                    .replace(/`([^`]+)`/g, '<strong>$1</strong>')
+                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                    .replace(/__([^_]+)__/g, '<strong>$1</strong>');
+            }
+
+            function renderAssistantMarkdown(content) {
+                const safeContent = escapeChatHtml(String(content || '').trim());
+                if (!safeContent) return '';
+
+                const lines = safeContent.split(/\r?\n/);
+                const blocks = [];
+                let paragraphLines = [];
+                let listType = null;
+                let listItems = [];
+
+                function flushParagraph() {
+                    if (!paragraphLines.length) return;
+                    const text = paragraphLines.join(' ').trim();
+                    if (text) {
+                        blocks.push(`<p>${renderChatInlineMarkdown(text)}</p>`);
+                    }
+                    paragraphLines = [];
+                }
+
+                function flushList() {
+                    if (!listType || !listItems.length) {
+                        listType = null;
+                        listItems = [];
+                        return;
+                    }
+                    blocks.push(
+                        `<${listType}>${listItems
+                            .map((item) => `<li>${renderChatInlineMarkdown(item)}</li>`)
+                            .join('')}</${listType}>`
+                    );
+                    listType = null;
+                    listItems = [];
+                }
+
+                lines.forEach((rawLine) => {
+                    const line = String(rawLine || '').trim();
+                    if (!line) {
+                        flushParagraph();
+                        flushList();
+                        return;
+                    }
+
+                    const headingMatch = line.match(/^(#{2,4})\s+(.+)$/);
+                    if (headingMatch) {
+                        flushParagraph();
+                        flushList();
+                        const depth = Math.min(4, Math.max(2, headingMatch[1].length));
+                        blocks.push(`<h${depth}>${renderChatInlineMarkdown(headingMatch[2])}</h${depth}>`);
+                        return;
+                    }
+
+                    const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+                    if (bulletMatch) {
+                        flushParagraph();
+                        if (listType !== 'ul') {
+                            flushList();
+                            listType = 'ul';
+                        }
+                        listItems.push(bulletMatch[1]);
+                        return;
+                    }
+
+                    const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
+                    if (orderedMatch) {
+                        flushParagraph();
+                        if (listType !== 'ol') {
+                            flushList();
+                            listType = 'ol';
+                        }
+                        listItems.push(orderedMatch[1]);
+                        return;
+                    }
+
+                    flushList();
+                    paragraphLines.push(line);
+                });
+
+                flushParagraph();
+                flushList();
+
+                return blocks.join('') || `<p>${renderChatInlineMarkdown(safeContent)}</p>`;
+            }
+
+            function renderMessageBubbleContent(bubble, item) {
+                if (item.role === 'assistant') {
+                    bubble.innerHTML = renderAssistantMarkdown(item.content);
+                    return;
+                }
+                bubble.textContent = item.content;
+            }
+
             function scrollMessagesToBottom() {
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             }
@@ -2707,7 +2842,7 @@
 
                     const bubble = document.createElement('div');
                     bubble.className = 'dashboard-ai-chat-bubble';
-                    bubble.textContent = item.content;
+                    renderMessageBubbleContent(bubble, item);
 
                     row.appendChild(bubble);
                     messagesEl.appendChild(row);
@@ -2719,7 +2854,7 @@
 
                     const bubble = document.createElement('div');
                     bubble.className = 'dashboard-ai-chat-bubble';
-                    bubble.textContent = 'Ruben denkt na...';
+                    bubble.textContent = 'Ruben Nijhuis denkt na...';
 
                     row.appendChild(bubble);
                     messagesEl.appendChild(row);
@@ -2795,7 +2930,7 @@
                 input.value = '';
                 appendMessage('user', question);
                 renderMessages(true);
-                formatStatus('Ruben verwerkt je vraag...', '');
+                formatStatus('Ruben Nijhuis verwerkt je vraag...', '');
                 setSending(true);
 
                 try {
@@ -2814,7 +2949,7 @@
                     const answer = String(data?.answer || '').trim() || 'Geen antwoord ontvangen.';
                     appendMessage('assistant', answer);
                     renderMessages(false);
-                    formatStatus('Bijgewerkt met de nieuwste dashboarddata.', 'ok');
+                    formatStatus('', '');
                 } catch (error) {
                     appendMessage(
                         'assistant',
