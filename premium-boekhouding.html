@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | Boekhouding</title>
-<link rel="stylesheet" href="assets/personnel-theme.css?v=20260402-6">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260409d">
 <script>
     (function () {
         document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -215,18 +215,13 @@ body {
   flex: 1;
   margin-left: 280px;
   padding: 3rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
 }
 
 .coming-shell {
   width: 100%;
   max-width: 980px;
-  min-height: calc(100vh - 6rem);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: auto;
 }
 
 .coming-title {
@@ -313,8 +308,18 @@ body {
   </aside>
 
   <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h1>Boekhouding</h1>
+        <p>Boekhoudoverzichten en koppelingen worden hier binnenkort in dezelfde premium omgeving beschikbaar.</p>
+      </div>
+    </div>
+
     <section class="coming-shell">
-      <h1 class="coming-title">Coming Soon</h1>
+      <div class="coming-panel">
+        <h2 class="coming-title">Binnenkort Beschikbaar</h2>
+        <p class="coming-subtitle">Deze pagina gebruikt nu dezelfde dashboard-shell. De boekhoudmodule volgt hier straks in dezelfde layout, typografie en spacing als de rest van de premium omgeving.</p>
+      </div>
     </section>
   </main>
 </div>

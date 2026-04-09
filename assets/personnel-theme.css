@@ -923,3 +923,136 @@ button,
     line-height: var(--sidebar-page-subtitle-line) !important;
     margin: 0 !important;
 }
+
+/* Canonical dashboard shell across all premium sidebar routes */
+:root {
+    --sidebar-shell-max-width: 1600px;
+    --sidebar-shell-gap: 3rem;
+}
+
+.dashboard-layout > .main-content,
+.dashboard-layout > main.main-content,
+.dashboard-layout > .main,
+.dashboard-layout > main.main,
+.dashboard-layout > .page-shell,
+.dashboard-layout > main.page-shell {
+    min-width: 0 !important;
+}
+
+.dashboard-layout > .main-content,
+.dashboard-layout > main.main-content,
+.dashboard-layout > .main,
+.dashboard-layout > main.main {
+    width: calc(100% - 280px) !important;
+    min-height: 100vh !important;
+    padding: 3rem 3rem 1.8rem !important;
+}
+
+.dashboard-layout > .page-shell,
+.dashboard-layout > main.page-shell {
+    width: calc(100% - 280px) !important;
+    min-height: 100vh !important;
+    padding: 3rem 3rem 1.8rem !important;
+}
+
+.dashboard-layout :is(.page-shell, .page-content, .page-header, .topbar, .page-hero, .register-shell, .coming-shell, .screen, .notepad-shell) {
+    width: min(var(--sidebar-shell-max-width), 100%) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.dashboard-layout :is(.topbar, .page-header, .page-hero) {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+    margin-bottom: var(--sidebar-shell-gap) !important;
+}
+
+.dashboard-layout :is(.topbar-left, .topbar-copy, .page-header > div, .page-hero > div:first-child, .header > div, .reg-header > div, .notepad-shell > header, .hero, .coming-shell) {
+    display: grid !important;
+    gap: 0.3rem !important;
+}
+
+.dashboard-layout :is(.topbar-right, .topbar-actions) {
+    display: flex !important;
+    align-items: center !important;
+    gap: 1rem !important;
+    flex-wrap: wrap !important;
+}
+
+.dashboard-layout :is(.page-content > .hero, .page-shell > .hero, .page-shell > .header, .notepad-shell > header, .reg-header, .coming-shell) {
+    margin-bottom: var(--sidebar-shell-gap) !important;
+}
+
+.dashboard-layout :is(.page-title, .hero-title, .reg-title, .coming-title, .costs-title, .beheer-title) {
+    font-family: 'Oswald', sans-serif !important;
+    font-size: var(--sidebar-page-title-size) !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: var(--sidebar-page-title-spacing) !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    color: var(--text-primary) !important;
+}
+
+.dashboard-layout :is(.page-subtitle, .page-sub, .hero-text, .reg-sub, .coming-subtitle, .costs-subtitle, .beheer-subtitle) {
+    color: var(--text-tertiary) !important;
+    font-size: var(--sidebar-page-subtitle-size) !important;
+    font-weight: 300 !important;
+    line-height: var(--sidebar-page-subtitle-line) !important;
+    margin: 0 !important;
+}
+
+.dashboard-layout :is(.page-shell, .main-content, .main, .screen.active) > :is(.page-title, .beheer-title) + :is(.page-subtitle, .page-sub, .beheer-subtitle) {
+    margin-top: 0.3rem !important;
+}
+
+.dashboard-layout :is(.page-shell, .main-content, .main, .screen.active) > :is(.page-subtitle, .page-sub) {
+    display: block !important;
+    margin-bottom: var(--sidebar-shell-gap) !important;
+}
+
+.dashboard-layout .coming-shell {
+    align-content: start !important;
+    justify-items: start !important;
+    min-height: auto !important;
+}
+
+.dashboard-layout .coming-panel {
+    width: min(960px, 100%) !important;
+    border: 1px solid var(--border) !important;
+    background: var(--bg-secondary) !important;
+    padding: 2rem !important;
+    box-shadow: none !important;
+    display: grid !important;
+    gap: 0.3rem !important;
+}
+
+.dashboard-layout .coming-panel p {
+    color: var(--text-tertiary) !important;
+    font-size: var(--sidebar-page-subtitle-size) !important;
+    line-height: 1.6 !important;
+    max-width: 64ch !important;
+}
+
+@media (max-width: 900px) {
+    .dashboard-layout > .main-content,
+    .dashboard-layout > main.main-content,
+    .dashboard-layout > .main,
+    .dashboard-layout > main.main,
+    .dashboard-layout > .page-shell,
+    .dashboard-layout > main.page-shell {
+        width: 100% !important;
+        padding: 1.5rem !important;
+    }
+
+    .dashboard-layout :is(.topbar, .page-header, .page-hero, .reg-header) {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+
+    .dashboard-layout :is(.topbar-right, .topbar-actions) {
+        width: 100% !important;
+    }
+}
