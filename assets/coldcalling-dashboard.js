@@ -3996,7 +3996,7 @@
       .map((entry) => {
         const sortedUpdates = entry.updates
           .slice()
-          .sort((a, b) => getCallLikeRecordUpdatedMs(b) - getCallLikeRecordUpdatedMs(a));
+          .sort((a, b) => getConversationRecordOccurredMs(b) - getConversationRecordOccurredMs(a));
         const sortedInsights = entry.insights
           .slice()
           .sort((a, b) => getCallLikeRecordUpdatedMs(b) - getCallLikeRecordUpdatedMs(a));
@@ -4029,11 +4029,13 @@
             ''
         );
         const lastUpdatedMs = Math.max(
-          getCallLikeRecordUpdatedMs(latestUpdate),
+          getConversationRecordOccurredMs(latestUpdate),
           getCallLikeRecordUpdatedMs(latestInsight)
         );
         const lastUpdatedAt =
-          normalizeFreeText(latestUpdate?.updatedAt || latestInsight?.analyzedAt || latestUpdate?.endedAt || '') ||
+          normalizeFreeText(
+            getConversationRecordOccurredAt(latestUpdate) || latestInsight?.analyzedAt || latestUpdate?.updatedAt || ''
+          ) ||
           '';
 
         return {
@@ -5238,9 +5240,7 @@
       const needle = normalizeSearchText(state.search);
       const rows = (Array.isArray(state.calls) ? state.calls : [])
         .filter((call) => isQualifiedPhoneConversation(call))
-        .sort(
-        (a, b) => getCallLikeRecordUpdatedMs(b) - getCallLikeRecordUpdatedMs(a)
-      );
+        .sort((a, b) => getConversationRecordOccurredMs(b) - getConversationRecordOccurredMs(a));
       if (!needle) return rows;
       return rows.filter((call) => {
         const haystack = normalizeSearchText(

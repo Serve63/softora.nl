@@ -70,6 +70,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /function getConversationRecordOccurredAt\(record\) \{/);
   assert.match(dashboardSource, /sort\(\(a, b\) => getConversationRecordOccurredMs\(b\) - getConversationRecordOccurredMs\(a\)\)/);
   assert.match(dashboardSource, /formatConversationTimestamp\(getConversationRecordOccurredAt\(record\)\)/);
+  assert.match(dashboardSource, /const sortedUpdates = entry\.updates[\s\S]*sort\(\(a, b\) => getConversationRecordOccurredMs\(b\) - getConversationRecordOccurredMs\(a\)\)/);
+  assert.match(dashboardSource, /const rows = \(Array\.isArray\(state\.calls\) \? state\.calls : \[\]\)[\s\S]*sort\(\(a, b\) => getConversationRecordOccurredMs\(b\) - getConversationRecordOccurredMs\(a\)\)/);
   assert.match(
     dashboardSource,
     /function buildLeadDatabaseCallSummarySourceText\(call, insight, interestedLead, remoteDetail = null\) \{[\s\S]*remoteDetail\?\.transcript[\s\S]*call\?\.transcriptFull[\s\S]*remoteDetail\?\.summary[\s\S]*call\?\.summary[\s\S]*insight\?\.summary[\s\S]*interestedLead\?\.summary/
