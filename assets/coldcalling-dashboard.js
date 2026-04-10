@@ -4512,16 +4512,6 @@
             margin-bottom: 8px;
           }
 
-          #leadDatabaseModalShell .lead-db-logo {
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 14px;
-            font-weight: 800;
-            letter-spacing: 1px;
-            color: var(--lead-db-crimson);
-            margin-bottom: 6px;
-            text-transform: uppercase;
-          }
-
           #leadDatabaseModalShell .lead-db-page-title {
             font-family: 'Barlow Condensed', sans-serif;
             font-size: 30px;
@@ -4690,39 +4680,6 @@
             gap: 8px;
             flex-wrap: wrap;
             margin-bottom: 16px;
-          }
-
-          #leadDatabaseModalShell .lead-db-filter-pills {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-          }
-
-          #leadDatabaseModalShell .lead-db-filter-pill {
-            border: 1px solid var(--lead-db-border);
-            border-radius: 20px;
-            background: var(--lead-db-card);
-            color: var(--lead-db-text-light);
-            padding: 5px 14px;
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.15s ease;
-          }
-
-          #leadDatabaseModalShell .lead-db-filter-pill:hover {
-            border-color: rgba(155, 35, 85, 0.3);
-            color: var(--lead-db-text-dark);
-          }
-
-          #leadDatabaseModalShell .lead-db-filter-pill.is-active {
-            background: var(--lead-db-crimson);
-            border-color: var(--lead-db-crimson);
-            color: #ffffff;
           }
 
           #leadDatabaseModalShell .lead-db-search-wrap {
@@ -4947,17 +4904,6 @@
             font-size: 13px;
           }
 
-          #leadDatabaseModalShell .lead-db-footer {
-            padding: 0 24px 20px;
-            text-align: right;
-            color: var(--lead-db-crimson);
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-          }
-
           #leadDatabaseCallDetailOverlay {
             position: fixed;
             inset: 0;
@@ -5097,7 +5043,6 @@
       <div id="leadDatabaseModalShell">
         <div class="lead-db-page">
           <div class="lead-db-header">
-            <div class="lead-db-logo">Softora.nl</div>
             <div class="lead-db-page-title">Database</div>
             <div id="leadDatabaseHeaderHint" class="lead-db-page-sub">${escapeHtml(modeUi.dbHint)}</div>
           </div>
@@ -5105,13 +5050,6 @@
           <div class="lead-db-toolbar">
             <div class="lead-db-toolbar-left">
               <div id="leadDatabaseRefreshInfo" class="lead-db-refresh-info">Nog niet ververst</div>
-              <button type="button" id="leadDatabaseRefreshBtn" class="lead-db-btn" aria-label="Verversen" title="Verversen">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <polyline points="23 4 23 10 17 10"></polyline>
-                  <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"></path>
-                </svg>
-                Verversen
-              </button>
             </div>
             <div class="lead-db-toolbar-right">
               <button type="button" id="leadDatabaseTemplateBtn" class="lead-db-btn">
@@ -5147,7 +5085,6 @@
           <div id="leadDatabaseSummaryCards" class="lead-db-stats"></div>
 
           <div class="lead-db-filter-bar">
-            <div id="leadDatabaseFilterPills" class="lead-db-filter-pills"></div>
             <div class="lead-db-search-wrap">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <circle cx="11" cy="11" r="8"></circle>
@@ -5183,8 +5120,6 @@
             </div>
           </div>
         </div>
-
-        <div class="lead-db-footer">Softora.nl</div>
       </div>
     `;
 
@@ -5608,14 +5543,12 @@
       const tableWrap = byId('leadDatabaseTableWrap');
       const statusBar = byId('leadDatabaseStatusBar');
       const summaryCards = byId('leadDatabaseSummaryCards');
-      const filterPills = byId('leadDatabaseFilterPills');
       const refreshInfo = byId('leadDatabaseRefreshInfo');
-      const refreshBtn = byId('leadDatabaseRefreshBtn');
       const importBtn = byId('leadDatabaseImportBtn');
       const addManualBtn = byId('leadDatabaseAddManualBtn');
       const templateBtn = byId('leadDatabaseTemplateBtn');
       const closeBtn = byId('leadDatabaseCancelBtn');
-      if (!tableWrap || !summaryCards || !filterPills || !statusBar) return;
+      if (!tableWrap || !summaryCards || !statusBar) return;
 
       const busy = state.importing || state.loading;
       if (refreshInfo) {
@@ -5629,9 +5562,6 @@
             : 'Nog niet ververst';
       }
 
-      if (refreshBtn) {
-        refreshBtn.disabled = state.loading;
-      }
       if (importBtn) {
         importBtn.disabled = busy;
       }
@@ -5668,26 +5598,6 @@
       summaryCards.querySelectorAll('[data-db-filter]').forEach((button) => {
         button.addEventListener('click', () => {
           const key = String(button.getAttribute('data-db-filter') || 'all').trim();
-          state.filter = key || 'all';
-          closeCallDetail();
-          render();
-        });
-      });
-
-      filterPills.innerHTML = cards
-        .map((card) => {
-          const isActive = state.filter === card.key;
-          return `
-            <button type="button" data-db-pill-filter="${escapeHtml(card.key)}" class="lead-db-filter-pill${
-              isActive ? ' is-active' : ''
-            }">${escapeHtml(getLeadDatabaseUiLabel(card.key))}</button>
-          `;
-        })
-        .join('');
-
-      filterPills.querySelectorAll('[data-db-pill-filter]').forEach((button) => {
-        button.addEventListener('click', () => {
-          const key = String(button.getAttribute('data-db-pill-filter') || 'all').trim();
           state.filter = key || 'all';
           closeCallDetail();
           render();
@@ -6024,11 +5934,6 @@
 
     byId('leadDatabaseCancelBtn')?.addEventListener('click', closeModal);
     byId('leadDatabaseCallDetailCloseBtn')?.addEventListener('click', closeCallDetail);
-    byId('leadDatabaseRefreshBtn')?.addEventListener('click', () => {
-      state.info = '';
-      state.error = '';
-      void loadData(true, { force: true });
-    });
     byId('leadDatabaseImportBtn')?.addEventListener('click', () => {
       if (state.importing || state.loading) return;
       byId('leadDatabaseImportInput')?.click();
