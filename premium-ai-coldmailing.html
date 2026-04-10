@@ -1215,7 +1215,8 @@
                 if (!text) return true;
                 return (
                     text === 'nog geen gesprekssamenvatting beschikbaar.' ||
-                    text === 'samenvatting volgt na verwerking van het gesprek.'
+                    text === 'samenvatting volgt na verwerking van het gesprek.' ||
+                    text === 'samenvatting wordt opgesteld op basis van de transcriptie.'
                 );
             }
 
@@ -1466,6 +1467,28 @@
                 return latestItem;
             }
 
+            function shouldRefreshCallBackedLeadDetail(detail) {
+                if (!detail || typeof detail !== 'object') return true;
+                const readableSummary = pickReadableSummary(
+                    detail?.conversationSummary,
+                    detail?.callSummary,
+                    detail?.aiSummary,
+                    detail?.summary
+                );
+                if (readableSummary) return false;
+                return Boolean(
+                    String(
+                        detail?.transcript ||
+                        detail?.transcriptSnippet ||
+                        detail?.recordingUrl ||
+                        detail?.recording_url ||
+                        detail?.audioUrl ||
+                        detail?.audio_url ||
+                        ''
+                    ).trim()
+                );
+            }
+
             async function ensureCallBackedLeadSources() {
                 if (callBackedLeadSources) return callBackedLeadSources;
                 if (callBackedLeadSourcesLoadPromise) return callBackedLeadSourcesLoadPromise;
@@ -1639,7 +1662,9 @@
                 const callId = resolveLeadCallId(lead);
                 const cacheKey = String(id || `call:${callId}`);
                 if (!callId) return null;
-                if (leadDetailsById[cacheKey]) return leadDetailsById[cacheKey];
+                if (leadDetailsById[cacheKey] && !shouldRefreshCallBackedLeadDetail(leadDetailsById[cacheKey])) {
+                    return leadDetailsById[cacheKey];
+                }
                 if (leadDetailLoadPromiseById[cacheKey]) return leadDetailLoadPromiseById[cacheKey];
 
                 const run = (async () => {

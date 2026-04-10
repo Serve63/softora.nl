@@ -223,7 +223,8 @@
     if (!text) return false;
     return (
       text === 'nog geen gesprekssamenvatting beschikbaar.' ||
-      text === 'samenvatting volgt na verwerking van het gesprek.'
+      text === 'samenvatting volgt na verwerking van het gesprek.' ||
+      text === 'samenvatting wordt opgesteld op basis van de transcriptie.'
     );
   }
 
@@ -5405,16 +5406,13 @@
         interestedLead?.summary
       );
       if (cachedSummary && !looksLikeAgendaConfirmationSummary(cachedSummary)) return cachedSummary;
-      if (String(call?.transcriptFull || call?.transcriptSnippet || '').trim()) {
-        return 'Samenvatting wordt opgesteld op basis van de transcriptie.';
-      }
       const readableSummary = pickReadableConversationSummary(
         call?.summary,
         insight?.summary,
         interestedLead?.summary
       );
       if (readableSummary && !looksLikeAgendaConfirmationSummary(readableSummary)) return readableSummary;
-      return 'Samenvatting volgt na verwerking van het gesprek.';
+      return '';
     }
 
     function hasLeadDatabaseSnapshot() {
@@ -5466,13 +5464,40 @@
       });
     }
 
-    async function fetchLeadDatabaseCallDetailPayload(callId) {
+    function shouldRefreshLeadDatabaseCallDetailPayload(detail) {
+      if (!detail || typeof detail !== 'object') return true;
+      const readableSummary = pickReadableConversationSummary(
+        detail?.summary,
+        detail?.callSummary,
+        detail?.aiSummary,
+        detail?.conversationSummary
+      );
+      if (readableSummary) return false;
+      return Boolean(
+        normalizeFreeText(
+          detail?.transcript ||
+            detail?.transcriptSnippet ||
+            detail?.recordingUrl ||
+            detail?.recording_url ||
+            detail?.audioUrl ||
+            detail?.audio_url ||
+            ''
+        )
+      );
+    }
+
+    async function fetchLeadDatabaseCallDetailPayload(callId, options = {}) {
       const normalizedCallId = normalizeFreeText(callId);
+      const force = Boolean(options && options.force);
       if (!normalizedCallId) return null;
-      if (callDetailPayloadByCallId.has(normalizedCallId)) {
-        return callDetailPayloadByCallId.get(normalizedCallId) || null;
+      if (!force && callDetailPayloadByCallId.has(normalizedCallId)) {
+        const cached = callDetailPayloadByCallId.get(normalizedCallId) || null;
+        if (!shouldRefreshLeadDatabaseCallDetailPayload(cached)) {
+          return cached;
+        }
+        callDetailPayloadByCallId.delete(normalizedCallId);
       }
-      if (callDetailPayloadPromiseByCallId.has(normalizedCallId)) {
+      if (!force && callDetailPayloadPromiseByCallId.has(normalizedCallId)) {
         return callDetailPayloadPromiseByCallId.get(normalizedCallId);
       }
 
@@ -5486,8 +5511,11 @@
           if (!response.ok || !data?.ok || !data?.detail || typeof data.detail !== 'object') {
             return null;
           }
-          callDetailPayloadByCallId.set(normalizedCallId, data.detail);
-          return data.detail;
+          const detail = data.detail;
+          if (!shouldRefreshLeadDatabaseCallDetailPayload(detail)) {
+            callDetailPayloadByCallId.set(normalizedCallId, detail);
+          }
+          return detail;
         })
         .catch(() => null)
         .finally(() => {
@@ -5502,14 +5530,24 @@
       const normalizedCallId = normalizeFreeText(call?.callId || '');
       const insight = getCallInsightRecord(normalizedCallId);
       const interestedLead = getInterestedLeadRecord(normalizedCallId);
-      const remoteDetail = await fetchLeadDatabaseCallDetailPayload(normalizedCallId);
-      const remoteSummary = pickReadableConversationSummary(
+      let remoteDetail = await fetchLeadDatabaseCallDetailPayload(normalizedCallId);
+      let remoteSummary = pickReadableConversationSummary(
         remoteDetail?.summary,
         remoteDetail?.callSummary,
         remoteDetail?.aiSummary,
         remoteDetail?.transcriptSnippet,
         remoteDetail?.transcript
       );
+      if (!remoteSummary && shouldRefreshLeadDatabaseCallDetailPayload(remoteDetail)) {
+        remoteDetail = await fetchLeadDatabaseCallDetailPayload(normalizedCallId, { force: true });
+        remoteSummary = pickReadableConversationSummary(
+          remoteDetail?.summary,
+          remoteDetail?.callSummary,
+          remoteDetail?.aiSummary,
+          remoteDetail?.transcriptSnippet,
+          remoteDetail?.transcript
+        );
+      }
       if (remoteSummary && !looksLikeAgendaConfirmationSummary(remoteSummary)) {
         callDetailSummaryByCallId.set(normalizedCallId, remoteSummary);
         setSharedCallSummary(normalizedCallId, remoteSummary);
@@ -5541,8 +5579,6 @@
       const sourceText = buildLeadDatabaseCallSummarySourceText(call, insight, interestedLead, remoteDetail);
       const shouldRewrite =
         !fallbackSummary ||
-        fallbackSummary === 'Samenvatting volgt na verwerking van het gesprek.' ||
-        fallbackSummary === 'Samenvatting wordt opgesteld op basis van de transcriptie.' ||
         fallbackSummary.length < 160 ||
         looksLikeAgendaConfirmationSummary(fallbackSummary);
       if (!shouldRewrite || sourceText.length < 24 || !normalizedCallId) {
@@ -5626,7 +5662,7 @@
         pickReadableConversationSummary(
           callDetailSummaryByCallId.get(normalizedCallId),
           getSharedCallSummary(normalizedCallId)
-        ) || getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
+        ) || '';
 
       detailTitle.textContent = company;
       detailMeta.textContent = metaLine;
@@ -5643,8 +5679,16 @@
       });
     }
 
-    function openCallDetail(callId) {
+    async function openCallDetail(callId) {
       state.detailCallId = normalizeFreeText(callId);
+      const call = getCallDetailRecord(state.detailCallId);
+      if (call) {
+        try {
+          await ensureLeadDatabaseCallSummary(call);
+        } catch (_error) {
+          // Render alsnog met de best beschikbare data.
+        }
+      }
       renderCallDetail();
     }
 
@@ -5810,7 +5854,7 @@
           const openRow = () => {
             const callId = normalizeFreeText(row.getAttribute('data-db-call-open') || '');
             if (!callId) return;
-            openCallDetail(callId);
+            void openCallDetail(callId);
           };
           row.addEventListener('click', openRow);
           row.addEventListener('keydown', (event) => {

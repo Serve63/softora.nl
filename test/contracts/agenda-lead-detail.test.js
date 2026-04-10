@@ -268,6 +268,37 @@ test('agenda lead detail service rewrites direct speech into a proper Dutch call
   assert.match(summaryPayload?.extraInstructions || '', /nooit met ellips of afgebroken tekst/i);
 });
 
+test('agenda lead detail service builds a transcript-based fallback summary when AI rewrite is unavailable', async () => {
+  const fixture = createFixture({
+    openAiApiKey: '',
+  });
+
+  const summary = await fixture.service.buildConversationSummaryForLeadDetail(
+    {
+      name: 'Eric Boonaan',
+      company: 'Servé Creusen',
+      summary: '',
+      transcriptSnippet:
+        'Hallo, met Eric Boonaan. Je spreekt met Ruben Nijhuis van Softora. Ik bel omdat de website verouderd oogt. Ik wil graag meteen een afspraak inplannen voor morgen om twaalf uur bij mij op kantoor.',
+    },
+    {
+      summary: '',
+      followUpReason: '',
+    },
+    {
+      date: '2026-04-11',
+      time: '12:00',
+      location: 'Medialaan 65 6087DE Amersfoort',
+    },
+    'Hallo, met Eric Boonaan. Je spreekt met Ruben Nijhuis van Softora. Ik bel omdat de website verouderd oogt qua design en technische opbouw. Ik wil graag meteen een afspraak inplannen voor morgen om twaalf uur bij mij op kantoor.'
+  );
+
+  assert.match(summary, /Ruben Nijhuis gaf aan dat de website van Servé Creusen verouderd oogt/i);
+  assert.match(summary, /Eric Boonaan reageerde positief en wilde een afspraak inplannen op 2026-04-11 om 12:00 bij Medialaan 65 6087DE Amersfoort/i);
+  assert.match(summary, /De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen/i);
+  assert.doesNotMatch(summary, /\bagent\b/i);
+});
+
 test('agenda lead detail service persists transcript-based summaries back into call state', async () => {
   const fixture = createFixture({
     openAiApiKey: 'test-key',
