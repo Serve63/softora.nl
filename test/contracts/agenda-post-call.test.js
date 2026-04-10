@@ -218,6 +218,9 @@ test('agenda post-call coordinator adds a new active order and links it back to 
   assert.equal(res.body.order.id, 1);
   assert.equal(res.body.order.sourceAppointmentId, 42);
   assert.equal(res.body.order.claimedBy, 'Servé Creusen');
+  assert.equal(res.body.order.companyName, 'Softora');
+  assert.equal(res.body.order.contactName, 'Serve Creusen');
+  assert.equal(res.body.order.contactPhone, '0612345678');
   assert.equal(appointments[0].activeOrderId, 1);
   assert.equal(appointments[0].activeOrderAddedBy, 'Serve');
   assert.equal(uiStateWrites.length, 1);

@@ -1905,10 +1905,28 @@
         }
 
         function getOrderCustomerMatchKey(record) {
-            const name = normalizeMatchValue(record?.clientName || record?.naam);
-            const location = normalizeMatchValue(record?.location || record?.bedrijf);
-            if (!name) return '';
-            return `${name}|${location}`;
+            const customerName = String(record?.naam || '').trim();
+            const customerCompany = String(record?.bedrijf || '').trim();
+            const customerPhone = String(record?.telefoon || '').trim();
+            if (customerName || customerCompany || customerPhone) {
+                if (!customerName && !customerCompany) return '';
+                return `${normalizeMatchValue(customerCompany)}|${normalizeMatchValue(customerName)}|${normalizeMatchValue(customerPhone)}`;
+            }
+
+            const explicitCompany = String(record?.companyName || '').trim();
+            const explicitContact = String(record?.contactName || '').trim();
+            const explicitPhone = String(record?.contactPhone || '').trim();
+            const legacyClientName = String(record?.clientName || '').trim();
+            const legacyLocation = String(record?.location || '').trim();
+            const hasExplicitIdentity = Boolean(explicitCompany || explicitContact || explicitPhone);
+            const name = hasExplicitIdentity
+                ? (explicitContact || legacyLocation || legacyClientName)
+                : legacyClientName;
+            const company = hasExplicitIdentity
+                ? (explicitCompany || legacyClientName || legacyLocation)
+                : legacyLocation;
+            if (!name && !company) return '';
+            return `${normalizeMatchValue(company)}|${normalizeMatchValue(name)}|${normalizeMatchValue(explicitPhone)}`;
         }
 
         function parseCustomerDatabase(raw) {
@@ -2435,6 +2453,10 @@
                         const amount = Number(item?.amount);
                         const clientName = String(item?.clientName || '').trim();
                         const location = String(item?.location || '').trim();
+                        const companyName = String(item?.companyName || '').trim();
+                        const contactName = String(item?.contactName || '').trim();
+                        const contactPhone = String(item?.contactPhone || item?.phone || '').trim();
+                        const contactEmail = String(item?.contactEmail || item?.email || '').trim();
                         const title = String(item?.title || '').trim();
                         const description = String(item?.description || '').trim();
                         const deliveryTime = String(item?.deliveryTime || '').trim();
@@ -2470,13 +2492,17 @@
                         const sourceAppointmentLabel = String(item?.sourceAppointmentLabel || '').trim();
                         const referenceImages = normalizeReferenceImageList(item?.referenceImages || item?.attachments || []);
                         if (!Number.isFinite(id) || id <= 0) return null;
-                        if (!clientName || !title || !description) return null;
+                        if ((!clientName && !companyName) || !title || !description) return null;
                         if (!Number.isFinite(amount) || amount <= 0) return null;
 
                         return resolveApiCostRecord({
                             id,
                             clientName,
                             location,
+                            companyName,
+                            contactName,
+                            contactPhone,
+                            contactEmail,
                             title,
                             description,
                             deliveryTime,
@@ -3209,6 +3235,8 @@
             const linkedPrompt = String(linkedLead?.postCallPrompt || '').trim();
             const linkedTranscript = String(linkedLead?.postCallNotesTranscript || '').trim();
             const linkedLeadOwnerName = normalizeClaimEmployeeName(linkedLead?.leadOwnerName || linkedLead?.leadOwnerFullName || '');
+            const linkedContactPhone = String(linkedLead?.phone || '').trim();
+            const linkedContactEmail = String(linkedLead?.contactEmail || linkedLead?.email || '').trim();
             const status = 'wacht';
 
             if (!companyName || !contactPerson || !title || !description || !deliveryTime) {
@@ -3224,6 +3252,10 @@
                 id: getNextOrderId(),
                 clientName: companyName,
                 location: contactPerson,
+                companyName,
+                contactName: contactPerson,
+                contactPhone: linkedContactPhone,
+                contactEmail: linkedContactEmail,
                 title,
                 description,
                 deliveryTime,

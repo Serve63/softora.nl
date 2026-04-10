@@ -97,3 +97,50 @@ test('customers page bootstrap falls back to deriving customers from active orde
   assert.equal(payload.customers[0].type, 'Website');
   assert.equal(payload.customers[0].status, 'Betaald');
 });
+
+test('customers page bootstrap prefers explicit order customer identity fields when available', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: '[]',
+          },
+        };
+      }
+
+      if (scope === 'premium_active_orders') {
+        return {
+          values: {
+            softora_custom_orders_premium_v1: JSON.stringify([
+              {
+                id: 21,
+                clientName: 'Softora B.V.',
+                location: 'Servé Creusen',
+                companyName: 'Softora B.V.',
+                contactName: 'Servé Creusen',
+                contactPhone: '+31 6 12 34 56 78',
+                title: 'Website opdracht',
+                description: 'Nieuwe website bouwen',
+                amount: 2500,
+                status: 'betaald',
+                paidAt: '2026-04-08T10:00:00.000Z',
+              },
+            ]),
+          },
+        };
+      }
+
+      return null;
+    },
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'orders');
+  assert.equal(payload.customers.length, 1);
+  assert.equal(payload.customers[0].naam, 'Servé Creusen');
+  assert.equal(payload.customers[0].bedrijf, 'Softora B.V.');
+  assert.equal(payload.customers[0].telefoon, '+31 6 12 34 56 78');
+});

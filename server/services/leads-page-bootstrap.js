@@ -1,3 +1,8 @@
+const {
+  buildLeadIdentityKey,
+  normalizeLeadLikePhoneKey,
+} = require('./lead-identity');
+
 function createLeadsPageBootstrapService(deps = {}) {
   const {
     agendaReadCoordinator = null,
@@ -38,12 +43,7 @@ function createLeadsPageBootstrapService(deps = {}) {
   function buildLeadVirtualSeed(item) {
     const callId = String(item?.callId || '').trim();
     if (callId) return `call:${callId}`;
-    const phoneDigits = String(item?.phone || '').replace(/\D/g, '');
-    if (phoneDigits) return `phone:${phoneDigits}`;
-    const companyKey = normalize(item?.company || '');
-    const contactKey = normalize(item?.contact || '');
-    if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
-    return '';
+    return buildLeadIdentityKey(item);
   }
 
   function resolveLeadListId(item) {
@@ -131,23 +131,8 @@ function createLeadsPageBootstrapService(deps = {}) {
     };
   }
 
-  function normalizePhoneDigits(value) {
-    const digits = String(value || '').replace(/\D/g, '');
-    if (!digits) return '';
-    if (digits.startsWith('0031')) return `31${digits.slice(4)}`;
-    if (digits.startsWith('31')) return digits;
-    if (digits.startsWith('0') && digits.length >= 10) return `31${digits.slice(1)}`;
-    if (digits.startsWith('6') && digits.length === 9) return `31${digits}`;
-    return digits;
-  }
-
   function buildLeadMatchKey(item) {
-    const phoneKey = normalizePhoneDigits(item?.phone || '');
-    if (phoneKey) return `phone:${phoneKey}`;
-    const companyKey = normalize(item?.company || '');
-    const contactKey = normalize(item?.contact || '');
-    if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
-    return '';
+    return buildLeadIdentityKey(item);
   }
 
   function buildLeadRecencyTimestamp(item) {
@@ -463,7 +448,7 @@ function createLeadsPageBootstrapService(deps = {}) {
   function applyLeadDatabaseIdentity(row, databaseByPhone) {
     const base = row && typeof row === 'object' ? row : {};
     const map = databaseByPhone instanceof Map ? databaseByPhone : new Map();
-    const phoneKey = normalizePhoneDigits(base?.phone || '');
+    const phoneKey = normalizeLeadLikePhoneKey(base?.phone || '');
     if (!phoneKey || !map.has(phoneKey)) return base;
 
     const databaseRow = map.get(phoneKey) || {};
@@ -490,7 +475,7 @@ function createLeadsPageBootstrapService(deps = {}) {
       const nextMap = new Map();
       parsed.forEach((item) => {
         const row = normalizeLeadDatabaseRow(item);
-        const phoneKey = normalizePhoneDigits(row.phone || '');
+        const phoneKey = normalizeLeadLikePhoneKey(row.phone || '');
         if (!phoneKey || nextMap.has(phoneKey)) return;
         nextMap.set(phoneKey, row);
       });

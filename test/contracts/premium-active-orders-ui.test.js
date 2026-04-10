@@ -17,6 +17,18 @@ test('premium actieve opdrachten renderen de claim-badge alleen met de naam', ()
   assert.match(source, /leadOwnerName: String\(item\?\.leadOwnerName \|\| item\?\.leadOwnerFullName \|\| ''\)\.trim\(\),/);
   assert.match(source, /const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder\(customOrder\);[\s\S]*const claimedBy = normalizeClaimEmployeeName\(customOrder\.claimedBy \|\| runtime\.claimedBy \|\| linkedLeadOwnerName \|\| ''\);/);
   assert.match(source, /claimedBy: linkedLeadOwnerName \|\| null,/);
+  assert.match(source, /companyName,\s*contactName: contactPerson,\s*contactPhone: linkedContactPhone,\s*contactEmail: linkedContactEmail,/);
+  assert.match(source, /const companyName = String\(item\?\.companyName \|\| ''\)\.trim\(\);/);
+  assert.match(source, /const contactName = String\(item\?\.contactName \|\| ''\)\.trim\(\);/);
+});
+
+test('premium actieve opdrachten gebruiken expliciete customer identity voor koppeling naar klanten', () => {
+  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /const explicitCompany = String\(record\?\.companyName \|\| ''\)\.trim\(\);/);
+  assert.match(source, /const explicitContact = String\(record\?\.contactName \|\| ''\)\.trim\(\);/);
+  assert.match(source, /return `\$\{normalizeMatchValue\(company\)\}\|\$\{normalizeMatchValue\(name\)\}\|\$\{normalizeMatchValue\(explicitPhone\)\}`;/);
 });
 
 test('premium actieve opdrachten tonen create-order modal zonder sample-design en domeinvelden', () => {

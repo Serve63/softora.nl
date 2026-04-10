@@ -57,10 +57,14 @@ function createAgendaPostCallHelpers(deps = {}) {
           const amount = Math.round(Number(item.amount));
           const clientName = truncateText(normalizeString(item.clientName || ''), 160);
           const location = truncateText(normalizeString(item.location || ''), 160);
+          const companyName = truncateText(normalizeString(item.companyName || ''), 160);
+          const contactName = truncateText(normalizeString(item.contactName || ''), 160);
+          const contactPhone = truncateText(normalizeString(item.contactPhone || item.phone || ''), 80);
+          const contactEmail = truncateText(normalizeString(item.contactEmail || item.email || ''), 160);
           const title = truncateText(normalizeString(item.title || ''), 200);
           const description = truncateText(normalizeString(item.description || ''), 3000);
           if (!Number.isFinite(id) || id <= 0) return null;
-          if (!clientName || !title || !description) return null;
+          if ((!clientName && !companyName) || !title || !description) return null;
           if (!Number.isFinite(amount) || amount <= 0) return null;
 
           return {
@@ -68,6 +72,10 @@ function createAgendaPostCallHelpers(deps = {}) {
             id,
             clientName,
             location,
+            companyName,
+            contactName,
+            contactPhone,
+            contactEmail,
             title,
             description,
             amount,
@@ -107,6 +115,11 @@ function createAgendaPostCallHelpers(deps = {}) {
   function buildActiveOrderRecordFromAppointment(appointment, input = {}, nextId = 1) {
     const company = truncateText(normalizeString(appointment?.company || ''), 160) || 'Nieuwe lead';
     const contact = truncateText(normalizeString(appointment?.contact || ''), 160);
+    const contactPhone = truncateText(normalizeString(appointment?.phone || ''), 80);
+    const contactEmail = truncateText(
+      normalizeString(appointment?.contactEmail || appointment?.email || ''),
+      160
+    );
     const claimedBy =
       truncateText(
         normalizeString(appointment?.leadOwnerName || appointment?.leadOwnerFullName || ''),
@@ -138,7 +151,11 @@ function createAgendaPostCallHelpers(deps = {}) {
     return {
       id: Number(nextId) || 1,
       clientName: company,
-      location: truncateText(normalizeString(input.location || ''), 160),
+      location: truncateText(normalizeString(input.location || contact || ''), 160),
+      companyName: company,
+      contactName: contact,
+      contactPhone,
+      contactEmail,
       title,
       description,
       amount,
@@ -306,6 +323,30 @@ function createAgendaPostCallCoordinator(deps = {}) {
     if (existingOrder) {
       existingOrder = {
         ...existingOrder,
+        clientName: truncateText(
+          normalizeString(existingOrder?.clientName || appointment?.company || ''),
+          160
+        ),
+        location: truncateText(
+          normalizeString(existingOrder?.location || appointment?.contact || ''),
+          160
+        ),
+        companyName: truncateText(
+          normalizeString(existingOrder?.companyName || appointment?.company || existingOrder?.clientName || ''),
+          160
+        ),
+        contactName: truncateText(
+          normalizeString(existingOrder?.contactName || appointment?.contact || existingOrder?.location || ''),
+          160
+        ),
+        contactPhone: truncateText(
+          normalizeString(existingOrder?.contactPhone || appointment?.phone || ''),
+          80
+        ),
+        contactEmail: truncateText(
+          normalizeString(existingOrder?.contactEmail || appointment?.contactEmail || appointment?.email || ''),
+          160
+        ),
         prompt: promptText,
         transcript: transcriptText || sanitizePostCallText(existingOrder?.transcript || '', 25000),
         domainName:

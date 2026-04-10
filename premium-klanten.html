@@ -1461,12 +1461,20 @@
                         const id = Number(item && item.id);
                         const amount = Number(item && item.amount);
                         const clientName = normalizeString(item && item.clientName);
-                        if (!Number.isFinite(id) || id <= 0 || !clientName) return null;
+                        const companyName = normalizeString(item && item.companyName);
+                        const contactName = normalizeString(item && item.contactName);
+                        const contactPhone = normalizeString(item && item.contactPhone);
+                        const contactEmail = normalizeString(item && item.contactEmail);
+                        if (!Number.isFinite(id) || id <= 0 || (!companyName && !clientName)) return null;
 
                         return {
                             id: id,
                             clientName: clientName,
                             location: normalizeString(item && item.location),
+                            companyName: companyName,
+                            contactName: contactName,
+                            contactPhone: contactPhone,
+                            contactEmail: contactEmail,
                             title: normalizeString(item && item.title) || "Website opdracht",
                             description: normalizeString(item && item.description),
                             prompt: normalizeString(item && item.prompt),
@@ -1498,7 +1506,20 @@
             const seen = new Map();
 
             orders.forEach(function (order) {
-                const key = normalizeSearchValue(order.clientName) + "|" + normalizeSearchValue(order.location);
+                const explicitCompany = normalizeString(order.companyName);
+                const explicitContact = normalizeString(order.contactName);
+                const explicitPhone = normalizeString(order.contactPhone);
+                const legacyClientName = normalizeString(order.clientName);
+                const legacyLocation = normalizeString(order.location);
+                const hasExplicitIdentity = Boolean(explicitCompany || explicitContact || explicitPhone);
+                const customerName = hasExplicitIdentity
+                    ? (explicitContact || legacyLocation || legacyClientName || "Onbekend")
+                    : (legacyClientName || "Onbekend");
+                const customerCompany = hasExplicitIdentity
+                    ? (explicitCompany || legacyClientName || legacyLocation || "-")
+                    : (legacyLocation || "-");
+                const customerPhone = explicitPhone || "-";
+                const key = normalizeSearchValue(customerCompany) + "|" + normalizeSearchValue(customerName) + "|" + normalizeSearchValue(customerPhone);
                 if (seen.has(key)) return;
 
                 const paidDate = normalizeString(order.paidAt).slice(0, 10);
@@ -1506,9 +1527,9 @@
 
                 seen.set(key, normalizeCustomer({
                     id: "seed-" + order.id,
-                    naam: order.clientName,
-                    bedrijf: order.location || "-",
-                    telefoon: "-",
+                    naam: customerName,
+                    bedrijf: customerCompany,
+                    telefoon: customerPhone,
                     type: inferTypeFromOrder(order),
                     website: order.title || "-",
                     bedrag: order.amount || 0,

@@ -99,12 +99,20 @@ function createCustomersPageBootstrapService(deps = {}) {
           const id = Number(item && item.id);
           const amount = Number(item && item.amount);
           const clientName = normalizeString(item && item.clientName);
-          if (!Number.isFinite(id) || id <= 0 || !clientName) return null;
+          const companyName = normalizeString(item && item.companyName);
+          const contactName = normalizeString(item && item.contactName);
+          const contactPhone = normalizeString(item && item.contactPhone);
+          const contactEmail = normalizeString(item && item.contactEmail);
+          if (!Number.isFinite(id) || id <= 0 || (!companyName && !clientName)) return null;
 
           return {
             id,
             clientName,
             location: normalizeString(item && item.location),
+            companyName,
+            contactName,
+            contactPhone,
+            contactEmail,
             title: normalizeString(item && item.title) || 'Website opdracht',
             description: normalizeString(item && item.description),
             prompt: normalizeString(item && item.prompt),
@@ -138,7 +146,20 @@ function createCustomersPageBootstrapService(deps = {}) {
     const seen = new Map();
 
     orders.forEach((order) => {
-      const key = `${normalizeString(order?.clientName).toLowerCase()}|${normalizeString(order?.location).toLowerCase()}`;
+      const explicitCompany = normalizeString(order?.companyName);
+      const explicitContact = normalizeString(order?.contactName);
+      const explicitPhone = normalizeString(order?.contactPhone);
+      const legacyClientName = normalizeString(order?.clientName);
+      const legacyLocation = normalizeString(order?.location);
+      const hasExplicitIdentity = Boolean(explicitCompany || explicitContact || explicitPhone);
+      const customerName = hasExplicitIdentity
+        ? explicitContact || legacyLocation || legacyClientName || 'Onbekend'
+        : legacyClientName || 'Onbekend';
+      const customerCompany = hasExplicitIdentity
+        ? explicitCompany || legacyClientName || legacyLocation || '-'
+        : legacyLocation || '-';
+      const customerPhone = explicitPhone || '-';
+      const key = `${normalizeString(customerCompany).toLowerCase()}|${normalizeString(customerName).toLowerCase()}|${normalizeString(customerPhone).toLowerCase()}`;
       if (!key || seen.has(key)) return;
 
       const paidDate = normalizeString(order?.paidAt).slice(0, 10);
@@ -148,9 +169,9 @@ function createCustomersPageBootstrapService(deps = {}) {
         key,
         normalizeCustomer({
           id: `seed-${order.id}`,
-          naam: order.clientName,
-          bedrijf: order.location || '-',
-          telefoon: '-',
+          naam: customerName,
+          bedrijf: customerCompany,
+          telefoon: customerPhone,
           type: inferTypeFromOrder(order),
           website: order.title || '-',
           bedrag: order.amount || 0,

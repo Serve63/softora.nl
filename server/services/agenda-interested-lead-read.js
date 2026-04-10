@@ -1,3 +1,9 @@
+const {
+  buildLeadIdentityKey,
+  normalizeLeadIdentityText,
+  normalizeLeadLikePhoneKey,
+} = require('./lead-identity');
+
 function createAgendaInterestedLeadReadService(deps = {}) {
   const {
     getRecentCallUpdates = () => [],
@@ -28,31 +34,8 @@ function createAgendaInterestedLeadReadService(deps = {}) {
     hasPositiveInterestSignal = () => false,
   } = deps;
 
-  function normalizeLeadFollowUpCandidateKeyPart(value) {
-    return normalizeString(value || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim();
-  }
-
-  function normalizeLeadLikePhoneKey(value) {
-    const digits = normalizeString(value || '').replace(/\D/g, '');
-    if (!digits) return '';
-    if (digits.startsWith('0031')) return `31${digits.slice(4)}`;
-    if (digits.startsWith('31')) return digits;
-    if (digits.startsWith('0') && digits.length >= 10) return `31${digits.slice(1)}`;
-    if (digits.startsWith('6') && digits.length === 9) return `31${digits}`;
-    return digits;
-  }
-
   function buildLeadFollowUpCandidateKey(item) {
-    const phoneDigits = normalizeLeadLikePhoneKey(item?.phone || '');
-    if (phoneDigits) return `phone:${phoneDigits}`;
-    const companyKey = normalizeLeadFollowUpCandidateKeyPart(item?.company || '');
-    const contactKey = normalizeLeadFollowUpCandidateKeyPart(item?.contact || '');
-    if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
-    return '';
+    return buildLeadIdentityKey(item);
   }
 
   function getLeadLikeRecencyTimestamp(value) {
@@ -217,7 +200,7 @@ function createAgendaInterestedLeadReadService(deps = {}) {
     getRecentAiCallInsights().forEach((insight) => {
       const callId = normalizeString(insight?.callId || '');
       const phoneKey = normalizeLeadLikePhoneKey(insight?.phone || '');
-      const companyKey = normalizeLeadFollowUpCandidateKeyPart(insight?.company || insight?.leadCompany || '');
+      const companyKey = normalizeLeadIdentityText(insight?.company || insight?.leadCompany || '');
       if (callId && !insightByCallId.has(callId)) insightByCallId.set(callId, insight);
       if (phoneKey && !insightByPhoneKey.has(phoneKey)) insightByPhoneKey.set(phoneKey, insight);
       if (companyKey && !insightByCompanyKey.has(companyKey)) insightByCompanyKey.set(companyKey, insight);
@@ -250,7 +233,7 @@ function createAgendaInterestedLeadReadService(deps = {}) {
         }
 
         const phoneKey = normalizeLeadLikePhoneKey(callUpdate?.phone || '');
-        const companyKey = normalizeLeadFollowUpCandidateKeyPart(callUpdate?.company || '');
+        const companyKey = normalizeLeadIdentityText(callUpdate?.company || '');
         const insight =
           insightByCallId.get(callId) ||
           (phoneKey ? insightByPhoneKey.get(phoneKey) : null) ||
@@ -346,11 +329,7 @@ function createAgendaInterestedLeadReadService(deps = {}) {
   }
 
   function normalizeColdcallingLeadSearch(value) {
-    return normalizeString(value || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim();
+    return normalizeLeadIdentityText(value);
   }
 
   function isServeCreusenLeadLikeServer(row) {
