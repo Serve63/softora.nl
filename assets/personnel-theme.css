@@ -955,13 +955,15 @@ button,
     padding: 3rem 3rem 1.8rem !important;
 }
 
-.dashboard-layout :is(.page-shell, .page-content, .page-header, .topbar, .page-hero, .register-shell, .coming-shell, .screen, .notepad-shell) {
+.dashboard-layout > :is(.main-content, main.main-content, .main, main.main) > :is(.page-content, .page-header, .topbar, .page-hero, .register-shell, .coming-shell, .screen, .notepad-shell),
+.dashboard-layout > :is(.page-shell, main.page-shell) > :is(.page-content, .page-header, .page-hero) {
     width: min(var(--sidebar-shell-max-width), 100%) !important;
     margin-left: auto !important;
     margin-right: auto !important;
 }
 
-.dashboard-layout :is(.topbar, .page-header, .page-hero) {
+.dashboard-layout > :is(.main-content, main.main-content, .main, main.main) > :is(.topbar, .page-header, .page-hero),
+.dashboard-layout > :is(.page-shell, main.page-shell) > :is(.page-header, .page-hero) {
     display: flex !important;
     justify-content: space-between !important;
     align-items: flex-start !important;
