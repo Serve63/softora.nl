@@ -4882,27 +4882,21 @@
       }
 
       tableWrap.innerHTML = `
-        <table style="width:100%; border-collapse:collapse; min-width:1180px;">
+        <table style="width:100%; border-collapse:collapse; min-width:820px;">
           <thead>
             <tr>
               <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Bedrijf</th>
-              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Contactpersoon</th>
-              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Telefoonnummer</th>
-              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Branche</th>
-              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Provincie</th>
               <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Adres</th>
-              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Webiste</th>
+              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Telefoonnummer</th>
+              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Website</th>
             </tr>
           </thead>
           <tbody>
             ${filtered
               .map((record) => {
                 const company = record.company || 'Onbekend bedrijf';
-                const contactPerson = record.contactPerson || '-';
-                const phone = record.phone || '-';
-                const branche = record.branche || '-';
-                const province = record.province || record.region || '-';
                 const address = record.address || '-';
+                const phone = record.phone || '-';
                 const website = record.website || '';
                 const websiteHref = /^https?:\/\//i.test(website) ? website : `https://${website}`;
                 return `
@@ -4910,21 +4904,12 @@
                     <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:220px; font-size:14px; font-weight:600; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
                       company
                     )}">${escapeHtml(company)}</td>
-                    <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:170px; font-size:13px; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
-                      contactPerson
-                    )}">${escapeHtml(contactPerson)}</td>
-                    <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; font-size:13px; color:${theme.text}; white-space:nowrap;">${escapeHtml(
-                      phone
-                    )}</td>
-                    <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:140px; font-size:13px; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
-                      branche
-                    )}">${escapeHtml(branche)}</td>
-                    <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:130px; font-size:13px; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
-                      province
-                    )}">${escapeHtml(province)}</td>
                     <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:280px; font-size:13px; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
                       address
                     )}">${escapeHtml(address)}</td>
+                    <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; font-size:13px; color:${theme.text}; white-space:nowrap;">${escapeHtml(
+                      phone
+                    )}</td>
                     <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:220px; font-size:13px; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
                       website || '-'
                     )}">${
