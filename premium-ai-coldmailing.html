@@ -1353,9 +1353,23 @@
                 return replaceGenericSoftoraSpeakerName(stripped);
             }
 
+            function stripActionableFollowUpSummarySentence(value) {
+                return String(value || '')
+                    .replace(
+                        /\s*(?:De\s+)?(?:logische\s+)?vervolgstap(?:\s*:\s*|\s+is(?:\s+om)?\s+|\s+om\s+)[^.?!]*(?:[.?!]|$)/gi,
+                        ' '
+                    )
+                    .replace(
+                        /\s*(?:Aanbevolen|Beste|Volgende)\s+(?:vervolgstap|stap)(?:\s*:\s*|\s+is(?:\s+om)?\s+|\s+om\s+)[^.?!]*(?:[.?!]|$)/gi,
+                        ' '
+                    )
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+            }
+
             function sanitizeConversationCopy(value) {
                 const stripped = stripDialogueMarkers(value);
-                return stripped.replace(/\s*\n+\s*/g, ' ').trim();
+                return stripActionableFollowUpSummarySentence(stripped.replace(/\s*\n+\s*/g, ' ').trim());
             }
 
             function looksMixedLanguageSummary(value) {
@@ -1516,15 +1530,6 @@
                         sentences.push('Het gesprek vroeg om extra zorgvuldigheid door de toon of gevoeligheid van de situatie.');
                     }
 
-                    if (hasAppointmentIntent) {
-                        sentences.push('De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen.');
-                    } else if (hasWhatsappRequest || hasEmailRequest) {
-                        sentences.push('De logische vervolgstap is om de gevraagde informatie via het afgesproken kanaal te delen.');
-                    } else if (hasCallbackRequest) {
-                        sentences.push('De logische vervolgstap is om op het gevraagde moment opnieuw contact op te nemen.');
-                    } else if (hasPositiveInterest) {
-                        sentences.push('De logische vervolgstap is om het gesprek inhoudelijk op te volgen.');
-                    }
                 }
 
                 const summary = Array.from(
@@ -1970,7 +1975,7 @@
                         style: 'medium',
                         maxSentences: 4,
                         extraInstructions:
-                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de vervolgstap als die er is; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent". Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect en eventuele bezwaren of context. Noem nadrukkelijk GEEN aanbevolen vervolgstap, GEEN instructie voor Softora en GEEN zin die uitlegt wat wij nu moeten doen; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent". Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
                     });
 
                     const rewrittenSummary = pickReadableSummary(mergedRaw);
@@ -2019,7 +2024,7 @@
                         style: 'medium',
                         maxSentences: 4,
                         extraInstructions:
-                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de vervolgstap als die er is; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent". Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect en eventuele bezwaren of context. Noem nadrukkelijk GEEN aanbevolen vervolgstap, GEEN instructie voor Softora en GEEN zin die uitlegt wat wij nu moeten doen; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent". Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
                     });
 
                     const rewrittenSummary = pickReadableSummary(mergedRaw);

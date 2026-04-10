@@ -148,9 +148,23 @@
     return replaceGenericSoftoraSpeakerName(stripped);
   }
 
+  function stripActionableFollowUpSummarySentence(value) {
+    return String(value || '')
+      .replace(
+        /\s*(?:De\s+)?(?:logische\s+)?vervolgstap(?:\s*:\s*|\s+is(?:\s+om)?\s+|\s+om\s+)[^.?!]*(?:[.?!]|$)/gi,
+        ' '
+      )
+      .replace(
+        /\s*(?:Aanbevolen|Beste|Volgende)\s+(?:vervolgstap|stap)(?:\s*:\s*|\s+is(?:\s+om)?\s+|\s+om\s+)[^.?!]*(?:[.?!]|$)/gi,
+        ' '
+      )
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
   function sanitizeConversationSummaryCopy(value) {
     const stripped = stripConversationDialogueMarkers(value);
-    return stripped.replace(/\s*\n+\s*/g, ' ').trim();
+    return stripActionableFollowUpSummarySentence(stripped.replace(/\s*\n+\s*/g, ' ').trim());
   }
 
   function looksLikeDirectSpeechConversationSummary(value) {
@@ -5522,15 +5536,6 @@
           sentences.push('Het gesprek vroeg om extra zorgvuldigheid door de toon of gevoeligheid van de situatie.');
         }
 
-        if (hasAppointmentIntent) {
-          sentences.push('De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen.');
-        } else if (hasWhatsappRequest || hasEmailRequest) {
-          sentences.push('De logische vervolgstap is om de gevraagde informatie via het afgesproken kanaal te delen.');
-        } else if (hasCallbackRequest) {
-          sentences.push('De logische vervolgstap is om op het gevraagde moment opnieuw contact op te nemen.');
-        } else if (hasPositiveInterest) {
-          sentences.push('De logische vervolgstap is om het gesprek inhoudelijk op te volgen.');
-        }
       }
 
       const summary = Array.from(
@@ -5759,7 +5764,7 @@
         style: 'medium',
         maxSentences: 4,
         extraInstructions:
-          'Schrijf uitsluitend in natuurlijk Nederlands als interne belnotitie voor Softora. Gebruik de transcriptie als bron van waarheid als die aanwezig is. Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer X gaf aan...". Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent". Vat in een paar volledige zinnen samen waar het gesprek over ging, wat de prospect wilde of zei, welke interesse of bezwaren er waren en wat de logische vervolgstap is als die echt is besproken. Gebruik nooit letterlijke dialoog, geen quotes, geen transcriptiestijl en geen labels zoals user:, bot:, agent: of klant:. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst.',
+          'Schrijf uitsluitend in natuurlijk Nederlands als interne belnotitie voor Softora. Gebruik de transcriptie als bron van waarheid als die aanwezig is. Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer X gaf aan...". Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent". Vat in een paar volledige zinnen samen waar het gesprek over ging, wat de prospect wilde of zei en welke interesse of bezwaren er waren, maar noem geen aanbevolen vervolgstap, geen instructie voor Softora en geen zin die uitlegt wat wij nu moeten doen. Gebruik nooit letterlijke dialoog, geen quotes, geen transcriptiestijl en geen labels zoals user:, bot:, agent: of klant:. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst.',
       })
         .then((summaryText) => {
           const rewrittenSummary = pickReadableConversationSummary(summaryText);

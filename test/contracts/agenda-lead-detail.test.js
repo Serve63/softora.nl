@@ -296,7 +296,7 @@ test('agenda lead detail service builds a transcript-based fallback summary when
 
   assert.match(summary, /Ruben Nijhuis gaf aan dat de website van Servé Creusen verouderd oogt/i);
   assert.match(summary, /Eric Boonaan reageerde positief en wilde een afspraak inplannen op 2026-04-11 om 12:00 bij Medialaan 65 6087DE Amersfoort/i);
-  assert.match(summary, /De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen/i);
+  assert.doesNotMatch(summary, /De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen/i);
   assert.doesNotMatch(summary, /\bagent\b/i);
 });
 

@@ -23,6 +23,7 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /lastLeadStatusTimestamp = safeDate\.getTime\(\);/);
   assert.match(pageSource, /const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v8';/);
   assert.match(pageSource, /function replaceGenericSoftoraSpeakerName\(value\) \{/);
+  assert.match(pageSource, /function stripActionableFollowUpSummarySentence\(value\) \{/);
   assert.match(pageSource, /function looksLikeDirectSpeechSummary\(value\) \{/);
   assert.match(pageSource, /function buildLeadTranscriptFallbackSummary\(lead, detail, interestedLead = null, update = null, insight = null\) \{/);
   assert.match(pageSource, /bevestigingsmail sturen/);
@@ -31,6 +32,8 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /agenda-item/);
   assert.match(pageSource, /Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt\./);
   assert.match(pageSource, /Gebruik nooit het woord "agent"\./);
+  assert.doesNotMatch(pageSource, /De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen/);
+  assert.doesNotMatch(pageSource, /pas aan het einde de vervolgstap als die er is/);
   assert.match(pageSource, /const freshDetailSummary = getCallBackedModalFallbackSummaryFromDetail\(lead, resolvedDetail\);/);
   assert.match(pageSource, /const immediateSummary = isCallBackedLead \|\| Boolean\(resolveLeadCallId\(recoveredLead, mergedDetail\)\)/);
   assert.match(pageSource, /void ensureCallBackedModalCopy\(normalizedTaskId, recoveredLead, effectiveDetail\)\.then\(\(summaryText\) => \{/);

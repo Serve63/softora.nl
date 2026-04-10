@@ -10,7 +10,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410u" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410v" defer><\/script>/);
   assert.match(
     pageSource,
     /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
@@ -58,6 +58,9 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /Gebruik nooit het woord "agent"\./);
   assert.match(dashboardSource, /function shouldRefreshLeadDatabaseCallDetailPayload\(detail\) \{/);
   assert.match(dashboardSource, /function buildLeadDatabaseTranscriptFallbackSummary\(call, insight, interestedLead, remoteDetail = null\) \{/);
+  assert.match(dashboardSource, /function stripActionableFollowUpSummarySentence\(value\) \{/);
+  assert.doesNotMatch(dashboardSource, /De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen/);
+  assert.doesNotMatch(dashboardSource, /wat de logische vervolgstap is als die echt is besproken/);
   assert.match(
     dashboardSource,
     /function getLeadDatabaseCallSummaryFallback\(call, insight, interestedLead\) \{[\s\S]*cachedDetail\?\.conversationSummary[\s\S]*callDetailSummaryByCallId\.get\(normalizedCallId\)/

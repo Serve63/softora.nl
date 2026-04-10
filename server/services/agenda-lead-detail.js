@@ -106,7 +106,17 @@ function createAgendaLeadDetailService(deps = {}) {
       .replace(/\b(user|bot|agent|klant)\s*:\s*/gi, ' ')
       .replace(/\s{2,}/g, ' ')
       .trim();
-    return replaceGenericSoftoraSpeakerName(stripped);
+    return replaceGenericSoftoraSpeakerName(stripped)
+      .replace(
+        /\s*(?:De\s+)?(?:logische\s+)?vervolgstap(?:\s*:\s*|\s+is(?:\s+om)?\s+|\s+om\s+)[^.?!]*(?:[.?!]|$)/gi,
+        ' '
+      )
+      .replace(
+        /\s*(?:Aanbevolen|Beste|Volgende)\s+(?:vervolgstap|stap)(?:\s*:\s*|\s+is(?:\s+om)?\s+|\s+om\s+)[^.?!]*(?:[.?!]|$)/gi,
+        ' '
+      )
+      .replace(/\s{2,}/g, ' ')
+      .trim();
   }
 
   function capitalizeSentenceStart(value) {
@@ -225,15 +235,6 @@ function createAgendaLeadDetailService(deps = {}) {
         sentences.push('Het gesprek vroeg om extra zorgvuldigheid door de toon of gevoeligheid van de situatie.');
       }
 
-      if (hasAppointmentIntent) {
-        sentences.push('De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen.');
-      } else if (hasWhatsappRequest || hasEmailRequest) {
-        sentences.push('De logische vervolgstap is om de gevraagde informatie via het afgesproken kanaal te delen.');
-      } else if (hasCallbackRequest) {
-        sentences.push('De logische vervolgstap is om op het gevraagde moment opnieuw contact op te nemen.');
-      } else if (hasPositiveInterest) {
-        sentences.push('De logische vervolgstap is om het gesprek inhoudelijk op te volgen.');
-      }
     }
 
     const summary = Array.from(new Set(sentences.map((sentence) => sanitizeConversationSummaryText(sentence)).filter(Boolean))).join(' ');
@@ -707,7 +708,7 @@ function createAgendaLeadDetailService(deps = {}) {
             'Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer/mevrouw X gaf aan...".',
             'Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent".',
             'Benoem de behoefte of vraag van de prospect, de reactie van de prospect en eventuele bezwaren of context.',
-            'Noem alleen aan het einde een vervolgstap als die echt in het gesprek naar voren kwam; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland".',
+            'Noem geen aanbevolen vervolgstap, geen instructie voor Softora en geen zin die uitlegt wat wij nu moeten doen; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland".',
             'Schrijf nadrukkelijk niet als agenda-item, afspraakbevestiging of bevestigingsbericht.',
             'Gebruik geen koppen, bullets, citaten of labels zoals user:, bot:, agent: of klant:.',
             'Eindig altijd met volledige zinnen en nooit met ellips of afgebroken tekst.',
