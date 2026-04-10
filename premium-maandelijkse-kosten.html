@@ -68,10 +68,10 @@ body {
 
 .header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 36px;
-  gap: 16px;
+  margin-bottom: 3rem;
+  gap: 1rem;
 }
 .logo {
   display: none;
@@ -85,17 +85,29 @@ body {
 }
 .page-title {
   font-family: 'Oswald', sans-serif;
-  font-size: 3rem;
-  font-weight: 600;
+  font-size: 2rem;
+  font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   line-height: 1;
+  margin-bottom: 0.3rem;
 }
 .page-sub {
   color: var(--text-tertiary);
   font-size: 0.9rem;
   font-weight: 300;
-  margin-top: 0.35rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+#last-updated {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--border);
 }
 
 .totals-row {
@@ -386,7 +398,7 @@ body {
           <div class="page-title">Maandelijkse Kosten</div>
           <div class="page-sub">Overzicht van alle vaste lasten</div>
         </div>
-        <div style="font-size:12px;color:var(--text-light)" id="last-updated"></div>
+        <div id="last-updated"></div>
       </div>
 
       <div class="totals-row">

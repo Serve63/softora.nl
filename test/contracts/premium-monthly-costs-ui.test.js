@@ -17,6 +17,10 @@ test('premium maandelijkse kosten gebruikt dashboard-typografie en verbergt lega
   assert.match(pageSource, /family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700/);
   assert.doesNotMatch(pageSource, /Barlow/);
   assert.match(pageSource, /\.page-title\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;/);
+  assert.match(pageSource, /\.page-title\s*\{[\s\S]*font-size:\s*2rem;/);
   assert.match(pageSource, /\.page-sub\s*\{[\s\S]*font-size:\s*0\.9rem;/);
+  assert.match(pageSource, /\.header\s*\{[\s\S]*align-items:\s*center;/);
+  assert.match(pageSource, /<div id="last-updated"><\/div>/);
+  assert.match(pageSource, /#last-updated\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;/);
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*padding:\s*3rem 3rem 1\.8rem;/);
 });
