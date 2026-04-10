@@ -755,6 +755,11 @@
             color: var(--text-tertiary);
         }
 
+        .lead-modal-required {
+            color: var(--accent);
+            margin-left: 0.18rem;
+        }
+
         .lead-modal-input,
         .lead-modal-textarea {
             width: 100%;
@@ -1048,16 +1053,16 @@
 
                     <div class="lead-modal-grid">
                         <div class="lead-modal-field">
-                            <label class="lead-modal-label" for="leadModalDate">Datum van afspraak</label>
-                            <input class="lead-modal-input" id="leadModalDate" type="date">
+                            <label class="lead-modal-label" for="leadModalDate">Datum van afspraak<span class="lead-modal-required">*</span></label>
+                            <input class="lead-modal-input" id="leadModalDate" type="date" required>
                         </div>
                         <div class="lead-modal-field">
                             <label class="lead-modal-label" for="leadModalTime">Tijd</label>
                             <input class="lead-modal-input" id="leadModalTime" type="time" step="60">
                         </div>
                         <div class="lead-modal-field lead-modal-field-full">
-                            <label class="lead-modal-label" for="leadModalLocation">Locatie</label>
-                            <input class="lead-modal-input" id="leadModalLocation" type="text" placeholder="Medialaan 65 6087DE Amersfoort" required>
+                            <label class="lead-modal-label" for="leadModalLocation">Locatie<span class="lead-modal-required">*</span></label>
+                            <input class="lead-modal-input" id="leadModalLocation" type="text" placeholder="Vul de afspraaklocatie in" required>
                         </div>
                         <div class="lead-modal-field lead-modal-field-full">
                             <label class="lead-modal-label" for="leadModalWhatsappInfo">Overige info uit WhatsApp</label>
@@ -1069,8 +1074,8 @@
                     <div class="lead-modal-actions">
                         <div class="lead-modal-left-actions">
                             <div class="lead-modal-confirm-wrap">
-                                <input id="leadModalWhatsappConfirm" type="checkbox">
-                                <label for="leadModalWhatsappConfirm">Bevestigd via Whatsapp</label>
+                                <input id="leadModalWhatsappConfirm" type="checkbox" required>
+                                <label for="leadModalWhatsappConfirm">Bevestigd via WhatsApp<span class="lead-modal-required">*</span></label>
                             </div>
                         </div>
                         <div class="lead-modal-actions-right">
@@ -2109,18 +2114,18 @@
 
             function resolveLeadIncomingTimestamp(lead, detail) {
                 const candidates = [
-                    detail?.createdAt,
-                    detail?.confirmationTaskCreatedAt,
-                    detail?.updatedAt,
-                    detail?.analyzedAt,
-                    detail?.endedAt,
-                    detail?.startedAt,
                     lead?.createdAt,
+                    detail?.createdAt,
                     lead?.confirmationTaskCreatedAt,
+                    detail?.confirmationTaskCreatedAt,
                     lead?.updatedAt,
                     lead?.analyzedAt,
                     lead?.endedAt,
                     lead?.startedAt,
+                    detail?.updatedAt,
+                    detail?.analyzedAt,
+                    detail?.endedAt,
+                    detail?.startedAt,
                 ];
 
                 for (const candidate of candidates) {
@@ -2136,12 +2141,19 @@
             function formatLeadIncomingDateLabel(lead, detail) {
                 const timestamp = resolveLeadIncomingTimestamp(lead, detail);
                 if (!timestamp) return 'Onbekend';
-                return new Intl.DateTimeFormat('nl-NL', {
+                const date = new Intl.DateTimeFormat('nl-NL', {
                     timeZone: 'Europe/Amsterdam',
                     day: '2-digit',
                     month: '2-digit',
                     year: 'numeric',
                 }).format(new Date(timestamp));
+                const time = new Intl.DateTimeFormat('nl-NL', {
+                    timeZone: 'Europe/Amsterdam',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                }).format(new Date(timestamp));
+                return [date, time].filter(Boolean).join(', ');
             }
 
             function renderLeadContactMeta(lead, detail) {
@@ -2334,6 +2346,8 @@
                 activeTaskId = normalizedTaskId;
                 setModalTaskActionsEnabled(hasTaskActions);
                 const leadType = resolveLeadType(lead);
+                const allowLocationPrefill =
+                    hasPersistedTask && !isCallBackedLead && !Boolean(resolveLeadCallId(lead));
                 const leadDateValue = String(lead.date || '').slice(0, 10);
                 const leadTimeValue = normalizeTimeValue(lead.time || '09:00') || '09:00';
                 const leadLocationValue = String(lead.location || '').trim();
@@ -2342,7 +2356,7 @@
                 modalSub.hidden = true;
                 modalDate.value = leadDateValue;
                 modalTime.value = leadTimeValue;
-                modalLocation.value = leadLocationValue;
+                modalLocation.value = allowLocationPrefill ? leadLocationValue : '';
                 modalWhatsappInfo.value = leadWhatsappInfoValue;
                 modalWhatsappConfirm.checked = false;
                 setModalStatus('');
@@ -2370,6 +2384,7 @@
                     }
 
                     const recoveredCallId = resolveLeadCallId(lead, taskDetail);
+                    const allowRecoveredLocationPrefill = allowLocationPrefill && !recoveredCallId;
                     const recoveredLead = recoveredCallId
                         ? {
                             ...lead,
@@ -2408,8 +2423,11 @@
                             modalTime.value = detailTimeValue || leadTimeValue;
                         }
                         if (
-                            !String(modalLocation.value || '').trim() ||
-                            String(modalLocation.value || '').trim() === leadLocationValue
+                            allowRecoveredLocationPrefill &&
+                            (
+                                !String(modalLocation.value || '').trim() ||
+                                String(modalLocation.value || '').trim() === leadLocationValue
+                            )
                         ) {
                             modalLocation.value = detailLocationValue || leadLocationValue;
                         }
@@ -2454,6 +2472,7 @@
                     const detailLocationValue = String(detail?.location || '').trim();
                     const detailWhatsappInfoValue = String(detail?.whatsappInfo || '').trim();
                     const recoveredCallId = resolveLeadCallId(lead, detail);
+                    const allowRecoveredLocationPrefill = allowLocationPrefill && !recoveredCallId;
                     const recoveredLead = recoveredCallId
                         ? {
                             ...lead,
@@ -2486,8 +2505,11 @@
                         modalTime.value = detailTimeValue || leadTimeValue;
                     }
                     if (
-                        !String(modalLocation.value || '').trim() ||
-                        String(modalLocation.value || '').trim() === leadLocationValue
+                        allowRecoveredLocationPrefill &&
+                        (
+                            !String(modalLocation.value || '').trim() ||
+                            String(modalLocation.value || '').trim() === leadLocationValue
+                        )
                     ) {
                         modalLocation.value = detailLocationValue || leadLocationValue;
                     }
@@ -2607,7 +2629,7 @@
                     return;
                 }
                 if (!whatsappConfirmed) {
-                    setModalStatus('Vink eerst "Bevestigd via Whatsapp" aan.', 'error');
+                    setModalStatus('Vink eerst "Bevestigd via WhatsApp" aan.', 'error');
                     modalWhatsappConfirm.focus();
                     return;
                 }
@@ -3166,6 +3188,7 @@
                     province: String(item?.province || item?.provincie || '').trim(),
                     address: String(item?.address || item?.adres || '').trim(),
                     website: String(item?.website || item?.webiste || item?.url || '').trim(),
+                    createdAt: String(item?.createdAt || item?.created_at || item?.updatedAt || item?.updated_at || '').trim(),
                 };
             }
 
@@ -3228,6 +3251,7 @@
                     province: String(databaseRow.province || base.province || '').trim(),
                     address: String(databaseRow.address || base.address || '').trim(),
                     website: String(databaseRow.website || base.website || '').trim(),
+                    createdAt: String(base.createdAt || databaseRow.createdAt || '').trim(),
                 };
             }
 

@@ -456,6 +456,7 @@ function createLeadsPageBootstrapService(deps = {}) {
       province: String(item?.province || item?.provincie || '').trim(),
       address: String(item?.address || item?.adres || '').trim(),
       website: String(item?.website || item?.webiste || item?.url || '').trim(),
+      createdAt: String(item?.createdAt || item?.created_at || item?.updatedAt || item?.updated_at || '').trim(),
     };
   }
 
@@ -475,6 +476,7 @@ function createLeadsPageBootstrapService(deps = {}) {
       province: String(databaseRow.province || base.province || '').trim(),
       address: String(databaseRow.address || base.address || '').trim(),
       website: String(databaseRow.website || base.website || '').trim(),
+      createdAt: String(base.createdAt || databaseRow.createdAt || '').trim(),
     };
   }
 

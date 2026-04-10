@@ -57,6 +57,7 @@ test('leads page bootstrap merges confirmation tasks, interested leads and lead 
               province: 'Noord-Brabant',
               address: 'Lindelaan 67',
               website: 'softora.nl',
+              createdAt: '2026-04-10T14:48:00.000Z',
             },
           ]),
         },
@@ -73,6 +74,7 @@ test('leads page bootstrap merges confirmation tasks, interested leads and lead 
   assert.equal(payload.leads[0].company, 'Softora.nl');
   assert.equal(payload.leads[0].branche, 'Tech');
   assert.equal(payload.leads[0].website, 'softora.nl');
+  assert.equal(payload.leads[0].createdAt, '2026-04-10T14:48:00.000Z');
   assert.equal(payload.leads[0].id, 12);
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
   assert.match(String(htmlReplacements.SOFTORA_LEADS_STATUS || ''), /^Laatste update: /);

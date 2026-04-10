@@ -42,7 +42,18 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
     /if \(allLeads\.length > 0\) \{[\s\S]*console\.warn\('\[softora-leads\] Live refresh overgeslagen; zichtbare leads blijven staan\.', message\);[\s\S]*setStatusLastUpdatedNow\(new Date\(lastLeadStatusTimestamp\)\);/
   );
   assert.match(pageSource, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
-  assert.match(pageSource, /<label class="lead-modal-label" for="leadModalDate">Datum van afspraak<\/label>/);
+  assert.match(pageSource, /<label class="lead-modal-label" for="leadModalDate">Datum van afspraak<span class="lead-modal-required">\*<\/span><\/label>/);
+  assert.match(pageSource, /<input class="lead-modal-input" id="leadModalDate" type="date" required>/);
+  assert.match(pageSource, /<label class="lead-modal-label" for="leadModalLocation">Locatie<span class="lead-modal-required">\*<\/span><\/label>/);
+  assert.match(pageSource, /<input class="lead-modal-input" id="leadModalLocation" type="text" placeholder="Vul de afspraaklocatie in" required>/);
+  assert.match(pageSource, /<input id="leadModalWhatsappConfirm" type="checkbox" required>/);
+  assert.match(pageSource, /<label for="leadModalWhatsappConfirm">Bevestigd via WhatsApp<span class="lead-modal-required">\*<\/span><\/label>/);
   assert.match(pageSource, /function formatLeadIncomingDateLabel\(lead, detail\)/);
+  assert.match(pageSource, /hour: '2-digit'/);
+  assert.match(pageSource, /minute: '2-digit'/);
   assert.match(pageSource, /<div class="lead-modal-meta-label">Datum<\/div>/);
+  assert.match(pageSource, /const allowLocationPrefill =/);
+  assert.match(pageSource, /modalLocation\.value = allowLocationPrefill \? leadLocationValue : '';/);
+  assert.match(pageSource, /const allowRecoveredLocationPrefill = allowLocationPrefill && !recoveredCallId;/);
+  assert.match(pageSource, /createdAt: String\(item\?\.createdAt \|\| item\?\.created_at \|\| item\?\.updatedAt \|\| item\?\.updated_at \|\| ''\)\.trim\(\),/);
 });
