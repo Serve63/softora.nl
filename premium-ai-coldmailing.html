@@ -1153,11 +1153,11 @@
             let activeTaskId = 0;
             let modalBusy = false;
             const leadsBootstrapPayload = readLeadsBootstrapPayload();
-            const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v2';
+            const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v3';
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
-            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v7';
+            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v8';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
             const leadDetailLoadPromiseById = Object.create(null);
@@ -1446,6 +1446,7 @@
                 const hasCallbackRequest = /\b(later terug|terugbellen|terug bellen|bel later|volgende week|andere keer)\b/i.test(
                     transcript
                 );
+                const hasOfficePreference = /\b(op kantoor|kantoor)\b/i.test(transcript);
                 const hasWhatsappRequest = /\b(whatsapp|app(?:je)?|appen)\b/i.test(transcript);
                 const hasEmailRequest = /\b(e-mail|email|mail|offerte)\b/i.test(transcript);
                 const hasAlertSignal = /\b(boos|kwaad|woedend|geirriteerd|geïrriteerd|agressief|klacht)\b/i.test(
@@ -1485,6 +1486,14 @@
                             appointmentLabel ? ` ${appointmentLabel}` : ''
                         }.`
                     );
+                    if (websiteContext) {
+                        sentences.push(
+                            `${prospectSubject} stond open om de vernieuwing van de website in een vervolggesprek verder door te nemen.`
+                        );
+                    }
+                    if (hasOfficePreference) {
+                        sentences.push('Een afspraak op kantoor had daarbij duidelijk de voorkeur.');
+                    }
                 } else if (hasCallbackRequest) {
                     sentences.push(`${prospectSubject} gaf aan dat later contact beter uitkomt.`);
                 } else if (hasPositiveInterest) {
@@ -1544,7 +1553,7 @@
             function looksLikeAgendaConfirmationSummary(value) {
                 const text = normalize(String(value || ''));
                 if (!text) return false;
-                return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie)/.test(
+                return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie|bevestigingsmail sturen|stuur(?:\s+\w+){0,3}\s+bevestigingsmail|gedetecteerde afspraak|afspraakbevestiging|agenda-item)/.test(
                     text
                 );
             }
@@ -1712,7 +1721,6 @@
                     insight?.summary,
                     update?.transcriptSnippet,
                     interestedLead?.summary,
-                    insight?.followUpReason,
                     lead?.summary,
                     update?.transcriptFull
                 );
@@ -1728,7 +1736,6 @@
                     detail?.aiSummary,
                     detail?.transcriptSnippet,
                     detail?.summary,
-                    detail?.followUpReason,
                     lead?.summary,
                     detail?.transcript
                 );
@@ -1926,10 +1933,11 @@
                 }
 
                 if (leadAiCopyById[cacheKey]) {
-                    const cachedSummary = String(leadAiCopyById[cacheKey]?.summaryText || '').trim();
+                    const cachedSummary = pickReadableSummary(leadAiCopyById[cacheKey]?.summaryText);
                     if (cachedSummary && !isGenericConversationPlaceholder(cachedSummary)) {
                         return cachedSummary;
                     }
+                    delete leadAiCopyById[cacheKey];
                 }
 
                 const sharedSummary = getSharedCallSummary(callId);
@@ -1953,7 +1961,7 @@
                     if (!shouldRewrite || sourceText.length < 24) {
                         const preferredSummary = fallbackSummary || '';
                         if (preferredSummary && !isGenericConversationPlaceholder(preferredSummary)) {
-                            leadAiCopyById[cacheKey] = { summaryText: preferredSummary };
+                            leadAiCopyById[cacheKey] = { summaryText: pickReadableSummary(preferredSummary) || '' };
                         }
                         return preferredSummary;
                     }
@@ -1973,7 +1981,7 @@
                         fallbackSummary ||
                         '';
                     if (summaryText && !isGenericConversationPlaceholder(summaryText)) {
-                        leadAiCopyById[cacheKey] = { summaryText };
+                        leadAiCopyById[cacheKey] = { summaryText: pickReadableSummary(summaryText) || '' };
                         setSharedCallSummary(callId, summaryText);
                     }
                     return summaryText;
@@ -1993,10 +2001,11 @@
 
                 const cacheKey = String(id);
                 if (leadAiCopyById[cacheKey]) {
-                    const cached = String(leadAiCopyById[cacheKey]?.summaryText || '').trim();
+                    const cached = pickReadableSummary(leadAiCopyById[cacheKey]?.summaryText);
                     if (cached && !isGenericConversationPlaceholder(cached)) {
                         return cached;
                     }
+                    delete leadAiCopyById[cacheKey];
                 }
 
                 const sourceText = buildModalSourceText(lead, detail);
@@ -2017,7 +2026,7 @@
                     const summaryText = looksLikeAgendaConfirmationSummary(rewrittenSummary) ? '' : rewrittenSummary;
 
                     leadAiCopyById[cacheKey] = {
-                        summaryText: summaryText || '',
+                        summaryText: pickReadableSummary(summaryText) || '',
                     };
                     return summaryText || '';
                 })()
@@ -2218,6 +2227,7 @@
             function renderLeadDetailsInModal(lead, detail, taskId, options = {}) {
                 const id = Number(taskId || lead?.id || 0) || 0;
                 const aiCopy = id > 0 ? leadAiCopyById[String(id)] : null;
+                const cachedSummary = pickReadableSummary(aiCopy?.summaryText);
                 const callBackedFallbackSummary = getCallBackedModalFallbackSummaryFromDetail(lead, detail || {});
                 const preferredSummary = pickReadableSummary(
                     options?.summaryText,
@@ -2245,7 +2255,7 @@
 
                 renderLeadContactMeta(lead, detail);
                 modalSummary.textContent =
-                    preferredSummary || String(aiCopy?.summaryText || '').trim() || fallbackCombined;
+                    preferredSummary || cachedSummary || fallbackCombined;
 
                 const recordingUrl = pickRecordingUrl(
                     detail?.recordingUrl,
@@ -2991,6 +3001,7 @@
             }
 
             function normalizeLeadRow(item) {
+                const readableSummary = pickReadableSummary(item?.conversationSummary, item?.summary);
                 return {
                     id: resolveLeadListId(item),
                     callId: resolveLeadCallId(item),
@@ -3004,8 +3015,8 @@
                     date: String(item?.date || '').trim(),
                     time: String(item?.time || '').trim(),
                     source: String(item?.source || '').trim(),
-                    summary: String(item?.summary || '').trim(),
-                    conversationSummary: String(item?.conversationSummary || '').trim(),
+                    summary: readableSummary || '',
+                    conversationSummary: readableSummary || '',
                     location: String(item?.location || item?.appointmentLocation || '').trim(),
                     whatsappInfo: String(item?.whatsappInfo || item?.whatsappNotes || item?.whatsapp || '').trim(),
                     createdAt: String(item?.createdAt || item?.confirmationTaskCreatedAt || item?.updatedAt || '').trim(),
@@ -3100,10 +3111,12 @@
                     : secondaryId > 0
                         ? secondaryId
                         : (preferredId || secondaryId || 0);
-                const preferredSummary = String(preferred?.summary || '').trim();
-                const secondarySummary = String(secondary?.summary || '').trim();
-                const preferredConversationSummary = String(preferred?.conversationSummary || '').trim();
-                const secondaryConversationSummary = String(secondary?.conversationSummary || '').trim();
+                const mergedSummary = pickReadableSummary(
+                    preferred?.conversationSummary,
+                    preferred?.summary,
+                    secondary?.conversationSummary,
+                    secondary?.summary
+                );
                 return {
                     ...preferred,
                     id: mergedId,
@@ -3114,16 +3127,8 @@
                     date: String(preferred?.date || secondary?.date || '').trim(),
                     time: String(preferred?.time || secondary?.time || '').trim(),
                     source: String(preferred?.source || secondary?.source || '').trim(),
-                    summary: String(
-                        (!preferredSummary || isGenericConversationPlaceholder(preferredSummary))
-                            ? (secondarySummary || preferredSummary)
-                            : (preferredSummary || secondarySummary)
-                    ).trim(),
-                    conversationSummary: String(
-                        (!preferredConversationSummary || isGenericConversationPlaceholder(preferredConversationSummary))
-                            ? (secondaryConversationSummary || preferredConversationSummary)
-                            : (preferredConversationSummary || secondaryConversationSummary)
-                    ).trim(),
+                    summary: mergedSummary || '',
+                    conversationSummary: mergedSummary || '',
                     location: String(preferred?.location || secondary?.location || '').trim(),
                     whatsappInfo: String(preferred?.whatsappInfo || secondary?.whatsappInfo || '').trim(),
                     createdAt: String(preferred?.createdAt || secondary?.createdAt || '').trim(),
@@ -3319,9 +3324,12 @@
                     date: dateTime.date,
                     time: dateTime.time,
                     source: 'Coldcalling interesse',
-                    summary: String(
-                        insight?.summary || update?.summary || update?.transcriptSnippet || insight?.followUpReason || ''
-                    ).trim(),
+                    summary: pickReadableSummary(
+                        insight?.summary,
+                        update?.summary,
+                        update?.transcriptSnippet,
+                        update?.transcriptFull
+                    ),
                     location: '',
                     whatsappInfo: String(insight?.followUpReason || '').trim(),
                     recordingUrl: normalizeLeadRecordingUrl(update),

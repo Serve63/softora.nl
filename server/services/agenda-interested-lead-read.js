@@ -34,6 +34,35 @@ function createAgendaInterestedLeadReadService(deps = {}) {
     hasPositiveInterestSignal = () => false,
   } = deps;
 
+  function looksLikeAgendaConfirmationSummary(value) {
+    const text = normalizeString(value || '').toLowerCase();
+    if (!text) return false;
+    return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie|bevestigingsmail sturen|stuur(?:\s+\w+){0,3}\s+bevestigingsmail|gedetecteerde afspraak|afspraakbevestiging|agenda-item)/.test(
+      text
+    );
+  }
+
+  function isGenericConversationSummaryPlaceholder(value) {
+    const text = normalizeString(value || '').toLowerCase();
+    if (!text) return false;
+    return (
+      text === 'nog geen gesprekssamenvatting beschikbaar.' ||
+      text === 'samenvatting volgt na verwerking van het gesprek.' ||
+      text === 'samenvatting wordt opgesteld op basis van de transcriptie.'
+    );
+  }
+
+  function pickReadableLeadSummary(...candidates) {
+    for (const candidate of candidates) {
+      const text = normalizeString(candidate || '');
+      if (!text) continue;
+      if (isGenericConversationSummaryPlaceholder(text)) continue;
+      if (looksLikeAgendaConfirmationSummary(text)) continue;
+      return truncateText(text, 900);
+    }
+    return '';
+  }
+
   function buildLeadFollowUpCandidateKey(item) {
     return buildLeadIdentityKey(item);
   }
@@ -262,16 +291,12 @@ function createAgendaInterestedLeadReadService(deps = {}) {
           date: normalizeDateYyyyMmDd(leadFollowUp?.date) || '',
           time: normalizeTimeHhMm(leadFollowUp?.time) || '09:00',
           source: 'Coldcalling interesse',
-          summary: truncateText(
-            normalizeString(
-              leadFollowUp?.summary ||
-                insight?.summary ||
-                callUpdate?.summary ||
-                callUpdate?.transcriptSnippet ||
-                insight?.followUpReason ||
-                ''
-            ),
-            900
+          summary: pickReadableLeadSummary(
+            insight?.summary,
+            callUpdate?.summary,
+            callUpdate?.transcriptSnippet,
+            callUpdate?.transcriptFull,
+            leadFollowUp?.summary
           ),
           location: resolveAppointmentLocation(leadFollowUp, callUpdate, insight),
           durationSeconds: resolveCallDurationSeconds(leadFollowUp, callUpdate, insight),
@@ -498,16 +523,11 @@ function createAgendaInterestedLeadReadService(deps = {}) {
                 normalizeString(latestUpdate?.endedAt || latestUpdate?.updatedAt || latestInsight?.analyzedAt || '').slice(11, 16)
               ) || '09:00',
             source: 'Coldcalling lead',
-            summary: truncateText(
-              normalizeString(
-                latestInsight?.summary ||
-                  latestInsight?.followUpReason ||
-                  latestUpdate?.summary ||
-                  latestUpdate?.transcriptSnippet ||
-                  latestUpdate?.transcriptFull ||
-                  ''
-              ),
-              900
+            summary: pickReadableLeadSummary(
+              latestInsight?.summary,
+              latestUpdate?.summary,
+              latestUpdate?.transcriptSnippet,
+              latestUpdate?.transcriptFull
             ),
             location: resolveAppointmentLocation(latestUpdate, latestInsight),
             whatsappInfo: truncateText(normalizeString(latestInsight?.followUpReason || ''), 6000),

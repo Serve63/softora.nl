@@ -40,6 +40,25 @@ function createLeadsPageBootstrapService(deps = {}) {
     );
   }
 
+  function looksLikeAgendaConfirmationSummary(value) {
+    const text = normalize(String(value || ''));
+    if (!text) return false;
+    return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie|bevestigingsmail sturen|stuur(?:\s+\w+){0,3}\s+bevestigingsmail|gedetecteerde afspraak|afspraakbevestiging|agenda-item)/.test(
+      text
+    );
+  }
+
+  function pickReadableLeadSummary(...candidates) {
+    for (const candidate of candidates) {
+      const text = String(candidate || '').trim();
+      if (!text) continue;
+      if (isGenericConversationPlaceholder(text)) continue;
+      if (looksLikeAgendaConfirmationSummary(text)) continue;
+      return text;
+    }
+    return '';
+  }
+
   function buildLeadVirtualSeed(item) {
     const callId = String(item?.callId || '').trim();
     if (callId) return `call:${callId}`;
@@ -81,6 +100,7 @@ function createLeadsPageBootstrapService(deps = {}) {
   }
 
   function normalizeLeadRow(item) {
+    const readableSummary = pickReadableLeadSummary(item?.conversationSummary, item?.summary);
     return {
       id: resolveLeadListId(item),
       callId: resolveLeadCallId(item),
@@ -94,8 +114,8 @@ function createLeadsPageBootstrapService(deps = {}) {
       date: String(item?.date || '').trim(),
       time: String(item?.time || '').trim(),
       source: String(item?.source || '').trim(),
-      summary: String(item?.summary || '').trim(),
-      conversationSummary: String(item?.conversationSummary || '').trim(),
+      summary: readableSummary || '',
+      conversationSummary: readableSummary || '',
       location: String(item?.location || item?.appointmentLocation || '').trim(),
       whatsappInfo: String(item?.whatsappInfo || item?.whatsappNotes || item?.whatsapp || '').trim(),
       createdAt: String(item?.createdAt || item?.confirmationTaskCreatedAt || item?.updatedAt || '').trim(),
@@ -178,10 +198,12 @@ function createLeadsPageBootstrapService(deps = {}) {
     const secondaryId = Number(secondary?.id) || 0;
     const mergedId =
       preferredId > 0 ? preferredId : secondaryId > 0 ? secondaryId : preferredId || secondaryId || 0;
-    const preferredSummary = String(preferred?.summary || '').trim();
-    const secondarySummary = String(secondary?.summary || '').trim();
-    const preferredConversationSummary = String(preferred?.conversationSummary || '').trim();
-    const secondaryConversationSummary = String(secondary?.conversationSummary || '').trim();
+    const mergedSummary = pickReadableLeadSummary(
+      preferred?.conversationSummary,
+      preferred?.summary,
+      secondary?.conversationSummary,
+      secondary?.summary
+    );
     return {
       ...preferred,
       id: mergedId,
@@ -192,16 +214,8 @@ function createLeadsPageBootstrapService(deps = {}) {
       date: String(preferred?.date || secondary?.date || '').trim(),
       time: String(preferred?.time || secondary?.time || '').trim(),
       source: String(preferred?.source || secondary?.source || '').trim(),
-      summary: String(
-        (!preferredSummary || isGenericConversationPlaceholder(preferredSummary))
-          ? secondarySummary || preferredSummary
-          : preferredSummary || secondarySummary
-      ).trim(),
-      conversationSummary: String(
-        (!preferredConversationSummary || isGenericConversationPlaceholder(preferredConversationSummary))
-          ? secondaryConversationSummary || preferredConversationSummary
-          : preferredConversationSummary || secondaryConversationSummary
-      ).trim(),
+      summary: mergedSummary || '',
+      conversationSummary: mergedSummary || '',
       location: String(preferred?.location || secondary?.location || '').trim(),
       whatsappInfo: String(preferred?.whatsappInfo || secondary?.whatsappInfo || '').trim(),
       createdAt: String(preferred?.createdAt || secondary?.createdAt || '').trim(),

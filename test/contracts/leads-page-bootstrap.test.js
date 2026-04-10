@@ -101,3 +101,56 @@ test('leads page bootstrap falls back safely when no data is available', async (
   assert.equal(htmlReplacements.SOFTORA_LEADS_STATUS, 'Nog geen leads gevonden.');
   assert.match(String(htmlReplacements.SOFTORA_LEADS_LIST || ''), /lead-empty/);
 });
+
+test('leads page bootstrap strips agenda follow-up instructions from visible summaries', async () => {
+  const service = createLeadsPageBootstrapService({
+    agendaReadCoordinator: {
+      async listConfirmationTasks() {
+        return {
+          ok: true,
+          tasks: [
+            {
+              id: 31,
+              company: 'Softora BV',
+              contact: 'Servé Creusen',
+              phone: '0612345678',
+              date: '2026-04-09',
+              time: '14:00',
+              source: 'Agenda taak',
+              summary: 'Bevestigingsmail sturen op basis van gedetecteerde afspraak in gesprekstranscriptie.',
+            },
+          ],
+        };
+      },
+      async listInterestedLeads() {
+        return {
+          ok: true,
+          leads: [
+            {
+              id: 0,
+              callId: 'call-31',
+              company: 'Softora BV',
+              contact: 'Servé Creusen',
+              phone: '0612345678',
+              date: '2026-04-10',
+              time: '10:00',
+              source: 'Coldcalling interesse',
+              summary: 'Ruben Nijhuis besprak de website en de prospect wilde een afspraak inplannen.',
+              leadChipClass: 'confirmed',
+            },
+          ],
+        };
+      },
+    },
+    getUiStateValues: async () => null,
+  });
+
+  const payload = await service.buildLeadsBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.leads.length, 1);
+  assert.equal(
+    payload.leads[0].summary,
+    'Ruben Nijhuis besprak de website en de prospect wilde een afspraak inplannen.'
+  );
+});

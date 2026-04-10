@@ -75,7 +75,7 @@ function createAgendaLeadDetailService(deps = {}) {
   function looksLikeAgendaConfirmationSummary(value) {
     const text = normalizeString(value || '').toLowerCase();
     if (!text) return false;
-    return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie|controleer de gegevens en zet daarna de afspraak in de agenda)/.test(
+    return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie|controleer de gegevens en zet daarna de afspraak in de agenda|bevestigingsmail sturen|stuur(?:\s+\w+){0,3}\s+bevestigingsmail|gedetecteerde afspraak|afspraakbevestiging|agenda-item)/.test(
       text
     );
   }
@@ -153,6 +153,7 @@ function createAgendaLeadDetailService(deps = {}) {
     const hasCallbackRequest = /\b(later terug|terugbellen|terug bellen|bel later|volgende week|andere keer)\b/i.test(
       transcript
     );
+    const hasOfficePreference = /\b(op kantoor|kantoor)\b/i.test(transcript);
     const hasWhatsappRequest = /\b(whatsapp|app(?:je)?|appen)\b/i.test(transcript);
     const hasEmailRequest = /\b(e-mail|email|mail|offerte)\b/i.test(transcript);
     const hasAlertSignal = /\b(boos|kwaad|woedend|geirriteerd|geïrriteerd|agressief|klacht)\b/i.test(
@@ -194,6 +195,14 @@ function createAgendaLeadDetailService(deps = {}) {
           appointmentLabel ? ` ${appointmentLabel}` : ''
         }.`
       );
+      if (websiteContext) {
+        sentences.push(
+          `${prospectSubject} stond open om de vernieuwing van de website in een vervolggesprek verder door te nemen.`
+        );
+      }
+      if (hasOfficePreference) {
+        sentences.push('Een afspraak op kantoor had daarbij duidelijk de voorkeur.');
+      }
     } else if (hasCallbackRequest) {
       sentences.push(`${prospectSubject} gaf aan dat later contact beter uitkomt.`);
     } else if (hasPositiveInterest) {
@@ -654,8 +663,7 @@ function createAgendaLeadDetailService(deps = {}) {
       callSummary,
       aiSummary,
       transcriptSnippet,
-      interestedSummary,
-      followUpReason
+      interestedSummary
     );
 
     const transcriptSourceText = buildTranscriptSummarySourceText(transcript, transcriptSnippet);
@@ -720,6 +728,8 @@ function createAgendaLeadDetailService(deps = {}) {
       }
     }
 
+    if (fallbackSummary) return fallbackSummary;
+
     const transcriptFallbackSummary = buildTranscriptFallbackSummaryForLeadDetail(
       callUpdate,
       aiInsight,
@@ -727,8 +737,6 @@ function createAgendaLeadDetailService(deps = {}) {
       transcript
     );
     if (transcriptFallbackSummary) return transcriptFallbackSummary;
-
-    if (fallbackSummary) return fallbackSummary;
 
     return '';
   }

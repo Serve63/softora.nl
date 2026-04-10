@@ -202,3 +202,38 @@ test('agenda interested lead read service tracks the latest row per reusable lea
   assert.equal(onlyRow.callId, 'call-latest');
   assert.equal(onlyRow.summary, 'Laatste follow-up');
 });
+
+test('agenda interested lead read service does not expose follow-up instructions as the lead summary', () => {
+  const service = createServiceFixture({
+    recentCallUpdates: [
+      {
+        callId: 'call-summary',
+        company: 'Softora',
+        name: 'Serve Creusen',
+        phone: '0612345678',
+        summary: '',
+        transcriptSnippet: 'Prospect wil de website vernieuwen en staat open voor een afspraak.',
+        updatedAt: '2026-04-08T12:30:00.000Z',
+      },
+    ],
+    recentAiCallInsights: [
+      {
+        callId: 'call-summary',
+        company: 'Softora',
+        contactName: 'Serve Creusen',
+        phone: '0612345678',
+        summary: '',
+        followUpReason: 'Bevestigingsmail sturen op basis van gedetecteerde afspraak in gesprekstranscriptie.',
+        analyzedAt: '2026-04-08T12:35:00.000Z',
+      },
+    ],
+  });
+
+  const rows = service.buildAllInterestedLeadRows();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].summary, 'Prospect wil de website vernieuwen en staat open voor een afspraak.');
+  assert.equal(
+    rows[0].whatsappInfo,
+    'Bevestigingsmail sturen op basis van gedetecteerde afspraak in gesprekstranscriptie.'
+  );
+});

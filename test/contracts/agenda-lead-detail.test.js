@@ -197,6 +197,7 @@ test('agenda lead detail service filters noisy summaries and keeps readable Dutc
   assert.equal(
     fixture.service.pickReadableConversationSummaryForLeadDetail(
       'Nog geen gesprekssamenvatting beschikbaar.',
+      'Bevestigingsmail sturen op basis van gedetecteerde afspraak in gesprekstranscriptie.',
       'Appointment booked with client.',
       'Klant wil een nieuwe website en staat open voor vervolgstap.'
     ),

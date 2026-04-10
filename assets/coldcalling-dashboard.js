@@ -24,7 +24,7 @@
   const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
   const LEAD_DATABASE_OVERRIDES_STORAGE_KEY = 'softora_coldcalling_lead_database_overrides_json';
-  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v7';
+  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v8';
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const STATS_RESET_BASELINE_STORAGE_KEY = 'softora_stats_reset_baseline_started';
@@ -5448,6 +5448,7 @@
       const hasCallbackRequest = /\b(later terug|terugbellen|terug bellen|bel later|volgende week|andere keer)\b/i.test(
         transcript
       );
+      const hasOfficePreference = /\b(op kantoor|kantoor)\b/i.test(transcript);
       const hasWhatsappRequest = /\b(whatsapp|app(?:je)?|appen)\b/i.test(transcript);
       const hasEmailRequest = /\b(e-mail|email|mail|offerte)\b/i.test(transcript);
       const hasAlertSignal = /\b(boos|kwaad|woedend|geirriteerd|geïrriteerd|agressief|klacht)\b/i.test(
@@ -5491,6 +5492,14 @@
             appointmentLabel ? ` ${appointmentLabel}` : ''
           }.`
         );
+        if (websiteContext) {
+          sentences.push(
+            `${prospectSubject} stond open om de vernieuwing van de website in een vervolggesprek verder door te nemen.`
+          );
+        }
+        if (hasOfficePreference) {
+          sentences.push('Een afspraak op kantoor had daarbij duidelijk de voorkeur.');
+        }
       } else if (hasCallbackRequest) {
         sentences.push(`${prospectSubject} gaf aan dat later contact beter uitkomt.`);
       } else if (hasPositiveInterest) {

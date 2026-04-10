@@ -53,7 +53,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /prewarmLeadDatabaseCallDetails\(4\);/);
   assert.match(dashboardSource, /looksLikeDirectSpeechConversationSummary/);
   assert.match(dashboardSource, /Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst/);
-  assert.match(dashboardSource, /const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v7';/);
+  assert.match(dashboardSource, /const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v8';/);
   assert.match(dashboardSource, /Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt\./);
   assert.match(dashboardSource, /Gebruik nooit het woord "agent"\./);
   assert.match(dashboardSource, /function shouldRefreshLeadDatabaseCallDetailPayload\(detail\) \{/);

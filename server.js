@@ -3828,7 +3828,6 @@ function buildGeneratedLeadFollowUpFromCall(callUpdate, insight = null) {
       insight?.summary ||
         callUpdate?.summary ||
         callUpdate?.transcriptSnippet ||
-        insight?.followUpReason ||
         'Lead toonde interesse tijdens het gesprek.'
     ),
     900
