@@ -21,6 +21,11 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
   assert.match(pageSource, /let lastLeadStatusTimestamp = 0;/);
   assert.match(pageSource, /lastLeadStatusTimestamp = safeDate\.getTime\(\);/);
+  assert.match(pageSource, /const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v6';/);
+  assert.match(pageSource, /function replaceGenericSoftoraSpeakerName\(value\) \{/);
+  assert.match(pageSource, /Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt\./);
+  assert.match(pageSource, /Gebruik nooit het woord "agent"\./);
+  assert.match(pageSource, /const freshDetailSummary = getCallBackedModalFallbackSummaryFromDetail\(lead, resolvedDetail\);/);
   assert.match(
     pageSource,
     /if \(allLeads\.length > 0\) \{[\s\S]*console\.warn\('\[softora-leads\] Live refresh overgeslagen; zichtbare leads blijven staan\.', message\);[\s\S]*setStatusLastUpdatedNow\(new Date\(lastLeadStatusTimestamp\)\);/

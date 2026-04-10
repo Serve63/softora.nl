@@ -229,7 +229,7 @@ test('agenda lead detail service rewrites direct speech into a proper Dutch call
       summaryPayload = payload;
       return {
         summary:
-          'De prospect gaf al snel aan geïnteresseerd te zijn in een vervolgafspraak over de website. Er is besproken dat Softora in een volgende stap de mogelijkheden toelicht.',
+          'De agent gaf al snel aan dat Softora een vervolgafspraak kan plannen over de website. De prospect stond open voor de volgende stap.',
       };
     },
   });
@@ -257,10 +257,14 @@ test('agenda lead detail service rewrites direct speech into a proper Dutch call
     'Hallo, met Eric Boonaan. Hey, goedemiddag, je spreekt met Ruben Nijhuis van Softora. De prospect geeft aan interesse te hebben in een afspraak.'
   );
 
-  assert.match(summary, /prospect gaf al snel aan geïnteresseerd te zijn/i);
+  assert.match(summary, /De prospect stond open voor de volgende stap/i);
+  assert.match(summary, /Ruben Nijhuis gaf al snel aan/i);
+  assert.doesNotMatch(summary, /\bagent\b/i);
   assert.match(summaryPayload?.text || '', /Gebruik de transcriptie hieronder als bron van waarheid/i);
   assert.doesNotMatch(summaryPayload?.text || '', /Plan een afspraak/i);
   assert.match(summaryPayload?.extraInstructions || '', /Schrijf in de derde persoon/i);
+  assert.match(summaryPayload?.extraInstructions || '', /Ruben Nijhuis/i);
+  assert.match(summaryPayload?.extraInstructions || '', /Gebruik nooit het woord "agent"/i);
   assert.match(summaryPayload?.extraInstructions || '', /nooit met ellips of afgebroken tekst/i);
 });
 

@@ -24,7 +24,7 @@
   const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
   const LEAD_DATABASE_OVERRIDES_STORAGE_KEY = 'softora_coldcalling_lead_database_overrides_json';
-  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v5';
+  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v6';
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const STATS_RESET_BASELINE_STORAGE_KEY = 'softora_stats_reset_baseline_started';
@@ -128,12 +128,24 @@
     return false;
   }
 
-  function stripConversationDialogueMarkers(value) {
+  function replaceGenericSoftoraSpeakerName(value) {
     return String(value || '')
+      .replace(/\bde\s+agent van\s+softora\b/gi, 'Ruben Nijhuis van Softora')
+      .replace(/\bsoftora[-\s]?agent\b/gi, 'Ruben Nijhuis van Softora')
+      .replace(/\bde\s+agent\b/gi, 'Ruben Nijhuis')
+      .replace(/\been\s+agent\b/gi, 'Ruben Nijhuis')
+      .replace(/\bagent\b/gi, 'Ruben Nijhuis')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  function stripConversationDialogueMarkers(value) {
+    const stripped = String(value || '')
       .replace(/\s*\|\s*/g, ' ')
       .replace(/\b(user|bot|agent|klant)\s*:\s*/gi, '')
       .replace(/\s{2,}/g, ' ')
       .trim();
+    return replaceGenericSoftoraSpeakerName(stripped);
   }
 
   function sanitizeConversationSummaryCopy(value) {
@@ -5490,12 +5502,6 @@
       const normalizedCallId = normalizeFreeText(call?.callId || '');
       const insight = getCallInsightRecord(normalizedCallId);
       const interestedLead = getInterestedLeadRecord(normalizedCallId);
-      const sharedSummary = getSharedCallSummary(normalizedCallId);
-      if (sharedSummary && !looksLikeAgendaConfirmationSummary(sharedSummary)) {
-        callDetailSummaryByCallId.set(normalizedCallId, sharedSummary);
-        return sharedSummary;
-      }
-
       const remoteDetail = await fetchLeadDatabaseCallDetailPayload(normalizedCallId);
       const remoteSummary = pickReadableConversationSummary(
         remoteDetail?.summary,
@@ -5508,6 +5514,12 @@
         callDetailSummaryByCallId.set(normalizedCallId, remoteSummary);
         setSharedCallSummary(normalizedCallId, remoteSummary);
         return remoteSummary;
+      }
+
+      const sharedSummary = getSharedCallSummary(normalizedCallId);
+      if (sharedSummary && !looksLikeAgendaConfirmationSummary(sharedSummary)) {
+        callDetailSummaryByCallId.set(normalizedCallId, sharedSummary);
+        return sharedSummary;
       }
 
       const fallbackSummary = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
@@ -5548,7 +5560,7 @@
         style: 'medium',
         maxSentences: 4,
         extraInstructions:
-          'Schrijf uitsluitend in natuurlijk Nederlands als interne belnotitie voor Softora. Gebruik de transcriptie als bron van waarheid als die aanwezig is. Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer X gaf aan...". Vat in een paar volledige zinnen samen waar het gesprek over ging, wat de prospect wilde of zei, welke interesse of bezwaren er waren en wat de logische vervolgstap is als die echt is besproken. Gebruik nooit letterlijke dialoog, geen quotes, geen transcriptiestijl en geen labels zoals user:, bot:, agent: of klant:. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst.',
+          'Schrijf uitsluitend in natuurlijk Nederlands als interne belnotitie voor Softora. Gebruik de transcriptie als bron van waarheid als die aanwezig is. Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer X gaf aan...". Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent". Vat in een paar volledige zinnen samen waar het gesprek over ging, wat de prospect wilde of zei, welke interesse of bezwaren er waren en wat de logische vervolgstap is als die echt is besproken. Gebruik nooit letterlijke dialoog, geen quotes, geen transcriptiestijl en geen labels zoals user:, bot:, agent: of klant:. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst.',
       })
         .then((summaryText) => {
           const rewrittenSummary = pickReadableConversationSummary(summaryText);

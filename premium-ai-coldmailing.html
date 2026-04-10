@@ -1157,7 +1157,7 @@
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
-            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v4';
+            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v6';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
             const leadDetailLoadPromiseById = Object.create(null);
@@ -1332,12 +1332,24 @@
                 return false;
             }
 
-            function stripDialogueMarkers(value) {
+            function replaceGenericSoftoraSpeakerName(value) {
                 return String(value || '')
+                    .replace(/\bde\s+agent van\s+softora\b/gi, 'Ruben Nijhuis van Softora')
+                    .replace(/\bsoftora[-\s]?agent\b/gi, 'Ruben Nijhuis van Softora')
+                    .replace(/\bde\s+agent\b/gi, 'Ruben Nijhuis')
+                    .replace(/\been\s+agent\b/gi, 'Ruben Nijhuis')
+                    .replace(/\bagent\b/gi, 'Ruben Nijhuis')
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+            }
+
+            function stripDialogueMarkers(value) {
+                const stripped = String(value || '')
                     .replace(/\s*\|\s*/g, ' ')
                     .replace(/\b(user|bot|agent|klant)\s*:\s*/gi, '')
                     .replace(/\s{2,}/g, ' ')
                     .trim();
+                return replaceGenericSoftoraSpeakerName(stripped);
             }
 
             function sanitizeConversationCopy(value) {
@@ -1396,15 +1408,24 @@
                 if (!normalizedCallId) return '';
                 const cache = readSharedCallSummaryCache();
                 const summary = String(cache?.[normalizedCallId] || '').trim();
-                if (!summary || isGenericConversationPlaceholder(summary) || looksLikeAgendaConfirmationSummary(summary)) {
+                const cleanedSummary = pickReadableSummary(summary);
+                if (!cleanedSummary || looksLikeAgendaConfirmationSummary(cleanedSummary)) {
+                    if (summary) {
+                        try {
+                            delete cache[normalizedCallId];
+                            window.localStorage.setItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY, JSON.stringify(cache));
+                        } catch (error) {
+                            // Ignore storage failures.
+                        }
+                    }
                     return '';
                 }
-                return summary;
+                return cleanedSummary;
             }
 
             function setSharedCallSummary(callId, summary) {
                 const normalizedCallId = String(callId || '').trim();
-                const normalizedSummary = String(summary || '').trim();
+                const normalizedSummary = pickReadableSummary(summary);
                 if (
                     !normalizedCallId ||
                     !normalizedSummary ||
@@ -1711,6 +1732,14 @@
                 const cacheKey = String(id || `call:${callId}`);
                 if (!callId) return '';
 
+                const resolvedDetail = detail || (await ensureCallBackedLeadDetail(taskId, lead)) || {};
+                const freshDetailSummary = getCallBackedModalFallbackSummaryFromDetail(lead, resolvedDetail);
+                if (freshDetailSummary && !isGenericConversationPlaceholder(freshDetailSummary)) {
+                    leadAiCopyById[cacheKey] = { summaryText: freshDetailSummary };
+                    setSharedCallSummary(callId, freshDetailSummary);
+                    return freshDetailSummary;
+                }
+
                 if (leadAiCopyById[cacheKey]) {
                     const cachedSummary = String(leadAiCopyById[cacheKey]?.summaryText || '').trim();
                     if (cachedSummary && !isGenericConversationPlaceholder(cachedSummary)) {
@@ -1729,26 +1758,7 @@
                 }
 
                 const run = (async () => {
-                    const resolvedDetail = detail || (await ensureCallBackedLeadDetail(taskId, lead)) || {};
                     const fallbackSummary = getCallBackedModalFallbackSummaryFromDetail(lead, resolvedDetail);
-                    const readableLeadSummary = pickReadableSummary(
-                        resolvedDetail?.conversationSummary,
-                        resolvedDetail?.callSummary,
-                        resolvedDetail?.aiSummary,
-                        resolvedDetail?.transcriptSnippet,
-                        resolvedDetail?.summary,
-                        resolvedDetail?.followUpReason
-                    );
-                    if (
-                        readableLeadSummary &&
-                        readableLeadSummary.length >= 160 &&
-                        !looksLikeAgendaConfirmationSummary(readableLeadSummary)
-                    ) {
-                        leadAiCopyById[cacheKey] = { summaryText: readableLeadSummary };
-                        setSharedCallSummary(callId, readableLeadSummary);
-                        return readableLeadSummary;
-                    }
-
                     const sourceText = buildModalSourceText(lead, resolvedDetail);
                     const shouldRewrite =
                         !fallbackSummary ||
@@ -1767,7 +1777,7 @@
                         style: 'medium',
                         maxSentences: 4,
                         extraInstructions:
-                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de vervolgstap als die er is; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de vervolgstap als die er is; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent". Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
                     });
 
                     const rewrittenSummary = pickReadableSummary(mergedRaw);
@@ -1815,10 +1825,10 @@
                         style: 'medium',
                         maxSentences: 4,
                         extraInstructions:
-                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de vervolgstap als die er is; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+                            'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de vervolgstap als die er is; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent". Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
                     });
 
-                    const rewrittenSummary = sanitizeConversationCopy(mergedRaw);
+                    const rewrittenSummary = pickReadableSummary(mergedRaw);
                     const summaryText = looksLikeAgendaConfirmationSummary(rewrittenSummary) ? '' : rewrittenSummary;
 
                     leadAiCopyById[cacheKey] = {

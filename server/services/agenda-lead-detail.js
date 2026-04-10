@@ -89,12 +89,24 @@ function createAgendaLeadDetailService(deps = {}) {
     );
   }
 
-  function sanitizeConversationSummaryText(value) {
+  function replaceGenericSoftoraSpeakerName(value) {
     return normalizeString(value || '')
+      .replace(/\bde\s+agent van\s+softora\b/gi, 'Ruben Nijhuis van Softora')
+      .replace(/\bsoftora[-\s]?agent\b/gi, 'Ruben Nijhuis van Softora')
+      .replace(/\bde\s+agent\b/gi, 'Ruben Nijhuis')
+      .replace(/\been\s+agent\b/gi, 'Ruben Nijhuis')
+      .replace(/\bagent\b/gi, 'Ruben Nijhuis')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  function sanitizeConversationSummaryText(value) {
+    const stripped = normalizeString(value || '')
       .replace(/\s*\|\s*/g, ' ')
       .replace(/\b(user|bot|agent|klant)\s*:\s*/gi, ' ')
       .replace(/\s{2,}/g, ' ')
       .trim();
+    return replaceGenericSoftoraSpeakerName(stripped);
   }
 
   function looksLikeDirectSpeechConversationSummaryText(value) {
@@ -563,6 +575,7 @@ function createAgendaLeadDetailService(deps = {}) {
               ? 'Gebruik de transcriptie als bron van waarheid. Als andere context afwijkt, volg altijd de transcriptie.'
               : '',
             'Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer/mevrouw X gaf aan...".',
+            'Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt. Gebruik nooit het woord "agent".',
             'Benoem de behoefte of vraag van de prospect, de reactie van de prospect en eventuele bezwaren of context.',
             'Noem alleen aan het einde een vervolgstap als die echt in het gesprek naar voren kwam; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland".',
             'Schrijf nadrukkelijk niet als agenda-item, afspraakbevestiging of bevestigingsbericht.',
@@ -570,7 +583,7 @@ function createAgendaLeadDetailService(deps = {}) {
             'Eindig altijd met volledige zinnen en nooit met ellips of afgebroken tekst.',
           ].join(' '),
         });
-        const rewrittenSummary = normalizeString(result?.summary || '');
+        const rewrittenSummary = sanitizeConversationSummaryText(result?.summary || '');
         if (
           rewrittenSummary &&
           !isGenericConversationSummaryPlaceholder(rewrittenSummary) &&
