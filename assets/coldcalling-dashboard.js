@@ -24,7 +24,7 @@
   const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
   const LEAD_DATABASE_OVERRIDES_STORAGE_KEY = 'softora_coldcalling_lead_database_overrides_json';
-  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v4';
+  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v5';
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const STATS_RESET_BASELINE_STORAGE_KEY = 'softora_stats_reset_baseline_started';
@@ -244,15 +244,24 @@
     if (!normalizedCallId) return '';
     const cache = readSharedCallSummaryCache();
     const summary = String(cache?.[normalizedCallId] || '').trim();
-    if (!summary || isGenericConversationPlaceholder(summary) || looksLikeAgendaConfirmationSummary(summary)) {
+    const cleanedSummary = pickReadableConversationSummary(summary);
+    if (!cleanedSummary || looksLikeAgendaConfirmationSummary(cleanedSummary)) {
+      if (summary) {
+        try {
+          delete cache[normalizedCallId];
+          window.localStorage.setItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY, JSON.stringify(cache));
+        } catch (error) {
+          // Ignore storage failures.
+        }
+      }
       return '';
     }
-    return summary;
+    return cleanedSummary;
   }
 
   function setSharedCallSummary(callId, summary) {
     const normalizedCallId = normalizeFreeText(callId);
-    const normalizedSummary = normalizeFreeText(summary);
+    const normalizedSummary = pickReadableConversationSummary(summary);
     if (
       !normalizedCallId ||
       !normalizedSummary ||
@@ -4672,11 +4681,26 @@
       return latestLead;
     }
 
-    function buildLeadDatabaseCallSummarySourceText(call, insight, interestedLead) {
-      return [
+    function buildLeadDatabaseCallSummarySourceText(call, insight, interestedLead, remoteDetail = null) {
+      const transcriptSource = [
+        remoteDetail?.transcript,
+        remoteDetail?.transcriptSnippet,
         call?.transcriptFull,
-        call?.summary,
         call?.transcriptSnippet,
+      ]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+        .join('\n\n');
+
+      if (transcriptSource) {
+        return [`Gebruik de transcriptie hieronder als bron van waarheid voor de samenvatting.`, transcriptSource]
+          .filter(Boolean)
+          .join('\n\n');
+      }
+
+      return [
+        remoteDetail?.summary,
+        call?.summary,
         insight?.summary,
         interestedLead?.summary,
       ]
@@ -4686,12 +4710,22 @@
     }
 
     function getLeadDatabaseCallSummaryFallback(call, insight, interestedLead) {
+      const normalizedCallId = normalizeFreeText(call?.callId || '');
+      const cachedSummary = pickReadableConversationSummary(
+        callDetailSummaryByCallId.get(normalizedCallId),
+        getSharedCallSummary(normalizedCallId),
+        call?.summary,
+        insight?.summary,
+        interestedLead?.summary
+      );
+      if (cachedSummary && !looksLikeAgendaConfirmationSummary(cachedSummary)) return cachedSummary;
+      if (String(call?.transcriptFull || call?.transcriptSnippet || '').trim()) {
+        return 'Samenvatting wordt opgesteld op basis van de transcriptie.';
+      }
       const readableSummary = pickReadableConversationSummary(
         call?.summary,
         insight?.summary,
-        call?.transcriptSnippet,
-        interestedLead?.summary,
-        call?.transcriptFull
+        interestedLead?.summary
       );
       if (readableSummary && !looksLikeAgendaConfirmationSummary(readableSummary)) return readableSummary;
       return 'Samenvatting volgt na verwerking van het gesprek.';
@@ -4724,6 +4758,28 @@
       return leadDatabasePrewarmPromise;
     }
 
+    function getLeadDatabaseSummaryWarmupCandidates(limit = 1) {
+      return (Array.isArray(state.calls) ? state.calls : [])
+        .filter((call) => isQualifiedPhoneConversation(call))
+        .sort((a, b) => getCallLikeRecordUpdatedMs(b) - getCallLikeRecordUpdatedMs(a))
+        .filter((call) => {
+          const normalizedCallId = normalizeFreeText(call?.callId || '');
+          if (!normalizedCallId) return false;
+          if (callDetailSummaryByCallId.has(normalizedCallId)) return false;
+          if (getSharedCallSummary(normalizedCallId)) return false;
+          const localSummary = pickReadableConversationSummary(call?.summary);
+          if (localSummary && localSummary.length >= 90) return false;
+          return Boolean(getCallRecordingUrl(call) || call?.transcriptFull || call?.transcriptSnippet);
+        })
+        .slice(0, Math.max(0, Number(limit || 0)));
+    }
+
+    function prewarmLeadDatabaseCallDetails(limit = 1) {
+      getLeadDatabaseSummaryWarmupCandidates(limit).forEach((call) => {
+        void ensureLeadDatabaseCallSummary(call);
+      });
+    }
+
     async function fetchLeadDatabaseCallDetailPayload(callId) {
       const normalizedCallId = normalizeFreeText(callId);
       if (!normalizedCallId) return null;
@@ -4737,7 +4793,7 @@
       const run = fetchWithTimeout(
         `/api/coldcalling/call-detail?callId=${encodeURIComponent(normalizedCallId)}`,
         { method: 'GET', cache: 'no-store' },
-        12000
+        45000
       )
         .then(async (response) => {
           const data = await parseApiResponse(response);
@@ -4784,7 +4840,6 @@
       const readableLeadSummary = pickReadableConversationSummary(
         call?.summary,
         insight?.summary,
-        call?.transcriptSnippet,
         interestedLead?.summary
       );
       const leadSummaryLooksStrong =
@@ -4797,10 +4852,11 @@
         return readableLeadSummary;
       }
 
-      const sourceText = buildLeadDatabaseCallSummarySourceText(call, insight, interestedLead);
+      const sourceText = buildLeadDatabaseCallSummarySourceText(call, insight, interestedLead, remoteDetail);
       const shouldRewrite =
         !fallbackSummary ||
         fallbackSummary === 'Samenvatting volgt na verwerking van het gesprek.' ||
+        fallbackSummary === 'Samenvatting wordt opgesteld op basis van de transcriptie.' ||
         fallbackSummary.length < 160 ||
         looksLikeAgendaConfirmationSummary(fallbackSummary);
       if (!shouldRewrite || sourceText.length < 24 || !normalizedCallId) {
@@ -4818,7 +4874,7 @@
         style: 'medium',
         maxSentences: 4,
         extraInstructions:
-          'Schrijf uitsluitend in natuurlijk Nederlands als interne belnotitie voor Softora. Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer X gaf aan...". Vat in een paar volledige zinnen samen waar het gesprek over ging, wat de prospect wilde of zei, welke interesse of bezwaren er waren en wat de logische vervolgstap is als die echt is besproken. Gebruik nooit letterlijke dialoog, geen quotes, geen transcriptiestijl en geen labels zoals user:, bot:, agent: of klant:. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst.',
+          'Schrijf uitsluitend in natuurlijk Nederlands als interne belnotitie voor Softora. Gebruik de transcriptie als bron van waarheid als die aanwezig is. Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer X gaf aan...". Vat in een paar volledige zinnen samen waar het gesprek over ging, wat de prospect wilde of zei, welke interesse of bezwaren er waren en wat de logische vervolgstap is als die echt is besproken. Gebruik nooit letterlijke dialoog, geen quotes, geen transcriptiestijl en geen labels zoals user:, bot:, agent: of klant:. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst.',
       })
         .then((summaryText) => {
           const rewrittenSummary = pickReadableConversationSummary(summaryText);
@@ -4880,7 +4936,11 @@
         .filter(Boolean)
         .join(' · ');
       const recordingUrl = getCallRecordingUrl(call);
-      const summaryText = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
+      const summaryText =
+        pickReadableConversationSummary(
+          callDetailSummaryByCallId.get(normalizedCallId),
+          getSharedCallSummary(normalizedCallId)
+        ) || getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
 
       detailTitle.textContent = company;
       detailMeta.textContent = metaLine;
@@ -5256,6 +5316,7 @@
         if (force) {
           state.info = `Verversd om ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}.`;
         }
+        prewarmLeadDatabaseCallDetails(1);
       } catch (error) {
         state.error = normalizeFreeText(error?.message || '') || 'Database kon niet geladen worden.';
       } finally {

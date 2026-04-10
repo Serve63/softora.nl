@@ -32,6 +32,7 @@ function createAgendaLeadDetailService(deps = {}) {
     getOpenAiApiKey = () => '',
     fetchImpl = fetch,
     upsertRecentCallUpdate = () => null,
+    upsertAiCallInsight = () => null,
     ensureRuleBasedInsightAndAppointment = () => null,
     maybeAnalyzeCallUpdateWithAi = async () => null,
     summaryContainsEnglishMarkers = () => false,
@@ -129,6 +130,22 @@ function createAgendaLeadDetailService(deps = {}) {
       return truncateText(cleaned, 4000);
     }
     return '';
+  }
+
+  function buildTranscriptSummarySourceText(transcriptText = '', transcriptSnippetText = '') {
+    const transcript = normalizeString(transcriptText || '');
+    const transcriptSnippet = normalizeString(transcriptSnippetText || '');
+    if (!transcript && !transcriptSnippet) return '';
+
+    return [
+      'Gebruik de transcriptie hieronder als bron van waarheid voor de samenvatting.',
+      transcript ? `Volledige transcriptie:\n${truncateText(transcript, 9000)}` : '',
+      transcriptSnippet && transcriptSnippet !== transcript
+        ? `Aanvullende transcript-snippet:\n${truncateText(transcriptSnippet, 1200)}`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
   }
 
   function inferAudioFileExtension(contentType = '', sourceUrl = '') {
@@ -507,11 +524,8 @@ function createAgendaLeadDetailService(deps = {}) {
       followUpReason
     );
 
-    const sourceText = [
-      transcript ? `Transcript van het gesprek:\n${truncateText(transcript, 9000)}` : '',
-      transcriptSnippet && transcriptSnippet !== transcript
-        ? `Korte transcript-snippet:\n${truncateText(transcriptSnippet, 1200)}`
-        : '',
+    const transcriptSourceText = buildTranscriptSummarySourceText(transcript, transcriptSnippet);
+    const contextOnlySourceText = [
       callSummary ? `Bestaande call-samenvatting:\n${truncateText(callSummary, 1800)}` : '',
       aiSummary ? `Bestaande AI-samenvatting:\n${truncateText(aiSummary, 1800)}` : '',
       interestedSummary && interestedSummary !== callSummary && interestedSummary !== aiSummary
@@ -521,6 +535,11 @@ function createAgendaLeadDetailService(deps = {}) {
     ]
       .filter(Boolean)
       .join('\n\n');
+    const sourceText = transcriptSourceText || contextOnlySourceText;
+    const persistedCallSummary = pickReadableConversationSummaryForLeadDetail(callSummary);
+    const persistedCallSummaryStrong = Boolean(
+      transcriptSourceText && persistedCallSummary && persistedCallSummary.length >= 90
+    );
 
     const needsAiRewrite =
       Boolean(sourceText) &&
@@ -528,7 +547,8 @@ function createAgendaLeadDetailService(deps = {}) {
         fallbackSummary.length < 220 ||
         summaryContainsEnglishMarkers(fallbackSummary) ||
         looksLikeDirectSpeechConversationSummaryText(fallbackSummary) ||
-        looksLikeAbruptConversationSummaryText(fallbackSummary));
+        looksLikeAbruptConversationSummaryText(fallbackSummary) ||
+        (Boolean(transcriptSourceText) && !persistedCallSummaryStrong));
 
     if (needsAiRewrite && getOpenAiApiKey()) {
       try {
@@ -539,6 +559,9 @@ function createAgendaLeadDetailService(deps = {}) {
           maxSentences: 4,
           extraInstructions: [
             'Maak een korte maar inhoudelijke belnotitie voor Softora die samenvat waar het gesprek over ging.',
+            transcriptSourceText
+              ? 'Gebruik de transcriptie als bron van waarheid. Als andere context afwijkt, volg altijd de transcriptie.'
+              : '',
             'Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer/mevrouw X gaf aan...".',
             'Benoem de behoefte of vraag van de prospect, de reactie van de prospect en eventuele bezwaren of context.',
             'Noem alleen aan het einde een vervolgstap als die echt in het gesprek naar voren kwam; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland".',
@@ -563,15 +586,6 @@ function createAgendaLeadDetailService(deps = {}) {
     }
 
     if (fallbackSummary) return fallbackSummary;
-
-    const transcriptFallback = sanitizeConversationSummaryText(transcriptSnippet || transcript);
-    if (
-      transcriptFallback &&
-      !looksLikeDirectSpeechConversationSummaryText(transcriptFallback) &&
-      !looksLikeAbruptConversationSummaryText(transcriptFallback)
-    ) {
-      return truncateText(transcriptFallback, 4000);
-    }
 
     return '';
   }
@@ -598,16 +612,12 @@ function createAgendaLeadDetailService(deps = {}) {
       findTranscriptFromWebhookEvents(normalizedCallId) ||
       '';
 
-    const existingReadableSummary = pickReadableConversationSummaryForLeadDetail(
-      callUpdate?.summary,
-      aiInsight?.summary,
-      interestedLead?.summary,
-      aiInsight?.followUpReason
+    const recordingUrl = resolvePreferredRecordingUrl(
+      callUpdate,
+      interestedLead,
+      { callId: normalizedCallId, provider: normalizeString(callUpdate?.provider || interestedLead?.provider || '') }
     );
-    const shouldHydrateTranscript =
-      !transcript &&
-      Boolean(resolvePreferredRecordingUrl(callUpdate, interestedLead, aiInsight)) &&
-      (!existingReadableSummary || existingReadableSummary.length < 220);
+    const shouldHydrateTranscript = !transcript && Boolean(recordingUrl);
 
     if (shouldHydrateTranscript) {
       const hydrated = await ensureTranscriptHydratedForLeadDetail(
@@ -632,11 +642,54 @@ function createAgendaLeadDetailService(deps = {}) {
       interestedLead,
       transcript
     );
-    const recordingUrl = resolvePreferredRecordingUrl(
-      callUpdate,
-      interestedLead,
-      { callId: normalizedCallId, provider: normalizeString(callUpdate?.provider || interestedLead?.provider || '') }
+    const normalizedTranscript = truncateText(normalizeString(transcript), 9000);
+    const normalizedTranscriptSnippet = truncateText(
+      normalizeString(callUpdate?.transcriptSnippet || normalizedTranscript.replace(/\s+/g, ' ')),
+      450
     );
+    const normalizedSummary = truncateText(normalizeString(summary || ''), 4000);
+    const shouldPersistTranscriptBackfill =
+      Boolean(normalizedTranscript) &&
+      (
+        normalizeString(callUpdate?.transcriptFull || '') !== normalizedTranscript ||
+        normalizeString(callUpdate?.transcriptSnippet || '') !== normalizedTranscriptSnippet ||
+        (normalizedSummary && normalizeString(callUpdate?.summary || '') !== normalizedSummary)
+      );
+
+    if (shouldPersistTranscriptBackfill) {
+      const persistedUpdate = upsertRecentCallUpdate(
+        {
+          callId: normalizedCallId,
+          summary: normalizedSummary,
+          transcriptFull: normalizedTranscript,
+          transcriptSnippet: normalizedTranscriptSnippet,
+          updatedAt: new Date().toISOString(),
+          updatedAtMs: Date.now(),
+        },
+        {
+          persistReason: 'call_detail_transcript_summary',
+        }
+      );
+      if (persistedUpdate) {
+        callUpdate = persistedUpdate;
+      }
+    }
+
+    if (
+      normalizedSummary &&
+      aiInsight &&
+      typeof upsertAiCallInsight === 'function' &&
+      normalizeString(aiInsight?.summary || '') !== normalizedSummary
+    ) {
+      const persistedInsight = upsertAiCallInsight({
+        ...aiInsight,
+        summary: normalizedSummary,
+        analyzedAt: new Date().toISOString(),
+      });
+      if (persistedInsight) {
+        aiInsight = persistedInsight;
+      }
+    }
 
     return {
       callId: normalizedCallId,
@@ -661,7 +714,7 @@ function createAgendaLeadDetailService(deps = {}) {
       time: normalizeTimeHhMm(interestedLead?.time || ''),
       location: sanitizeAppointmentLocation(interestedLead?.location || ''),
       whatsappInfo: sanitizeAppointmentWhatsappInfo(interestedLead?.whatsappInfo || ''),
-      summary: truncateText(normalizeString(summary || ''), 4000),
+      summary: normalizedSummary,
       callSummary: truncateText(normalizeString(callUpdate?.summary || ''), 1800),
       aiSummary: truncateText(normalizeString(aiInsight?.summary || ''), 1800),
       followUpReason: truncateText(
@@ -669,10 +722,10 @@ function createAgendaLeadDetailService(deps = {}) {
         900
       ),
       transcriptSnippet: truncateText(
-        normalizeString(callUpdate?.transcriptSnippet || transcript),
+        normalizeString(callUpdate?.transcriptSnippet || normalizedTranscript),
         1200
       ),
-      transcript: truncateText(normalizeString(transcript), 9000),
+      transcript: normalizedTranscript,
       recordingUrl: normalizeString(recordingUrl || ''),
       recordingUrlAvailable: Boolean(normalizeString(recordingUrl || '')),
       durationSeconds: resolveCallDurationSeconds(callUpdate, interestedLead, aiInsight),

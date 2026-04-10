@@ -1378,6 +1378,7 @@ const agendaLeadDetailService = createAgendaLeadDetailService({
   parseJsonLoose,
   getOpenAiApiKey,
   upsertRecentCallUpdate,
+  upsertAiCallInsight,
   ensureRuleBasedInsightAndAppointment,
   maybeAnalyzeCallUpdateWithAi,
   summaryContainsEnglishMarkers,

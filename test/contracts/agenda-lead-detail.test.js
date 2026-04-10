@@ -34,6 +34,7 @@ function createFixture(overrides = {}) {
   const aiCallInsightsByCallId = new Map(overrides.aiCallInsightsByCallId || []);
   const transcriptionPromiseByCallId = new Map();
   const upsertCalls = [];
+  const aiInsightUpserts = [];
   const aiAnalyzeCalls = [];
 
   const service = createAgendaLeadDetailService({
@@ -92,6 +93,11 @@ function createFixture(overrides = {}) {
       upsertCalls.push(update);
       return update;
     },
+    upsertAiCallInsight: (insight) => {
+      aiInsightUpserts.push(insight);
+      aiCallInsightsByCallId.set(normalizeString(insight?.callId || ''), insight);
+      return insight;
+    },
     ensureRuleBasedInsightAndAppointment:
       overrides.ensureRuleBasedInsightAndAppointment ||
       ((callUpdate) => ({
@@ -139,6 +145,7 @@ function createFixture(overrides = {}) {
 
   return {
     aiAnalyzeCalls,
+    aiInsightUpserts,
     service,
     transcriptionPromiseByCallId,
     upsertCalls,
@@ -251,8 +258,68 @@ test('agenda lead detail service rewrites direct speech into a proper Dutch call
   );
 
   assert.match(summary, /prospect gaf al snel aan geïnteresseerd te zijn/i);
+  assert.match(summaryPayload?.text || '', /Gebruik de transcriptie hieronder als bron van waarheid/i);
+  assert.doesNotMatch(summaryPayload?.text || '', /Plan een afspraak/i);
   assert.match(summaryPayload?.extraInstructions || '', /Schrijf in de derde persoon/i);
   assert.match(summaryPayload?.extraInstructions || '', /nooit met ellips of afgebroken tekst/i);
+});
+
+test('agenda lead detail service persists transcript-based summaries back into call state', async () => {
+  const fixture = createFixture({
+    openAiApiKey: 'test-key',
+    recentCallUpdates: [
+      {
+        callId: 'call-persist',
+        company: 'Servé Creusen',
+        phone: '+31629917185',
+        summary:
+          'Hallo, met Eric Boonaan. Hey, goedemiddag, je spreekt met Ruben Nijhuis van Softora...',
+        transcriptFull:
+          'Hallo, met Eric Boonaan. Hey, goedemiddag, je spreekt met Ruben Nijhuis van Softora. De prospect geeft aan open te staan voor een afspraak over de website.',
+        transcriptSnippet:
+          'Hallo, met Eric Boonaan. De prospect geeft aan open te staan voor een afspraak over de website.',
+        recordingUrl: 'https://www.softora.nl/audio/test.mp3',
+        updatedAt: '2026-04-10T14:48:00.000Z',
+      },
+    ],
+    aiCallInsightsByCallId: [
+      [
+        'call-persist',
+        {
+          callId: 'call-persist',
+          summary: 'Rule insight',
+          analyzedAt: '2026-04-10T14:48:10.000Z',
+        },
+      ],
+    ],
+    generateTextSummaryWithAi: async () => ({
+      summary:
+        'De prospect gaf tijdens het gesprek aan geïnteresseerd te zijn in een afspraak over de website. Softora kan in een vervolgstap de mogelijkheden toelichten.',
+    }),
+  });
+
+  const detail = await fixture.service.buildCallBackedLeadDetail('call-persist');
+
+  assert.match(detail?.summary || '', /prospect gaf tijdens het gesprek aan geïnteresseerd te zijn/i);
+  assert.match(detail?.transcript || '', /je spreekt met Ruben Nijhuis van Softora/i);
+  assert.ok(
+    fixture.upsertCalls.some(
+      (update) =>
+        normalizeString(update?.callId) === 'call-persist' &&
+        /prospect gaf tijdens het gesprek aan geïnteresseerd te zijn/i.test(
+          normalizeString(update?.summary || '')
+        )
+    )
+  );
+  assert.ok(
+    fixture.aiInsightUpserts.some(
+      (insight) =>
+        normalizeString(insight?.callId) === 'call-persist' &&
+        /prospect gaf tijdens het gesprek aan geïnteresseerd te zijn/i.test(
+          normalizeString(insight?.summary || '')
+        )
+    )
+  );
 });
 
 test('agenda lead detail service builds stable call-backed detail payloads', async () => {
