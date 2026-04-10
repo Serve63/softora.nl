@@ -65,6 +65,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.doesNotMatch(dashboardSource, /id="leadDatabaseRefreshBtn"/);
   assert.doesNotMatch(dashboardSource, /id="leadDatabaseFilterPills"/);
   assert.doesNotMatch(dashboardSource, /<button type="button" id="leadDatabaseCancelBtn" class="lead-db-btn">Sluiten<\/button>/);
+  assert.match(dashboardSource, /\{ label: 'Gebeld', cls: 'lead-db-status-pill lead-db-status-pill--belt' \}/);
+  assert.doesNotMatch(dashboardSource, /\{ label: 'Actuele bellijst', cls: 'lead-db-status-pill lead-db-status-pill--belt' \}/);
   assert.match(
     dashboardSource,
     /function buildLeadDatabaseCallSummarySourceText\(call, insight, interestedLead, remoteDetail = null\) \{[\s\S]*remoteDetail\?\.transcript[\s\S]*call\?\.transcriptFull[\s\S]*remoteDetail\?\.summary[\s\S]*call\?\.summary[\s\S]*insight\?\.summary[\s\S]*interestedLead\?\.summary/

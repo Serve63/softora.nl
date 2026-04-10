@@ -5700,7 +5700,7 @@
                         ? { label: 'Interesse', cls: 'lead-db-status-pill lead-db-status-pill--interesse' }
                         : intent === 'outside_range'
                           ? { label: 'Buiten bereik', cls: 'lead-db-status-pill lead-db-status-pill--buiten' }
-                          : { label: 'Actuele bellijst', cls: 'lead-db-status-pill lead-db-status-pill--belt' };
+                          : { label: 'Gebeld', cls: 'lead-db-status-pill lead-db-status-pill--belt' };
                   const duration = formatConversationDuration(call?.durationSeconds);
                   const updatedAt = normalizeFreeText(call?.updatedAt || '');
                   const callId = normalizeFreeText(call?.callId || '');
