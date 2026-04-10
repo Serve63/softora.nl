@@ -1137,7 +1137,7 @@
     statusEl = document.createElement('div');
     statusEl.id = 'campaignStatusMessage';
     statusEl.style.display = 'none';
-    statusEl.style.margin = '14px 0 0';
+    statusEl.style.margin = '14px 0 18px';
     statusEl.style.padding = '10px 14px';
     statusEl.style.borderRadius = '12px';
     statusEl.style.fontSize = '13px';
