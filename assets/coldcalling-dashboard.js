@@ -3173,6 +3173,16 @@
     return Number.isFinite(updatedAt) ? updatedAt : 0;
   }
 
+  function getConversationRecordOccurredAt(record) {
+    return String(record?.endedAt || record?.startedAt || record?.createdAt || record?.updatedAt || '').trim();
+  }
+
+  function getConversationRecordOccurredMs(record) {
+    const occurredAt = Date.parse(getConversationRecordOccurredAt(record));
+    if (Number.isFinite(occurredAt) && occurredAt > 0) return occurredAt;
+    return getConversationRecordUpdatedMs(record);
+  }
+
   function buildConversationRecordsFromUpdates(updates) {
     const byId = new Map();
 
@@ -3209,7 +3219,7 @@
       });
     });
 
-    return Array.from(byId.values()).sort((a, b) => getConversationRecordUpdatedMs(b) - getConversationRecordUpdatedMs(a));
+    return Array.from(byId.values()).sort((a, b) => getConversationRecordOccurredMs(b) - getConversationRecordOccurredMs(a));
   }
 
   function inferConversationAnswered(record) {
@@ -3492,7 +3502,7 @@
 
       detailEl.innerHTML = [
         '<div style="max-width:100%;">',
-        `  <div style="font-family:Oswald,sans-serif; font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:8px;">${escapeHtml(formatConversationTimestamp(record.updatedAt || record.endedAt || record.startedAt))}</div>`,
+        `  <div style="font-family:Oswald,sans-serif; font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:${theme.textMuted}; margin-bottom:8px;">${escapeHtml(formatConversationTimestamp(getConversationRecordOccurredAt(record)))}</div>`,
         `  <div style="font-family:Oswald,sans-serif; font-size:34px; line-height:1; text-transform:uppercase; letter-spacing:0.03em; color:${theme.text};">${escapeHtml(getConversationLeadLabel(record))}</div>`,
         `  <div style="margin-top:12px; color:${theme.textMuted}; font-size:14px;">${escapeHtml(record.phone || 'Geen telefoonnummer beschikbaar')}</div>`,
         `  <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:14px 28px; margin-top:28px; margin-bottom:28px;">`,
@@ -5538,11 +5548,11 @@
       const company = normalizeFreeText(call?.company || call?.name || 'Onbekend');
       const phone = formatLeadDatabasePhone(normalizeFreeText(call?.phone || ''));
       const duration = formatConversationDuration(call?.durationSeconds);
-      const updatedAt = normalizeFreeText(call?.updatedAt || '');
+      const occurredAt = normalizeFreeText(getConversationRecordOccurredAt(call));
       const normalizedCallId = normalizeFreeText(call?.callId || '');
       const insight = getCallInsightRecord(normalizedCallId);
       const interestedLead = getInterestedLeadRecord(normalizedCallId);
-      const metaLine = [phone || '-', duration, updatedAt ? formatConversationTimestamp(updatedAt) : 'Onbekend']
+      const metaLine = [phone || '-', duration, occurredAt ? formatConversationTimestamp(occurredAt) : 'Onbekend']
         .filter(Boolean)
         .join(' · ');
       const recordingUrl = getCallRecordingUrl(call);
@@ -5702,7 +5712,7 @@
                           ? { label: 'Buiten bereik', cls: 'lead-db-status-pill lead-db-status-pill--buiten' }
                           : { label: 'Gebeld', cls: 'lead-db-status-pill lead-db-status-pill--belt' };
                   const duration = formatConversationDuration(call?.durationSeconds);
-                  const updatedAt = normalizeFreeText(call?.updatedAt || '');
+                  const occurredAt = normalizeFreeText(getConversationRecordOccurredAt(call));
                   const callId = normalizeFreeText(call?.callId || '');
                   return `
                     <div class="lead-db-row lead-db-row--calls" data-db-call-open="${escapeHtml(
@@ -5718,7 +5728,7 @@
                       <div class="lead-db-cell"><span class="${status.cls}">${escapeHtml(status.label)}</span></div>
                       <div class="lead-db-cell lead-db-cell--mono">${escapeHtml(duration)}</div>
                       <div class="lead-db-cell lead-db-cell--muted">${
-                        updatedAt ? escapeHtml(formatConversationTimestamp(updatedAt)) : '-'
+                        occurredAt ? escapeHtml(formatConversationTimestamp(occurredAt)) : '-'
                       }</div>
                     </div>
                   `;
