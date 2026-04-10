@@ -5543,6 +5543,7 @@
       const normalizedCallId = normalizeFreeText(call?.callId || '');
       const cachedDetail = callDetailPayloadByCallId.get(normalizedCallId) || null;
       const cachedSummary = pickReadableConversationSummary(
+        cachedDetail?.conversationSummary,
         callDetailSummaryByCallId.get(normalizedCallId),
         getSharedCallSummary(normalizedCallId),
         cachedDetail?.summary,
@@ -5680,6 +5681,7 @@
       const interestedLead = getInterestedLeadRecord(normalizedCallId);
       let remoteDetail = await fetchLeadDatabaseCallDetailPayload(normalizedCallId);
       let remoteSummary = pickReadableConversationSummary(
+        remoteDetail?.conversationSummary,
         remoteDetail?.summary,
         remoteDetail?.callSummary,
         remoteDetail?.aiSummary,
@@ -5689,6 +5691,7 @@
       if (!remoteSummary && shouldRefreshLeadDatabaseCallDetailPayload(remoteDetail)) {
         remoteDetail = await fetchLeadDatabaseCallDetailPayload(normalizedCallId, { force: true });
         remoteSummary = pickReadableConversationSummary(
+          remoteDetail?.conversationSummary,
           remoteDetail?.summary,
           remoteDetail?.callSummary,
           remoteDetail?.aiSummary,
@@ -5821,9 +5824,9 @@
       const immediateFallbackSummary = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
       const summaryText =
         pickReadableConversationSummary(
+          immediateFallbackSummary,
           callDetailSummaryByCallId.get(normalizedCallId),
-          getSharedCallSummary(normalizedCallId),
-          immediateFallbackSummary
+          getSharedCallSummary(normalizedCallId)
         ) || '';
 
       detailTitle.textContent = company;

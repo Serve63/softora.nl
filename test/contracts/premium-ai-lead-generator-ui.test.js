@@ -10,7 +10,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410t" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410u" defer><\/script>/);
   assert.match(
     pageSource,
     /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
@@ -60,7 +60,19 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /function buildLeadDatabaseTranscriptFallbackSummary\(call, insight, interestedLead, remoteDetail = null\) \{/);
   assert.match(
     dashboardSource,
+    /function getLeadDatabaseCallSummaryFallback\(call, insight, interestedLead\) \{[\s\S]*cachedDetail\?\.conversationSummary[\s\S]*callDetailSummaryByCallId\.get\(normalizedCallId\)/
+  );
+  assert.match(
+    dashboardSource,
+    /async function ensureLeadDatabaseCallSummary\(call\) \{[\s\S]*remoteDetail\?\.conversationSummary[\s\S]*remoteDetail\?\.summary/
+  );
+  assert.match(
+    dashboardSource,
     /function openCallDetail\(callId\) \{[\s\S]*const immediateSummary = getLeadDatabaseCallSummaryFallback\(call, insight, interestedLead\);[\s\S]*renderCallDetail\(\);/
+  );
+  assert.match(
+    dashboardSource,
+    /function renderCallDetail\(\) \{[\s\S]*const immediateFallbackSummary = getLeadDatabaseCallSummaryFallback\(call, insight, interestedLead\);[\s\S]*pickReadableConversationSummary\(\s*immediateFallbackSummary,\s*callDetailSummaryByCallId\.get\(normalizedCallId\),\s*getSharedCallSummary\(normalizedCallId\)\s*\)/
   );
   assert.doesNotMatch(dashboardSource, /return 'Samenvatting wordt opgesteld op basis van de transcriptie\.';/);
   assert.match(dashboardSource, /family=Barlow\+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600/);
