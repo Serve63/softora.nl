@@ -10,6 +10,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410b" defer><\/script>/);
   assert.match(
     pageSource,
     /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
@@ -32,6 +33,11 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--regio\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*4;/);
   assert.match(dashboardSource, /let controlWrap = byId\('leadListControlWrap'\);[\s\S]*if \(!controlWrap\)/);
   assert.match(dashboardSource, /let dispatchWrap = byId\('callDispatchControlWrap'\);[\s\S]*if \(!dispatchWrap\)/);
+  assert.match(
+    dashboardSource,
+    /<th[\s\S]*>Bedrijf<\/th>[\s\S]*<th[\s\S]*>Adres<\/th>[\s\S]*<th[\s\S]*>Telefoonnummer<\/th>[\s\S]*<th[\s\S]*>Website<\/th>/
+  );
+  assert.doesNotMatch(dashboardSource, /Contactpersoon|Webiste/);
   assert.match(dashboardSource, /function openLeadDatabaseFromCampaignControl\(\) \{[\s\S]*ensureLeadDatabaseModal\(\)[\s\S]*dbModal\.openLeadDatabaseModal\(\);/);
   assert.match(dashboardSource, /function bindLeadDatabaseOpenControl\(\) \{[\s\S]*window\.openLeadDatabaseModalFromCampaign = openLeadDatabaseFromCampaignControl;[\s\S]*button\.dataset\.dbOpenBound !== '1'/);
   assert.match(dashboardSource, /bindLeadDatabaseOpenControl\(\);\s*void bootstrapColdcallingUi\(\);/);
