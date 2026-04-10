@@ -10,7 +10,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410h" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410i" defer><\/script>/);
   assert.match(
     pageSource,
     /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
@@ -55,6 +55,11 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst/);
   assert.match(dashboardSource, /const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v5';/);
   assert.match(dashboardSource, /Samenvatting wordt opgesteld op basis van de transcriptie\./);
+  assert.match(dashboardSource, /family=Barlow\+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600/);
+  assert.match(dashboardSource, /<div class="lead-db-toolbar">[\s\S]*leadDatabaseRefreshInfo[\s\S]*leadDatabaseTemplateBtn[\s\S]*leadDatabaseAddManualBtn[\s\S]*leadDatabaseImportBtn/);
+  assert.match(dashboardSource, /<div id="leadDatabaseSummaryCards" class="lead-db-stats"><\/div>/);
+  assert.match(dashboardSource, /<div id="leadDatabaseFilterPills" class="lead-db-filter-pills"><\/div>/);
+  assert.match(dashboardSource, /class="lead-db-table-card"/);
   assert.match(
     dashboardSource,
     /function buildLeadDatabaseCallSummarySourceText\(call, insight, interestedLead, remoteDetail = null\) \{[\s\S]*remoteDetail\?\.transcript[\s\S]*call\?\.transcriptFull[\s\S]*remoteDetail\?\.summary[\s\S]*call\?\.summary[\s\S]*insight\?\.summary[\s\S]*interestedLead\?\.summary/

@@ -4445,6 +4445,641 @@
     const callDetailPayloadByCallId = new Map();
     const callDetailPayloadPromiseByCallId = new Map();
     let leadDatabasePrewarmPromise = null;
+    const leadDatabaseUiLabels = {
+      all: 'Alle bedrijven',
+      callback: 'Actuele bellijst',
+      interesse: 'Interesse',
+      blacklist: 'Geen interesse',
+      outside_range: 'Buiten bereik',
+      phone_calls: 'Telefoongesprekken',
+    };
+
+    function getLeadDatabaseUiLabel(key) {
+      return leadDatabaseUiLabels[String(key || '').trim()] || 'Onbekend';
+    }
+
+    function ensureLeadDatabasePresentationAssets() {
+      if (!document.getElementById('leadDatabaseModalFontLink')) {
+        const fontLink = document.createElement('link');
+        fontLink.id = 'leadDatabaseModalFontLink';
+        fontLink.rel = 'stylesheet';
+        fontLink.href =
+          'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap';
+        document.head.appendChild(fontLink);
+      }
+
+      if (!document.getElementById('leadDatabaseModalStyles')) {
+        const style = document.createElement('style');
+        style.id = 'leadDatabaseModalStyles';
+        style.textContent = `
+          #leadDatabaseModalShell {
+            --lead-db-bg: #f0ede8;
+            --lead-db-crimson: #9b2355;
+            --lead-db-crimson-light: #c4346a;
+            --lead-db-text-dark: #1a1a2e;
+            --lead-db-text-mid: #555555;
+            --lead-db-text-light: #999999;
+            --lead-db-border: #e2ddd6;
+            --lead-db-card: #ffffff;
+            --lead-db-tag: #f5f0eb;
+            --lead-db-green: #16733c;
+            --lead-db-red: #c0392b;
+            --lead-db-orange: #b45a00;
+            --lead-db-blue: #1a5f8a;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--lead-db-bg);
+            color: var(--lead-db-text-dark);
+            font-family: 'Barlow', sans-serif;
+            overflow: hidden;
+          }
+
+          #leadDatabaseModalShell,
+          #leadDatabaseModalShell * {
+            box-sizing: border-box;
+          }
+
+          #leadDatabaseModalShell .lead-db-page {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            padding: 40px 48px 24px;
+          }
+
+          #leadDatabaseModalShell .lead-db-header {
+            margin-bottom: 8px;
+          }
+
+          #leadDatabaseModalShell .lead-db-logo {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--lead-db-crimson);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+          }
+
+          #leadDatabaseModalShell .lead-db-page-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 30px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            line-height: 1;
+            text-transform: uppercase;
+          }
+
+          #leadDatabaseModalShell .lead-db-page-sub {
+            margin-top: 6px;
+            font-size: 13px;
+            color: var(--lead-db-text-light);
+          }
+
+          #leadDatabaseModalShell .lead-db-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin: 20px 0 18px;
+          }
+
+          #leadDatabaseModalShell .lead-db-toolbar-left,
+          #leadDatabaseModalShell .lead-db-toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+          }
+
+          #leadDatabaseModalShell .lead-db-refresh-info {
+            font-size: 12px;
+            color: var(--lead-db-text-light);
+          }
+
+          #leadDatabaseModalShell .lead-db-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 16px;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 4px;
+            background: var(--lead-db-card);
+            color: var(--lead-db-text-mid);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+          }
+
+          #leadDatabaseModalShell .lead-db-btn:hover {
+            border-color: var(--lead-db-crimson);
+            color: var(--lead-db-crimson);
+          }
+
+          #leadDatabaseModalShell .lead-db-btn--primary {
+            background: var(--lead-db-crimson);
+            border-color: var(--lead-db-crimson);
+            color: #ffffff;
+          }
+
+          #leadDatabaseModalShell .lead-db-btn--primary:hover {
+            background: var(--lead-db-crimson-light);
+            border-color: var(--lead-db-crimson-light);
+            color: #ffffff;
+          }
+
+          #leadDatabaseModalShell .lead-db-btn svg {
+            width: 13px;
+            height: 13px;
+            flex-shrink: 0;
+          }
+
+          #leadDatabaseModalShell .lead-db-btn[disabled] {
+            opacity: 0.55;
+            cursor: progress;
+          }
+
+          #leadDatabaseModalShell .lead-db-status {
+            display: none;
+            margin-bottom: 18px;
+            padding: 12px 16px;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 6px;
+            background: var(--lead-db-card);
+            font-size: 13px;
+            color: var(--lead-db-text-mid);
+          }
+
+          #leadDatabaseModalShell .lead-db-status--error {
+            border-color: rgba(192, 57, 43, 0.18);
+            background: rgba(192, 57, 43, 0.08);
+            color: var(--lead-db-red);
+          }
+
+          #leadDatabaseModalShell .lead-db-status--info {
+            border-color: rgba(22, 115, 60, 0.18);
+            background: rgba(22, 115, 60, 0.08);
+            color: var(--lead-db-green);
+          }
+
+          #leadDatabaseModalShell .lead-db-status--muted {
+            border-color: var(--lead-db-border);
+            background: var(--lead-db-tag);
+            color: var(--lead-db-text-mid);
+          }
+
+          #leadDatabaseModalShell .lead-db-stats {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 28px;
+          }
+
+          #leadDatabaseModalShell .lead-db-stat {
+            width: 100%;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 6px;
+            background: var(--lead-db-card);
+            padding: 14px 16px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+
+          #leadDatabaseModalShell .lead-db-stat:hover {
+            border-color: rgba(155, 35, 85, 0.35);
+            transform: translateY(-1px);
+          }
+
+          #leadDatabaseModalShell .lead-db-stat.is-active {
+            border-color: var(--lead-db-crimson);
+            box-shadow: 0 0 0 1px rgba(155, 35, 85, 0.08);
+          }
+
+          #leadDatabaseModalShell .lead-db-stat-label {
+            margin-bottom: 6px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            line-height: 1.3;
+            text-transform: uppercase;
+            color: var(--lead-db-text-light);
+          }
+
+          #leadDatabaseModalShell .lead-db-stat-val {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1;
+            color: var(--lead-db-text-dark);
+          }
+
+          #leadDatabaseModalShell .lead-db-stat.is-active .lead-db-stat-val {
+            color: var(--lead-db-crimson);
+          }
+
+          #leadDatabaseModalShell .lead-db-filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+          }
+
+          #leadDatabaseModalShell .lead-db-filter-pills {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+          }
+
+          #leadDatabaseModalShell .lead-db-filter-pill {
+            border: 1px solid var(--lead-db-border);
+            border-radius: 20px;
+            background: var(--lead-db-card);
+            color: var(--lead-db-text-light);
+            padding: 5px 14px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+
+          #leadDatabaseModalShell .lead-db-filter-pill:hover {
+            border-color: rgba(155, 35, 85, 0.3);
+            color: var(--lead-db-text-dark);
+          }
+
+          #leadDatabaseModalShell .lead-db-filter-pill.is-active {
+            background: var(--lead-db-crimson);
+            border-color: var(--lead-db-crimson);
+            color: #ffffff;
+          }
+
+          #leadDatabaseModalShell .lead-db-search-wrap {
+            position: relative;
+            margin-left: auto;
+          }
+
+          #leadDatabaseModalShell .lead-db-search-wrap input {
+            width: 220px;
+            padding: 7px 12px 7px 30px;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 4px;
+            background: var(--lead-db-card);
+            color: var(--lead-db-text-dark);
+            font-family: 'Barlow', sans-serif;
+            font-size: 12px;
+            outline: none;
+            transition: border-color 0.15s ease;
+          }
+
+          #leadDatabaseModalShell .lead-db-search-wrap input:focus {
+            border-color: var(--lead-db-crimson);
+          }
+
+          #leadDatabaseModalShell .lead-db-search-wrap svg {
+            position: absolute;
+            left: 9px;
+            top: 50%;
+            width: 12px;
+            height: 12px;
+            color: var(--lead-db-text-light);
+            transform: translateY(-50%);
+            pointer-events: none;
+          }
+
+          #leadDatabaseModalShell .lead-db-table-card {
+            overflow: hidden;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 6px;
+            background: var(--lead-db-card);
+          }
+
+          #leadDatabaseModalShell .lead-db-table-wrap {
+            min-height: 180px;
+            overflow: auto;
+          }
+
+          #leadDatabaseModalShell .lead-db-table-head,
+          #leadDatabaseModalShell .lead-db-row {
+            display: grid;
+            gap: 0;
+            align-items: center;
+          }
+
+          #leadDatabaseModalShell .lead-db-table-head {
+            padding: 9px 20px;
+            background: var(--lead-db-tag);
+            border-bottom: 1px solid var(--lead-db-border);
+          }
+
+          #leadDatabaseModalShell .lead-db-table-head span {
+            color: var(--lead-db-text-light);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+          }
+
+          #leadDatabaseModalShell .lead-db-table-head--records,
+          #leadDatabaseModalShell .lead-db-row--records {
+            grid-template-columns: 2fr 1.45fr 1.25fr 1fr;
+            min-width: 900px;
+          }
+
+          #leadDatabaseModalShell .lead-db-table-head--calls,
+          #leadDatabaseModalShell .lead-db-row--calls {
+            grid-template-columns: 2fr 1.3fr 1.4fr 0.8fr 1.35fr;
+            min-width: 980px;
+          }
+
+          #leadDatabaseModalShell .lead-db-row {
+            padding: 13px 20px;
+            border-bottom: 1px solid var(--lead-db-border);
+            transition: background 0.12s ease;
+          }
+
+          #leadDatabaseModalShell .lead-db-row:last-child {
+            border-bottom: none;
+          }
+
+          #leadDatabaseModalShell .lead-db-row:hover {
+            background: var(--lead-db-tag);
+          }
+
+          #leadDatabaseModalShell .lead-db-row[role="button"] {
+            cursor: pointer;
+          }
+
+          #leadDatabaseModalShell .lead-db-row[role="button"]:focus {
+            outline: 2px solid rgba(155, 35, 85, 0.25);
+            outline-offset: -2px;
+          }
+
+          #leadDatabaseModalShell .lead-db-cell-bedrijf {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+          }
+
+          #leadDatabaseModalShell .lead-db-company-avatar {
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 6px;
+            background: var(--lead-db-tag);
+            color: var(--lead-db-crimson);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 11px;
+            font-weight: 800;
+          }
+
+          #leadDatabaseModalShell .lead-db-company-name,
+          #leadDatabaseModalShell .lead-db-cell,
+          #leadDatabaseModalShell .lead-db-cell a {
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          #leadDatabaseModalShell .lead-db-company-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--lead-db-text-dark);
+          }
+
+          #leadDatabaseModalShell .lead-db-cell {
+            font-size: 12px;
+            color: var(--lead-db-text-mid);
+          }
+
+          #leadDatabaseModalShell .lead-db-cell--mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          }
+
+          #leadDatabaseModalShell .lead-db-cell--muted {
+            color: var(--lead-db-text-light);
+          }
+
+          #leadDatabaseModalShell .lead-db-cell a {
+            color: var(--lead-db-text-dark);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            flex-shrink: 0;
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--interesse {
+            background: rgba(22, 115, 60, 0.1);
+            color: var(--lead-db-green);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--interesse::before {
+            background: var(--lead-db-green);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--geen {
+            background: rgba(180, 90, 0, 0.1);
+            color: var(--lead-db-orange);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--geen::before {
+            background: var(--lead-db-orange);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--buiten {
+            background: rgba(155, 35, 85, 0.08);
+            color: var(--lead-db-crimson);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--buiten::before {
+            background: var(--lead-db-crimson);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--belt {
+            background: rgba(26, 95, 138, 0.1);
+            color: var(--lead-db-blue);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--belt::before {
+            background: var(--lead-db-blue);
+          }
+
+          #leadDatabaseModalShell .lead-db-empty {
+            padding: 48px;
+            text-align: center;
+            color: var(--lead-db-text-light);
+            font-size: 13px;
+          }
+
+          #leadDatabaseModalShell .lead-db-footer {
+            padding: 0 24px 20px;
+            text-align: right;
+            color: var(--lead-db-crimson);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+          }
+
+          #leadDatabaseCallDetailOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 10010;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(0, 0, 0, 0.35);
+          }
+
+          #leadDatabaseCallDetailCard {
+            width: min(860px, 100%);
+            max-height: min(86vh, 920px);
+            overflow: auto;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 10px;
+            background: var(--lead-db-card);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+          }
+
+          #leadDatabaseCallDetailHeader {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px 20px;
+            background: var(--lead-db-tag);
+            border-bottom: 1px solid var(--lead-db-border);
+          }
+
+          #leadDatabaseCallDetailTitle {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 26px;
+            font-weight: 800;
+            line-height: 1.05;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--lead-db-text-dark);
+          }
+
+          #leadDatabaseCallDetailMeta {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--lead-db-text-light);
+          }
+
+          #leadDatabaseCallDetailCloseBtn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 4px;
+            background: var(--lead-db-card);
+            color: var(--lead-db-text-mid);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+          }
+
+          #leadDatabaseCallDetailBody {
+            padding: 20px;
+          }
+
+          #leadDatabaseCallDetailBody .lead-db-detail-label {
+            margin-bottom: 8px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: var(--lead-db-text-light);
+          }
+
+          #leadDatabaseCallDetailSummary {
+            font-size: 15px;
+            line-height: 1.75;
+            color: var(--lead-db-text-dark);
+          }
+
+          #leadDatabaseCallDetailAudio {
+            width: 100%;
+            color-scheme: light;
+          }
+
+          @media (max-width: 1200px) {
+            #leadDatabaseModalShell .lead-db-stats {
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+          }
+
+          @media (max-width: 820px) {
+            #leadDatabaseModalShell .lead-db-page {
+              padding: 24px 18px 18px;
+            }
+
+            #leadDatabaseModalShell .lead-db-toolbar {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+
+            #leadDatabaseModalShell .lead-db-search-wrap {
+              width: 100%;
+              margin-left: 0;
+            }
+
+            #leadDatabaseModalShell .lead-db-search-wrap input {
+              width: 100%;
+            }
+
+            #leadDatabaseModalShell .lead-db-stats {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
 
     modal = document.createElement('div');
     modal.id = 'leadDatabaseModalOverlay';
@@ -4456,74 +5091,109 @@
     modal.style.padding = '0';
     modal.style.zIndex = '9999';
     const modeUi = getBusinessModeUiConfig();
+    ensureLeadDatabasePresentationAssets();
 
     modal.innerHTML = `
-      <div id="leadDatabaseModalShell" style="width:100vw; height:100vh; overflow:hidden; display:flex; flex-direction:column;">
-        <div id="leadDatabaseModalHeader" style="min-height:60px; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 14px;">
-          <div>
-            <div style="font-family:Oswald,sans-serif; font-size:23px; line-height:1; letter-spacing:0.03em; text-transform:uppercase;">Database</div>
-            <div id="leadDatabaseHeaderHint" style="margin-top:4px; font-size:12px;">${escapeHtml(modeUi.dbHint)}</div>
+      <div id="leadDatabaseModalShell">
+        <div class="lead-db-page">
+          <div class="lead-db-header">
+            <div class="lead-db-logo">Softora.nl</div>
+            <div class="lead-db-page-title">Database</div>
+            <div id="leadDatabaseHeaderHint" class="lead-db-page-sub">${escapeHtml(modeUi.dbHint)}</div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button type="button" id="leadDatabaseRefreshBtn" aria-label="Verversen" title="Verversen" style="height:36px; width:36px; padding:0; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; line-height:1; cursor:pointer;"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg></button>
-            <button type="button" id="leadDatabaseCancelBtn" style="height:34px; padding:0 11px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Sluiten</button>
-          </div>
-        </div>
-        <div id="leadDatabaseModalBody" style="flex:1; min-height:0; overflow:auto; padding:12px;">
-          <div id="leadDatabaseStatusBar" style="display:none; margin-bottom:8px; padding:8px 10px; border-radius:6px; font-size:12px;"></div>
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
-            <input type="search" id="leadDatabaseSearchInput" class="form-input magnetic" placeholder="Zoek bedrijf of nummer..." style="max-width:420px; height:34px;">
-            <button type="button" id="leadDatabaseImportBtn" style="height:34px; padding:0 11px; border-radius:6px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Upload</button>
-            <button type="button" id="leadDatabaseAddManualBtn" style="height:34px; padding:0 11px; border-radius:6px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Handmatig toevoegen</button>
-            <button type="button" id="leadDatabaseTemplateBtn" style="height:34px; padding:0 11px; border-radius:6px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Template download</button>
-            <input type="file" id="leadDatabaseImportInput" accept=".csv,.tsv,.txt,.json,.xls,.xlsx" style="display:none;">
-          </div>
-          <div id="leadDatabaseSummaryCards" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; margin-bottom:10px;"></div>
-          <div id="leadDatabaseTableWrap" style="border:1px solid rgba(255,255,255,0.08); border-radius:8px; overflow:auto; min-height:180px;"></div>
-        </div>
-        <div id="leadDatabaseCallDetailOverlay" style="position:fixed; inset:0; z-index:10010; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(0,0,0,0.55);">
-          <div id="leadDatabaseCallDetailCard" style="width:min(820px, 100%); max-height:min(86vh, 920px); overflow:auto; border-radius:12px; border:1px solid rgba(255,255,255,0.14); background:rgba(20,20,30,0.96); box-shadow:0 24px 80px rgba(0,0,0,0.45);">
-            <div id="leadDatabaseCallDetailHeader" style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.1);">
-              <div>
-                <div id="leadDatabaseCallDetailTitle" style="font-family:Oswald,sans-serif; font-size:24px; line-height:1.1; letter-spacing:0.03em; text-transform:uppercase;">Telefoongesprek</div>
-                <div id="leadDatabaseCallDetailMeta" style="margin-top:6px; font-size:12px; opacity:0.85;"></div>
-              </div>
-              <button type="button" id="leadDatabaseCallDetailCloseBtn" style="height:34px; padding:0 12px; border-radius:8px; font-family:Oswald,sans-serif; letter-spacing:0.06em; text-transform:uppercase; font-size:12px; cursor:pointer;">Sluiten</button>
+
+          <div class="lead-db-toolbar">
+            <div class="lead-db-toolbar-left">
+              <div id="leadDatabaseRefreshInfo" class="lead-db-refresh-info">Nog niet ververst</div>
+              <button type="button" id="leadDatabaseRefreshBtn" class="lead-db-btn" aria-label="Verversen" title="Verversen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"></path>
+                </svg>
+                Verversen
+              </button>
             </div>
-            <div id="leadDatabaseCallDetailBody" style="padding:16px;">
+            <div class="lead-db-toolbar-right">
+              <button type="button" id="leadDatabaseTemplateBtn" class="lead-db-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Template download
+              </button>
+              <button type="button" id="leadDatabaseAddManualBtn" class="lead-db-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Handmatig toevoegen
+              </button>
+              <button type="button" id="leadDatabaseImportBtn" class="lead-db-btn lead-db-btn--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Upload
+              </button>
+              <button type="button" id="leadDatabaseCancelBtn" class="lead-db-btn">Sluiten</button>
+              <input type="file" id="leadDatabaseImportInput" accept=".csv,.tsv,.txt,.json,.xls,.xlsx" style="display:none;">
+            </div>
+          </div>
+
+          <div id="leadDatabaseStatusBar" class="lead-db-status" aria-live="polite"></div>
+
+          <div id="leadDatabaseSummaryCards" class="lead-db-stats"></div>
+
+          <div class="lead-db-filter-bar">
+            <div id="leadDatabaseFilterPills" class="lead-db-filter-pills"></div>
+            <div class="lead-db-search-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="search" id="leadDatabaseSearchInput" placeholder="Zoek bedrijf of nummer...">
+            </div>
+          </div>
+
+          <div class="lead-db-table-card">
+            <div id="leadDatabaseTableWrap" class="lead-db-table-wrap"></div>
+          </div>
+        </div>
+
+        <div id="leadDatabaseCallDetailOverlay">
+          <div id="leadDatabaseCallDetailCard">
+            <div id="leadDatabaseCallDetailHeader">
+              <div>
+                <div id="leadDatabaseCallDetailTitle">Telefoongesprek</div>
+                <div id="leadDatabaseCallDetailMeta"></div>
+              </div>
+              <button type="button" id="leadDatabaseCallDetailCloseBtn">Sluiten</button>
+            </div>
+            <div id="leadDatabaseCallDetailBody">
               <div style="margin-bottom:16px;">
-                <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; opacity:0.75; margin-bottom:8px;">Samenvatting</div>
-                <div id="leadDatabaseCallDetailSummary" style="font-size:14px; line-height:1.75;"></div>
+                <div class="lead-db-detail-label">Samenvatting</div>
+                <div id="leadDatabaseCallDetailSummary"></div>
               </div>
               <div>
-                <div style="font-family:Oswald,sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; opacity:0.75; margin-bottom:8px;">Gesprek terugluisteren</div>
-                <audio id="leadDatabaseCallDetailAudio" controls preload="metadata" style="width:100%; color-scheme:dark;"></audio>
+                <div class="lead-db-detail-label">Gesprek terugluisteren</div>
+                <audio id="leadDatabaseCallDetailAudio" controls preload="metadata"></audio>
               </div>
             </div>
           </div>
         </div>
-        <div id="leadDatabaseModalFooter" style="min-height:38px; display:flex; align-items:center; justify-content:flex-end; padding:0 14px; font-size:11px;">
-          <div style="font-family:Oswald,sans-serif; letter-spacing:0.12em; text-transform:uppercase;">Softora.nl</div>
-        </div>
+
+        <div class="lead-db-footer">Softora.nl</div>
       </div>
     `;
 
     document.body.appendChild(modal);
 
     function applyTheme() {
-      const theme = getConversationThemeTokens();
-      modal.style.background = theme.overlay;
+      modal.style.background = 'rgba(0, 0, 0, 0.08)';
       const shell = byId('leadDatabaseModalShell');
-      const header = byId('leadDatabaseModalHeader');
-      const body = byId('leadDatabaseModalBody');
-      const footer = byId('leadDatabaseModalFooter');
       const hint = byId('leadDatabaseHeaderHint');
-      const refreshBtn = byId('leadDatabaseRefreshBtn');
-      const importBtn = byId('leadDatabaseImportBtn');
-      const addManualBtn = byId('leadDatabaseAddManualBtn');
-      const templateBtn = byId('leadDatabaseTemplateBtn');
-      const cancelBtn = byId('leadDatabaseCancelBtn');
-      const statusBar = byId('leadDatabaseStatusBar');
       const detailOverlay = byId('leadDatabaseCallDetailOverlay');
       const detailCard = byId('leadDatabaseCallDetailCard');
       const detailHeader = byId('leadDatabaseCallDetailHeader');
@@ -4532,56 +5202,28 @@
       const detailCloseBtn = byId('leadDatabaseCallDetailCloseBtn');
 
       if (shell) {
-        shell.style.background = theme.shellBg;
-        shell.style.color = theme.text;
+        shell.style.background = '#f0ede8';
+        shell.style.color = '#1a1a2e';
       }
-      if (header) {
-        header.style.background = theme.chromeBg;
-        header.style.borderBottom = `1px solid ${theme.border}`;
-      }
-      if (body) {
-        body.style.background = theme.panelBg;
-      }
-      if (footer) {
-        footer.style.background = theme.chromeBg;
-        footer.style.borderTop = `1px solid ${theme.border}`;
-        footer.style.color = theme.accent;
-      }
-      if (hint) hint.style.color = theme.textMuted;
-      [refreshBtn, importBtn, addManualBtn, templateBtn].forEach((button) => {
-        if (!button) return;
-        button.style.border = `1px solid ${theme.buttonBorder}`;
-        button.style.background = theme.buttonBg;
-        button.style.color = theme.buttonText;
-      });
-      if (cancelBtn) {
-        cancelBtn.style.border = `1px solid ${theme.buttonBorder}`;
-        cancelBtn.style.background = 'transparent';
-        cancelBtn.style.color = theme.buttonMutedText;
-      }
-      if (statusBar) {
-        statusBar.style.border = `1px solid ${theme.border}`;
-        statusBar.style.background = theme.blockBg;
-        statusBar.style.color = theme.textMuted;
-      }
+      if (hint) hint.style.color = '#999999';
       if (detailOverlay) {
-        detailOverlay.style.background = getConversationThemeMode() === 'light' ? 'rgba(17,22,33,0.5)' : 'rgba(0,0,0,0.62)';
+        detailOverlay.style.background = 'rgba(0, 0, 0, 0.35)';
       }
       if (detailCard) {
-        detailCard.style.border = `1px solid ${theme.border}`;
-        detailCard.style.background = theme.shellBg;
-        detailCard.style.color = theme.text;
+        detailCard.style.border = '1px solid #e2ddd6';
+        detailCard.style.background = '#ffffff';
+        detailCard.style.color = '#1a1a2e';
       }
       if (detailHeader) {
-        detailHeader.style.borderBottom = `1px solid ${theme.border}`;
-        detailHeader.style.background = theme.chromeBg;
+        detailHeader.style.borderBottom = '1px solid #e2ddd6';
+        detailHeader.style.background = '#f5f0eb';
       }
-      if (detailMeta) detailMeta.style.color = theme.textMuted;
-      if (detailSummary) detailSummary.style.color = theme.text;
+      if (detailMeta) detailMeta.style.color = '#999999';
+      if (detailSummary) detailSummary.style.color = '#1a1a2e';
       if (detailCloseBtn) {
-        detailCloseBtn.style.border = `1px solid ${theme.buttonBorder}`;
-        detailCloseBtn.style.background = 'transparent';
-        detailCloseBtn.style.color = theme.buttonMutedText;
+        detailCloseBtn.style.border = '1px solid #e2ddd6';
+        detailCloseBtn.style.background = '#ffffff';
+        detailCloseBtn.style.color = '#555555';
       }
     }
 
@@ -4945,7 +5587,7 @@
       detailTitle.textContent = company;
       detailMeta.textContent = metaLine;
       detailSummary.textContent = summaryText || 'Nog geen samenvatting beschikbaar.';
-      detailAudio.style.colorScheme = getConversationThemeMode();
+      detailAudio.style.colorScheme = 'light';
       detailAudio.src = recordingUrl;
       detailAudio.load();
       detailOverlay.style.display = 'flex';
@@ -4963,30 +5605,44 @@
     }
 
     function render() {
-      const theme = getConversationThemeTokens();
       const tableWrap = byId('leadDatabaseTableWrap');
       const statusBar = byId('leadDatabaseStatusBar');
       const summaryCards = byId('leadDatabaseSummaryCards');
+      const filterPills = byId('leadDatabaseFilterPills');
+      const refreshInfo = byId('leadDatabaseRefreshInfo');
       const refreshBtn = byId('leadDatabaseRefreshBtn');
       const importBtn = byId('leadDatabaseImportBtn');
       const addManualBtn = byId('leadDatabaseAddManualBtn');
-      if (!tableWrap || !summaryCards || !statusBar) return;
+      const templateBtn = byId('leadDatabaseTemplateBtn');
+      const closeBtn = byId('leadDatabaseCancelBtn');
+      if (!tableWrap || !summaryCards || !filterPills || !statusBar) return;
+
+      const busy = state.importing || state.loading;
+      if (refreshInfo) {
+        refreshInfo.textContent = state.lastRefreshedAt
+          ? `Verversd om ${new Date(state.lastRefreshedAt).toLocaleTimeString('nl-NL', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}`
+          : state.loading
+            ? 'Database laden...'
+            : 'Nog niet ververst';
+      }
 
       if (refreshBtn) {
-        refreshBtn.style.opacity = state.loading ? '0.7' : '1';
-        refreshBtn.style.cursor = state.loading ? 'progress' : 'pointer';
+        refreshBtn.disabled = state.loading;
       }
       if (importBtn) {
-        const busy = state.importing || state.loading;
         importBtn.disabled = busy;
-        importBtn.style.opacity = busy ? '0.7' : '1';
-        importBtn.style.cursor = busy ? 'progress' : 'pointer';
       }
       if (addManualBtn) {
-        const busy = state.importing || state.loading;
         addManualBtn.disabled = busy;
-        addManualBtn.style.opacity = busy ? '0.7' : '1';
-        addManualBtn.style.cursor = busy ? 'progress' : 'pointer';
+      }
+      if (templateBtn) {
+        templateBtn.disabled = state.loading;
+      }
+      if (closeBtn) {
+        closeBtn.disabled = false;
       }
 
       const cards = getLeadDatabaseFilterCards(state.records, state.calls);
@@ -4994,30 +5650,19 @@
         state.filter = 'callback';
       }
       const filtered = getFilteredRecords();
+
       summaryCards.innerHTML = cards
-        .map(
-          (card) => {
-            const isActive = state.filter === card.key;
-            const isActueleBellijst = card.key === 'callback';
-            const borderColor = isActueleBellijst
-              ? isActive
-                ? '#2d8a5e'
-                : '#7ecfa8'
-              : isActive
-                ? theme.text
-                : theme.border;
-            return `
-            <button type="button" data-db-filter="${escapeHtml(card.key)}" style="text-align:left; border:2px solid ${borderColor}; background:${theme.blockBg}; border-radius:6px; padding:7px 9px; cursor:pointer;">
-              <div style="font-family:Oswald,sans-serif; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">${escapeHtml(
-                card.label
-              )}</div>
-              <div style="margin-top:4px; font-size:18px; line-height:1; color:${theme.text};">${escapeHtml(
-                String(card.count)
-              )}</div>
+        .map((card) => {
+          const isActive = state.filter === card.key;
+          return `
+            <button type="button" data-db-filter="${escapeHtml(card.key)}" class="lead-db-stat${
+              isActive ? ' is-active' : ''
+            }">
+              <div class="lead-db-stat-label">${escapeHtml(getLeadDatabaseUiLabel(card.key))}</div>
+              <div class="lead-db-stat-val">${escapeHtml(String(card.count))}</div>
             </button>
           `;
-          }
-        )
+        })
         .join('');
 
       summaryCards.querySelectorAll('[data-db-filter]').forEach((button) => {
@@ -5029,31 +5674,50 @@
         });
       });
 
+      filterPills.innerHTML = cards
+        .map((card) => {
+          const isActive = state.filter === card.key;
+          return `
+            <button type="button" data-db-pill-filter="${escapeHtml(card.key)}" class="lead-db-filter-pill${
+              isActive ? ' is-active' : ''
+            }">${escapeHtml(getLeadDatabaseUiLabel(card.key))}</button>
+          `;
+        })
+        .join('');
+
+      filterPills.querySelectorAll('[data-db-pill-filter]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const key = String(button.getAttribute('data-db-pill-filter') || 'all').trim();
+          state.filter = key || 'all';
+          closeCallDetail();
+          render();
+        });
+      });
+
       if (state.error) {
+        statusBar.hidden = false;
         statusBar.style.display = 'block';
-        statusBar.style.borderColor = 'rgba(255,99,99,0.25)';
-        statusBar.style.background = getConversationThemeMode() === 'light' ? '#ffe9ed' : 'rgba(255,99,99,0.14)';
-        statusBar.style.color = theme.text;
+        statusBar.className = 'lead-db-status lead-db-status--error';
         statusBar.textContent = state.error;
-      } else if (state.info) {
+      } else if (state.info && !/^Verversd om\b/i.test(String(state.info || ''))) {
+        statusBar.hidden = false;
         statusBar.style.display = 'block';
-        statusBar.style.borderColor = 'rgba(44,207,125,0.24)';
-        statusBar.style.background = getConversationThemeMode() === 'light' ? '#e3f6ea' : 'rgba(44,207,125,0.14)';
-        statusBar.style.color = theme.text;
+        statusBar.className = 'lead-db-status lead-db-status--info';
         statusBar.textContent = state.info;
       } else if (state.sourceErrors.length > 0) {
+        statusBar.hidden = false;
         statusBar.style.display = 'block';
-        statusBar.style.borderColor = theme.border;
-        statusBar.style.background = theme.blockBg;
-        statusBar.style.color = theme.textMuted;
+        statusBar.className = 'lead-db-status lead-db-status--muted';
         statusBar.textContent = state.sourceErrors.join(' ');
       } else {
+        statusBar.hidden = true;
         statusBar.style.display = 'none';
+        statusBar.className = 'lead-db-status';
         statusBar.textContent = '';
       }
 
       if (state.loading && state.records.length === 0) {
-        tableWrap.innerHTML = `<div style="padding:18px; color:${theme.textMuted};">Database laden...</div>`;
+        tableWrap.innerHTML = `<div class="lead-db-empty">Database laden...</div>`;
         return;
       }
 
@@ -5061,69 +5725,63 @@
         const calls = getFilteredCalls();
         const callIntentByCallId = buildCallIntentByCallId(state.records);
         if (calls.length === 0) {
-          tableWrap.innerHTML = `<div style="padding:18px; color:${theme.textMuted};">Geen telefoongesprekken gevonden.</div>`;
+          tableWrap.innerHTML = `<div class="lead-db-empty">Geen telefoongesprekken gevonden.</div>`;
           return;
         }
 
         tableWrap.innerHTML = `
-          <table style="width:100%; border-collapse:collapse; min-width:760px;">
-            <thead>
-              <tr>
-                <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Bedrijf</th>
-                <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Telefoon</th>
-                <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Status</th>
-                <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Duur</th>
-                <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Tijd</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div class="lead-db-table-head lead-db-table-head--calls">
+            <span>Bedrijf</span>
+            <span>Telefoon</span>
+            <span>Status</span>
+            <span>Duur</span>
+            <span>Tijd</span>
+          </div>
+          <div class="lead-db-table-body">
               ${calls
                 .map((call) => {
                   const company = normalizeFreeText(call?.company || call?.name || 'Onbekend');
+                  const avatar = company
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .map((part) => part[0] || '')
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase();
                   const phone = formatLeadDatabasePhone(normalizeFreeText(call?.phone || ''));
                   const intent = inferPhoneConversationIntent(call, callIntentByCallId);
-                  const isNegative = intent === 'geen_interesse';
-                  const isPositive = intent === 'interesse';
-                  const status = isNegative ? 'Geen interesse' : isPositive ? 'Interesse' : 'Geen duidelijke interesse';
-                  const statusBg = isNegative
-                    ? getConversationThemeMode() === 'light'
-                      ? '#ffe9ed'
-                      : 'rgba(255,99,99,0.14)'
-                    : isPositive
-                      ? getConversationThemeMode() === 'light'
-                        ? '#e3f6ea'
-                        : 'rgba(44,207,125,0.14)'
-                      : getConversationThemeMode() === 'light'
-                        ? '#eef1f6'
-                        : 'rgba(150,166,188,0.2)';
+                  const status =
+                    intent === 'geen_interesse'
+                      ? { label: 'Geen interesse', cls: 'lead-db-status-pill lead-db-status-pill--geen' }
+                      : intent === 'interesse'
+                        ? { label: 'Interesse', cls: 'lead-db-status-pill lead-db-status-pill--interesse' }
+                        : intent === 'outside_range'
+                          ? { label: 'Buiten bereik', cls: 'lead-db-status-pill lead-db-status-pill--buiten' }
+                          : { label: 'Actuele bellijst', cls: 'lead-db-status-pill lead-db-status-pill--belt' };
                   const duration = formatConversationDuration(call?.durationSeconds);
                   const updatedAt = normalizeFreeText(call?.updatedAt || '');
                   const callId = normalizeFreeText(call?.callId || '');
                   return `
-                    <tr data-db-call-open="${escapeHtml(callId)}" tabindex="0" role="button" aria-label="Open gesprek van ${escapeHtml(
+                    <div class="lead-db-row lead-db-row--calls" data-db-call-open="${escapeHtml(
+                      callId
+                    )}" tabindex="0" role="button" aria-label="Open gesprek van ${escapeHtml(
                       company
-                    )}" style="cursor:pointer;">
-                      <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:220px; font-size:13px; font-weight:600; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
-                        company
-                      )}">${escapeHtml(company)}</td>
-                      <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; font-size:13px; color:${theme.text}; white-space:nowrap;">${escapeHtml(
-                        phone || '-'
-                      )}</td>
-                      <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; white-space:nowrap;">
-                        <span style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; font-size:11px; background:${statusBg}; color:${theme.text};">${status}</span>
-                      </td>
-                      <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; font-size:12px; color:${theme.textMuted}; white-space:nowrap;">${escapeHtml(
-                        duration
-                      )}</td>
-                      <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; font-size:12px; color:${theme.textMuted}; white-space:nowrap;">${
+                    )}">
+                      <div class="lead-db-cell-bedrijf" title="${escapeHtml(company)}">
+                        <div class="lead-db-company-avatar">${escapeHtml(avatar || 'DB')}</div>
+                        <div class="lead-db-company-name">${escapeHtml(company)}</div>
+                      </div>
+                      <div class="lead-db-cell lead-db-cell--mono">${escapeHtml(phone || '-')}</div>
+                      <div class="lead-db-cell"><span class="${status.cls}">${escapeHtml(status.label)}</span></div>
+                      <div class="lead-db-cell lead-db-cell--mono">${escapeHtml(duration)}</div>
+                      <div class="lead-db-cell lead-db-cell--muted">${
                         updatedAt ? escapeHtml(formatConversationTimestamp(updatedAt)) : '-'
-                      }</td>
-                    </tr>
+                      }</div>
+                    </div>
                   `;
                 })
                 .join('')}
-            </tbody>
-          </table>
+          </div>
         `;
         tableWrap.querySelectorAll('[data-db-call-open]').forEach((row) => {
           const openRow = () => {
@@ -5143,7 +5801,7 @@
       }
 
       if (filtered.length === 0) {
-        tableWrap.innerHTML = `<div style="padding:18px; color:${theme.textMuted};">${
+        tableWrap.innerHTML = `<div class="lead-db-empty">${
           state.records.length === 0
             ? 'Nog geen leads met telefoonnummer in de database. Upload een document of gebruik "Handmatig toevoegen".'
             : 'Geen resultaten voor je zoekopdracht.'
@@ -5152,51 +5810,52 @@
       }
 
       tableWrap.innerHTML = `
-        <table style="width:100%; border-collapse:collapse; min-width:820px;">
-          <thead>
-            <tr>
-              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Bedrijf</th>
-              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Adres</th>
-              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Telefoonnummer</th>
-              <th style="position:sticky; top:0; z-index:2; text-align:left; padding:7px 8px; border-bottom:1px solid ${theme.border}; background:${theme.chromeBg}; font-family:Oswald,sans-serif; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:${theme.textMuted};">Website</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div class="lead-db-table-head lead-db-table-head--records">
+          <span>Bedrijf</span>
+          <span>Adres</span>
+          <span>Telefoonnummer</span>
+          <span>Website</span>
+        </div>
+        <div class="lead-db-table-body">
             ${filtered
               .map((record) => {
                 const company = record.company || 'Onbekend bedrijf';
+                const avatar = company
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .map((part) => part[0] || '')
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase();
                 const address = record.address || '-';
-                const phone = record.phone || '-';
+                const phone =
+                  formatLeadDatabasePhone(normalizeFreeText(record.phone || '')) ||
+                  normalizeFreeText(record.phone || '') ||
+                  '-';
                 const website = record.website || '';
                 const websiteHref = /^https?:\/\//i.test(website) ? website : `https://${website}`;
                 return `
-                  <tr>
-                    <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:220px; font-size:14px; font-weight:600; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
-                      company
-                    )}">${escapeHtml(company)}</td>
-                    <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:280px; font-size:13px; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
-                      address
-                    )}">${escapeHtml(address)}</td>
-                    <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; font-size:13px; color:${theme.text}; white-space:nowrap;">${escapeHtml(
-                      phone
-                    )}</td>
-                    <td style="padding:7px 8px; border-bottom:1px solid ${theme.border}; vertical-align:middle; max-width:220px; font-size:13px; color:${theme.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(
-                      website || '-'
-                    )}">${
+                  <div class="lead-db-row lead-db-row--records">
+                    <div class="lead-db-cell-bedrijf" title="${escapeHtml(company)}">
+                      <div class="lead-db-company-avatar">${escapeHtml(avatar || 'DB')}</div>
+                      <div class="lead-db-company-name">${escapeHtml(company)}</div>
+                    </div>
+                    <div class="lead-db-cell" title="${escapeHtml(address)}">${escapeHtml(address)}</div>
+                    <div class="lead-db-cell lead-db-cell--mono">${escapeHtml(phone)}</div>
+                    <div class="lead-db-cell" title="${escapeHtml(website || '-')}">${
                       website
                         ? `<a href="${escapeHtml(
                             websiteHref
-                          )}" target="_blank" rel="noopener noreferrer" style="color:${theme.text}; text-decoration:underline; text-underline-offset:2px;">${escapeHtml(
+                          )}" target="_blank" rel="noopener noreferrer" style="color:#1a1a2e; text-decoration:underline; text-underline-offset:2px;">${escapeHtml(
                             website
                           )}</a>`
                         : '-'
-                    }</td>
-                  </tr>
+                    }</div>
+                  </div>
                 `;
               })
               .join('')}
-          </tbody>
-        </table>
+        </div>
       `;
 
     }
