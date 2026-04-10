@@ -5208,11 +5208,9 @@
       render();
       try {
         const result = await promptAndSaveSingleManualLead();
-        if (!result?.ok) {
-          state.info = 'Geen handmatige lead toegevoegd.';
-        } else if (result.remoteSaved === false) {
+        if (result?.ok && result.remoteSaved === false) {
           state.info = 'Lead lokaal toegevoegd. Opslaan naar Supabase volgt zodra verbinding beschikbaar is.';
-        } else {
+        } else if (result?.ok) {
           state.info = 'Handmatige lead toegevoegd.';
         }
         await loadData(false);
