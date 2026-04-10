@@ -4229,7 +4229,7 @@
   function hasNegativePhoneConversationInterestSignal(value) {
     const text = normalizeSearchText(value);
     if (!text) return false;
-    return /(niet meer bellen|bel( me)? niet|geen interesse|niet geinteresseerd|niet geïnteresseerd|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst)/.test(
+    return /(niet meer bellen|bel( me)? niet|geen interesse|geen behoefte|niet geinteresseerd|niet geïnteresseerd|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst|geen prioriteit|geen tijd voor|zijn voorzien|al voorzien|tevreden met huidige partij)/.test(
       text
     );
   }
@@ -4237,7 +4237,31 @@
   function hasPositivePhoneConversationInterestSignal(value) {
     const text = normalizeSearchText(value);
     if (!text) return false;
-    return /(interesse|geinteresseerd|geïnteresseerd|afspraak|demo|offerte|stuur (de )?(mail|info)|mail .* (offerte|informatie)|terugbellen|callback)/.test(
+    return /(interesse|geinteresseerd|geïnteresseerd|afspraak|demo|offerte|voorstel|prijsopgave|kennismaking|stuur (de )?(offerte|informatie|info|voorstel)|mail .* (offerte|informatie|info|voorstel))/i.test(
+      text
+    );
+  }
+
+  function hasUnavailablePhoneConversationSignal(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return /(niet bereikbaar|buiten bereik|geen gehoor|geen antwoord|niet opgenomen|no answer|not reachable|onbereikbaar|voicemail|antwoordapparaat|busy|bezet|missed|not connected|not_connected|failed)/.test(
+      text
+    );
+  }
+
+  function hasAlertPhoneConversationSignal(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return /(boos|kwaad|agressief|woedend|dreig|klacht|escalat|terugbellen|callback|bel (me )?later|later terug|later opnieuw|op de app|via de app|whatsapp|whats app|stuur .* (app|whatsapp)|andere service|andere dienst|ander product|andere vraag|ander onderwerp)/.test(
+      text
+    );
+  }
+
+  function hasOtherPhoneConversationSignal(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return /(gaat (hier )?niet over|ga ik niet over|ben ik niet van|niet de juiste persoon|verkeerde persoon|verkeerd nummer|collega gaat hierover|ander contactpersoon|doorverbinden|doorverbonden|receptie|algemene mailbox|beslisser is er niet|eigenaar is er niet)/.test(
       text
     );
   }
@@ -4248,11 +4272,14 @@
     const callSpecificIntent = callId ? normalizeFreeText(callIntentByCallId?.get(callId) || '') : '';
 
     // Telefoongesprekken moeten het specifieke gesprek labelen, niet de huidige leadstatus op hetzelfde nummer.
+    if (hasAlertPhoneConversationSignal(text)) return 'alert';
+    if (hasUnavailablePhoneConversationSignal(text)) return 'outside_range';
     if (hasNegativePhoneConversationInterestSignal(text)) return 'geen_interesse';
     if (callSpecificIntent === 'geen_interesse') return 'geen_interesse';
     if (hasPositivePhoneConversationInterestSignal(text)) return 'interesse';
     if (callSpecificIntent === 'interesse') return 'interesse';
-    return 'onbekend';
+    if (hasOtherPhoneConversationSignal(text)) return 'overig';
+    return 'overig';
   }
 
   function buildCallIntentByCallId(records) {
@@ -4914,12 +4941,12 @@
           }
 
           #leadDatabaseModalShell .lead-db-status-pill--geen {
-            background: rgba(180, 90, 0, 0.1);
-            color: var(--lead-db-orange);
+            background: rgba(192, 57, 43, 0.1);
+            color: var(--lead-db-red);
           }
 
           #leadDatabaseModalShell .lead-db-status-pill--geen::before {
-            background: var(--lead-db-orange);
+            background: var(--lead-db-red);
           }
 
           #leadDatabaseModalShell .lead-db-status-pill--buiten {
@@ -4938,6 +4965,15 @@
 
           #leadDatabaseModalShell .lead-db-status-pill--belt::before {
             background: var(--lead-db-blue);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--alert {
+            background: rgba(180, 90, 0, 0.12);
+            color: var(--lead-db-orange);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--alert::before {
+            background: var(--lead-db-orange);
           }
 
           #leadDatabaseModalShell .lead-db-empty {
@@ -5708,9 +5744,11 @@
                       ? { label: 'Geen interesse', cls: 'lead-db-status-pill lead-db-status-pill--geen' }
                       : intent === 'interesse'
                         ? { label: 'Interesse', cls: 'lead-db-status-pill lead-db-status-pill--interesse' }
+                        : intent === 'alert'
+                          ? { label: 'Alert', cls: 'lead-db-status-pill lead-db-status-pill--alert' }
                         : intent === 'outside_range'
-                          ? { label: 'Buiten bereik', cls: 'lead-db-status-pill lead-db-status-pill--buiten' }
-                          : { label: 'Gebeld', cls: 'lead-db-status-pill lead-db-status-pill--belt' };
+                          ? { label: 'Niet bereikbaar', cls: 'lead-db-status-pill lead-db-status-pill--buiten' }
+                          : { label: 'Overig', cls: 'lead-db-status-pill lead-db-status-pill--belt' };
                   const duration = formatConversationDuration(call?.durationSeconds);
                   const occurredAt = normalizeFreeText(getConversationRecordOccurredAt(call));
                   const callId = normalizeFreeText(call?.callId || '');
