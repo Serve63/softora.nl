@@ -1157,7 +1157,7 @@
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
-            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v6';
+            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v7';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
             const leadDetailLoadPromiseById = Object.create(null);
@@ -1370,6 +1370,160 @@
                 return strongMatches >= 2 || (strongMatches >= 1 && mildMatches >= 3) || mildMatches >= 6;
             }
 
+            function looksLikeDirectSpeechSummary(value) {
+                const raw = sanitizeConversationCopy(value);
+                if (!raw) return false;
+                const lower = raw.toLowerCase();
+                if (/^(hallo|hoi|hey|goedemiddag|goedemorgen|goedenavond|met\s+\w+|ja[,\s]|nee[,\s]|oke?[,\s]|prima[,\s])/.test(lower)) {
+                    return true;
+                }
+                if (/\bje spreekt met\b|\bik bel je\b|\bkan ik\b|\bweet je wat we doen\b|\bik wil graag meteen\b/i.test(raw)) {
+                    return true;
+                }
+                const questionCount = (raw.match(/\?/g) || []).length;
+                const commaCount = (raw.match(/,/g) || []).length;
+                return questionCount >= 1 && commaCount >= 3 && raw.length >= 140;
+            }
+
+            function looksLikeAbruptSummary(value) {
+                const raw = sanitizeConversationCopy(value);
+                if (!raw) return false;
+                return /(\.\.\.|…)$/.test(raw);
+            }
+
+            function capitalizeLeadSentenceStart(value) {
+                const raw = String(value || '').trim();
+                if (!raw) return '';
+                return raw.charAt(0).toUpperCase() + raw.slice(1);
+            }
+
+            function buildLeadTranscriptFallbackSummary(lead, detail, interestedLead = null, update = null, insight = null) {
+                const sourceDetail = detail && typeof detail === 'object' ? detail : {};
+                const transcript = [
+                    sourceDetail?.transcript,
+                    sourceDetail?.transcriptSnippet,
+                    update?.transcriptFull,
+                    update?.transcriptSnippet,
+                    looksLikeTranscriptText(sourceDetail?.summary) || looksLikeDirectSpeechSummary(sourceDetail?.summary)
+                        ? sourceDetail?.summary
+                        : '',
+                    looksLikeTranscriptText(update?.summary) || looksLikeDirectSpeechSummary(update?.summary)
+                        ? update?.summary
+                        : '',
+                    looksLikeTranscriptText(lead?.summary) || looksLikeDirectSpeechSummary(lead?.summary)
+                        ? lead?.summary
+                        : '',
+                ]
+                    .map((value) => String(value || '').trim())
+                    .filter(Boolean)
+                    .join('\n\n');
+
+                if (!transcript || transcript.length < 24) return '';
+
+                const company = String(
+                    lead?.company || sourceDetail?.company || interestedLead?.company || insight?.company || insight?.leadCompany || ''
+                ).trim();
+                const contact = String(
+                    lead?.name || sourceDetail?.name || interestedLead?.contact || insight?.contactName || insight?.leadName || ''
+                ).trim();
+                const prospectReference = contact || (company ? `de contactpersoon van ${company}` : 'de prospect');
+                const prospectSubject = capitalizeLeadSentenceStart(prospectReference);
+                const websiteContext = /\bwebsite\b/i.test(transcript);
+                const outdatedWebsiteContext = /\b(verouderd|verouderde|oud|ouderwets|technische opbouw|design)\b/i.test(
+                    transcript
+                );
+                const hasAppointmentIntent = /\b(afspraak|inplannen|langskomen|langs komen|op kantoor)\b/i.test(
+                    transcript
+                );
+                const hasPositiveInterest =
+                    hasAppointmentIntent ||
+                    /\b(interesse|geinteresseerd|geïnteresseerd|open voor|klinkt goed|ja graag|prima|helemaal goed)\b/i.test(
+                        transcript
+                    );
+                const hasNoInterest = /\b(geen interesse|geen behoefte|niet nodig|hoeft niet|laat maar|we hebben al)\b/i.test(
+                    transcript
+                );
+                const hasCallbackRequest = /\b(later terug|terugbellen|terug bellen|bel later|volgende week|andere keer)\b/i.test(
+                    transcript
+                );
+                const hasWhatsappRequest = /\b(whatsapp|app(?:je)?|appen)\b/i.test(transcript);
+                const hasEmailRequest = /\b(e-mail|email|mail|offerte)\b/i.test(transcript);
+                const hasAlertSignal = /\b(boos|kwaad|woedend|geirriteerd|geïrriteerd|agressief|klacht)\b/i.test(
+                    transcript
+                );
+                const hasOtherServiceSignal = /\b(andere service|andere dienst|ander product|andere oplossing)\b/i.test(
+                    transcript
+                );
+
+                const appointmentDate = String(sourceDetail?.date || interestedLead?.date || lead?.date || '').trim();
+                const appointmentTime = normalizeTimeValue(sourceDetail?.time || interestedLead?.time || lead?.time || '');
+                const appointmentLocation = String(
+                    sourceDetail?.location || interestedLead?.location || lead?.location || ''
+                ).trim();
+                const appointmentParts = [];
+                if (appointmentDate) appointmentParts.push(`op ${appointmentDate}`);
+                if (appointmentTime) appointmentParts.push(`om ${appointmentTime}`);
+                if (appointmentLocation) appointmentParts.push(`bij ${appointmentLocation}`);
+                const appointmentLabel = appointmentParts.join(' ');
+
+                const sentences = [];
+                if (websiteContext && outdatedWebsiteContext) {
+                    sentences.push(
+                        `Ruben Nijhuis gaf aan dat de website ${company ? `van ${company}` : 'van de prospect'} verouderd oogt qua design en technische opbouw.`
+                    );
+                } else if (websiteContext) {
+                    sentences.push(`Ruben Nijhuis besprak de huidige website en mogelijke verbeteringen met ${prospectReference}.`);
+                } else {
+                    sentences.push(`Ruben Nijhuis voerde een inhoudelijk gesprek met ${prospectReference} over de huidige situatie en mogelijke vervolgstappen.`);
+                }
+
+                if (hasNoInterest) {
+                    sentences.push(`${prospectSubject} gaf aan op dit moment geen behoefte te hebben aan een vervolgstap.`);
+                } else if (hasAppointmentIntent) {
+                    sentences.push(
+                        `${prospectSubject} reageerde positief en wilde een afspraak inplannen${
+                            appointmentLabel ? ` ${appointmentLabel}` : ''
+                        }.`
+                    );
+                } else if (hasCallbackRequest) {
+                    sentences.push(`${prospectSubject} gaf aan dat later contact beter uitkomt.`);
+                } else if (hasPositiveInterest) {
+                    sentences.push(`${prospectSubject} gaf aan geïnteresseerd te zijn in een vervolgstap.`);
+                }
+
+                if (!hasNoInterest) {
+                    if (hasWhatsappRequest && hasEmailRequest) {
+                        sentences.push('Er is besproken dat aanvullende informatie via WhatsApp of e-mail gedeeld kan worden.');
+                    } else if (hasWhatsappRequest) {
+                        sentences.push('Er is besproken dat verdere informatie via WhatsApp gedeeld kan worden.');
+                    } else if (hasEmailRequest) {
+                        sentences.push('Er is besproken dat verdere informatie per e-mail gedeeld kan worden.');
+                    }
+
+                    if (hasOtherServiceSignal) {
+                        sentences.push(`${prospectSubject} stuurde het gesprek richting een andere dienst of aanvullende vraag.`);
+                    }
+                    if (hasAlertSignal) {
+                        sentences.push('Het gesprek vroeg om extra zorgvuldigheid door de toon of gevoeligheid van de situatie.');
+                    }
+
+                    if (hasAppointmentIntent) {
+                        sentences.push('De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen.');
+                    } else if (hasWhatsappRequest || hasEmailRequest) {
+                        sentences.push('De logische vervolgstap is om de gevraagde informatie via het afgesproken kanaal te delen.');
+                    } else if (hasCallbackRequest) {
+                        sentences.push('De logische vervolgstap is om op het gevraagde moment opnieuw contact op te nemen.');
+                    } else if (hasPositiveInterest) {
+                        sentences.push('De logische vervolgstap is om het gesprek inhoudelijk op te volgen.');
+                    }
+                }
+
+                const summary = Array.from(
+                    new Set(sentences.map((sentence) => sanitizeConversationCopy(sentence)).filter(Boolean))
+                ).join(' ');
+                return pickReadableSummary(summary) || sanitizeConversationCopy(summary);
+            }
+
             function pickReadableSummary(...candidates) {
                 for (const candidate of candidates) {
                     const raw = String(candidate || '').trim();
@@ -1380,6 +1534,8 @@
                     if (isGenericConversationPlaceholder(cleaned)) continue;
                     if (looksLikeAgendaConfirmationSummary(cleaned)) continue;
                     if (looksMixedLanguageSummary(cleaned)) continue;
+                    if (looksLikeDirectSpeechSummary(cleaned)) continue;
+                    if (looksLikeAbruptSummary(cleaned)) continue;
                     if (cleaned) return cleaned;
                 }
                 return '';
@@ -1476,10 +1632,10 @@
                     detail?.summary
                 );
                 if (readableSummary) return false;
+                const transcript = String(detail?.transcript || detail?.transcriptSnippet || '').trim();
+                if (transcript) return false;
                 return Boolean(
                     String(
-                        detail?.transcript ||
-                        detail?.transcriptSnippet ||
                         detail?.recordingUrl ||
                         detail?.recording_url ||
                         detail?.audioUrl ||
@@ -1560,7 +1716,9 @@
                     lead?.summary,
                     update?.transcriptFull
                 );
-                return looksLikeAgendaConfirmationSummary(preferred) ? '' : preferred || '';
+                if (preferred && !looksLikeAgendaConfirmationSummary(preferred)) return preferred;
+                const transcriptFallback = buildLeadTranscriptFallbackSummary(lead, null, interestedLead, update, insight);
+                return looksLikeAgendaConfirmationSummary(transcriptFallback) ? '' : transcriptFallback || '';
             }
 
             function getCallBackedModalFallbackSummaryFromDetail(lead, detail) {
@@ -1574,7 +1732,9 @@
                     lead?.summary,
                     detail?.transcript
                 );
-                return looksLikeAgendaConfirmationSummary(preferred) ? '' : preferred || '';
+                if (preferred && !looksLikeAgendaConfirmationSummary(preferred)) return preferred;
+                const transcriptFallback = buildLeadTranscriptFallbackSummary(lead, detail);
+                return looksLikeAgendaConfirmationSummary(transcriptFallback) ? '' : transcriptFallback || '';
             }
 
             function buildCallBackedLeadDetail(lead, interestedLead, update, insight) {
@@ -2058,7 +2218,12 @@
             function renderLeadDetailsInModal(lead, detail, taskId, options = {}) {
                 const id = Number(taskId || lead?.id || 0) || 0;
                 const aiCopy = id > 0 ? leadAiCopyById[String(id)] : null;
-                const preferredSummary = pickReadableSummary(options?.summaryText, detail?.conversationSummary);
+                const callBackedFallbackSummary = getCallBackedModalFallbackSummaryFromDetail(lead, detail || {});
+                const preferredSummary = pickReadableSummary(
+                    options?.summaryText,
+                    detail?.conversationSummary,
+                    callBackedFallbackSummary
+                );
                 const isCallBacked = hasCallBackedLead(lead) || Boolean(String(detail?.callId || '').trim());
 
                 const readableSummary = pickReadableSummary(
@@ -2067,7 +2232,8 @@
                     detail?.aiSummary,
                     detail?.transcriptSnippet,
                     detail?.summary,
-                    lead?.summary
+                    lead?.summary,
+                    callBackedFallbackSummary
                 );
                 const fallbackSummaryBase = !looksLikeAgendaConfirmationSummary(readableSummary) ? readableSummary : '';
                 const fallbackSummary =
@@ -2245,16 +2411,22 @@
                         : null;
                     if (openSeq !== modalOpenSequence) return;
                     const mergedDetail = mergeLeadModalDetailSources(callBackedDetail, taskDetail);
-                    const summaryText = isCallBackedLead || Boolean(resolveLeadCallId(recoveredLead, mergedDetail))
-                        ? await ensureCallBackedModalCopy(normalizedTaskId, recoveredLead, mergedDetail)
+                    const effectiveDetail = mergedDetail || taskDetail || callBackedDetail;
+                    const immediateSummary = isCallBackedLead || Boolean(resolveLeadCallId(recoveredLead, mergedDetail))
+                        ? getCallBackedModalFallbackSummaryFromDetail(recoveredLead, effectiveDetail)
                         : '';
-                    if (openSeq !== modalOpenSequence) return;
-                    renderLeadDetailsInModal(recoveredLead, mergedDetail || taskDetail || callBackedDetail, normalizedTaskId, { summaryText });
-                    await ensureMinimumLoader(summaryText ? 500 : 250);
+                    renderLeadDetailsInModal(recoveredLead, effectiveDetail, normalizedTaskId, { summaryText: immediateSummary });
+                    await ensureMinimumLoader(immediateSummary ? 300 : 250);
                     if (openSeq !== modalOpenSequence) return;
                     setModalLoading(false);
                     setModalBusy(false);
                     setModalStatus('');
+                    if (isCallBackedLead || Boolean(resolveLeadCallId(recoveredLead, mergedDetail))) {
+                        void ensureCallBackedModalCopy(normalizedTaskId, recoveredLead, effectiveDetail).then((summaryText) => {
+                            if (openSeq !== modalOpenSequence || activeTaskId !== normalizedTaskId) return;
+                            renderLeadDetailsInModal(recoveredLead, effectiveDetail, normalizedTaskId, { summaryText });
+                        });
+                    }
                     return;
                 }
 
@@ -2316,21 +2488,30 @@
                         delete leadAiCopyById[String(normalizedTaskId)];
                         const callBackedDetail = (await ensureCallBackedLeadDetail(normalizedTaskId, recoveredLead)) || detail;
                         if (openSeq !== modalOpenSequence) return;
-                        const summaryText = await ensureCallBackedModalCopy(
-                            normalizedTaskId,
+                        const effectiveDetail = callBackedDetail || detail;
+                        const immediateSummary = getCallBackedModalFallbackSummaryFromDetail(
                             recoveredLead,
-                            callBackedDetail
+                            effectiveDetail
                         );
-                        if (openSeq !== modalOpenSequence) return;
 
-                        renderLeadDetailsInModal(recoveredLead, callBackedDetail || detail, normalizedTaskId, {
-                            summaryText,
+                        renderLeadDetailsInModal(recoveredLead, effectiveDetail, normalizedTaskId, {
+                            summaryText: immediateSummary,
                         });
-                        await ensureMinimumLoader(summaryText ? 500 : 250);
+                        await ensureMinimumLoader(immediateSummary ? 300 : 250);
                         if (openSeq !== modalOpenSequence) return;
                         setModalLoading(false);
                         setModalBusy(false);
                         setModalStatus('');
+                        void ensureCallBackedModalCopy(
+                            normalizedTaskId,
+                            recoveredLead,
+                            effectiveDetail
+                        ).then((summaryText) => {
+                            if (openSeq !== modalOpenSequence || activeTaskId !== normalizedTaskId) return;
+                            renderLeadDetailsInModal(recoveredLead, effectiveDetail, normalizedTaskId, {
+                                summaryText,
+                            });
+                        });
                         return;
                     }
 
