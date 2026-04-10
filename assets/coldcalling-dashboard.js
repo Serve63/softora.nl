@@ -5396,11 +5396,149 @@
         .join('\n\n');
     }
 
+    function capitalizeLeadDatabaseSentenceStart(value) {
+      const raw = normalizeFreeText(value || '');
+      if (!raw) return '';
+      return raw.charAt(0).toUpperCase() + raw.slice(1);
+    }
+
+    function buildLeadDatabaseTranscriptFallbackSummary(call, insight, interestedLead, remoteDetail = null) {
+      const transcript = [
+        remoteDetail?.transcript,
+        remoteDetail?.transcriptSnippet,
+        call?.transcriptFull,
+        call?.transcriptSnippet,
+        looksLikeConversationTranscript(call?.summary) || looksLikeDirectSpeechConversationSummary(call?.summary)
+          ? call?.summary
+          : '',
+        looksLikeConversationTranscript(remoteDetail?.summary) ||
+        looksLikeDirectSpeechConversationSummary(remoteDetail?.summary)
+          ? remoteDetail?.summary
+          : '',
+      ]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+        .join('\n\n');
+
+      if (!transcript || transcript.length < 24) return '';
+
+      const company = normalizeFreeText(
+        call?.company || interestedLead?.company || insight?.company || insight?.leadCompany || ''
+      );
+      const contact = normalizeFreeText(
+        call?.name || interestedLead?.contact || insight?.contactName || insight?.leadName || ''
+      );
+      const prospectReference = contact || (company ? `de contactpersoon van ${company}` : 'de prospect');
+      const prospectSubject = capitalizeLeadDatabaseSentenceStart(prospectReference);
+      const websiteContext = /\bwebsite\b/i.test(transcript);
+      const outdatedWebsiteContext = /\b(verouderd|verouderde|oud|ouderwets|technische opbouw|design)\b/i.test(
+        transcript
+      );
+      const hasAppointmentIntent = /\b(afspraak|inplannen|langskomen|langs komen|op kantoor)\b/i.test(
+        transcript
+      );
+      const hasPositiveInterest =
+        hasAppointmentIntent ||
+        /\b(interesse|geinteresseerd|geïnteresseerd|open voor|klinkt goed|ja graag|prima|helemaal goed)\b/i.test(
+          transcript
+        );
+      const hasNoInterest = /\b(geen interesse|geen behoefte|niet nodig|hoeft niet|laat maar|we hebben al)\b/i.test(
+        transcript
+      );
+      const hasCallbackRequest = /\b(later terug|terugbellen|terug bellen|bel later|volgende week|andere keer)\b/i.test(
+        transcript
+      );
+      const hasWhatsappRequest = /\b(whatsapp|app(?:je)?|appen)\b/i.test(transcript);
+      const hasEmailRequest = /\b(e-mail|email|mail|offerte)\b/i.test(transcript);
+      const hasAlertSignal = /\b(boos|kwaad|woedend|geirriteerd|geïrriteerd|agressief|klacht)\b/i.test(
+        transcript
+      );
+      const hasOtherServiceSignal = /\b(andere service|andere dienst|ander product|andere oplossing)\b/i.test(
+        transcript
+      );
+
+      const appointmentDate = normalizeFreeText(interestedLead?.date || remoteDetail?.date || '');
+      const appointmentTime = normalizeFreeText(interestedLead?.time || remoteDetail?.time || '');
+      const appointmentLocation = normalizeFreeText(
+        interestedLead?.location || remoteDetail?.location || remoteDetail?.appointmentLocation || ''
+      );
+      const appointmentParts = [];
+      if (appointmentDate) appointmentParts.push(`op ${appointmentDate}`);
+      if (appointmentTime) appointmentParts.push(`om ${appointmentTime}`);
+      if (appointmentLocation) appointmentParts.push(`bij ${appointmentLocation}`);
+      const appointmentLabel = appointmentParts.join(' ');
+
+      const sentences = [];
+      if (websiteContext && outdatedWebsiteContext) {
+        sentences.push(
+          `Ruben Nijhuis gaf aan dat de website ${company ? `van ${company}` : 'van de prospect'} verouderd oogt qua design en technische opbouw.`
+        );
+      } else if (websiteContext) {
+        sentences.push(
+          `Ruben Nijhuis besprak de huidige website en mogelijke verbeteringen met ${prospectReference}.`
+        );
+      } else {
+        sentences.push(
+          `Ruben Nijhuis voerde een inhoudelijk gesprek met ${prospectReference} over de huidige situatie en mogelijke vervolgstappen.`
+        );
+      }
+
+      if (hasNoInterest) {
+        sentences.push(`${prospectSubject} gaf aan op dit moment geen behoefte te hebben aan een vervolgstap.`);
+      } else if (hasAppointmentIntent) {
+        sentences.push(
+          `${prospectSubject} reageerde positief en wilde een afspraak inplannen${
+            appointmentLabel ? ` ${appointmentLabel}` : ''
+          }.`
+        );
+      } else if (hasCallbackRequest) {
+        sentences.push(`${prospectSubject} gaf aan dat later contact beter uitkomt.`);
+      } else if (hasPositiveInterest) {
+        sentences.push(`${prospectSubject} gaf aan geïnteresseerd te zijn in een vervolgstap.`);
+      }
+
+      if (!hasNoInterest) {
+        if (hasWhatsappRequest && hasEmailRequest) {
+          sentences.push('Er is besproken dat aanvullende informatie via WhatsApp of e-mail gedeeld kan worden.');
+        } else if (hasWhatsappRequest) {
+          sentences.push('Er is besproken dat verdere informatie via WhatsApp gedeeld kan worden.');
+        } else if (hasEmailRequest) {
+          sentences.push('Er is besproken dat verdere informatie per e-mail gedeeld kan worden.');
+        }
+
+        if (hasOtherServiceSignal) {
+          sentences.push(`${prospectSubject} stuurde het gesprek richting een andere dienst of aanvullende vraag.`);
+        }
+        if (hasAlertSignal) {
+          sentences.push('Het gesprek vroeg om extra zorgvuldigheid door de toon of gevoeligheid van de situatie.');
+        }
+
+        if (hasAppointmentIntent) {
+          sentences.push('De logische vervolgstap is om de afspraak te bevestigen en intern op te volgen.');
+        } else if (hasWhatsappRequest || hasEmailRequest) {
+          sentences.push('De logische vervolgstap is om de gevraagde informatie via het afgesproken kanaal te delen.');
+        } else if (hasCallbackRequest) {
+          sentences.push('De logische vervolgstap is om op het gevraagde moment opnieuw contact op te nemen.');
+        } else if (hasPositiveInterest) {
+          sentences.push('De logische vervolgstap is om het gesprek inhoudelijk op te volgen.');
+        }
+      }
+
+      const summary = Array.from(
+        new Set(sentences.map((sentence) => sanitizeConversationSummaryCopy(sentence)).filter(Boolean))
+      ).join(' ');
+      return pickReadableConversationSummary(summary) || sanitizeConversationSummaryCopy(summary);
+    }
+
     function getLeadDatabaseCallSummaryFallback(call, insight, interestedLead) {
       const normalizedCallId = normalizeFreeText(call?.callId || '');
+      const cachedDetail = callDetailPayloadByCallId.get(normalizedCallId) || null;
       const cachedSummary = pickReadableConversationSummary(
         callDetailSummaryByCallId.get(normalizedCallId),
         getSharedCallSummary(normalizedCallId),
+        cachedDetail?.summary,
+        cachedDetail?.callSummary,
+        cachedDetail?.aiSummary,
         call?.summary,
         insight?.summary,
         interestedLead?.summary
@@ -5412,6 +5550,13 @@
         interestedLead?.summary
       );
       if (readableSummary && !looksLikeAgendaConfirmationSummary(readableSummary)) return readableSummary;
+      const transcriptFallback = buildLeadDatabaseTranscriptFallbackSummary(
+        call,
+        insight,
+        interestedLead,
+        cachedDetail
+      );
+      if (transcriptFallback && !looksLikeAgendaConfirmationSummary(transcriptFallback)) return transcriptFallback;
       return '';
     }
 
@@ -5473,16 +5618,10 @@
         detail?.conversationSummary
       );
       if (readableSummary) return false;
+      const transcript = normalizeFreeText(detail?.transcript || detail?.transcriptSnippet || '');
+      if (transcript) return false;
       return Boolean(
-        normalizeFreeText(
-          detail?.transcript ||
-            detail?.transcriptSnippet ||
-            detail?.recordingUrl ||
-            detail?.recording_url ||
-            detail?.audioUrl ||
-            detail?.audio_url ||
-            ''
-        )
+        normalizeFreeText(detail?.recordingUrl || detail?.recording_url || detail?.audioUrl || detail?.audio_url || '')
       );
     }
 
@@ -5552,6 +5691,18 @@
         callDetailSummaryByCallId.set(normalizedCallId, remoteSummary);
         setSharedCallSummary(normalizedCallId, remoteSummary);
         return remoteSummary;
+      }
+
+      const remoteTranscriptFallback = buildLeadDatabaseTranscriptFallbackSummary(
+        call,
+        insight,
+        interestedLead,
+        remoteDetail
+      );
+      if (remoteTranscriptFallback && !looksLikeAgendaConfirmationSummary(remoteTranscriptFallback)) {
+        callDetailSummaryByCallId.set(normalizedCallId, remoteTranscriptFallback);
+        setSharedCallSummary(normalizedCallId, remoteTranscriptFallback);
+        return remoteTranscriptFallback;
       }
 
       const sharedSummary = getSharedCallSummary(normalizedCallId);
@@ -5658,10 +5809,12 @@
         .filter(Boolean)
         .join(' · ');
       const recordingUrl = getCallRecordingUrl(call);
+      const immediateFallbackSummary = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
       const summaryText =
         pickReadableConversationSummary(
           callDetailSummaryByCallId.get(normalizedCallId),
-          getSharedCallSummary(normalizedCallId)
+          getSharedCallSummary(normalizedCallId),
+          immediateFallbackSummary
         ) || '';
 
       detailTitle.textContent = company;
@@ -5679,14 +5832,17 @@
       });
     }
 
-    async function openCallDetail(callId) {
+    function openCallDetail(callId) {
       state.detailCallId = normalizeFreeText(callId);
       const call = getCallDetailRecord(state.detailCallId);
       if (call) {
-        try {
-          await ensureLeadDatabaseCallSummary(call);
-        } catch (_error) {
-          // Render alsnog met de best beschikbare data.
+        const normalizedCallId = normalizeFreeText(call?.callId || '');
+        const insight = getCallInsightRecord(normalizedCallId);
+        const interestedLead = getInterestedLeadRecord(normalizedCallId);
+        const immediateSummary = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
+        if (immediateSummary) {
+          callDetailSummaryByCallId.set(normalizedCallId, immediateSummary);
+          setSharedCallSummary(normalizedCallId, immediateSummary);
         }
       }
       renderCallDetail();
@@ -6042,7 +6198,7 @@
         if (force) {
           state.info = `Verversd om ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}.`;
         }
-        prewarmLeadDatabaseCallDetails(1);
+        prewarmLeadDatabaseCallDetails(4);
       } catch (error) {
         state.error = normalizeFreeText(error?.message || '') || 'Database kon niet geladen worden.';
       } finally {
