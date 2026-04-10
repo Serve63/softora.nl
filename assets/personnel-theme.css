@@ -924,46 +924,46 @@ button,
     margin: 0 !important;
 }
 
-/* Canonical dashboard shell across all premium sidebar routes */
+/* Canonical dashboard shell for premium sidebar routes that explicitly opt in */
 :root {
     --sidebar-shell-max-width: 1600px;
     --sidebar-shell-gap: 3rem;
 }
 
-.dashboard-layout > .main-content,
-.dashboard-layout > main.main-content,
-.dashboard-layout > .main,
-.dashboard-layout > main.main,
-.dashboard-layout > .page-shell,
-.dashboard-layout > main.page-shell {
+.dashboard-layout[data-sidebar-shell="canonical"] > .main-content,
+.dashboard-layout[data-sidebar-shell="canonical"] > main.main-content,
+.dashboard-layout[data-sidebar-shell="canonical"] > .main,
+.dashboard-layout[data-sidebar-shell="canonical"] > main.main,
+.dashboard-layout[data-sidebar-shell="canonical"] > .page-shell,
+.dashboard-layout[data-sidebar-shell="canonical"] > main.page-shell {
     min-width: 0 !important;
 }
 
-.dashboard-layout > .main-content,
-.dashboard-layout > main.main-content,
-.dashboard-layout > .main,
-.dashboard-layout > main.main {
+.dashboard-layout[data-sidebar-shell="canonical"] > .main-content,
+.dashboard-layout[data-sidebar-shell="canonical"] > main.main-content,
+.dashboard-layout[data-sidebar-shell="canonical"] > .main,
+.dashboard-layout[data-sidebar-shell="canonical"] > main.main {
     width: calc(100% - 280px) !important;
     min-height: 100vh !important;
     padding: 3rem 3rem 1.8rem !important;
 }
 
-.dashboard-layout > .page-shell,
-.dashboard-layout > main.page-shell {
+.dashboard-layout[data-sidebar-shell="canonical"] > .page-shell,
+.dashboard-layout[data-sidebar-shell="canonical"] > main.page-shell {
     width: calc(100% - 280px) !important;
     min-height: 100vh !important;
     padding: 3rem 3rem 1.8rem !important;
 }
 
-.dashboard-layout > :is(.main-content, main.main-content, .main, main.main) > :is(.page-content, .page-header, .topbar, .page-hero, .register-shell, .coming-shell, .screen, .notepad-shell),
-.dashboard-layout > :is(.page-shell, main.page-shell) > :is(.page-content, .page-header, .page-hero) {
+.dashboard-layout[data-sidebar-shell="canonical"] > :is(.main-content, main.main-content, .main, main.main) > :is(.page-content, .page-header, .topbar, .page-hero, .register-shell, .coming-shell, .screen, .notepad-shell),
+.dashboard-layout[data-sidebar-shell="canonical"] > :is(.page-shell, main.page-shell) > :is(.page-content, .page-header, .page-hero) {
     width: min(var(--sidebar-shell-max-width), 100%) !important;
     margin-left: auto !important;
     margin-right: auto !important;
 }
 
-.dashboard-layout > :is(.main-content, main.main-content, .main, main.main) > :is(.topbar, .page-header, .page-hero),
-.dashboard-layout > :is(.page-shell, main.page-shell) > :is(.page-header, .page-hero) {
+.dashboard-layout[data-sidebar-shell="canonical"] > :is(.main-content, main.main-content, .main, main.main) > :is(.topbar, .page-header, .page-hero),
+.dashboard-layout[data-sidebar-shell="canonical"] > :is(.page-shell, main.page-shell) > :is(.page-header, .page-hero) {
     display: flex !important;
     justify-content: space-between !important;
     align-items: flex-start !important;
@@ -971,23 +971,23 @@ button,
     margin-bottom: var(--sidebar-shell-gap) !important;
 }
 
-.dashboard-layout :is(.topbar-left, .topbar-copy, .page-header > div, .page-hero > div:first-child, .header > div, .reg-header > div, .notepad-shell > header, .hero, .coming-shell) {
+.dashboard-layout[data-sidebar-shell="canonical"] :is(.topbar-left, .topbar-copy, .page-header > div, .page-hero > div:first-child, .header > div, .reg-header > div, .notepad-shell > header, .hero, .coming-shell) {
     display: grid !important;
     gap: 0.3rem !important;
 }
 
-.dashboard-layout :is(.topbar-right, .topbar-actions) {
+.dashboard-layout[data-sidebar-shell="canonical"] :is(.topbar-right, .topbar-actions) {
     display: flex !important;
     align-items: center !important;
     gap: 1rem !important;
     flex-wrap: wrap !important;
 }
 
-.dashboard-layout :is(.page-content > .hero, .page-shell > .hero, .page-shell > .header, .notepad-shell > header, .reg-header, .coming-shell) {
+.dashboard-layout[data-sidebar-shell="canonical"] :is(.page-content > .hero, .page-shell > .hero, .page-shell > .header, .notepad-shell > header, .reg-header, .coming-shell) {
     margin-bottom: var(--sidebar-shell-gap) !important;
 }
 
-.dashboard-layout :is(.page-title, .hero-title, .reg-title, .coming-title, .costs-title, .beheer-title) {
+.dashboard-layout[data-sidebar-shell="canonical"] :is(.page-title, .hero-title, .reg-title, .coming-title, .costs-title, .beheer-title) {
     font-family: 'Oswald', sans-serif !important;
     font-size: var(--sidebar-page-title-size) !important;
     font-weight: 700 !important;
@@ -998,7 +998,7 @@ button,
     color: var(--text-primary) !important;
 }
 
-.dashboard-layout :is(.page-subtitle, .page-sub, .hero-text, .reg-sub, .coming-subtitle, .costs-subtitle, .beheer-subtitle) {
+.dashboard-layout[data-sidebar-shell="canonical"] :is(.page-subtitle, .page-sub, .hero-text, .reg-sub, .coming-subtitle, .costs-subtitle, .beheer-subtitle) {
     color: var(--text-tertiary) !important;
     font-size: var(--sidebar-page-subtitle-size) !important;
     font-weight: 300 !important;
@@ -1006,22 +1006,22 @@ button,
     margin: 0 !important;
 }
 
-.dashboard-layout :is(.page-shell, .main-content, .main, .screen.active) > :is(.page-title, .beheer-title) + :is(.page-subtitle, .page-sub, .beheer-subtitle) {
+.dashboard-layout[data-sidebar-shell="canonical"] :is(.page-shell, .main-content, .main, .screen.active) > :is(.page-title, .beheer-title) + :is(.page-subtitle, .page-sub, .beheer-subtitle) {
     margin-top: 0.3rem !important;
 }
 
-.dashboard-layout :is(.page-shell, .main-content, .main, .screen.active) > :is(.page-subtitle, .page-sub) {
+.dashboard-layout[data-sidebar-shell="canonical"] :is(.page-shell, .main-content, .main, .screen.active) > :is(.page-subtitle, .page-sub) {
     display: block !important;
     margin-bottom: var(--sidebar-shell-gap) !important;
 }
 
-.dashboard-layout .coming-shell {
+.dashboard-layout[data-sidebar-shell="canonical"] .coming-shell {
     align-content: start !important;
     justify-items: start !important;
     min-height: auto !important;
 }
 
-.dashboard-layout .coming-panel {
+.dashboard-layout[data-sidebar-shell="canonical"] .coming-panel {
     width: min(960px, 100%) !important;
     border: 1px solid var(--border) !important;
     background: var(--bg-secondary) !important;
@@ -1031,7 +1031,7 @@ button,
     gap: 0.3rem !important;
 }
 
-.dashboard-layout .coming-panel p {
+.dashboard-layout[data-sidebar-shell="canonical"] .coming-panel p {
     color: var(--text-tertiary) !important;
     font-size: var(--sidebar-page-subtitle-size) !important;
     line-height: 1.6 !important;
@@ -1039,22 +1039,22 @@ button,
 }
 
 @media (max-width: 900px) {
-    .dashboard-layout > .main-content,
-    .dashboard-layout > main.main-content,
-    .dashboard-layout > .main,
-    .dashboard-layout > main.main,
-    .dashboard-layout > .page-shell,
-    .dashboard-layout > main.page-shell {
+    .dashboard-layout[data-sidebar-shell="canonical"] > .main-content,
+    .dashboard-layout[data-sidebar-shell="canonical"] > main.main-content,
+    .dashboard-layout[data-sidebar-shell="canonical"] > .main,
+    .dashboard-layout[data-sidebar-shell="canonical"] > main.main,
+    .dashboard-layout[data-sidebar-shell="canonical"] > .page-shell,
+    .dashboard-layout[data-sidebar-shell="canonical"] > main.page-shell {
         width: 100% !important;
         padding: 1.5rem !important;
     }
 
-    .dashboard-layout :is(.topbar, .page-header, .page-hero, .reg-header) {
+    .dashboard-layout[data-sidebar-shell="canonical"] :is(.topbar, .page-header, .page-hero, .reg-header) {
         flex-direction: column !important;
         align-items: flex-start !important;
     }
 
-    .dashboard-layout :is(.topbar-right, .topbar-actions) {
+    .dashboard-layout[data-sidebar-shell="canonical"] :is(.topbar-right, .topbar-actions) {
         width: 100% !important;
     }
 }
