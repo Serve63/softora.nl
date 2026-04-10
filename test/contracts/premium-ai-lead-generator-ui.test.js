@@ -10,7 +10,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410e" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410f" defer><\/script>/);
   assert.match(
     pageSource,
     /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
@@ -45,6 +45,16 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.doesNotMatch(dashboardSource, /Voer telefoonnummer in \(NL formaat, bijv\. 0612345678 of \+31612345678\)\./);
   assert.doesNotMatch(dashboardSource, /Geen handmatige lead toegevoegd\./);
   assert.match(dashboardSource, /statusEl\.style\.margin = '14px 0 18px';/);
+  assert.match(dashboardSource, /\/api\/coldcalling\/call-detail\?callId=\$\{encodeURIComponent\(normalizedCallId\)\}/);
+  assert.match(
+    dashboardSource,
+    /function buildLeadDatabaseCallSummarySourceText\(call, insight, interestedLead\) \{[\s\S]*call\?\.transcriptFull[\s\S]*call\?\.summary[\s\S]*call\?\.transcriptSnippet[\s\S]*insight\?\.summary[\s\S]*interestedLead\?\.summary/
+  );
+  assert.doesNotMatch(
+    dashboardSource,
+    /function buildLeadDatabaseCallSummarySourceText\(call, insight, interestedLead\) \{[\s\S]*insight\?\.followUpReason[\s\S]*interestedLead\?\.whatsappInfo/
+  );
+  assert.match(dashboardSource, /bevestigingsmail sturen/);
   assert.match(dashboardSource, /function openLeadDatabaseFromCampaignControl\(\) \{[\s\S]*ensureLeadDatabaseModal\(\)[\s\S]*dbModal\.openLeadDatabaseModal\(\);/);
   assert.match(dashboardSource, /function bindLeadDatabaseOpenControl\(\) \{[\s\S]*window\.openLeadDatabaseModalFromCampaign = openLeadDatabaseFromCampaignControl;[\s\S]*button\.dataset\.dbOpenBound !== '1'/);
   assert.match(dashboardSource, /bindLeadDatabaseOpenControl\(\);\s*void bootstrapColdcallingUi\(\);/);

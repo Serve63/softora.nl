@@ -173,7 +173,7 @@
   function looksLikeAgendaConfirmationSummary(value) {
     const text = normalizeSearchText(value);
     if (!text) return false;
-    return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie)/.test(
+    return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie|bevestigingsmail sturen|stuur(?:\s+\w+){0,3}\s+bevestigingsmail|gedetecteerde afspraak|afspraakbevestiging|agenda-item)/.test(
       text
     );
   }
@@ -4399,6 +4399,8 @@
     };
     const callDetailSummaryByCallId = new Map();
     const callDetailSummaryPromiseByCallId = new Map();
+    const callDetailPayloadByCallId = new Map();
+    const callDetailPayloadPromiseByCallId = new Map();
 
     modal = document.createElement('div');
     modal.id = 'leadDatabaseModalOverlay';
@@ -4641,12 +4643,10 @@
         call?.summary,
         call?.transcriptSnippet,
         insight?.summary,
-        insight?.followUpReason,
         interestedLead?.summary,
-        interestedLead?.whatsappInfo,
       ]
         .map((value) => String(value || '').trim())
-        .filter(Boolean)
+        .filter((value) => value && !looksLikeAgendaConfirmationSummary(value))
         .join('\n\n');
     }
 
@@ -4656,11 +4656,42 @@
         insight?.summary,
         call?.transcriptSnippet,
         interestedLead?.summary,
-        insight?.followUpReason,
         call?.transcriptFull
       );
       if (readableSummary && !looksLikeAgendaConfirmationSummary(readableSummary)) return readableSummary;
       return 'Samenvatting volgt na verwerking van het gesprek.';
+    }
+
+    async function fetchLeadDatabaseCallDetailPayload(callId) {
+      const normalizedCallId = normalizeFreeText(callId);
+      if (!normalizedCallId) return null;
+      if (callDetailPayloadByCallId.has(normalizedCallId)) {
+        return callDetailPayloadByCallId.get(normalizedCallId) || null;
+      }
+      if (callDetailPayloadPromiseByCallId.has(normalizedCallId)) {
+        return callDetailPayloadPromiseByCallId.get(normalizedCallId);
+      }
+
+      const run = fetchWithTimeout(
+        `/api/coldcalling/call-detail?callId=${encodeURIComponent(normalizedCallId)}`,
+        { method: 'GET', cache: 'no-store' },
+        12000
+      )
+        .then(async (response) => {
+          const data = await parseApiResponse(response);
+          if (!response.ok || !data?.ok || !data?.detail || typeof data.detail !== 'object') {
+            return null;
+          }
+          callDetailPayloadByCallId.set(normalizedCallId, data.detail);
+          return data.detail;
+        })
+        .catch(() => null)
+        .finally(() => {
+          callDetailPayloadPromiseByCallId.delete(normalizedCallId);
+        });
+
+      callDetailPayloadPromiseByCallId.set(normalizedCallId, run);
+      return run;
     }
 
     async function ensureLeadDatabaseCallSummary(call) {
@@ -4672,13 +4703,27 @@
         callDetailSummaryByCallId.set(normalizedCallId, sharedSummary);
         return sharedSummary;
       }
+
+      const remoteDetail = await fetchLeadDatabaseCallDetailPayload(normalizedCallId);
+      const remoteSummary = pickReadableConversationSummary(
+        remoteDetail?.summary,
+        remoteDetail?.callSummary,
+        remoteDetail?.aiSummary,
+        remoteDetail?.transcriptSnippet,
+        remoteDetail?.transcript
+      );
+      if (remoteSummary && !looksLikeAgendaConfirmationSummary(remoteSummary)) {
+        callDetailSummaryByCallId.set(normalizedCallId, remoteSummary);
+        setSharedCallSummary(normalizedCallId, remoteSummary);
+        return remoteSummary;
+      }
+
       const fallbackSummary = getLeadDatabaseCallSummaryFallback(call, insight, interestedLead);
       const readableLeadSummary = pickReadableConversationSummary(
         call?.summary,
         insight?.summary,
         call?.transcriptSnippet,
-        interestedLead?.summary,
-        insight?.followUpReason
+        interestedLead?.summary
       );
       const leadSummaryLooksStrong =
         readableLeadSummary &&
@@ -5143,6 +5188,8 @@
         state.sourceErrors = Array.isArray(data.sourceErrors) ? data.sourceErrors : [];
         callDetailSummaryByCallId.clear();
         callDetailSummaryPromiseByCallId.clear();
+        callDetailPayloadByCallId.clear();
+        callDetailPayloadPromiseByCallId.clear();
         state.lastRefreshedAt = new Date().toISOString();
         if (force) {
           state.info = `Verversd om ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}.`;
