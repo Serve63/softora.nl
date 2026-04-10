@@ -4509,7 +4509,15 @@
           }
 
           #leadDatabaseModalShell .lead-db-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
             margin-bottom: 8px;
+          }
+
+          #leadDatabaseModalShell .lead-db-header-copy {
+            min-width: 0;
           }
 
           #leadDatabaseModalShell .lead-db-page-title {
@@ -4525,6 +4533,29 @@
             margin-top: 6px;
             font-size: 13px;
             color: var(--lead-db-text-light);
+          }
+
+          #leadDatabaseModalShell .lead-db-close-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            flex-shrink: 0;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 999px;
+            background: var(--lead-db-card);
+            color: var(--lead-db-text-mid);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+
+          #leadDatabaseModalShell .lead-db-close-btn:hover {
+            border-color: var(--lead-db-crimson);
+            color: var(--lead-db-crimson);
           }
 
           #leadDatabaseModalShell .lead-db-toolbar {
@@ -4684,7 +4715,7 @@
 
           #leadDatabaseModalShell .lead-db-search-wrap {
             position: relative;
-            margin-left: auto;
+            margin-left: 0;
           }
 
           #leadDatabaseModalShell .lead-db-search-wrap input {
@@ -5043,8 +5074,11 @@
       <div id="leadDatabaseModalShell">
         <div class="lead-db-page">
           <div class="lead-db-header">
-            <div class="lead-db-page-title">Database</div>
-            <div id="leadDatabaseHeaderHint" class="lead-db-page-sub">${escapeHtml(modeUi.dbHint)}</div>
+            <div class="lead-db-header-copy">
+              <div class="lead-db-page-title">Database</div>
+              <div id="leadDatabaseHeaderHint" class="lead-db-page-sub">${escapeHtml(modeUi.dbHint)}</div>
+            </div>
+            <button type="button" id="leadDatabaseCancelBtn" class="lead-db-close-btn" aria-label="Sluiten" title="Sluiten">×</button>
           </div>
 
           <div class="lead-db-toolbar">
@@ -5075,7 +5109,6 @@
                 </svg>
                 Upload
               </button>
-              <button type="button" id="leadDatabaseCancelBtn" class="lead-db-btn">Sluiten</button>
               <input type="file" id="leadDatabaseImportInput" accept=".csv,.tsv,.txt,.json,.xls,.xlsx" style="display:none;">
             </div>
           </div>

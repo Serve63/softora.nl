@@ -59,10 +59,12 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /<div class="lead-db-toolbar">[\s\S]*leadDatabaseRefreshInfo[\s\S]*leadDatabaseTemplateBtn[\s\S]*leadDatabaseAddManualBtn[\s\S]*leadDatabaseImportBtn/);
   assert.match(dashboardSource, /<div id="leadDatabaseSummaryCards" class="lead-db-stats"><\/div>/);
   assert.match(dashboardSource, /class="lead-db-table-card"/);
+  assert.match(dashboardSource, /<button type="button" id="leadDatabaseCancelBtn" class="lead-db-close-btn" aria-label="Sluiten" title="Sluiten">×<\/button>/);
   assert.doesNotMatch(dashboardSource, /<div class="lead-db-logo">Softora\.nl<\/div>/);
   assert.doesNotMatch(dashboardSource, /<div class="lead-db-footer">Softora\.nl<\/div>/);
   assert.doesNotMatch(dashboardSource, /id="leadDatabaseRefreshBtn"/);
   assert.doesNotMatch(dashboardSource, /id="leadDatabaseFilterPills"/);
+  assert.doesNotMatch(dashboardSource, /<button type="button" id="leadDatabaseCancelBtn" class="lead-db-btn">Sluiten<\/button>/);
   assert.match(
     dashboardSource,
     /function buildLeadDatabaseCallSummarySourceText\(call, insight, interestedLead, remoteDetail = null\) \{[\s\S]*remoteDetail\?\.transcript[\s\S]*call\?\.transcriptFull[\s\S]*remoteDetail\?\.summary[\s\S]*call\?\.summary[\s\S]*insight\?\.summary[\s\S]*interestedLead\?\.summary/
