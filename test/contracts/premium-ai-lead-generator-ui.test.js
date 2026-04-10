@@ -67,8 +67,10 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.doesNotMatch(dashboardSource, /<button type="button" id="leadDatabaseCancelBtn" class="lead-db-btn">Sluiten<\/button>/);
   assert.match(dashboardSource, /function hasAlertPhoneConversationSignal\(value\) \{/);
   assert.match(dashboardSource, /function hasOtherPhoneConversationSignal\(value\) \{/);
+  assert.match(dashboardSource, /function hasOutOfServicePhoneConversationSignal\(value\) \{/);
   assert.match(dashboardSource, /\{ label: 'Alert', cls: 'lead-db-status-pill lead-db-status-pill--alert' \}/);
-  assert.match(dashboardSource, /\{ label: 'Niet bereikbaar', cls: 'lead-db-status-pill lead-db-status-pill--buiten' \}/);
+  assert.match(dashboardSource, /\{ label: 'Buiten gebruik', cls: 'lead-db-status-pill lead-db-status-pill--buiten' \}/);
+  assert.match(dashboardSource, /\{ label: 'Niet bereikbaar', cls: 'lead-db-status-pill lead-db-status-pill--niet-bereikbaar' \}/);
   assert.match(dashboardSource, /\{ label: 'Overig', cls: 'lead-db-status-pill lead-db-status-pill--belt' \}/);
   assert.doesNotMatch(dashboardSource, /\{ label: 'Gebeld', cls: 'lead-db-status-pill lead-db-status-pill--belt' \}/);
   assert.doesNotMatch(dashboardSource, /\{ label: 'Actuele bellijst', cls: 'lead-db-status-pill lead-db-status-pill--belt' \}/);

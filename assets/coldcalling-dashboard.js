@@ -4245,7 +4245,15 @@
   function hasUnavailablePhoneConversationSignal(value) {
     const text = normalizeSearchText(value);
     if (!text) return false;
-    return /(niet bereikbaar|buiten bereik|geen gehoor|geen antwoord|niet opgenomen|no answer|not reachable|onbereikbaar|voicemail|antwoordapparaat|busy|bezet|missed|not connected|not_connected|failed)/.test(
+    return /(niet bereikbaar|buiten bereik|geen gehoor|geen antwoord|niet opgenomen|no answer|onbereikbaar|voicemail|antwoordapparaat|busy|bezet|missed)/.test(
+      text
+    );
+  }
+
+  function hasOutOfServicePhoneConversationSignal(value) {
+    const text = normalizeSearchText(value);
+    if (!text) return false;
+    return /(buiten gebruik|buiten[- ]?dienst|niet in gebruik|nummer niet in gebruik|niet aangesloten|not reachable|not connected|not_connected|failed|out of service|not in service|disconnected|number unavailable|ongeldig nummer|invalid number|nummer bestaat niet)/.test(
       text
     );
   }
@@ -4273,6 +4281,7 @@
 
     // Telefoongesprekken moeten het specifieke gesprek labelen, niet de huidige leadstatus op hetzelfde nummer.
     if (hasAlertPhoneConversationSignal(text)) return 'alert';
+    if (hasOutOfServicePhoneConversationSignal(text)) return 'out_of_service';
     if (hasUnavailablePhoneConversationSignal(text)) return 'outside_range';
     if (hasNegativePhoneConversationInterestSignal(text)) return 'geen_interesse';
     if (callSpecificIntent === 'geen_interesse') return 'geen_interesse';
@@ -4956,6 +4965,15 @@
 
           #leadDatabaseModalShell .lead-db-status-pill--buiten::before {
             background: var(--lead-db-crimson);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--niet-bereikbaar {
+            background: rgba(192, 57, 43, 0.08);
+            color: var(--lead-db-red);
+          }
+
+          #leadDatabaseModalShell .lead-db-status-pill--niet-bereikbaar::before {
+            background: var(--lead-db-red);
           }
 
           #leadDatabaseModalShell .lead-db-status-pill--belt {
@@ -5746,8 +5764,10 @@
                         ? { label: 'Interesse', cls: 'lead-db-status-pill lead-db-status-pill--interesse' }
                         : intent === 'alert'
                           ? { label: 'Alert', cls: 'lead-db-status-pill lead-db-status-pill--alert' }
+                        : intent === 'out_of_service'
+                          ? { label: 'Buiten gebruik', cls: 'lead-db-status-pill lead-db-status-pill--buiten' }
                         : intent === 'outside_range'
-                          ? { label: 'Niet bereikbaar', cls: 'lead-db-status-pill lead-db-status-pill--buiten' }
+                          ? { label: 'Niet bereikbaar', cls: 'lead-db-status-pill lead-db-status-pill--niet-bereikbaar' }
                           : { label: 'Overig', cls: 'lead-db-status-pill lead-db-status-pill--belt' };
                   const duration = formatConversationDuration(call?.durationSeconds);
                   const occurredAt = normalizeFreeText(getConversationRecordOccurredAt(call));
