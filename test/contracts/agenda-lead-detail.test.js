@@ -214,6 +214,47 @@ test('agenda lead detail service filters noisy summaries and keeps readable Dutc
   assert.equal(summary, 'we willen snel door met de nieuwe website.');
 });
 
+test('agenda lead detail service rewrites direct speech into a proper Dutch call note', async () => {
+  let summaryPayload = null;
+  const fixture = createFixture({
+    openAiApiKey: 'test-key',
+    generateTextSummaryWithAi: async (payload) => {
+      summaryPayload = payload;
+      return {
+        summary:
+          'De prospect gaf al snel aan geïnteresseerd te zijn in een vervolgafspraak over de website. Er is besproken dat Softora in een volgende stap de mogelijkheden toelicht.',
+      };
+    },
+  });
+
+  assert.equal(
+    fixture.service.pickReadableConversationSummaryForLeadDetail(
+      'Hallo, met Eric Boonaan. Hey, goedemiddag, je spreekt met Ruben Nijhuis van Softora, ik bel je even omdat...',
+      'De prospect gaf aan open te staan voor een vervolgafspraak.'
+    ),
+    'De prospect gaf aan open te staan voor een vervolgafspraak.'
+  );
+
+  const summary = await fixture.service.buildConversationSummaryForLeadDetail(
+    {
+      summary:
+        'Hallo, met Eric Boonaan. Hey, goedemiddag, je spreekt met Ruben Nijhuis van Softora, ik bel je even omdat...',
+      transcriptSnippet:
+        'Hallo, met Eric Boonaan. Hey, goedemiddag, je spreekt met Ruben Nijhuis van Softora, ik bel je even omdat de website verouderd oogt.',
+    },
+    {
+      summary: '',
+      followUpReason: 'Plan een afspraak.',
+    },
+    null,
+    'Hallo, met Eric Boonaan. Hey, goedemiddag, je spreekt met Ruben Nijhuis van Softora. De prospect geeft aan interesse te hebben in een afspraak.'
+  );
+
+  assert.match(summary, /prospect gaf al snel aan geïnteresseerd te zijn/i);
+  assert.match(summaryPayload?.extraInstructions || '', /Schrijf in de derde persoon/i);
+  assert.match(summaryPayload?.extraInstructions || '', /nooit met ellips of afgebroken tekst/i);
+});
+
 test('agenda lead detail service builds stable call-backed detail payloads', async () => {
   const fixture = createFixture({
     recentCallUpdates: [

@@ -68,7 +68,7 @@
   function openLeadDatabaseFromCampaignControl() {
     const dbModal = ensureLeadDatabaseModal();
     if (!dbModal || typeof dbModal.openLeadDatabaseModal !== 'function') return false;
-    dbModal.openLeadDatabaseModal();
+    void dbModal.openLeadDatabaseModal();
     return true;
   }
 
@@ -141,6 +141,27 @@
     return stripped.replace(/\s*\n+\s*/g, ' ').trim();
   }
 
+  function looksLikeDirectSpeechConversationSummary(value) {
+    const raw = sanitizeConversationSummaryCopy(value);
+    if (!raw) return false;
+    const lower = raw.toLowerCase();
+    if (/^(hallo|hoi|hey|goedemiddag|goedemorgen|goedenavond|met\s+\w+|ja[,\s]|nee[,\s]|oke?[,\s]|prima[,\s])/.test(lower)) {
+      return true;
+    }
+    if (/\bje spreekt met\b|\bik bel je\b|\bkan ik\b|\bweet je wat we doen\b|\bik wil graag meteen\b/i.test(raw)) {
+      return true;
+    }
+    const questionCount = (raw.match(/\?/g) || []).length;
+    const commaCount = (raw.match(/,/g) || []).length;
+    return questionCount >= 1 && commaCount >= 3 && raw.length >= 140;
+  }
+
+  function looksLikeAbruptConversationSummary(value) {
+    const raw = sanitizeConversationSummaryCopy(value);
+    if (!raw) return false;
+    return /(\.\.\.|…)$/.test(raw);
+  }
+
   function looksMixedLanguageConversationSummary(value) {
     const normalized = sanitizeConversationSummaryCopy(value).toLowerCase();
     if (!normalized) return false;
@@ -165,9 +186,16 @@
       if (isGenericConversationPlaceholder(cleaned)) continue;
       if (looksLikeAgendaConfirmationSummary(cleaned)) continue;
       if (looksMixedLanguageConversationSummary(cleaned)) continue;
+      if (looksLikeDirectSpeechConversationSummary(cleaned)) continue;
+      if (looksLikeAbruptConversationSummary(cleaned)) continue;
       if (cleaned) return cleaned;
     }
     return '';
+  }
+
+  function isAbortLikeLoadError(error) {
+    const text = normalizeSearchText(error?.message || error || '');
+    return /abort|aborted|signal is aborted/.test(text);
   }
 
   function looksLikeAgendaConfirmationSummary(value) {
@@ -4053,7 +4081,9 @@
         sourceErrors.push(`Call-updates niet geladen (${response.status}).`);
       }
     } catch (error) {
-      sourceErrors.push(`Call-updates niet geladen (${error?.message || 'onbekende fout'}).`);
+      if (!isAbortLikeLoadError(error)) {
+        sourceErrors.push(`Call-updates niet geladen (${error?.message || 'onbekende fout'}).`);
+      }
     }
 
     let insights = [];
@@ -4070,7 +4100,9 @@
         sourceErrors.push(`AI-insights niet geladen (${response.status}).`);
       }
     } catch (error) {
-      sourceErrors.push(`AI-insights niet geladen (${error?.message || 'onbekende fout'}).`);
+      if (!isAbortLikeLoadError(error)) {
+        sourceErrors.push(`AI-insights niet geladen (${error?.message || 'onbekende fout'}).`);
+      }
     }
 
     let interestedLeads = [];
@@ -4087,7 +4119,9 @@
         sourceErrors.push(`Interesse-leads niet geladen (${response.status}).`);
       }
     } catch (error) {
-      sourceErrors.push(`Interesse-leads niet geladen (${error?.message || 'onbekende fout'}).`);
+      if (!isAbortLikeLoadError(error)) {
+        sourceErrors.push(`Interesse-leads niet geladen (${error?.message || 'onbekende fout'}).`);
+      }
     }
 
     const scopedUpdates = filterCallLikeRowsForMode(updates, allowedPhoneKeys);
@@ -4401,6 +4435,7 @@
     const callDetailSummaryPromiseByCallId = new Map();
     const callDetailPayloadByCallId = new Map();
     const callDetailPayloadPromiseByCallId = new Map();
+    let leadDatabasePrewarmPromise = null;
 
     modal = document.createElement('div');
     modal.id = 'leadDatabaseModalOverlay';
@@ -4662,6 +4697,33 @@
       return 'Samenvatting volgt na verwerking van het gesprek.';
     }
 
+    function hasLeadDatabaseSnapshot() {
+      return (
+        Boolean(state.lastRefreshedAt) ||
+        (Array.isArray(state.records) && state.records.length > 0) ||
+        (Array.isArray(state.calls) && state.calls.length > 0)
+      );
+    }
+
+    function prewarmLeadDatabase(options = {}) {
+      const force = Boolean(options && options.force);
+      if (leadDatabasePrewarmPromise && !force) {
+        return leadDatabasePrewarmPromise;
+      }
+
+      leadDatabasePrewarmPromise = (async () => {
+        if (!remoteUiStateLoaded || remoteUiStateLoadingPromise) {
+          await loadRemoteUiState();
+        }
+        await loadData(false, force ? { force: true } : {});
+        return true;
+      })().finally(() => {
+        leadDatabasePrewarmPromise = null;
+      });
+
+      return leadDatabasePrewarmPromise;
+    }
+
     async function fetchLeadDatabaseCallDetailPayload(callId) {
       const normalizedCallId = normalizeFreeText(callId);
       if (!normalizedCallId) return null;
@@ -4756,7 +4818,7 @@
         style: 'medium',
         maxSentences: 4,
         extraInstructions:
-          'Schrijf uitsluitend in natuurlijk Nederlands. Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging. Benoem de behoefte of vraag van de prospect, de reactie van de prospect, eventuele bezwaren of context, en pas aan het einde de vervolgstap als die er is; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland". Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Gebruik GEEN koppen, GEEN bullets en GEEN labels zoals user:, bot:, agent: of klant:.',
+          'Schrijf uitsluitend in natuurlijk Nederlands als interne belnotitie voor Softora. Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer X gaf aan...". Vat in een paar volledige zinnen samen waar het gesprek over ging, wat de prospect wilde of zei, welke interesse of bezwaren er waren en wat de logische vervolgstap is als die echt is besproken. Gebruik nooit letterlijke dialoog, geen quotes, geen transcriptiestijl en geen labels zoals user:, bot:, agent: of klant:. Schrijf nadrukkelijk NIET als agenda-item, bevestigingsbericht of afspraakbevestiging. Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst.',
       })
         .then((summaryText) => {
           const rewrittenSummary = pickReadableConversationSummary(summaryText);
@@ -5217,12 +5279,16 @@
       }
     }
 
-    function openModal() {
+    async function openModal() {
       applyTheme();
       state.filter = 'callback';
+      if (!hasLeadDatabaseSnapshot()) {
+        await prewarmLeadDatabase();
+      }
       modal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
-      void loadData(true);
+      render();
+      void prewarmLeadDatabase({ force: true });
       if (state.pollTimer) {
         window.clearInterval(state.pollTimer);
       }
@@ -5320,6 +5386,7 @@
     render();
     modal.openLeadDatabaseModal = openModal;
     modal.closeLeadDatabaseModal = closeModal;
+    modal.prewarmLeadDatabase = prewarmLeadDatabase;
     modal.refreshLeadDatabaseModal = () => loadData(false);
     return modal;
   }
@@ -6105,6 +6172,10 @@
       );
     } else {
       void refreshDashboardStatsFromSupabase({ force: true, silent: true });
+      const leadDatabaseModal = ensureLeadDatabaseModal();
+      if (leadDatabaseModal && typeof leadDatabaseModal.prewarmLeadDatabase === 'function') {
+        void leadDatabaseModal.prewarmLeadDatabase();
+      }
     }
 
     // Zorg dat het loglabel direct "calls" toont in plaats van "mails".

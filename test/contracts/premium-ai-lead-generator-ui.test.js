@@ -10,7 +10,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410f" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410g" defer><\/script>/);
   assert.match(
     pageSource,
     /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
@@ -46,6 +46,11 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.doesNotMatch(dashboardSource, /Geen handmatige lead toegevoegd\./);
   assert.match(dashboardSource, /statusEl\.style\.margin = '14px 0 18px';/);
   assert.match(dashboardSource, /\/api\/coldcalling\/call-detail\?callId=\$\{encodeURIComponent\(normalizedCallId\)\}/);
+  assert.match(dashboardSource, /function prewarmLeadDatabase\(options = \{\}\) \{/);
+  assert.match(dashboardSource, /if \(!hasLeadDatabaseSnapshot\(\)\) \{\s*await prewarmLeadDatabase\(\);/);
+  assert.match(dashboardSource, /void leadDatabaseModal\.prewarmLeadDatabase\(\);/);
+  assert.match(dashboardSource, /looksLikeDirectSpeechConversationSummary/);
+  assert.match(dashboardSource, /Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst/);
   assert.match(
     dashboardSource,
     /function buildLeadDatabaseCallSummarySourceText\(call, insight, interestedLead\) \{[\s\S]*call\?\.transcriptFull[\s\S]*call\?\.summary[\s\S]*call\?\.transcriptSnippet[\s\S]*insight\?\.summary[\s\S]*interestedLead\?\.summary/

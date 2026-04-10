@@ -96,6 +96,27 @@ function createAgendaLeadDetailService(deps = {}) {
       .trim();
   }
 
+  function looksLikeDirectSpeechConversationSummaryText(value) {
+    const raw = sanitizeConversationSummaryText(value);
+    if (!raw) return false;
+    const lower = raw.toLowerCase();
+    if (/^(hallo|hoi|hey|goedemiddag|goedemorgen|goedenavond|met\s+\w+|ja[,\s]|nee[,\s]|oke?[,\s]|prima[,\s])/.test(lower)) {
+      return true;
+    }
+    if (/\bje spreekt met\b|\bik bel je\b|\bkan ik\b|\bweet je wat we doen\b|\bik wil graag meteen\b/i.test(raw)) {
+      return true;
+    }
+    const questionCount = (raw.match(/\?/g) || []).length;
+    const commaCount = (raw.match(/,/g) || []).length;
+    return questionCount >= 1 && commaCount >= 3 && raw.length >= 140;
+  }
+
+  function looksLikeAbruptConversationSummaryText(value) {
+    const raw = sanitizeConversationSummaryText(value);
+    if (!raw) return false;
+    return /(\.\.\.|…)$/.test(raw);
+  }
+
   function pickReadableConversationSummaryForLeadDetail(...candidates) {
     for (const candidate of candidates) {
       const cleaned = sanitizeConversationSummaryText(candidate);
@@ -103,6 +124,8 @@ function createAgendaLeadDetailService(deps = {}) {
       if (isGenericConversationSummaryPlaceholder(cleaned)) continue;
       if (looksLikeAgendaConfirmationSummary(cleaned)) continue;
       if (summaryContainsEnglishMarkers(cleaned)) continue;
+      if (looksLikeDirectSpeechConversationSummaryText(cleaned)) continue;
+      if (looksLikeAbruptConversationSummaryText(cleaned)) continue;
       return truncateText(cleaned, 4000);
     }
     return '';
@@ -503,7 +526,9 @@ function createAgendaLeadDetailService(deps = {}) {
       Boolean(sourceText) &&
       (!fallbackSummary ||
         fallbackSummary.length < 220 ||
-        summaryContainsEnglishMarkers(fallbackSummary));
+        summaryContainsEnglishMarkers(fallbackSummary) ||
+        looksLikeDirectSpeechConversationSummaryText(fallbackSummary) ||
+        looksLikeAbruptConversationSummaryText(fallbackSummary));
 
     if (needsAiRewrite && getOpenAiApiKey()) {
       try {
@@ -513,18 +538,22 @@ function createAgendaLeadDetailService(deps = {}) {
           language: 'nl',
           maxSentences: 4,
           extraInstructions: [
-            'Maak een korte maar inhoudelijke belnotitie die samenvat waar het gesprek over ging.',
+            'Maak een korte maar inhoudelijke belnotitie voor Softora die samenvat waar het gesprek over ging.',
+            'Schrijf in de derde persoon, bijvoorbeeld: "De prospect gaf aan..." of "Meneer/mevrouw X gaf aan...".',
             'Benoem de behoefte of vraag van de prospect, de reactie van de prospect en eventuele bezwaren of context.',
             'Noem alleen aan het einde een vervolgstap als die echt in het gesprek naar voren kwam; vermijd exacte zinsneden als "afspraak ingepland" of "afspraak is ingepland".',
             'Schrijf nadrukkelijk niet als agenda-item, afspraakbevestiging of bevestigingsbericht.',
-            'Gebruik geen koppen, bullets of labels zoals user:, bot:, agent: of klant:.',
+            'Gebruik geen koppen, bullets, citaten of labels zoals user:, bot:, agent: of klant:.',
+            'Eindig altijd met volledige zinnen en nooit met ellips of afgebroken tekst.',
           ].join(' '),
         });
         const rewrittenSummary = normalizeString(result?.summary || '');
         if (
           rewrittenSummary &&
           !isGenericConversationSummaryPlaceholder(rewrittenSummary) &&
-          !summaryContainsEnglishMarkers(rewrittenSummary)
+          !summaryContainsEnglishMarkers(rewrittenSummary) &&
+          !looksLikeDirectSpeechConversationSummaryText(rewrittenSummary) &&
+          !looksLikeAbruptConversationSummaryText(rewrittenSummary)
         ) {
           return rewrittenSummary;
         }
@@ -536,7 +565,11 @@ function createAgendaLeadDetailService(deps = {}) {
     if (fallbackSummary) return fallbackSummary;
 
     const transcriptFallback = sanitizeConversationSummaryText(transcriptSnippet || transcript);
-    if (transcriptFallback) {
+    if (
+      transcriptFallback &&
+      !looksLikeDirectSpeechConversationSummaryText(transcriptFallback) &&
+      !looksLikeAbruptConversationSummaryText(transcriptFallback)
+    ) {
       return truncateText(transcriptFallback, 4000);
     }
 
