@@ -2641,67 +2641,170 @@
     };
   }
 
-  async function promptManualLeadInput(message, initialValue = '', dialogOptions = {}) {
-    if (window.SoftoraDialogs && typeof window.SoftoraDialogs.prompt === 'function') {
-      const value = await window.SoftoraDialogs.prompt(
-        message,
-        initialValue,
-        {
-          title: dialogOptions.title || 'Lead handmatig toevoegen',
-          confirmText: dialogOptions.confirmText || 'Opslaan',
-          cancelText: dialogOptions.cancelText || 'Annuleren',
-        }
-      );
-      return normalizeFreeText(value);
+  async function promptForManualLeadDetails(defaults = {}) {
+    if (typeof document === 'undefined' || !document.body) {
+      const company = normalizeFreeText(window.prompt('Bedrijf', normalizeFreeText(defaults.company || '')));
+      if (!company) return { ok: false, cancelled: true };
+      const address = normalizeFreeText(window.prompt('Adres', normalizeFreeText(defaults.address || '')));
+      const phone = normalizeFreeText(window.prompt('Telefoonnummer', normalizeFreeText(defaults.phone || '')));
+      if (!phone) return { ok: false, cancelled: true };
+      const website = normalizeFreeText(window.prompt('Website', normalizeFreeText(defaults.website || '')));
+      return {
+        ok: true,
+        values: { company, address, phone, website },
+      };
     }
-    const fallbackValue = window.prompt(message, initialValue);
-    return normalizeFreeText(fallbackValue);
+
+    return new Promise((resolve) => {
+      const theme = getConversationThemeTokens();
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.inset = '0';
+      overlay.style.zIndex = '10020';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.padding = '24px';
+      overlay.style.background = 'rgba(14, 16, 24, 0.5)';
+      overlay.style.backdropFilter = 'blur(2px)';
+
+      overlay.innerHTML = `
+        <div style="width:min(920px, 100%); border-radius:16px; border:1px solid ${theme.border}; background:${theme.chromeBg}; box-shadow:0 28px 90px rgba(0,0,0,0.28); padding:26px 28px 22px;">
+          <div style="font-family:Oswald,sans-serif; font-size:28px; line-height:1; letter-spacing:0.03em; text-transform:uppercase; color:${theme.text};">Lead handmatig toevoegen</div>
+          <div style="margin-top:14px; font-size:15px; line-height:1.6; color:${theme.textMuted};">Vul de leadgegevens in. We nemen deze direct op in het bedrijvenregister.</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:22px;">
+            <label style="display:flex; flex-direction:column; gap:7px;">
+              <span style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:${theme.textMuted};">Bedrijf</span>
+              <input type="text" data-manual-lead-company inputmode="text" autocomplete="organization" value="${escapeHtml(normalizeFreeText(defaults.company || ''))}" style="height:56px; padding:0 16px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-size:16px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:7px;">
+              <span style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:${theme.textMuted};">Adres</span>
+              <input type="text" data-manual-lead-address inputmode="text" autocomplete="street-address" value="${escapeHtml(normalizeFreeText(defaults.address || ''))}" style="height:56px; padding:0 16px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-size:16px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:7px;">
+              <span style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:${theme.textMuted};">Telefoonnummer</span>
+              <input type="tel" data-manual-lead-phone inputmode="tel" autocomplete="tel" value="${escapeHtml(normalizeFreeText(defaults.phone || ''))}" placeholder="0612345678 of +31612345678" style="height:56px; padding:0 16px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-size:16px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:7px;">
+              <span style="font-family:Oswald,sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:${theme.textMuted};">Website</span>
+              <input type="text" data-manual-lead-website inputmode="url" autocomplete="url" value="${escapeHtml(normalizeFreeText(defaults.website || ''))}" placeholder="voorbeeld.nl" style="height:56px; padding:0 16px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-size:16px;">
+            </label>
+          </div>
+          <div data-manual-lead-error style="min-height:20px; margin-top:14px; font-size:13px; color:#b4235b;"></div>
+          <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:12px;">
+            <button type="button" data-manual-lead-cancel style="height:48px; min-width:148px; padding:0 22px; border-radius:10px; border:1px solid ${theme.border}; background:${theme.blockBg}; color:${theme.text}; font-family:Oswald,sans-serif; font-size:16px; letter-spacing:0.05em; text-transform:uppercase; cursor:pointer;">Annuleren</button>
+            <button type="button" data-manual-lead-confirm style="height:48px; min-width:148px; padding:0 22px; border-radius:10px; border:1px solid transparent; background:${theme.accent}; color:#fff; font-family:Oswald,sans-serif; font-size:16px; letter-spacing:0.05em; text-transform:uppercase; cursor:pointer;">Opslaan</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      const companyInput = overlay.querySelector('[data-manual-lead-company]');
+      const addressInput = overlay.querySelector('[data-manual-lead-address]');
+      const phoneInput = overlay.querySelector('[data-manual-lead-phone]');
+      const websiteInput = overlay.querySelector('[data-manual-lead-website]');
+      const errorEl = overlay.querySelector('[data-manual-lead-error]');
+      const cancelBtn = overlay.querySelector('[data-manual-lead-cancel]');
+      const confirmBtn = overlay.querySelector('[data-manual-lead-confirm]');
+
+      let finished = false;
+
+      function cleanup(result) {
+        if (finished) return;
+        finished = true;
+        document.removeEventListener('keydown', onKeyDown, true);
+        overlay.remove();
+        resolve(result);
+      }
+
+      function setError(message) {
+        if (!errorEl) return;
+        errorEl.textContent = normalizeFreeText(message);
+      }
+
+      function submit() {
+        const company = normalizeFreeText(companyInput?.value || '');
+        const address = normalizeFreeText(addressInput?.value || '');
+        const phone = normalizeFreeText(phoneInput?.value || '');
+        const website = normalizeFreeText(websiteInput?.value || '');
+
+        if (!company) {
+          setError('Bedrijf ontbreekt.');
+          companyInput?.focus();
+          return;
+        }
+        if (!phone) {
+          setError('Telefoonnummer ontbreekt.');
+          phoneInput?.focus();
+          return;
+        }
+        if (!looksLikePhoneNumber(phone)) {
+          setError('Telefoonnummer lijkt ongeldig. Gebruik bijv. 0612345678 of +31612345678.');
+          phoneInput?.focus();
+          return;
+        }
+
+        cleanup({
+          ok: true,
+          values: {
+            company,
+            address,
+            phone,
+            website,
+          },
+        });
+      }
+
+      function onKeyDown(event) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          cleanup({ ok: false, cancelled: true });
+          return;
+        }
+        if (event.key === 'Enter' && event.target && event.target.tagName !== 'TEXTAREA') {
+          event.preventDefault();
+          submit();
+        }
+      }
+
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+          cleanup({ ok: false, cancelled: true });
+        }
+      });
+      cancelBtn?.addEventListener('click', () => cleanup({ ok: false, cancelled: true }));
+      confirmBtn?.addEventListener('click', submit);
+      document.addEventListener('keydown', onKeyDown, true);
+      window.setTimeout(() => {
+        companyInput?.focus();
+        companyInput?.select?.();
+      }, 0);
+    });
   }
 
   async function promptAndSaveSingleManualLead(defaults = {}) {
-    const phone = await promptManualLeadInput(
-      'Voer telefoonnummer in (NL formaat, bijv. 0612345678 of +31612345678).',
-      normalizeFreeText(defaults.phone || ''),
-      {
-        title: 'Lead handmatig toevoegen',
-        confirmText: 'Volgende',
-      }
-    );
-
-    if (!phone) {
+    const leadInput = await promptForManualLeadDetails(defaults);
+    if (!leadInput?.ok) {
       return {
         ok: false,
         cancelled: true,
       };
     }
 
-    if (!looksLikePhoneNumber(phone)) {
-      throw new Error('Telefoonnummer lijkt ongeldig. Gebruik bijv. 0612345678 of +31612345678.');
-    }
-
-    const company = await promptManualLeadInput(
-      'Bedrijfsnaam (optioneel).',
-      normalizeFreeText(defaults.company || ''),
-      {
-        title: 'Lead handmatig toevoegen',
-        confirmText: 'Volgende',
-      }
-    );
-
     const selectedRegion = normalizeCampaignRegionPromptValue(getSelectedText('regio'));
-    const region = await promptManualLeadInput(
-      'Regio (optioneel).',
-      normalizeFreeText(defaults.region || selectedRegion),
-      {
-        title: 'Lead handmatig toevoegen',
-        confirmText: 'Opslaan',
-      }
-    );
+    const company = normalizeFreeText(leadInput.values?.company || defaults.company || '');
+    const phone = normalizeFreeText(leadInput.values?.phone || defaults.phone || '');
+    const address = normalizeFreeText(leadInput.values?.address || defaults.address || '');
+    const website = normalizeFreeText(leadInput.values?.website || defaults.website || '');
+    const region = normalizeFreeText(defaults.region || selectedRegion);
 
     const singleLead = {
-      company: company || 'Handmatige lead',
+      company,
       phone,
       region,
+      address,
+      website,
     };
 
     const merged = mergeLeadRows(getSavedLeadRows(), [singleLead]);
