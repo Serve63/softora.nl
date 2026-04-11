@@ -17,7 +17,16 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
     pageSource,
     /function loadCachedLeads\(\) \{[\s\S]*const bootstrapLeads = Array\.isArray\(leadsBootstrapPayload\?\.leads\)/
   );
+  assert.match(pageSource, /if \(localCache\.leads\.length > 0 && localCache\.savedAt > bootstrapSavedAt\) \{/);
   assert.match(pageSource, /window\.localStorage\.setItem\(\s*LEADS_CACHE_KEY,/);
+  assert.match(
+    pageSource,
+    /async function submitLeadToAgenda\(\) \{[\s\S]*allLeads = allLeads\.filter\(\(item\) => Number\(item\.id\) !== taskId\);[\s\S]*persistCachedLeads\(allLeads\);/
+  );
+  assert.match(
+    pageSource,
+    /async function removeLead\(\) \{[\s\S]*allLeads = allLeads\.filter\(\(item\) => Number\(item\.id\) !== taskId\);[\s\S]*persistCachedLeads\(allLeads\);/
+  );
   assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
   assert.match(pageSource, /let lastLeadStatusTimestamp = 0;/);
   assert.match(pageSource, /lastLeadStatusTimestamp = safeDate\.getTime\(\);/);

@@ -74,6 +74,7 @@ function createFixture(overrides = {}) {
   const activityCalls = [];
   const smtpCalls = [];
   const dismissCalls = [];
+  const persistWaitCalls = [];
   const callUpdatesByCallId = new Map([
     [
       'call-1',
@@ -224,6 +225,10 @@ function createFixture(overrides = {}) {
         return null;
       }
     },
+    waitForQueuedRuntimeStatePersist: async () => {
+      persistWaitCalls.push('waited');
+      return true;
+    },
     logger: {
       error() {},
     },
@@ -234,6 +239,7 @@ function createFixture(overrides = {}) {
     appointments,
     coordinator,
     dismissCalls,
+    persistWaitCalls,
     setCalls,
     smtpCalls,
   };
@@ -280,7 +286,7 @@ test('agenda confirmation coordinator sends SMTP confirmation mail and persists 
 });
 
 test('agenda confirmation coordinator can set a lead task into the agenda and close the task', async () => {
-  const { activityCalls, appointments, coordinator, dismissCalls } = createFixture();
+  const { activityCalls, appointments, coordinator, dismissCalls, persistWaitCalls } = createFixture();
   const res = createResponseRecorder();
 
   await coordinator.setLeadTaskInAgendaById(
@@ -309,4 +315,49 @@ test('agenda confirmation coordinator can set a lead task into the agenda and cl
   assert.equal(appointments[0].confirmationResponseReceived, true);
   assert.equal(dismissCalls[0].reason, 'confirmation_task_set_in_agenda_dismiss');
   assert.equal(activityCalls[0].reason, 'dashboard_activity_lead_set_in_agenda');
+  assert.deepEqual(persistWaitCalls, ['waited']);
+});
+
+test('agenda confirmation coordinator waits for queued persist before removing a lead task', async () => {
+  const { activityCalls, appointments, coordinator, dismissCalls, persistWaitCalls } = createFixture({
+    appointments: [
+      {
+        id: 202,
+        company: 'Softora',
+        contact: 'Serve Creusen',
+        phone: '0612345678',
+        date: '2026-04-09',
+        time: '10:30',
+        source: 'AI Cold Calling',
+        summary: 'Lead opvolgen na interesse.',
+        callId: 'call-1',
+        provider: 'retell',
+        aiGenerated: true,
+        needsConfirmationEmail: true,
+        confirmationTaskType: 'lead_follow_up',
+        confirmationEmailSent: false,
+        confirmationResponseReceived: false,
+        confirmationAppointmentCancelled: false,
+      },
+    ],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.markLeadTaskCancelledById(
+    {
+      body: {
+        actor: 'Serve',
+      },
+    },
+    res,
+    '202'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.cancelled, true);
+  assert.equal(appointments[0].confirmationAppointmentCancelled, true);
+  assert.equal(dismissCalls[0].reason, 'confirmation_task_mark_cancelled_dismiss');
+  assert.equal(activityCalls[0].reason, 'dashboard_activity_mark_cancelled');
+  assert.deepEqual(persistWaitCalls, ['waited']);
 });

@@ -67,6 +67,7 @@ function createAgendaConfirmationCoordinator(deps = {}) {
     normalizeAbsoluteHttpUrl = (value) => String(value || '').trim(),
     getOpenAiTranscriptionModelCandidates = () => ['gpt-4o-mini-transcribe'],
     parseJsonLoose = () => null,
+    waitForQueuedRuntimeStatePersist = async () => true,
     logger = console,
   } = deps;
 
@@ -951,6 +952,8 @@ function createAgendaConfirmationCoordinator(deps = {}) {
       'dashboard_activity_lead_set_in_agenda'
     );
 
+    await waitForQueuedRuntimeStatePersist();
+
     return res.status(200).json({
       ok: true,
       taskCompleted: true,
@@ -1009,7 +1012,7 @@ function createAgendaConfirmationCoordinator(deps = {}) {
     });
   }
 
-  function markLeadTaskCancelledById(req, res, taskIdRaw) {
+  async function markLeadTaskCancelledById(req, res, taskIdRaw) {
     const idx = getGeneratedAppointmentIndexById(taskIdRaw);
     if (idx < 0) {
       return res.status(404).json({ ok: false, error: 'Taak of afspraak niet gevonden' });
@@ -1058,6 +1061,8 @@ function createAgendaConfirmationCoordinator(deps = {}) {
       },
       'dashboard_activity_mark_cancelled'
     );
+
+    await waitForQueuedRuntimeStatePersist();
 
     return res.status(200).json({
       ok: true,

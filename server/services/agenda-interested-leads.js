@@ -35,6 +35,7 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     dismissInterestedLeadIdentity = () => {},
     appendDashboardActivity = () => {},
     cancelOpenLeadFollowUpTasksByIdentity = () => [],
+    waitForQueuedRuntimeStatePersist = async () => true,
   } = deps;
 
   function buildMaterializedInterestedLeadAppointment(callId, requestBody = {}) {
@@ -358,6 +359,8 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       'dashboard_activity_interested_lead_set_in_agenda'
     );
 
+    await waitForQueuedRuntimeStatePersist();
+
     return res.status(200).json({
       ok: true,
       taskCompleted: true,
@@ -403,6 +406,8 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       },
       'dashboard_activity_interested_lead_removed'
     );
+
+    await waitForQueuedRuntimeStatePersist();
 
     return res.status(200).json({
       ok: true,

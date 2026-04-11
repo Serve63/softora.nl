@@ -2682,6 +2682,7 @@
                     }
 
                     allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
+                    persistCachedLeads(allLeads);
                     delete leadDetailsById[String(taskId)];
                     delete leadAiCopyById[String(taskId)];
                     renderList();
@@ -2766,6 +2767,7 @@
                     }
 
                     allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
+                    persistCachedLeads(allLeads);
                     delete leadDetailsById[String(taskId)];
                     delete leadAiCopyById[String(taskId)];
                     renderList();
@@ -3505,6 +3507,30 @@
                     ? leadsBootstrapPayload.leads.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
                     : [];
                 const bootstrapSavedAt = Date.parse(String(leadsBootstrapPayload?.loadedAt || '').trim()) || 0;
+                let localCache = { leads: [], savedAt: 0 };
+
+                try {
+                    const raw = String(window.localStorage.getItem(LEADS_CACHE_KEY) || '').trim();
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        const savedAt = Number(parsed?.savedAt) || 0;
+                        if (savedAt && Date.now() - savedAt <= LEADS_CACHE_MAX_AGE_MS) {
+                            localCache = {
+                                leads: Array.isArray(parsed?.leads)
+                                    ? parsed.leads.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                                    : [],
+                                savedAt,
+                            };
+                        }
+                    }
+                } catch (error) {
+                    localCache = { leads: [], savedAt: 0 };
+                }
+
+                if (localCache.leads.length > 0 && localCache.savedAt > bootstrapSavedAt) {
+                    return localCache;
+                }
+
                 if (bootstrapLeads.length > 0) {
                     return {
                         leads: bootstrapLeads,
@@ -3512,24 +3538,7 @@
                     };
                 }
 
-                try {
-                    const raw = String(window.localStorage.getItem(LEADS_CACHE_KEY) || '').trim();
-                    if (!raw) return { leads: [], savedAt: 0 };
-                    const parsed = JSON.parse(raw);
-                    const savedAt = Number(parsed?.savedAt) || 0;
-                    if (!savedAt || Date.now() - savedAt > LEADS_CACHE_MAX_AGE_MS) {
-                        return { leads: [], savedAt: 0 };
-                    }
-                    const leads = Array.isArray(parsed?.leads)
-                        ? parsed.leads.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
-                        : [];
-                    return {
-                        leads,
-                        savedAt,
-                    };
-                } catch (error) {
-                    return { leads: [], savedAt: 0 };
-                }
+                return localCache;
             }
 
             function persistCachedLeads(rows) {

@@ -6828,6 +6828,7 @@ const agendaInterestedLeadsCoordinator = createAgendaInterestedLeadsCoordinator(
   dismissInterestedLeadIdentity,
   appendDashboardActivity,
   cancelOpenLeadFollowUpTasksByIdentity,
+  waitForQueuedRuntimeStatePersist,
 });
 
 const {
@@ -6917,6 +6918,7 @@ const agendaConfirmationCoordinator = createAgendaConfirmationCoordinator({
   normalizeAbsoluteHttpUrl,
   getOpenAiTranscriptionModelCandidates,
   parseJsonLoose,
+  waitForQueuedRuntimeStatePersist,
 });
 
 const {

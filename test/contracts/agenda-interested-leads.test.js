@@ -72,6 +72,7 @@ function createFixture(overrides = {}) {
   const hydrateCalls = [];
   const upsertCalls = [];
   const cancelCalls = [];
+  const persistWaitCalls = [];
 
   function setGeneratedAgendaAppointmentAtIndex(idx, nextValue, _reason) {
     appointments[idx] = {
@@ -176,6 +177,10 @@ function createFixture(overrides = {}) {
       cancelCalls.push({ callId, rowLike, actor, reason });
       return 2;
     },
+    waitForQueuedRuntimeStatePersist: async () => {
+      persistWaitCalls.push('waited');
+      return true;
+    },
   });
 
   return {
@@ -185,12 +190,13 @@ function createFixture(overrides = {}) {
     coordinator,
     dismissCalls,
     hydrateCalls,
+    persistWaitCalls,
     upsertCalls,
   };
 }
 
 test('agenda interested leads coordinator materializes a lead into the agenda', async () => {
-  const { activityCalls, appointments, coordinator, dismissCalls, upsertCalls } = createFixture();
+  const { activityCalls, appointments, coordinator, dismissCalls, persistWaitCalls, upsertCalls } = createFixture();
   const res = createResponseRecorder();
 
   await coordinator.setInterestedLeadInAgendaResponse(
@@ -221,10 +227,11 @@ test('agenda interested leads coordinator materializes a lead into the agenda', 
   assert.equal(appointments[0].confirmationResponseReceived, true);
   assert.equal(dismissCalls[0].reason, 'interested_lead_set_in_agenda_dismiss');
   assert.equal(activityCalls[0].reason, 'dashboard_activity_interested_lead_set_in_agenda');
+  assert.deepEqual(persistWaitCalls, ['waited']);
 });
 
 test('agenda interested leads coordinator dismisses a lead and cancels open follow-up tasks', async () => {
-  const { activityCalls, cancelCalls, coordinator, dismissCalls } = createFixture();
+  const { activityCalls, cancelCalls, coordinator, dismissCalls, persistWaitCalls } = createFixture();
   const res = createResponseRecorder();
 
   await coordinator.dismissInterestedLeadResponse(
@@ -244,6 +251,7 @@ test('agenda interested leads coordinator dismisses a lead and cancels open foll
   assert.equal(dismissCalls[0].reason, 'interested_lead_dismissed_manual');
   assert.equal(cancelCalls[0].reason, 'interested_lead_dismissed_manual_cancel');
   assert.equal(activityCalls[0].reason, 'dashboard_activity_interested_lead_removed');
+  assert.deepEqual(persistWaitCalls, ['waited']);
 });
 
 test('agenda interested leads coordinator hydrates first when supabase runtime is configured but cold', async () => {
