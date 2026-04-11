@@ -52,6 +52,10 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.match(source, /const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';/);
   assert.match(source, /function buildDossierCacheFingerprint\(baseData\) \{/);
   assert.match(source, /function getCachedDossierLayoutResponse\(rawValue, orderId, fingerprint\) \{/);
+  assert.match(source, /window\.localStorage\.getItem\(getBrowserDossierCacheKey\(orderId\)\)/);
+  assert.match(source, /window\.localStorage\.setItem\(getBrowserDossierCacheKey\(orderId\), serialized\)/);
+  assert.match(source, /let staleLayoutResponse = null;/);
+  assert.match(source, /return staleLayoutResponse;/);
   assert.match(source, /async function persistDossierCache\(rawValue, orderId, fingerprint, layoutResponse\) \{/);
   assert.match(source, /const cachedLayoutResponse = getCachedDossierLayoutResponse\(/);
   assert.match(source, /if \(cachedLayoutResponse\) \{[\s\S]*renderDossier\(baseData, cachedLayoutResponse\);/);

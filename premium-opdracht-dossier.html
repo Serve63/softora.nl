@@ -866,47 +866,64 @@
                 return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
             }
 
-            function getSessionDossierCacheKey(orderId) {
+            function getBrowserDossierCacheKey(orderId) {
                 return `${DOSSIER_CACHE_KEY}:${String(orderId || '')}`;
             }
 
             function readSessionDossierCacheEntry(orderId) {
                 try {
-                    return safeJsonParse(window.sessionStorage.getItem(getSessionDossierCacheKey(orderId)), null);
+                    return safeJsonParse(window.sessionStorage.getItem(getBrowserDossierCacheKey(orderId)), null);
                 } catch (_) {
                     return null;
                 }
             }
 
-            function writeSessionDossierCacheEntry(orderId, entry) {
+            function readLocalDossierCacheEntry(orderId) {
                 try {
-                    window.sessionStorage.setItem(
-                        getSessionDossierCacheKey(orderId),
-                        JSON.stringify(entry || {})
-                    );
+                    return safeJsonParse(window.localStorage.getItem(getBrowserDossierCacheKey(orderId)), null);
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            function writeBrowserDossierCacheEntry(orderId, entry) {
+                const serialized = JSON.stringify(entry || {});
+                try {
+                    window.sessionStorage.setItem(getBrowserDossierCacheKey(orderId), serialized);
                 } catch (_) {
                     // ignore session cache failures
+                }
+                try {
+                    window.localStorage.setItem(getBrowserDossierCacheKey(orderId), serialized);
+                } catch (_) {
+                    // ignore local cache failures
                 }
             }
 
             function getCachedDossierLayoutResponse(rawValue, orderId, fingerprint) {
+                const localEntry = readLocalDossierCacheEntry(orderId);
                 const sessionEntry = readSessionDossierCacheEntry(orderId);
                 const cacheMap = parseDossierCacheMap(rawValue);
                 const entries = [
+                    localEntry && typeof localEntry === 'object' ? localEntry : null,
                     sessionEntry && typeof sessionEntry === 'object' ? sessionEntry : null,
                     cacheMap[String(orderId)],
                 ];
+                let staleLayoutResponse = null;
 
                 for (const entry of entries) {
                     if (!entry || typeof entry !== 'object') continue;
+                    const layoutResponse = entry.layoutResponse;
+                    if (layoutResponse && typeof layoutResponse === 'object' && !staleLayoutResponse) {
+                        staleLayoutResponse = layoutResponse;
+                    }
                     const entryFingerprint = String(entry.fingerprint || '').trim();
                     if (!entryFingerprint || entryFingerprint !== String(fingerprint || '').trim()) continue;
-                    const layoutResponse = entry.layoutResponse;
                     if (layoutResponse && typeof layoutResponse === 'object') {
                         return layoutResponse;
                     }
                 }
-                return null;
+                return staleLayoutResponse;
             }
 
             function buildNextDossierCacheMap(rawValue, orderId, fingerprint, layoutResponse) {
@@ -932,7 +949,7 @@
             async function persistDossierCache(rawValue, orderId, fingerprint, layoutResponse) {
                 if (!orderId || !layoutResponse || typeof layoutResponse !== 'object') return;
                 const nextCacheMap = buildNextDossierCacheMap(rawValue, orderId, fingerprint, layoutResponse);
-                writeSessionDossierCacheEntry(orderId, nextCacheMap[String(orderId)]);
+                writeBrowserDossierCacheEntry(orderId, nextCacheMap[String(orderId)]);
                 await fetchUiStateSetWithFallback(REMOTE_SCOPE, {
                     patch: {
                         [DOSSIER_CACHE_KEY]: JSON.stringify(nextCacheMap),
