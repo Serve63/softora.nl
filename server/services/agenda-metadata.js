@@ -108,12 +108,36 @@ function createAgendaMetadataService(deps = {}) {
     return aKey.localeCompare(bKey);
   }
 
+  function isGeneratedAppointmentPendingAgendaPlacement(appointment) {
+    if (!appointment || typeof appointment !== 'object') return false;
+
+    const confirmationTaskTypeRaw = normalizeString(
+      appointment?.confirmationTaskType || appointment?.taskType || appointment?.type || ''
+    ).toLowerCase();
+    const isLeadFollowUpTask = confirmationTaskTypeRaw === 'lead_follow_up';
+    const needsConfirmation = toBooleanSafe(
+      appointment?.needsConfirmationEmail,
+      toBooleanSafe(appointment?.aiGenerated, false)
+    );
+    const alreadyResolved = Boolean(
+      appointment?.confirmationResponseReceived ||
+        appointment?.confirmationResponseReceivedAt ||
+        appointment?.confirmationAppointmentCancelled ||
+        appointment?.confirmationAppointmentCancelledAt
+    );
+
+    return !alreadyResolved && (needsConfirmation || isLeadFollowUpTask);
+  }
+
   function isGeneratedAppointmentVisibleForAgenda(appointment) {
     if (!appointment || typeof appointment !== 'object') return false;
     if (
       appointment.confirmationAppointmentCancelled ||
       appointment.confirmationAppointmentCancelledAt
     ) {
+      return false;
+    }
+    if (isGeneratedAppointmentPendingAgendaPlacement(appointment)) {
       return false;
     }
     return Boolean(normalizeDateYyyyMmDd(appointment?.date || ''));
@@ -448,6 +472,7 @@ function createAgendaMetadataService(deps = {}) {
     buildLeadToAgendaSummary,
     buildLeadToAgendaSummaryFallback,
     compareAgendaAppointments,
+    isGeneratedAppointmentPendingAgendaPlacement,
     isGeneratedAppointmentVisibleForAgenda,
     refreshAgendaAppointmentCallSourcesIfNeeded,
     refreshGeneratedAgendaSummariesIfNeeded,

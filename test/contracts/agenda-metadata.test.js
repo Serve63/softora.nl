@@ -152,6 +152,39 @@ test('agenda metadata service sorts visible appointments and resolves location f
   );
   assert.equal(service.isGeneratedAppointmentVisibleForAgenda({ date: '2026-04-10' }), true);
   assert.equal(
+    service.isGeneratedAppointmentPendingAgendaPlacement({
+      date: '2026-04-10',
+      confirmationTaskType: 'lead_follow_up',
+      needsConfirmationEmail: true,
+    }),
+    true
+  );
+  assert.equal(
+    service.isGeneratedAppointmentVisibleForAgenda({
+      date: '2026-04-10',
+      confirmationTaskType: 'lead_follow_up',
+      needsConfirmationEmail: true,
+    }),
+    false
+  );
+  assert.equal(
+    service.isGeneratedAppointmentVisibleForAgenda({
+      date: '2026-04-10',
+      confirmationTaskType: 'send_confirmation_email',
+      needsConfirmationEmail: true,
+    }),
+    false
+  );
+  assert.equal(
+    service.isGeneratedAppointmentVisibleForAgenda({
+      date: '2026-04-10',
+      confirmationTaskType: 'lead_follow_up',
+      needsConfirmationEmail: false,
+      confirmationResponseReceived: true,
+    }),
+    true
+  );
+  assert.equal(
     service.isGeneratedAppointmentVisibleForAgenda({
       date: '2026-04-10',
       confirmationAppointmentCancelled: true,
