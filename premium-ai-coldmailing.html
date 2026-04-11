@@ -2342,7 +2342,7 @@
                 modalSub.textContent = '';
                 modalSub.hidden = true;
                 modalDate.value = '';
-                modalTime.value = leadTimeValue;
+                modalTime.value = '';
                 modalLocation.value = allowLocationPrefill ? leadLocationValue : '';
                 modalWhatsappInfo.value = leadWhatsappInfoValue;
                 modalWhatsappConfirm.checked = false;
@@ -2401,12 +2401,7 @@
                         const detailWhatsappInfoValue = String(taskDetail?.whatsappInfo || '').trim();
 
                         // date left empty intentionally
-                        if (
-                            !String(modalTime.value || '').trim() ||
-                            normalizeTimeValue(modalTime.value || '') === leadTimeValue
-                        ) {
-                            modalTime.value = detailTimeValue || leadTimeValue;
-                        }
+                        // time left empty intentionally
                         if (
                             allowRecoveredLocationPrefill &&
                             (
@@ -2480,13 +2475,7 @@
                         }
                     }
 
-                    // date left empty intentionally
-                    if (
-                        !String(modalTime.value || '').trim() ||
-                        normalizeTimeValue(modalTime.value || '') === leadTimeValue
-                    ) {
-                        modalTime.value = detailTimeValue || leadTimeValue;
-                    }
+                    // date + time left empty intentionally
                     if (
                         allowRecoveredLocationPrefill &&
                         (
