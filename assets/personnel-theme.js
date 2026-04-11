@@ -1358,7 +1358,7 @@
     async function refreshSidebarLeadsCount() {
         const badge = getSidebarCountBadge("leads");
         if (!badge) return;
-        const cachedLeadCount = readCachedSidebarCount("leads");
+        const suppressedKeys = readSuppressedLeadKeys();
         const pathName = String((window.location && window.location.pathname) || "").trim().toLowerCase();
         const liveLeadsPageCount = Number(window.__softoraLeadsPageCount);
         if (
@@ -1366,11 +1366,18 @@
             Number.isFinite(liveLeadsPageCount) &&
             liveLeadsPageCount >= 0
         ) {
+            // On the live leads page the count already reflects suppression (renderList handles it)
             paintSidebarCount("leads", Math.floor(liveLeadsPageCount), {
                 singular: "open lead",
                 plural: "open leads",
             });
             return;
+        }
+
+        // If we have suppressed leads, hide the badge immediately so it never flickers
+        // with a stale value while the async fetch is in-flight.
+        if (suppressedKeys.size > 0) {
+            badge.hidden = true;
         }
 
         const [tasksData, interestedLeadsData] = await Promise.all([
@@ -1383,15 +1390,18 @@
         ]);
 
         if (!tasksData && !interestedLeadsData) {
-            if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
-                paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
-                return;
+            // Only fall back to cache if nothing is suppressed
+            if (suppressedKeys.size === 0) {
+                const cachedLeadCount = readCachedSidebarCount("leads");
+                if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
+                    paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
+                    return;
+                }
             }
             paintSidebarCount("leads", null);
             return;
         }
 
-        const suppressedKeys = readSuppressedLeadKeys();
         const pendingRows = (Array.isArray(tasksData && tasksData.tasks)
             ? tasksData.tasks.map(normalizeLeadRowForCount)
             : []).filter(function(r) { return !isLeadRowSuppressed(r, suppressedKeys); });
