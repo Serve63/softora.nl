@@ -8,7 +8,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260410b">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -24,7 +24,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260405a" defer></script>
+    <script src="assets/personnel-theme.js?v=20260411a" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -2663,8 +2663,9 @@
             }
 
             if (completeBtnEl) {
-                completeBtnEl.disabled = isDelivered;
-                completeBtnEl.classList.toggle('done', isDelivered);
+                completeBtnEl.textContent = 'Factuur betaald';
+                completeBtnEl.disabled = ui.isPaid;
+                completeBtnEl.classList.toggle('done', ui.isPaid);
             }
 
             refreshOrderSummaryCards();
@@ -2769,7 +2770,6 @@
                 paidAt: record.paidAt,
                 progressPct: record.status === 'klaar' || record.status === 'betaald' ? 100 : 0
             });
-            const claimInfo = getOrderClaimInfo(id);
             const isDelivered = ui.isBuilt;
             const isPaid = ui.isPaid;
             const clientLine = [record.clientName, record.location].filter(Boolean).join(' — ');
@@ -2779,7 +2779,6 @@
             const title = String(record.title || 'Opdracht').trim() || 'Opdracht';
             const description = String(record.description || 'Geen extra omschrijving.').trim() || 'Geen extra omschrijving.';
             const deliveryHtml = `<div class="order-delivery"><strong>Oplevertijd</strong>${escapeHtml(deliveryLabel)}</div>`;
-            const claimHtml = `<div class="order-claim" aria-hidden="true"><span class="order-claim-name">${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</span></div>`;
 
             return `
                 <div class="order-card has-claim ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
@@ -2795,13 +2794,12 @@
                             <div class="order-price-value"><span class="currency">€</span>${amountText}</div>
                         </div>
                         <div class="order-actions">
-                            ${claimHtml}
                             <button class="execute-btn magnetic" id="btn-${id}" type="button" data-order="${id}">
                                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h18M5.25 7.5v10.5A1.5 1.5 0 0 0 6.75 19.5h10.5a1.5 1.5 0 0 0 1.5-1.5V7.5M9 7.5V6a3 3 0 1 1 6 0v1.5"></path></svg>
                                 Open dossier
                             </button>
                             <button class="complete-btn magnetic" id="complete-btn-${id}" type="button" data-order-complete="${id}">
-                                Voltooid
+                                Factuur betaald
                             </button>
                         </div>
                     </div>
@@ -3483,10 +3481,22 @@
                 paidAt: null
             });
 
-            appendOrderLog(id, 'Opdracht handmatig op voltooid gezet.', true);
+            appendOrderLog(id, 'Opdracht handmatig als opgeleverd gemarkeerd.', true);
             persistOrdersRuntime();
             applyOrderUiStateToCard(id);
             setOrderFilter('completed');
+        }
+
+        function handleOrderPaymentAction(id) {
+            const order = orders[id];
+            if (!order) return;
+            const ui = resolveOrderUiState(order);
+            if (ui.isPaid) return;
+            if (ui.isBuilt) {
+                markOrderAsPaid(id);
+                return;
+            }
+            markOrderAsCompleted(id);
         }
 
         function buildFallbackSitePrompt(meta, customOrder) {
@@ -4366,7 +4376,7 @@
             b.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const id = Number(b.getAttribute('data-order-complete'));
-                markOrderAsCompleted(id);
+                handleOrderPaymentAction(id);
             });
         });
 

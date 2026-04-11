@@ -60,9 +60,21 @@
     interested: 0,
     conversionPct: 0,
   };
+  let coldcallingDashboardBootstrapPayload = null;
 
   function byId(id) {
     return document.getElementById(id);
+  }
+
+  function readColdcallingDashboardBootstrapPayload() {
+    const element = document.getElementById('softoraColdcallingDashboardBootstrap');
+    if (!element) return null;
+    try {
+      const parsed = JSON.parse(String(element.textContent || '{}'));
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   function openLeadDatabaseFromCampaignControl() {
@@ -1600,6 +1612,38 @@
       return;
     }
     writeStorage(STATS_RESET_BASELINE_STORAGE_KEY, JSON.stringify(normalized));
+  }
+
+  function primeStatsFromBootstrap() {
+    if (!coldcallingDashboardBootstrapPayload || typeof coldcallingDashboardBootstrapPayload !== 'object') {
+      coldcallingDashboardBootstrapPayload = readColdcallingDashboardBootstrapPayload();
+    }
+    const payload = coldcallingDashboardBootstrapPayload;
+    if (!payload || typeof payload !== 'object') return;
+
+    const statsSummary =
+      payload.statsSummary && typeof payload.statsSummary === 'object'
+        ? payload.statsSummary
+        : payload.statsDisplay && typeof payload.statsDisplay === 'object'
+          ? payload.statsDisplay
+          : null;
+    const statsResetBaseline =
+      payload.statsResetBaseline && typeof payload.statsResetBaseline === 'object'
+        ? payload.statsResetBaseline
+        : null;
+
+    if (statsResetBaseline) {
+      setStatsResetBaselineState(statsResetBaseline);
+    }
+    if (statsSummary) {
+      latestStatsSummary = {
+        started: normalizeStatsSummaryValue(statsSummary.started),
+        answered: normalizeStatsSummaryValue(statsSummary.answered),
+        interested: normalizeStatsSummaryValue(statsSummary.interested),
+        conversionPct: normalizeStatsSummaryValue(statsSummary.conversionPct),
+      };
+      updateStats(latestStatsSummary);
+    }
   }
 
   async function resetStatsRowToZero() {
@@ -7111,6 +7155,7 @@
   };
 
   async function bootstrapColdcallingUi() {
+    primeStatsFromBootstrap();
     activeBusinessMode = await loadSavedStatusPillModeFromSupabase();
     applyStatusPillMode(activeBusinessMode);
     const uiStateLoaded = await loadRemoteUiState();

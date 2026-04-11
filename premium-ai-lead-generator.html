@@ -8,7 +8,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260410b">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -24,7 +24,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260405a" defer></script>
+    <script src="assets/personnel-theme.js?v=20260411a" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -1816,19 +1816,19 @@
                             </svg>
                         </button>
                     </div>
-                    <div class="stat-card-value" id="statCalled">0</div>
+                    <div class="stat-card-value" id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-label">Opgenomen</div>
-                    <div class="stat-card-value accent" id="statBooked" style="color: var(--accent-light);">0</div>
+                    <div class="stat-card-value accent" id="statBooked" style="color: var(--accent-light);"><!-- SOFTORA_COLDCALLING_STAT_BOOKED --></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-label">Geïnteresseerd</div>
-                    <div class="stat-card-value green" id="statInterested" style="color: var(--green);">0</div>
+                    <div class="stat-card-value green" id="statInterested" style="color: var(--green);"><!-- SOFTORA_COLDCALLING_STAT_INTERESTED --></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-label">Conversie</div>
-                    <div class="stat-card-value" id="statConversion">0%</div>
+                    <div class="stat-card-value" id="statConversion"><!-- SOFTORA_COLDCALLING_STAT_CONVERSION --></div>
                 </div>
             </div>
 
@@ -2426,6 +2426,7 @@
             });
         }
     </script>
-    <script src="assets/coldcalling-dashboard.js?v=20260410v" defer></script>
+    <!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->
+    <script src="assets/coldcalling-dashboard.js?v=20260411a" defer></script>
 </body>
 </html>

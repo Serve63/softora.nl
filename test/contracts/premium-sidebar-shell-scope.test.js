@@ -37,6 +37,7 @@ const customLayoutPages = [
 
 test('personnel theme canonical shell is explicitly opt-in', () => {
   const themeSource = readRepoFile('assets/personnel-theme.css');
+  const themeJsSource = readRepoFile('assets/personnel-theme.js');
 
   assert.match(
     themeSource,
@@ -46,6 +47,12 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
     themeSource,
     /\.dashboard-layout > \.main-content,\s*\.dashboard-layout > main\.main-content/s
   );
+  assert.match(themeJsSource, /function neutralizeSidebarAnchors\(\) \{/);
+  assert.match(themeJsSource, /anchor\.removeAttribute\("href"\);/);
+  assert.match(themeJsSource, /openSidebarNavigationTarget\(anchor\.dataset\.sidebarHref, event\);/);
+  assert.match(themeJsSource, /document\.body\.setAttribute\("data-sidebar-nav-ready", "1"\);/);
+  assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
+  assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
 });
 
 test('canonical premium pages opt into the shared sidebar shell', () => {

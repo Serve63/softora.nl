@@ -8,7 +8,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260410b">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
     <script>
         (function () {
             document.documentElement.setAttribute('data-personnel-loading', 'true');
@@ -24,7 +24,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260405a" defer></script>
+    <script src="assets/personnel-theme.js?v=20260411a" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -337,7 +337,7 @@
 
         .split {
             display: grid;
-            grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+            grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
             flex: 1;
             min-height: 0;
             overflow: hidden;
@@ -358,19 +358,19 @@
         }
 
         .form-inner {
-            padding: 12px 14px;
+            padding: 18px 20px 22px;
             flex: 1;
         }
 
         .section-label {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.56rem;
+            font-size: 0.66rem;
             font-weight: 700;
-            letter-spacing: 0.17em;
+            letter-spacing: 0.18em;
             text-transform: uppercase;
             color: var(--text-tertiary);
-            margin-bottom: 6px;
-            margin-top: 10px;
+            margin-bottom: 8px;
+            margin-top: 14px;
         }
 
         .section-label:first-child { margin-top: 0; }
@@ -378,15 +378,15 @@
         .form-group {
             display: flex;
             flex-direction: column;
-            gap: 2px;
-            margin-bottom: 6px;
+            gap: 4px;
+            margin-bottom: 10px;
         }
 
         .form-group label {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.54rem;
+            font-size: 0.62rem;
             font-weight: 700;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
             color: var(--text-tertiary);
         }
@@ -395,11 +395,11 @@
         .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 6px 8px;
+            padding: 10px 12px;
             border: 1px solid var(--border);
-            border-radius: 3px;
+            border-radius: 8px;
             font-family: 'Inter', sans-serif;
-            font-size: 0.72rem;
+            font-size: 0.92rem;
             color: var(--text-primary);
             background: var(--bg-tertiary);
             transition: border-color .15s, background .15s;
@@ -421,33 +421,33 @@
 
         .form-group textarea {
             resize: vertical;
-            min-height: 52px;
+            min-height: 112px;
         }
 
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6px;
+            gap: 10px;
         }
 
         .divider {
             border: none;
             border-top: 1px solid var(--border);
-            margin: 10px 0 4px;
+            margin: 16px 0 10px;
         }
 
         .regels-head {
             display: grid;
             grid-template-columns: 3fr 1fr 1.2fr 28px;
-            gap: 6px;
-            margin-bottom: 4px;
+            gap: 10px;
+            margin-bottom: 8px;
         }
 
         .regels-head span {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.52rem;
+            font-size: 0.6rem;
             font-weight: 700;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
             color: var(--text-tertiary);
         }
@@ -455,14 +455,14 @@
         .regel-row {
             display: grid;
             grid-template-columns: 3fr 1fr 1.2fr 28px;
-            gap: 6px;
-            margin-bottom: 4px;
+            gap: 10px;
+            margin-bottom: 8px;
             align-items: center;
         }
 
         .regel-row input {
-            padding: 6px 6px;
-            font-size: 0.72rem;
+            padding: 10px 12px;
+            font-size: 0.92rem;
         }
 
         .btn-remove {
@@ -488,18 +488,18 @@
 
         .btn-add {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.62rem;
+            font-size: 0.72rem;
             font-weight: 700;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
             color: var(--accent);
             background: none;
             border: 1px dashed rgba(155, 35, 85, .4);
-            border-radius: 4px;
-            padding: 5px 9px;
+            border-radius: 10px;
+            padding: 10px 14px;
             cursor: pointer;
             transition: all .15s;
-            margin-top: 2px;
+            margin-top: 4px;
         }
 
         .btn-add:hover {
@@ -543,7 +543,7 @@
             align-items: flex-end;
             justify-content: flex-start;
             border-left: 1px solid var(--border);
-            padding: 0 0 0 12px;
+            padding: 0 0 0 18px;
         }
 
         .preview-canvas {
@@ -555,7 +555,7 @@
             display: flex;
             align-items: flex-start;
             justify-content: flex-end;
-            margin-top: -4px;
+            margin-top: 10px;
         }
 
         .pdf-page {
@@ -932,7 +932,6 @@
                 <div class="split">
                     <div class="form-panel">
                         <div class="form-inner">
-                            <div class="section-label">Klantgegevens</div>
                             <div class="form-row">
                                 <div class="form-group"><label>Bedrijfsnaam</label><input type="text" id="o-bedrijf" oninput="updatePreview()" placeholder="De Vries B.V."></div>
                                 <div class="form-group"><label>Contactpersoon</label><input type="text" id="o-contact" oninput="updatePreview()" placeholder="Dhr. De Vries"></div>
@@ -945,7 +944,6 @@
                             </div>
 
                             <hr class="divider">
-                            <div class="section-label">Offerte details</div>
                             <div class="form-row">
                                 <div class="form-group"><label>Offertenummer</label><input type="text" id="o-nummer" oninput="updatePreview()" placeholder="OFF-2026-001"></div>
                                 <div class="form-group"><label>Datum</label><input type="date" id="o-datum" oninput="updatePreview()"></div>
@@ -956,7 +954,6 @@
                             </div>
 
                             <hr class="divider">
-                            <div class="section-label">Regelomschrijvingen</div>
                             <div class="regels-head"><span>Omschrijving</span><span>Aantal</span><span>Prijs</span><span></span></div>
                             <div id="o-regels"></div>
                             <button class="btn-add" type="button" onclick="addRegel('o')">+ Regel toevoegen</button>
@@ -979,7 +976,6 @@
                 <div class="split">
                     <div class="form-panel">
                         <div class="form-inner">
-                            <div class="section-label">Klantgegevens</div>
                             <div class="form-row">
                                 <div class="form-group"><label>Bedrijfsnaam</label><input type="text" id="f-bedrijf" oninput="updatePreview()" placeholder="De Vries B.V."></div>
                                 <div class="form-group"><label>Contactpersoon</label><input type="text" id="f-contact" oninput="updatePreview()" placeholder="Dhr. De Vries"></div>
@@ -1004,7 +1000,6 @@
                             <div class="form-group"><label>Referentie / Project</label><input type="text" id="f-ref" oninput="updatePreview()" placeholder="Website Business pakket"></div>
 
                             <hr class="divider">
-                            <div class="section-label">Regelomschrijvingen</div>
                             <div class="regels-head"><span>Omschrijving</span><span>Aantal</span><span>Prijs</span><span></span></div>
                             <div id="f-regels"></div>
                             <button class="btn-add" type="button" onclick="addRegel('f')">+ Regel toevoegen</button>
@@ -1027,7 +1022,6 @@
                 <div class="split">
                     <div class="form-panel">
                         <div class="form-inner">
-                            <div class="section-label">Klantgegevens</div>
                             <div class="form-row">
                                 <div class="form-group"><label>Bedrijfsnaam</label><input type="text" id="h-bedrijf" oninput="updatePreview()" placeholder="De Vries B.V."></div>
                                 <div class="form-group"><label>Contactpersoon</label><input type="text" id="h-contact" oninput="updatePreview()" placeholder="Dhr. De Vries"></div>
@@ -1116,13 +1110,13 @@
             if (!panel) return;
 
             const isStacked = window.innerWidth <= 1100;
-            const horizontalPadding = isStacked ? 36 : 14;
-            const verticalPadding = isStacked ? 36 : 6;
+            const horizontalPadding = isStacked ? 30 : 8;
+            const verticalPadding = isStacked ? 30 : 2;
             const availableWidth = Math.max(panel.clientWidth - horizontalPadding, 320);
             const availableHeight = Math.max(panel.clientHeight - verticalPadding, 320);
             const widthScale = availableWidth / 595;
             const heightScale = availableHeight / 842;
-            const maxScale = isStacked ? 0.78 : 0.9;
+            const maxScale = isStacked ? 0.86 : 0.98;
             const nextScale = Math.max(0.55, Math.min(widthScale, heightScale, maxScale));
 
             root.style.setProperty('--pdf-preview-scale', nextScale.toFixed(4));

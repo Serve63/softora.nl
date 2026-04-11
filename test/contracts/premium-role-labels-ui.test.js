@@ -25,3 +25,10 @@ test('premium rol-labels tonen Full Acces in plaats van Administrator', () => {
   assert.doesNotMatch(userManagementSource, /Administrator/);
   assert.match(userManagementSource, /Full Acces/);
 });
+
+test('premium instellingen gebruikt merk-kleuren in de verwijderpopup', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../premium-instellingen.html'), 'utf8');
+
+  assert.match(source, /\.confirm-title\s*\{[\s\S]*color:\s*var\(--crimson\);/);
+  assert.match(source, /\.btn-del\s*\{[\s\S]*background:\s*linear-gradient\(135deg,\s*var\(--crimson\),\s*var\(--crimson-light\)\);/);
+});

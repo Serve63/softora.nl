@@ -29,8 +29,13 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
-  assert.match(source, /Websitelink aanmaken/);
-  assert.match(source, /id="website-link-html"/);
-  assert.match(source, /id="website-link-slug"/);
+  assert.doesNotMatch(source, />AI Photo Preview</);
+  assert.doesNotMatch(source, />Website URL</);
+  assert.doesNotMatch(source, /id="website-preview-url"/);
+  assert.doesNotMatch(source, /id="website-preview-generate"/);
+  assert.doesNotMatch(source, /id="website-link-html"/);
+  assert.doesNotMatch(source, /id="website-link-slug"/);
+  assert.doesNotMatch(source, /Gegenereerde websitegenerator preview/);
+  assert.match(source, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*\) \{\s*return;\s*\}/);
   assert.match(source, /\/api\/website-links\/create/);
 });

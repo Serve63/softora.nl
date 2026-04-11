@@ -70,6 +70,7 @@ const { createRubenAssistant } = require('./server/services/ruben-assistant');
 const { createAiToolsCoordinator } = require('./server/services/ai-tools');
 const { createCustomersPageBootstrapService } = require('./server/services/customers-page-bootstrap');
 const { createHtmlPageCoordinator } = require('./server/services/html-pages');
+const { createColdcallingDashboardBootstrapService } = require('./server/services/coldcalling-dashboard-bootstrap');
 const { createLeadsPageBootstrapService } = require('./server/services/leads-page-bootstrap');
 const { registerAgendaMutationRoutes } = require('./server/routes/agenda');
 const { registerPremiumAuthRoutes } = require('./server/routes/premium-auth');
@@ -6979,6 +6980,14 @@ const leadsPageBootstrapService = createLeadsPageBootstrapService({
   leadDatabaseRowsStorageKey: 'softora_coldcalling_lead_rows_json',
 });
 
+const coldcallingDashboardBootstrapService = createColdcallingDashboardBootstrapService({
+  agendaReadCoordinator,
+  getUiStateValues,
+  getRecentCallUpdates: () => recentCallUpdates,
+  getRecentAiCallInsights: () => recentAiCallInsights,
+  normalizeString,
+});
+
 getRuntimeHtmlPageBootstrapData = async (_req, fileName) => {
   if (fileName === 'premium-personeel-agenda.html') {
     return {
@@ -7003,6 +7012,16 @@ getRuntimeHtmlPageBootstrapData = async (_req, fileName) => {
       scriptId: 'softoraLeadsBootstrap',
       data: leadsPayload,
       htmlReplacements: leadsPageBootstrapService.buildLeadsPageHtmlReplacements(leadsPayload),
+    };
+  }
+
+  if (fileName === 'premium-ai-lead-generator.html') {
+    const dashboardPayload = await coldcallingDashboardBootstrapService.buildBootstrapPayload();
+    return {
+      marker: 'SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP',
+      scriptId: 'softoraColdcallingDashboardBootstrap',
+      data: dashboardPayload,
+      htmlReplacements: coldcallingDashboardBootstrapService.buildDashboardHtmlReplacements(dashboardPayload),
     };
   }
 

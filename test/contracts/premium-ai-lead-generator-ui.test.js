@@ -10,7 +10,12 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   const dashboardSource = fs.readFileSync(dashboardPath, 'utf8');
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260410v" defer><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260411a" defer><\/script>/);
+  assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
+  assert.match(pageSource, /id="statBooked"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_BOOKED --><\/div>/);
+  assert.match(pageSource, /id="statInterested"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_INTERESTED --><\/div>/);
+  assert.match(pageSource, /id="statConversion"><!-- SOFTORA_COLDCALLING_STAT_CONVERSION --><\/div>/);
   assert.match(
     pageSource,
     /<button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="window\.openLeadDatabaseModalFromCampaign && window\.openLeadDatabaseModalFromCampaign\(\)"/
@@ -33,9 +38,14 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--regio\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*4;/);
   assert.match(dashboardSource, /let controlWrap = byId\('leadListControlWrap'\);[\s\S]*if \(!controlWrap\)/);
   assert.match(dashboardSource, /let dispatchWrap = byId\('callDispatchControlWrap'\);[\s\S]*if \(!dispatchWrap\)/);
+  assert.match(dashboardSource, /let coldcallingDashboardBootstrapPayload = null;/);
+  assert.match(dashboardSource, /function readColdcallingDashboardBootstrapPayload\(\) \{[\s\S]*softoraColdcallingDashboardBootstrap/);
+  assert.match(dashboardSource, /function primeStatsFromBootstrap\(\) \{/);
+  assert.match(dashboardSource, /if \(statsResetBaseline\) \{\s*setStatsResetBaselineState\(statsResetBaseline\);\s*\}/);
+  assert.match(dashboardSource, /primeStatsFromBootstrap\(\);\s*activeBusinessMode = await loadSavedStatusPillModeFromSupabase\(\);/);
   assert.match(
     dashboardSource,
-    /<th[\s\S]*>Bedrijf<\/th>[\s\S]*<th[\s\S]*>Adres<\/th>[\s\S]*<th[\s\S]*>Telefoonnummer<\/th>[\s\S]*<th[\s\S]*>Website<\/th>/
+    /<span>Bedrijf<\/span>[\s\S]*<span>Adres<\/span>[\s\S]*<span>Telefoonnummer<\/span>[\s\S]*<span>Website<\/span>/
   );
   assert.doesNotMatch(dashboardSource, /Contactpersoon|Webiste/);
   assert.match(

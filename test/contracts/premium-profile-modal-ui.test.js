@@ -17,9 +17,10 @@ test('premium profielmodal heeft een werkende annuleerknop en subtielere stijl',
     cssSource,
     /\.premium-profile-dialog\s*\{[\s\S]*width:\s*min\(500px,\s*100%\);[\s\S]*border-radius:\s*24px;[\s\S]*box-shadow:\s*0 18px 52px rgba\(12,\s*14,\s*26,\s*0\.16\);/s
   );
+  assert.doesNotMatch(jsSource, /Werk je naam en profielfoto bij voor de premium omgeving\./);
   assert.match(
     cssSource,
-    /\.premium-profile-title\s*\{[\s\S]*font-size:\s*clamp\(1\.5rem,\s*3vw,\s*2rem\);[\s\S]*max-width:\s*11ch;/s
+    /\.premium-profile-title\s*\{[\s\S]*font-size:\s*clamp\(1\.26rem,\s*2\.4vw,\s*1\.62rem\);[\s\S]*max-width:\s*none;[\s\S]*white-space:\s*nowrap;/s
   );
   assert.match(
     cssSource,

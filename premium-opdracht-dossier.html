@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260410b">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -20,7 +20,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260405a" defer></script>
+    <script src="assets/personnel-theme.js?v=20260411a" defer></script>
     <style>
         * {
             margin: 0;
@@ -729,6 +729,7 @@
             const REMOTE_SCOPE = 'premium_active_orders';
             const CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
             const ORDER_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
+            const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';
             const root = document.getElementById('dossierRoot');
 
             function esc(value) {
@@ -810,6 +811,30 @@
                 return {};
             }
 
+            async function fetchUiStateSetWithFallback(scope, body) {
+                const encoded = encodeURIComponent(String(scope || ''));
+                const endpoints = [
+                    `/api/ui-state-set?scope=${encoded}`,
+                    `/api/ui-state/${encoded}`
+                ];
+
+                for (const endpoint of endpoints) {
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body || {})
+                        });
+                        if (!response.ok) continue;
+                        const data = await response.json().catch(() => ({}));
+                        if (data?.ok) return data;
+                    } catch (_) {
+                        // try next endpoint
+                    }
+                }
+                return null;
+            }
+
             function getOrderIdFromQuery() {
                 const params = new URLSearchParams(window.location.search || '');
                 const id = Number(params.get('id'));
@@ -819,6 +844,102 @@
             function shouldAutoPrint() {
                 const params = new URLSearchParams(window.location.search || '');
                 return /^(1|true|yes)$/i.test(String(params.get('autoprint') || ''));
+            }
+
+            function buildDossierCacheFingerprint(baseData) {
+                return JSON.stringify({
+                    title: String(baseData?.title || '').trim(),
+                    company: String(baseData?.company || '').trim(),
+                    contact: String(baseData?.contact || '').trim(),
+                    domainName: String(baseData?.domainName || '').trim(),
+                    deliveryTime: String(baseData?.deliveryTime || '').trim(),
+                    claimedBy: String(baseData?.claimedBy || '').trim(),
+                    claimedAt: String(baseData?.claimedAt || '').trim(),
+                    description: String(baseData?.description || '').trim(),
+                    transcript: String(baseData?.transcript || '').trim(),
+                    sourceAppointmentLabel: String(baseData?.sourceAppointmentLabel || '').trim(),
+                });
+            }
+
+            function parseDossierCacheMap(rawValue) {
+                const parsed = safeJsonParse(rawValue, {});
+                return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+            }
+
+            function getSessionDossierCacheKey(orderId) {
+                return `${DOSSIER_CACHE_KEY}:${String(orderId || '')}`;
+            }
+
+            function readSessionDossierCacheEntry(orderId) {
+                try {
+                    return safeJsonParse(window.sessionStorage.getItem(getSessionDossierCacheKey(orderId)), null);
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            function writeSessionDossierCacheEntry(orderId, entry) {
+                try {
+                    window.sessionStorage.setItem(
+                        getSessionDossierCacheKey(orderId),
+                        JSON.stringify(entry || {})
+                    );
+                } catch (_) {
+                    // ignore session cache failures
+                }
+            }
+
+            function getCachedDossierLayoutResponse(rawValue, orderId, fingerprint) {
+                const sessionEntry = readSessionDossierCacheEntry(orderId);
+                const cacheMap = parseDossierCacheMap(rawValue);
+                const entries = [
+                    sessionEntry && typeof sessionEntry === 'object' ? sessionEntry : null,
+                    cacheMap[String(orderId)],
+                ];
+
+                for (const entry of entries) {
+                    if (!entry || typeof entry !== 'object') continue;
+                    const entryFingerprint = String(entry.fingerprint || '').trim();
+                    if (!entryFingerprint || entryFingerprint !== String(fingerprint || '').trim()) continue;
+                    const layoutResponse = entry.layoutResponse;
+                    if (layoutResponse && typeof layoutResponse === 'object') {
+                        return layoutResponse;
+                    }
+                }
+                return null;
+            }
+
+            function buildNextDossierCacheMap(rawValue, orderId, fingerprint, layoutResponse) {
+                const current = parseDossierCacheMap(rawValue);
+                const next = {
+                    ...current,
+                    [String(orderId)]: {
+                        fingerprint: String(fingerprint || '').trim(),
+                        updatedAt: new Date().toISOString(),
+                        layoutResponse,
+                    },
+                };
+                const orderedEntries = Object.entries(next)
+                    .sort((a, b) => {
+                        const left = Date.parse(String(a?.[1]?.updatedAt || '')) || 0;
+                        const right = Date.parse(String(b?.[1]?.updatedAt || '')) || 0;
+                        return right - left;
+                    })
+                    .slice(0, 40);
+                return Object.fromEntries(orderedEntries);
+            }
+
+            async function persistDossierCache(rawValue, orderId, fingerprint, layoutResponse) {
+                if (!orderId || !layoutResponse || typeof layoutResponse !== 'object') return;
+                const nextCacheMap = buildNextDossierCacheMap(rawValue, orderId, fingerprint, layoutResponse);
+                writeSessionDossierCacheEntry(orderId, nextCacheMap[String(orderId)]);
+                await fetchUiStateSetWithFallback(REMOTE_SCOPE, {
+                    patch: {
+                        [DOSSIER_CACHE_KEY]: JSON.stringify(nextCacheMap),
+                    },
+                    source: 'premium-opdracht-dossier',
+                    actor: 'browser',
+                });
             }
 
             function renderError(message) {
@@ -1244,6 +1365,21 @@
                 }
 
                 const baseData = buildBaseOrderData(orderId, customOrder, runtimeOrder);
+                const dossierFingerprint = buildDossierCacheFingerprint(baseData);
+                const cachedLayoutResponse = getCachedDossierLayoutResponse(
+                    values?.[DOSSIER_CACHE_KEY],
+                    orderId,
+                    dossierFingerprint
+                );
+                if (cachedLayoutResponse) {
+                    renderDossier(baseData, cachedLayoutResponse);
+                    if (shouldAutoPrint()) {
+                        window.setTimeout(() => {
+                            window.print();
+                        }, 420);
+                    }
+                    return;
+                }
                 renderLoading(
                     'Opus bouwt het dossier',
                     ''
@@ -1261,6 +1397,7 @@
                 }
 
                 renderDossier(baseData, layoutResponse);
+                void persistDossierCache(values?.[DOSSIER_CACHE_KEY], orderId, dossierFingerprint, layoutResponse);
 
                 if (shouldAutoPrint()) {
                     window.setTimeout(() => {

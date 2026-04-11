@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260410b">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
 <script>
   (function () {
     document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -20,7 +20,7 @@
     }
   })();
 </script>
-<script src="assets/personnel-theme.js?v=20260405a" defer></script>
+<script src="assets/personnel-theme.js?v=20260411a" defer></script>
 <style>
 *,
 *::before,
@@ -495,97 +495,7 @@ body {
       <section class="page-hero">
         <div>
           <h1 class="page-title">Websitegenerator</h1>
-          <p class="page-subtitle">
-            Vul een bestaande website in. Softora AI scant de huidige site en maakt daar direct een nieuwe homepage-preview
-            van als downloadbare afbeelding.
-          </p>
         </div>
-        <div class="hero-pill">AI Photo Preview</div>
-      </section>
-
-      <section class="toolbar-card">
-        <label class="input-label" for="website-preview-url">Website URL</label>
-        <div class="url-toolbar">
-          <input
-            id="website-preview-url"
-            class="url-input"
-            type="url"
-            inputmode="url"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="https://voorbeeld.nl"
-          >
-          <button id="website-preview-generate" class="primary-btn" type="button">Genereer preview</button>
-        </div>
-        <div id="website-preview-status" class="status-line">Vul een URL in en laat AI een nieuwe visuele websitevoorstel maken.</div>
-      </section>
-
-      <section class="toolbar-card publish-card">
-        <label class="input-label" for="website-link-slug">Websitelink aanmaken</label>
-        <p class="publish-copy">
-          Plak HTML-code en publiceer direct een publieke pagina op je domein. Optioneel kun je zelf het pad kiezen;
-          anders maken we automatisch een nette link voor je aan.
-        </p>
-
-        <div class="publish-grid">
-          <div>
-            <label class="input-label" for="website-link-slug">Link pad op je domein (optioneel)</label>
-            <div class="slug-input-shell">
-              <span class="slug-prefix">softora.nl/</span>
-              <input
-                id="website-link-slug"
-                class="slug-input"
-                type="text"
-                inputmode="text"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="bijv. campagne-pagina"
-              >
-            </div>
-          </div>
-
-          <div>
-            <label class="input-label" for="website-link-html">HTML code</label>
-            <textarea
-              id="website-link-html"
-              class="code-input"
-              placeholder="Plak hier de HTML-code van je pagina..."
-            ></textarea>
-          </div>
-        </div>
-
-        <div class="publish-actions">
-          <button id="website-link-create" class="primary-btn" type="button">Websitelink aanmaken</button>
-        </div>
-        <div id="website-link-status" class="status-line">Plak HTML-code en maak direct een publieke link op je domein.</div>
-        <div id="website-link-result" class="publish-result" hidden>
-          <span class="publish-result-label">Aangemaakte link</span>
-          <a id="website-link-url" class="publish-result-link" href="#" target="_blank" rel="noopener noreferrer"></a>
-          <button id="website-link-copy" class="secondary-btn" type="button">Kopieer link</button>
-        </div>
-      </section>
-
-      <section class="workspace">
-        <article class="preview-card">
-          <div class="preview-head">
-            <div>
-              <h2 class="panel-kicker" style="margin-bottom: 0.2rem;">Nieuwe preview</h2>
-              <div id="website-preview-meta" class="preview-meta">Nog geen afbeelding gegenereerd.</div>
-            </div>
-            <a id="website-preview-download" class="secondary-btn" href="#" download hidden>Download afbeelding</a>
-          </div>
-
-          <div id="website-preview-stage" class="preview-stage">
-            <div id="website-preview-empty" class="preview-empty">
-              <h3>Nieuwe homepage als beeld</h3>
-              <p>
-                Deze pagina maakt geen code, maar eerst een visuele AI-preview van hoe de website opnieuw vormgegeven kan worden.
-                Handig om snel richting, uitstraling en compositie te beoordelen.
-              </p>
-            </div>
-            <img id="website-preview-image" class="preview-image" alt="Gegenereerde websitegenerator preview" hidden>
-          </div>
-        </article>
       </section>
     </div>
   </main>
@@ -608,6 +518,26 @@ body {
   const websiteLinkResultEl = document.getElementById("website-link-result");
   const websiteLinkUrlEl = document.getElementById("website-link-url");
   const websiteLinkCopyEl = document.getElementById("website-link-copy");
+
+  if (
+    !urlInput ||
+    !generateButton ||
+    !statusEl ||
+    !metaEl ||
+    !stageEl ||
+    !emptyEl ||
+    !imageEl ||
+    !downloadEl ||
+    !websiteLinkSlugEl ||
+    !websiteLinkHtmlEl ||
+    !websiteLinkCreateEl ||
+    !websiteLinkStatusEl ||
+    !websiteLinkResultEl ||
+    !websiteLinkUrlEl ||
+    !websiteLinkCopyEl
+  ) {
+    return;
+  }
 
   function setStatus(message, tone) {
     statusEl.textContent = String(message || "");

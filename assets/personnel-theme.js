@@ -604,6 +604,7 @@
             ensureStaticSidebarLink(sidebar, "beheer", getWebsitePreviewSidebarLink(), ["seo", "packages", "pdfs"]);
             syncStaticSidebarActiveState(sidebar, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
+            neutralizeSidebarAnchors();
             sidebar.dataset.sidebarReady = "true";
             return;
         }
@@ -611,11 +612,61 @@
         // Alleen legacy/lege sidebars nog opbouwen; statische sidebars blijven onaangeroerd.
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
         pruneDeprecatedSidebarLinks(sidebar);
+        neutralizeSidebarAnchors();
         sidebar.dataset.sidebarReady = "true";
     }
 
     function buildSidebarRoleLabel(role) {
         return String(role || "").toLowerCase() === "admin" ? "Full Acces" : "Medewerker";
+    }
+
+    function openSidebarNavigationTarget(url, event) {
+        const href = String(url || "").trim();
+        if (!href) return;
+        const openInNewTab = Boolean(
+            event &&
+            (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1)
+        );
+        if (openInNewTab) {
+            window.open(href, "_blank", "noopener,noreferrer");
+            return;
+        }
+        window.location.assign(href);
+    }
+
+    function neutralizeSidebarAnchors() {
+        if (!isPremiumPersonnelContext) return;
+        let initializedCount = 0;
+        document
+            .querySelectorAll(".sidebar a.sidebar-logo, .sidebar a.sidebar-link, .sidebar-footer a.logout-btn")
+            .forEach(function (anchor) {
+                if (!anchor || anchor.dataset.sidebarNavInit === "1") return;
+                const href = String(anchor.getAttribute("href") || "").trim();
+                if (!href) return;
+                anchor.dataset.sidebarNavInit = "1";
+                anchor.dataset.sidebarHref = href;
+                anchor.removeAttribute("href");
+                anchor.setAttribute("role", "link");
+                anchor.setAttribute("tabindex", "0");
+                anchor.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    openSidebarNavigationTarget(anchor.dataset.sidebarHref, event);
+                });
+                anchor.addEventListener("auxclick", function (event) {
+                    if (event.button !== 1) return;
+                    event.preventDefault();
+                    openSidebarNavigationTarget(anchor.dataset.sidebarHref, event);
+                });
+                anchor.addEventListener("keydown", function (event) {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    openSidebarNavigationTarget(anchor.dataset.sidebarHref, event);
+                });
+                initializedCount += 1;
+            });
+        if (initializedCount > 0) {
+            document.body.setAttribute("data-sidebar-nav-ready", "1");
+        }
     }
 
     function buildSidebarInitialsFromSession(session) {
@@ -834,7 +885,6 @@
             '  <div class="premium-profile-header">',
             '    <p class="premium-profile-kicker">Profiel</p>',
             '    <h2 class="premium-profile-title" id="premium-profile-title">Persoonlijke instellingen</h2>',
-            '    <p class="premium-profile-text">Werk je naam en profielfoto bij voor de premium omgeving.</p>',
             '  </div>',
             '  <form class="premium-profile-form" novalidate>',
             '    <div class="premium-profile-identity">',
@@ -1513,6 +1563,7 @@
 
     initSoftoraDialogs();
     applyUnifiedPremiumSidebar();
+    neutralizeSidebarAnchors();
     initPremiumSidebarProfile();
     initSidebarNotificationCounts();
     forceLightTheme();
