@@ -22,13 +22,13 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   );
   assert.match(pageSource, /<div class="form-group form-group--dispatch" id="callDispatchControlWrap">/);
   assert.match(pageSource, /<select class="form-select magnetic" id="callDispatchMode">/);
-  assert.match(pageSource, /<select class="form-select magnetic" id="regio" data-force-change-value="custom">/);
+  assert.match(pageSource, /<select class="form-select magnetic" id="regio">/);
   assert.match(pageSource, /<select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">/);
   assert.match(pageSource, /<option value="websites" data-dot-color="accent" selected>Website's<\/option>/);
   assert.match(pageSource, /<option value="voice_software" data-dot-color="green" disabled>🔒 Voicesoftware<\/option>/);
   assert.match(pageSource, /<option value="business_software" data-dot-color="blue" disabled>🔒 Bedrijfssoftware<\/option>/);
   assert.match(pageSource, /<option value="unlimited" selected>Geen limiet<\/option>/);
-  assert.match(pageSource, /<option value="custom">Aangepast<\/option>/);
+  assert.doesNotMatch(pageSource, /<option value="custom">Aangepast<\/option>/);
   assert.match(pageSource, /window\.openSiteInputDialog = openSiteInputDialog;/);
   assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="accent"\] \.site-select-trigger::before \{[\s\S]*background:\s*var\(--accent-light\);/);
   assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="blue"\] \.site-select-trigger::before \{[\s\S]*background:\s*#2563eb;/);
@@ -93,12 +93,14 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /<div class="lead-db-toolbar">[\s\S]*leadDatabaseRefreshInfo[\s\S]*leadDatabaseTemplateBtn[\s\S]*leadDatabaseAddManualBtn[\s\S]*leadDatabaseImportBtn/);
   assert.match(dashboardSource, /<div id="leadDatabaseSummaryCards" class="lead-db-stats"><\/div>/);
   assert.match(dashboardSource, /class="lead-db-table-card"/);
+  assert.match(dashboardSource, /lead-db-table-summary[\s\S]*Unieke mensen gebeld[\s\S]*Totale beltijd/);
   assert.match(dashboardSource, /<button type="button" id="leadDatabaseCancelBtn" class="lead-db-close-btn" aria-label="Sluiten" title="Sluiten">×<\/button>/);
   assert.doesNotMatch(dashboardSource, /<div class="lead-db-logo">Softora\.nl<\/div>/);
   assert.doesNotMatch(dashboardSource, /<div class="lead-db-footer">Softora\.nl<\/div>/);
   assert.doesNotMatch(dashboardSource, /id="leadDatabaseRefreshBtn"/);
   assert.doesNotMatch(dashboardSource, /id="leadDatabaseFilterPills"/);
   assert.doesNotMatch(dashboardSource, /<button type="button" id="leadDatabaseCancelBtn" class="lead-db-btn">Sluiten<\/button>/);
+  assert.doesNotMatch(dashboardSource, /lead-db-company-avatar/);
   assert.match(dashboardSource, /function hasAlertPhoneConversationSignal\(value\) \{/);
   assert.match(dashboardSource, /function hasOtherPhoneConversationSignal\(value\) \{/);
   assert.match(dashboardSource, /function hasOutOfServicePhoneConversationSignal\(value\) \{/);
@@ -111,6 +113,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /function getConversationRecordOccurredAt\(record\) \{/);
   assert.match(dashboardSource, /sort\(\(a, b\) => getConversationRecordOccurredMs\(b\) - getConversationRecordOccurredMs\(a\)\)/);
   assert.match(dashboardSource, /formatConversationTimestamp\(getConversationRecordOccurredAt\(record\)\)/);
+  assert.match(dashboardSource, /function buildLeadDatabaseCallSummaryStats\(calls\) \{/);
+  assert.match(dashboardSource, /function formatLeadDatabaseAggregateDuration\(totalSeconds\) \{/);
   assert.match(dashboardSource, /const sortedUpdates = entry\.updates[\s\S]*sort\(\(a, b\) => getConversationRecordOccurredMs\(b\) - getConversationRecordOccurredMs\(a\)\)/);
   assert.match(dashboardSource, /const rows = \(Array\.isArray\(state\.calls\) \? state\.calls : \[\]\)[\s\S]*sort\(\(a, b\) => getConversationRecordOccurredMs\(b\) - getConversationRecordOccurredMs\(a\)\)/);
   assert.match(

@@ -3310,6 +3310,52 @@
     return `${mins}m ${String(secs).padStart(2, '0')}s`;
   }
 
+  function getLeadDatabaseCallPartyIdentity(call) {
+    const normalizedPhone = phoneKey(call?.phone || '');
+    if (normalizedPhone) return `phone:${normalizedPhone}`;
+
+    const companyKey = normalizeSearchText(call?.company || '');
+    const nameKey = normalizeSearchText(call?.name || '');
+    if (companyKey || nameKey) return `lead:${companyKey}|${nameKey}`;
+
+    const callId = normalizeFreeText(call?.callId || '');
+    return callId ? `call:${callId}` : '';
+  }
+
+  function formatLeadDatabaseAggregateDuration(totalSeconds) {
+    const safeSeconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
+    if (safeSeconds >= 3600) {
+      const hours = Math.floor(safeSeconds / 3600);
+      const minutes = Math.floor((safeSeconds % 3600) / 60);
+      return minutes > 0 ? `${hours} uur ${minutes} min` : `${hours} uur`;
+    }
+
+    const minutes = Math.floor(safeSeconds / 60);
+    if (minutes > 0) return `${minutes} min`;
+    if (safeSeconds > 0) return `${safeSeconds} sec`;
+    return '0 min';
+  }
+
+  function buildLeadDatabaseCallSummaryStats(calls) {
+    const uniquePeople = new Set();
+    let totalDurationSeconds = 0;
+
+    (Array.isArray(calls) ? calls : []).forEach((call) => {
+      const identity = getLeadDatabaseCallPartyIdentity(call);
+      if (identity) uniquePeople.add(identity);
+
+      const durationSeconds = Math.max(0, Math.round(Number(call?.durationSeconds) || 0));
+      if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+        totalDurationSeconds += durationSeconds;
+      }
+    });
+
+    return {
+      uniquePeopleCalled: uniquePeople.size,
+      totalDurationLabel: formatLeadDatabaseAggregateDuration(totalDurationSeconds),
+    };
+  }
+
   function formatConversationTimestamp(value) {
     const raw = String(value || '').trim();
     if (!raw) return 'Onbekend';
@@ -4925,24 +4971,7 @@
           #leadDatabaseModalShell .lead-db-cell-bedrijf {
             display: flex;
             align-items: center;
-            gap: 10px;
             min-width: 0;
-          }
-
-          #leadDatabaseModalShell .lead-db-company-avatar {
-            width: 30px;
-            height: 30px;
-            border: 1px solid var(--lead-db-border);
-            border-radius: 6px;
-            background: var(--lead-db-tag);
-            color: var(--lead-db-crimson);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 11px;
-            font-weight: 800;
           }
 
           #leadDatabaseModalShell .lead-db-company-name,
@@ -4977,6 +5006,44 @@
             color: var(--lead-db-text-dark);
             text-decoration: underline;
             text-underline-offset: 2px;
+          }
+
+          #leadDatabaseModalShell .lead-db-table-summary {
+            display: flex;
+            align-items: stretch;
+            justify-content: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 16px 20px;
+            border-top: 1px solid var(--lead-db-border);
+            background: linear-gradient(90deg, rgba(155, 35, 85, 0.06), rgba(155, 35, 85, 0.015));
+          }
+
+          #leadDatabaseModalShell .lead-db-table-summary-item {
+            min-width: 190px;
+            padding: 10px 14px;
+            border: 1px solid var(--lead-db-border);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.72);
+          }
+
+          #leadDatabaseModalShell .lead-db-table-summary-label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--lead-db-text-light);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+          }
+
+          #leadDatabaseModalShell .lead-db-table-summary-value {
+            display: block;
+            color: var(--lead-db-text-dark);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 26px;
+            font-weight: 700;
+            line-height: 1;
           }
 
           #leadDatabaseModalShell .lead-db-status-pill {
@@ -5993,6 +6060,7 @@
       if (state.filter === 'phone_calls') {
         const calls = getFilteredCalls();
         const callIntentByCallId = buildCallIntentByCallId(state.records);
+        const callSummary = buildLeadDatabaseCallSummaryStats(calls);
         if (calls.length === 0) {
           tableWrap.innerHTML = `<div class="lead-db-empty">Geen telefoongesprekken gevonden.</div>`;
           return;
@@ -6010,13 +6078,6 @@
               ${calls
                 .map((call) => {
                   const company = normalizeFreeText(call?.company || call?.name || 'Onbekend');
-                  const avatar = company
-                    .split(/\s+/)
-                    .filter(Boolean)
-                    .map((part) => part[0] || '')
-                    .join('')
-                    .slice(0, 2)
-                    .toUpperCase();
                   const phone = formatLeadDatabasePhone(normalizeFreeText(call?.phone || ''));
                   const intent = inferPhoneConversationIntent(call, callIntentByCallId);
                   const status =
@@ -6040,8 +6101,7 @@
                     )}" tabindex="0" role="button" aria-label="Open gesprek van ${escapeHtml(
                       company
                     )}">
-                      <div class="lead-db-cell-bedrijf" title="${escapeHtml(company)}">
-                        <div class="lead-db-company-avatar">${escapeHtml(avatar || 'DB')}</div>
+                      <div class="lead-db-cell-bedrijf">
                         <div class="lead-db-company-name">${escapeHtml(company)}</div>
                       </div>
                       <div class="lead-db-cell lead-db-cell--mono">${escapeHtml(phone || '-')}</div>
@@ -6054,6 +6114,16 @@
                   `;
                 })
                 .join('')}
+          </div>
+          <div class="lead-db-table-summary" role="status" aria-live="polite">
+            <div class="lead-db-table-summary-item">
+              <span class="lead-db-table-summary-label">Unieke mensen gebeld</span>
+              <span class="lead-db-table-summary-value">${escapeHtml(String(callSummary.uniquePeopleCalled))}</span>
+            </div>
+            <div class="lead-db-table-summary-item">
+              <span class="lead-db-table-summary-label">Totale beltijd</span>
+              <span class="lead-db-table-summary-value">${escapeHtml(callSummary.totalDurationLabel)}</span>
+            </div>
           </div>
         `;
         tableWrap.querySelectorAll('[data-db-call-open]').forEach((row) => {
@@ -6093,13 +6163,6 @@
             ${filtered
               .map((record) => {
                 const company = record.company || 'Onbekend bedrijf';
-                const avatar = company
-                  .split(/\s+/)
-                  .filter(Boolean)
-                  .map((part) => part[0] || '')
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase();
                 const address = record.address || '-';
                 const phone =
                   formatLeadDatabasePhone(normalizeFreeText(record.phone || '')) ||
@@ -6109,8 +6172,7 @@
                 const websiteHref = /^https?:\/\//i.test(website) ? website : `https://${website}`;
                 return `
                   <div class="lead-db-row lead-db-row--records">
-                    <div class="lead-db-cell-bedrijf" title="${escapeHtml(company)}">
-                      <div class="lead-db-company-avatar">${escapeHtml(avatar || 'DB')}</div>
+                    <div class="lead-db-cell-bedrijf">
                       <div class="lead-db-company-name">${escapeHtml(company)}</div>
                     </div>
                     <div class="lead-db-cell" title="${escapeHtml(address)}">${escapeHtml(address)}</div>

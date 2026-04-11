@@ -3,19 +3,26 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken factuur-betaald actie', () => {
+test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
   const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
-  assert.match(source, /<button class="complete-btn magnetic" id="complete-btn-\$\{id\}" type="button" data-order-complete="\$\{id\}">\s*Factuur betaald\s*<\/button>\s*<div class="order-assignee" id="assignee-\$\{id\}">\$\{escapeHtml\(claimInfo\.by \|\| 'Nog niet geclaimd'\)\}<\/div>/);
+  assert.match(source, /const paymentButtonHtml = ui\.isBuilt\s*\?\s*''\s*:/);
   assert.match(source, /<button class="complete-btn magnetic" id="complete-btn-\$\{id\}" type="button" data-order-complete="\$\{id\}">\s*Factuur betaald\s*<\/button>/);
+  assert.match(source, /\$\{paymentButtonHtml\}\s*<div class="order-assignee" id="assignee-\$\{id\}">\$\{escapeHtml\(claimInfo\.by \|\| 'Nog niet geclaimd'\)\}<\/div>/);
   assert.match(source, /completeBtnEl\.textContent = 'Factuur betaald';/);
+  assert.match(source, /completeBtnEl\.hidden = isDelivered;/);
+  assert.match(source, /completeBtnEl\.style\.display = isDelivered \? 'none' : '';/);
   assert.match(source, /assigneeEl\.textContent = claimInfo\.by \|\| 'Nog niet geclaimd';/);
-  assert.match(source, /function handleOrderPaymentAction\(id\) \{[\s\S]*if \(ui\.isBuilt\) \{\s*markOrderAsPaid\(id\);[\s\S]*markOrderAsCompleted\(id\);/);
-  assert.match(source, /document\.querySelectorAll\('\.complete-btn'\)\.forEach\(\(b\) => \{[\s\S]*handleOrderPaymentAction\(id\);/);
+  assert.match(source, /const isPaidOrder = Boolean\(paidAt\) \|\| status\.key === 'betaald';[\s\S]*if \(isPaidOrder\) \{[\s\S]*nextStatus = 'betaald';/);
+  assert.match(source, /async function handleOrderPaymentAction\(id\) \{[\s\S]*if \(ui\.isPaid \|\| ui\.isBuilt\) return false;[\s\S]*return markOrderAsPaid\(id, \{ confirm: true \}\);/);
+  assert.match(source, /window\.SoftoraDialogs && typeof window\.SoftoraDialogs\.confirm === 'function'[\s\S]*Factuur betaald bevestigen/);
+  assert.match(source, /await persistRequiredUiStateKeysOrThrow\(\s*\[CUSTOM_ORDERS_KEY, ORDER_RUNTIME_KEY\],/);
+  assert.match(source, /document\.querySelectorAll\('\.complete-btn'\)\.forEach\(\(b\) => \{[\s\S]*void handleOrderPaymentAction\(id\);/);
+  assert.match(source, /window\.addEventListener\('pagehide', \(\) => \{[\s\S]*void flushRemoteUiStateSave\(\);/);
   assert.match(source, /leadOwnerName: String\(item\?\.leadOwnerName \|\| item\?\.leadOwnerFullName \|\| ''\)\.trim\(\),/);
   assert.match(source, /const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder\(customOrder\);[\s\S]*const claimedBy = normalizeClaimEmployeeName\(customOrder\.claimedBy \|\| runtime\.claimedBy \|\| linkedLeadOwnerName \|\| ''\);/);
   assert.match(source, /claimedBy: linkedLeadOwnerName \|\| null,/);

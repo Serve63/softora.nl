@@ -1609,6 +1609,7 @@
         let remoteUiStateLoadPromise = null;
         let remoteUiStateSaveTimer = null;
         let remoteUiStateSaveInFlight = false;
+        let remoteUiStateSavePromise = null;
         let remoteUiStatePendingPatch = {};
 
         const orders = {
@@ -1788,26 +1789,56 @@
         }
 
         async function flushRemoteUiStateSave() {
-            if (remoteUiStateSaveInFlight) return;
+            if (remoteUiStateSaveTimer) {
+                clearTimeout(remoteUiStateSaveTimer);
+                remoteUiStateSaveTimer = null;
+            }
+            if (remoteUiStateSaveInFlight) {
+                await (remoteUiStateSavePromise || Promise.resolve());
+            }
             const patch = remoteUiStatePendingPatch;
             const keys = Object.keys(patch);
             if (!keys.length) return;
 
             remoteUiStatePendingPatch = {};
             remoteUiStateSaveInFlight = true;
+            const currentSavePromise = (async () => {
+                try {
+                    await fetchUiStateSetWithFallback(REMOTE_UI_STATE_SCOPE, {
+                        patch,
+                        source: 'premium-actieve-opdrachten',
+                        actor: 'browser'
+                    });
+                } catch (_) {
+                    keys.forEach((key) => {
+                        remoteUiStatePendingPatch[key] = String(patch[key] ?? '');
+                    });
+                } finally {
+                    remoteUiStateSaveInFlight = false;
+                    if (Object.keys(remoteUiStatePendingPatch).length) queueRemoteUiStateSave();
+                }
+            })();
+            remoteUiStateSavePromise = currentSavePromise;
             try {
-                await fetchUiStateSetWithFallback(REMOTE_UI_STATE_SCOPE, {
-                    patch,
-                    source: 'premium-actieve-opdrachten',
-                    actor: 'browser'
-                });
-            } catch (_) {
-                keys.forEach((key) => {
-                    remoteUiStatePendingPatch[key] = String(patch[key] ?? '');
-                });
+                await currentSavePromise;
             } finally {
-                remoteUiStateSaveInFlight = false;
-                if (Object.keys(remoteUiStatePendingPatch).length) queueRemoteUiStateSave();
+                if (remoteUiStateSavePromise === currentSavePromise) {
+                    remoteUiStateSavePromise = null;
+                }
+            }
+        }
+
+        async function persistRequiredUiStateKeysOrThrow(requiredKeys, errorMessage) {
+            await flushRemoteUiStateSave();
+            if (remoteUiStateSaveTimer) {
+                clearTimeout(remoteUiStateSaveTimer);
+                remoteUiStateSaveTimer = null;
+                await flushRemoteUiStateSave();
+            }
+            const keys = Array.isArray(requiredKeys) ? requiredKeys : [];
+            const stillPending = keys.some((key) => Object.prototype.hasOwnProperty.call(remoteUiStatePendingPatch, key));
+            if (remoteUiStateSaveInFlight || remoteUiStateSaveTimer || stillPending) {
+                throw new Error(errorMessage || 'Remote UI-state kon niet volledig worden opgeslagen.');
             }
         }
 
@@ -2609,6 +2640,20 @@
             writeStateValue(ORDER_RUNTIME_KEY, JSON.stringify(serializeOrdersRuntime()));
         }
 
+        function cloneOrderRuntimeForRollback(order) {
+            if (!order || typeof order !== 'object') return null;
+            return {
+                ...order,
+                logs: Array.isArray(order.logs)
+                    ? order.logs.map((entry) => ({
+                        time: String(entry?.time || ''),
+                        msg: String(entry?.msg || ''),
+                        highlight: Boolean(entry?.highlight)
+                    }))
+                    : []
+            };
+        }
+
         function applyOrderUiStateToCard(id) {
             const order = orders[id];
             if (!order) return;
@@ -2678,7 +2723,9 @@
 
             if (completeBtnEl) {
                 completeBtnEl.textContent = 'Factuur betaald';
-                completeBtnEl.disabled = ui.isPaid;
+                completeBtnEl.hidden = isDelivered;
+                completeBtnEl.style.display = isDelivered ? 'none' : '';
+                completeBtnEl.disabled = isDelivered || ui.isPaid;
                 completeBtnEl.classList.toggle('done', ui.isPaid);
             }
 
@@ -2700,9 +2747,13 @@
                 let nextStatus = status.key;
                 let note = '';
                 const paidAt = String(order.paidAt || '').trim();
+                const isPaidOrder = Boolean(paidAt) || status.key === 'betaald';
                 const claimInfo = getOrderClaimInfo(id);
 
-                if (claimInfo.isClaimed && !hasPreview) {
+                if (isPaidOrder) {
+                    nextStatus = 'betaald';
+                    if (nextPct >= 100 && !hasPreview) nextPct = 0;
+                } else if (claimInfo.isClaimed && !hasPreview) {
                     if (nextStatus !== 'betaald') nextStatus = 'bezig';
                     if (nextPct >= 100) nextPct = 0;
                 } else if (pct >= 100 && hasPreview) {
@@ -2719,7 +2770,7 @@
                 } else if (status.key === 'bezig') {
                     nextStatus = 'actief';
                     note = 'Vorige run stond nog op bezig maar draaide niet meer. Voer de opdracht opnieuw uit.';
-                } else if ((status.key === 'klaar' || status.key === 'betaald') && !hasPreview) {
+                } else if (status.key === 'klaar' && !hasPreview) {
                     nextStatus = 'actief';
                     note = 'Opdracht stond op klaar zonder preview en is teruggezet.';
                 }
@@ -2794,6 +2845,12 @@
             const title = String(record.title || 'Opdracht').trim() || 'Opdracht';
             const description = String(record.description || 'Geen extra omschrijving.').trim() || 'Geen extra omschrijving.';
             const deliveryHtml = `<div class="order-delivery"><strong>Oplevertijd</strong>${escapeHtml(deliveryLabel)}</div>`;
+            const paymentButtonHtml = ui.isBuilt
+                ? ''
+                : `
+                            <button class="complete-btn magnetic" id="complete-btn-${id}" type="button" data-order-complete="${id}">
+                                Factuur betaald
+                            </button>`;
 
             return `
                 <div class="order-card has-claim ${isDelivered ? 'delivered' : ''} ${isPaid ? 'paid' : ''}" id="order-${id}" role="button" tabindex="0" aria-label="Opdracht ${id}">
@@ -2813,9 +2870,7 @@
                                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5h18M5.25 7.5v10.5A1.5 1.5 0 0 0 6.75 19.5h10.5a1.5 1.5 0 0 0 1.5-1.5V7.5M9 7.5V6a3 3 0 1 1 6 0v1.5"></path></svg>
                                 Open dossier
                             </button>
-                            <button class="complete-btn magnetic" id="complete-btn-${id}" type="button" data-order-complete="${id}">
-                                Factuur betaald
-                            </button>
+                            ${paymentButtonHtml}
                             <div class="order-assignee" id="assignee-${id}">${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</div>
                         </div>
                     </div>
@@ -2857,7 +2912,7 @@
                 completeBtn.dataset.boundComplete = '1';
                 completeBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    markOrderAsCompleted(id);
+                    void handleOrderPaymentAction(id);
                 });
             }
 
@@ -3458,26 +3513,87 @@
             };
         }
 
-        function markOrderAsPaid(id) {
+        async function markOrderAsPaid(id, options = {}) {
             const order = orders[id];
-            if (!order) return;
+            if (!order) return false;
 
             const ui = resolveOrderUiState(order);
-            if (!ui.isBuilt || ui.isPaid) return;
+            if (ui.isPaid) return true;
+
+            const requiresConfirmation = options.confirm === true && !ui.isBuilt;
+            if (requiresConfirmation) {
+                const orderLabel = String(getCustomOrderById(id)?.title || order.type || order.name || 'deze opdracht').trim();
+                const confirmationMessage = `Factuur van "${orderLabel}" als betaald markeren? Deze opdracht wordt dan direct verplaatst naar voltooide opdrachten.`;
+                const confirmed =
+                    window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
+                        ? await window.SoftoraDialogs.confirm(confirmationMessage, {
+                            title: 'Factuur betaald bevestigen',
+                            confirmText: 'Bevestigen',
+                            cancelText: 'Annuleren',
+                        })
+                        : window.confirm(confirmationMessage);
+                if (!confirmed) return false;
+            }
+
+            const previousOrder = cloneOrderRuntimeForRollback(order);
+            const previousCustomOrders = customOrders.slice();
+            const completeBtnEl = document.getElementById(`complete-btn-${id}`);
+            if (completeBtnEl) {
+                completeBtnEl.disabled = true;
+                completeBtnEl.textContent = 'Opslaan...';
+            }
 
             const nowIso = new Date().toISOString();
-            order.paidAt = nowIso;
-            order.statusKey = 'betaald';
-            order.updatedAt = Date.now();
+            try {
+                order.progressPct = 100;
+                order.paidAt = nowIso;
+                order.statusKey = 'betaald';
+                order.updatedAt = Date.now();
 
-            updateCustomOrderById(id, {
-                status: 'betaald',
-                paidAt: nowIso
-            });
+                updateCustomOrderById(id, {
+                    status: 'betaald',
+                    paidAt: nowIso
+                });
 
-            appendOrderLog(id, 'Klant heeft betaald. Opdracht is volledig afgerond.', true);
-            persistOrdersRuntime();
-            applyOrderUiStateToCard(id);
+                appendOrderLog(
+                    id,
+                    ui.isBuilt
+                        ? 'Klant heeft betaald. Opdracht is volledig afgerond.'
+                        : 'Factuur bevestigd als betaald. Opdracht is afgerond en verplaatst naar voltooide opdrachten.',
+                    true
+                );
+                persistOrdersRuntime();
+                await persistRequiredUiStateKeysOrThrow(
+                    [CUSTOM_ORDERS_KEY, ORDER_RUNTIME_KEY],
+                    'Remote opdrachtstatus kon niet worden opgeslagen.'
+                );
+                applyOrderUiStateToCard(id);
+                setOrderFilter('completed');
+                return true;
+            } catch (error) {
+                console.error('Factuurstatus opslaan mislukt:', error);
+                customOrders = previousCustomOrders;
+                persistCustomOrders();
+                if (previousOrder) {
+                    orders[id] = previousOrder;
+                }
+                persistOrdersRuntime();
+                try {
+                    await flushRemoteUiStateSave();
+                } catch (_) {
+                    // ignore rollback flush errors
+                }
+                applyOrderUiStateToCard(id);
+                if (window.SoftoraDialogs && typeof window.SoftoraDialogs.alert === 'function') {
+                    await window.SoftoraDialogs.alert('Factuurstatus opslaan mislukt. Probeer het opnieuw.', {
+                        title: 'Opslaan mislukt',
+                        confirmText: 'Sluiten',
+                    });
+                } else {
+                    window.alert('Factuurstatus opslaan mislukt. Probeer het opnieuw.');
+                }
+                return false;
+            }
         }
 
         function markOrderAsCompleted(id) {
@@ -3503,16 +3619,12 @@
             setOrderFilter('completed');
         }
 
-        function handleOrderPaymentAction(id) {
+        async function handleOrderPaymentAction(id) {
             const order = orders[id];
-            if (!order) return;
+            if (!order) return false;
             const ui = resolveOrderUiState(order);
-            if (ui.isPaid) return;
-            if (ui.isBuilt) {
-                markOrderAsPaid(id);
-                return;
-            }
-            markOrderAsCompleted(id);
+            if (ui.isPaid || ui.isBuilt) return false;
+            return markOrderAsPaid(id, { confirm: true });
         }
 
         function buildFallbackSitePrompt(meta, customOrder) {
@@ -4392,7 +4504,7 @@
             b.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const id = Number(b.getAttribute('data-order-complete'));
-                handleOrderPaymentAction(id);
+                void handleOrderPaymentAction(id);
             });
         });
 
@@ -4455,6 +4567,9 @@
         }
 
         void initializeActiveOrdersPageState();
+        window.addEventListener('pagehide', () => {
+            void flushRemoteUiStateSave();
+        });
 
         // Cursor (robust)
         (function initCursor() {
