@@ -1160,7 +1160,8 @@
             const leadsBootstrapPayload = readLeadsBootstrapPayload();
             const LEADS_MEMORY_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEADS_LOAD_RETRY_DELAY_MS = 4000;
-            const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
+            const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+            const LEAD_SUPPRESSION_STORAGE_KEY = 'softora_coldcalling_suppressed_leads_json';
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
             const leadDetailsById = Object.create(null);
@@ -3167,9 +3168,24 @@
 
             function persistSuppressedLeadRows() {
                 purgeExpiredSuppressedLeadKeys();
+                try {
+                    const obj = Object.fromEntries(manuallySuppressedLeadKeys);
+                    localStorage.setItem(LEAD_SUPPRESSION_STORAGE_KEY, JSON.stringify(obj));
+                } catch (_) {}
             }
 
             function hydrateSuppressedLeadRows() {
+                try {
+                    const raw = localStorage.getItem(LEAD_SUPPRESSION_STORAGE_KEY);
+                    if (raw) {
+                        const obj = JSON.parse(raw);
+                        if (obj && typeof obj === 'object') {
+                            Object.entries(obj).forEach(([key, expiresAt]) => {
+                                manuallySuppressedLeadKeys.set(key, Number(expiresAt) || 0);
+                            });
+                        }
+                    }
+                } catch (_) {}
                 purgeExpiredSuppressedLeadKeys();
             }
 

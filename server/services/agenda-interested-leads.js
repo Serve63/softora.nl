@@ -38,6 +38,7 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     buildRuntimeStateSnapshotPayload = () => null,
     applyRuntimeStateSnapshotPayload = () => false,
     waitForQueuedRuntimeSnapshotPersist = async () => true,
+    invalidateSupabaseSyncTimestamp = () => {},
   } = deps;
 
   function takeRuntimeMutationSnapshot() {
@@ -378,6 +379,7 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     ensureLeadMutationPersisted(runtimeSnapshot, 'Lead kon niet veilig in gedeelde opslag worden gezet.').catch(
       () => null
     );
+    invalidateSupabaseSyncTimestamp();
 
     return res.status(200).json({
       ok: true,
@@ -426,13 +428,8 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       'dashboard_activity_interested_lead_removed'
     );
 
-    const persistFailureMessage = await ensureLeadMutationPersisted(
-      runtimeSnapshot,
-      'Leadverwijdering kon niet veilig in gedeelde opslag worden opgeslagen.'
-    );
-    if (persistFailureMessage !== true) {
-      return res.status(503).json({ ok: false, error: persistFailureMessage });
-    }
+    ensureLeadMutationPersisted(runtimeSnapshot, 'Leadverwijdering kon niet veilig in gedeelde opslag worden opgeslagen.').catch(() => null);
+    invalidateSupabaseSyncTimestamp();
 
     return res.status(200).json({
       ok: true,

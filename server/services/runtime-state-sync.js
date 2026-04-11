@@ -1023,11 +1023,17 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     return applied;
   }
 
+  function invalidateSupabaseSyncTimestamp() {
+    runtimeState.runtimeStateLastSupabaseSyncCheckMs = 0;
+    runtimeState.supabaseCallUpdatesLastSyncCheckMs = 0;
+  }
+
   return {
     applyRuntimeStateSnapshotPayload,
     buildCallUpdateRowPersistMeta,
     ensureRuntimeStateHydratedFromSupabase,
     forceHydrateRuntimeStateWithRetries,
+    invalidateSupabaseSyncTimestamp,
     mergeCallUpdatesFromSupabaseRows,
     persistRuntimeStateToSupabase,
     persistSingleCallUpdateRowToSupabase,

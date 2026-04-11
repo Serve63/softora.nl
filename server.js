@@ -1261,6 +1261,7 @@ const {
   buildCallUpdateRowPersistMeta,
   ensureRuntimeStateHydratedFromSupabase,
   forceHydrateRuntimeStateWithRetries,
+  invalidateSupabaseSyncTimestamp,
   persistRuntimeStateToSupabase,
   queueCallUpdateRowPersist,
   syncCallUpdatesFromSupabaseRows,
@@ -6832,6 +6833,7 @@ const agendaInterestedLeadsCoordinator = createAgendaInterestedLeadsCoordinator(
   buildRuntimeStateSnapshotPayload,
   applyRuntimeStateSnapshotPayload,
   waitForQueuedRuntimeSnapshotPersist,
+  invalidateSupabaseSyncTimestamp,
 });
 
 const {
@@ -6924,6 +6926,7 @@ const agendaConfirmationCoordinator = createAgendaConfirmationCoordinator({
   buildRuntimeStateSnapshotPayload,
   applyRuntimeStateSnapshotPayload,
   waitForQueuedRuntimeSnapshotPersist,
+  invalidateSupabaseSyncTimestamp,
 });
 
 const {

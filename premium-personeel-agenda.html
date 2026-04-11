@@ -473,6 +473,108 @@
         .modal-workspace-status.error { color: var(--red); }
         .modal-workspace-status.success { color: var(--green); }
 
+        /* Workspace loading overlay */
+        .modal-workspace-loading {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.82);
+            border-radius: 8px;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .modal-workspace-loading.show { display: flex; }
+        .modal-workspace-spinner {
+            width: 28px; height: 28px;
+            border: 2.5px solid var(--border);
+            border-top-color: var(--primary, #7e3f6b);
+            border-radius: 50%;
+            animation: wspin 0.7s linear infinite;
+        }
+        @keyframes wspin { to { transform: rotate(360deg); } }
+
+        /* Workspace success state */
+        .modal-workspace-success {
+            display: none;
+            flex-direction: column;
+            gap: 0.9rem;
+            padding: 0.2rem 0;
+        }
+        .modal-workspace-success.show { display: flex; }
+
+        .ws-success-title {
+            font-size: 0.85rem;
+            color: var(--green);
+            font-weight: 500;
+        }
+
+        .ws-customer-reminder {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.7rem;
+            background: #fdf6f0;
+            border: 1px solid #f0d9c8;
+            border-radius: 8px;
+            padding: 0.75rem 0.9rem;
+        }
+        .ws-customer-reminder-icon {
+            flex-shrink: 0;
+            width: 36px; height: 36px;
+            background: #f4e0d0;
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            color: #b56a3a;
+        }
+        .ws-customer-reminder-body { flex: 1; min-width: 0; }
+        .ws-customer-reminder-label {
+            font-size: 0.72rem;
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #b56a3a;
+            margin-bottom: 0.2rem;
+        }
+        .ws-customer-reminder-text {
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+        .ws-customer-reminder-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-top: 0.4rem;
+            font-size: 0.78rem;
+            color: #b56a3a;
+            text-decoration: none;
+            font-weight: 500;
+            border: 1px solid #f0d9c8;
+            border-radius: 5px;
+            padding: 0.2rem 0.5rem;
+            background: #fff;
+            cursor: pointer;
+        }
+        .ws-customer-reminder-link:hover { background: #fdf0e6; }
+
+        .ws-customer-checkbox-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.55rem;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            user-select: none;
+        }
+        .ws-customer-checkbox-row input[type="checkbox"] {
+            width: 16px; height: 16px;
+            margin-top: 2px;
+            accent-color: var(--primary, #7e3f6b);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
         .modal-workspace-actions {
             margin-top: 0.5rem;
             display: flex;
@@ -800,9 +902,12 @@
                     <div class="modal-audio-meta" id="modalAudioMeta" hidden></div>
                 </div>
             </div>
-            <div class="modal-workspace" id="modalWorkspace">
+            <div class="modal-workspace" id="modalWorkspace" style="position:relative;">
+                <div class="modal-workspace-loading" id="workspaceLoadingOverlay">
+                    <div class="modal-workspace-spinner"></div>
+                </div>
                 <div class="modal-workspace-status" id="workspaceVoiceStatus"></div>
-                <div class="modal-workspace-grid">
+                <div class="modal-workspace-grid" id="workspaceInputArea">
                     <div class="modal-workspace-field">
                         <div class="modal-workspace-label">Notities meeting</div>
                         <textarea id="workspaceTranscript" placeholder="Zet hier alle meetingnotities: doelen, wensen, stijl, functionaliteiten, planning, budget, bijzonderheden..."></textarea>
@@ -812,6 +917,26 @@
                     </div>
                 </div>
                 <div class="modal-workspace-status" id="workspaceSaveStatus"></div>
+                <div class="modal-workspace-success" id="workspaceSuccessState">
+                    <div class="ws-success-title" id="workspaceSuccessTitle"></div>
+                    <div class="ws-customer-reminder">
+                        <div class="ws-customer-reminder-icon">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        </div>
+                        <div class="ws-customer-reminder-body">
+                            <div class="ws-customer-reminder-label">Actie vereist</div>
+                            <div class="ws-customer-reminder-text" id="wsReminderText"></div>
+                            <a class="ws-customer-reminder-link" id="wsKlantenLink" href="/premium-klanten" target="_blank" rel="noopener">
+                                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                Klanten database openen
+                            </a>
+                        </div>
+                    </div>
+                    <label class="ws-customer-checkbox-row">
+                        <input type="checkbox" id="wsCustomerAddedCheck">
+                        <span id="wsCustomerAddedLabel">Ik heb de klant toegevoegd aan het klantenbestand</span>
+                    </label>
+                </div>
             </div>
         </div>
         <div class="modal-footer">
@@ -963,6 +1088,13 @@
     const customerDbReminderEl = document.getElementById('customerDbReminder');
     const customerDbReminderTextEl = document.getElementById('customerDbReminderText');
     const customerDbReminderProgressEl = document.getElementById('customerDbReminderProgress');
+    const workspaceLoadingOverlay = document.getElementById('workspaceLoadingOverlay');
+    const workspaceInputArea = document.getElementById('workspaceInputArea');
+    const workspaceSuccessState = document.getElementById('workspaceSuccessState');
+    const workspaceSuccessTitle = document.getElementById('workspaceSuccessTitle');
+    const wsReminderText = document.getElementById('wsReminderText');
+    const wsCustomerAddedCheck = document.getElementById('wsCustomerAddedCheck');
+    const wsCustomerAddedLabel = document.getElementById('wsCustomerAddedLabel');
     const ACTIVE_ORDERS_UI_SCOPE = 'premium_active_orders';
     const ACTIVE_ORDERS_CUSTOM_KEY = 'softora_custom_orders_premium_v1';
 
@@ -975,6 +1107,14 @@
     let knownActiveOrderByAppointmentId = new Map();
     let loadServerAppointmentsPromise = null;
     let customerDbReminderTimer = null;
+    let workspacePendingCustomerCheck = false;
+
+    if (wsCustomerAddedCheck) {
+        wsCustomerAddedCheck.addEventListener('change', function() {
+            workspacePendingCustomerCheck = !this.checked;
+            refreshWorkspacePrimaryButtonLabel();
+        });
+    }
 
     function normalizeWorkspaceDomainName(value) {
         const raw = String(value || '')
@@ -1366,6 +1506,29 @@
         workspaceSaveStatusEl.className = `modal-workspace-status${variant ? ` ${variant}` : ''}`;
     }
 
+    function setWorkspaceLoading(loading) {
+        if (workspaceLoadingOverlay) workspaceLoadingOverlay.classList.toggle('show', loading);
+    }
+
+    function showWorkspaceSuccess(customerName, successMessage) {
+        const name = normalizeReminderName(customerName) || 'de klant';
+        if (workspaceInputArea) workspaceInputArea.style.display = 'none';
+        if (workspaceSaveStatusEl) workspaceSaveStatusEl.textContent = '';
+        if (workspaceSuccessTitle) workspaceSuccessTitle.textContent = successMessage || 'Opdracht aangemaakt.';
+        if (wsReminderText) wsReminderText.textContent = `Vergeet ${name} niet toe te voegen aan je klantenbestand.`;
+        if (wsCustomerAddedCheck) wsCustomerAddedCheck.checked = false;
+        if (wsCustomerAddedLabel) wsCustomerAddedLabel.textContent = `Ik heb ${name} toegevoegd aan het klantenbestand`;
+        if (workspaceSuccessState) workspaceSuccessState.classList.add('show');
+        workspacePendingCustomerCheck = true;
+        refreshWorkspacePrimaryButtonLabel();
+    }
+
+    function hideWorkspaceSuccess() {
+        if (workspaceSuccessState) workspaceSuccessState.classList.remove('show');
+        if (workspaceInputArea) workspaceInputArea.style.display = '';
+        workspacePendingCustomerCheck = false;
+    }
+
     function setVoiceStatus(message, variant = '') {
         workspaceVoiceStatusEl.textContent = message || '';
         workspaceVoiceStatusEl.className = `modal-workspace-status${variant ? ` ${variant}` : ''}`;
@@ -1458,6 +1621,10 @@
     }
 
     function applyWorkspaceMode(enabled) {
+        if (!enabled) {
+            hideWorkspaceSuccess();
+            setWorkspaceLoading(false);
+        }
         modalWorkspaceMode = Boolean(enabled);
         modalOverviewElement.classList.toggle('hide', modalWorkspaceMode);
         modalWorkspaceElement.classList.toggle('show', modalWorkspaceMode);
@@ -1575,7 +1742,7 @@
 
         if (linkedOrderId) {
             modalPrimaryBtn.textContent = 'Open dossier';
-            modalPrimaryBtn.disabled = workspaceBusy;
+            modalPrimaryBtn.disabled = workspaceBusy || workspacePendingCustomerCheck;
             return;
         }
 
@@ -1963,14 +2130,14 @@
 
         workspaceBusy = true;
         refreshWorkspacePrimaryButtonLabel();
-        setWorkspaceStatus('Opdracht aanmaken...', '');
+        setWorkspaceStatus('', '');
+        setWorkspaceLoading(true);
 
         try {
             let promptText = String(workspaceDraftPrompt || '').trim();
             const shouldGeneratePrompt = options?.autoGeneratePrompt !== false;
 
             if (!promptText && shouldGeneratePrompt) {
-                setWorkspaceStatus('Notities verwerken naar AI bouwprompt... (kan 20-45 sec duren)', '');
                 const promptResult = await postJsonWithFallback(
                     ['/api/ai-transcript-to-prompt', '/api/ai/transcript-to-prompt'],
                     {
@@ -1987,6 +2154,7 @@
             }
 
             if (!promptText) {
+                setWorkspaceLoading(false);
                 setWorkspaceStatus('Prompt kon niet worden gemaakt. Vul handmatig een prompt in of probeer opnieuw.', 'error');
                 return null;
             }
@@ -2020,14 +2188,14 @@
                     knownActiveOrderByAppointmentId.set(appointmentId, createdOrderId);
                 }
             }
-            if (result?.alreadyExisted) {
-                setWorkspaceStatus('Opdracht bestond al en is bijgewerkt met je nieuwste notities.', 'success');
-            } else {
-                setWorkspaceStatus('Opdracht aangemaakt en toegevoegd aan actieve opdrachten.', 'success');
-            }
-            showCustomerDbReminder(String(apt?.company || apt?.contact || ''));
+            setWorkspaceLoading(false);
+            const successMsg = result?.alreadyExisted
+                ? 'Opdracht bestond al en is bijgewerkt met je nieuwste notities.'
+                : 'Opdracht aangemaakt en toegevoegd aan actieve opdrachten.';
+            showWorkspaceSuccess(String(apt?.company || apt?.contact || ''), successMsg);
             return result;
         } catch (error) {
+            setWorkspaceLoading(false);
             setWorkspaceStatus(`Opdracht aanmaken mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
             return null;
         } finally {
