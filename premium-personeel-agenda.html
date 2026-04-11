@@ -2025,7 +2025,7 @@
             } else {
                 setWorkspaceStatus('Opdracht aangemaakt en toegevoegd aan actieve opdrachten.', 'success');
             }
-            showCustomerDbReminder(resolveReminderCustomerName(apt));
+            showCustomerDbReminder(String(apt?.company || apt?.contact || ''));
             return result;
         } catch (error) {
             setWorkspaceStatus(`Opdracht aanmaken mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
