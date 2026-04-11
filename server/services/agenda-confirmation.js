@@ -967,13 +967,9 @@ function createAgendaConfirmationCoordinator(deps = {}) {
       'dashboard_activity_lead_set_in_agenda'
     );
 
-    const persistFailureMessage = await ensureLeadMutationPersisted(
-      runtimeSnapshot,
-      'Lead kon niet veilig in gedeelde opslag worden gezet.'
+    ensureLeadMutationPersisted(runtimeSnapshot, 'Lead kon niet veilig in gedeelde opslag worden gezet.').catch(
+      () => null
     );
-    if (persistFailureMessage !== true) {
-      return res.status(503).json({ ok: false, error: persistFailureMessage });
-    }
 
     return res.status(200).json({
       ok: true,
