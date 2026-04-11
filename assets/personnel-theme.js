@@ -1540,9 +1540,12 @@
     function initSidebarNotificationCounts() {
         if (!isPremiumPersonnelContext) return;
         if (!document.querySelector("[data-sidebar-count-key]")) return;
-        const cachedLeadCount = readCachedSidebarCount("leads");
-        if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
-            paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
+        const suppressedKeys = readSuppressedLeadKeys();
+        if (suppressedKeys.size === 0) {
+            const cachedLeadCount = readCachedSidebarCount("leads");
+            if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
+                paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
+            }
         }
         refreshSidebarNotificationCounts();
         window.setInterval(refreshSidebarNotificationCounts, 45000);
