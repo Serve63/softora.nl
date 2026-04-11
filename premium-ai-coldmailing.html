@@ -1159,6 +1159,7 @@
             let modalBusy = false;
             const leadsBootstrapPayload = readLeadsBootstrapPayload();
             const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v3';
+            const SUPPRESSED_LEAD_KEYS_STORAGE_KEY = 'softora.leads.suppressed.v1';
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEADS_LOAD_RETRY_DELAY_MS = 4000;
             const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
@@ -2993,6 +2994,11 @@
             }
 
             function renderList() {
+                const filteredRows = filterSuppressedLeadRows(Array.isArray(allLeads) ? allLeads : []);
+                if (filteredRows.length !== (Array.isArray(allLeads) ? allLeads.length : 0)) {
+                    allLeads = filteredRows.sort(sortByDateDesc);
+                    persistCachedLeads(allLeads);
+                }
                 const currentLeadCount = Array.isArray(allLeads) ? allLeads.length : 0;
                 window.__softoraLeadsPageCount = currentLeadCount;
                 if (!allLeads.length) {
@@ -3192,6 +3198,43 @@
                 });
             }
 
+            function persistSuppressedLeadRows() {
+                try {
+                    purgeExpiredSuppressedLeadKeys();
+                    const entries = Array.from(manuallySuppressedLeadKeys.entries())
+                        .filter(([key, expiresAt]) => String(key || '').trim() && Number(expiresAt) > Date.now());
+                    if (!entries.length) {
+                        window.sessionStorage.removeItem(SUPPRESSED_LEAD_KEYS_STORAGE_KEY);
+                        return;
+                    }
+                    window.sessionStorage.setItem(
+                        SUPPRESSED_LEAD_KEYS_STORAGE_KEY,
+                        JSON.stringify(entries)
+                    );
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            }
+
+            function hydrateSuppressedLeadRows() {
+                try {
+                    const raw = String(window.sessionStorage.getItem(SUPPRESSED_LEAD_KEYS_STORAGE_KEY) || '').trim();
+                    if (!raw) return;
+                    const parsed = JSON.parse(raw);
+                    if (!Array.isArray(parsed)) return;
+                    const nowMs = Date.now();
+                    parsed.forEach((entry) => {
+                        const key = String(Array.isArray(entry) ? entry[0] : '').trim();
+                        const expiresAt = Number(Array.isArray(entry) ? entry[1] : 0);
+                        if (!key || expiresAt <= nowMs) return;
+                        manuallySuppressedLeadKeys.set(key, expiresAt);
+                    });
+                    persistSuppressedLeadRows();
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            }
+
             function suppressLeadRowLocally(item) {
                 const keys = buildSuppressedLeadKeys(item);
                 if (!keys.length) return;
@@ -3200,6 +3243,7 @@
                 keys.forEach((key) => {
                     manuallySuppressedLeadKeys.set(key, expiresAt);
                 });
+                persistSuppressedLeadRows();
             }
 
             function clearSuppressedLeadRow(item) {
@@ -3208,6 +3252,7 @@
                 keys.forEach((key) => {
                     manuallySuppressedLeadKeys.delete(key);
                 });
+                persistSuppressedLeadRows();
             }
 
             function isSuppressedLeadRow(item) {
@@ -3221,6 +3266,8 @@
             function filterSuppressedLeadRows(rows) {
                 return (Array.isArray(rows) ? rows : []).filter((row) => !isSuppressedLeadRow(row));
             }
+
+            hydrateSuppressedLeadRows();
 
             function buildLeadRecencyTimestamp(item) {
                 const explicit = Date.parse(String(item?.createdAt || item?.updatedAt || '').trim());
@@ -3791,7 +3838,7 @@
                     setStatus(allLeads.length ? 'Leads verversen...' : 'Leads laden...', '');
                 }
                 loadLeadsPromise = (async () => {
-                    const freshLeads = await fetchLeadRows();
+                    const freshLeads = filterSuppressedLeadRows(await fetchLeadRows());
                     if (leadRetryTimer) {
                         window.clearTimeout(leadRetryTimer);
                         leadRetryTimer = null;

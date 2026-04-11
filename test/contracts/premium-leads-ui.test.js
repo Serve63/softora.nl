@@ -19,11 +19,15 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   );
   assert.match(pageSource, /if \(localCache\.leads\.length > 0 && localCache\.savedAt > bootstrapSavedAt\) \{/);
   assert.match(pageSource, /window\.localStorage\.setItem\(\s*LEADS_CACHE_KEY,/);
+  assert.match(pageSource, /const SUPPRESSED_LEAD_KEYS_STORAGE_KEY = 'softora\.leads\.suppressed\.v1';/);
   assert.match(pageSource, /const LEADS_LOAD_RETRY_DELAY_MS = 4000;/);
   assert.match(pageSource, /const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 \* 60 \* 2;/);
+  assert.match(pageSource, /function persistSuppressedLeadRows\(\) \{/);
+  assert.match(pageSource, /function hydrateSuppressedLeadRows\(\) \{/);
   assert.match(pageSource, /function suppressLeadRowLocally\(item\) \{/);
   assert.match(pageSource, /function clearSuppressedLeadRow\(item\) \{/);
   assert.match(pageSource, /function filterSuppressedLeadRows\(rows\) \{/);
+  assert.match(pageSource, /hydrateSuppressedLeadRows\(\);/);
   assert.match(
     pageSource,
     /function finalizeLeadMutation\(taskId\) \{[\s\S]*suppressLeadRowLocally\(currentLead\);[\s\S]*closeLeadModal\(\);[\s\S]*renderList\(\);[\s\S]*refreshLeadSidebarCountsSafely\(\);/
@@ -44,6 +48,14 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(
     pageSource,
     /const mergedRows = filterSuppressedLeadRows\([\s\S]*dedupe\(\[\]\.concat\(pendingRows \|\| \[\], interestedRows \|\| \[\]\)\)/
+  );
+  assert.match(
+    pageSource,
+    /function renderList\(\) \{[\s\S]*const filteredRows = filterSuppressedLeadRows\(Array\.isArray\(allLeads\) \? allLeads : \[\]\);[\s\S]*persistCachedLeads\(allLeads\);/
+  );
+  assert.match(
+    pageSource,
+    /loadLeadsPromise = \(async \(\) => \{[\s\S]*const freshLeads = filterSuppressedLeadRows\(await fetchLeadRows\(\)\);/
   );
   assert.match(pageSource, /function isLeadLoadTimeoutError\(error\) \{/);
   assert.match(pageSource, /function scheduleLeadRetry\(delayMs = LEADS_LOAD_RETRY_DELAY_MS\) \{/);
