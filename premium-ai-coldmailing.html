@@ -1014,7 +1014,7 @@
 
             <section class="panel">
                 <div class="lead-status" id="leadStatus"><!-- SOFTORA_LEADS_STATUS --></div>
-                <div class="lead-list" id="leadList"><!-- SOFTORA_LEADS_LIST --></div>
+                <div class="lead-list" id="leadList" style="visibility:hidden;"><!-- SOFTORA_LEADS_LIST --></div>
             </section>
         </main>
 
@@ -3027,6 +3027,7 @@
                     window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
                 }
                 paintLocalLeadsBadge(currentLeadCount);
+                listEl.style.visibility = '';
             }
 
             function sortByDateDesc(a, b) {
