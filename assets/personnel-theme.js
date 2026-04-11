@@ -1053,16 +1053,44 @@
 
     function normalizeLeadRowForCount(item) {
         return {
+            id: Number((item && item.id) || 0) || 0,
             company: String((item && item.company) || "Onbekende lead").trim(),
             contact: String((item && item.contact) || "").trim(),
             phone: String((item && item.phone) || "").trim(),
             date: String((item && item.date) || "").trim(),
             time: String((item && item.time) || "").trim(),
-            callId: String((item && item.callId) || "").trim(),
+            callId: String((item && (item.callId || item.call_id || item.sourceCallId)) || "").trim(),
             createdAt: String((item && item.createdAt) || "").trim(),
             confirmationTaskCreatedAt: String((item && item.confirmationTaskCreatedAt) || "").trim(),
             updatedAt: String((item && item.updatedAt) || "").trim(),
         };
+    }
+
+    function readSuppressedLeadKeys() {
+        try {
+            const raw = localStorage.getItem("softora_coldcalling_suppressed_leads_json");
+            if (!raw) return new Map();
+            const obj = JSON.parse(raw);
+            if (!obj || typeof obj !== "object") return new Map();
+            const nowMs = Date.now();
+            const map = new Map();
+            Object.entries(obj).forEach(function(entry) {
+                const key = entry[0];
+                const expiresAt = Number(entry[1]) || 0;
+                if (expiresAt > nowMs && (key.startsWith("id:") || key.startsWith("call:"))) {
+                    map.set(key, expiresAt);
+                }
+            });
+            return map;
+        } catch (_) { return new Map(); }
+    }
+
+    function isLeadRowSuppressed(row, suppressedKeys) {
+        const rowId = Number(row && row.id) || 0;
+        const callId = String(row && row.callId || "").trim();
+        if (rowId > 0 && suppressedKeys.has("id:" + rowId)) return true;
+        if (callId && suppressedKeys.has("call:" + callId)) return true;
+        return false;
     }
 
     function dedupeLeadRowsForCount(rows) {
@@ -1363,12 +1391,13 @@
             return;
         }
 
-        const pendingRows = Array.isArray(tasksData && tasksData.tasks)
+        const suppressedKeys = readSuppressedLeadKeys();
+        const pendingRows = (Array.isArray(tasksData && tasksData.tasks)
             ? tasksData.tasks.map(normalizeLeadRowForCount)
-            : [];
-        const interestedRowsRaw = Array.isArray(interestedLeadsData && interestedLeadsData.leads)
+            : []).filter(function(r) { return !isLeadRowSuppressed(r, suppressedKeys); });
+        const interestedRowsRaw = (Array.isArray(interestedLeadsData && interestedLeadsData.leads)
             ? interestedLeadsData.leads.map(normalizeLeadRowForCount)
-            : [];
+            : []).filter(function(r) { return !isLeadRowSuppressed(r, suppressedKeys); });
         const interestedRows = filterInterestedRowsForCount(interestedRowsRaw, pendingRows);
         const total = dedupeLeadRowsForCount([].concat(pendingRows, interestedRows)).length;
         paintSidebarCount("leads", total, { singular: "open lead", plural: "open leads" });
