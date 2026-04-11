@@ -7,8 +7,10 @@ const {
   countAddedServerJsFunctions,
   countDiffLines,
   isBehaviorChangePath,
+  isFrontendProductionPath,
   isHighRiskPath,
   isTestPath,
+  listAddedBrowserStorageApis,
   normalizeRepoPath,
 } = require('./lib/agent-guardrails-core');
 
@@ -131,6 +133,16 @@ const highRiskFiles = changedFiles.filter(isHighRiskPath);
 const serverJsDiffArgs = getDiffArgsForPath('server.js');
 const serverJsDiffText = serverJsDiffArgs ? tryRunGit(serverJsDiffArgs) : '';
 const serverJsCounts = countDiffLines(serverJsDiffText);
+const browserStorageViolations = changedFiles
+  .filter(isFrontendProductionPath)
+  .map((filePath) => {
+    const diffArgs = getDiffArgsForPath(filePath);
+    const diffText = diffArgs ? tryRunGit(diffArgs) : '';
+    const apis = listAddedBrowserStorageApis(diffText);
+    if (apis.length === 0) return '';
+    return `${filePath} (${apis.join(', ')})`;
+  })
+  .filter(Boolean);
 
 const violations = buildGuardrailViolations({
   changedFiles,
@@ -146,11 +158,13 @@ const violations = buildGuardrailViolations({
   serverJsNetGrowth: Math.max(0, serverJsCounts.additions - serverJsCounts.deletions),
   maxServerJsNetGrowth: Number(process.env.GUARDRAILS_MAX_SERVER_JS_NET_GROWTH || 25),
   addedServerJsFunctions: countAddedServerJsFunctions(serverJsDiffText),
+  browserStorageViolations,
   allowUntestedChanges: toBooleanEnv('ALLOW_UNTESTED_CHANGES'),
   allowNoRuntimeBackup: toBooleanEnv('SKIP_RUNTIME_BACKUP_CHECK'),
   allowServerJsGrowth: toBooleanEnv('ALLOW_SERVER_JS_GROWTH'),
   allowServerJsFunctions: toBooleanEnv('ALLOW_SERVER_JS_FUNCTIONS'),
   allowNonstandardServerFiles: toBooleanEnv('ALLOW_NONSTANDARD_SERVER_FILES'),
+  allowBrowserStorage: toBooleanEnv('ALLOW_BROWSER_STORAGE'),
 });
 
 if (changedFiles.length > 0) {

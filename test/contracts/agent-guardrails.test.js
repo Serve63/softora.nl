@@ -5,7 +5,9 @@ const {
   countAddedServerJsFunctions,
   countDiffLines,
   isAllowedNewServerPath,
+  isFrontendProductionPath,
   isHighRiskPath,
+  listAddedBrowserStorageApis,
 } = require('../../scripts/lib/agent-guardrails-core');
 
 test('agent guardrails detect high-risk changes without tests and recent backup', () => {
@@ -78,9 +80,39 @@ test('agent guardrails block nonstandard new server files and new root js files'
   assert.match(violations[1], /Nieuwe root-JS files gedetecteerd/i);
 });
 
+test('agent guardrails detect newly added browser storage in production frontend files', () => {
+  const diffText = [
+    '@@ -10,0 +11,3 @@',
+    "+window.localStorage.setItem('x', '1');",
+    "+window.sessionStorage.removeItem('y');",
+    '+const untouched = 1;',
+  ].join('\n');
+
+  assert.deepEqual(listAddedBrowserStorageApis(diffText), ['localStorage', 'sessionStorage']);
+
+  const violations = buildGuardrailViolations({
+    changedFiles: ['premium-ai-coldmailing.html', 'test/contracts/example.test.js'],
+    addedFiles: [],
+    changedTests: ['test/contracts/example.test.js'],
+    highRiskFiles: [],
+    behaviorFiles: ['premium-ai-coldmailing.html'],
+    browserStorageViolations: ['premium-ai-coldmailing.html (localStorage, sessionStorage)'],
+    newestBackupAgeMs: 5 * 60 * 1000,
+    isCi: false,
+    serverJsLineCount: 7200,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(violations.length, 1);
+  assert.match(violations[0], /Nieuwe browser-opslag in productiecode gedetecteerd/i);
+});
+
 test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isAllowedNewServerPath('server/services/new-service.js'), true);
   assert.equal(isAllowedNewServerPath('server/helpers/new-helper.js'), false);
+  assert.equal(isFrontendProductionPath('premium-ai-coldmailing.html'), true);
+  assert.equal(isFrontendProductionPath('assets/coldcalling-dashboard.js'), true);
+  assert.equal(isFrontendProductionPath('server/services/ui-state.js'), false);
   assert.equal(isHighRiskPath('server/services/agenda-metadata.js'), true);
   assert.equal(isHighRiskPath('docs/repo-map.md'), false);
 });

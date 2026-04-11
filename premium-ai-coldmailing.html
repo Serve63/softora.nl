@@ -1158,18 +1158,17 @@
             let activeTaskId = 0;
             let modalBusy = false;
             const leadsBootstrapPayload = readLeadsBootstrapPayload();
-            const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v3';
-            const SUPPRESSED_LEAD_KEYS_STORAGE_KEY = 'softora.leads.suppressed.v1';
-            const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
+            const LEADS_MEMORY_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEADS_LOAD_RETRY_DELAY_MS = 4000;
             const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
-            const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v8';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
+            const sharedCallSummaryCacheByCallId = Object.create(null);
             const leadDetailLoadPromiseById = Object.create(null);
             const leadAiCopyPromiseById = Object.create(null);
+            const leadOverviewCacheState = { leads: [], savedAt: 0 };
             let leadDatabaseIdentityLoaded = false;
             let leadDatabaseIdentityLoadPromise = null;
             let leadDatabaseIdentityByPhone = new Map();
@@ -1574,14 +1573,7 @@
             }
 
             function readSharedCallSummaryCache() {
-                try {
-                    const raw = String(window.localStorage.getItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY) || '').trim();
-                    if (!raw) return {};
-                    const parsed = JSON.parse(raw);
-                    return parsed && typeof parsed === 'object' ? parsed : {};
-                } catch (error) {
-                    return {};
-                }
+                return sharedCallSummaryCacheByCallId;
             }
 
             function getSharedCallSummary(callId) {
@@ -1592,12 +1584,7 @@
                 const cleanedSummary = pickReadableSummary(summary);
                 if (!cleanedSummary || looksLikeAgendaConfirmationSummary(cleanedSummary)) {
                     if (summary) {
-                        try {
-                            delete cache[normalizedCallId];
-                            window.localStorage.setItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY, JSON.stringify(cache));
-                        } catch (error) {
-                            // Ignore storage failures.
-                        }
+                        delete cache[normalizedCallId];
                     }
                     return '';
                 }
@@ -1615,14 +1602,9 @@
                 ) {
                     return;
                 }
-                try {
-                    const cache = readSharedCallSummaryCache();
-                    if (String(cache?.[normalizedCallId] || '').trim() === normalizedSummary) return;
-                    cache[normalizedCallId] = normalizedSummary;
-                    window.localStorage.setItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY, JSON.stringify(cache));
-                } catch (error) {
-                    // Ignore storage failures.
-                }
+                const cache = readSharedCallSummaryCache();
+                if (String(cache?.[normalizedCallId] || '').trim() === normalizedSummary) return;
+                cache[normalizedCallId] = normalizedSummary;
             }
 
             function getCallBackedSourceUpdatedMs(item) {
@@ -3199,40 +3181,11 @@
             }
 
             function persistSuppressedLeadRows() {
-                try {
-                    purgeExpiredSuppressedLeadKeys();
-                    const entries = Array.from(manuallySuppressedLeadKeys.entries())
-                        .filter(([key, expiresAt]) => String(key || '').trim() && Number(expiresAt) > Date.now());
-                    if (!entries.length) {
-                        window.sessionStorage.removeItem(SUPPRESSED_LEAD_KEYS_STORAGE_KEY);
-                        return;
-                    }
-                    window.sessionStorage.setItem(
-                        SUPPRESSED_LEAD_KEYS_STORAGE_KEY,
-                        JSON.stringify(entries)
-                    );
-                } catch (error) {
-                    // Ignore storage failures.
-                }
+                purgeExpiredSuppressedLeadKeys();
             }
 
             function hydrateSuppressedLeadRows() {
-                try {
-                    const raw = String(window.sessionStorage.getItem(SUPPRESSED_LEAD_KEYS_STORAGE_KEY) || '').trim();
-                    if (!raw) return;
-                    const parsed = JSON.parse(raw);
-                    if (!Array.isArray(parsed)) return;
-                    const nowMs = Date.now();
-                    parsed.forEach((entry) => {
-                        const key = String(Array.isArray(entry) ? entry[0] : '').trim();
-                        const expiresAt = Number(Array.isArray(entry) ? entry[1] : 0);
-                        if (!key || expiresAt <= nowMs) return;
-                        manuallySuppressedLeadKeys.set(key, expiresAt);
-                    });
-                    persistSuppressedLeadRows();
-                } catch (error) {
-                    // Ignore storage failures.
-                }
+                purgeExpiredSuppressedLeadKeys();
             }
 
             function suppressLeadRowLocally(item) {
@@ -3680,30 +3633,24 @@
                     ).sort(sortByDateDesc)
                     : [];
                 const bootstrapSavedAt = Date.parse(String(leadsBootstrapPayload?.loadedAt || '').trim()) || 0;
-                let localCache = { leads: [], savedAt: 0 };
+                let memoryCache = {
+                    leads: Array.isArray(leadOverviewCacheState.leads)
+                        ? filterSuppressedLeadRows(
+                            leadOverviewCacheState.leads.map((item) => normalizeLeadRow(item))
+                        ).sort(sortByDateDesc)
+                        : [],
+                    savedAt: Number(leadOverviewCacheState.savedAt) || 0,
+                };
 
-                try {
-                    const raw = String(window.localStorage.getItem(LEADS_CACHE_KEY) || '').trim();
-                    if (raw) {
-                        const parsed = JSON.parse(raw);
-                        const savedAt = Number(parsed?.savedAt) || 0;
-                        if (savedAt && Date.now() - savedAt <= LEADS_CACHE_MAX_AGE_MS) {
-                            localCache = {
-                                leads: Array.isArray(parsed?.leads)
-                                    ? filterSuppressedLeadRows(
-                                        parsed.leads.map((item) => normalizeLeadRow(item))
-                                    ).sort(sortByDateDesc)
-                                    : [],
-                                savedAt,
-                            };
-                        }
-                    }
-                } catch (error) {
-                    localCache = { leads: [], savedAt: 0 };
+                if (
+                    memoryCache.savedAt &&
+                    Date.now() - memoryCache.savedAt > LEADS_MEMORY_CACHE_MAX_AGE_MS
+                ) {
+                    memoryCache = { leads: [], savedAt: 0 };
                 }
 
-                if (localCache.leads.length > 0 && localCache.savedAt > bootstrapSavedAt) {
-                    return localCache;
+                if (memoryCache.leads.length > 0 && memoryCache.savedAt > bootstrapSavedAt) {
+                    return memoryCache;
                 }
 
                 if (bootstrapLeads.length > 0) {
@@ -3713,26 +3660,17 @@
                     };
                 }
 
-                return localCache;
+                return memoryCache;
             }
 
             function persistCachedLeads(rows) {
-                try {
-                    const safeRows = filterSuppressedLeadRows(
-                        Array.isArray(rows)
-                            ? rows.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
-                            : []
-                    );
-                    window.localStorage.setItem(
-                        LEADS_CACHE_KEY,
-                        JSON.stringify({
-                            savedAt: Date.now(),
-                            leads: safeRows,
-                        })
-                    );
-                } catch (error) {
-                    // Ignore storage failures.
-                }
+                const safeRows = filterSuppressedLeadRows(
+                    Array.isArray(rows)
+                        ? rows.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                        : []
+                );
+                leadOverviewCacheState.savedAt = Date.now();
+                leadOverviewCacheState.leads = safeRows;
             }
 
             function serializeLeadRows(rows) {

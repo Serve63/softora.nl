@@ -24,7 +24,6 @@
   const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
   const AI_NOTEBOOK_ROWS_STORAGE_KEY = 'softora_ai_notebook_rows_json';
   const LEAD_DATABASE_OVERRIDES_STORAGE_KEY = 'softora_coldcalling_lead_database_overrides_json';
-  const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v8';
   const CALL_DISPATCH_MODE_STORAGE_KEY = 'softora_call_dispatch_mode';
   const CALL_DISPATCH_DELAY_STORAGE_KEY = 'softora_call_dispatch_delay_seconds';
   const STATS_RESET_BASELINE_STORAGE_KEY = 'softora_stats_reset_baseline_started';
@@ -61,6 +60,7 @@
     conversionPct: 0,
   };
   let coldcallingDashboardBootstrapPayload = null;
+  const sharedCallSummaryCacheByCallId = Object.create(null);
 
   function byId(id) {
     return document.getElementById(id);
@@ -268,14 +268,7 @@
   }
 
   function readSharedCallSummaryCache() {
-    try {
-      const raw = String(window.localStorage.getItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY) || '').trim();
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (error) {
-      return {};
-    }
+    return sharedCallSummaryCacheByCallId;
   }
 
   function getSharedCallSummary(callId) {
@@ -286,12 +279,7 @@
     const cleanedSummary = pickReadableConversationSummary(summary);
     if (!cleanedSummary || looksLikeAgendaConfirmationSummary(cleanedSummary)) {
       if (summary) {
-        try {
-          delete cache[normalizedCallId];
-          window.localStorage.setItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY, JSON.stringify(cache));
-        } catch (error) {
-          // Ignore storage failures.
-        }
+        delete cache[normalizedCallId];
       }
       return '';
     }
@@ -309,14 +297,9 @@
     ) {
       return;
     }
-    try {
-      const cache = readSharedCallSummaryCache();
-      if (String(cache?.[normalizedCallId] || '').trim() === normalizedSummary) return;
-      cache[normalizedCallId] = normalizedSummary;
-      window.localStorage.setItem(SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY, JSON.stringify(cache));
-    } catch (error) {
-      // Ignore storage failures.
-    }
+    const cache = readSharedCallSummaryCache();
+    if (String(cache?.[normalizedCallId] || '').trim() === normalizedSummary) return;
+    cache[normalizedCallId] = normalizedSummary;
   }
 
   function normalizeBusinessMode(mode) {

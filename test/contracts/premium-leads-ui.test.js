@@ -13,17 +13,18 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /function readLeadsBootstrapPayload\(\)/);
   assert.match(pageSource, /document\.getElementById\('softoraLeadsBootstrap'\)/);
   assert.match(pageSource, /const leadsBootstrapPayload = readLeadsBootstrapPayload\(\);/);
+  assert.match(pageSource, /const LEADS_MEMORY_CACHE_MAX_AGE_MS = 1000 \* 60 \* 60 \* 24;/);
+  assert.match(pageSource, /const sharedCallSummaryCacheByCallId = Object\.create\(null\);/);
+  assert.match(pageSource, /const leadOverviewCacheState = \{ leads: \[\], savedAt: 0 \};/);
   assert.match(
     pageSource,
     /function loadCachedLeads\(\) \{[\s\S]*const bootstrapLeads = Array\.isArray\(leadsBootstrapPayload\?\.leads\)/
   );
-  assert.match(pageSource, /if \(localCache\.leads\.length > 0 && localCache\.savedAt > bootstrapSavedAt\) \{/);
-  assert.match(pageSource, /window\.localStorage\.setItem\(\s*LEADS_CACHE_KEY,/);
-  assert.match(pageSource, /const SUPPRESSED_LEAD_KEYS_STORAGE_KEY = 'softora\.leads\.suppressed\.v1';/);
+  assert.match(pageSource, /if \(memoryCache\.leads\.length > 0 && memoryCache\.savedAt > bootstrapSavedAt\) \{/);
   assert.match(pageSource, /const LEADS_LOAD_RETRY_DELAY_MS = 4000;/);
   assert.match(pageSource, /const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 \* 60 \* 2;/);
-  assert.match(pageSource, /function persistSuppressedLeadRows\(\) \{/);
-  assert.match(pageSource, /function hydrateSuppressedLeadRows\(\) \{/);
+  assert.match(pageSource, /function persistSuppressedLeadRows\(\) \{\s*purgeExpiredSuppressedLeadKeys\(\);\s*\}/);
+  assert.match(pageSource, /function hydrateSuppressedLeadRows\(\) \{\s*purgeExpiredSuppressedLeadKeys\(\);\s*\}/);
   assert.match(pageSource, /function suppressLeadRowLocally\(item\) \{/);
   assert.match(pageSource, /function clearSuppressedLeadRow\(item\) \{/);
   assert.match(pageSource, /function filterSuppressedLeadRows\(rows\) \{/);
@@ -53,6 +54,7 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
     pageSource,
     /function renderList\(\) \{[\s\S]*const filteredRows = filterSuppressedLeadRows\(Array\.isArray\(allLeads\) \? allLeads : \[\]\);[\s\S]*persistCachedLeads\(allLeads\);/
   );
+  assert.match(pageSource, /function persistCachedLeads\(rows\) \{[\s\S]*leadOverviewCacheState\.savedAt = Date\.now\(\);[\s\S]*leadOverviewCacheState\.leads = safeRows;/);
   assert.match(
     pageSource,
     /loadLeadsPromise = \(async \(\) => \{[\s\S]*const freshLeads = filterSuppressedLeadRows\(await fetchLeadRows\(\)\);/
@@ -68,7 +70,7 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
   assert.match(pageSource, /let lastLeadStatusTimestamp = 0;/);
   assert.match(pageSource, /lastLeadStatusTimestamp = safeDate\.getTime\(\);/);
-  assert.match(pageSource, /const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v8';/);
+  assert.match(pageSource, /function readSharedCallSummaryCache\(\) \{\s*return sharedCallSummaryCacheByCallId;\s*\}/);
   assert.match(pageSource, /function replaceGenericSoftoraSpeakerName\(value\) \{/);
   assert.match(pageSource, /function stripActionableFollowUpSummarySentence\(value\) \{/);
   assert.match(pageSource, /function looksLikeDirectSpeechSummary\(value\) \{/);
@@ -108,4 +110,6 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /modalLocation\.value = allowLocationPrefill \? leadLocationValue : '';/);
   assert.match(pageSource, /const allowRecoveredLocationPrefill = allowLocationPrefill && !recoveredCallId;/);
   assert.match(pageSource, /createdAt: String\(item\?\.createdAt \|\| item\?\.created_at \|\| item\?\.updatedAt \|\| item\?\.updated_at \|\| ''\)\.trim\(\),/);
+  assert.doesNotMatch(pageSource, /window\.localStorage/);
+  assert.doesNotMatch(pageSource, /window\.sessionStorage/);
 });

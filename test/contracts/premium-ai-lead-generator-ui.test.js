@@ -63,7 +63,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /prewarmLeadDatabaseCallDetails\(4\);/);
   assert.match(dashboardSource, /looksLikeDirectSpeechConversationSummary/);
   assert.match(dashboardSource, /Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst/);
-  assert.match(dashboardSource, /const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v8';/);
+  assert.match(dashboardSource, /const sharedCallSummaryCacheByCallId = Object\.create\(null\);/);
+  assert.match(dashboardSource, /function readSharedCallSummaryCache\(\) \{\s*return sharedCallSummaryCacheByCallId;\s*\}/);
   assert.match(dashboardSource, /Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt\./);
   assert.match(dashboardSource, /Gebruik nooit het woord "agent"\./);
   assert.match(dashboardSource, /function shouldRefreshLeadDatabaseCallDetailPayload\(detail\) \{/);
@@ -131,6 +132,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /savedRegio === CUSTOM_CAMPAIGN_REGIO_VALUE[\s\S]*applyCampaignRegioSelection\(regioEl, CUSTOM_CAMPAIGN_REGIO_VALUE, savedCustomRegioKm\);/);
   assert.match(dashboardSource, /if \(selectedValue === CUSTOM_CAMPAIGN_REGIO_VALUE\) \{[\s\S]*const customKm = await promptForCustomCampaignRegioKm\(initialCustomKm\);/);
   assert.match(pageSource, /const activeDotColor = String\([\s\S]*selectedOption\?\.dataset\?\.dotColor[\s\S]*wrapper\.dataset\.dotColor = activeDotColor;/);
+  assert.doesNotMatch(dashboardSource, /window\.localStorage/);
+  assert.doesNotMatch(dashboardSource, /window\.sessionStorage/);
 });
 
 test('premium ai lead generator persists dashboard config and stats through Supabase-only flows', () => {

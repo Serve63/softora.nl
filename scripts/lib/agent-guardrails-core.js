@@ -22,6 +22,21 @@ const ALLOWED_NEW_SERVER_PREFIXES = Object.freeze([
   'server/services/',
 ]);
 
+const DISALLOWED_BROWSER_STORAGE_PATTERNS = Object.freeze([
+  {
+    label: 'localStorage',
+    pattern: /\b(?:window\.)?localStorage\b/,
+  },
+  {
+    label: 'sessionStorage',
+    pattern: /\b(?:window\.)?sessionStorage\b/,
+  },
+  {
+    label: 'indexedDB',
+    pattern: /\b(?:window\.)?indexedDB\b/,
+  },
+]);
+
 function normalizeRepoPath(filePath) {
   return String(filePath || '').replace(/\\/g, '/').replace(/^\.\/+/, '');
 }
@@ -40,6 +55,11 @@ function isBehaviorChangePath(filePath) {
     normalized.startsWith('assets/') ||
     /^[^/]+\.html$/i.test(normalized)
   );
+}
+
+function isFrontendProductionPath(filePath) {
+  const normalized = normalizeRepoPath(filePath);
+  return normalized.startsWith('assets/') || /^[^/]+\.html$/i.test(normalized);
 }
 
 function isHighRiskPath(filePath) {
@@ -82,6 +102,24 @@ function countAddedServerJsFunctions(diffText = '') {
     .length;
 }
 
+function listAddedBrowserStorageApis(diffText = '') {
+  const hits = new Set();
+
+  String(diffText || '')
+    .split('\n')
+    .forEach((line) => {
+      if (!/^\+(?!\+\+\+)/.test(line)) return;
+      const source = line.slice(1);
+      DISALLOWED_BROWSER_STORAGE_PATTERNS.forEach(({ label, pattern }) => {
+        if (pattern.test(source)) {
+          hits.add(label);
+        }
+      });
+    });
+
+  return Array.from(hits).sort();
+}
+
 function formatAgeMs(ageMs) {
   if (!Number.isFinite(ageMs) || ageMs < 0) return 'onbekend';
   const minutes = Math.round(ageMs / 60000);
@@ -105,11 +143,13 @@ function buildGuardrailViolations(options = {}) {
     serverJsNetGrowth = 0,
     maxServerJsNetGrowth = 25,
     addedServerJsFunctions = 0,
+    browserStorageViolations = [],
     allowUntestedChanges = false,
     allowNoRuntimeBackup = false,
     allowServerJsGrowth = false,
     allowServerJsFunctions = false,
     allowNonstandardServerFiles = false,
+    allowBrowserStorage = false,
   } = options;
 
   const violations = [];
@@ -157,6 +197,12 @@ function buildGuardrailViolations(options = {}) {
     );
   }
 
+  if (!allowBrowserStorage && browserStorageViolations.length > 0) {
+    violations.push(
+      `[guardrails] Nieuwe browser-opslag in productiecode gedetecteerd: ${browserStorageViolations.join(', ')}. Gebruik gedeelde opslag via server/Supabase of gebruik ALLOW_BROWSER_STORAGE=1 voor een bewuste uitzondering.`
+    );
+  }
+
   if (!isCi && !allowNoRuntimeBackup && highRiskFiles.length > 0) {
     if (!Number.isFinite(newestBackupAgeMs)) {
       violations.push(
@@ -179,7 +225,9 @@ module.exports = {
   formatAgeMs,
   isAllowedNewServerPath,
   isBehaviorChangePath,
+  isFrontendProductionPath,
   isHighRiskPath,
   isTestPath,
+  listAddedBrowserStorageApis,
   normalizeRepoPath,
 };
