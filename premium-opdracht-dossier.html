@@ -85,7 +85,7 @@
             min-height: 100%;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: stretch;
             justify-content: flex-start;
             gap: 1rem;
             padding-bottom: 2rem;
@@ -93,25 +93,27 @@
         }
 
         .paper-shell {
-            --paper-scale: 1;
-            width: calc(var(--paper-width) * var(--paper-scale));
+            width: min(100%, var(--paper-width));
+            max-width: var(--paper-width);
             display: flex;
             flex-direction: column;
             align-items: stretch;
             gap: 1rem;
+            align-self: center;
         }
 
         .page-toolbar {
             width: 100%;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 0.75rem;
-            position: static;
+            position: sticky;
+            top: 0;
             z-index: 1;
-            padding: 0;
-            background: transparent;
-            backdrop-filter: none;
+            padding: 0.1rem 0 0.25rem;
+            background: linear-gradient(180deg, rgba(238, 241, 245, 0.98), rgba(238, 241, 245, 0.82), rgba(238, 241, 245, 0));
+            backdrop-filter: blur(6px);
         }
 
         .toolbar-meta {
@@ -139,34 +141,32 @@
             align-items: center;
             gap: 0.45rem;
             flex-wrap: wrap;
-            justify-content: flex-start;
+            justify-content: flex-end;
             flex: 0 0 auto;
+            margin-left: auto;
         }
 
         .paper-stage {
-            position: relative;
+            position: static;
             width: 100%;
-            height: calc(var(--paper-min-height) * var(--paper-scale));
+            height: auto;
+            overflow: visible;
         }
 
         .dossier-page {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: var(--paper-width);
-            min-width: var(--paper-width);
-            max-width: var(--paper-width);
-            height: var(--paper-min-height);
+            position: relative;
+            width: 100%;
+            min-width: 0;
+            max-width: none;
+            height: auto;
             min-height: var(--paper-min-height);
             background: var(--paper-bg);
             border: 1px solid rgba(26, 31, 52, 0.08);
             border-radius: 0;
             box-shadow: 0 28px 54px rgba(16, 19, 34, 0.14), 0 2px 8px rgba(16, 19, 34, 0.06);
-            overflow: hidden;
+            overflow: visible;
             display: flex;
             flex-direction: column;
-            transform: scale(var(--paper-scale));
-            transform-origin: top left;
         }
 
         .brand-bar {
@@ -215,7 +215,7 @@
             align-content: stretch;
             flex: 1 1 auto;
             min-height: 0;
-            overflow: auto;
+            overflow: visible;
         }
 
         .loading,
@@ -540,7 +540,6 @@
             }
 
             .paper-shell {
-                --paper-scale: 1;
                 gap: 0.75rem;
             }
 
@@ -1215,24 +1214,8 @@
 
             function syncPaperScale() {
                 const paperShell = document.getElementById('paperShell');
-                const pageToolbar = document.getElementById('pageToolbar');
-                const mainContent = document.querySelector('.main-content');
-                if (!paperShell || !mainContent) return;
-
-                if (window.innerWidth <= 900) {
-                    paperShell.style.setProperty('--paper-scale', '1');
-                    return;
-                }
-
-                const paperWidth = 794;
-                const paperHeight = 1123;
-                const wrapWidth = Math.max(320, root.clientWidth || mainContent.clientWidth || paperWidth);
-                const toolbarHeight = pageToolbar ? pageToolbar.offsetHeight : 0;
-                const availableWidth = Math.max(320, wrapWidth - 8);
-                const availableHeight = Math.max(320, mainContent.clientHeight - toolbarHeight - 24);
-                const scale = Math.min(1, availableWidth / paperWidth, availableHeight / paperHeight);
-
-                paperShell.style.setProperty('--paper-scale', String(Math.max(0.62, scale)));
+                if (!paperShell) return;
+                paperShell.style.setProperty('--paper-scale', '1');
             }
 
             function renderLayoutBlock(block) {
@@ -1298,46 +1281,46 @@
                 document.title = `Softora | Uitvoerdossier #${orderId}`;
 
                 root.innerHTML = `
-                    <div class="paper-shell" id="paperShell">
                     <div class="page-toolbar screen-only" id="pageToolbar" style="justify-content: flex-end;">
                         <div class="toolbar-actions">
                             <button type="button" class="btn btn-primary" id="printBtn">Download PDF</button>
                         </div>
                     </div>
 
-                    <div class="paper-stage">
-                    <article class="dossier-page">
-                        <header class="brand-bar">
-                            <div>
-                                <div class="brand-logo">SOFTORA.NL</div>
-                                <div class="brand-sub">Uitvoerdossier voor uitvoering</div>
-                            </div>
-                            <div class="brand-meta">
-                                <div>Order #${esc(orderId)}</div>
-                                <div>${esc(orderDateLabel)}</div>
-                            </div>
-                        </header>
+                    <div class="paper-shell" id="paperShell">
+                        <div class="paper-stage">
+                            <article class="dossier-page">
+                                <header class="brand-bar">
+                                    <div>
+                                        <div class="brand-logo">SOFTORA.NL</div>
+                                        <div class="brand-sub">Uitvoerdossier voor uitvoering</div>
+                                    </div>
+                                    <div class="brand-meta">
+                                        <div>Order #${esc(orderId)}</div>
+                                        <div>${esc(orderDateLabel)}</div>
+                                    </div>
+                                </header>
 
-                        <div class="page-body">
-                            <div class="top-row">
-                                <div>
-                                    <div class="eyebrow">Uitvoerdossier</div>
-                                    <h1 class="title">${esc(layout.documentTitle || `Opdracht #${orderId}`)}</h1>
-                                    <p class="subtitle">${esc(layout.subtitle || 'Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie.')}</p>
-                                    ${source ? `<div class="source-chip">Dynamisch via ${esc(model || source)}</div>` : ''}
+                                <div class="page-body">
+                                    <div class="top-row">
+                                        <div>
+                                            <div class="eyebrow">Uitvoerdossier</div>
+                                            <h1 class="title">${esc(layout.documentTitle || `Opdracht #${orderId}`)}</h1>
+                                            <p class="subtitle">${esc(layout.subtitle || 'Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie.')}</p>
+                                            ${source ? `<div class="source-chip">Dynamisch via ${esc(model || source)}</div>` : ''}
+                                        </div>
+                                    </div>
+
+                                    ${warning ? `<div class="warning-note">${esc(warning)}</div>` : ''}
+                                    ${blocksHtml}
+
+                                    <section class="layout-block">
+                                        <div class="layout-block-head"><h2 class="section-title">Prompt voor Claude Opus 4.6</h2></div>
+                                        <pre class="prompt-box" id="opusPromptDisplay">${esc(opusPrompt)}</pre>
+                                    </section>
                                 </div>
-                            </div>
-
-                            ${warning ? `<div class="warning-note">${esc(warning)}</div>` : ''}
-                            ${blocksHtml}
-
-                            <section class="layout-block">
-                                <div class="layout-block-head"><h2 class="section-title">Prompt voor Claude Opus 4.6</h2></div>
-                                <pre class="prompt-box" id="opusPromptDisplay">${esc(opusPrompt)}</pre>
-                            </section>
+                            </article>
                         </div>
-                    </article>
-                    </div>
                     </div>
                 `;
 

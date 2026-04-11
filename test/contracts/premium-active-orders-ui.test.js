@@ -69,3 +69,17 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.match(source, /if \(cachedLayoutResponse\) \{[\s\S]*renderDossier\(baseData, cachedLayoutResponse\);/);
   assert.match(source, /void persistDossierCache\(values\?\.\[DOSSIER_CACHE_KEY\], orderId, dossierFingerprint, layoutResponse\);/);
 });
+
+test('premium opdrachtdossier toont de pdf-knop rechtsboven en laat de pagina volledig uitlopen', () => {
+  const filePath = path.join(__dirname, '../../premium-opdracht-dossier.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /\.dossier-wrap \{[\s\S]*align-items:\s*stretch;/);
+  assert.match(source, /\.page-toolbar \{[\s\S]*justify-content:\s*flex-end;[\s\S]*position:\s*sticky;[\s\S]*top:\s*0;/);
+  assert.match(source, /\.toolbar-actions \{[\s\S]*justify-content:\s*flex-end;[\s\S]*margin-left:\s*auto;/);
+  assert.match(source, /\.paper-stage \{[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/);
+  assert.match(source, /\.dossier-page \{[\s\S]*position:\s*relative;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/);
+  assert.match(source, /\.page-body \{[\s\S]*overflow:\s*visible;/);
+  assert.match(source, /root\.innerHTML = `\s*<div class="page-toolbar screen-only" id="pageToolbar" style="justify-content: flex-end;">[\s\S]*<div class="paper-shell" id="paperShell">/);
+  assert.match(source, /function syncPaperScale\(\) \{[\s\S]*paperShell\.style\.setProperty\('--paper-scale', '1'\);/);
+});
