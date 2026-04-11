@@ -1120,21 +1120,9 @@
 
     function readSuppressedLeadKeys() {
         try {
-            const raw = localStorage.getItem("softora_coldcalling_suppressed_leads_json");
-            if (!raw) return new Map();
-            const obj = JSON.parse(raw);
-            if (!obj || typeof obj !== "object") return new Map();
-            const nowMs = Date.now();
-            const map = new Map();
-            Object.entries(obj).forEach(function(entry) {
-                const key = entry[0];
-                const expiresAt = Number(entry[1]) || 0;
-                if (expiresAt > nowMs && (key.startsWith("id:") || key.startsWith("call:"))) {
-                    map.set(key, expiresAt);
-                }
-            });
-            return map;
-        } catch (_) { return new Map(); }
+            localStorage.removeItem("softora_coldcalling_suppressed_leads_json");
+        } catch (_) {}
+        return new Map();
     }
 
     function isLeadRowSuppressed(row, suppressedKeys) {

@@ -3166,28 +3166,14 @@
             }
 
             function persistSuppressedLeadRows() {
-                purgeExpiredSuppressedLeadKeys();
                 try {
-                    const obj = Object.fromEntries(manuallySuppressedLeadKeys);
-                    localStorage.setItem(LEAD_SUPPRESSION_STORAGE_KEY, JSON.stringify(obj));
+                    localStorage.removeItem(LEAD_SUPPRESSION_STORAGE_KEY);
                 } catch (_) {}
             }
 
             function hydrateSuppressedLeadRows() {
-                try {
-                    const raw = localStorage.getItem(LEAD_SUPPRESSION_STORAGE_KEY);
-                    if (raw) {
-                        const obj = JSON.parse(raw);
-                        if (obj && typeof obj === 'object') {
-                            Object.entries(obj).forEach(([key, expiresAt]) => {
-                                // Sla alleen id: en call: keys op — match: keys zijn te breed
-                                if (!key.startsWith('id:') && !key.startsWith('call:')) return;
-                                manuallySuppressedLeadKeys.set(key, Number(expiresAt) || 0);
-                            });
-                        }
-                    }
-                } catch (_) {}
-                purgeExpiredSuppressedLeadKeys();
+                manuallySuppressedLeadKeys.clear();
+                persistSuppressedLeadRows();
             }
 
             function suppressLeadRowLocally(item) {
@@ -3219,7 +3205,7 @@
             }
 
             function filterSuppressedLeadRows(rows) {
-                return (Array.isArray(rows) ? rows : []).filter((row) => !isSuppressedLeadRow(row));
+                return Array.isArray(rows) ? rows : [];
             }
 
             hydrateSuppressedLeadRows();
