@@ -29,28 +29,17 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --accent: #8b2252;
-  --accent-dark: #6b1a3f;
-  --accent-light: #a62d65;
-  --accent-glow: rgba(139, 34, 82, 0.4);
-  --bg-primary: #080808;
-  --bg-secondary: #0d0d0d;
-  --bg-tertiary: #111111;
-  --text-primary: #f5f5f5;
-  --text-secondary: #888888;
-  --text-tertiary: #555555;
-  --border: rgba(255, 255, 255, 0.06);
-  --sidebar-logo-color: #f5f5f5;
-  --bg: #080808;
-  --sidebar-bg: #0d0d0d;
+  --bg: #f6f2ec;
+  --sidebar-bg: #fcfaf7;
   --crimson: #8b2252;
   --crimson-light: #a62d65;
-  --crimson-soft: rgba(139, 34, 82, 0.12);
-  --text-dark: #f5f5f5;
-  --text-mid: #888888;
-  --text-light: #555555;
+  --crimson-soft: rgba(139, 34, 82, 0.08);
+  --text-dark: #1a1a2e;
+  --text-mid: #606272;
+  --text-light: #9a9cac;
+  --border: rgba(20, 24, 35, 0.09);
   --white: #ffffff;
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+  --shadow: 0 18px 40px rgba(26, 26, 46, 0.08);
 }
 
 html, body {
@@ -59,8 +48,8 @@ html, body {
 
 body {
   font-family: 'Inter', sans-serif;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  background: radial-gradient(circle at top left, rgba(166, 45, 101, 0.06), transparent 28%), var(--bg);
+  color: var(--text-dark);
   min-height: 100vh;
 }
 
@@ -98,7 +87,7 @@ body {
   font-size: 24px;
   font-weight: 800;
   letter-spacing: 1px;
-  color: var(--text-dark);
+  color: var(--crimson);
   border-bottom: 1px solid var(--border);
   text-decoration: none;
 }

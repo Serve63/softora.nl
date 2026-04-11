@@ -7,19 +7,18 @@ function readPage(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
-const darkDashboardSurfacePages = [
+const lightPremiumSurfacePages = [
   'premium-bevestigingsmails.html',
   'premium-mailbox.html',
   'premium-boekhouding.html',
 ];
 
-test('selected premium pages reuse the dashboard dark surface palette', () => {
-  for (const relativePath of darkDashboardSurfacePages) {
+test('selected premium pages keep their lichte premium palette', () => {
+  for (const relativePath of lightPremiumSurfacePages) {
     const pageSource = readPage(relativePath);
 
-    assert.match(pageSource, /--bg-primary:\s*#080808/);
-    assert.match(pageSource, /--bg-secondary:\s*#0d0d0d/);
-    assert.match(pageSource, /--text-primary:\s*#f5f5f5/);
-    assert.match(pageSource, /--border:\s*rgba\(255,\s*255,\s*255,\s*0\.06\)/);
+    assert.match(pageSource, /--bg:\s*#f6f2ec|--bg:\s*#f0ede8/);
+    assert.match(pageSource, /--text-dark:\s*#1a1a2e/);
+    assert.match(pageSource, /--crimson:\s*#(?:8b2252|9b2355)/i);
   }
 });
