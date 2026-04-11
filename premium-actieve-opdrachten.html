@@ -652,22 +652,12 @@
         }
 
         .order-assignee {
-            display: flex;
-            align-items: center;
-            gap: 0.45rem;
-            margin-bottom: 0.42rem;
-            font-size: 0.76rem;
+            min-height: 1.1rem;
+            margin-top: 0.15rem;
+            font-size: 0.78rem;
             color: var(--text-secondary);
             line-height: 1.35;
-        }
-
-        .order-assignee strong {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.64rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.11em;
-            color: var(--text-tertiary);
+            text-align: center;
         }
 
         .order-title {
@@ -2683,7 +2673,7 @@
             }
 
             if (assigneeEl) {
-                assigneeEl.innerHTML = `<strong>Behandelaar</strong>${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}`;
+                assigneeEl.textContent = claimInfo.by || 'Nog niet geclaimd';
             }
 
             if (completeBtnEl) {
@@ -2810,7 +2800,6 @@
                     <div class="order-main">
                         <div class="order-info">
                             <div class="order-client">${escapeHtml(clientLine || 'Nieuwe opdracht')}</div>
-                            <div class="order-assignee" id="assignee-${id}"><strong>Behandelaar</strong>${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</div>
                             <div class="order-title">${escapeHtml(title)}</div>
                             <div class="order-desc">${escapeHtml(description)}</div>
                             ${deliveryHtml}
@@ -2827,6 +2816,7 @@
                             <button class="complete-btn magnetic" id="complete-btn-${id}" type="button" data-order-complete="${id}">
                                 Factuur betaald
                             </button>
+                            <div class="order-assignee" id="assignee-${id}">${escapeHtml(claimInfo.by || 'Nog niet geclaimd')}</div>
                         </div>
                     </div>
                     <div class="order-progress" id="progress-${id}">

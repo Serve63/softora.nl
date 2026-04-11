@@ -10,10 +10,10 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken f
   assert.doesNotMatch(source, /const claimHtml = /);
   assert.doesNotMatch(source, /<div class="order-claim"/);
   assert.match(source, /<div class="order-actions">\s*<button class="execute-btn magnetic"/);
-  assert.match(source, /<div class="order-assignee" id="assignee-\$\{id\}"><strong>Behandelaar<\/strong>\$\{escapeHtml\(claimInfo\.by \|\| 'Nog niet geclaimd'\)\}<\/div>/);
+  assert.match(source, /<button class="complete-btn magnetic" id="complete-btn-\$\{id\}" type="button" data-order-complete="\$\{id\}">\s*Factuur betaald\s*<\/button>\s*<div class="order-assignee" id="assignee-\$\{id\}">\$\{escapeHtml\(claimInfo\.by \|\| 'Nog niet geclaimd'\)\}<\/div>/);
   assert.match(source, /<button class="complete-btn magnetic" id="complete-btn-\$\{id\}" type="button" data-order-complete="\$\{id\}">\s*Factuur betaald\s*<\/button>/);
   assert.match(source, /completeBtnEl\.textContent = 'Factuur betaald';/);
-  assert.match(source, /assigneeEl\.innerHTML = `<strong>Behandelaar<\/strong>\$\{escapeHtml\(claimInfo\.by \|\| 'Nog niet geclaimd'\)\}`;/);
+  assert.match(source, /assigneeEl\.textContent = claimInfo\.by \|\| 'Nog niet geclaimd';/);
   assert.match(source, /function handleOrderPaymentAction\(id\) \{[\s\S]*if \(ui\.isBuilt\) \{\s*markOrderAsPaid\(id\);[\s\S]*markOrderAsCompleted\(id\);/);
   assert.match(source, /document\.querySelectorAll\('\.complete-btn'\)\.forEach\(\(b\) => \{[\s\S]*handleOrderPaymentAction\(id\);/);
   assert.match(source, /leadOwnerName: String\(item\?\.leadOwnerName \|\| item\?\.leadOwnerFullName \|\| ''\)\.trim\(\),/);
