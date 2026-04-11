@@ -397,8 +397,6 @@ function renderList() {
   let list = getMailsForFolder(activeFolder);
   if (q) list = list.filter(m => m.from.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.preview.toLowerCase().includes(q));
   filteredMails = list;
-  document.getElementById('mail-count').textContent = list.length + ' mail' + (list.length !== 1 ? 's' : '');
-
   const wrap = document.getElementById('mail-items');
   if (!list.length) { wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Geen e-mails gevonden.</div>`; return; }
 
