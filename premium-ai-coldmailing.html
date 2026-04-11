@@ -2341,7 +2341,7 @@
                 const leadWhatsappInfoValue = String(lead.whatsappInfo || '').trim();
                 modalSub.textContent = '';
                 modalSub.hidden = true;
-                modalDate.value = leadDateValue;
+                modalDate.value = '';
                 modalTime.value = leadTimeValue;
                 modalLocation.value = allowLocationPrefill ? leadLocationValue : '';
                 modalWhatsappInfo.value = leadWhatsappInfoValue;
@@ -2400,8 +2400,8 @@
                         const detailLocationValue = String(taskDetail?.location || '').trim();
                         const detailWhatsappInfoValue = String(taskDetail?.whatsappInfo || '').trim();
 
-                        if (!String(modalDate.value || '').trim() || String(modalDate.value || '') === leadDateValue) {
-                            modalDate.value = detailDateValue || leadDateValue;
+                        if (!String(modalDate.value || '').trim()) {
+                            modalDate.value = detailDateValue || '';
                         }
                         if (
                             !String(modalTime.value || '').trim() ||
@@ -2482,8 +2482,8 @@
                         }
                     }
 
-                    if (!String(modalDate.value || '').trim() || String(modalDate.value || '') === leadDateValue) {
-                        modalDate.value = detailDateValue || leadDateValue;
+                    if (!String(modalDate.value || '').trim()) {
+                        modalDate.value = detailDateValue || '';
                     }
                     if (
                         !String(modalTime.value || '').trim() ||
