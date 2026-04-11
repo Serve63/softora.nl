@@ -24,6 +24,13 @@ test('premium rol-labels tonen Full Acces in plaats van Administrator', () => {
   assert.match(themeSource, /Full Acces/);
   assert.doesNotMatch(userManagementSource, /Administrator/);
   assert.match(userManagementSource, /Full Acces/);
+
+  const settingsSource = fs.readFileSync(path.join(root, 'premium-instellingen.html'), 'utf8');
+  assert.match(
+    settingsSource,
+    /assets\/premium-user-management\.js\?v=20260411a/,
+    'premium-instellingen moet een versie op premium-user-management.js zetten zodat ADMIN niet uit browsercache terugkomt'
+  );
 });
 
 test('premium instellingen gebruikt merk-kleuren in de verwijderpopup', () => {
