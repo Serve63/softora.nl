@@ -1059,6 +1059,12 @@
       if (remoteUiStateLoaded && remoteUiStateLastSource === 'supabase') {
         return { ok: true, source: 'supabase' };
       }
+      // Nog niet geladen of niet vanuit Supabase — probeer opnieuw te laden
+      remoteUiStateLoaded = false;
+      const retryLoaded = await loadRemoteUiState();
+      if (retryLoaded && remoteUiStateLastSource === 'supabase') {
+        return { ok: true, source: 'supabase' };
+      }
       return {
         ok: false,
         source: remoteUiStateLastSource || 'unloaded',
@@ -7153,6 +7159,20 @@
         'error',
         remoteUiStateLastError || 'Dashboardconfiguratie kon niet uit Supabase geladen worden.'
       );
+      // Automatisch opnieuw proberen na 5 seconden
+      window.setTimeout(async () => {
+        remoteUiStateLoaded = false;
+        const retried = await loadRemoteUiState();
+        if (retried && remoteUiStateLastSource === 'supabase') {
+          setStatusPill('idle', '');
+          setStatusMessage('', '');
+          void refreshDashboardStatsFromSupabase({ force: true, silent: true });
+          const leadDatabaseModal = ensureLeadDatabaseModal();
+          if (leadDatabaseModal && typeof leadDatabaseModal.prewarmLeadDatabase === 'function') {
+            void leadDatabaseModal.prewarmLeadDatabase();
+          }
+        }
+      }, 5000);
     } else {
       void refreshDashboardStatsFromSupabase({ force: true, silent: true });
       const leadDatabaseModal = ensureLeadDatabaseModal();
