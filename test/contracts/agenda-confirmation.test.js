@@ -75,6 +75,8 @@ function createFixture(overrides = {}) {
   const smtpCalls = [];
   const dismissCalls = [];
   const persistWaitCalls = [];
+  const snapshotCalls = [];
+  const applySnapshotCalls = [];
   const callUpdatesByCallId = new Map([
     [
       'call-1',
@@ -225,9 +227,21 @@ function createFixture(overrides = {}) {
         return null;
       }
     },
-    waitForQueuedRuntimeStatePersist: async () => {
-      persistWaitCalls.push('waited');
+    buildRuntimeStateSnapshotPayload: () => {
+      const snapshot = {
+        savedAt: '2026-04-01T10:00:00.000Z',
+        generatedAgendaAppointments: appointments.map((item) => ({ ...item })),
+      };
+      snapshotCalls.push(snapshot);
+      return snapshot;
+    },
+    applyRuntimeStateSnapshotPayload: (snapshot, options) => {
+      applySnapshotCalls.push({ snapshot, options });
       return true;
+    },
+    waitForQueuedRuntimeSnapshotPersist: async () => {
+      persistWaitCalls.push('waited');
+      return overrides.persistWaitResult !== undefined ? Boolean(overrides.persistWaitResult) : true;
     },
     logger: {
       error() {},
@@ -236,11 +250,13 @@ function createFixture(overrides = {}) {
 
   return {
     activityCalls,
+    applySnapshotCalls,
     appointments,
     coordinator,
     dismissCalls,
     persistWaitCalls,
     setCalls,
+    snapshotCalls,
     smtpCalls,
   };
 }
@@ -360,4 +376,87 @@ test('agenda confirmation coordinator waits for queued persist before removing a
   assert.equal(dismissCalls[0].reason, 'confirmation_task_mark_cancelled_dismiss');
   assert.equal(activityCalls[0].reason, 'dashboard_activity_mark_cancelled');
   assert.deepEqual(persistWaitCalls, ['waited']);
+});
+
+test('agenda confirmation coordinator rolls back set-in-agenda when shared Supabase persist fails', async () => {
+  const { activityCalls, applySnapshotCalls, coordinator, dismissCalls, persistWaitCalls, snapshotCalls } =
+    createFixture({
+      supabaseConfigured: true,
+      supabaseHydrated: true,
+      persistWaitResult: false,
+    });
+  const res = createResponseRecorder();
+
+  await coordinator.setLeadTaskInAgendaById(
+    {
+      body: {
+        appointmentDate: '2026-04-10',
+        appointmentTime: '11:45',
+        location: 'Amsterdam',
+        whatsappInfo: 'Stuur route via WhatsApp',
+        whatsappConfirmed: true,
+        actor: 'Serve',
+      },
+    },
+    res,
+    '101'
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /gedeelde opslag/);
+  assert.equal(dismissCalls.length, 1);
+  assert.equal(activityCalls.length, 1);
+  assert.deepEqual(persistWaitCalls, ['waited']);
+  assert.equal(snapshotCalls.length, 1);
+  assert.equal(applySnapshotCalls.length, 1);
+});
+
+test('agenda confirmation coordinator rolls back lead removal when shared Supabase persist fails', async () => {
+  const { activityCalls, applySnapshotCalls, coordinator, dismissCalls, persistWaitCalls, snapshotCalls } =
+    createFixture({
+      appointments: [
+        {
+          id: 202,
+          company: 'Softora',
+          contact: 'Serve Creusen',
+          phone: '0612345678',
+          date: '2026-04-09',
+          time: '10:30',
+          source: 'AI Cold Calling',
+          summary: 'Lead opvolgen na interesse.',
+          callId: 'call-1',
+          provider: 'retell',
+          aiGenerated: true,
+          needsConfirmationEmail: true,
+          confirmationTaskType: 'lead_follow_up',
+          confirmationEmailSent: false,
+          confirmationResponseReceived: false,
+          confirmationAppointmentCancelled: false,
+        },
+      ],
+      supabaseConfigured: true,
+      supabaseHydrated: true,
+      persistWaitResult: false,
+    });
+  const res = createResponseRecorder();
+
+  await coordinator.markLeadTaskCancelledById(
+    {
+      body: {
+        actor: 'Serve',
+      },
+    },
+    res,
+    '202'
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /gedeelde opslag/);
+  assert.equal(dismissCalls.length, 1);
+  assert.equal(activityCalls.length, 1);
+  assert.deepEqual(persistWaitCalls, ['waited']);
+  assert.equal(snapshotCalls.length, 1);
+  assert.equal(applySnapshotCalls.length, 1);
 });

@@ -67,11 +67,32 @@ function createAgendaConfirmationCoordinator(deps = {}) {
     normalizeAbsoluteHttpUrl = (value) => String(value || '').trim(),
     getOpenAiTranscriptionModelCandidates = () => ['gpt-4o-mini-transcribe'],
     parseJsonLoose = () => null,
-    waitForQueuedRuntimeStatePersist = async () => true,
+    buildRuntimeStateSnapshotPayload = () => null,
+    applyRuntimeStateSnapshotPayload = () => false,
+    waitForQueuedRuntimeSnapshotPersist = async () => true,
     logger = console,
   } = deps;
 
   const confirmationTaskConversationPromiseByCacheKey = new Map();
+
+  function takeRuntimeMutationSnapshot() {
+    if (!isSupabaseConfigured()) return null;
+    const snapshot = buildRuntimeStateSnapshotPayload();
+    return snapshot && typeof snapshot === 'object' ? snapshot : null;
+  }
+
+  async function ensureLeadMutationPersisted(runtimeSnapshot, failureMessage) {
+    if (!isSupabaseConfigured()) return true;
+    const persisted = await waitForQueuedRuntimeSnapshotPersist();
+    if (persisted) return true;
+    const rehydrated = await forceHydrateRuntimeStateWithRetries(1);
+    if (!rehydrated && runtimeSnapshot) {
+      applyRuntimeStateSnapshotPayload(runtimeSnapshot, {
+        updatedAt: normalizeString(runtimeSnapshot?.savedAt || '') || new Date().toISOString(),
+      });
+    }
+    return failureMessage || 'Leadwijziging kon niet veilig in gedeelde opslag worden opgeslagen.';
+  }
 
   function buildConfirmationTaskDetail(appointment) {
     const task = mapAppointmentToConfirmationTask(appointment);
@@ -898,6 +919,7 @@ function createAgendaConfirmationCoordinator(deps = {}) {
       return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
     }
 
+    const runtimeSnapshot = takeRuntimeMutationSnapshot();
     const nowIso = new Date().toISOString();
     const mergedSummary = await buildLeadToAgendaSummary(
       req.body?.summary || appointment?.summary,
@@ -952,7 +974,13 @@ function createAgendaConfirmationCoordinator(deps = {}) {
       'dashboard_activity_lead_set_in_agenda'
     );
 
-    await waitForQueuedRuntimeStatePersist();
+    const persistFailureMessage = await ensureLeadMutationPersisted(
+      runtimeSnapshot,
+      'Lead kon niet veilig in gedeelde opslag worden gezet.'
+    );
+    if (persistFailureMessage !== true) {
+      return res.status(503).json({ ok: false, error: persistFailureMessage });
+    }
 
     return res.status(200).json({
       ok: true,
@@ -1025,6 +1053,7 @@ function createAgendaConfirmationCoordinator(deps = {}) {
 
     const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
     const callId = normalizeString(appointment?.callId || '');
+    const runtimeSnapshot = takeRuntimeMutationSnapshot();
     const nowIso = new Date().toISOString();
     const updatedAppointment = setGeneratedAgendaAppointmentAtIndex(
       idx,
@@ -1062,7 +1091,13 @@ function createAgendaConfirmationCoordinator(deps = {}) {
       'dashboard_activity_mark_cancelled'
     );
 
-    await waitForQueuedRuntimeStatePersist();
+    const persistFailureMessage = await ensureLeadMutationPersisted(
+      runtimeSnapshot,
+      'Leadverwijdering kon niet veilig in gedeelde opslag worden opgeslagen.'
+    );
+    if (persistFailureMessage !== true) {
+      return res.status(503).json({ ok: false, error: persistFailureMessage });
+    }
 
     return res.status(200).json({
       ok: true,

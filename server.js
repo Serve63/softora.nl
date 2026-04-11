@@ -1266,6 +1266,7 @@ const {
   syncCallUpdatesFromSupabaseRows,
   syncRuntimeStateFromSupabaseIfNewer,
   waitForQueuedCallUpdateRowPersist,
+  waitForQueuedRuntimeSnapshotPersist,
   waitForQueuedRuntimeStatePersist,
 } = runtimeStateSyncCoordinator;
 
@@ -6828,7 +6829,9 @@ const agendaInterestedLeadsCoordinator = createAgendaInterestedLeadsCoordinator(
   dismissInterestedLeadIdentity,
   appendDashboardActivity,
   cancelOpenLeadFollowUpTasksByIdentity,
-  waitForQueuedRuntimeStatePersist,
+  buildRuntimeStateSnapshotPayload,
+  applyRuntimeStateSnapshotPayload,
+  waitForQueuedRuntimeSnapshotPersist,
 });
 
 const {
@@ -6918,7 +6921,9 @@ const agendaConfirmationCoordinator = createAgendaConfirmationCoordinator({
   normalizeAbsoluteHttpUrl,
   getOpenAiTranscriptionModelCandidates,
   parseJsonLoose,
-  waitForQueuedRuntimeStatePersist,
+  buildRuntimeStateSnapshotPayload,
+  applyRuntimeStateSnapshotPayload,
+  waitForQueuedRuntimeSnapshotPersist,
 });
 
 const {

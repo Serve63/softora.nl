@@ -763,11 +763,21 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     return runtimeState.supabasePersistChain;
   }
 
+  async function waitForQueuedRuntimeSnapshotPersist() {
+    if (!isSupabaseConfigured()) return false;
+    try {
+      return Boolean(await runtimeState.supabasePersistChain);
+    } catch (error) {
+      logError('[Supabase][RuntimePersistAwaitError]', error?.message || error);
+      return false;
+    }
+  }
+
   async function waitForQueuedRuntimeStatePersist() {
     if (!isSupabaseConfigured()) return false;
     try {
-      const runtimePersistOk = Boolean(await runtimeState.supabasePersistChain);
-      const callUpdatePersistOk = Boolean(await runtimeState.supabaseCallUpdatePersistChain);
+      const runtimePersistOk = await waitForQueuedRuntimeSnapshotPersist();
+      const callUpdatePersistOk = await waitForQueuedCallUpdateRowPersist();
       return runtimePersistOk && callUpdatePersistOk;
     } catch (error) {
       logError('[Supabase][PersistAwaitError]', error?.message || error);
@@ -1026,6 +1036,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     syncCallUpdatesFromSupabaseRows,
     syncRuntimeStateFromSupabaseIfNewer,
     waitForQueuedCallUpdateRowPersist,
+    waitForQueuedRuntimeSnapshotPersist,
     waitForQueuedRuntimeStatePersist,
   };
 }

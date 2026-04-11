@@ -35,8 +35,29 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     dismissInterestedLeadIdentity = () => {},
     appendDashboardActivity = () => {},
     cancelOpenLeadFollowUpTasksByIdentity = () => [],
-    waitForQueuedRuntimeStatePersist = async () => true,
+    buildRuntimeStateSnapshotPayload = () => null,
+    applyRuntimeStateSnapshotPayload = () => false,
+    waitForQueuedRuntimeSnapshotPersist = async () => true,
   } = deps;
+
+  function takeRuntimeMutationSnapshot() {
+    if (!isSupabaseConfigured()) return null;
+    const snapshot = buildRuntimeStateSnapshotPayload();
+    return snapshot && typeof snapshot === 'object' ? snapshot : null;
+  }
+
+  async function ensureLeadMutationPersisted(runtimeSnapshot, failureMessage) {
+    if (!isSupabaseConfigured()) return true;
+    const persisted = await waitForQueuedRuntimeSnapshotPersist();
+    if (persisted) return true;
+    const rehydrated = await forceHydrateRuntimeStateWithRetries(1);
+    if (!rehydrated && runtimeSnapshot) {
+      applyRuntimeStateSnapshotPayload(runtimeSnapshot, {
+        updatedAt: normalizeString(runtimeSnapshot?.savedAt || '') || new Date().toISOString(),
+      });
+    }
+    return failureMessage || 'Leadwijziging kon niet veilig in gedeelde opslag worden opgeslagen.';
+  }
 
   function buildMaterializedInterestedLeadAppointment(callId, requestBody = {}) {
     const normalizedCallId = normalizeString(callId);
@@ -295,6 +316,7 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
     }
 
+    const runtimeSnapshot = takeRuntimeMutationSnapshot();
     const persistedAppointment = upsertGeneratedAgendaAppointment(baseAppointment, callId);
     if (!persistedAppointment) {
       return res.status(500).json({ ok: false, error: 'Lead kon niet worden opgeslagen.' });
@@ -359,7 +381,13 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       'dashboard_activity_interested_lead_set_in_agenda'
     );
 
-    await waitForQueuedRuntimeStatePersist();
+    const persistFailureMessage = await ensureLeadMutationPersisted(
+      runtimeSnapshot,
+      'Lead kon niet veilig in gedeelde opslag worden gezet.'
+    );
+    if (persistFailureMessage !== true) {
+      return res.status(503).json({ ok: false, error: persistFailureMessage });
+    }
 
     return res.status(200).json({
       ok: true,
@@ -381,6 +409,7 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
 
     const leadRow = findInterestedLeadRowByCallId(callId);
     const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
+    const runtimeSnapshot = takeRuntimeMutationSnapshot();
     dismissInterestedLeadIdentity(
       callId,
       leadRow || getLatestCallUpdateByCallId(callId) || {},
@@ -407,7 +436,13 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       'dashboard_activity_interested_lead_removed'
     );
 
-    await waitForQueuedRuntimeStatePersist();
+    const persistFailureMessage = await ensureLeadMutationPersisted(
+      runtimeSnapshot,
+      'Leadverwijdering kon niet veilig in gedeelde opslag worden opgeslagen.'
+    );
+    if (persistFailureMessage !== true) {
+      return res.status(503).json({ ok: false, error: persistFailureMessage });
+    }
 
     return res.status(200).json({
       ok: true,

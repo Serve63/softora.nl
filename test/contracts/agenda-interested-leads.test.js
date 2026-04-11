@@ -73,6 +73,8 @@ function createFixture(overrides = {}) {
   const upsertCalls = [];
   const cancelCalls = [];
   const persistWaitCalls = [];
+  const snapshotCalls = [];
+  const applySnapshotCalls = [];
 
   function setGeneratedAgendaAppointmentAtIndex(idx, nextValue, _reason) {
     appointments[idx] = {
@@ -177,20 +179,34 @@ function createFixture(overrides = {}) {
       cancelCalls.push({ callId, rowLike, actor, reason });
       return 2;
     },
-    waitForQueuedRuntimeStatePersist: async () => {
-      persistWaitCalls.push('waited');
+    buildRuntimeStateSnapshotPayload: () => {
+      const snapshot = {
+        savedAt: '2026-04-01T10:00:00.000Z',
+        generatedAgendaAppointments: appointments.map((item) => ({ ...item })),
+      };
+      snapshotCalls.push(snapshot);
+      return snapshot;
+    },
+    applyRuntimeStateSnapshotPayload: (snapshot, options) => {
+      applySnapshotCalls.push({ snapshot, options });
       return true;
+    },
+    waitForQueuedRuntimeSnapshotPersist: async () => {
+      persistWaitCalls.push('waited');
+      return overrides.persistWaitResult !== undefined ? Boolean(overrides.persistWaitResult) : true;
     },
   });
 
   return {
     activityCalls,
+    applySnapshotCalls,
     appointments,
     cancelCalls,
     coordinator,
     dismissCalls,
     hydrateCalls,
     persistWaitCalls,
+    snapshotCalls,
     upsertCalls,
   };
 }
@@ -272,4 +288,66 @@ test('agenda interested leads coordinator hydrates first when supabase runtime i
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(hydrateCalls, [3]);
+});
+
+test('agenda interested leads coordinator rejects dismissal when shared Supabase persist fails', async () => {
+  const { activityCalls, applySnapshotCalls, cancelCalls, coordinator, dismissCalls, persistWaitCalls, snapshotCalls } =
+    createFixture({
+      supabaseConfigured: true,
+      supabaseHydrated: true,
+      persistWaitResult: false,
+    });
+  const res = createResponseRecorder();
+
+  await coordinator.dismissInterestedLeadResponse(
+    {
+      body: {
+        callId: 'call-1',
+        actor: 'Serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /gedeelde opslag/);
+  assert.equal(dismissCalls.length, 1);
+  assert.equal(cancelCalls.length, 1);
+  assert.equal(activityCalls.length, 1);
+  assert.deepEqual(persistWaitCalls, ['waited']);
+  assert.equal(snapshotCalls.length, 1);
+  assert.equal(applySnapshotCalls.length, 1);
+});
+
+test('agenda interested leads coordinator rejects set-in-agenda when shared Supabase persist fails', async () => {
+  const { applySnapshotCalls, coordinator, persistWaitCalls, snapshotCalls, upsertCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+    persistWaitResult: false,
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.setInterestedLeadInAgendaResponse(
+    {
+      body: {
+        callId: 'call-1',
+        appointmentDate: '2026-04-10',
+        appointmentTime: '14:30',
+        location: 'Amsterdam',
+        whatsappInfo: 'Stuur route door',
+        whatsappConfirmed: true,
+        actor: 'Serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.match(res.body.error, /gedeelde opslag/);
+  assert.equal(upsertCalls.length, 1);
+  assert.deepEqual(persistWaitCalls, ['waited']);
+  assert.equal(snapshotCalls.length, 1);
+  assert.equal(applySnapshotCalls.length, 1);
 });
