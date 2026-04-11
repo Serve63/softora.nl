@@ -326,6 +326,19 @@ test('runtime state sync coordinator hydrates from REST fallback and clears hydr
   assert.equal(fixture.generatedAgendaAppointments[0].id, 55);
 });
 
+test('runtime state sync coordinator treats queued runtime snapshot await as a no-op when Supabase is disabled', async () => {
+  const fixture = createFixture({
+    isSupabaseConfigured: false,
+    runtimeState: createRuntimeState({
+      supabasePersistChain: Promise.resolve(false),
+    }),
+  });
+
+  const persisted = await fixture.coordinator.waitForQueuedRuntimeSnapshotPersist();
+
+  assert.equal(persisted, true);
+});
+
 test('runtime state sync coordinator persists merged runtime snapshots and updates sync markers', async () => {
   const fixture = createFixture({
     recentCallUpdates: [

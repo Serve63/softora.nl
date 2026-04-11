@@ -764,7 +764,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
   }
 
   async function waitForQueuedRuntimeSnapshotPersist() {
-    if (!isSupabaseConfigured()) return false;
+    if (!isSupabaseConfigured()) return true;
     try {
       return Boolean(await runtimeState.supabasePersistChain);
     } catch (error) {

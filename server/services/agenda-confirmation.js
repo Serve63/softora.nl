@@ -83,9 +83,9 @@ function createAgendaConfirmationCoordinator(deps = {}) {
   }
 
   async function ensureLeadMutationPersisted(runtimeSnapshot, failureMessage) {
-    if (!isSupabaseConfigured()) return true;
     const persisted = await waitForQueuedRuntimeSnapshotPersist();
     if (persisted) return true;
+    if (!isSupabaseConfigured()) return true;
     const rehydrated = await forceHydrateRuntimeStateWithRetries(1);
     if (!rehydrated && runtimeSnapshot) {
       applyRuntimeStateSnapshotPayload(runtimeSnapshot, {
@@ -93,6 +93,23 @@ function createAgendaConfirmationCoordinator(deps = {}) {
       });
     }
     return failureMessage || 'Leadwijziging kon niet veilig in gedeelde opslag worden opgeslagen.';
+  }
+
+  async function ensureLeadMutationPersistedOrRespond(res, runtimeSnapshot, failureMessage) {
+    const persistResult = await ensureLeadMutationPersisted(runtimeSnapshot, failureMessage);
+    if (persistResult === true) {
+      invalidateSupabaseSyncTimestamp();
+      return true;
+    }
+
+    const errorMessage =
+      normalizeString(persistResult || failureMessage) ||
+      'Leadwijziging kon niet veilig in gedeelde opslag worden opgeslagen.';
+    res.status(503).json({
+      ok: false,
+      error: errorMessage,
+    });
+    return false;
   }
 
   function buildConfirmationTaskDetail(appointment) {
@@ -968,10 +985,12 @@ function createAgendaConfirmationCoordinator(deps = {}) {
       'dashboard_activity_lead_set_in_agenda'
     );
 
-    ensureLeadMutationPersisted(runtimeSnapshot, 'Lead kon niet veilig in gedeelde opslag worden gezet.').catch(
-      () => null
+    const persistOk = await ensureLeadMutationPersistedOrRespond(
+      res,
+      runtimeSnapshot,
+      'Lead kon niet veilig in gedeelde opslag worden gezet.'
     );
-    invalidateSupabaseSyncTimestamp();
+    if (!persistOk) return res;
 
     return res.status(200).json({
       ok: true,
@@ -1082,8 +1101,12 @@ function createAgendaConfirmationCoordinator(deps = {}) {
       'dashboard_activity_mark_cancelled'
     );
 
-    ensureLeadMutationPersisted(runtimeSnapshot, 'Leadverwijdering kon niet veilig in gedeelde opslag worden opgeslagen.').catch(() => null);
-    invalidateSupabaseSyncTimestamp();
+    const persistOk = await ensureLeadMutationPersistedOrRespond(
+      res,
+      runtimeSnapshot,
+      'Leadverwijdering kon niet veilig in gedeelde opslag worden opgeslagen.'
+    );
+    if (!persistOk) return res;
 
     return res.status(200).json({
       ok: true,
