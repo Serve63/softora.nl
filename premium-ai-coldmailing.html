@@ -2400,9 +2400,7 @@
                         const detailLocationValue = String(taskDetail?.location || '').trim();
                         const detailWhatsappInfoValue = String(taskDetail?.whatsappInfo || '').trim();
 
-                        if (!String(modalDate.value || '').trim()) {
-                            modalDate.value = detailDateValue || '';
-                        }
+                        // date left empty intentionally
                         if (
                             !String(modalTime.value || '').trim() ||
                             normalizeTimeValue(modalTime.value || '') === leadTimeValue
@@ -2482,9 +2480,7 @@
                         }
                     }
 
-                    if (!String(modalDate.value || '').trim()) {
-                        modalDate.value = detailDateValue || '';
-                    }
+                    // date left empty intentionally
                     if (
                         !String(modalTime.value || '').trim() ||
                         normalizeTimeValue(modalTime.value || '') === leadTimeValue
