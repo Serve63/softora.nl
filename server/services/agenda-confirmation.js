@@ -887,15 +887,8 @@ function createAgendaConfirmationCoordinator(deps = {}) {
     const appointmentTime = normalizeTimeHhMm(
       req.body?.appointmentTime || req.body?.time || appointment?.time || ''
     );
-    const rawLocation = sanitizeAppointmentLocation(
-      req.body?.location || req.body?.appointmentLocation || appointment?.location || ''
-    );
-    const location = resolveAgendaLocationValue(
-      rawLocation,
-      req.body?.summary,
-      appointment?.summary || '',
-      req.body?.whatsappInfo || req.body?.whatsappNotes || req.body?.notes || '',
-      appointment?.whatsappInfo || ''
+    const location = sanitizeAppointmentLocation(
+      req.body?.location || req.body?.appointmentLocation || ''
     );
     const whatsappInfo = sanitizeAppointmentWhatsappInfo(
       req.body?.whatsappInfo ||

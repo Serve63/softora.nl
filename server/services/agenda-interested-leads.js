@@ -305,13 +305,7 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       toBooleanSafe(baseAppointment?.whatsappConfirmed, false)
     );
 
-    const location = resolveAgendaLocationValue(
-      rawLocation,
-      req.body?.summary,
-      baseAppointment?.summary || '',
-      req.body?.whatsappInfo || '',
-      baseAppointment?.whatsappInfo || ''
-    );
+    const location = rawLocation;
     if (!location) {
       return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
     }
