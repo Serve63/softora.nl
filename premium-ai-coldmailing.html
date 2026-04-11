@@ -1160,6 +1160,7 @@
             const leadsBootstrapPayload = readLeadsBootstrapPayload();
             const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v3';
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
+            const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
             const SHARED_CALL_SUMMARY_CACHE_STORAGE_KEY = 'softora_shared_call_summary_cache_v8';
@@ -1176,6 +1177,7 @@
             let loadLeadsPromise = null;
             let queuedReload = false;
             let lastLeadStatusTimestamp = 0;
+            const manuallySuppressedLeadKeys = new Map();
 
             function paintLocalLeadsBadge(count) {
                 const badge = document.querySelector('[data-sidebar-count-key="leads"]');
@@ -2598,6 +2600,112 @@
                 throw lastError || new Error('Actie mislukt.');
             }
 
+            function refreshLeadSidebarCountsSafely() {
+                try {
+                    if (
+                        window.SoftoraPersonnelTheme &&
+                        typeof window.SoftoraPersonnelTheme.refreshSidebarCounts === 'function'
+                    ) {
+                        const refreshCountsResult = window.SoftoraPersonnelTheme.refreshSidebarCounts();
+                        if (refreshCountsResult && typeof refreshCountsResult.catch === 'function') {
+                            refreshCountsResult.catch((error) => {
+                                console.warn('[softora-leads] Sidebar counts verversen mislukt.', error);
+                            });
+                        }
+                        return;
+                    }
+
+                    if (
+                        window.SoftoraPersonnelTheme &&
+                        typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
+                    ) {
+                        const refreshLeadsResult = window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
+                        if (refreshLeadsResult && typeof refreshLeadsResult.catch === 'function') {
+                            refreshLeadsResult.catch((error) => {
+                                console.warn('[softora-leads] Leads badge verversen mislukt.', error);
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[softora-leads] Sidebar counts verversen mislukt.', error);
+                }
+            }
+
+            function finalizeLeadMutation(taskId) {
+                const normalizedTaskId = Number(taskId) || 0;
+                if (!normalizedTaskId) return;
+                const currentLead = getLeadById(normalizedTaskId);
+                if (currentLead) {
+                    suppressLeadRowLocally(currentLead);
+                }
+
+                allLeads = allLeads.filter((item) => Number(item.id) !== normalizedTaskId);
+                persistCachedLeads(allLeads);
+                delete leadDetailsById[String(normalizedTaskId)];
+                delete leadAiCopyById[String(normalizedTaskId)];
+
+                closeLeadModal();
+                renderList();
+
+                if (allLeads.length > 0) {
+                    setStatusLastUpdatedNow();
+                } else {
+                    setStatus('Nog geen leads gevonden.', '');
+                }
+
+                refreshLeadSidebarCountsSafely();
+            }
+
+            function buildLeadMutationRollbackSnapshot(taskId) {
+                const normalizedTaskId = Number(taskId) || 0;
+                if (!normalizedTaskId) return null;
+
+                const leadIndex = allLeads.findIndex((item) => Number(item?.id) === normalizedTaskId);
+                if (leadIndex < 0) return null;
+
+                const cacheKey = String(normalizedTaskId);
+                return {
+                    taskId: normalizedTaskId,
+                    leadIndex,
+                    lead: normalizeLeadRow(allLeads[leadIndex]),
+                    detail: leadDetailsById[cacheKey] && typeof leadDetailsById[cacheKey] === 'object'
+                        ? { ...leadDetailsById[cacheKey] }
+                        : null,
+                    aiCopy: leadAiCopyById[cacheKey] && typeof leadAiCopyById[cacheKey] === 'object'
+                        ? { ...leadAiCopyById[cacheKey] }
+                        : null,
+                };
+            }
+
+            function rollbackLeadMutation(snapshot) {
+                const safeSnapshot = snapshot && typeof snapshot === 'object' ? snapshot : null;
+                const normalizedTaskId = Number(safeSnapshot?.taskId) || 0;
+                if (!normalizedTaskId || !safeSnapshot?.lead) return;
+                clearSuppressedLeadRow(safeSnapshot.lead);
+
+                if (!allLeads.some((item) => Number(item?.id) === normalizedTaskId)) {
+                    const nextRows = Array.isArray(allLeads) ? allLeads.slice() : [];
+                    const insertIndex = Math.min(
+                        Math.max(Number(safeSnapshot?.leadIndex) || 0, 0),
+                        nextRows.length
+                    );
+                    nextRows.splice(insertIndex, 0, normalizeLeadRow(safeSnapshot.lead));
+                    allLeads = dedupe(nextRows).sort(sortByDateDesc);
+                    persistCachedLeads(allLeads);
+                    renderList();
+                }
+
+                const cacheKey = String(normalizedTaskId);
+                if (safeSnapshot.detail) {
+                    leadDetailsById[cacheKey] = safeSnapshot.detail;
+                }
+                if (safeSnapshot.aiCopy) {
+                    leadAiCopyById[cacheKey] = safeSnapshot.aiCopy;
+                }
+
+                refreshLeadSidebarCountsSafely();
+            }
+
             async function submitLeadToAgenda() {
                 const taskId = Number(activeTaskId) || 0;
                 if (!taskId || modalBusy) return;
@@ -2681,30 +2789,7 @@
                         throw new Error('Deze lead heeft geen geldige taak of callId.');
                     }
 
-                    allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
-                    persistCachedLeads(allLeads);
-                    delete leadDetailsById[String(taskId)];
-                    delete leadAiCopyById[String(taskId)];
-                    renderList();
-                    if (allLeads.length > 0) {
-                        setStatusLastUpdatedNow();
-                    } else {
-                        setStatus('Nog geen leads gevonden.', '');
-                    }
-
-                    if (
-                        window.SoftoraPersonnelTheme &&
-                        typeof window.SoftoraPersonnelTheme.refreshSidebarCounts === 'function'
-                    ) {
-                        window.SoftoraPersonnelTheme.refreshSidebarCounts();
-                    } else if (
-                        window.SoftoraPersonnelTheme &&
-                        typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
-                    ) {
-                        window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
-                    }
-
-                    closeLeadModal();
+                    finalizeLeadMutation(taskId);
                 } catch (error) {
                     setModalStatus(String(error?.message || 'Invoegen in agenda mislukt.'), 'error');
                 } finally {
@@ -2735,13 +2820,15 @@
 
                 setModalBusy(true);
                 setModalStatus('Lead wordt verwijderd...', '');
+                let rollbackSnapshot = null;
                 try {
+                    let removeLeadRequest = null;
                     if (isCallBackedLead) {
                         const callId = String(lead.callId || '').trim();
                         if (!callId) {
                             throw new Error('Deze lead heeft geen callId en kan daarom niet blijvend worden verwijderd.');
                         }
-                        await postJsonWithFallback(
+                        removeLeadRequest = () => postJsonWithFallback(
                             [
                                 '/api/agenda/interested-leads/dismiss',
                                 '/api/agenda/interested-lead-dismiss',
@@ -2752,7 +2839,7 @@
                             }
                         );
                     } else if (hasTaskActions) {
-                        await postJsonWithFallback(
+                        removeLeadRequest = () => postJsonWithFallback(
                             [
                                 `/api/agenda/confirmation-tasks/${encodeURIComponent(String(taskId))}/mark-cancelled`,
                                 `/api/agenda/confirmation-task-mark-cancelled?taskId=${encodeURIComponent(String(taskId))}`,
@@ -2766,32 +2853,19 @@
                         throw new Error('Deze lead heeft geen geldige taak of callId.');
                     }
 
-                    allLeads = allLeads.filter((item) => Number(item.id) !== taskId);
-                    persistCachedLeads(allLeads);
-                    delete leadDetailsById[String(taskId)];
-                    delete leadAiCopyById[String(taskId)];
-                    renderList();
+                    rollbackSnapshot = buildLeadMutationRollbackSnapshot(taskId);
+                    finalizeLeadMutation(taskId);
+                    setStatus('Lead verwijderen...', '');
+                    await removeLeadRequest();
+
                     if (allLeads.length > 0) {
                         setStatusLastUpdatedNow();
                     } else {
                         setStatus('Nog geen leads gevonden.', '');
                     }
-
-                    if (
-                        window.SoftoraPersonnelTheme &&
-                        typeof window.SoftoraPersonnelTheme.refreshSidebarCounts === 'function'
-                    ) {
-                        window.SoftoraPersonnelTheme.refreshSidebarCounts();
-                    } else if (
-                        window.SoftoraPersonnelTheme &&
-                        typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
-                    ) {
-                        window.SoftoraPersonnelTheme.refreshSidebarLeadsCount();
-                    }
-
-                    closeLeadModal();
                 } catch (error) {
-                    setModalStatus(String(error?.message || 'Lead verwijderen mislukt.'), 'error');
+                    rollbackLeadMutation(rollbackSnapshot);
+                    setStatus(`Lead verwijderen mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
                 } finally {
                     setModalBusy(false);
                 }
@@ -3096,6 +3170,54 @@
                 const contactKey = normalize(item?.contact || '');
                 if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
                 return '';
+            }
+
+            function buildSuppressedLeadKeys(item) {
+                const keys = [];
+                const rowId = Number(item?.id) || 0;
+                const callId = String(resolveLeadCallId(item) || item?.callId || '').trim();
+                const matchKey = buildLeadMatchKey(item);
+                if (rowId > 0) keys.push(`id:${rowId}`);
+                if (callId) keys.push(`call:${callId}`);
+                if (matchKey) keys.push(`match:${matchKey}`);
+                return keys;
+            }
+
+            function purgeExpiredSuppressedLeadKeys(nowMs = Date.now()) {
+                manuallySuppressedLeadKeys.forEach((expiresAt, key) => {
+                    if (Number(expiresAt) > nowMs) return;
+                    manuallySuppressedLeadKeys.delete(key);
+                });
+            }
+
+            function suppressLeadRowLocally(item) {
+                const keys = buildSuppressedLeadKeys(item);
+                if (!keys.length) return;
+                const expiresAt = Date.now() + MANUAL_LEAD_SUPPRESSION_TTL_MS;
+                purgeExpiredSuppressedLeadKeys();
+                keys.forEach((key) => {
+                    manuallySuppressedLeadKeys.set(key, expiresAt);
+                });
+            }
+
+            function clearSuppressedLeadRow(item) {
+                const keys = buildSuppressedLeadKeys(item);
+                if (!keys.length) return;
+                keys.forEach((key) => {
+                    manuallySuppressedLeadKeys.delete(key);
+                });
+            }
+
+            function isSuppressedLeadRow(item) {
+                const nowMs = Date.now();
+                purgeExpiredSuppressedLeadKeys(nowMs);
+                const keys = buildSuppressedLeadKeys(item);
+                if (!keys.length) return false;
+                return keys.some((key) => Number(manuallySuppressedLeadKeys.get(key) || 0) > nowMs);
+            }
+
+            function filterSuppressedLeadRows(rows) {
+                return (Array.isArray(rows) ? rows : []).filter((row) => !isSuppressedLeadRow(row));
             }
 
             function buildLeadRecencyTimestamp(item) {
@@ -3504,7 +3626,9 @@
 
             function loadCachedLeads() {
                 const bootstrapLeads = Array.isArray(leadsBootstrapPayload?.leads)
-                    ? leadsBootstrapPayload.leads.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                    ? filterSuppressedLeadRows(
+                        leadsBootstrapPayload.leads.map((item) => normalizeLeadRow(item))
+                    ).sort(sortByDateDesc)
                     : [];
                 const bootstrapSavedAt = Date.parse(String(leadsBootstrapPayload?.loadedAt || '').trim()) || 0;
                 let localCache = { leads: [], savedAt: 0 };
@@ -3517,7 +3641,9 @@
                         if (savedAt && Date.now() - savedAt <= LEADS_CACHE_MAX_AGE_MS) {
                             localCache = {
                                 leads: Array.isArray(parsed?.leads)
-                                    ? parsed.leads.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                                    ? filterSuppressedLeadRows(
+                                        parsed.leads.map((item) => normalizeLeadRow(item))
+                                    ).sort(sortByDateDesc)
                                     : [],
                                 savedAt,
                             };
@@ -3543,9 +3669,11 @@
 
             function persistCachedLeads(rows) {
                 try {
-                    const safeRows = Array.isArray(rows)
-                        ? rows.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
-                        : [];
+                    const safeRows = filterSuppressedLeadRows(
+                        Array.isArray(rows)
+                            ? rows.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                            : []
+                    );
                     window.localStorage.setItem(
                         LEADS_CACHE_KEY,
                         JSON.stringify({
@@ -3559,9 +3687,11 @@
             }
 
             function serializeLeadRows(rows) {
-                const safeRows = Array.isArray(rows)
-                    ? rows.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
-                    : [];
+                const safeRows = filterSuppressedLeadRows(
+                    Array.isArray(rows)
+                        ? rows.map((item) => normalizeLeadRow(item)).sort(sortByDateDesc)
+                        : []
+                );
                 return JSON.stringify(safeRows);
             }
 
@@ -3623,9 +3753,11 @@
                     interestError = error;
                 }
 
-                const mergedRows = dedupe([].concat(pendingRows || [], interestedRows || []))
-                    .map((row) => applyLeadDatabaseIdentity(row, databaseByPhone))
-                    .sort(sortByDateDesc);
+                const mergedRows = filterSuppressedLeadRows(
+                    dedupe([].concat(pendingRows || [], interestedRows || []))
+                        .map((row) => applyLeadDatabaseIdentity(row, databaseByPhone))
+                        .sort(sortByDateDesc)
+                );
                 if (mergedRows.length > 0 || (!taskError && !interestError)) {
                     return mergedRows;
                 }

@@ -19,13 +19,30 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   );
   assert.match(pageSource, /if \(localCache\.leads\.length > 0 && localCache\.savedAt > bootstrapSavedAt\) \{/);
   assert.match(pageSource, /window\.localStorage\.setItem\(\s*LEADS_CACHE_KEY,/);
+  assert.match(pageSource, /const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 \* 60 \* 2;/);
+  assert.match(pageSource, /function suppressLeadRowLocally\(item\) \{/);
+  assert.match(pageSource, /function clearSuppressedLeadRow\(item\) \{/);
+  assert.match(pageSource, /function filterSuppressedLeadRows\(rows\) \{/);
   assert.match(
     pageSource,
-    /async function submitLeadToAgenda\(\) \{[\s\S]*allLeads = allLeads\.filter\(\(item\) => Number\(item\.id\) !== taskId\);[\s\S]*persistCachedLeads\(allLeads\);/
+    /function finalizeLeadMutation\(taskId\) \{[\s\S]*suppressLeadRowLocally\(currentLead\);[\s\S]*closeLeadModal\(\);[\s\S]*renderList\(\);[\s\S]*refreshLeadSidebarCountsSafely\(\);/
+  );
+  assert.match(pageSource, /function buildLeadMutationRollbackSnapshot\(taskId\) \{/);
+  assert.match(
+    pageSource,
+    /function rollbackLeadMutation\(snapshot\) \{[\s\S]*clearSuppressedLeadRow\(safeSnapshot\.lead\);[\s\S]*allLeads = dedupe\(nextRows\)\.sort\(sortByDateDesc\);[\s\S]*renderList\(\);/
   );
   assert.match(
     pageSource,
-    /async function removeLead\(\) \{[\s\S]*allLeads = allLeads\.filter\(\(item\) => Number\(item\.id\) !== taskId\);[\s\S]*persistCachedLeads\(allLeads\);/
+    /async function submitLeadToAgenda\(\) \{[\s\S]*finalizeLeadMutation\(taskId\);/
+  );
+  assert.match(
+    pageSource,
+    /async function removeLead\(\) \{[\s\S]*let rollbackSnapshot = null;[\s\S]*rollbackSnapshot = buildLeadMutationRollbackSnapshot\(taskId\);[\s\S]*finalizeLeadMutation\(taskId\);[\s\S]*setStatus\('Lead verwijderen\.\.\.', ''\);[\s\S]*await removeLeadRequest\(\);[\s\S]*catch \(error\) \{[\s\S]*rollbackLeadMutation\(rollbackSnapshot\);[\s\S]*setStatus\(`Lead verwijderen mislukt: \$\{String\(error\?\.message \|\| 'onbekende fout'\)\}`, 'error'\);/
+  );
+  assert.match(
+    pageSource,
+    /const mergedRows = filterSuppressedLeadRows\([\s\S]*dedupe\(\[\]\.concat\(pendingRows \|\| \[\], interestedRows \|\| \[\]\)\)/
   );
   assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
   assert.match(pageSource, /let lastLeadStatusTimestamp = 0;/);
