@@ -1080,9 +1080,32 @@
         ).trim();
     }
 
+    function buildLeadVirtualSeedForCount(item) {
+        const callId = resolveLeadCallIdForCount(item);
+        if (callId) return `call:${callId}`;
+        const phoneDigits = String((item && item.phone) || "").replace(/\D/g, "");
+        if (phoneDigits) return `phone:${phoneDigits}`;
+        const companyKey = normalizeLeadFieldForCount(item && item.company);
+        const contactKey = normalizeLeadFieldForCount(item && item.contact);
+        if (companyKey || contactKey) return `name:${companyKey}|${contactKey}`;
+        return "";
+    }
+
+    function resolveLeadListIdForCount(item) {
+        const explicitId = Number((item && item.id) || 0) || 0;
+        if (explicitId > 0) return explicitId;
+        const seed = buildLeadVirtualSeedForCount(item);
+        if (!seed) return 0;
+        let hash = 0;
+        for (let i = 0; i < seed.length; i += 1) {
+            hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+        }
+        return -(Math.abs(hash || 1));
+    }
+
     function normalizeLeadRowForCount(item) {
         return {
-            id: Number((item && item.id) || 0) || 0,
+            id: resolveLeadListIdForCount(item),
             company: String((item && item.company) || "Onbekende lead").trim(),
             contact: String((item && item.contact) || "").trim(),
             phone: String((item && item.phone) || "").trim(),
@@ -1117,7 +1140,7 @@
     function isLeadRowSuppressed(row, suppressedKeys) {
         const rowId = Number(row && row.id) || 0;
         const callId = String(row && row.callId || "").trim();
-        if (rowId > 0 && suppressedKeys.has("id:" + rowId)) return true;
+        if (rowId !== 0 && suppressedKeys.has("id:" + rowId)) return true;
         if (callId && suppressedKeys.has("call:" + callId)) return true;
         return false;
     }
@@ -1125,14 +1148,21 @@
     function dedupeLeadRowsForCount(rows) {
         const map = new Map();
         (Array.isArray(rows) ? rows : []).forEach(function (row) {
-            const fallbackKey = [
-                normalizeLeadFieldForCount(row && row.company),
-                normalizeLeadFieldForCount(row && row.contact),
-                normalizeLeadFieldForCount(row && row.phone),
-                normalizeLeadFieldForCount(row && row.date),
-                normalizeLeadFieldForCount(row && row.time),
-            ].join("|");
-            const key = buildLeadMatchKeyForCount(row) || fallbackKey;
+            const rowId = Number(row && row.id) || 0;
+            const callId = String((row && row.callId) || "").trim();
+            const key = buildLeadMatchKeyForCount(row) || (
+                callId
+                    ? `call:${callId}`
+                    : rowId > 0
+                        ? `id:${rowId}`
+                        : [
+                            normalizeLeadFieldForCount(row && row.company),
+                            normalizeLeadFieldForCount(row && row.contact),
+                            normalizeLeadFieldForCount(row && row.phone),
+                            normalizeLeadFieldForCount(row && row.date),
+                            normalizeLeadFieldForCount(row && row.time),
+                        ].join("|")
+            );
             if (!map.has(key)) map.set(key, row);
         });
         return Array.from(map.values());

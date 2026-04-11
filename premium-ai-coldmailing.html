@@ -3153,7 +3153,7 @@
                 const keys = [];
                 const rowId = Number(item?.id) || 0;
                 const callId = String(resolveLeadCallId(item) || item?.callId || '').trim();
-                if (rowId > 0) keys.push(`id:${rowId}`);
+                if (rowId !== 0) keys.push(`id:${rowId}`);
                 if (callId) keys.push(`call:${callId}`);
                 return keys;
             }
