@@ -1160,6 +1160,7 @@
             const leadsBootstrapPayload = readLeadsBootstrapPayload();
             const LEADS_CACHE_KEY = 'softora.leads.overview.cache.v3';
             const LEADS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
+            const LEADS_LOAD_RETRY_DELAY_MS = 4000;
             const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
@@ -1175,6 +1176,7 @@
             let callBackedLeadSourcesLoadPromise = null;
             let modalOpenSequence = 0;
             let loadLeadsPromise = null;
+            let leadRetryTimer = null;
             let queuedReload = false;
             let lastLeadStatusTimestamp = 0;
             const manuallySuppressedLeadKeys = new Map();
@@ -3526,7 +3528,7 @@
                 const seenCallIds = new Set();
 
                 try {
-                    const data = await fetchTasksJson('/api/agenda/interested-leads?limit=500', 8000);
+                    const data = await fetchTasksJson('/api/agenda/interested-leads?limit=500', 10000);
                     return (Array.isArray(data?.leads) ? data.leads : [])
                         .map((item) => applyLeadDatabaseIdentity(normalizeLeadRow(item)))
                         .filter((row) => {
@@ -3545,8 +3547,8 @@
                 }
 
                 const responses = await Promise.allSettled([
-                    fetchTasksJson('/api/coldcalling/call-updates?limit=500', 8000),
-                    fetchTasksJson('/api/ai/call-insights?limit=500', 8000),
+                    fetchTasksJson('/api/coldcalling/call-updates?limit=500', 10000),
+                    fetchTasksJson('/api/ai/call-insights?limit=500', 10000),
                 ]);
                 const updatesData = responses[0]?.status === 'fulfilled' ? responses[0].value : null;
                 const insightsData = responses[1]?.status === 'fulfilled' ? responses[1].value : null;
@@ -3699,6 +3701,19 @@
                 return serializeLeadRows(a) !== serializeLeadRows(b);
             }
 
+            function isLeadLoadTimeoutError(error) {
+                const message = normalize(String(error?.message || error || ''));
+                return message.includes('duurde te lang');
+            }
+
+            function scheduleLeadRetry(delayMs = LEADS_LOAD_RETRY_DELAY_MS) {
+                if (leadRetryTimer) return;
+                leadRetryTimer = window.setTimeout(() => {
+                    leadRetryTimer = null;
+                    loadLeads({ silent: true });
+                }, Math.max(1000, Number(delayMs) || LEADS_LOAD_RETRY_DELAY_MS));
+            }
+
             async function fetchTasksJson(url, timeoutMs) {
                 const controller = new AbortController();
                 const timeoutId = window.setTimeout(() => {
@@ -3727,9 +3742,9 @@
             async function fetchLeadRows() {
                 const databaseByPhone = await ensureLeadDatabaseIdentityByPhone();
                 const endpoints = [
-                    { url: '/api/agenda/confirmation-tasks?quick=1&limit=400', timeoutMs: 5000 },
-                    { url: '/api/agenda/confirmation-tasks?fast=1&limit=400', timeoutMs: 5000 },
-                    { url: '/api/agenda/confirmation-tasks?limit=400', timeoutMs: 9000 },
+                    { url: '/api/agenda/confirmation-tasks?quick=1&limit=400', timeoutMs: 7000 },
+                    { url: '/api/agenda/confirmation-tasks?fast=1&limit=400', timeoutMs: 7000 },
+                    { url: '/api/agenda/confirmation-tasks?limit=400', timeoutMs: 12000 },
                 ];
                 let taskError = null;
                 let pendingRows = [];
@@ -3777,6 +3792,10 @@
                 }
                 loadLeadsPromise = (async () => {
                     const freshLeads = await fetchLeadRows();
+                    if (leadRetryTimer) {
+                        window.clearTimeout(leadRetryTimer);
+                        leadRetryTimer = null;
+                    }
                     const shouldRerender = leadRowsDiffer(allLeads, freshLeads);
                     allLeads = freshLeads;
                     if (shouldRerender || !allLeads.length) {
@@ -3805,6 +3824,12 @@
                             allLeads = cached.leads;
                             renderList();
                             setStatusLastUpdatedNow(new Date(cached.savedAt));
+                            return;
+                        }
+                        if (isLeadLoadTimeoutError(error)) {
+                            setStatus('Leads laden duurt langer dan verwacht. We proberen automatisch opnieuw...', '');
+                            renderList();
+                            scheduleLeadRetry();
                             return;
                         }
                         setStatus(`Leads laden mislukt: ${message}`, 'error');
@@ -3884,6 +3909,7 @@
                 } catch (error) {
                     window.__softoraLeadsPageCount = undefined;
                 }
+                if (leadRetryTimer) window.clearTimeout(leadRetryTimer);
                 if (pollTimer) window.clearInterval(pollTimer);
             });
 

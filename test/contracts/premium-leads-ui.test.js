@@ -19,6 +19,7 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   );
   assert.match(pageSource, /if \(localCache\.leads\.length > 0 && localCache\.savedAt > bootstrapSavedAt\) \{/);
   assert.match(pageSource, /window\.localStorage\.setItem\(\s*LEADS_CACHE_KEY,/);
+  assert.match(pageSource, /const LEADS_LOAD_RETRY_DELAY_MS = 4000;/);
   assert.match(pageSource, /const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 \* 60 \* 2;/);
   assert.match(pageSource, /function suppressLeadRowLocally\(item\) \{/);
   assert.match(pageSource, /function clearSuppressedLeadRow\(item\) \{/);
@@ -44,6 +45,14 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
     pageSource,
     /const mergedRows = filterSuppressedLeadRows\([\s\S]*dedupe\(\[\]\.concat\(pendingRows \|\| \[\], interestedRows \|\| \[\]\)\)/
   );
+  assert.match(pageSource, /function isLeadLoadTimeoutError\(error\) \{/);
+  assert.match(pageSource, /function scheduleLeadRetry\(delayMs = LEADS_LOAD_RETRY_DELAY_MS\) \{/);
+  assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?quick=1&limit=400', timeoutMs: 7000/);
+  assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?fast=1&limit=400', timeoutMs: 7000/);
+  assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?limit=400', timeoutMs: 12000/);
+  assert.match(pageSource, /\/api\/agenda\/interested-leads\?limit=500', 10000/);
+  assert.match(pageSource, /\/api\/coldcalling\/call-updates\?limit=500', 10000/);
+  assert.match(pageSource, /\/api\/ai\/call-insights\?limit=500', 10000/);
   assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
   assert.match(pageSource, /let lastLeadStatusTimestamp = 0;/);
   assert.match(pageSource, /lastLeadStatusTimestamp = safeDate\.getTime\(\);/);
@@ -66,6 +75,10 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(
     pageSource,
     /if \(allLeads\.length > 0\) \{[\s\S]*console\.warn\('\[softora-leads\] Live refresh overgeslagen; zichtbare leads blijven staan\.', message\);[\s\S]*setStatusLastUpdatedNow\(new Date\(lastLeadStatusTimestamp\)\);/
+  );
+  assert.match(
+    pageSource,
+    /if \(isLeadLoadTimeoutError\(error\)\) \{[\s\S]*setStatus\('Leads laden duurt langer dan verwacht\. We proberen automatisch opnieuw\.\.\.', ''\);[\s\S]*scheduleLeadRetry\(\);[\s\S]*return;/
   );
   assert.match(pageSource, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
   assert.match(pageSource, /<label class="lead-modal-label" for="leadModalDate">Datum van afspraak<span class="lead-modal-required">\*<\/span><\/label>/);
