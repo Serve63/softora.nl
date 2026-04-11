@@ -1051,6 +1051,35 @@
             .trim();
     }
 
+    function extractCallIdFromRecordingUrlForCount(value) {
+        var raw = String(value || "").trim();
+        if (!raw) return "";
+        try {
+            var parsed = new URL(raw, window.location.origin);
+            return String(parsed.searchParams.get("callId") || "").trim();
+        } catch (e) {
+            var match = raw.match(/[?&]callId=([^&#]+)/i);
+            if (!match) return "";
+            try { return decodeURIComponent(String(match[1] || "").trim()); }
+            catch (e2) { return String(match[1] || "").trim(); }
+        }
+    }
+
+    function resolveLeadCallIdForCount(item) {
+        if (!item) return "";
+        return String(
+            item.callId ||
+            item.call_id ||
+            item.sourceCallId ||
+            extractCallIdFromRecordingUrlForCount(item.recordingUrl) ||
+            extractCallIdFromRecordingUrlForCount(item.recording_url) ||
+            extractCallIdFromRecordingUrlForCount(item.recordingUrlProxy) ||
+            extractCallIdFromRecordingUrlForCount(item.audioUrl) ||
+            extractCallIdFromRecordingUrlForCount(item.audio_url) ||
+            ""
+        ).trim();
+    }
+
     function normalizeLeadRowForCount(item) {
         return {
             id: Number((item && item.id) || 0) || 0,
@@ -1059,7 +1088,7 @@
             phone: String((item && item.phone) || "").trim(),
             date: String((item && item.date) || "").trim(),
             time: String((item && item.time) || "").trim(),
-            callId: String((item && (item.callId || item.call_id || item.sourceCallId)) || "").trim(),
+            callId: resolveLeadCallIdForCount(item),
             createdAt: String((item && item.createdAt) || "").trim(),
             confirmationTaskCreatedAt: String((item && item.confirmationTaskCreatedAt) || "").trim(),
             updatedAt: String((item && item.updatedAt) || "").trim(),
