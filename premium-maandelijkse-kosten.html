@@ -70,7 +70,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 3rem;
+  margin-bottom: 2.25rem;
   gap: 1rem;
 }
 .logo {
@@ -85,56 +85,56 @@ body {
 }
 .page-title {
   font-family: 'Oswald', sans-serif;
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 1.8rem;
+  font-weight: 600;
+  letter-spacing: 0.015em;
   text-transform: uppercase;
   line-height: 1;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.24rem;
 }
 .page-sub {
   color: var(--text-tertiary);
-  font-size: 0.9rem;
-  font-weight: 300;
+  font-size: 0.82rem;
+  font-weight: 400;
   line-height: 1.4;
   margin: 0;
 }
 
 #last-updated {
   font-family: 'Oswald', sans-serif;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   color: var(--text-tertiary);
-  padding: 0.6rem 1.2rem;
+  padding: 0.52rem 1rem;
   border: 1px solid var(--border);
 }
 
 .totals-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 32px;
+  gap: 14px;
+  margin-bottom: 24px;
 }
 .totaal-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 20px 22px;
+  padding: 18px 20px;
 }
 .totaal-card.accent { border-color: var(--crimson); border-width: 2px; }
 .totaal-label {
   font-family: 'Oswald', sans-serif;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-light);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .totaal-amount {
   font-family: 'Oswald', sans-serif;
-  font-size: 3rem;
+  font-size: 2.62rem;
   font-weight: 600;
   color: var(--text-dark);
   line-height: 1;
@@ -142,9 +142,9 @@ body {
 .totaal-amount.red { color: var(--red); }
 .totaal-amount.green { color: var(--green); }
 .totaal-note {
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   color: var(--text-tertiary);
-  margin-top: 0.45rem;
+  margin-top: 0.38rem;
 }
 
 .category {
@@ -152,10 +152,10 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 .category-header {
-  padding: 13px 20px;
+  padding: 12px 18px;
   background: var(--tag);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -164,18 +164,18 @@ body {
 }
 .category-title {
   font-family: 'Oswald', sans-serif;
-  font-size: 1rem;
+  font-size: 0.92rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--text-dark);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 .category-total {
   font-family: 'Oswald', sans-serif;
-  font-size: 2rem;
+  font-size: 1.68rem;
   font-weight: 600;
   color: var(--text-dark);
   line-height: 1;
@@ -183,35 +183,35 @@ body {
 
 .cost-row {
   display: grid;
-  grid-template-columns: 1fr 120px 110px 90px;
+  grid-template-columns: 1fr 112px 98px 100px;
   align-items: center;
   gap: 0;
-  padding: 12px 20px;
+  padding: 10px 18px;
   border-bottom: 1px solid var(--border);
   transition: background .1s;
 }
 .cost-row:last-child { border-bottom: none; }
 .cost-row:hover { background: var(--tag); }
 .cost-row.head {
-  padding: 7px 20px;
+  padding: 6px 18px;
   background: var(--tag);
   border-bottom: 1px solid var(--border);
 }
 .cost-row.head span {
   font-family: 'Oswald', sans-serif;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-light);
 }
 
-.cost-name { font-size: 1rem; font-weight: 600; color: var(--text-dark); }
-.cost-note { font-size: 0.9rem; color: var(--text-tertiary); margin-top: 2px; }
-.cost-freq { font-size: 0.9rem; color: var(--text-tertiary); }
+.cost-name { font-size: 0.92rem; font-weight: 600; color: var(--text-dark); line-height: 1.25; }
+.cost-note { font-size: 0.82rem; color: var(--text-tertiary); margin-top: 1px; }
+.cost-freq { font-size: 0.82rem; color: var(--text-tertiary); }
 .cost-amount {
   font-family: 'Oswald', sans-serif;
-  font-size: 1.8rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-dark);
   line-height: 1;
@@ -219,11 +219,11 @@ body {
 .cost-status { justify-self: end; }
 .status-pill {
   font-family: 'Oswald', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.64rem;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 3px 9px;
+  padding: 3px 8px;
   border-radius: 20px;
 }
 .pill-active { background: rgba(22,115,60,.1); color: var(--green); }
@@ -231,24 +231,24 @@ body {
 .pill-yearly { background: rgba(155,35,85,.1); color: var(--crimson); }
 
 .add-row {
-  padding: 10px 20px;
+  padding: 9px 18px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   border-top: 1px dashed var(--border);
 }
 .add-inputs {
   display: grid;
-  grid-template-columns: 1fr 120px 110px 90px;
+  grid-template-columns: 1fr 112px 100px 108px;
   gap: 8px;
   flex: 1;
 }
 .add-inputs input, .add-inputs select {
-  padding: 7px 10px;
+  padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 4px;
   font-family: 'Inter', sans-serif;
-  font-size: 0.95rem;
+  font-size: 0.86rem;
   color: var(--text-dark);
   background: var(--bg);
   outline: none;
@@ -258,15 +258,15 @@ body {
 .add-inputs input:focus,
 .add-inputs select:focus { border-color: var(--crimson); background: #fff; }
 .btn-add {
-  padding: 7px 14px;
+  padding: 6px 12px;
   background: var(--crimson);
   color: #fff;
   border: none;
   border-radius: 4px;
   font-family: 'Oswald', sans-serif;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background .15s;
@@ -297,9 +297,9 @@ body {
   right: 24px;
   background: var(--text-dark);
   color: #fff;
-  padding: 10px 16px;
+  padding: 9px 14px;
   border-radius: 5px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   opacity: 0;
   transform: translateY(8px);
