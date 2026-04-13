@@ -38,7 +38,17 @@ html, body { height: 100%; }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
 .dashboard-layout { height: 100%; display: flex; min-height: 100vh; }
 .sidebar { width: 280px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; display: flex; flex-direction: column; }
-.main-content { margin-left: 280px; width: calc(100% - 280px); min-width: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.main-content {
+  margin-left: 280px;
+  width: calc(100% - 280px);
+  min-width: 0;
+  min-height: 0;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
 /* -- TOP BAR -- */
 .topbar {
@@ -47,18 +57,17 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 24px;
+  padding: 0 20px 0 16px;
+  gap: 12px;
   flex-shrink: 0;
 }
-.topbar-logo {
-  font-family: 'Oswald', sans-serif;
-  font-size: 17px; font-weight: 800;
-  letter-spacing: 1px;
-  color: var(--crimson);
-  margin-right: 8px;
+.doc-tabs {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
 }
-.doc-tabs { display: flex; gap: 2px; }
 .doc-tab {
   font-family: 'Oswald', sans-serif;
   font-size: 12px; font-weight: 500;
@@ -86,16 +95,24 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .btn-dl svg { width: 13px; height: 13px; }
 
 /* -- SPLIT -- */
-.split { display: flex; flex: 1; overflow: hidden; }
+.split {
+  display: grid;
+  grid-template-columns: minmax(280px, min(380px, 34vw)) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
 
 /* -- FORM PANEL -- */
 .form-panel {
-  width: 300px;
-  flex-shrink: 0;
+  width: 100%;
+  max-width: 420px;
+  min-height: 0;
   background: var(--panel);
   border-right: 1px solid var(--border);
   overflow-y: auto;
-  padding: 28px 24px 40px;
+  overflow-x: hidden;
+  padding: 20px 20px 32px;
 }
 
 .section-title {
@@ -179,41 +196,54 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 
 /* -- PREVIEW PANEL -- */
 .preview-panel {
-  flex: 1;
+  min-width: 0;
+  min-height: 0;
   background: var(--preview-bg);
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 20px 12px;
-  gap: 0;
+  padding: 0;
 }
-.a4-stage {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-bottom: 20px;
+.preview-panel-head {
+  flex-shrink: 0;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--preview-bg);
 }
 .preview-hint {
   font-size: 10px; font-weight: 700;
   letter-spacing: 2px; text-transform: uppercase;
-  color: #aaa;
-  margin-bottom: 16px;
-  align-self: flex-start;
+  color: var(--light);
+  margin: 0;
+}
+.a4-stage {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px 12px 24px;
+}
+.a4-scale-wrap {
+  flex-shrink: 0;
+  margin: 0 auto;
+  overflow: hidden;
 }
 
 /* -- A4 PAGE -- */
 .a4 {
-  width: 560px;
-  min-height: 792px;
+  width: 595px;
+  min-height: 842px;
   background: #fff;
   box-shadow: 0 2px 24px rgba(0,0,0,.14);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   font-family: 'Inter', sans-serif;
-  transform-origin: top center;
+  transform-origin: top left;
 }
 
 /* PDF HEADER */
@@ -315,12 +345,19 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .toast.show { opacity: 1; transform: none; }
 
 @media (max-width: 900px) {
-  .main-content { margin-left: 0; width: 100%; }
+  .main-content { margin-left: 0; width: 100%; max-height: none; height: auto; min-height: 100vh; }
   .sidebar { display: none; }
-  .form-panel { width: 100%; }
-  .split { flex-direction: column; }
-  .a4-stage { justify-content: flex-start; }
-  .a4 { width: min(560px, 100%); min-height: auto; transform: none !important; }
+  .form-panel { max-width: none; }
+  .split { grid-template-columns: 1fr; }
+  .a4-stage { min-height: 420px; }
+  .a4 { width: min(595px, calc(100vw - 32px)); min-height: auto; }
+  .a4-scale-wrap {
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 auto;
+  }
+  .a4 { transform: none !important; }
 }
 </style>
 </head>
@@ -331,7 +368,6 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 <aside class="sidebar"></aside>
 <main class="main-content">
 <div class="topbar">
-  <div class="topbar-logo">SOFTORA.NL</div>
   <div class="doc-tabs">
     <button class="doc-tab active" onclick="setDoc('offerte',this)">Offerte</button>
     <button class="doc-tab" onclick="setDoc('factuur',this)">Factuur</button>
@@ -355,10 +391,14 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 
   <!-- PREVIEW -->
   <div class="preview-panel">
-    <div class="preview-hint">Live preview</div>
+    <div class="preview-panel-head">
+      <div class="preview-hint">Live preview</div>
+    </div>
     <div class="a4-stage" id="a4-stage">
-      <div class="a4" id="a4">
-        <!-- filled by JS -->
+      <div class="a4-scale-wrap" id="a4-scale-wrap">
+        <div class="a4" id="a4">
+          <!-- filled by JS -->
+        </div>
       </div>
     </div>
   </div>
@@ -626,22 +666,52 @@ function update() {
       </div>
       <div class="pdf-footer">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
   }
-  fitPreview();
+  scheduleFitPreview();
+}
+
+function scheduleFitPreview() {
+  requestAnimationFrame(function () {
+    requestAnimationFrame(fitPreview);
+  });
 }
 
 function fitPreview() {
-  if (window.innerWidth <= 900) return;
-  const panel = document.querySelector('.preview-panel');
   const stage = document.getElementById('a4-stage');
+  const wrap = document.getElementById('a4-scale-wrap');
   const a4 = document.getElementById('a4');
-  if (!panel || !stage || !a4) return;
-  const panelW = panel.clientWidth - 28;
-  const panelH = panel.clientHeight - 54;
-  const baseW = 560;
-  const baseH = 792;
-  const scale = Math.max(0.72, Math.min(panelW / baseW, panelH / baseH, 1));
-  a4.style.transform = `scale(${scale})`;
-  stage.style.height = `${Math.round(baseH * scale) + 12}px`;
+  if (!stage || !wrap || !a4) return;
+
+  if (window.innerWidth <= 900) {
+    a4.style.transform = '';
+    wrap.style.width = '';
+    wrap.style.height = '';
+    wrap.style.overflow = '';
+    stage.style.minHeight = '';
+    return;
+  }
+
+  const padX = 32;
+  const padY = 32;
+  const availW = Math.max(120, stage.clientWidth - padX);
+  const availH = Math.max(120, stage.clientHeight - padY);
+
+  const baseW = 595;
+  const baseH = Math.max(842, a4.offsetHeight || 842);
+
+  let scale = Math.min(availW / baseW, availH / baseH, 1);
+  scale = Math.max(scale, 0.34);
+
+  const scaledW = Math.ceil(baseW * scale);
+  const scaledH = Math.ceil(baseH * scale);
+
+  wrap.style.width = scaledW + 'px';
+  wrap.style.height = scaledH + 'px';
+  wrap.style.overflow = 'hidden';
+
+  a4.style.transform = 'scale(' + scale + ')';
+  a4.style.transformOrigin = 'top left';
+
+  stage.style.minHeight = '';
 }
 
 // -- DOWNLOAD --
@@ -762,7 +832,20 @@ function showToast(msg) {
 
 // init
 buildForm();
-window.addEventListener('resize', fitPreview);
+window.addEventListener('resize', scheduleFitPreview);
+
+(function initPreviewFit() {
+  const stage = document.getElementById('a4-stage');
+  if (!stage || typeof ResizeObserver === 'undefined') {
+    window.addEventListener('load', scheduleFitPreview);
+    return;
+  }
+  var ro = new ResizeObserver(function () {
+    scheduleFitPreview();
+  });
+  ro.observe(stage);
+  window.addEventListener('load', scheduleFitPreview);
+})();
 </script>
 </body>
 </html>
