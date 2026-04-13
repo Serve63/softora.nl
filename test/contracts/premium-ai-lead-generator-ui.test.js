@@ -31,7 +31,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.doesNotMatch(pageSource, /<option value="custom">Aangepast<\/option>/);
   assert.match(
     pageSource,
-    /<div class="slider-labels">\s*<span data-slider-label-value="1">1<\/span>\s*<span data-slider-label-value="50">50<\/span>\s*<span data-slider-label-value="100">100<\/span>\s*<span data-slider-label-value="150">150<\/span>\s*<span class="slider-label-infinity" data-slider-label-value="250">&infin;<\/span>\s*<\/div>/
+    /<div class="slider-labels">\s*<span data-slider-label-value="1">1<\/span>\s*<span data-slider-label-value="50">50<\/span>\s*<span data-slider-label-value="100">100<\/span>\s*<span data-slider-label-value="150">150<\/span>\s*<span data-slider-label-value="200">200<\/span>\s*<span class="slider-label-infinity" data-slider-label-value="250">&infin;<\/span>\s*<\/div>/
   );
   assert.match(pageSource, /window\.openSiteInputDialog = openSiteInputDialog;/);
   assert.match(pageSource, /\.slider-labels\s*\{[\s\S]*position:\s*relative;[\s\S]*height:\s*1\.4rem;/);
