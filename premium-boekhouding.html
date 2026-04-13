@@ -101,34 +101,26 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 #screen-map { display: none; flex-direction: column; }
 #screen-map.active { display: flex; }
 
-.map-bar {
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  padding: 0 48px;
-  height: 52px;
-  display: flex; align-items: center;
-  gap: 16px;
-  position: sticky; top: 0; z-index: 10;
-  flex-shrink: 0;
+.map-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--light);
+  cursor: pointer;
+  transition: color 0.15s;
 }
-.back-btn { display: flex; align-items: center; gap: 7px; font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--light); background: none; border: none; cursor: pointer; transition: color .15s; padding: 0; }
-.back-btn:hover { color: var(--crimson); }
-.back-btn svg { width: 13px; height: 13px; }
-.map-bar-title { font-family: 'Oswald', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--dark); }
-.map-bar-period { font-size: 12px; color: var(--light); margin-left: 4px; }
-.map-bar-right { margin-left: auto; display: flex; gap: 10px; }
-.btn-add { display: flex; align-items: center; gap: 7px; padding: 7px 16px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
-.btn-add:hover { background: var(--clight); }
-.btn-add svg { width: 12px; height: 12px; }
+.map-back-link:hover { color: var(--crimson); }
 
 .map-body { padding: 32px 48px 60px; flex: 1; }
-
-/* DROPZONE */
-.dropzone { border: 1.5px dashed var(--border); border-radius: 6px; padding: 28px; text-align: center; cursor: pointer; transition: all .18s; margin-bottom: 24px; background: var(--card); }
-.dropzone:hover, .dropzone.over { border-color: var(--crimson); background: rgba(139,34,82,.02); }
-.dropzone svg { width: 24px; height: 24px; color: var(--light); margin: 0 auto 8px; display: block; }
-.dropzone p { font-size: 13px; color: var(--light); line-height: 1.6; }
-.dropzone span { color: var(--crimson); font-weight: 600; }
 
 /* FILES */
 .files-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -154,7 +146,28 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 
 .files-empty { text-align: center; padding: 40px 0; color: var(--light); }
 .files-empty svg { width: 32px; height: 32px; opacity: .2; margin: 0 auto 10px; display: block; }
-.files-empty p { font-size: 13px; }
+.files-empty p { font-size: 13px; line-height: 1.55; }
+.files-empty-trigger {
+  cursor: pointer;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  padding: 44px 20px;
+  background: var(--card);
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+.files-empty-trigger:hover,
+.files-empty-trigger.files-empty--over {
+  border-color: rgba(139, 34, 82, 0.45);
+  background: rgba(139, 34, 82, 0.03);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.05);
+}
+.files-empty-trigger:hover svg,
+.files-empty-trigger.files-empty--over svg { opacity: 0.35; }
+.files-empty-trigger:focus {
+  outline: 2px solid rgba(139, 34, 82, 0.35);
+  outline-offset: 2px;
+}
+.files-empty-trigger .files-empty-accent { color: var(--crimson); font-weight: 600; }
 
 /* NOTES */
 .notes-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--light); margin-bottom: 10px; }
@@ -194,25 +207,9 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 
 <!-- SCHERM 2: MAP -->
 <div class="screen" id="screen-map">
-  <div class="map-bar">
-    <button class="back-btn" onclick="goBack()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
-      Terug
-    </button>
-    <div>
-      <span class="map-bar-title" id="map-title"></span>
-      <span class="map-bar-period" id="map-period"></span>
-    </div>
-    <div class="map-bar-right">
-      <button class="btn-add" onclick="document.getElementById('file-inp').click()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Toevoegen
-      </button>
-      <input type="file" multiple id="file-inp" style="display:none" onchange="addFiles(this.files)">
-    </div>
-  </div>
-
   <div class="map-body">
+    <button type="button" class="map-back-link" onclick="goBack()">← Terug naar overzicht</button>
+    <input type="file" multiple id="file-inp" style="display:none" onchange="addFiles(this.files)">
 
     <div class="files-header">
       <div class="files-title">Bestanden</div>
@@ -350,8 +347,6 @@ function openMap(id) {
   const a = all.find(x => x.id === id); if (!a) return;
   const e = entry(id);
 
-  document.getElementById('map-title').textContent = a.naam;
-  document.getElementById('map-period').textContent = '- ' + a.period;
   document.getElementById('notes-ta').value = e.notes || '';
   renderFiles();
 
@@ -369,9 +364,14 @@ function renderFiles() {
   cnt.textContent = files.length + ' bestand' + (files.length!==1?'en':'');
 
   if (!files.length) {
-    grid.innerHTML = `<div class="files-empty" style="grid-column:1/-1">
+    grid.innerHTML = `<div class="files-empty files-empty-trigger" style="grid-column:1/-1" role="button" tabindex="0" aria-label="Bestand kiezen of hierheen slepen"
+      onclick="document.getElementById('file-inp').click()"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('file-inp').click();}"
+      ondragover="event.preventDefault();this.classList.add('files-empty--over')"
+      ondragleave="this.classList.remove('files-empty--over')"
+      ondrop="event.preventDefault();this.classList.remove('files-empty--over');addFiles(event.dataTransfer.files)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <p>Nog geen bestanden - sleep ze hierheen of klik op toevoegen</p>
+      <p>Nog geen bestanden — sleep ze hierheen of <span class="files-empty-accent">klik in dit vlak</span> om te uploaden.</p>
     </div>`;
     return;
   }
@@ -430,6 +430,8 @@ function addFiles(list) {
     renderFiles();
     renderList();
     showToast(n + ' bestand' + (n!==1?'en':'') + ' toegevoegd');
+    const inp = document.getElementById('file-inp');
+    if (inp) inp.value = '';
   });
 }
 
