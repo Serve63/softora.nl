@@ -61,3 +61,9 @@ test('page smoke: premium-ai-coldmailing.html keeps pending lead removals visibl
     'Pending removal status ontbreekt.'
   );
 });
+
+test('page smoke: premium-actieve-opdrachten.html defaults to in behandeling without an open tab', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
+  assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
+  assert.match(html, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
+});

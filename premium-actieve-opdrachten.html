@@ -451,9 +451,8 @@
             position: relative;
         }
 
-        .orders-filter-btn[data-order-filter="open"] { order: 1; }
-        .orders-filter-btn[data-order-filter="in_progress"] { order: 2; }
-        .orders-filter-btn[data-order-filter="completed"] { order: 3; }
+        .orders-filter-btn[data-order-filter="in_progress"] { order: 1; }
+        .orders-filter-btn[data-order-filter="completed"] { order: 2; }
 
         .orders-filter-btn:hover {
             color: var(--accent-light);
@@ -1578,10 +1577,6 @@
             </div>
 
             <div class="orders-filter-bar" aria-label="Opdrachten filter">
-                <button class="orders-filter-btn magnetic" type="button" data-order-filter="open" aria-pressed="false">
-                    <span class="orders-filter-label"><span class="orders-filter-dot"></span>Openstaande opdrachten</span>
-                    <span class="orders-filter-count" id="filterCountOpen">0</span>
-                </button>
                 <button class="orders-filter-btn magnetic" type="button" data-order-filter="in_progress" aria-pressed="false">
                     <span class="orders-filter-label"><span class="orders-filter-dot"></span>In behandeling</span>
                     <span class="orders-filter-count" id="filterCountProgress">0</span>
@@ -1661,7 +1656,7 @@
         let currentModalId = null;
         let currentClaimOrderId = null;
         let buildMode = 'premium';
-        let activeOrderFilter = 'open';
+        let activeOrderFilter = 'in_progress';
         const activeProgressAnimations = {};
         const apiCostEstimateRequests = {};
         const progressSimulationPlans = {
@@ -2297,7 +2292,6 @@
 
             if (!visibleCards.length) {
                 const emptyTextByFilter = {
-                    open: 'Geen openstaande opdrachten.',
                     completed: 'Geen voltooide opdrachten.',
                     in_progress: 'Er is nu geen opdracht bezig.'
                 };
@@ -2328,7 +2322,7 @@
             if (ui.status.key === 'bezig') {
                 return 'in_progress';
             }
-            return 'open';
+            return 'in_progress';
         }
 
         function updateOrderFilterButtonState() {
@@ -2342,7 +2336,6 @@
 
         function updateOrderFilterCounts(cards) {
             const counts = {
-                open: 0,
                 completed: 0,
                 in_progress: 0
             };
@@ -2352,8 +2345,6 @@
                 counts[group] = (counts[group] || 0) + 1;
             });
 
-            const openEl = document.getElementById('filterCountOpen');
-            if (openEl) openEl.textContent = String(counts.open);
             const completedEl = document.getElementById('filterCountCompleted');
             if (completedEl) completedEl.textContent = String(counts.completed);
             const progressEl = document.getElementById('filterCountProgress');
@@ -2373,7 +2364,7 @@
 
         function setOrderFilter(nextFilter) {
             const normalized = String(nextFilter || '').trim().toLowerCase();
-            activeOrderFilter = normalized || 'open';
+            activeOrderFilter = normalized === 'open' ? 'in_progress' : normalized || 'in_progress';
             applyOrderFilter();
         }
 
