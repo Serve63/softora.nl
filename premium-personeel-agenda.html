@@ -305,16 +305,13 @@
             gap: 0.5rem;
             flex-shrink: 0;
         }
-        .modal-icon-btn,
         .modal-close {
             width: 36px; height: 36px; border: 1px solid var(--border);
             background: none; color: var(--text-tertiary); cursor: none;
             display: flex; align-items: center; justify-content: center; transition: all 0.2s;
             flex-shrink: 0;
         }
-        .modal-icon-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); }
         .modal-close:hover { border-color: var(--red); color: var(--red); }
-        .modal-icon-btn svg,
         .modal-close svg { width: 16px; height: 16px; }
 
         .modal-type-badge {
@@ -478,21 +475,74 @@
             display: none;
             position: absolute;
             inset: 0;
-            background: rgba(255,255,255,0.82);
-            border-radius: 8px;
+            background: rgba(250, 248, 246, 0.82);
+            backdrop-filter: blur(10px) saturate(1.15);
+            -webkit-backdrop-filter: blur(10px) saturate(1.15);
+            border-radius: 10px;
             align-items: center;
             justify-content: center;
             z-index: 10;
         }
         .modal-workspace-loading.show { display: flex; }
-        .modal-workspace-spinner {
-            width: 28px; height: 28px;
-            border: 2.5px solid var(--border);
-            border-top-color: var(--primary, #7e3f6b);
-            border-radius: 50%;
-            animation: wspin 0.7s linear infinite;
+        .modal-workspace-loading-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 1.15rem 1.4rem 1rem;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(26, 20, 40, 0.08);
+            border-radius: 12px;
+            box-shadow:
+                0 14px 42px rgba(24, 18, 40, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.65) inset;
+            text-align: center;
+            max-width: 240px;
         }
-        @keyframes wspin { to { transform: rotate(360deg); } }
+        .modal-workspace-loader {
+            width: 42px;
+            height: 42px;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .modal-workspace-loader::before,
+        .modal-workspace-loader::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 2px solid transparent;
+        }
+        .modal-workspace-loader::before {
+            border-top-color: var(--accent, #8b2252);
+            border-right-color: rgba(139, 34, 82, 0.12);
+            animation: wsLoaderSpin 1.05s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+        }
+        .modal-workspace-loader::after {
+            inset: 6px;
+            border-bottom-color: rgba(139, 34, 82, 0.42);
+            border-left-color: transparent;
+            animation: wsLoaderSpin 0.78s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite reverse;
+        }
+        @keyframes wsLoaderSpin {
+            to { transform: rotate(360deg); }
+        }
+        .modal-workspace-loading-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        .modal-workspace-loading-sub {
+            font-size: 0.72rem;
+            font-weight: 400;
+            color: var(--text-tertiary);
+            line-height: 1.4;
+            margin: -0.15rem 0 0;
+        }
 
         /* Workspace success state */
         .modal-workspace-success {
@@ -855,13 +905,6 @@
                 <div class="modal-contact" id="modalContact">Contact</div>
             </div>
             <div class="modal-top-actions">
-                <button class="modal-icon-btn magnetic" id="modalPdfBtn" type="button" aria-label="Download PDF" title="Download PDF">
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v11"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m7 10 5 5 5-5"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 20h14"></path>
-                    </svg>
-                </button>
                 <button class="modal-close magnetic" onclick="closeModal()" type="button" aria-label="Sluiten">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
@@ -904,7 +947,11 @@
             </div>
             <div class="modal-workspace" id="modalWorkspace" style="position:relative;">
                 <div class="modal-workspace-loading" id="workspaceLoadingOverlay">
-                    <div class="modal-workspace-spinner"></div>
+                    <div class="modal-workspace-loading-card" role="status" aria-live="polite" aria-busy="true">
+                        <div class="modal-workspace-loader" aria-hidden="true"></div>
+                        <p class="modal-workspace-loading-title">Even geduld</p>
+                        <p class="modal-workspace-loading-sub">Dit kan een paar seconden duren.</p>
+                    </div>
                 </div>
                 <div class="modal-workspace-status" id="workspaceVoiceStatus"></div>
                 <div class="modal-workspace-grid" id="workspaceInputArea">
@@ -1070,7 +1117,6 @@
     const modalOverviewElement = document.getElementById('modalOverview');
     const modalWorkspaceElement = document.getElementById('modalWorkspace');
     const modalPrimaryBtn = document.getElementById('modalPrimaryBtn');
-    const modalPdfBtn = document.getElementById('modalPdfBtn');
     const modalNoDealBtn = document.getElementById('modalNoDealBtn');
     const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
     const modalAudioBlock = document.getElementById('modalAudioBlock');
@@ -1628,7 +1674,6 @@
         modalWorkspaceMode = Boolean(enabled);
         modalOverviewElement.classList.toggle('hide', modalWorkspaceMode);
         modalWorkspaceElement.classList.toggle('show', modalWorkspaceMode);
-        if (modalPdfBtn) modalPdfBtn.hidden = modalWorkspaceMode;
         if (modalAudioBlock) modalAudioBlock.hidden = modalWorkspaceMode;
         refreshWorkspacePrimaryButtonLabel();
     }
@@ -2294,8 +2339,12 @@
 
         // Re-attach magnetic
         document.querySelectorAll('.appointment.magnetic').forEach((elem) => {
-            elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
-            elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+            elem.addEventListener('mouseenter', () => {
+                if (cursor) cursor.classList.add('hover');
+            });
+            elem.addEventListener('mouseleave', () => {
+                if (cursor) cursor.classList.remove('hover');
+            });
         });
     }
 
@@ -2377,11 +2426,6 @@
     }
 
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
-    if (modalPdfBtn) {
-        modalPdfBtn.addEventListener('click', () => {
-            window.print();
-        });
-    }
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
     modalSecondaryBtn.addEventListener('click', handleModalSecondaryAction);
     if (notesImageUploadBtn && notesImageUploadInput) {
@@ -2431,6 +2475,7 @@
     document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
 
     function animateCursor() {
+        if (!cursor || !cursorDot) return;
         cursorX += (mouseX - cursorX) * 1;
         cursorY += (mouseY - cursorY) * 1;
         cursor.style.left = `${cursorX}px`;
@@ -2441,11 +2486,17 @@
         cursorDot.style.top = `${dotY}px`;
         requestAnimationFrame(animateCursor);
     }
-    animateCursor();
+    if (cursor && cursorDot) {
+        animateCursor();
+    }
 
     document.querySelectorAll('.magnetic').forEach((elem) => {
-        elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
-        elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        elem.addEventListener('mouseenter', () => {
+            if (cursor) cursor.classList.add('hover');
+        });
+        elem.addEventListener('mouseleave', () => {
+            if (cursor) cursor.classList.remove('hover');
+        });
     });
 </script>
 </body>

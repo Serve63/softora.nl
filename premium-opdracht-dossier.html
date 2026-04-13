@@ -223,13 +223,15 @@
             width: min(100%, var(--paper-width));
             max-width: var(--paper-width);
             min-height: 320px;
-            background: linear-gradient(180deg, #ffffff, #fbfbfd);
+            background: linear-gradient(180deg, #ffffff 0%, #faf9fc 55%, #f6f5f9 100%);
             border: 1px solid var(--line);
-            border-radius: 0;
+            border-radius: 12px;
             padding: 1.5rem;
             color: var(--muted);
             line-height: 1.55;
-            box-shadow: 0 22px 46px rgba(16, 19, 34, 0.12);
+            box-shadow:
+                0 24px 56px rgba(16, 19, 34, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.75) inset;
         }
 
         .error {
@@ -242,6 +244,41 @@
             display: grid;
             place-items: center;
             text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .loading-shell::before {
+            content: '';
+            position: absolute;
+            inset: -40% -60%;
+            background: radial-gradient(ellipse at 50% 0%, rgba(139, 34, 82, 0.07), transparent 55%);
+            pointer-events: none;
+        }
+
+        .loading-shell::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(139, 34, 82, 0.45), transparent);
+            opacity: 0.5;
+            animation: loadingBarPulse 2.4s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes loadingBarPulse {
+            0%,
+            100% {
+                opacity: 0.25;
+                transform: scaleX(0.92);
+            }
+            50% {
+                opacity: 0.85;
+                transform: scaleX(1);
+            }
         }
 
         .loading-inner {
@@ -249,46 +286,79 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.7rem;
+            gap: 0.85rem;
+            position: relative;
+            z-index: 1;
         }
 
-        .loader-spinner {
-            width: 56px;
-            height: 56px;
-            border-radius: 999px;
-            border: 4px solid rgba(139, 34, 82, 0.12);
+        .loader-visual {
+            position: relative;
+            width: 64px;
+            height: 64px;
+            margin-bottom: 0.15rem;
+        }
+
+        .loader-orbit {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 2px solid transparent;
             border-top-color: var(--accent);
-            animation: dossierSpin 0.9s linear infinite;
+            border-right-color: rgba(139, 34, 82, 0.12);
+            animation: dossierSpin 1.15s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+        }
+
+        .loader-orbit--inner {
+            inset: 10px;
+            border-top-color: rgba(139, 34, 82, 0.4);
+            border-right-color: transparent;
+            border-bottom-color: rgba(139, 34, 82, 0.15);
+            animation-duration: 0.82s;
+            animation-direction: reverse;
+        }
+
+        .loader-dot {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 9px;
+            height: 9px;
+            margin: -4.5px 0 0 -4.5px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--accent), #c24a78);
+            box-shadow: 0 0 0 12px rgba(139, 34, 82, 0.06);
         }
 
         .loading-eyebrow {
             font-family: 'Oswald', sans-serif;
-            font-size: 0.78rem;
+            font-size: 0.68rem;
             font-weight: 500;
-            letter-spacing: 0.14em;
+            letter-spacing: 0.2em;
             text-transform: uppercase;
-            color: #8a91a6;
+            color: #9aa0b5;
         }
 
         .loading-title {
             font-family: 'Oswald', sans-serif;
-            font-size: clamp(1.9rem, 4vw, 3rem);
+            font-size: clamp(1.55rem, 3.2vw, 2.35rem);
             font-weight: 700;
-            letter-spacing: 0.02em;
-            line-height: 0.98;
+            letter-spacing: 0.04em;
+            line-height: 1.05;
             text-transform: uppercase;
             color: #171b2f;
         }
 
         .loading-copy {
-            max-width: 42ch;
-            font-size: 0.95rem;
-            line-height: 1.7;
+            max-width: 38ch;
+            font-size: 0.9rem;
+            line-height: 1.65;
             color: var(--muted);
         }
 
         @keyframes dossierSpin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .top-row {
@@ -756,10 +826,14 @@
             <div class="dossier-wrap" id="dossierRoot">
                 <div class="loading loading-shell">
                     <div class="loading-inner">
-                        <div class="loader-spinner" aria-hidden="true"></div>
+                        <div class="loader-visual" aria-hidden="true">
+                            <div class="loader-orbit"></div>
+                            <div class="loader-orbit loader-orbit--inner"></div>
+                            <div class="loader-dot"></div>
+                        </div>
                         <div class="loading-eyebrow">Uitvoerdossier</div>
-                        <div class="loading-title">Even Geduld</div>
-                        <p class="loading-copy">Opdrachtgegevens worden geladen en verwerkt.</p>
+                        <div class="loading-title">Even geduld</div>
+                        <p class="loading-copy">Opdrachtgegevens worden geladen en voor je klaargezet.</p>
                     </div>
                 </div>
             </div>
@@ -963,8 +1037,12 @@
                 root.innerHTML = `
                     <div class="loading loading-shell">
                         <div class="loading-inner">
-                            <div class="loader-spinner" aria-hidden="true"></div>
-                            <div class="loading-eyebrow">Claude Opus 4.6</div>
+                            <div class="loader-visual" aria-hidden="true">
+                                <div class="loader-orbit"></div>
+                                <div class="loader-orbit loader-orbit--inner"></div>
+                                <div class="loader-dot"></div>
+                            </div>
+                            <div class="loading-eyebrow">Uitvoerdossier</div>
                             <div class="loading-title">${esc(title || 'Even geduld')}</div>
                             ${description ? `<p class="loading-copy">${esc(description)}</p>` : ''}
                         </div>
