@@ -67,3 +67,11 @@ test('page smoke: premium-actieve-opdrachten.html defaults to in behandeling wit
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
   assert.match(html, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
 });
+
+test('page smoke: assets/personnel-theme.js persists sidebar counts across premium page loads', () => {
+  const js = fs.readFileSync(path.join(repoRoot, 'assets/personnel-theme.js'), 'utf8');
+  assert.match(js, /softora_sidebar_counts_v1/, 'Persistente sidebar-count cache ontbreekt.');
+  assert.match(js, /paintSidebarCount\("active_orders", cachedActiveOrdersCount/, 'Actieve opdrachten hoort direct uit cache te kunnen schilderen.');
+  assert.match(js, /paintSidebarCount\("agenda", cachedAgendaCount/, 'Agenda hoort direct uit cache te kunnen schilderen.');
+  assert.match(js, /paintSidebarCount\("leads", cachedLeadCount/, 'Leads hoort direct uit cache te kunnen schilderen.');
+});

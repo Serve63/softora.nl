@@ -7,11 +7,15 @@
     const publicStorageKey = "softora_premium_public_theme_mode";
     const publicFallbackStorageKey = "softora_public_theme_mode";
     const sidebarCountCacheKey = "softora_sidebar_count_cache_v1";
+    const sidebarCountPersistCookieKey = "softora_sidebar_counts_v1";
     const leadSuppressionCookieKey = "softora_hidden_leads_v1";
-    const sidebarCountCacheState = (
-        window[sidebarCountCacheKey] &&
-        typeof window[sidebarCountCacheKey] === "object"
-    ) ? window[sidebarCountCacheKey] : Object.create(null);
+    const sidebarCountCacheState = mergeSidebarCountState(
+        readPersistedSidebarCountState(),
+        (
+            window[sidebarCountCacheKey] &&
+            typeof window[sidebarCountCacheKey] === "object"
+        ) ? window[sidebarCountCacheKey] : null
+    );
     const SIDEBAR_COUNT_CACHE_TTL_MS = 1000 * 60 * 10;
     const root = document.documentElement;
     const themeButtons = document.querySelectorAll(".theme-switch-btn[data-theme-value]");
@@ -636,6 +640,88 @@
         pruneDeprecatedSidebarLinks(sidebar);
         neutralizeSidebarAnchors();
         sidebar.dataset.sidebarReady = "true";
+        // #region agent log
+        fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraSidebarDebugRunId || (window.__softoraSidebarDebugRunId = 'sidebar-ui-' + Date.now()),hypothesisId:'H14',location:'assets/personnel-theme.js:620',message:'Unified premium sidebar rebuilt for page load',data:{pathname,activeKey,staticSidebar:false,sidebarReady:sidebar.dataset.sidebarReady === 'true'},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+    }
+
+    function mergeSidebarCountState() {
+        const merged = Object.create(null);
+        Array.from(arguments).forEach(function (source) {
+            if (!source || typeof source !== "object") return;
+            Object.keys(source).forEach(function (key) {
+                const entry = source[key];
+                const count = Number(entry && entry.count);
+                const expiresAt = Number(entry && entry.expiresAt);
+                if (!Number.isFinite(count) || count < 0) return;
+                if (!Number.isFinite(expiresAt) || expiresAt <= 0) return;
+                const existingExpiresAt = Number(merged[key] && merged[key].expiresAt) || 0;
+                if (existingExpiresAt > expiresAt) return;
+                merged[key] = {
+                    count: Math.max(0, Math.floor(count)),
+                    expiresAt: expiresAt,
+                };
+            });
+        });
+        return merged;
+    }
+
+    function readCookieValueByName(name) {
+        const needle = `${String(name || "").trim()}=`;
+        if (!needle || typeof document === "undefined") return "";
+        const parts = String(document.cookie || "").split(";");
+        for (let i = 0; i < parts.length; i += 1) {
+            const part = String(parts[i] || "").trim();
+            if (!part || part.indexOf(needle) !== 0) continue;
+            return part.slice(needle.length);
+        }
+        return "";
+    }
+
+    function writeCookieValue(name, value, maxAgeSeconds) {
+        const safeName = String(name || "").trim();
+        if (!safeName || typeof document === "undefined") return;
+        const safeMaxAge = Math.max(0, Math.floor(Number(maxAgeSeconds) || 0));
+        const encodedValue = safeMaxAge > 0 ? encodeURIComponent(String(value || "")) : "";
+        document.cookie =
+            `${safeName}=${encodedValue}; path=/; max-age=${safeMaxAge}; SameSite=Lax`;
+    }
+
+    function readPersistedSidebarCountState() {
+        const raw = readCookieValueByName(sidebarCountPersistCookieKey);
+        if (!raw) return Object.create(null);
+        try {
+            const parsed = JSON.parse(decodeURIComponent(raw));
+            return parsed && typeof parsed === "object" ? parsed : Object.create(null);
+        } catch (error) {
+            return Object.create(null);
+        }
+    }
+
+    function persistSidebarCountCache() {
+        const payload = Object.create(null);
+        const nowMs = Date.now();
+        let maxExpiresAt = 0;
+        Object.keys(sidebarCountCacheState).forEach(function (key) {
+            const entry = sidebarCountCacheState[key];
+            const count = Number(entry && entry.count);
+            const expiresAt = Number(entry && entry.expiresAt);
+            if (!Number.isFinite(count) || count < 0) return;
+            if (!Number.isFinite(expiresAt) || expiresAt <= nowMs) return;
+            payload[key] = {
+                count: Math.max(0, Math.floor(count)),
+                expiresAt: expiresAt,
+            };
+            if (expiresAt > maxExpiresAt) {
+                maxExpiresAt = expiresAt;
+            }
+        });
+        if (!Object.keys(payload).length) {
+            writeCookieValue(sidebarCountPersistCookieKey, "", 0);
+            return;
+        }
+        const maxAgeSeconds = Math.max(60, Math.ceil((maxExpiresAt - nowMs) / 1000));
+        writeCookieValue(sidebarCountPersistCookieKey, JSON.stringify(payload), maxAgeSeconds);
     }
 
     function buildSidebarRoleLabel(role) {
@@ -1419,11 +1505,14 @@
 
     function readSidebarCountCache() {
         const nowMs = Date.now();
+        let changed = false;
         Object.keys(sidebarCountCacheState).forEach(function (key) {
             const expiresAt = Number(sidebarCountCacheState[key] && sidebarCountCacheState[key].expiresAt) || 0;
             if (expiresAt > nowMs) return;
             delete sidebarCountCacheState[key];
+            changed = true;
         });
+        if (changed) persistSidebarCountCache();
         return sidebarCountCacheState;
     }
 
@@ -1432,12 +1521,14 @@
         if (!key) return;
         if (!Number.isFinite(count) || count < 0) {
             delete sidebarCountCacheState[key];
+            persistSidebarCountCache();
             return;
         }
         sidebarCountCacheState[key] = {
             count: Math.max(0, Math.floor(Number(count) || 0)),
             expiresAt: Date.now() + SIDEBAR_COUNT_CACHE_TTL_MS,
         };
+        persistSidebarCountCache();
         return;
     }
 
@@ -1562,6 +1653,14 @@
 
         const appointmentsData = await fetchJsonNoStore("/api/agenda/appointments?limit=400");
         if (!appointmentsData) {
+            const cachedAgendaCount = readCachedSidebarCount("agenda");
+            if (Number.isFinite(cachedAgendaCount) && cachedAgendaCount >= 0) {
+                // #region agent log
+                fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraSidebarDebugRunId || (window.__softoraSidebarDebugRunId = 'sidebar-ui-' + Date.now()),hypothesisId:'H13',location:'assets/personnel-theme.js:1559',message:'Sidebar agenda count reused cached value',data:{cachedAgendaCount},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+                paintSidebarCount("agenda", cachedAgendaCount, { singular: "afspraak", plural: "afspraken" });
+                return;
+            }
             paintSidebarCount("agenda", null);
             return;
         }
@@ -1679,6 +1778,18 @@
             return;
         }
 
+        const cachedActiveOrdersCount = readCachedSidebarCount("active_orders");
+        if (Number.isFinite(cachedActiveOrdersCount) && cachedActiveOrdersCount >= 0) {
+            // #region agent log
+            fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraSidebarDebugRunId || (window.__softoraSidebarDebugRunId = 'sidebar-ui-' + Date.now()),hypothesisId:'H13',location:'assets/personnel-theme.js:1668',message:'Sidebar active orders count reused cached value',data:{cachedActiveOrdersCount},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+            paintSidebarCount("active_orders", cachedActiveOrdersCount, {
+                singular: "actieve opdracht",
+                plural: "actieve opdrachten",
+            });
+            return;
+        }
+
         paintSidebarCount("active_orders", null);
     }
 
@@ -1696,9 +1807,31 @@
         const pathName = String((window.location && window.location.pathname) || "").trim().toLowerCase();
         const isLiveLeadsPage = isLeadsPagePath(pathName);
         const cachedLeadCount = readCachedSidebarCount("leads");
-        if (!isLiveLeadsPage && Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
-            paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
+        const cachedAgendaCount = readCachedSidebarCount("agenda");
+        const cachedActiveOrdersCount = readCachedSidebarCount("active_orders");
+        const paintedFromCacheKeys = [];
+        if (Number.isFinite(cachedActiveOrdersCount) && cachedActiveOrdersCount >= 0) {
+            paintSidebarCount("active_orders", cachedActiveOrdersCount, {
+                singular: "actieve opdracht",
+                plural: "actieve opdrachten",
+            });
+            paintedFromCacheKeys.push("active_orders");
         }
+        if (Number.isFinite(cachedAgendaCount) && cachedAgendaCount >= 0) {
+            paintSidebarCount("agenda", cachedAgendaCount, {
+                singular: "afspraak",
+                plural: "afspraken",
+            });
+            paintedFromCacheKeys.push("agenda");
+        }
+        if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
+            paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
+            paintedFromCacheKeys.push("leads");
+        }
+        const sidebar = document.querySelector(".sidebar");
+        // #region agent log
+        fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraSidebarDebugRunId || (window.__softoraSidebarDebugRunId = 'sidebar-ui-' + Date.now()),hypothesisId:'H12',location:'assets/personnel-theme.js:1693',message:'Sidebar notification counts initialized',data:{pathName,isLiveLeadsPage,cachedLeadCount:Number.isFinite(cachedLeadCount)?cachedLeadCount:null,cachedAgendaCount:Number.isFinite(cachedAgendaCount)?cachedAgendaCount:null,cachedActiveOrdersCount:Number.isFinite(cachedActiveOrdersCount)?cachedActiveOrdersCount:null,paintedFromCacheKeys,sidebarReady:Boolean(sidebar && sidebar.dataset && sidebar.dataset.sidebarReady === 'true')},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         refreshSidebarNotificationCounts();
         window.setInterval(refreshSidebarNotificationCounts, 45000);
         window.addEventListener("focus", refreshSidebarNotificationCounts);
