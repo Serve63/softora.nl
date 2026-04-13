@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Boekhouding - Softora.nl</title>
+<link rel="stylesheet" href="/assets/iphone-optimizations.css">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
+<script>
+  (function () {
+    document.documentElement.setAttribute("data-personnel-loading", "true");
+    try {
+      document.documentElement.setAttribute("data-theme-mode", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    } catch (_) {
+      /* ignore */
+    }
+  })();
+</script>
+<script src="assets/personnel-theme.js?v=20260411a" defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -13,6 +27,9 @@
   --mid: #606272; --light: #9a9cac; --green: #16733c; --orange: #b45a00; --red: #c0392b;
 }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; }
+.dashboard-layout { display: flex; min-height: 100vh; }
+.sidebar { width: 280px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; display: flex; flex-direction: column; }
+.main-content { margin-left: 280px; width: calc(100% - 280px); min-width: 0; }
 
 .screen { display: none; min-height: 100vh; }
 .screen.active { display: block; }
@@ -47,7 +64,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
   cursor: pointer;
   transition: all .15s;
 }
-.aangifte-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,.07); border-color: rgba(155,35,85,.2); }
+.aangifte-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,.07); border-color: rgba(139,34,82,.2); }
 .aangifte-row.done { border-color: rgba(22,115,60,.2); background: rgba(22,115,60,.02); }
 .aangifte-row.urgent { border-color: rgba(192,57,43,.25); }
 .aangifte-row.soon { border-color: rgba(180,90,0,.2); }
@@ -108,7 +125,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 
 /* DROPZONE */
 .dropzone { border: 1.5px dashed var(--border); border-radius: 6px; padding: 28px; text-align: center; cursor: pointer; transition: all .18s; margin-bottom: 24px; background: var(--card); }
-.dropzone:hover, .dropzone.over { border-color: var(--crimson); background: rgba(155,35,85,.02); }
+.dropzone:hover, .dropzone.over { border-color: var(--crimson); background: rgba(139,34,82,.02); }
 .dropzone svg { width: 24px; height: 24px; color: var(--light); margin: 0 auto 8px; display: block; }
 .dropzone p { font-size: 13px; color: var(--light); line-height: 1.6; }
 .dropzone span { color: var(--crimson); font-weight: 600; }
@@ -121,7 +138,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 .files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 28px; }
 
 .file-tile { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 14px 12px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; transition: all .15s; position: relative; text-align: center; }
-.file-tile:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); border-color: rgba(155,35,85,.2); transform: translateY(-1px); }
+.file-tile:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); border-color: rgba(139,34,82,.2); transform: translateY(-1px); }
 
 .file-doc { position: relative; width: 40px; height: 48px; }
 .file-doc svg.doc-bg { width: 40px; height: 48px; position: absolute; top: 0; left: 0; }
@@ -149,9 +166,16 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 /* TOAST */
 .toast { position: fixed; bottom: 24px; right: 24px; background: var(--dark); color: #fff; padding: 10px 16px; border-radius: 5px; font-size: 12px; font-weight: 500; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; z-index: 99; }
 .toast.show { opacity: 1; transform: translateY(0); }
+@media (max-width: 900px) {
+  .main-content { margin-left: 0; width: 100%; }
+  .sidebar { display: none; }
+}
 </style>
 </head>
 <body>
+<div class="dashboard-layout">
+<aside class="sidebar"></aside>
+<main class="main-content">
 
 <!-- SCHERM 1: OVERZICHT -->
 <div class="screen active" id="screen-overzicht">
@@ -429,5 +453,7 @@ function showToast(msg) {
 
 renderList();
 </script>
+</main>
+</div>
 </body>
 </html>

@@ -4,24 +4,41 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDF's - Softora.nl</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/iphone-optimizations.css">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
+<script>
+  (function () {
+    document.documentElement.setAttribute("data-personnel-loading", "true");
+    try {
+      document.documentElement.setAttribute("data-theme-mode", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    } catch (_) {
+      /* ignore */
+    }
+  })();
+</script>
+<script src="assets/personnel-theme.js?v=20260411a" defer></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #f5f4f1;
+  --bg: #f6f2ec;
   --panel: #ffffff;
   --preview-bg: #e8e6e1;
-  --crimson: #9b2355;
+  --crimson: #8b2252;
+  --crimson-light: #a62d65;
   --border: #e0ddd8;
   --text: #1a1a2e;
-  --muted: #888;
-  --light: #bbb;
+  --muted: #606272;
+  --light: #9a9cac;
   --input-bg: #faf9f7;
 }
 html, body { height: 100%; overflow: hidden; }
-body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
-.dashboard-layout { height: 100%; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
+.dashboard-layout { height: 100%; display: flex; min-height: 100vh; }
+.sidebar { width: 280px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; display: flex; flex-direction: column; }
+.main-content { margin-left: 280px; width: calc(100% - 280px); min-width: 0; height: 100vh; display: flex; flex-direction: column; }
 
 /* -- TOP BAR -- */
 .topbar {
@@ -35,7 +52,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   flex-shrink: 0;
 }
 .topbar-logo {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 17px; font-weight: 800;
   letter-spacing: 1px;
   color: var(--crimson);
@@ -43,6 +60,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 }
 .doc-tabs { display: flex; gap: 2px; }
 .doc-tab {
+  font-family: 'Oswald', sans-serif;
   font-size: 12px; font-weight: 500;
   padding: 6px 16px;
   border-radius: 4px;
@@ -52,7 +70,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   transition: all .15s;
 }
 .doc-tab:hover { color: var(--text); background: var(--bg); }
-.doc-tab.active { color: var(--crimson); background: rgba(155,35,85,.07); font-weight: 600; }
+.doc-tab.active { color: var(--crimson); background: rgba(139,34,82,.07); font-weight: 600; }
 
 .topbar-right { margin-left: auto; }
 .btn-dl {
@@ -60,7 +78,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   padding: 8px 20px;
   background: var(--crimson); color: #fff;
   border: none; border-radius: 5px;
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
   cursor: pointer; transition: opacity .15s;
 }
@@ -102,7 +120,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: 'Barlow', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   color: var(--text);
   background: var(--input-bg);
@@ -126,7 +144,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   padding: 7px 8px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: 'Barlow', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   color: var(--text);
   background: var(--input-bg);
@@ -149,7 +167,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 .btn-add-regel {
   font-size: 11px; font-weight: 600;
   color: var(--crimson);
-  background: none; border: 1px dashed rgba(155,35,85,.3);
+  background: none; border: 1px dashed rgba(139,34,82,.3);
   border-radius: 4px;
   padding: 6px 12px;
   cursor: pointer;
@@ -157,7 +175,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   transition: all .15s;
   margin-top: 4px;
 }
-.btn-add-regel:hover { border-color: var(--crimson); background: rgba(155,35,85,.04); }
+.btn-add-regel:hover { border-color: var(--crimson); background: rgba(139,34,82,.04); }
 
 /* -- PREVIEW PANEL -- */
 .preview-panel {
@@ -187,7 +205,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  font-family: 'Barlow', sans-serif;
+  font-family: 'Inter', sans-serif;
 }
 
 /* PDF HEADER */
@@ -199,7 +217,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   justify-content: space-between;
 }
 .pdf-logo {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 18px; font-weight: 800;
   letter-spacing: 1px;
   color: #fff;
@@ -266,8 +284,8 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   width: 240px;
   border-radius: 2px;
 }
-.pdf-total-grand-label { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-.pdf-total-grand-amount { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 800; }
+.pdf-total-grand-label { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.pdf-total-grand-amount { font-family: 'Oswald', sans-serif; font-size: 15px; font-weight: 700; }
 
 /* NOTES */
 .pdf-notes { margin-top: 20px; }
@@ -287,12 +305,19 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 /* TOAST */
 .toast { position: fixed; bottom: 20px; right: 20px; background: #1a1a2e; color: #fff; padding: 10px 16px; border-radius: 5px; font-size: 12px; opacity: 0; transform: translateY(6px); transition: all .2s; pointer-events: none; z-index: 99; }
 .toast.show { opacity: 1; transform: none; }
+
+@media (max-width: 900px) {
+  .main-content { margin-left: 0; width: 100%; }
+  .sidebar { display: none; }
+}
 </style>
 </head>
 <body>
 
 <!-- TOP BAR -->
 <div class="dashboard-layout" data-sidebar-shell="canonical">
+<aside class="sidebar"></aside>
+<main class="main-content">
 <div class="topbar">
   <div class="topbar-logo">SOFTORA.NL</div>
   <div class="doc-tabs">
@@ -325,6 +350,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   </div>
 
 </div>
+</main>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -567,7 +593,7 @@ function update() {
             ${v('email')?`<div class="pdf-addr-line">${v('email')}</div>`:''}
           </div>
         </div>
-        <div style="background:${col};color:#fff;border-radius:3px;padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px">${hlabels[htype]}</div>
+        <div style="background:${col};color:#fff;border-radius:3px;padding:8px 14px;font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px">${hlabels[htype]}</div>
         <div style="font-size:11px;color:#555;line-height:1.9;margin-bottom:18px">${msgs[htype].replace(/\n/g,'<br>')}</div>
         <div class="pdf-meta" style="margin-bottom:16px">
           <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurnummer</div><div class="pdf-meta-val">${v('factnr')||'—'}</div></div>
@@ -580,7 +606,7 @@ function update() {
             <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.7;margin-bottom:2px">Betaal uiterlijk</div>
             <strong>${fmtDate(v('nieuwdat'))}</strong> · IBAN: ${v('iban')||'—'}
           </div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800">${v('bedrag')||'—'}</div>
+          <div style="font-family:'Oswald',sans-serif;font-size:20px;font-weight:700">${v('bedrag')||'—'}</div>
         </div>
         ${v('notities')?`<div class="pdf-notes"><div class="pdf-notes-label">Toelichting</div><div class="pdf-notes-text">${v('notities').replace(/\n/g,'<br>')}</div></div>`:''}
       </div>
@@ -593,7 +619,7 @@ function downloadPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'a4' });
   const W=210, PL=20, PR=190;
-  const CR=[155,35,85], DK=[26,26,46], MD=[100,100,110], BG=[249,248,246];
+  const CR=[139,34,82], DK=[26,26,46], MD=[100,100,110], BG=[249,248,246];
   const fmtD=s=>{ if(!s) return '—'; const[y,m,d]=s.split('-'); return `${d}-${m}-${y}`; };
   const fmtN=n=>n.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2});
 
