@@ -22,7 +22,8 @@ function createAgendaInterestedLeadStateService(deps = {}) {
   }
 
   function isInterestedLeadDismissedForRow(callId, rowLike) {
-    if (isInterestedLeadDismissed(callId)) return true;
+    const normalizedCallId = normalizeString(callId);
+    if (normalizedCallId) return isInterestedLeadDismissed(normalizedCallId);
     const leadKey = buildLeadFollowUpCandidateKey(rowLike || {});
     return isInterestedLeadDismissedByKey(leadKey);
   }

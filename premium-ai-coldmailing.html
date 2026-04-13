@@ -3224,10 +3224,8 @@
                 const keys = [];
                 const rowId = Number(item?.id) || 0;
                 const callId = String(resolveLeadCallId(item) || item?.callId || '').trim();
-                const matchKey = buildLeadMatchKey(item);
                 if (rowId !== 0) keys.push(`id:${rowId}`);
                 if (callId) keys.push(`call:${callId}`);
-                if (matchKey) keys.push(matchKey);
                 return keys;
             }
 
@@ -3236,6 +3234,11 @@
                     if (Number(expiresAt) > nowMs) return;
                     manuallySuppressedLeadKeys.delete(key);
                 });
+            }
+
+            function isPersistedSuppressionKey(key) {
+                const normalizedKey = String(key || '').trim();
+                return normalizedKey.startsWith('id:') || normalizedKey.startsWith('call:');
             }
 
             function readCookieValueByName(cookieName) {
@@ -3268,6 +3271,7 @@
             function persistSuppressedLeadRows() {
                 purgeExpiredSuppressedLeadKeys();
                 const entries = Array.from(manuallySuppressedLeadKeys.entries())
+                    .filter((entry) => isPersistedSuppressionKey(entry?.[0]))
                     .filter((entry) => Number(entry?.[1] || 0) > Date.now())
                     .sort((a, b) => Number(b?.[1] || 0) - Number(a?.[1] || 0))
                     .slice(0, 40);
@@ -3294,7 +3298,7 @@
                             if (!Array.isArray(entry) || entry.length < 2) return;
                             const key = String(entry[0] || '').trim();
                             const expiresAt = Number(entry[1]) || 0;
-                            if (!key || expiresAt <= nowMs) return;
+                            if (!key || !isPersistedSuppressionKey(key) || expiresAt <= nowMs) return;
                             manuallySuppressedLeadKeys.set(key, expiresAt);
                         });
                     }

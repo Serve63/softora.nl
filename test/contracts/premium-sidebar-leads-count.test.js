@@ -11,7 +11,6 @@ test('sidebar leads badge mirrors the leads page virtual id logic for suppressed
   assert.match(leadsPageSource, /function buildLeadVirtualSeed\(item\) \{/);
   assert.match(leadsPageSource, /function resolveLeadListId\(item\) \{/);
   assert.match(leadsPageSource, /if \(rowId !== 0\) keys\.push\(`id:\$\{rowId\}`\);/);
-  assert.match(leadsPageSource, /if \(matchKey\) keys\.push\(matchKey\);/);
 
   assert.match(themeSource, /function buildLeadVirtualSeedForCount\(item\) \{/);
   assert.match(themeSource, /const isLiveLeadsPage = isLeadsPagePath\(pathName\);/);
@@ -21,7 +20,7 @@ test('sidebar leads badge mirrors the leads page virtual id logic for suppressed
   assert.match(themeSource, /function resolveLeadListIdForCount\(item\) \{[\s\S]*if \(explicitId > 0\) return explicitId;[\s\S]*return -\(Math\.abs\(hash \|\| 1\)\);/);
   assert.match(themeSource, /id: resolveLeadListIdForCount\(item\),/);
   assert.match(themeSource, /if \(rowId !== 0 && suppressedKeys\.has\("id:" \+ rowId\)\) return true;/);
-  assert.match(themeSource, /if \(matchKey && suppressedKeys\.has\(matchKey\)\) return true;/);
+  assert.match(themeSource, /if \(callId && suppressedKeys\.has\("call:" \+ callId\)\) return true;/);
   assert.match(themeSource, /if \(!isLiveLeadsPage && total <= 0 && Number\.isFinite\(cachedLeadCount\) && cachedLeadCount > 0\) \{/);
   assert.match(themeSource, /const key = buildLeadMatchKeyForCount\(row\) \|\| \([\s\S]*callId[\s\S]*`call:\$\{callId\}`[\s\S]*rowId > 0[\s\S]*`id:\$\{rowId\}`/);
 });

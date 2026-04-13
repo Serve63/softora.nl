@@ -78,6 +78,10 @@ test('agenda interested lead state service resolves dismissed state for rows via
   assert.equal(service.isInterestedLeadDismissedForRow('call-2', { company: 'X' }), true);
   assert.equal(
     service.isInterestedLeadDismissedForRow('other-call', { company: 'Softora', contact: 'Serve' }),
+    false
+  );
+  assert.equal(
+    service.isInterestedLeadDismissedForRow('', { company: 'Softora', contact: 'Serve' }),
     true
   );
   assert.equal(

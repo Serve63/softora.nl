@@ -24,6 +24,10 @@ test('premium leads keeps suppression local without storage side effects', () =>
   );
   assert.match(
     leadsPageSource,
+    /function buildSuppressedLeadKeys\(item\) \{[\s\S]*if \(rowId !== 0\) keys\.push\(`id:\$\{rowId\}`\);[\s\S]*if \(callId\) keys\.push\(`call:\$\{callId\}`\);[\s\S]*return keys;/
+  );
+  assert.match(
+    leadsPageSource,
     /function filterSuppressedLeadRows\(rows\) \{\s*if \(!Array\.isArray\(rows\)\) return \[\];[\s\S]*!isSuppressedLeadRow\(row\)/
   );
   assert.match(leadsPageSource, /function promoteLeadRowSuppression\(item\) \{\s*suppressLeadRowLocally\(item, COMPLETED_LEAD_SUPPRESSION_TTL_MS\);/);

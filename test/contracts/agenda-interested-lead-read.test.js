@@ -174,6 +174,32 @@ test('agenda interested lead read service filters dismissed rows from both mater
   assert.equal(service.findInterestedLeadRowByCallId('call-dismissed'), null);
 });
 
+test('agenda interested lead read service still shows a newer call when only an older reusable key was dismissed', () => {
+  const service = createServiceFixture({
+    recentCallUpdates: [
+      {
+        callId: 'call-fresh',
+        company: 'Softora',
+        name: 'Serve Creusen',
+        phone: '0612345678',
+        summary: 'Nieuwe testcall met interesse',
+        updatedAt: '2026-04-08T12:00:00.000Z',
+      },
+    ],
+    isInterestedLeadDismissedForRow: (callId, rowLike) => {
+      if (normalizeString(callId) === 'call-old') return true;
+      if (!normalizeString(callId)) {
+        return normalizeString(rowLike?.company).toLowerCase() === 'softora';
+      }
+      return false;
+    },
+  });
+
+  const rows = service.buildAllInterestedLeadRows();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].callId, 'call-fresh');
+});
+
 test('agenda interested lead read service tracks the latest row per reusable lead key', () => {
   const service = createServiceFixture({
     recentCallUpdates: [

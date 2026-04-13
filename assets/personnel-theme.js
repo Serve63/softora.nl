@@ -1157,6 +1157,10 @@
 
     function readSuppressedLeadKeys() {
         const map = new Map();
+        function isPersistedSuppressionKey(key) {
+            const normalizedKey = String(key || "").trim();
+            return normalizedKey.indexOf("id:") === 0 || normalizedKey.indexOf("call:") === 0;
+        }
         try {
             const cookiePairs = String(document.cookie || "").split(/;\s*/);
             const rawPair = cookiePairs.find(function (pair) {
@@ -1172,7 +1176,7 @@
                     if (!Array.isArray(entry) || entry.length < 2) return;
                     const key = String(entry[0] || "").trim();
                     const expiresAt = Number(entry[1]) || 0;
-                    if (!key || expiresAt <= nowMs) return;
+                    if (!key || !isPersistedSuppressionKey(key) || expiresAt <= nowMs) return;
                     map.set(key, expiresAt);
                 });
             }
@@ -1183,10 +1187,8 @@
     function isLeadRowSuppressed(row, suppressedKeys) {
         const rowId = Number(row && row.id) || 0;
         const callId = String(row && row.callId || "").trim();
-        const matchKey = buildLeadMatchKeyForCount(row);
         if (rowId !== 0 && suppressedKeys.has("id:" + rowId)) return true;
         if (callId && suppressedKeys.has("call:" + callId)) return true;
-        if (matchKey && suppressedKeys.has(matchKey)) return true;
         return false;
     }
 
