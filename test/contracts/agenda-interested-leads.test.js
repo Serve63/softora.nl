@@ -70,6 +70,7 @@ function createFixture(overrides = {}) {
   const activityCalls = [];
   const dismissCalls = [];
   const hydrateCalls = [];
+  const syncRuntimeCalls = [];
   const upsertCalls = [];
   const cancelCalls = [];
   const persistWaitCalls = [];
@@ -88,6 +89,10 @@ function createFixture(overrides = {}) {
     getSupabaseStateHydrated: () => !overrides.supabaseConfigured || Boolean(overrides.supabaseHydrated),
     forceHydrateRuntimeStateWithRetries: async (times) => {
       hydrateCalls.push(times);
+    },
+    syncRuntimeStateFromSupabaseIfNewer: async (options) => {
+      syncRuntimeCalls.push(options);
+      return overrides.syncRuntimeResult !== undefined ? Boolean(overrides.syncRuntimeResult) : false;
     },
     backfillInsightsAndAppointmentsFromRecentCallUpdates: () => {},
     normalizeString,
@@ -207,6 +212,7 @@ function createFixture(overrides = {}) {
     hydrateCalls,
     persistWaitCalls,
     snapshotCalls,
+    syncRuntimeCalls,
     upsertCalls,
   };
 }
@@ -350,4 +356,37 @@ test('agenda interested leads coordinator rejects set-in-agenda when shared Supa
   assert.deepEqual(persistWaitCalls, ['waited']);
   assert.equal(snapshotCalls.length, 1);
   assert.equal(applySnapshotCalls.length, 1);
+});
+
+test('agenda interested leads coordinator accepts set-in-agenda after timeout when forced remote sync confirms it', async () => {
+  const { applySnapshotCalls, coordinator, hydrateCalls, persistWaitCalls, syncRuntimeCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+    persistWaitResult: false,
+    syncRuntimeResult: true,
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.setInterestedLeadInAgendaResponse(
+    {
+      body: {
+        callId: 'call-1',
+        appointmentDate: '2026-04-10',
+        appointmentTime: '14:30',
+        location: 'Amsterdam',
+        whatsappInfo: 'Stuur route door',
+        whatsappConfirmed: true,
+        actor: 'Serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.taskCompleted, true);
+  assert.deepEqual(persistWaitCalls, ['waited']);
+  assert.equal(syncRuntimeCalls.length, 1);
+  assert.equal(hydrateCalls.length, 0);
+  assert.equal(applySnapshotCalls.length, 0);
 });

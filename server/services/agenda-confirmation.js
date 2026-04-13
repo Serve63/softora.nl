@@ -82,12 +82,58 @@ function createAgendaConfirmationCoordinator(deps = {}) {
     return snapshot && typeof snapshot === 'object' ? snapshot : null;
   }
 
-  async function ensureLeadMutationPersisted(runtimeSnapshot, failureMessage) {
+  function resolveGeneratedAgendaAppointmentById(rawId) {
+    const id = Number(rawId);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    const idx = getGeneratedAppointmentIndexById(id);
+    if (idx < 0) return null;
+    return getGeneratedAgendaAppointments()[idx] || null;
+  }
+
+  function doesAgendaMutationMatchAppointment(expected, candidate) {
+    if (!expected || !candidate) return false;
+
+    const expectedId = Number(expected?.id || 0);
+    const candidateId = Number(candidate?.id || 0);
+    if (!Number.isFinite(expectedId) || expectedId <= 0 || expectedId !== candidateId) return false;
+
+    const expectedCallId = normalizeString(expected?.callId || '');
+    const candidateCallId = normalizeString(candidate?.callId || '');
+    if (expectedCallId && expectedCallId !== candidateCallId) return false;
+
+    const expectedDate = normalizeDateYyyyMmDd(expected?.date || '');
+    const candidateDate = normalizeDateYyyyMmDd(candidate?.date || '');
+    if (expectedDate && expectedDate !== candidateDate) return false;
+
+    const expectedTime = normalizeTimeHhMm(expected?.time || '');
+    const candidateTime = normalizeTimeHhMm(candidate?.time || '');
+    if (expectedTime && expectedTime !== candidateTime) return false;
+
+    const expectedLocation = normalizeString(expected?.location || expected?.appointmentLocation || '');
+    const candidateLocation = normalizeString(candidate?.location || candidate?.appointmentLocation || '');
+    if (expectedLocation && expectedLocation !== candidateLocation) return false;
+
+    return true;
+  }
+
+  async function ensureLeadMutationPersisted(runtimeSnapshot, failureMessage, options = {}) {
+    const verifyPersisted =
+      options && typeof options.verifyPersisted === 'function' ? options.verifyPersisted : null;
     const persisted = await waitForQueuedRuntimeSnapshotPersist();
     if (persisted) return true;
     if (!isSupabaseConfigured()) return true;
-    const rehydrated = await forceHydrateRuntimeStateWithRetries(1);
-    if (!rehydrated && runtimeSnapshot) {
+    const syncedFromSharedState = await syncRuntimeStateFromSupabaseIfNewer({ force: true, maxAgeMs: 0 }).catch(
+      () => false
+    );
+    if (syncedFromSharedState && verifyPersisted) {
+      try {
+        if (verifyPersisted()) return true;
+      } catch {
+        // Val terug op foutpad als verificatie zelf faalt.
+      }
+    }
+
+    if (!syncedFromSharedState && runtimeSnapshot) {
       applyRuntimeStateSnapshotPayload(runtimeSnapshot, {
         updatedAt: normalizeString(runtimeSnapshot?.savedAt || '') || new Date().toISOString(),
       });
@@ -95,8 +141,8 @@ function createAgendaConfirmationCoordinator(deps = {}) {
     return failureMessage || 'Leadwijziging kon niet veilig in gedeelde opslag worden opgeslagen.';
   }
 
-  async function ensureLeadMutationPersistedOrRespond(res, runtimeSnapshot, failureMessage) {
-    const persistResult = await ensureLeadMutationPersisted(runtimeSnapshot, failureMessage);
+  async function ensureLeadMutationPersistedOrRespond(res, runtimeSnapshot, failureMessage, options = {}) {
+    const persistResult = await ensureLeadMutationPersisted(runtimeSnapshot, failureMessage, options);
     if (persistResult === true) {
       invalidateSupabaseSyncTimestamp();
       return true;
@@ -988,7 +1034,14 @@ function createAgendaConfirmationCoordinator(deps = {}) {
     const persistOk = await ensureLeadMutationPersistedOrRespond(
       res,
       runtimeSnapshot,
-      'Lead kon niet veilig in gedeelde opslag worden gezet.'
+      'Lead kon niet veilig in gedeelde opslag worden gezet.',
+      {
+        verifyPersisted: () =>
+          doesAgendaMutationMatchAppointment(
+            updatedAppointment,
+            resolveGeneratedAgendaAppointmentById(updatedAppointment?.id)
+          ),
+      }
     );
     if (!persistOk) return res;
 

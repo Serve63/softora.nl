@@ -77,6 +77,7 @@ function createFixture(overrides = {}) {
   const persistWaitCalls = [];
   const snapshotCalls = [];
   const applySnapshotCalls = [];
+  const syncRuntimeCalls = [];
   const callUpdatesByCallId = new Map([
     [
       'call-1',
@@ -185,7 +186,10 @@ function createFixture(overrides = {}) {
     isSupabaseConfigured: () => Boolean(overrides.supabaseConfigured),
     getSupabaseStateHydrated: () => !overrides.supabaseConfigured || Boolean(overrides.supabaseHydrated),
     forceHydrateRuntimeStateWithRetries: async () => {},
-    syncRuntimeStateFromSupabaseIfNewer: async () => {},
+    syncRuntimeStateFromSupabaseIfNewer: async (options) => {
+      syncRuntimeCalls.push(options);
+      return overrides.syncRuntimeResult !== undefined ? Boolean(overrides.syncRuntimeResult) : false;
+    },
     isImapMailConfigured: () => false,
     syncInboundConfirmationEmailsFromImap: async () => ({ ok: true }),
     backfillInsightsAndAppointmentsFromRecentCallUpdates: () => {},
@@ -257,6 +261,7 @@ function createFixture(overrides = {}) {
     persistWaitCalls,
     setCalls,
     snapshotCalls,
+    syncRuntimeCalls,
     smtpCalls,
   };
 }
@@ -410,6 +415,38 @@ test('agenda confirmation coordinator rolls back set-in-agenda when shared Supab
   assert.deepEqual(persistWaitCalls, ['waited']);
   assert.equal(snapshotCalls.length, 1);
   assert.equal(applySnapshotCalls.length, 1);
+});
+
+test('agenda confirmation coordinator accepts set-in-agenda after timeout when forced remote sync confirms it', async () => {
+  const { applySnapshotCalls, coordinator, persistWaitCalls, syncRuntimeCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+    persistWaitResult: false,
+    syncRuntimeResult: true,
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.setLeadTaskInAgendaById(
+    {
+      body: {
+        appointmentDate: '2026-04-10',
+        appointmentTime: '11:45',
+        location: 'Amsterdam',
+        whatsappInfo: 'Stuur route via WhatsApp',
+        whatsappConfirmed: true,
+        actor: 'Serve',
+      },
+    },
+    res,
+    '101'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.taskCompleted, true);
+  assert.deepEqual(persistWaitCalls, ['waited']);
+  assert.equal(syncRuntimeCalls.length, 1);
+  assert.equal(applySnapshotCalls.length, 0);
 });
 
 test('agenda confirmation coordinator rolls back lead removal when shared Supabase persist fails', async () => {
