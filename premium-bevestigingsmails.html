@@ -1051,7 +1051,7 @@
         /* Stats bar */
         .stats-bar {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 1.5rem;
             margin-bottom: 3rem;
         }
@@ -1070,6 +1070,7 @@
         .stat-card:nth-child(2) { animation-delay: 0.6s; }
         .stat-card:nth-child(3) { animation-delay: 0.7s; }
         .stat-card:nth-child(4) { animation-delay: 0.8s; }
+        .stat-card:nth-child(5) { animation-delay: 0.9s; }
 
         .stat-card-label {
             font-family: 'Oswald', sans-serif;
@@ -1830,19 +1831,23 @@
                             </svg>
                         </button>
                     </div>
-                    <div class="stat-card-value" id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --></div>
+                    <div class="stat-card-value" id="statSent">0</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-label">Geopend</div>
-                    <div class="stat-card-value accent" id="statBooked" style="color: var(--accent-light);"><!-- SOFTORA_COLDCALLING_STAT_BOOKED --></div>
+                    <div class="stat-card-value accent" id="statOpened" style="color: var(--accent-light);">0</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card-label">Kliks</div>
-                    <div class="stat-card-value green" id="statInterested" style="color: var(--green);"><!-- SOFTORA_COLDCALLING_STAT_INTERESTED --></div>
+                    <div class="stat-card-label">Gereageerd</div>
+                    <div class="stat-card-value" id="statReplied">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Interesse</div>
+                    <div class="stat-card-value green" id="statInterested" style="color: var(--green);">0</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-label">Conversie</div>
-                    <div class="stat-card-value" id="statConversion"><!-- SOFTORA_COLDCALLING_STAT_CONVERSION --></div>
+                    <div class="stat-card-value" id="statConversion">0%</div>
                 </div>
             </div>
 
@@ -2289,9 +2294,10 @@
 
         let isRunning = false;
         let callInterval = null;
-        let totalCalled = 0;
+        let totalSent = 0;
+        let totalOpened = 0;
+        let totalReplied = 0;
         let totalInterested = 0;
-        let totalBooked = 0;
 
         const companies = [
             'Bakkerij van Dijk', 'Restaurant De Harmonie', 'Kapsalon Mooi', 'Autoservice Tilburg',
@@ -2333,26 +2339,30 @@
             const company = companies[Math.floor(Math.random() * companies.length)];
             const roll = Math.random();
 
-            totalCalled++;
-            document.getElementById('statCalled').textContent = totalCalled;
+            totalSent++;
+            document.getElementById('statSent').textContent = totalSent;
 
             if (roll < 0.15) {
-                totalBooked++;
+                totalOpened++;
+                totalReplied++;
                 totalInterested++;
-                addLog('success', `<strong>${company}</strong> — Bevestiging geaccepteerd; afspraak voor vervolg ingepland.`);
+                addLog('success', `<strong>${company}</strong> — Mail geopend; prospect reageerde positief en toonde duidelijke interesse.`);
             } else if (roll < 0.35) {
-                totalInterested++;
-                addLog('call', `<strong>${company}</strong> — Mail geopend; link in bevestiging geklikt.`);
+                totalOpened++;
+                totalReplied++;
+                addLog('call', `<strong>${company}</strong> — Mail geopend; prospect reageerde met inhoudelijke vragen.`);
             } else if (roll < 0.6) {
-                addLog('skip', `<strong>${company}</strong> — Geen reactie binnen venster; herinnering gepland.`);
+                totalOpened++;
+                addLog('skip', `<strong>${company}</strong> — Mail geopend, maar er is nog geen reactie ontvangen.`);
             } else {
-                addLog('call', `<strong>${company}</strong> — Afgemeld of geen interesse in deze campagne.`);
+                addLog('call', `<strong>${company}</strong> — Mail is verzonden, maar er is nog geen bruikbare engagement gemeten.`);
             }
 
+            document.getElementById('statOpened').textContent = totalOpened;
+            document.getElementById('statReplied').textContent = totalReplied;
             document.getElementById('statInterested').textContent = totalInterested;
-            document.getElementById('statBooked').textContent = totalBooked;
-            document.getElementById('statConversion').textContent = totalCalled > 0
-                ? Math.round((totalBooked / totalCalled) * 100) + '%'
+            document.getElementById('statConversion').textContent = totalSent > 0
+                ? Math.round((totalInterested / totalSent) * 100) + '%'
                 : '0%';
         }
 
