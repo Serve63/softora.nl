@@ -957,7 +957,7 @@
                 <div class="modal-contact" id="modalContact">Contact</div>
             </div>
             <div class="modal-top-actions">
-                <button class="modal-close magnetic" onclick="closeModal()" type="button" aria-label="Sluiten">
+                <button class="modal-close magnetic" id="modalCloseBtn" onclick="closeModal()" type="button" aria-label="Sluiten">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -1171,6 +1171,7 @@
     const modalPrimaryBtn = document.getElementById('modalPrimaryBtn');
     const modalNoDealBtn = document.getElementById('modalNoDealBtn');
     const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
     const modalAudioBlock = document.getElementById('modalAudioBlock');
     const modalAudioPlayer = document.getElementById('modalAudioPlayer');
     const modalAudioEmpty = document.getElementById('modalAudioEmpty');
@@ -1212,6 +1213,21 @@
             workspacePendingCustomerCheck = !this.checked;
             refreshWorkspacePrimaryButtonLabel();
         });
+    }
+
+    function isWorkspaceExitLocked() {
+        return modalWorkspaceMode && (workspaceBusy || workspacePendingCustomerCheck);
+    }
+
+    function syncWorkspaceExitControls() {
+        const shouldLockExit = isWorkspaceExitLocked();
+        if (modalCloseBtn) {
+            modalCloseBtn.hidden = shouldLockExit;
+            modalCloseBtn.disabled = shouldLockExit;
+        }
+        if (modalSecondaryBtn) {
+            modalSecondaryBtn.disabled = shouldLockExit;
+        }
     }
 
     function normalizeWorkspaceDomainName(value) {
@@ -1612,7 +1628,10 @@
         const name = normalizeReminderName(customerName) || 'de klant';
         if (workspaceInputArea) workspaceInputArea.style.display = 'none';
         if (workspaceSaveStatusEl) workspaceSaveStatusEl.textContent = '';
-        if (workspaceSuccessTitle) workspaceSuccessTitle.textContent = successMessage || 'Opdracht aangemaakt.';
+        if (workspaceSuccessTitle) {
+            workspaceSuccessTitle.textContent = successMessage || 'Dossier aangemaakt.';
+            workspaceSuccessTitle.hidden = true;
+        }
         if (wsReminderText) wsReminderText.textContent = `Vergeet ${name} niet toe te voegen aan je klantenbestand.`;
         if (wsCustomerAddedCheck) wsCustomerAddedCheck.checked = false;
         if (wsCustomerAddedLabel) wsCustomerAddedLabel.textContent = `Ik heb ${name} toegevoegd aan het klantenbestand`;
@@ -1624,6 +1643,7 @@
     function hideWorkspaceSuccess() {
         if (workspaceSuccessState) workspaceSuccessState.classList.remove('show');
         if (workspaceInputArea) workspaceInputArea.style.display = '';
+        if (workspaceSuccessTitle) workspaceSuccessTitle.hidden = false;
         workspacePendingCustomerCheck = false;
     }
 
@@ -1820,6 +1840,7 @@
                 modalNoDealBtn.hidden = true;
                 modalNoDealBtn.disabled = true;
                 modalSecondaryBtn.textContent = 'Sluiten';
+                syncWorkspaceExitControls();
                 return;
             }
 
@@ -1829,6 +1850,7 @@
             modalNoDealBtn.hidden = false;
             modalNoDealBtn.disabled = workspaceBusy;
             modalSecondaryBtn.textContent = 'Sluiten';
+            syncWorkspaceExitControls();
             return;
         }
 
@@ -1840,11 +1862,13 @@
         if (linkedOrderId) {
             modalPrimaryBtn.textContent = 'Open dossier';
             modalPrimaryBtn.disabled = workspaceBusy || workspacePendingCustomerCheck;
+            syncWorkspaceExitControls();
             return;
         }
 
-        modalPrimaryBtn.textContent = 'Opdracht aanmaken';
+        modalPrimaryBtn.textContent = 'Dossier aanmaken';
         modalPrimaryBtn.disabled = workspaceBusy;
+        syncWorkspaceExitControls();
     }
 
     async function markActiveAppointmentNoDeal() {
@@ -1896,7 +1920,7 @@
         const updatedAt = String(apt?.postCallUpdatedAt || '');
         const linkedOrderId = getLinkedOrderIdForAppointment(apt);
         if (linkedOrderId) {
-            setWorkspaceStatus(`Opdracht al aangemaakt (opdracht #${linkedOrderId}).`, 'success');
+            setWorkspaceStatus(`Dossier al aangemaakt (opdracht #${linkedOrderId}).`, 'success');
         } else if (updatedAt) {
             setWorkspaceStatus(`Laatst opgeslagen: ${new Date(updatedAt).toLocaleString('nl-NL')}`);
         } else {
@@ -2287,13 +2311,13 @@
             }
             setWorkspaceLoading(false);
             const successMsg = result?.alreadyExisted
-                ? 'Opdracht bestond al en is bijgewerkt met je nieuwste notities.'
-                : 'Opdracht aangemaakt en toegevoegd aan actieve opdrachten.';
+                ? 'Dossier bestond al en is bijgewerkt met je nieuwste notities.'
+                : 'Dossier aangemaakt en toegevoegd aan actieve opdrachten.';
             showWorkspaceSuccess(String(apt?.company || apt?.contact || ''), successMsg);
             return result;
         } catch (error) {
             setWorkspaceLoading(false);
-            setWorkspaceStatus(`Opdracht aanmaken mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
+            setWorkspaceStatus(`Dossier aanmaken mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
             return null;
         } finally {
             workspaceBusy = false;
@@ -2440,6 +2464,7 @@
     }
 
     function closeModal() {
+        if (isWorkspaceExitLocked()) return;
         if (notesImageUploadInput) notesImageUploadInput.value = '';
         if (modalAudioPlayer) {
             modalAudioPlayer.pause();
@@ -2470,6 +2495,7 @@
     }
 
     function handleModalSecondaryAction() {
+        if (isWorkspaceExitLocked()) return;
         if (!modalWorkspaceMode) {
             closeModal();
             return;
