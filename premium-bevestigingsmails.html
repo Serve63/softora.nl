@@ -1051,7 +1051,7 @@
         /* Stats bar */
         .stats-bar {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 1.5rem;
             margin-bottom: 3rem;
         }
@@ -1070,6 +1070,7 @@
         .stat-card:nth-child(2) { animation-delay: 0.6s; }
         .stat-card:nth-child(3) { animation-delay: 0.7s; }
         .stat-card:nth-child(4) { animation-delay: 0.8s; }
+        .stat-card:nth-child(5) { animation-delay: 0.9s; }
 
         .stat-card-label {
             font-family: 'Oswald', sans-serif;
@@ -1841,6 +1842,10 @@
                     <div class="stat-card-value green" id="statInterested" style="color: var(--green);">0</div>
                 </div>
                 <div class="stat-card">
+                    <div class="stat-card-label">Lead</div>
+                    <div class="stat-card-value" id="statLead">0</div>
+                </div>
+                <div class="stat-card">
                     <div class="stat-card-label">Conversie</div>
                     <div class="stat-card-value" id="statConversion">0%</div>
                 </div>
@@ -2292,6 +2297,7 @@
         let totalSent = 0;
         let totalOpened = 0;
         let totalInterested = 0;
+        let totalLeads = 0;
 
         const companies = [
             'Bakkerij van Dijk', 'Restaurant De Harmonie', 'Kapsalon Mooi', 'Autoservice Tilburg',
@@ -2329,32 +2335,50 @@
             }
         }
 
+        function updateStats() {
+            document.getElementById('statSent').textContent = totalSent;
+            document.getElementById('statOpened').textContent = totalOpened;
+            document.getElementById('statInterested').textContent = totalInterested;
+            document.getElementById('statLead').textContent = totalLeads;
+            document.getElementById('statConversion').textContent = totalSent > 0
+                ? Math.round((totalLeads / totalSent) * 100) + '%'
+                : '0%';
+        }
+
+        document.getElementById('statsResetBtn')?.addEventListener('click', () => {
+            totalSent = 0;
+            totalOpened = 0;
+            totalInterested = 0;
+            totalLeads = 0;
+            updateStats();
+        });
+
         function simulateCall() {
             const company = companies[Math.floor(Math.random() * companies.length)];
             const roll = Math.random();
 
             totalSent++;
-            document.getElementById('statSent').textContent = totalSent;
 
-            if (roll < 0.15) {
+            if (roll < 0.12) {
                 totalOpened++;
                 totalInterested++;
-                addLog('success', `<strong>${company}</strong> — Mail geopend; prospect reageerde positief en toonde duidelijke interesse.`);
-            } else if (roll < 0.35) {
+                totalLeads++;
+                addLog('success', `<strong>${company}</strong> — Mail geopend; prospect reageerde positief, toonde interesse en is als lead gekwalificeerd.`);
+            } else if (roll < 0.24) {
+                totalOpened++;
+                totalInterested++;
+                addLog('success', `<strong>${company}</strong> — Mail geopend; prospect toonde duidelijke interesse, maar is nog geen lead.`);
+            } else if (roll < 0.44) {
                 totalOpened++;
                 addLog('call', `<strong>${company}</strong> — Mail geopend; prospect reageerde met inhoudelijke vragen.`);
-            } else if (roll < 0.6) {
+            } else if (roll < 0.68) {
                 totalOpened++;
                 addLog('skip', `<strong>${company}</strong> — Mail geopend, maar er is nog geen reactie ontvangen.`);
             } else {
                 addLog('call', `<strong>${company}</strong> — Mail is verzonden, maar er is nog geen bruikbare engagement gemeten.`);
             }
 
-            document.getElementById('statOpened').textContent = totalOpened;
-            document.getElementById('statInterested').textContent = totalInterested;
-            document.getElementById('statConversion').textContent = totalSent > 0
-                ? Math.round((totalInterested / totalSent) * 100) + '%'
-                : '0%';
+            updateStats();
         }
 
         function toggleCampaign() {
@@ -2390,6 +2414,8 @@
                 }
             }
         }
+
+        updateStats();
 
         // Cursor
         const cursor = document.querySelector('.cursor');

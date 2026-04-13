@@ -78,11 +78,12 @@ test('page smoke: assets/personnel-theme.js persists sidebar counts across premi
   assert.match(js, /paintSidebarCount\("leads", cachedLeadCount/, 'Leads hoort direct uit cache te kunnen schilderen.');
 });
 
-test('page smoke: premium-bevestigingsmails.html shows the four coldmailing KPI labels', () => {
+test('page smoke: premium-bevestigingsmails.html shows the five coldmailing KPI labels', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-bevestigingsmails.html'), 'utf8');
   assert.match(html, />Totaal verzonden<\/span>/, 'Totaal verzonden ontbreekt.');
   assert.match(html, />Geopend<\/div>/, 'Geopend ontbreekt.');
   assert.doesNotMatch(html, />Gereageerd<\/div>/, 'Gereageerd hoort niet meer zichtbaar te zijn.');
   assert.match(html, />Interesse<\/div>/, 'Interesse ontbreekt.');
+  assert.match(html, />Lead<\/div>/, 'Lead ontbreekt.');
   assert.match(html, />Conversie<\/div>/, 'Conversie ontbreekt.');
 });

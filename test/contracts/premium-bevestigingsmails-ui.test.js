@@ -16,9 +16,11 @@ test('premium bevestigingsmails mirrors lead-generator shell without coldcalling
   assert.match(pageSource, /<div class="generator-grid">/);
   assert.match(pageSource, /<span class="panel-title">Coldmailing Instellingen<\/span>/);
   assert.match(pageSource, /<button class="launch-btn magnetic" id="launchBtn" onclick="toggleCampaign\(\)">/);
-  assert.match(pageSource, /id="statCalled"/);
-  assert.match(pageSource, /id="statBooked"/);
+  assert.match(pageSource, /id="statSent"/);
+  assert.match(pageSource, /id="statOpened"/);
   assert.match(pageSource, /id="statInterested"/);
+  assert.match(pageSource, /id="statLead"/);
   assert.match(pageSource, /id="statConversion"/);
+  assert.match(pageSource, />Lead<\/div>/);
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
 });
