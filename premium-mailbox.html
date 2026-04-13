@@ -373,13 +373,19 @@ let activeFolder = 'inbox';
 let activeMail = null;
 let filteredMails = [];
 
+/** Tags hidden in the list row (data may still include them for filtering). */
+function mailListVisibleTags(tags) {
+  return (tags || []).filter(t => t !== 'klant' && t !== 'factuur');
+}
+
 function setFolder(folder, el) {
   activeFolder = folder;
   activeMail = null;
   document.querySelectorAll('.folder-item').forEach(f => f.classList.remove('active'));
   el.classList.add('active');
   const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
-  document.getElementById('folder-label').textContent = labels[folder] || folder;
+  const folderLabelEl = document.getElementById('folder-label');
+  if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
   document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
   renderList();
 }
@@ -400,7 +406,9 @@ function renderList() {
   const wrap = document.getElementById('mail-items');
   if (!list.length) { wrap.innerHTML = `<div style="padding:40px;text-align:center;font-size:13px;color:var(--text-light)">Geen e-mails gevonden.</div>`; return; }
 
-  wrap.innerHTML = list.map(m => `
+  wrap.innerHTML = list.map(m => {
+    const rowTags = mailListVisibleTags(m.tags);
+    return `
     <div class="mail-item ${m.unread ? 'unread' : ''} ${activeMail === m.id ? 'active' : ''}" onclick="openMail(${m.id})">
       ${m.unread ? '<div class="unread-dot"></div>' : ''}
       <div class="mail-item-top">
@@ -409,8 +417,9 @@ function renderList() {
       </div>
       <div class="mail-subject">${m.subject}</div>
       <div class="mail-preview">${m.preview}</div>
-      ${m.tags.length ? `<div class="mail-tags">${m.tags.map(t => `<span class="mail-tag tag-${t}">${t}</span>`).join('')}</div>` : ''}
-    </div>`).join('');
+      ${rowTags.length ? `<div class="mail-tags">${rowTags.map(t => `<span class="mail-tag tag-${t}">${t}</span>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
 
   const unread = mails.filter(m => m.folder === 'inbox' && m.unread).length;
   const badge = document.getElementById('badge-inbox');
