@@ -1163,6 +1163,7 @@
             const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
             const LEAD_SUPPRESSION_STORAGE_KEY = 'softora_coldcalling_suppressed_leads_json';
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
+            const LEAD_MODAL_REQUEST_TIMEOUT_MS = 20000;
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
@@ -2546,15 +2547,25 @@
                 }
             }
 
-            async function postJsonWithFallback(endpoints, body) {
+            async function postJsonWithFallback(endpoints, body, options = {}) {
                 const list = Array.isArray(endpoints) ? endpoints : [endpoints];
                 let lastError = null;
+                const timeoutMs = Math.max(
+                    1000,
+                    Math.min(
+                        60000,
+                        Number(options?.timeoutMs || LEAD_MODAL_REQUEST_TIMEOUT_MS) || LEAD_MODAL_REQUEST_TIMEOUT_MS
+                    )
+                );
                 for (const endpoint of list) {
+                    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+                    const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
                     try {
                         const response = await fetch(endpoint, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(body || {}),
+                            signal: controller ? controller.signal : undefined,
                         });
                         const data = await response.json().catch(() => ({}));
                         if (!response.ok || data?.ok === false) {
@@ -2565,7 +2576,13 @@
                         }
                         return data;
                     } catch (error) {
-                        lastError = error instanceof Error ? error : new Error(String(error || 'Onbekende fout'));
+                        if (error?.name === 'AbortError') {
+                            lastError = new Error(`Server reageert niet op tijd (timeout na ${Math.round(timeoutMs / 1000)}s).`);
+                        } else {
+                            lastError = error instanceof Error ? error : new Error(String(error || 'Onbekende fout'));
+                        }
+                    } finally {
+                        if (timeout) clearTimeout(timeout);
                     }
                 }
                 throw lastError || new Error('Actie mislukt.');

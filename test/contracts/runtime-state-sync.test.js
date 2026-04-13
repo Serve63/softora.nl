@@ -339,6 +339,44 @@ test('runtime state sync coordinator treats queued runtime snapshot await as a n
   assert.equal(persisted, true);
 });
 
+test('runtime state sync coordinator times out queued runtime snapshot waits instead of hanging forever', async () => {
+  const fixture = createFixture({
+    queuedRuntimePersistAwaitTimeoutMs: 5,
+    runtimeState: createRuntimeState({
+      supabasePersistChain: new Promise(() => {}),
+    }),
+  });
+
+  const persisted = await fixture.coordinator.waitForQueuedRuntimeSnapshotPersist();
+
+  assert.equal(persisted, false);
+  assert.match(fixture.runtimeState.supabaseLastPersistError, /Wachten op gedeelde agenda-opslag duurde langer dan/);
+});
+
+test('runtime state sync coordinator falls back when supabase client persist hangs', async () => {
+  const persistedRows = [];
+  const fixture = createFixture({
+    supabaseClientPersistTimeoutMs: 5,
+    getSupabaseClient: () => ({
+      from() {
+        return {
+          upsert: async () => new Promise(() => {}),
+        };
+      },
+    }),
+    upsertSupabaseStateRowViaRest: async (row) => {
+      persistedRows.push(row);
+      return { ok: true, status: 200 };
+    },
+  });
+
+  const ok = await fixture.coordinator.persistRuntimeStateToSupabase('hung_client_contract_test');
+
+  assert.equal(ok, true);
+  assert.equal(persistedRows.length, 1);
+  assert.equal(persistedRows[0].meta.reason, 'hung_client_contract_test');
+});
+
 test('runtime state sync coordinator persists merged runtime snapshots and updates sync markers', async () => {
   const fixture = createFixture({
     recentCallUpdates: [

@@ -12,6 +12,8 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     supabaseCallUpdateRowsFetchLimit = 500,
     runtimeStateSupabaseSyncCooldownMs = 4000,
     runtimeStateRemoteNewerThresholdMs = 250,
+    supabaseClientPersistTimeoutMs = 12000,
+    queuedRuntimePersistAwaitTimeoutMs = 15000,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     parseNumberSafe = (value, fallback = null) => {
@@ -95,6 +97,23 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
   function logInfo(...args) {
     if (logger && typeof logger.log === 'function') {
       logger.log(...args);
+    }
+  }
+
+  async function awaitWithTimeout(promise, timeoutMs, errorMessage) {
+    const safeTimeoutMs = Math.max(1000, Math.min(60000, Number(timeoutMs) || 12000));
+    let timeoutId = null;
+    try {
+      return await Promise.race([
+        Promise.resolve(promise),
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error(errorMessage || `Timeout na ${Math.round(safeTimeoutMs / 1000)}s`));
+          }, safeTimeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
 
@@ -647,9 +666,19 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       if (!client) return false;
 
       async function persistRow(row) {
-        const { error } = await client.from(supabaseStateTable).upsert(row, {
-          onConflict: 'state_key',
-        });
+        let error = null;
+        try {
+          const result = await awaitWithTimeout(
+            client.from(supabaseStateTable).upsert(row, {
+              onConflict: 'state_key',
+            }),
+            supabaseClientPersistTimeoutMs,
+            `Supabase client persist timeout na ${Math.round(Math.max(1000, Math.min(60000, Number(supabaseClientPersistTimeoutMs) || 12000)) / 1000)}s`
+          );
+          error = result?.error || null;
+        } catch (persistError) {
+          error = persistError;
+        }
 
         if (!error) {
           return { ok: true, source: 'client', error: null };
@@ -673,7 +702,16 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       }
 
       let payload = buildRuntimeStateSnapshotPayloadWithLimits();
-      const remoteSnapshot = await fetchSupabaseStateRowViaRest('payload,updated_at');
+      const remoteSnapshot = await awaitWithTimeout(
+        fetchSupabaseStateRowViaRest('payload,updated_at'),
+        supabaseClientPersistTimeoutMs,
+        `Supabase snapshot fetch timeout na ${Math.round(Math.max(1000, Math.min(60000, Number(supabaseClientPersistTimeoutMs) || 12000)) / 1000)}s`
+      ).catch((error) => ({
+        ok: false,
+        status: null,
+        body: null,
+        error: truncateText(error?.message || String(error), 500),
+      }));
       if (remoteSnapshot.ok) {
         const remoteRow = Array.isArray(remoteSnapshot.body)
           ? remoteSnapshot.body[0] || null
@@ -766,9 +804,14 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
   async function waitForQueuedRuntimeSnapshotPersist() {
     if (!isSupabaseConfigured()) return true;
     try {
-      return Boolean(await runtimeState.supabasePersistChain);
+      return Boolean(await awaitWithTimeout(
+        runtimeState.supabasePersistChain,
+        queuedRuntimePersistAwaitTimeoutMs,
+        `Wachten op gedeelde agenda-opslag duurde langer dan ${Math.round(Math.max(1000, Math.min(60000, Number(queuedRuntimePersistAwaitTimeoutMs) || 15000)) / 1000)}s`
+      ));
     } catch (error) {
       logError('[Supabase][RuntimePersistAwaitError]', error?.message || error);
+      runtimeState.supabaseLastPersistError = truncateText(error?.message || String(error), 500);
       return false;
     }
   }
@@ -818,9 +861,14 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     const client = getSupabaseClient();
     if (client) {
       try {
-        const { error } = await client.from(supabaseStateTable).upsert(row, {
-          onConflict: 'state_key',
-        });
+        const result = await awaitWithTimeout(
+          client.from(supabaseStateTable).upsert(row, {
+            onConflict: 'state_key',
+          }),
+          supabaseClientPersistTimeoutMs,
+          `Supabase call-update persist timeout na ${Math.round(Math.max(1000, Math.min(60000, Number(supabaseClientPersistTimeoutMs) || 12000)) / 1000)}s`
+        );
+        const error = result?.error || null;
         if (!error) {
           runtimeState.supabaseLastCallUpdatePersistError = '';
           return true;

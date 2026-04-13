@@ -167,3 +167,22 @@ test('supabase state store normalizes call update keys and clamps REST fetch lim
   assert.equal(fetchUrl.searchParams.get('order'), 'updated_at.desc');
   assert.equal(fetchUrl.searchParams.get('limit'), '2000');
 });
+
+test('supabase state store aborts hung REST requests with a timeout error', async () => {
+  const fixture = createFixture({
+    supabaseRestTimeoutMs: 5,
+    fetchImpl: async (_url, options = {}) =>
+      new Promise((_, reject) => {
+        options.signal?.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      }),
+  });
+
+  const result = await fixture.store.fetchSupabaseStateRowViaRest();
+
+  assert.equal(result.ok, false);
+  assert.match(result.error || '', /Supabase REST timeout na/);
+});

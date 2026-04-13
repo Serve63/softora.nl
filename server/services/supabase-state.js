@@ -8,6 +8,7 @@ function createSupabaseStateStore(deps = {}) {
     supabaseStateKey = '',
     supabaseCallUpdateStateKeyPrefix = '',
     supabaseCallUpdateRowsFetchLimit = 1000,
+    supabaseRestTimeoutMs = 12000,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     createClient = createSupabaseClient,
@@ -47,8 +48,15 @@ function createSupabaseStateStore(deps = {}) {
       return { ok: false, status: null, body: null, error: 'Fetch is niet beschikbaar.' };
     }
 
+    const timeoutMs = Math.max(1000, Math.min(60000, Number(supabaseRestTimeoutMs) || 12000));
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
     try {
-      const response = await fetchImpl(url, options);
+      const response = await fetchImpl(url, {
+        ...options,
+        signal: controller ? controller.signal : options.signal,
+      });
       const text = await response.text();
       let body = null;
       try {
@@ -63,8 +71,15 @@ function createSupabaseStateStore(deps = {}) {
         ok: false,
         status: null,
         body: null,
-        error: truncateText(error?.message || String(error), 500),
+        error: truncateText(
+          error?.name === 'AbortError'
+            ? `Supabase REST timeout na ${Math.round(timeoutMs / 1000)}s`
+            : (error?.message || String(error)),
+          500
+        ),
       };
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
   }
 
