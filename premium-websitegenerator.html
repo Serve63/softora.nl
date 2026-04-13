@@ -4,7 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Website Generator – Softora.nl</title>
+<link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
+<script>
+  (function () {
+    document.documentElement.setAttribute("data-personnel-loading", "true");
+    try {
+      document.documentElement.setAttribute("data-theme-mode", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    } catch (_) {
+      /* ignore */
+    }
+  })();
+</script>
+<script src="assets/personnel-theme.js?v=20260411a" defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -12,7 +26,12 @@
   --text-dark: #1a1a2e; --text-mid: #555; --text-light: #999;
   --border: #e2ddd6; --card: #ffffff; --tag: #f5f0eb;
 }
-body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text-dark); min-height: 100vh; padding: 40px 48px; }
+body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text-dark); min-height: 100vh; }
+
+.dashboard-layout { display: flex; min-height: 100vh; }
+.sidebar { width: 280px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; display: flex; flex-direction: column; }
+.main-content { margin-left: 280px; width: calc(100% - 280px); min-width: 0; padding: 40px 48px; }
+.page-shell { width: min(1380px, 100%); }
 
 .page-title { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
 .page-sub { font-size: 13px; color: var(--text-light); margin-bottom: 36px; }
@@ -105,10 +124,18 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 /* TOAST */
 .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text-dark); color: #fff; padding: 10px 16px; border-radius: 5px; font-size: 13px; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; z-index: 99; }
 .toast.show { opacity: 1; transform: translateY(0); }
+
+@media (max-width: 900px) {
+  .main-content { margin-left: 0; width: 100%; padding: 24px 16px; }
+  .sidebar { display: none; }
+}
 </style>
 </head>
 <body>
-
+<div class="dashboard-layout">
+<aside class="sidebar"></aside>
+<main class="main-content">
+<div class="page-shell">
 <div class="page-title">Website Generator</div>
 <div class="page-sub">Scan een website en genereer een visuele preview, of maak een live paginalink aan</div>
 
@@ -188,6 +215,9 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 </div>
 
 <div class="toast" id="toast"></div>
+</div>
+</main>
+</div>
 
 <script>
 function switchTab(name, el) {
