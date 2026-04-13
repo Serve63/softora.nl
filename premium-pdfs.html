@@ -23,15 +23,15 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #f6f2ec;
-  --panel: #ffffff;
-  --preview-bg: #e8e6e1;
-  --crimson: #8b2252;
-  --crimson-light: #a62d65;
-  --border: #e0ddd8;
-  --text: #1a1a2e;
-  --muted: #606272;
-  --light: #9a9cac;
+  --bg: var(--bg-primary, #f8f7f4);
+  --panel: var(--bg-secondary, #ffffff);
+  --preview-bg: var(--bg-primary, #f8f7f4);
+  --crimson: var(--accent, #8b2252);
+  --crimson-light: var(--accent-light, #a62d65);
+  --border: rgba(0, 0, 0, 0.08);
+  --text: var(--text-primary, #1a1a2e);
+  --muted: var(--text-secondary, #606272);
+  --light: var(--text-tertiary, #9a9cac);
   --input-bg: #faf9f7;
 }
 html, body { height: 100%; }

@@ -22,9 +22,9 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #f6f2ec; --crimson: #8b2252; --crimson-light: #a62d65;
-  --text-dark: #1a1a2e; --text-mid: #606272; --text-light: #9a9cac;
-  --border: #e2ddd6; --card: #ffffff; --tag: #f5f0eb;
+  --bg: var(--bg-primary, #f8f7f4); --crimson: var(--accent, #8b2252); --crimson-light: var(--accent-light, #a62d65);
+  --text-dark: var(--text-primary, #1a1a2e); --text-mid: var(--text-secondary, #606272); --text-light: var(--text-tertiary, #9a9cac);
+  --border: rgba(0, 0, 0, 0.08); --card: var(--bg-secondary, #ffffff); --tag: #f5f0eb;
 }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-dark); min-height: 100vh; }
 
