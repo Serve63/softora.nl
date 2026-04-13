@@ -3167,12 +3167,35 @@
 
             function persistSuppressedLeadRows() {
                 try {
-                    localStorage.removeItem(LEAD_SUPPRESSION_STORAGE_KEY);
+                    const entries = [];
+                    manuallySuppressedLeadKeys.forEach((expiresAt, key) => {
+                        entries.push([key, expiresAt]);
+                    });
+                    if (entries.length > 0) {
+                        localStorage.setItem(LEAD_SUPPRESSION_STORAGE_KEY, JSON.stringify(entries));
+                    } else {
+                        localStorage.removeItem(LEAD_SUPPRESSION_STORAGE_KEY);
+                    }
                 } catch (_) {}
             }
 
             function hydrateSuppressedLeadRows() {
                 manuallySuppressedLeadKeys.clear();
+                try {
+                    const raw = localStorage.getItem(LEAD_SUPPRESSION_STORAGE_KEY);
+                    if (raw) {
+                        const entries = JSON.parse(raw);
+                        const nowMs = Date.now();
+                        if (Array.isArray(entries)) {
+                            entries.forEach(([key, expiresAt]) => {
+                                if (key && Number(expiresAt) > nowMs) {
+                                    manuallySuppressedLeadKeys.set(String(key), Number(expiresAt));
+                                }
+                            });
+                        }
+                    }
+                } catch (_) {}
+                purgeExpiredSuppressedLeadKeys();
                 persistSuppressedLeadRows();
             }
 
@@ -3205,7 +3228,8 @@
             }
 
             function filterSuppressedLeadRows(rows) {
-                return Array.isArray(rows) ? rows : [];
+                if (!Array.isArray(rows)) return [];
+                return rows.filter((row) => !isSuppressedLeadRow(row));
             }
 
             hydrateSuppressedLeadRows();
