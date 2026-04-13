@@ -374,6 +374,11 @@
         };
     }
 
+    function isLeadsPagePath(path) {
+        const p = String(path || "").toLowerCase();
+        return p.indexOf("/premium-leads") === 0 || p.indexOf("/premium-ai-coldmailing") === 0;
+    }
+
     function getSidebarActiveKey(path) {
         const p = String(path || "").toLowerCase();
         if (
@@ -384,7 +389,7 @@
             return "active_orders";
         }
         if (p.indexOf("/premium-personeel-agenda") === 0) return "agenda";
-        if (p.indexOf("/premium-leads") === 0 || p.indexOf("/premium-ai-coldmailing") === 0) return "leads";
+        if (isLeadsPagePath(p)) return "leads";
         if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldcalling";
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
@@ -1475,9 +1480,10 @@
         const requestId = ++sidebarLeadsRefreshRequestId;
         const suppressedKeys = readSuppressedLeadKeys();
         const pathName = String((window.location && window.location.pathname) || "").trim().toLowerCase();
+        const isLiveLeadsPage = isLeadsPagePath(pathName);
         const liveLeadsPageCount = Number(window.__softoraLeadsPageCount);
         if (
-            (pathName.indexOf("/premium-leads") === 0 || pathName.indexOf("/premium-ai-coldmailing") === 0) &&
+            isLiveLeadsPage &&
             Number.isFinite(liveLeadsPageCount) &&
             liveLeadsPageCount >= 0
         ) {
@@ -1502,6 +1508,16 @@
         if (requestId !== sidebarLeadsRefreshRequestId) return;
 
         if (!tasksData && !interestedLeadsData) {
+            if (isLiveLeadsPage) {
+                paintSidebarCount(
+                    "leads",
+                    Number.isFinite(liveLeadsPageCount) && liveLeadsPageCount >= 0
+                        ? Math.floor(liveLeadsPageCount)
+                        : null,
+                    { singular: "open lead", plural: "open leads" }
+                );
+                return;
+            }
             const cachedLeadCount = readCachedSidebarCount("leads");
             if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
                 paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
@@ -1520,7 +1536,7 @@
         const interestedRows = filterInterestedRowsForCount(interestedRowsRaw, pendingRows);
         const total = dedupeLeadRowsForCount([].concat(pendingRows, interestedRows)).length;
         const cachedLeadCount = readCachedSidebarCount("leads");
-        if (total <= 0 && Number.isFinite(cachedLeadCount) && cachedLeadCount > 0) {
+        if (!isLiveLeadsPage && total <= 0 && Number.isFinite(cachedLeadCount) && cachedLeadCount > 0) {
             sidebarLeadsZeroSnapshotStreak += 1;
             if (sidebarLeadsZeroSnapshotStreak <= 2) {
                 paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
@@ -1669,8 +1685,10 @@
     function initSidebarNotificationCounts() {
         if (!isPremiumPersonnelContext) return;
         if (!document.querySelector("[data-sidebar-count-key]")) return;
+        const pathName = String((window.location && window.location.pathname) || "").trim().toLowerCase();
+        const isLiveLeadsPage = isLeadsPagePath(pathName);
         const cachedLeadCount = readCachedSidebarCount("leads");
-        if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
+        if (!isLiveLeadsPage && Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
             paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
         }
         refreshSidebarNotificationCounts();

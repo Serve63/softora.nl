@@ -20,10 +20,8 @@ test('premium sidebar navigation normalizes old leads links to the clean route',
   const root = path.join(__dirname, '../..');
   const themeSource = fs.readFileSync(path.join(root, 'assets/personnel-theme.js'), 'utf8');
 
+  assert.match(themeSource, /function isLeadsPagePath\(path\) \{/);
   assert.match(themeSource, /if \(href === "\/premium-ai-coldmailing"\) return "\/premium-leads";/);
   assert.match(themeSource, /href: "\/premium-leads",\s*label: "Leads"/);
-  assert.match(
-    themeSource,
-    /if \(p\.indexOf\("\/premium-leads"\) === 0 \|\| p\.indexOf\("\/premium-ai-coldmailing"\) === 0\) return "leads";/
-  );
+  assert.match(themeSource, /if \(isLeadsPagePath\(p\)\) return "leads";/);
 });
