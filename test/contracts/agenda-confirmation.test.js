@@ -245,6 +245,9 @@ function createFixture(overrides = {}) {
     },
     waitForQueuedRuntimeSnapshotPersist: async () => {
       persistWaitCalls.push('waited');
+      if (overrides.persistWaitPromise) {
+        return await overrides.persistWaitPromise;
+      }
       return overrides.persistWaitResult !== undefined ? Boolean(overrides.persistWaitResult) : true;
     },
     logger: {
@@ -336,6 +339,38 @@ test('agenda confirmation coordinator can set a lead task into the agenda and cl
   assert.equal(appointments[0].confirmationResponseReceived, true);
   assert.equal(dismissCalls[0].reason, 'confirmation_task_set_in_agenda_dismiss');
   assert.equal(activityCalls[0].reason, 'dashboard_activity_lead_set_in_agenda');
+  assert.deepEqual(persistWaitCalls, ['waited']);
+});
+
+test('agenda confirmation coordinator responds accepted when shared persist stays pending', async () => {
+  const { appointments, coordinator, dismissCalls, persistWaitCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+    persistWaitPromise: new Promise(() => {}),
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.setLeadTaskInAgendaById(
+    {
+      body: {
+        appointmentDate: '2026-04-10',
+        appointmentTime: '11:45',
+        location: 'Amsterdam',
+        whatsappInfo: 'Stuur route via WhatsApp',
+        whatsappConfirmed: true,
+        actor: 'Serve',
+      },
+    },
+    res,
+    '101'
+  );
+
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.taskCompleted, true);
+  assert.equal(res.body.persistencePending, true);
+  assert.equal(appointments[0].date, '2026-04-10');
+  assert.equal(dismissCalls[0].reason, 'confirmation_task_set_in_agenda_dismiss');
   assert.deepEqual(persistWaitCalls, ['waited']);
 });
 

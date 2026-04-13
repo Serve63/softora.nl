@@ -1166,7 +1166,7 @@
             const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_MODAL_REQUEST_TIMEOUT_MS = 20000;
-            const LEAD_MODAL_AGENDA_SUBMIT_TIMEOUT_MS = 45000;
+            const LEAD_MODAL_AGENDA_SUBMIT_TIMEOUT_MS = 20000;
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
@@ -2054,6 +2054,11 @@
                 modalDeleteBtn.disabled = modalBusy;
             }
 
+            function setAgendaSubmitUiState(nextPending) {
+                agendaSubmitInFlight = Boolean(nextPending);
+                modalCloseBtn.hidden = agendaSubmitInFlight;
+            }
+
             function setModalTaskActionsEnabled(nextEnabled) {
                 const enabled = Boolean(nextEnabled);
                 const confirmWrap = modalWhatsappConfirm.closest('.lead-modal-confirm-wrap');
@@ -2195,6 +2200,7 @@
                 activeTaskId = 0;
                 modalAudioPlayer.pause();
                 modalAudioPlayer.currentTime = 0;
+                setAgendaSubmitUiState(false);
                 setModalBusy(false);
                 setModalStatus('');
                 setModalLoading(false);
@@ -2765,7 +2771,7 @@
                     return;
                 }
 
-                agendaSubmitInFlight = true;
+                setAgendaSubmitUiState(true);
                 setModalBusy(true);
                 setModalStatus('');
                 applyOptimisticLeadRemovalFromOverview(taskId);
@@ -2823,9 +2829,8 @@
                     rollbackLeadMutation(snapshot);
                     setModalLoading(false);
                     setModalStatus(String(error?.message || 'Invoegen in agenda mislukt.'), 'error');
-                    await openLeadModal(taskId);
                 } finally {
-                    agendaSubmitInFlight = false;
+                    setAgendaSubmitUiState(false);
                     setModalBusy(false);
                 }
             }

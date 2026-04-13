@@ -198,6 +198,9 @@ function createFixture(overrides = {}) {
     },
     waitForQueuedRuntimeSnapshotPersist: async () => {
       persistWaitCalls.push('waited');
+      if (overrides.persistWaitPromise) {
+        return await overrides.persistWaitPromise;
+      }
       return overrides.persistWaitResult !== undefined ? Boolean(overrides.persistWaitResult) : true;
     },
   });
@@ -249,6 +252,38 @@ test('agenda interested leads coordinator materializes a lead into the agenda', 
   assert.equal(appointments[0].confirmationResponseReceived, true);
   assert.equal(dismissCalls[0].reason, 'interested_lead_set_in_agenda_dismiss');
   assert.equal(activityCalls[0].reason, 'dashboard_activity_interested_lead_set_in_agenda');
+  assert.deepEqual(persistWaitCalls, ['waited']);
+});
+
+test('agenda interested leads coordinator responds accepted when shared persist stays pending', async () => {
+  const { appointments, coordinator, persistWaitCalls, upsertCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+    persistWaitPromise: new Promise(() => {}),
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.setInterestedLeadInAgendaResponse(
+    {
+      body: {
+        callId: 'call-1',
+        appointmentDate: '2026-04-10',
+        appointmentTime: '14:30',
+        location: 'Amsterdam',
+        whatsappInfo: 'Stuur route door',
+        whatsappConfirmed: true,
+        actor: 'Serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.taskCompleted, true);
+  assert.equal(res.body.persistencePending, true);
+  assert.equal(upsertCalls.length, 1);
+  assert.equal(appointments[0].date, '2026-04-10');
   assert.deepEqual(persistWaitCalls, ['waited']);
 });
 
