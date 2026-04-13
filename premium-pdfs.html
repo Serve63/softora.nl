@@ -188,6 +188,13 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   padding: 20px 12px;
   gap: 0;
 }
+.a4-stage {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-bottom: 20px;
+}
 .preview-hint {
   font-size: 10px; font-weight: 700;
   letter-spacing: 2px; text-transform: uppercase;
@@ -206,6 +213,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   display: flex;
   flex-direction: column;
   font-family: 'Inter', sans-serif;
+  transform-origin: top center;
 }
 
 /* PDF HEADER */
@@ -311,7 +319,8 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   .sidebar { display: none; }
   .form-panel { width: 100%; }
   .split { flex-direction: column; }
-  .a4 { width: min(560px, 100%); min-height: auto; }
+  .a4-stage { justify-content: flex-start; }
+  .a4 { width: min(560px, 100%); min-height: auto; transform: none !important; }
 }
 </style>
 </head>
@@ -347,8 +356,10 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   <!-- PREVIEW -->
   <div class="preview-panel">
     <div class="preview-hint">Live preview</div>
-    <div class="a4" id="a4">
-      <!-- filled by JS -->
+    <div class="a4-stage" id="a4-stage">
+      <div class="a4" id="a4">
+        <!-- filled by JS -->
+      </div>
     </div>
   </div>
 
@@ -615,6 +626,22 @@ function update() {
       </div>
       <div class="pdf-footer">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
   }
+  fitPreview();
+}
+
+function fitPreview() {
+  if (window.innerWidth <= 900) return;
+  const panel = document.querySelector('.preview-panel');
+  const stage = document.getElementById('a4-stage');
+  const a4 = document.getElementById('a4');
+  if (!panel || !stage || !a4) return;
+  const panelW = panel.clientWidth - 28;
+  const panelH = panel.clientHeight - 54;
+  const baseW = 560;
+  const baseH = 792;
+  const scale = Math.max(0.72, Math.min(panelW / baseW, panelH / baseH, 1));
+  a4.style.transform = `scale(${scale})`;
+  stage.style.height = `${Math.round(baseH * scale) + 12}px`;
 }
 
 // -- DOWNLOAD --
@@ -735,6 +762,7 @@ function showToast(msg) {
 
 // init
 buildForm();
+window.addEventListener('resize', fitPreview);
 </script>
 </body>
 </html>
