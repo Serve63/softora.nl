@@ -9,7 +9,7 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
 
   assert.match(pageSource, /<!-- SOFTORA_LEADS_BOOTSTRAP -->/);
   assert.match(pageSource, /<div class="lead-status" id="leadStatus"><!-- SOFTORA_LEADS_STATUS --><\/div>/);
-  assert.match(pageSource, /<div class="lead-list" id="leadList"><!-- SOFTORA_LEADS_LIST --><\/div>/);
+  assert.match(pageSource, /<div class="lead-list" id="leadList"(?: style="visibility:hidden;")?><!-- SOFTORA_LEADS_LIST --><\/div>/);
   assert.match(pageSource, /function readLeadsBootstrapPayload\(\)/);
   assert.match(pageSource, /document\.getElementById\('softoraLeadsBootstrap'\)/);
   assert.match(pageSource, /const leadsBootstrapPayload = readLeadsBootstrapPayload\(\);/);
@@ -23,10 +23,12 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /if \(memoryCache\.leads\.length > 0 && memoryCache\.savedAt > bootstrapSavedAt\) \{/);
   assert.match(pageSource, /const LEADS_LOAD_RETRY_DELAY_MS = 4000;/);
   assert.match(pageSource, /const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 \* 60 \* 2;/);
-  assert.match(pageSource, /function persistSuppressedLeadRows\(\) \{\s*purgeExpiredSuppressedLeadKeys\(\);\s*\}/);
-  assert.match(pageSource, /function hydrateSuppressedLeadRows\(\) \{\s*purgeExpiredSuppressedLeadKeys\(\);\s*\}/);
-  assert.match(pageSource, /function suppressLeadRowLocally\(item\) \{/);
+  assert.match(pageSource, /const SERVER_VISIBLE_LEAD_SUPPRESSION_GRACE_MS = 1000 \* 60 \* 2;/);
+  assert.match(pageSource, /function persistSuppressedLeadRows\(\) \{[\s\S]*purgeExpiredSuppressedLeadKeys\(\);[\s\S]*JSON\.stringify\(entries\)/);
+  assert.match(pageSource, /function hydrateSuppressedLeadRows\(\) \{[\s\S]*suppressedLeadCreatedAtByKey\.clear\(\);[\s\S]*purgeExpiredSuppressedLeadKeys\(\);[\s\S]*persistSuppressedLeadRows\(\);/);
+  assert.match(pageSource, /function suppressLeadRowLocally\(item(?:, ttlMs = MANUAL_LEAD_SUPPRESSION_TTL_MS)?\) \{/);
   assert.match(pageSource, /function clearSuppressedLeadRow\(item\) \{/);
+  assert.match(pageSource, /function reconcileServerVisibleLeadSuppressions\(rows\) \{/);
   assert.match(pageSource, /function filterSuppressedLeadRows\(rows\) \{/);
   assert.match(pageSource, /hydrateSuppressedLeadRows\(\);/);
   assert.match(
@@ -48,7 +50,7 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   );
   assert.match(
     pageSource,
-    /const mergedRows = filterSuppressedLeadRows\([\s\S]*dedupe\(\[\]\.concat\(pendingRows \|\| \[\], interestedRows \|\| \[\]\)\)/
+    /const mergedRows = dedupe\(\[\]\.concat\(pendingRows \|\| \[\], interestedRows \|\| \[\]\)\)[\s\S]*reconcileServerVisibleLeadSuppressions\(mergedRows\);[\s\S]*const visibleRows = filterSuppressedLeadRows\(mergedRows\);/
   );
   assert.match(
     pageSource,

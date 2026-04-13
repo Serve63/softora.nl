@@ -9,6 +9,9 @@
     const sidebarCountCacheKey = "softora_sidebar_count_cache_v1";
     const sidebarCountPersistCookieKey = "softora_sidebar_counts_v1";
     const leadSuppressionCookieKey = "softora_hidden_leads_v1";
+    const manualLeadSuppressionTtlMs = 1000 * 60 * 2;
+    const completedLeadSuppressionTtlMs = 1000 * 60 * 60 * 24 * 30;
+    const serverVisibleLeadSuppressionGraceMs = 1000 * 60 * 2;
     const sidebarCountCacheState = mergeSidebarCountState(
         readPersistedSidebarCountState(),
         (
@@ -1247,6 +1250,15 @@
             const normalizedKey = String(key || "").trim();
             return normalizedKey.indexOf("id:") === 0 || normalizedKey.indexOf("call:") === 0;
         }
+        function inferCreatedAt(expiresAt) {
+            const safeExpiresAt = Number(expiresAt) || 0;
+            if (safeExpiresAt <= 0) return 0;
+            const remainingMs = Math.max(0, safeExpiresAt - Date.now());
+            const assumedTtlMs = remainingMs > manualLeadSuppressionTtlMs
+                ? completedLeadSuppressionTtlMs
+                : manualLeadSuppressionTtlMs;
+            return Math.max(0, safeExpiresAt - assumedTtlMs);
+        }
         try {
             const cookiePairs = String(document.cookie || "").split(/;\s*/);
             const rawPair = cookiePairs.find(function (pair) {
@@ -1263,19 +1275,35 @@
                     const key = String(entry[0] || "").trim();
                     const expiresAt = Number(entry[1]) || 0;
                     if (!key || !isPersistedSuppressionKey(key) || expiresAt <= nowMs) return;
-                    map.set(key, expiresAt);
+                    map.set(key, {
+                        expiresAt: expiresAt,
+                        createdAt: Math.max(0, Math.min(Number(entry[2]) || inferCreatedAt(expiresAt), expiresAt)),
+                    });
                 });
             }
         } catch (_) {}
         return map;
     }
 
-    function isLeadRowSuppressed(row, suppressedKeys) {
+    function isLeadRowSuppressed(row, suppressedKeys, options) {
         const rowId = Number(row && row.id) || 0;
         const callId = String(row && row.callId || "").trim();
-        if (rowId !== 0 && suppressedKeys.has("id:" + rowId)) return true;
-        if (callId && suppressedKeys.has("call:" + callId)) return true;
-        return false;
+        let entry = null;
+        if (rowId !== 0 && suppressedKeys.has("id:" + rowId)) {
+            entry = suppressedKeys.get("id:" + rowId);
+        }
+        if (!entry && callId && suppressedKeys.has("call:" + callId)) {
+            entry = suppressedKeys.get("call:" + callId);
+        }
+        if (!entry) return false;
+        if (options && options.ignoreServerVisibleStaleSuppression) {
+            const nowMs = Number(options.nowMs) || Date.now();
+            const createdAt = Number(entry.createdAt) || 0;
+            if (createdAt > 0 && nowMs - createdAt >= serverVisibleLeadSuppressionGraceMs) {
+                return false;
+            }
+        }
+        return true;
     }
 
     function dedupeLeadRowsForCount(rows) {
@@ -1623,12 +1651,16 @@
             return;
         }
 
+        const serverVisibleSuppressionOptions = {
+            ignoreServerVisibleStaleSuppression: true,
+            nowMs: Date.now(),
+        };
         const pendingRows = (Array.isArray(tasksData && tasksData.tasks)
             ? tasksData.tasks.map(normalizeLeadRowForCount)
-            : []).filter(function(r) { return !isLeadRowSuppressed(r, suppressedKeys); });
+            : []).filter(function(r) { return !isLeadRowSuppressed(r, suppressedKeys, serverVisibleSuppressionOptions); });
         const interestedRowsRaw = (Array.isArray(interestedLeadsData && interestedLeadsData.leads)
             ? interestedLeadsData.leads.map(normalizeLeadRowForCount)
-            : []).filter(function(r) { return !isLeadRowSuppressed(r, suppressedKeys); });
+            : []).filter(function(r) { return !isLeadRowSuppressed(r, suppressedKeys, serverVisibleSuppressionOptions); });
         const interestedRows = filterInterestedRowsForCount(interestedRowsRaw, pendingRows);
         const total = dedupeLeadRowsForCount([].concat(pendingRows, interestedRows)).length;
         const cachedLeadCount = readCachedSidebarCount("leads");

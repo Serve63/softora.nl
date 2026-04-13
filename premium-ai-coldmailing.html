@@ -1165,6 +1165,7 @@
             const LEADS_EMPTY_SNAPSHOT_GRACE_MS = 1000 * 60;
             const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
             const COMPLETED_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+            const SERVER_VISIBLE_LEAD_SUPPRESSION_GRACE_MS = 1000 * 60 * 2;
             const LEAD_SUPPRESSION_COOKIE_KEY = 'softora_hidden_leads_v1';
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_MODAL_REQUEST_TIMEOUT_MS = 20000;
@@ -1189,6 +1190,7 @@
             let consecutiveEmptyLeadSnapshots = 0;
             let lastNonEmptyLeadSnapshotAtMs = 0;
             const manuallySuppressedLeadKeys = new Map();
+            const suppressedLeadCreatedAtByKey = new Map();
 
             function paintLocalLeadsBadge(count) {
                 const badge = document.querySelector('[data-sidebar-count-key="leads"]');
@@ -3259,7 +3261,26 @@
                 manuallySuppressedLeadKeys.forEach((expiresAt, key) => {
                     if (Number(expiresAt) > nowMs) return;
                     manuallySuppressedLeadKeys.delete(key);
+                    suppressedLeadCreatedAtByKey.delete(key);
                 });
+            }
+
+            function inferSuppressedLeadCreatedAtMs(expiresAt) {
+                const safeExpiresAt = Number(expiresAt) || 0;
+                if (safeExpiresAt <= 0) return 0;
+                const remainingMs = Math.max(0, safeExpiresAt - Date.now());
+                const assumedTtlMs = remainingMs > MANUAL_LEAD_SUPPRESSION_TTL_MS
+                    ? COMPLETED_LEAD_SUPPRESSION_TTL_MS
+                    : MANUAL_LEAD_SUPPRESSION_TTL_MS;
+                return Math.max(0, safeExpiresAt - assumedTtlMs);
+            }
+
+            function getSuppressedLeadCreatedAtMs(key, expiresAt) {
+                const normalizedKey = String(key || '').trim();
+                if (!normalizedKey) return 0;
+                const explicitCreatedAt = Number(suppressedLeadCreatedAtByKey.get(normalizedKey) || 0);
+                if (explicitCreatedAt > 0) return explicitCreatedAt;
+                return inferSuppressedLeadCreatedAtMs(expiresAt);
             }
 
             function isPersistedSuppressionKey(key) {
@@ -3299,6 +3320,11 @@
                 const entries = Array.from(manuallySuppressedLeadKeys.entries())
                     .filter((entry) => isPersistedSuppressionKey(entry?.[0]))
                     .filter((entry) => Number(entry?.[1] || 0) > Date.now())
+                    .map((entry) => [
+                        String(entry?.[0] || '').trim(),
+                        Number(entry?.[1] || 0),
+                        getSuppressedLeadCreatedAtMs(entry?.[0], entry?.[1]),
+                    ])
                     .sort((a, b) => Number(b?.[1] || 0) - Number(a?.[1] || 0))
                     .slice(0, 40);
                 if (!entries.length) {
@@ -3315,6 +3341,7 @@
 
             function hydrateSuppressedLeadRows() {
                 manuallySuppressedLeadKeys.clear();
+                suppressedLeadCreatedAtByKey.clear();
                 try {
                     const raw = readCookieValueByName(LEAD_SUPPRESSION_COOKIE_KEY);
                     const parsed = raw ? JSON.parse(raw) : [];
@@ -3325,7 +3352,12 @@
                             const key = String(entry[0] || '').trim();
                             const expiresAt = Number(entry[1]) || 0;
                             if (!key || !isPersistedSuppressionKey(key) || expiresAt <= nowMs) return;
+                            const createdAt = Math.max(
+                                0,
+                                Math.min(Number(entry[2]) || inferSuppressedLeadCreatedAtMs(expiresAt), expiresAt)
+                            );
                             manuallySuppressedLeadKeys.set(key, expiresAt);
+                            suppressedLeadCreatedAtByKey.set(key, createdAt);
                         });
                     }
                 } catch (_) {}
@@ -3339,10 +3371,12 @@
             function suppressLeadRowLocally(item, ttlMs = MANUAL_LEAD_SUPPRESSION_TTL_MS) {
                 const keys = buildSuppressedLeadKeys(item);
                 if (!keys.length) return;
-                const expiresAt = Date.now() + Math.max(1000, Number(ttlMs) || MANUAL_LEAD_SUPPRESSION_TTL_MS);
+                const nowMs = Date.now();
+                const expiresAt = nowMs + Math.max(1000, Number(ttlMs) || MANUAL_LEAD_SUPPRESSION_TTL_MS);
                 purgeExpiredSuppressedLeadKeys();
                 keys.forEach((key) => {
                     manuallySuppressedLeadKeys.set(key, expiresAt);
+                    suppressedLeadCreatedAtByKey.set(key, nowMs);
                 });
                 persistSuppressedLeadRows();
             }
@@ -3351,13 +3385,51 @@
                 suppressLeadRowLocally(item, COMPLETED_LEAD_SUPPRESSION_TTL_MS);
             }
 
+            function clearSuppressedLeadKeys(keys) {
+                const safeKeys = Array.isArray(keys)
+                    ? keys.map((key) => String(key || '').trim()).filter(Boolean)
+                    : [];
+                if (!safeKeys.length) return;
+                safeKeys.forEach((key) => {
+                    manuallySuppressedLeadKeys.delete(key);
+                    suppressedLeadCreatedAtByKey.delete(key);
+                });
+                persistSuppressedLeadRows();
+            }
+
             function clearSuppressedLeadRow(item) {
                 const keys = buildSuppressedLeadKeys(item);
                 if (!keys.length) return;
-                keys.forEach((key) => {
-                    manuallySuppressedLeadKeys.delete(key);
+                clearSuppressedLeadKeys(keys);
+            }
+
+            function reconcileServerVisibleLeadSuppressions(rows) {
+                if (!Array.isArray(rows) || !rows.length) return 0;
+                const nowMs = Date.now();
+                const keysToClear = new Set();
+                rows.forEach((row) => {
+                    const keys = buildSuppressedLeadKeys(row);
+                    if (!keys.length) return;
+                    const shouldClearForRow = keys.some((key) => {
+                        const expiresAt = Number(manuallySuppressedLeadKeys.get(key) || 0);
+                        if (expiresAt <= nowMs) return false;
+                        const createdAt = getSuppressedLeadCreatedAtMs(key, expiresAt);
+                        if (createdAt <= 0) return false;
+                        return nowMs - createdAt >= SERVER_VISIBLE_LEAD_SUPPRESSION_GRACE_MS;
+                    });
+                    if (!shouldClearForRow) return;
+                    keys.forEach((key) => {
+                        if (Number(manuallySuppressedLeadKeys.get(key) || 0) > nowMs) {
+                            keysToClear.add(key);
+                        }
+                    });
                 });
-                persistSuppressedLeadRows();
+                if (!keysToClear.size) return 0;
+                clearSuppressedLeadKeys(Array.from(keysToClear));
+                // #region agent log
+                fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H1',location:'premium-ai-coldmailing.html:3363',message:'Cleared stale suppressions for server-visible leads',data:{clearedKeyCount:keysToClear.size,rowCount:rows.length,graceMs:SERVER_VISIBLE_LEAD_SUPPRESSION_GRACE_MS},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+                return keysToClear.size;
             }
 
             function isSuppressedLeadRow(item) {
@@ -3937,13 +4009,13 @@
                     interestError = error;
                 }
 
-                const mergedRows = filterSuppressedLeadRows(
-                    dedupe([].concat(pendingRows || [], interestedRows || []))
-                        .map((row) => applyLeadDatabaseIdentity(row, databaseByPhone))
-                        .sort(sortByDateDesc)
-                );
-                if (mergedRows.length > 0 || (!taskError && !interestError)) {
-                    return mergedRows;
+                const mergedRows = dedupe([].concat(pendingRows || [], interestedRows || []))
+                    .map((row) => applyLeadDatabaseIdentity(row, databaseByPhone))
+                    .sort(sortByDateDesc);
+                reconcileServerVisibleLeadSuppressions(mergedRows);
+                const visibleRows = filterSuppressedLeadRows(mergedRows);
+                if (visibleRows.length > 0 || (!taskError && !interestError)) {
+                    return visibleRows;
                 }
 
                 throw taskError || interestError || new Error('Leads laden mislukt');

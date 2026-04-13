@@ -19,8 +19,9 @@ test('sidebar leads badge mirrors the leads page virtual id logic for suppressed
   assert.match(themeSource, /if \(companyKey \|\| contactKey\) return `name:\$\{companyKey\}\|\$\{contactKey\}`;/);
   assert.match(themeSource, /function resolveLeadListIdForCount\(item\) \{[\s\S]*if \(explicitId > 0\) return explicitId;[\s\S]*return -\(Math\.abs\(hash \|\| 1\)\);/);
   assert.match(themeSource, /id: resolveLeadListIdForCount\(item\),/);
-  assert.match(themeSource, /if \(rowId !== 0 && suppressedKeys\.has\("id:" \+ rowId\)\) return true;/);
-  assert.match(themeSource, /if \(callId && suppressedKeys\.has\("call:" \+ callId\)\) return true;/);
+  assert.match(themeSource, /if \(rowId !== 0 && suppressedKeys\.has\("id:" \+ rowId\)\) \{[\s\S]*entry = suppressedKeys\.get\("id:" \+ rowId\);/);
+  assert.match(themeSource, /if \(!entry && callId && suppressedKeys\.has\("call:" \+ callId\)\) \{[\s\S]*entry = suppressedKeys\.get\("call:" \+ callId\);/);
+  assert.match(themeSource, /if \(options && options\.ignoreServerVisibleStaleSuppression\) \{/);
   assert.match(themeSource, /if \(!isLiveLeadsPage && total <= 0 && Number\.isFinite\(cachedLeadCount\) && cachedLeadCount > 0\) \{/);
   assert.match(themeSource, /const key = buildLeadMatchKeyForCount\(row\) \|\| \([\s\S]*callId[\s\S]*`call:\$\{callId\}`[\s\S]*rowId > 0[\s\S]*`id:\$\{rowId\}`/);
 });
