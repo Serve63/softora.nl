@@ -92,6 +92,21 @@
             position: relative;
         }
 
+        /* Alleen laadscherm: exact in het midden van het hoofdveld (naast sidebar) */
+        .main-content:has(.dossier-wrap > .loading.loading-shell:only-child) {
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dossier-wrap:has(> .loading.loading-shell:only-child) {
+            flex: 0 0 auto;
+            min-height: 0;
+            width: min(100%, var(--paper-width));
+            max-width: var(--paper-width);
+            align-self: center;
+            padding-bottom: 0;
+        }
+
         .paper-shell {
             width: min(100%, var(--paper-width));
             max-width: var(--paper-width);
@@ -587,10 +602,26 @@
                 padding: 0.75rem;
             }
 
+            .main-content:has(.dossier-wrap > .loading.loading-shell:only-child) {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                box-sizing: border-box;
+            }
+
             .dossier-wrap {
                 height: auto;
                 display: flex;
                 align-items: stretch;
+            }
+
+            .dossier-wrap:has(> .loading.loading-shell:only-child) {
+                flex: 0 0 auto;
+                min-height: 0;
+                width: min(100%, var(--paper-width));
+                max-width: var(--paper-width);
             }
 
             .paper-shell,
