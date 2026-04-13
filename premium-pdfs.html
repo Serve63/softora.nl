@@ -64,8 +64,8 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .doc-tabs {
   display: flex;
   gap: 2px;
-  flex: 1;
-  justify-content: center;
+  flex: 0 1 auto;
+  justify-content: flex-start;
   min-width: 0;
 }
 .doc-tab {
@@ -691,15 +691,15 @@ function fitPreview() {
   }
 
   const padX = 32;
-  const padY = 32;
+  const padY = 24;
   const availW = Math.max(120, stage.clientWidth - padX);
-  const availH = Math.max(120, stage.clientHeight - padY);
 
   const baseW = 595;
   const baseH = Math.max(842, a4.offsetHeight || 842);
 
-  let scale = Math.min(availW / baseW, availH / baseH, 1);
-  scale = Math.max(scale, 0.34);
+  // Keep the page visually large in fullscreen: fit on width, allow vertical scroll.
+  let scale = Math.min(availW / baseW, 1);
+  scale = Math.max(scale, 0.42);
 
   const scaledW = Math.ceil(baseW * scale);
   const scaledH = Math.ceil(baseH * scale);
@@ -710,7 +710,6 @@ function fitPreview() {
 
   a4.style.transform = 'scale(' + scale + ')';
   a4.style.transformOrigin = 'top left';
-
   stage.style.minHeight = '';
 }
 
