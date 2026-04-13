@@ -2506,6 +2506,18 @@
     modalPrimaryBtn.addEventListener('click', handleModalPrimaryAction);
     modalNoDealBtn.addEventListener('click', () => { void markActiveAppointmentNoDeal(); });
     modalSecondaryBtn.addEventListener('click', handleModalSecondaryAction);
+    modalElement.addEventListener('click', (event) => {
+        if (event.target !== modalElement) return;
+        event.preventDefault();
+        event.stopPropagation();
+    });
+    window.addEventListener('keydown', (event) => {
+        if (!modalElement.classList.contains('show')) return;
+        if (event.key !== 'Escape') return;
+        if (!isWorkspaceExitLocked()) return;
+        event.preventDefault();
+        event.stopPropagation();
+    }, true);
     if (notesImageUploadBtn && notesImageUploadInput) {
         notesImageUploadBtn.addEventListener('click', () => {
             if (workspaceBusy) return;
