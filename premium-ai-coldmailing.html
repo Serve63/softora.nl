@@ -1160,10 +1160,12 @@
             const leadsBootstrapPayload = readLeadsBootstrapPayload();
             const LEADS_MEMORY_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEADS_LOAD_RETRY_DELAY_MS = 4000;
-            const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
-            const LEAD_SUPPRESSION_STORAGE_KEY = 'softora_coldcalling_suppressed_leads_json';
+            const LEADS_EMPTY_SNAPSHOT_GRACE_ROUNDS = 2;
+            const LEADS_EMPTY_SNAPSHOT_GRACE_MS = 1000 * 60;
+            const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_MODAL_REQUEST_TIMEOUT_MS = 20000;
+            const LEAD_MODAL_AGENDA_SUBMIT_TIMEOUT_MS = 120000;
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
@@ -1181,6 +1183,8 @@
             let leadRetryTimer = null;
             let queuedReload = false;
             let lastLeadStatusTimestamp = 0;
+            let consecutiveEmptyLeadSnapshots = 0;
+            let lastNonEmptyLeadSnapshotAtMs = 0;
             const manuallySuppressedLeadKeys = new Map();
 
             function paintLocalLeadsBadge(count) {
@@ -2553,7 +2557,7 @@
                 const timeoutMs = Math.max(
                     1000,
                     Math.min(
-                        60000,
+                        180000,
                         Number(options?.timeoutMs || LEAD_MODAL_REQUEST_TIMEOUT_MS) || LEAD_MODAL_REQUEST_TIMEOUT_MS
                     )
                 );
@@ -2731,7 +2735,7 @@
                 }
 
                 setModalBusy(true);
-                setModalStatus('Afspraak wordt in agenda gezet...', '');
+                setModalStatus('Afspraak wordt in agenda gezet... dit kan tot 2 minuten duren.', '');
                 try {
                     if (isCallBackedLead) {
                         const callId = String(lead.callId || '').trim();
@@ -2755,7 +2759,8 @@
                                 company: lead.company,
                                 contact: lead.contact,
                                 phone: lead.phone,
-                            }
+                            },
+                            { timeoutMs: LEAD_MODAL_AGENDA_SUBMIT_TIMEOUT_MS }
                         );
                     } else if (hasTaskActions) {
                         await postJsonWithFallback(
@@ -2771,7 +2776,8 @@
                                 whatsappConfirmed,
                                 summary: summaryText,
                                 actor: 'Leads pagina',
-                            }
+                            },
+                            { timeoutMs: LEAD_MODAL_AGENDA_SUBMIT_TIMEOUT_MS }
                         );
                     } else {
                         throw new Error('Deze lead heeft geen geldige taak of callId.');
@@ -3183,37 +3189,11 @@
             }
 
             function persistSuppressedLeadRows() {
-                try {
-                    const entries = [];
-                    manuallySuppressedLeadKeys.forEach((expiresAt, key) => {
-                        entries.push([key, expiresAt]);
-                    });
-                    if (entries.length > 0) {
-                        localStorage.setItem(LEAD_SUPPRESSION_STORAGE_KEY, JSON.stringify(entries));
-                    } else {
-                        localStorage.removeItem(LEAD_SUPPRESSION_STORAGE_KEY);
-                    }
-                } catch (_) {}
+                purgeExpiredSuppressedLeadKeys();
             }
 
             function hydrateSuppressedLeadRows() {
-                manuallySuppressedLeadKeys.clear();
-                try {
-                    const raw = localStorage.getItem(LEAD_SUPPRESSION_STORAGE_KEY);
-                    if (raw) {
-                        const entries = JSON.parse(raw);
-                        const nowMs = Date.now();
-                        if (Array.isArray(entries)) {
-                            entries.forEach(([key, expiresAt]) => {
-                                if (key && Number(expiresAt) > nowMs) {
-                                    manuallySuppressedLeadKeys.set(String(key), Number(expiresAt));
-                                }
-                            });
-                        }
-                    }
-                } catch (_) {}
                 purgeExpiredSuppressedLeadKeys();
-                persistSuppressedLeadRows();
             }
 
             function suppressLeadRowLocally(item) {
@@ -3728,6 +3708,29 @@
                 }, Math.max(1000, Number(delayMs) || LEADS_LOAD_RETRY_DELAY_MS));
             }
 
+            function shouldKeepVisibleLeadsOnTransientEmptySnapshot(freshRows) {
+                if (!Array.isArray(freshRows) || freshRows.length > 0) {
+                    if (Array.isArray(freshRows) && freshRows.length > 0) {
+                        consecutiveEmptyLeadSnapshots = 0;
+                        lastNonEmptyLeadSnapshotAtMs = Date.now();
+                    }
+                    return false;
+                }
+                if (!Array.isArray(allLeads) || allLeads.length === 0) {
+                    consecutiveEmptyLeadSnapshots += 1;
+                    return false;
+                }
+
+                const nowMs = Date.now();
+                consecutiveEmptyLeadSnapshots += 1;
+                const ageSinceLastNonEmptyMs =
+                    lastNonEmptyLeadSnapshotAtMs > 0 ? nowMs - lastNonEmptyLeadSnapshotAtMs : Number.POSITIVE_INFINITY;
+                return (
+                    consecutiveEmptyLeadSnapshots <= LEADS_EMPTY_SNAPSHOT_GRACE_ROUNDS ||
+                    ageSinceLastNonEmptyMs <= LEADS_EMPTY_SNAPSHOT_GRACE_MS
+                );
+            }
+
             async function fetchTasksJson(url, timeoutMs) {
                 const controller = new AbortController();
                 const timeoutId = window.setTimeout(() => {
@@ -3806,17 +3809,40 @@
                 }
                 loadLeadsPromise = (async () => {
                     const freshLeads = filterSuppressedLeadRows(await fetchLeadRows());
-                    if (leadRetryTimer) {
+                    let resolvedLeads = freshLeads;
+                    let keptVisibleRowsOnTransientEmpty = false;
+                    if (shouldKeepVisibleLeadsOnTransientEmptySnapshot(freshLeads)) {
+                        keptVisibleRowsOnTransientEmpty = true;
+                        resolvedLeads = Array.isArray(allLeads) ? allLeads.slice() : [];
+                        scheduleLeadRetry(Math.min(2500, LEADS_LOAD_RETRY_DELAY_MS));
+                        console.warn(
+                            '[softora-leads] Lege live snapshot tijdelijk genegeerd om UI-flicker te voorkomen.',
+                            {
+                                consecutiveEmptyLeadSnapshots,
+                                ageSinceLastNonEmptyMs:
+                                    lastNonEmptyLeadSnapshotAtMs > 0
+                                        ? Date.now() - lastNonEmptyLeadSnapshotAtMs
+                                        : null,
+                            }
+                        );
+                    }
+                    if (leadRetryTimer && !keptVisibleRowsOnTransientEmpty) {
                         window.clearTimeout(leadRetryTimer);
                         leadRetryTimer = null;
                     }
-                    const shouldRerender = leadRowsDiffer(allLeads, freshLeads);
-                    allLeads = freshLeads;
+                    const shouldRerender = leadRowsDiffer(allLeads, resolvedLeads);
+                    allLeads = resolvedLeads;
                     if (shouldRerender || !allLeads.length) {
                         renderList();
                     }
                     persistCachedLeads(allLeads);
-                    if (allLeads.length > 0) {
+                    if (keptVisibleRowsOnTransientEmpty) {
+                        if (lastLeadStatusTimestamp > 0) {
+                            setStatusLastUpdatedNow(new Date(lastLeadStatusTimestamp));
+                        } else {
+                            setStatus('Leads staan klaar.', '');
+                        }
+                    } else if (allLeads.length > 0) {
                         setStatusLastUpdatedNow();
                     } else {
                         setStatus('Nog geen leads gevonden.', '');
@@ -3836,6 +3862,8 @@
                         const cached = loadCachedLeads();
                         if (cached.leads.length > 0) {
                             allLeads = cached.leads;
+                            consecutiveEmptyLeadSnapshots = 0;
+                            lastNonEmptyLeadSnapshotAtMs = Date.now();
                             renderList();
                             setStatusLastUpdatedNow(new Date(cached.savedAt));
                             return;
@@ -3892,6 +3920,8 @@
             const cachedLeads = loadCachedLeads();
             if (cachedLeads.leads.length > 0) {
                 allLeads = cachedLeads.leads;
+                consecutiveEmptyLeadSnapshots = 0;
+                lastNonEmptyLeadSnapshotAtMs = Date.now();
                 renderList();
                 setStatusLastUpdatedNow(new Date(cachedLeads.savedAt));
             }

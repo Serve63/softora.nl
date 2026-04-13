@@ -7,12 +7,20 @@
     const publicStorageKey = "softora_premium_public_theme_mode";
     const publicFallbackStorageKey = "softora_public_theme_mode";
     const sidebarCountCacheKey = "softora_sidebar_count_cache_v1";
+    const sidebarCountCacheState = (
+        window[sidebarCountCacheKey] &&
+        typeof window[sidebarCountCacheKey] === "object"
+    ) ? window[sidebarCountCacheKey] : Object.create(null);
+    const SIDEBAR_COUNT_CACHE_TTL_MS = 1000 * 60 * 10;
     const root = document.documentElement;
     const themeButtons = document.querySelectorAll(".theme-switch-btn[data-theme-value]");
     let premiumSessionSnapshot = null;
     let premiumSessionPromise = null;
     let premiumProfileModalRef = null;
     let premiumSidebarProfileResolved = !isPremiumPersonnelContext;
+    let sidebarLeadsRefreshRequestId = 0;
+    let sidebarLeadsZeroSnapshotStreak = 0;
+    window[sidebarCountCacheKey] = sidebarCountCacheState;
 
     window.SoftoraAI = window.SoftoraAI || {};
 
@@ -1135,9 +1143,6 @@
     }
 
     function readSuppressedLeadKeys() {
-        try {
-            localStorage.removeItem("softora_coldcalling_suppressed_leads_json");
-        } catch (_) {}
         return new Map();
     }
 
@@ -1375,11 +1380,26 @@
     }
 
     function readSidebarCountCache() {
-        void sidebarCountCacheKey;
-        return {};
+        const nowMs = Date.now();
+        Object.keys(sidebarCountCacheState).forEach(function (key) {
+            const expiresAt = Number(sidebarCountCacheState[key] && sidebarCountCacheState[key].expiresAt) || 0;
+            if (expiresAt > nowMs) return;
+            delete sidebarCountCacheState[key];
+        });
+        return sidebarCountCacheState;
     }
 
     function writeSidebarCountCache(countKey, count) {
+        const key = String(countKey || "").trim();
+        if (!key) return;
+        if (!Number.isFinite(count) || count < 0) {
+            delete sidebarCountCacheState[key];
+            return;
+        }
+        sidebarCountCacheState[key] = {
+            count: Math.max(0, Math.floor(Number(count) || 0)),
+            expiresAt: Date.now() + SIDEBAR_COUNT_CACHE_TTL_MS,
+        };
         return;
     }
 
@@ -1421,6 +1441,7 @@
     async function refreshSidebarLeadsCount() {
         const badge = getSidebarCountBadge("leads");
         if (!badge) return;
+        const requestId = ++sidebarLeadsRefreshRequestId;
         const suppressedKeys = readSuppressedLeadKeys();
         const pathName = String((window.location && window.location.pathname) || "").trim().toLowerCase();
         const liveLeadsPageCount = Number(window.__softoraLeadsPageCount);
@@ -1430,17 +1451,13 @@
             liveLeadsPageCount >= 0
         ) {
             // On the live leads page the count already reflects suppression (renderList handles it)
+            if (requestId !== sidebarLeadsRefreshRequestId) return;
+            sidebarLeadsZeroSnapshotStreak = 0;
             paintSidebarCount("leads", Math.floor(liveLeadsPageCount), {
                 singular: "open lead",
                 plural: "open leads",
             });
             return;
-        }
-
-        // If we have suppressed leads, hide the badge immediately so it never flickers
-        // with a stale value while the async fetch is in-flight.
-        if (suppressedKeys.size > 0) {
-            badge.hidden = true;
         }
 
         const [tasksData, interestedLeadsData] = await Promise.all([
@@ -1451,15 +1468,13 @@
             ]),
             fetchJsonNoStore("/api/agenda/interested-leads?limit=500"),
         ]);
+        if (requestId !== sidebarLeadsRefreshRequestId) return;
 
         if (!tasksData && !interestedLeadsData) {
-            // Only fall back to cache if nothing is suppressed
-            if (suppressedKeys.size === 0) {
-                const cachedLeadCount = readCachedSidebarCount("leads");
-                if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
-                    paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
-                    return;
-                }
+            const cachedLeadCount = readCachedSidebarCount("leads");
+            if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
+                paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
+                return;
             }
             paintSidebarCount("leads", null);
             return;
@@ -1473,6 +1488,16 @@
             : []).filter(function(r) { return !isLeadRowSuppressed(r, suppressedKeys); });
         const interestedRows = filterInterestedRowsForCount(interestedRowsRaw, pendingRows);
         const total = dedupeLeadRowsForCount([].concat(pendingRows, interestedRows)).length;
+        const cachedLeadCount = readCachedSidebarCount("leads");
+        if (total <= 0 && Number.isFinite(cachedLeadCount) && cachedLeadCount > 0) {
+            sidebarLeadsZeroSnapshotStreak += 1;
+            if (sidebarLeadsZeroSnapshotStreak <= 2) {
+                paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
+                return;
+            }
+        } else {
+            sidebarLeadsZeroSnapshotStreak = 0;
+        }
         paintSidebarCount("leads", total, { singular: "open lead", plural: "open leads" });
     }
 
@@ -1613,12 +1638,9 @@
     function initSidebarNotificationCounts() {
         if (!isPremiumPersonnelContext) return;
         if (!document.querySelector("[data-sidebar-count-key]")) return;
-        const suppressedKeys = readSuppressedLeadKeys();
-        if (suppressedKeys.size === 0) {
-            const cachedLeadCount = readCachedSidebarCount("leads");
-            if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
-                paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
-            }
+        const cachedLeadCount = readCachedSidebarCount("leads");
+        if (Number.isFinite(cachedLeadCount) && cachedLeadCount >= 0) {
+            paintSidebarCount("leads", cachedLeadCount, { singular: "open lead", plural: "open leads" });
         }
         refreshSidebarNotificationCounts();
         window.setInterval(refreshSidebarNotificationCounts, 45000);
