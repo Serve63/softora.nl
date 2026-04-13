@@ -44,6 +44,8 @@ test('premium actieve opdrachten tonen create-order modal zonder sample-design e
   const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
+  assert.match(source, /\.modal-btn\.danger \{[\s\S]*color:\s*var\(--accent-light\);/);
+  assert.match(source, /\.modal-btn\.danger:hover \{[\s\S]*color:\s*var\(--accent-light\);/);
   assert.doesNotMatch(source, /Voorbeelddesign meenemen als basis/);
   assert.doesNotMatch(source, /Gebruik dit als je de stijl\/richting van het voorbeelddesign wilt doorzetten in de echte build\./);
   assert.doesNotMatch(source, /Domeinnaam \(voor live launch\)/);
