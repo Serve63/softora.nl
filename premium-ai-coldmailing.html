@@ -2863,6 +2863,7 @@
                 setModalStatus('Lead wordt verwijderd...', '');
                 let rollbackSnapshot = null;
                 let removeLeadSucceeded = false;
+                let removeLeadPersistencePending = false;
                 let removeLeadErrorMessage = '';
                 try {
                     let removeLeadRequest = null;
@@ -2899,7 +2900,22 @@
                     rollbackSnapshot = buildLeadMutationRollbackSnapshot(taskId);
                     finalizeLeadMutation(taskId);
                     setStatus('Lead verwijderen...', '');
-                    await removeLeadRequest();
+                    const removeLeadResult = await removeLeadRequest();
+                    removeLeadPersistencePending = Boolean(removeLeadResult?.persistencePending);
+                    if (removeLeadPersistencePending) {
+                        rollbackLeadMutation(rollbackSnapshot);
+                        rollbackSnapshot = null;
+                        setStatus(
+                            'Leadverwijdering wordt nog verwerkt. De lead blijft zichtbaar tot dit overal is opgeslagen.',
+                            ''
+                        );
+                        try {
+                            await loadLeads({ silent: true });
+                        } catch (refreshError) {
+                            console.warn('[softora-leads] Pending leadverwijdering kon niet direct worden ververst.', refreshError);
+                        }
+                        return;
+                    }
                     promoteLeadRowSuppression(lead);
                     removeLeadSucceeded = true;
 
@@ -2914,7 +2930,7 @@
                     setStatus(`Lead verwijderen mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
                 } finally {
                     // #region agent log
-                    fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H5',location:'premium-ai-coldmailing.html:2841',message:'Lead remove completed',data:{taskId,hasCallBackedLead:isCallBackedLead,hasTaskActions,removeLeadSucceeded,errorMessage:removeLeadErrorMessage,remainingCount:Array.isArray(allLeads)?allLeads.length:0},timestamp:Date.now()})}).catch(()=>{});
+                    fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H5',location:'premium-ai-coldmailing.html:2841',message:'Lead remove completed',data:{taskId,hasCallBackedLead:isCallBackedLead,hasTaskActions,removeLeadSucceeded,removeLeadPersistencePending,errorMessage:removeLeadErrorMessage,remainingCount:Array.isArray(allLeads)?allLeads.length:0},timestamp:Date.now()})}).catch(()=>{});
                     // #endregion
                     setModalBusy(false);
                 }

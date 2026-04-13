@@ -51,3 +51,13 @@ for (const filePath of unifiedPersonnelThemeTargets) {
     );
   });
 }
+
+test('page smoke: premium-ai-coldmailing.html keeps pending lead removals visible until shared persist completes', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
+  assert.match(html, /removeLeadResult\?\.persistencePending/, 'Pending removal branch ontbreekt.');
+  assert.match(
+    html,
+    /Leadverwijdering wordt nog verwerkt\. De lead blijft zichtbaar tot dit overal is opgeslagen\./,
+    'Pending removal status ontbreekt.'
+  );
+});
