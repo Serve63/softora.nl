@@ -929,18 +929,31 @@
         }
 
         .slider-labels {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            position: relative;
+            height: 1.4rem;
             margin-top: 0.5rem;
         }
 
         .slider-labels span {
+            position: absolute;
+            left: var(--slider-label-position, 0%);
+            transform: translateX(-50%);
             font-size: 0.7rem;
             color: var(--text-tertiary);
             font-family: 'Oswald', sans-serif;
             text-transform: uppercase;
             letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        .slider-labels span:first-child {
+            left: 0;
+            transform: translateX(0);
+        }
+
+        .slider-labels span:last-child {
+            left: 100%;
+            transform: translateX(-100%);
         }
 
         .slider-labels .slider-label-infinity {
@@ -1738,11 +1751,11 @@
                             </div>
                             <input type="range" min="1" max="250" value="1" step="1" id="leadSlider" data-custom-value-mode="sync-slider">
                             <div class="slider-labels">
-                                <span>1</span>
-                                <span>50</span>
-                                <span>100</span>
-                                <span>150</span>
-                                <span class="slider-label-infinity">&infin;</span>
+                                <span data-slider-label-value="1">1</span>
+                                <span data-slider-label-value="50">50</span>
+                                <span data-slider-label-value="100">100</span>
+                                <span data-slider-label-value="150">150</span>
+                                <span class="slider-label-infinity" data-slider-label-value="250">&infin;</span>
                             </div>
                         </div>
                     </div>

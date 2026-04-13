@@ -528,17 +528,31 @@
         }
 
         .slider-labels {
-            display: flex;
-            justify-content: space-between;
+            position: relative;
+            height: 1.4rem;
             margin-top: 0.5rem;
         }
 
         .slider-labels span {
+            position: absolute;
+            left: var(--slider-label-position, 0%);
+            transform: translateX(-50%);
             font-size: 0.7rem;
             color: var(--text-tertiary);
             font-family: 'Oswald', sans-serif;
             text-transform: uppercase;
             letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        .slider-labels span:first-child {
+            left: 0;
+            transform: translateX(0);
+        }
+
+        .slider-labels span:last-child {
+            left: 100%;
+            transform: translateX(-100%);
         }
 
         /* Price input */
@@ -912,9 +926,9 @@
                             </div>
                             <input type="range" min="5" max="50" value="15" step="5" id="leadSlider" class="magnetic">
                             <div class="slider-labels">
-                                <span>5</span>
-                                <span>25</span>
-                                <span>50</span>
+                                <span data-slider-label-value="5">5</span>
+                                <span data-slider-label-value="25">25</span>
+                                <span data-slider-label-value="50">50</span>
                             </div>
                         </div>
                     </div>

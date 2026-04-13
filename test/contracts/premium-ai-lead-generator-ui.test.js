@@ -29,7 +29,14 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<option value="business_software" data-dot-color="blue" disabled>🔒 Bedrijfssoftware<\/option>/);
   assert.match(pageSource, /<option value="unlimited" selected>Geen limiet<\/option>/);
   assert.doesNotMatch(pageSource, /<option value="custom">Aangepast<\/option>/);
+  assert.match(
+    pageSource,
+    /<div class="slider-labels">\s*<span data-slider-label-value="1">1<\/span>\s*<span data-slider-label-value="50">50<\/span>\s*<span data-slider-label-value="100">100<\/span>\s*<span data-slider-label-value="150">150<\/span>\s*<span class="slider-label-infinity" data-slider-label-value="250">&infin;<\/span>\s*<\/div>/
+  );
   assert.match(pageSource, /window\.openSiteInputDialog = openSiteInputDialog;/);
+  assert.match(pageSource, /\.slider-labels\s*\{[\s\S]*position:\s*relative;[\s\S]*height:\s*1\.4rem;/);
+  assert.match(pageSource, /\.slider-labels span\s*\{[\s\S]*position:\s*absolute;[\s\S]*left:\s*var\(--slider-label-position, 0%\);[\s\S]*transform:\s*translateX\(-50%\);/);
+  assert.match(pageSource, /\.slider-labels span:last-child\s*\{[\s\S]*left:\s*100%;[\s\S]*transform:\s*translateX\(-100%\);/);
   assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="accent"\] \.site-select-trigger::before \{[\s\S]*background:\s*var\(--accent-light\);/);
   assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="blue"\] \.site-select-trigger::before \{[\s\S]*background:\s*#2563eb;/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--lead-list\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*3;/);
@@ -64,6 +71,9 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /looksLikeDirectSpeechConversationSummary/);
   assert.match(dashboardSource, /Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst/);
   assert.match(dashboardSource, /const sharedCallSummaryCacheByCallId = Object\.create\(null\);/);
+  assert.match(dashboardSource, /function positionLeadSliderLabels\(sliderEl = leadSlider\) \{/);
+  assert.match(dashboardSource, /labelEl\.style\.setProperty\('--slider-label-position', `\$\{ratio \* 100\}%`\);/);
+  assert.match(dashboardSource, /positionLeadSliderLabels\(\);\s*renderLeadAmountDisplay\(\);/);
   assert.match(dashboardSource, /function readSharedCallSummaryCache\(\) \{\s*return sharedCallSummaryCacheByCallId;\s*\}/);
   assert.match(dashboardSource, /Noem de medewerker van Softora bij naam als Ruben Nijhuis wanneer die in de samenvatting voorkomt\./);
   assert.match(dashboardSource, /Gebruik nooit het woord "agent"\./);

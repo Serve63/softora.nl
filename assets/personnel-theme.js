@@ -12,6 +12,7 @@
     let premiumSessionSnapshot = null;
     let premiumSessionPromise = null;
     let premiumProfileModalRef = null;
+    let premiumSidebarProfileResolved = !isPremiumPersonnelContext;
 
     window.SoftoraAI = window.SoftoraAI || {};
 
@@ -52,8 +53,15 @@
     let loadingStateReleased = false;
     function scheduleLoadingStateRelease() {
         if (loadingStateReleased) return;
+        if (!premiumSidebarProfileResolved) return;
         loadingStateReleased = true;
         requestAnimationFrame(releaseLoadingState);
+    }
+
+    function markPremiumSidebarProfileResolved() {
+        if (premiumSidebarProfileResolved) return;
+        premiumSidebarProfileResolved = true;
+        scheduleLoadingStateRelease();
     }
 
     if (document.readyState === "interactive" || document.readyState === "complete") {
@@ -701,7 +709,10 @@
         const avatarEl = document.querySelector("[data-sidebar-avatar]");
         const triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
 
-        if (!nameEl || !roleEl || !avatarEl || !triggerEl) return;
+        if (!nameEl || !roleEl || !avatarEl || !triggerEl) {
+            markPremiumSidebarProfileResolved();
+            return;
+        }
 
         const resolvedSession = session && session.authenticated
             ? session
@@ -719,6 +730,7 @@
             `Profiel bewerken van ${String(resolvedSession.displayName || "Softora Premium")}`
         );
         paintSidebarAvatar(avatarEl, resolvedSession);
+        markPremiumSidebarProfileResolved();
     }
 
     async function requestJson(url, options) {
@@ -1035,7 +1047,11 @@
     function initPremiumSidebarProfile() {
         if (!isPremiumPersonnelContext) return;
         const triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
-        if (!triggerEl || triggerEl.dataset.profileInit === "1") return;
+        if (!triggerEl) {
+            markPremiumSidebarProfileResolved();
+            return;
+        }
+        if (triggerEl.dataset.profileInit === "1") return;
         triggerEl.dataset.profileInit = "1";
         triggerEl.addEventListener("click", function () {
             openPremiumProfileModal();

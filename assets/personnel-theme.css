@@ -45,6 +45,11 @@
     transition-delay: 0ms !important;
 }
 
+:root[data-personnel-loading="true"] [data-sidebar-profile-trigger] {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
 
 .sidebar-theme {
     display: none !important;

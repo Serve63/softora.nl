@@ -26,4 +26,13 @@ test('premium profielmodal heeft een werkende annuleerknop en subtielere stijl',
     cssSource,
     /\.premium-profile-primary-btn,\s*\.premium-profile-secondary-btn\s*\{[\s\S]*min-height:\s*40px;[\s\S]*border-radius:\s*999px;/s
   );
+  assert.match(jsSource, /let premiumSidebarProfileResolved = !isPremiumPersonnelContext;/);
+  assert.match(jsSource, /function markPremiumSidebarProfileResolved\(\) \{/);
+  assert.match(jsSource, /if \(!premiumSidebarProfileResolved\) return;/);
+  assert.match(jsSource, /paintSidebarAvatar\(avatarEl, resolvedSession\);\s*markPremiumSidebarProfileResolved\(\);/s);
+  assert.match(jsSource, /if \(!triggerEl\) \{\s*markPremiumSidebarProfileResolved\(\);\s*return;\s*\}/s);
+  assert.match(
+    cssSource,
+    /:root\[data-personnel-loading="true"\] \[data-sidebar-profile-trigger\] \{[\s\S]*opacity:\s*0 !important;[\s\S]*pointer-events:\s*none !important;/s
+  );
 });

@@ -589,6 +589,22 @@
     leadValueEl.innerHTML = `${displayAmount} <span>mensen</span>`;
   }
 
+  function positionLeadSliderLabels(sliderEl = leadSlider) {
+    if (!(sliderEl instanceof HTMLInputElement)) return;
+    const labelsWrap = sliderEl.parentElement?.querySelector('.slider-labels');
+    if (!labelsWrap) return;
+    const min = Math.max(0, Math.round(parseNumber(sliderEl.min, 0)));
+    const max = Math.max(min, Math.round(parseNumber(sliderEl.max, min)));
+    labelsWrap.querySelectorAll('[data-slider-label-value]').forEach((labelEl) => {
+      const rawValue = String(labelEl.getAttribute('data-slider-label-value') || '').trim();
+      const parsedValue = Math.round(parseNumber(rawValue, NaN));
+      if (!Number.isFinite(parsedValue)) return;
+      const clampedValue = Math.max(min, Math.min(max, parsedValue));
+      const ratio = max > min ? (clampedValue - min) / (max - min) : 0;
+      labelEl.style.setProperty('--slider-label-position', `${ratio * 100}%`);
+    });
+  }
+
   function readPositiveIntStorage(key, fallback = null) {
     const raw = readStorage(key).trim();
     if (!raw) return fallback;
@@ -736,6 +752,7 @@
       syncCustomSelectUi(stackEl);
     }
 
+    positionLeadSliderLabels();
     renderLeadAmountDisplay();
   }
 
