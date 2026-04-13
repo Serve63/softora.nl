@@ -529,19 +529,20 @@
 
         .slider-labels {
             position: relative;
-            height: 1.4rem;
-            margin-top: 0.5rem;
+            height: 1.55rem;
+            margin-top: 0.6rem;
         }
 
         .slider-labels span {
             position: absolute;
             left: var(--slider-label-position, 0%);
             transform: translateX(-50%);
-            font-size: 0.7rem;
+            font-size: 0.78rem;
+            font-weight: 500;
             color: var(--text-tertiary);
-            font-family: 'Oswald', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
+            font-family: 'Inter', sans-serif;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.02em;
             white-space: nowrap;
         }
 
@@ -1007,6 +1008,26 @@
     </div>
 
     <script>
+        function syncSliderTickLabels() {
+            const el = document.getElementById('leadSlider');
+            const wrap = el?.parentElement?.querySelector('.slider-labels');
+            if (!el || !wrap) return;
+            const min = Number(el.min);
+            const max = Number(el.max);
+            if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
+            const denom = max - min;
+            wrap.querySelectorAll('[data-slider-label-value]').forEach((tick) => {
+                const v = Number(tick.getAttribute('data-slider-label-value'));
+                if (!Number.isFinite(v)) return;
+                if (tick === wrap.firstElementChild || tick === wrap.lastElementChild) {
+                    tick.style.removeProperty('--slider-label-position');
+                    return;
+                }
+                const pct = ((v - min) / denom) * 100;
+                tick.style.setProperty('--slider-label-position', `${pct}%`);
+            });
+        }
+
         const slider = document.getElementById('leadSlider');
         const sliderValue = document.getElementById('leadValue');
         sliderValue.style.cursor = 'pointer';
@@ -1065,6 +1086,7 @@
             }
         });
         renderSliderValue();
+        syncSliderTickLabels();
 
         let isRunning = false;
         let callInterval = null;
