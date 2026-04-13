@@ -1051,7 +1051,7 @@
         /* Stats bar */
         .stats-bar {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 1.5rem;
             margin-bottom: 3rem;
         }
@@ -1070,7 +1070,6 @@
         .stat-card:nth-child(2) { animation-delay: 0.6s; }
         .stat-card:nth-child(3) { animation-delay: 0.7s; }
         .stat-card:nth-child(4) { animation-delay: 0.8s; }
-        .stat-card:nth-child(5) { animation-delay: 0.9s; }
 
         .stat-card-label {
             font-family: 'Oswald', sans-serif;
@@ -1838,10 +1837,6 @@
                     <div class="stat-card-value accent" id="statOpened" style="color: var(--accent-light);">0</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card-label">Gereageerd</div>
-                    <div class="stat-card-value" id="statReplied">0</div>
-                </div>
-                <div class="stat-card">
                     <div class="stat-card-label">Interesse</div>
                     <div class="stat-card-value green" id="statInterested" style="color: var(--green);">0</div>
                 </div>
@@ -2296,7 +2291,6 @@
         let callInterval = null;
         let totalSent = 0;
         let totalOpened = 0;
-        let totalReplied = 0;
         let totalInterested = 0;
 
         const companies = [
@@ -2344,12 +2338,10 @@
 
             if (roll < 0.15) {
                 totalOpened++;
-                totalReplied++;
                 totalInterested++;
                 addLog('success', `<strong>${company}</strong> — Mail geopend; prospect reageerde positief en toonde duidelijke interesse.`);
             } else if (roll < 0.35) {
                 totalOpened++;
-                totalReplied++;
                 addLog('call', `<strong>${company}</strong> — Mail geopend; prospect reageerde met inhoudelijke vragen.`);
             } else if (roll < 0.6) {
                 totalOpened++;
@@ -2359,7 +2351,6 @@
             }
 
             document.getElementById('statOpened').textContent = totalOpened;
-            document.getElementById('statReplied').textContent = totalReplied;
             document.getElementById('statInterested').textContent = totalInterested;
             document.getElementById('statConversion').textContent = totalSent > 0
                 ? Math.round((totalInterested / totalSent) * 100) + '%'
