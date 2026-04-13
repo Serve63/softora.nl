@@ -3,319 +3,431 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/assets/iphone-optimizations.css">
-<title>Softora | Boekhouding</title>
-<link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
-<script>
-    (function () {
-        document.documentElement.setAttribute("data-personnel-loading", "true");
-        try {
-            var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
-            var storageKey = isPremiumPersonnel
-                ? "softora_premium_personnel_theme_mode"
-                : "softora_software_personnel_theme_mode";
-            document.documentElement.setAttribute("data-theme-mode", "light");
-            document.documentElement.setAttribute("data-theme", "light");
-        } catch (error) {
-            /* ignore storage errors */
-        }
-    })();
-</script>
-<script src="assets/personnel-theme.js?v=20260411a" defer></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>Boekhouding - Softora.nl</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #f6f2ec;
-  --sidebar-bg: #fcfaf7;
-  --crimson: #8b2252;
-  --crimson-light: #a62d65;
-  --crimson-soft: rgba(139, 34, 82, 0.08);
-  --text-dark: #1a1a2e;
-  --text-mid: #606272;
-  --text-light: #9a9cac;
-  --border: rgba(20, 24, 35, 0.09);
-  --white: #ffffff;
-  --shadow: 0 18px 40px rgba(26, 26, 46, 0.08);
+  --bg: #f0ede8; --card: #fff; --tag: #f5f0eb; --border: #e2ddd6;
+  --crimson: #9b2355; --clight: #c4346a; --dark: #1a1a2e;
+  --mid: #555; --light: #999; --green: #16733c; --orange: #b45a00; --red: #c0392b;
 }
+body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; }
 
-html, body {
-  min-height: 100%;
-}
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: block; }
 
-body {
-  font-family: 'Inter', sans-serif;
-  background: radial-gradient(circle at top left, rgba(166, 45, 101, 0.06), transparent 28%), var(--bg);
-  color: var(--text-dark);
-  min-height: 100vh;
-}
+/* -- SCHERM 1: OVERZICHT -- */
+#screen-overzicht { padding: 40px 48px 60px; }
 
-.noise-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-}
+.logo { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); margin-bottom: 6px; }
+.page-title { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.page-sub { font-size: 13px; color: var(--light); margin-top: 3px; margin-bottom: 32px; }
 
-.dashboard-layout {
-  display: flex;
-  min-height: 100vh;
-}
+.year-nav { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+.year-label { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+.btn-yr { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--mid); transition: all .15s; }
+.btn-yr:hover { border-color: var(--crimson); color: var(--crimson); }
+.btn-yr svg { width: 13px; height: 13px; }
 
-.sidebar {
-  width: 280px;
-  min-height: 100vh;
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  z-index: 10;
-}
+.section-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--light); margin-bottom: 12px; margin-top: 24px; }
+.section-label:first-child { margin-top: 0; }
 
-.sidebar-logo {
-  padding: 30px 28px 22px;
-  font-family: 'Oswald', sans-serif;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: var(--crimson);
-  border-bottom: 1px solid var(--border);
-  text-decoration: none;
-}
+/* AANGIFTE RIJEN */
+.aangifte-list { display: flex; flex-direction: column; gap: 8px; }
 
-.sidebar-nav {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.sidebar-section-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--text-light);
-  padding: 22px 28px 8px;
-  text-transform: uppercase;
-}
-
-.nav-item {
-  display: flex;
+.aangifte-row {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: grid;
+  grid-template-columns: 40px 1fr 100px 160px 110px 32px;
   align-items: center;
-  gap: 12px;
-  padding: 11px 28px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-mid);
+  padding: 14px 18px;
   cursor: pointer;
-  transition: all 0.15s ease;
-  text-decoration: none;
-  position: relative;
+  transition: all .15s;
 }
+.aangifte-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,.07); border-color: rgba(155,35,85,.2); }
+.aangifte-row.done { border-color: rgba(22,115,60,.2); background: rgba(22,115,60,.02); }
+.aangifte-row.urgent { border-color: rgba(192,57,43,.25); }
+.aangifte-row.soon { border-color: rgba(180,90,0,.2); }
 
-.nav-item:hover {
-  color: var(--text-dark);
-  background: rgba(0, 0, 0, 0.025);
-}
+.check-cell { display: flex; align-items: center; }
+.check-box { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; flex-shrink: 0; }
+.check-box:hover { border-color: var(--green); }
+.check-box.checked { background: var(--green); border-color: var(--green); }
+.check-box svg { width: 10px; height: 10px; color: #fff; opacity: 0; transition: opacity .15s; }
+.check-box.checked svg { opacity: 1; }
 
-.nav-item.active {
-  color: var(--text-dark);
-  background: rgba(139, 34, 82, 0.06);
-  font-weight: 600;
-}
+.info-cell { padding-right: 16px; }
+.row-name { font-size: 13px; font-weight: 600; color: var(--dark); margin-bottom: 2px; }
+.row-period { font-size: 11px; color: var(--light); }
 
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--crimson);
-  border-radius: 0 2px 2px 0;
-}
+.files-cell { font-size: 12px; color: var(--mid); text-align: center; }
+.files-cell strong { display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; color: var(--dark); line-height: 1; }
 
-.nav-icon {
-  width: 18px;
-  height: 18px;
-  opacity: 0.62;
+.deadline-cell { text-align: right; }
+.dl-label { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); margin-bottom: 2px; }
+.dl-date { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 800; }
+
+.badge-cell { display: flex; justify-content: flex-end; }
+.badge { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 4px; white-space: nowrap; font-family: 'Barlow Condensed', sans-serif; letter-spacing: .5px; }
+.badge-done     { background: rgba(22,115,60,.1); color: var(--green); }
+.badge-urgent   { background: rgba(192,57,43,.1); color: var(--red); }
+.badge-soon     { background: rgba(180,90,0,.1);  color: var(--orange); }
+.badge-future   { background: rgba(0,0,0,.05);    color: var(--light); }
+
+.arrow-cell { display: flex; justify-content: flex-end; color: var(--light); }
+.aangifte-row:hover .arrow-cell { color: var(--crimson); }
+
+/* -- SCHERM 2: MAP -- */
+#screen-map { display: none; flex-direction: column; }
+#screen-map.active { display: flex; }
+
+.map-bar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 48px;
+  height: 52px;
+  display: flex; align-items: center;
+  gap: 16px;
+  position: sticky; top: 0; z-index: 10;
   flex-shrink: 0;
 }
+.back-btn { display: flex; align-items: center; gap: 7px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--light); background: none; border: none; cursor: pointer; transition: color .15s; padding: 0; }
+.back-btn:hover { color: var(--crimson); }
+.back-btn svg { width: 13px; height: 13px; }
+.map-bar-title { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--dark); }
+.map-bar-period { font-size: 12px; color: var(--light); margin-left: 4px; }
+.map-bar-right { margin-left: auto; display: flex; gap: 10px; }
+.btn-add { display: flex; align-items: center; gap: 7px; padding: 7px 16px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+.btn-add:hover { background: var(--clight); }
+.btn-add svg { width: 12px; height: 12px; }
 
-.nav-item.active .nav-icon,
-.nav-item:hover .nav-icon {
-  opacity: 1;
-}
+.map-body { padding: 32px 48px 60px; flex: 1; }
 
-.sidebar-footer {
-  flex-shrink: 0;
-  padding: 1.5rem 2rem;
-  border-top: 1px solid var(--border);
-}
+/* DROPZONE */
+.dropzone { border: 1.5px dashed var(--border); border-radius: 6px; padding: 28px; text-align: center; cursor: pointer; transition: all .18s; margin-bottom: 24px; background: var(--card); }
+.dropzone:hover, .dropzone.over { border-color: var(--crimson); background: rgba(155,35,85,.02); }
+.dropzone svg { width: 24px; height: 24px; color: var(--light); margin: 0 auto 8px; display: block; }
+.dropzone p { font-size: 13px; color: var(--light); line-height: 1.6; }
+.dropzone span { color: var(--crimson); font-weight: 600; }
 
-.sidebar-user {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-}
+/* FILES */
+.files-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.files-title { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--light); }
+.files-count { font-size: 11px; color: var(--light); }
 
-.sidebar-avatar {
-  width: 38px;
-  height: 38px;
-  background: var(--crimson);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Oswald', sans-serif;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #fff;
-  flex-shrink: 0;
-}
+.files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 28px; }
 
-.sidebar-user-info {
-  flex: 1;
-  min-width: 0;
-}
+.file-tile { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 14px 12px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; transition: all .15s; position: relative; text-align: center; }
+.file-tile:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); border-color: rgba(155,35,85,.2); transform: translateY(-1px); }
 
-.sidebar-user-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-dark);
-}
+.file-doc { position: relative; width: 40px; height: 48px; }
+.file-doc svg.doc-bg { width: 40px; height: 48px; position: absolute; top: 0; left: 0; }
+.file-doc-ext { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); font-size: 7px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: #fff; background: rgba(0,0,0,.2); padding: 1px 4px; border-radius: 2px; white-space: nowrap; }
 
-.sidebar-user-role {
-  font-size: 0.78rem;
-  color: var(--text-light);
-}
+.file-name { font-size: 11px; font-weight: 600; color: var(--dark); line-height: 1.3; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-size { font-size: 10px; color: var(--light); }
 
-.logout-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-light);
-  text-decoration: none;
-}
+.file-del { position: absolute; top: 5px; right: 5px; width: 18px; height: 18px; background: none; border: none; cursor: pointer; color: var(--light); display: none; align-items: center; justify-content: center; border-radius: 3px; transition: all .15s; }
+.file-tile:hover .file-del { display: flex; }
+.file-del:hover { color: var(--red); background: rgba(192,57,43,.08); }
+.file-del svg { width: 10px; height: 10px; }
 
-.logout-btn svg {
-  width: 18px;
-  height: 18px;
-}
+.files-empty { text-align: center; padding: 40px 0; color: var(--light); }
+.files-empty svg { width: 32px; height: 32px; opacity: .2; margin: 0 auto 10px; display: block; }
+.files-empty p { font-size: 13px; }
 
-.main-content {
-  flex: 1;
-  margin-left: 280px;
-  padding: 3rem;
-  display: block;
-}
+/* NOTES */
+.notes-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--light); margin-bottom: 10px; }
+.notes-ta { width: 100%; border: 1px solid var(--border); border-radius: 5px; padding: 10px 12px; font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--dark); background: var(--card); resize: none; outline: none; min-height: 80px; transition: border-color .15s; line-height: 1.6; }
+.notes-ta:focus { border-color: var(--crimson); }
+.btn-save { margin-top: 10px; display: flex; align-items: center; gap: 7px; padding: 8px 18px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+.btn-save:hover { background: var(--clight); }
 
-.coming-shell {
-  width: 100%;
-  max-width: 980px;
-  min-height: auto;
-}
-
-.coming-title {
-  font-family: 'Oswald', sans-serif;
-  font-size: clamp(2.8rem, 7vw, 5.6rem);
-  font-weight: 700;
-  line-height: 0.96;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--text-dark);
-}
-
-@media (max-width: 920px) {
-  .sidebar {
-    position: static;
-    width: 100%;
-    min-height: auto;
-  }
-
-  .dashboard-layout {
-    flex-direction: column;
-  }
-
-  .main-content {
-    margin-left: 0;
-    padding: 1.5rem;
-  }
-
-  .coming-shell {
-    min-height: auto;
-  }
-}
-
-@media (max-width: 640px) {
-}
+/* TOAST */
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--dark); color: #fff; padding: 10px 16px; border-radius: 5px; font-size: 12px; font-weight: 500; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; z-index: 99; }
+.toast.show { opacity: 1; transform: translateY(0); }
 </style>
 </head>
 <body>
-<div class="noise-overlay"></div>
-<div class="dashboard-layout" data-sidebar-shell="canonical">
-  <aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">
-    <a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
-    <nav class="sidebar-nav">
-      <div class="sidebar-section sidebar-flow-section">
-        <div class="sidebar-section-label">Overzicht</div>
-        <a href="/premium-personeel-dashboard" class="sidebar-link magnetic" data-sidebar-key="dashboard"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span class="sidebar-link-text">Dashboard</span></a>
-        <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic" data-sidebar-key="active_orders"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="sidebar-link-text">Actieve Opdrachten</span></a>
-        <a href="/premium-personeel-agenda" class="sidebar-link magnetic" data-sidebar-key="agenda"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg><span class="sidebar-link-text">Agenda</span></a>
-        <a href="/premium-ai-coldmailing" class="sidebar-link magnetic" data-sidebar-key="leads"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg><span class="sidebar-link-text">Leads</span><span class="sidebar-notification-badge" data-sidebar-count-key="leads" hidden>0</span></a>
-        <a href="/premium-ai-lead-generator" class="sidebar-link magnetic" data-sidebar-key="coldcalling"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg><span class="sidebar-link-text">Coldcalling</span></a>
-        <a href="/premium-bevestigingsmails" class="sidebar-link magnetic" data-sidebar-key="coldmailing"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Coldmailing</span></a>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-section-label">Beheer</div>
-        <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
-        <a href="/premium-mailbox" class="sidebar-link magnetic" data-sidebar-key="mailbox"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Mailbox</span></a>
-        <a href="/premium-seo" class="sidebar-link magnetic" data-sidebar-key="seo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span class="sidebar-link-text">SEO</span></a>
-        <a href="/premium-pakketten" class="sidebar-link magnetic" data-sidebar-key="packages"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg><span class="sidebar-link-text">Pakketten</span></a>
-        <a href="/premium-pdfs" class="sidebar-link magnetic" data-sidebar-key="pdfs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span class="sidebar-link-text">PDF'S</span></a>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-section-label">Extra</div>
-        <a href="/premium-wachtwoordenregister" class="sidebar-link magnetic" data-sidebar-key="passwords"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg><span class="sidebar-link-text">Wachtwoordenregister</span></a>
-        <a href="/premium-maandelijkse-kosten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Maandelijkse kosten</span></a>
-        <a href="/premium-boekhouding" class="sidebar-link magnetic active" data-sidebar-key="bookkeeping"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg><span class="sidebar-link-text">Boekhouding</span></a>
-        <a href="/premium-kladblok" class="sidebar-link magnetic" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
-        <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
-      </div>
-    </nav>
-    <div class="sidebar-footer">
-      <div class="sidebar-user">
-        <button type="button" class="sidebar-user-trigger" data-sidebar-profile-trigger="1" aria-label="Profiel bewerken">
-          <div class="sidebar-avatar" data-sidebar-avatar>SP</div>
-          <div class="sidebar-user-info">
-            <div class="sidebar-user-name" data-sidebar-user-name>Softora Premium</div>
-            <div class="sidebar-user-role" data-sidebar-user-role>Full Acces</div>
-          </div>
-        </button>
-        <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-        </a>
-      </div>
-    </div>
-  </aside>
 
-  <main class="main-content">
-    <div class="topbar">
-      <div class="topbar-left">
-        <h1>Boekhouding</h1>
-        <p>Boekhoudoverzichten en koppelingen worden hier binnenkort in dezelfde premium omgeving beschikbaar.</p>
-      </div>
-    </div>
+<!-- SCHERM 1: OVERZICHT -->
+<div class="screen active" id="screen-overzicht">
+  <div class="logo">SOFTORA.NL</div>
+  <div class="page-title">Boekhouding</div>
+  <div class="page-sub">Fiscale verplichtingen en aangiftekalender voor je VOF</div>
 
-  </main>
+  <div class="year-nav">
+    <button class="btn-yr" onclick="changeYear(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <div class="year-label" id="year-label">2026</div>
+    <button class="btn-yr" onclick="changeYear(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg></button>
+  </div>
+
+  <div id="list-wrap"></div>
 </div>
+
+<!-- SCHERM 2: MAP -->
+<div class="screen" id="screen-map">
+  <div class="map-bar">
+    <button class="back-btn" onclick="goBack()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+      Terug
+    </button>
+    <div>
+      <span class="map-bar-title" id="map-title"></span>
+      <span class="map-bar-period" id="map-period"></span>
+    </div>
+    <div class="map-bar-right">
+      <button class="btn-add" onclick="document.getElementById('file-inp').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Toevoegen
+      </button>
+      <input type="file" multiple id="file-inp" style="display:none" onchange="addFiles(this.files)">
+    </div>
+  </div>
+
+  <div class="map-body">
+
+    <div class="files-header">
+      <div class="files-title">Bestanden</div>
+      <div class="files-count" id="files-count"></div>
+    </div>
+    <div class="files-grid" id="files-grid"></div>
+
+    <div class="notes-label">Notities</div>
+    <textarea class="notes-ta" id="notes-ta" placeholder="Bijv. referentienummer, ingestuurde bedragen, bijzonderheden..."></textarea>
+    <button class="btn-save" onclick="saveNotes()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>
+      Opslaan
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let year = new Date().getFullYear();
+let openId = null;
+
+// STATE
+function load() { try { return JSON.parse(localStorage.getItem('bkh3')||'{}'); } catch { return {}; } }
+function save() { try { localStorage.setItem('bkh3', JSON.stringify(st)); } catch {} }
+let st = load();
+function entry(id) { return st[id] || { checked:false, files:[], notes:'' }; }
+function upd(id, d) { st[id] = { ...entry(id), ...d }; save(); }
+
+// AANGIFTES
+function aangiftes(y) {
+  return [
+    { id:`btw1-${y}`, naam:'BTW Aangifte', period:`1e kwartaal ${y} (jan - mrt)`, deadline:`${y}-04-30`, cat:'Omzetbelasting (BTW)' },
+    { id:`btw2-${y}`, naam:'BTW Aangifte', period:`2e kwartaal ${y} (apr - jun)`, deadline:`${y}-07-31`, cat:'Omzetbelasting (BTW)' },
+    { id:`btw3-${y}`, naam:'BTW Aangifte', period:`3e kwartaal ${y} (jul - sep)`, deadline:`${y}-10-31`, cat:'Omzetbelasting (BTW)' },
+    { id:`btw4-${y}`, naam:'BTW Aangifte', period:`4e kwartaal ${y} (okt - dec)`, deadline:`${y+1}-01-31`, cat:'Omzetbelasting (BTW)' },
+    { id:`ib-${y}`,   naam:'Inkomstenbelasting', period:`Belastingjaar ${y}`,      deadline:`${y+1}-05-01`, cat:'Inkomstenbelasting' },
+    { id:`icp1-${y}`, naam:'ICP Opgave', period:`1e kwartaal ${y}`,               deadline:`${y}-04-30`, cat:'Overige Opgaven' },
+  ];
+}
+
+// HELPERS
+function daysLeft(d) { const n=new Date(); n.setHours(0,0,0,0); const t=new Date(d); t.setHours(0,0,0,0); return Math.round((t-n)/86400000); }
+function fmtDate(s) { if(!s) return '-'; const[y,m,d]=s.split('-'); const mo=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec']; return `${parseInt(d,10)} ${mo[m-1]} ${y}`; }
+function fmtSize(b) { return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
+
+function badge(id, deadline) {
+  const e = entry(id);
+  if (e.checked) return { cls:'badge-done', txt:'Ingediend' };
+  const d = daysLeft(deadline);
+  if (d < 0)   return { cls:'badge-urgent', txt:'Verlopen' };
+  if (d <= 14) return { cls:'badge-urgent', txt:`Nog ${d} dagen` };
+  if (d <= 30) return { cls:'badge-soon',   txt:`Nog ${d} dagen` };
+  return { cls:'badge-future', txt:`Nog ${d} dagen` };
+}
+
+function rowClass(id, deadline) {
+  const e = entry(id);
+  if (e.checked) return 'done';
+  const d = daysLeft(deadline);
+  if (d <= 14) return 'urgent';
+  if (d <= 30) return 'soon';
+  return '';
+}
+
+// RENDER OVERZICHT
+function renderList() {
+  document.getElementById('year-label').textContent = year;
+  const all = aangiftes(year);
+  const undone = all.filter(a => !entry(a.id).checked).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+  const done   = all.filter(a =>  entry(a.id).checked).sort((a,b)=>new Date(a.deadline)-new Date(b.deadline));
+
+  let html = '';
+
+  // Group undone by category
+  if (undone.length) {
+    const cats = [...new Set(undone.map(a => a.cat))];
+    cats.forEach(cat => {
+      const items = undone.filter(a => a.cat === cat);
+      html += `<div class="section-label">${cat}</div><div class="aangifte-list">`;
+      html += items.map(a => row(a)).join('');
+      html += `</div>`;
+    });
+  }
+  if (done.length) {
+    html += `<div class="section-label">Ingediend</div><div class="aangifte-list">`;
+    html += done.map(a => row(a)).join('');
+    html += `</div>`;
+  }
+
+  document.getElementById('list-wrap').innerHTML = html;
+}
+
+function row(a) {
+  const e = entry(a.id);
+  const fc = (e.files||[]).length;
+  const b = badge(a.id, a.deadline);
+  const dlColor = e.checked?'var(--green)':daysLeft(a.deadline)<=14?'var(--red)':daysLeft(a.deadline)<=30?'var(--orange)':'var(--dark)';
+
+  return `<div class="aangifte-row ${rowClass(a.id,a.deadline)}" onclick="openMap('${a.id}')">
+    <div class="check-cell" onclick="event.stopPropagation()">
+      <div class="check-box ${e.checked?'checked':''}" onclick="toggleCheck('${a.id}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+    <div class="info-cell">
+      <div class="row-name">${a.naam}</div>
+      <div class="row-period">${a.period}</div>
+    </div>
+    <div class="files-cell"><strong>${fc}</strong>bestand${fc!==1?'en':''}</div>
+    <div class="deadline-cell">
+      <div class="dl-label">Deadline</div>
+      <div class="dl-date" style="color:${dlColor}">${fmtDate(a.deadline)}</div>
+    </div>
+    <div class="badge-cell"><span class="badge ${b.cls}">${b.txt}</span></div>
+    <div class="arrow-cell"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+  </div>`;
+}
+
+// TOGGLE CHECK
+function toggleCheck(id) {
+  const e = entry(id);
+  upd(id, { checked: !e.checked });
+  renderList();
+  showToast(!e.checked ? 'Gemarkeerd als ingediend' : 'Teruggezet naar openstaand');
+}
+
+// JAAR
+function changeYear(d) { year += d; renderList(); }
+
+// OPEN MAP
+function openMap(id) {
+  openId = id;
+  const all = aangiftes(year);
+  const a = all.find(x => x.id === id); if (!a) return;
+  const e = entry(id);
+
+  document.getElementById('map-title').textContent = a.naam;
+  document.getElementById('map-period').textContent = '- ' + a.period;
+  document.getElementById('notes-ta').value = e.notes || '';
+  renderFiles();
+
+  document.getElementById('screen-overzicht').classList.remove('active');
+  document.getElementById('screen-map').classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// RENDER FILES
+function renderFiles() {
+  const e = entry(openId);
+  const files = e.files || [];
+  const grid = document.getElementById('files-grid');
+  const cnt  = document.getElementById('files-count');
+  cnt.textContent = files.length + ' bestand' + (files.length!==1?'en':'');
+
+  if (!files.length) {
+    grid.innerHTML = `<div class="files-empty" style="grid-column:1/-1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <p>Nog geen bestanden - sleep ze hierheen of klik op toevoegen</p>
+    </div>`;
+    return;
+  }
+
+  const extCol = { pdf:'#c0392b',xlsx:'#16733c',xls:'#16733c',csv:'#16733c',docx:'#1a5f8a',doc:'#1a5f8a',jpg:'#b45a00',jpeg:'#b45a00',png:'#b45a00',pptx:'#c0392b' };
+
+  grid.innerHTML = files.map((f,i) => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    const col = extCol[ext] || '#888';
+    return `<div class="file-tile" onclick="openFile(${i})">
+      <button class="file-del" onclick="event.stopPropagation();delFile(${i})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div class="file-doc">
+        <svg class="doc-bg" viewBox="0 0 40 48" fill="none">
+          <path d="M0 4C0 1.79086 1.79086 0 4 0H26L40 14V44C40 46.2091 38.2091 48 36 48H4C1.79086 48 0 46.2091 0 44V4Z" fill="${col}15" stroke="${col}35" stroke-width="1.2"/>
+          <path d="M26 0L40 14H30C27.7909 14 26 12.2091 26 10V0Z" fill="${col}35"/>
+        </svg>
+        <div class="file-doc-ext">${ext}</div>
+      </div>
+      <div class="file-name" title="${f.name}">${f.name}</div>
+      <div class="file-size">${f.size}</div>
+    </div>`;
+  }).join('');
+}
+
+function openFile(i) {
+  const f = (entry(openId).files||[])[i];
+  if (!f) return;
+  if (f.url) { const a=document.createElement('a'); a.href=f.url; a.download=f.name; a.click(); }
+  showToast('Bestand: ' + f.name);
+}
+
+function delFile(i) {
+  const e = entry(openId);
+  const files = [...(e.files||[])];
+  const name = files[i] ? files[i].name : 'Bestand';
+  files.splice(i,1);
+  upd(openId, { files });
+  renderFiles();
+  renderList();
+  showToast(name + ' verwijderd');
+}
+
+function addFiles(list) {
+  const e = entry(openId);
+  const files = [...(e.files||[])];
+  let n = 0;
+  const readers = Array.from(list).map(f => new Promise(res => {
+    const r = new FileReader();
+    r.onload = ev => { files.push({ name:f.name, size:fmtSize(f.size), url:ev.target.result }); n++; res(); };
+    r.readAsDataURL(f);
+  }));
+  Promise.all(readers).then(() => {
+    upd(openId, { files });
+    renderFiles();
+    renderList();
+    showToast(n + ' bestand' + (n!==1?'en':'') + ' toegevoegd');
+  });
+}
+
+function saveNotes() {
+  upd(openId, { notes: document.getElementById('notes-ta').value });
+  showToast('Notities opgeslagen');
+}
+
+function goBack() {
+  openId = null;
+  document.getElementById('screen-map').classList.remove('active');
+  document.getElementById('screen-overzicht').classList.add('active');
+  renderList();
+  window.scrollTo(0,0);
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+renderList();
+</script>
 </body>
 </html>
