@@ -1157,6 +1157,7 @@
             let pollTimer = null;
             let activeTaskId = 0;
             let modalBusy = false;
+            let agendaSubmitInFlight = false;
             const leadsBootstrapPayload = readLeadsBootstrapPayload();
             const LEADS_MEMORY_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEADS_LOAD_RETRY_DELAY_MS = 4000;
@@ -1165,7 +1166,7 @@
             const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_MODAL_REQUEST_TIMEOUT_MS = 20000;
-            const LEAD_MODAL_AGENDA_SUBMIT_TIMEOUT_MS = 120000;
+            const LEAD_MODAL_AGENDA_SUBMIT_TIMEOUT_MS = 45000;
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
@@ -2648,6 +2649,30 @@
                 refreshLeadSidebarCountsSafely();
             }
 
+            function applyOptimisticLeadRemovalFromOverview(taskId) {
+                const normalizedTaskId = Number(taskId) || 0;
+                if (!normalizedTaskId) return;
+                const currentLead = getLeadById(normalizedTaskId);
+                if (currentLead) {
+                    suppressLeadRowLocally(currentLead);
+                }
+
+                allLeads = allLeads.filter((item) => Number(item.id) !== normalizedTaskId);
+                persistCachedLeads(allLeads);
+                delete leadDetailsById[String(normalizedTaskId)];
+                delete leadAiCopyById[String(normalizedTaskId)];
+
+                renderList();
+
+                if (allLeads.length > 0) {
+                    setStatusLastUpdatedNow();
+                } else {
+                    setStatus('Nog geen leads gevonden.', '');
+                }
+
+                refreshLeadSidebarCountsSafely();
+            }
+
             function buildLeadMutationRollbackSnapshot(taskId) {
                 const normalizedTaskId = Number(taskId) || 0;
                 if (!normalizedTaskId) return null;
@@ -2734,8 +2759,17 @@
                     return;
                 }
 
+                const snapshot = buildLeadMutationRollbackSnapshot(taskId);
+                if (!snapshot) {
+                    setModalStatus('Kon lead niet klaarzetten voor agenda-actie. Vernieuw de pagina en probeer opnieuw.', 'error');
+                    return;
+                }
+
+                agendaSubmitInFlight = true;
                 setModalBusy(true);
-                setModalStatus('Afspraak wordt in agenda gezet... dit kan tot 2 minuten duren.', '');
+                setModalStatus('');
+                applyOptimisticLeadRemovalFromOverview(taskId);
+                setModalLoading(true, 'Bezig met invoegen in de agenda');
                 try {
                     if (isCallBackedLead) {
                         const callId = String(lead.callId || '').trim();
@@ -2783,10 +2817,15 @@
                         throw new Error('Deze lead heeft geen geldige taak of callId.');
                     }
 
-                    finalizeLeadMutation(taskId);
+                    setModalLoading(false);
+                    closeLeadModal();
                 } catch (error) {
+                    rollbackLeadMutation(snapshot);
+                    setModalLoading(false);
                     setModalStatus(String(error?.message || 'Invoegen in agenda mislukt.'), 'error');
+                    await openLeadModal(taskId);
                 } finally {
+                    agendaSubmitInFlight = false;
                     setModalBusy(false);
                 }
             }
@@ -3889,15 +3928,18 @@
             }
 
             modalCloseBtn.addEventListener('click', () => {
+                if (agendaSubmitInFlight) return;
                 closeLeadModal();
             });
 
             modalCancelBtn.addEventListener('click', () => {
+                if (agendaSubmitInFlight) return;
                 closeLeadModal();
             });
 
             modalOverlay.addEventListener('click', (event) => {
                 if (event.target === modalOverlay) {
+                    if (agendaSubmitInFlight) return;
                     closeLeadModal();
                 }
             });
@@ -3913,6 +3955,7 @@
             window.addEventListener('keydown', (event) => {
                 if (event.key !== 'Escape') return;
                 if (!modalOverlay.classList.contains('show')) return;
+                if (agendaSubmitInFlight) return;
                 event.preventDefault();
                 closeLeadModal();
             });

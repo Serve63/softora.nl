@@ -40,7 +40,7 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   );
   assert.match(
     pageSource,
-    /async function submitLeadToAgenda\(\) \{[\s\S]*finalizeLeadMutation\(taskId\);/
+    /async function submitLeadToAgenda\(\) \{[\s\S]*applyOptimisticLeadRemovalFromOverview\(taskId\);[\s\S]*closeLeadModal\(\);/
   );
   assert.match(
     pageSource,
