@@ -779,6 +779,7 @@
             const otp = document.getElementById('otp');
             const btn = document.querySelector('.login-btn');
             const remember = document.getElementById('remember');
+            if (!btn) return false;
             const originalBtnText = btn.textContent;
 
             email.classList.remove('error');

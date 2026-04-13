@@ -603,8 +603,12 @@
 
         grid.innerHTML = html;
         document.querySelectorAll('.appointment.magnetic').forEach((elem) => {
-            elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
-            elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+            elem.addEventListener('mouseenter', () => {
+                if (cursor) cursor.classList.add('hover');
+            });
+            elem.addEventListener('mouseleave', () => {
+                if (cursor) cursor.classList.remove('hover');
+            });
         });
     }
 
@@ -643,6 +647,7 @@
     document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
 
     function animateCursor() {
+        if (!cursor || !cursorDot) return;
         cursorX += (mouseX - cursorX) * 1;
         cursorY += (mouseY - cursorY) * 1;
         cursor.style.left = `${cursorX}px`;
@@ -653,11 +658,17 @@
         cursorDot.style.top = `${dotY}px`;
         requestAnimationFrame(animateCursor);
     }
-    animateCursor();
+    if (cursor && cursorDot) {
+        animateCursor();
+    }
 
     document.querySelectorAll('.magnetic').forEach((elem) => {
-        elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
-        elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        elem.addEventListener('mouseenter', () => {
+            if (cursor) cursor.classList.add('hover');
+        });
+        elem.addEventListener('mouseleave', () => {
+            if (cursor) cursor.classList.remove('hover');
+        });
     });
 </script>
 </body>

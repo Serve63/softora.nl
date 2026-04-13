@@ -8,7 +8,6 @@ function readPage(relativePath) {
 }
 
 const lightPremiumSurfacePages = [
-  'premium-bevestigingsmails.html',
   'premium-mailbox.html',
   'premium-boekhouding.html',
 ];

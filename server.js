@@ -2356,6 +2356,17 @@ function normalizeDateYyyyMmDd(value) {
   if (!raw) return '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
 
+  // NL-invoer (dd-mm-jjjj of dd/mm/jjjj) — voorkomt lege normalisatie bij date-inputs buiten ISO.
+  const dmy = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const year = Number(dmy[3]);
+    if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${String(year)}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
   const asDate = new Date(raw);
   if (Number.isNaN(asDate.getTime())) return '';
   const y = asDate.getFullYear();

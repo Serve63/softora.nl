@@ -13,7 +13,9 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     runtimeStateSupabaseSyncCooldownMs = 4000,
     runtimeStateRemoteNewerThresholdMs = 250,
     supabaseClientPersistTimeoutMs = 12000,
-    queuedRuntimePersistAwaitTimeoutMs = 15000,
+    // Agenda-acties ketenen vaak meerdere persists (upsert, mutatie, dismiss, dashboard-activiteit).
+    // 15s was te kort op trage netwerken → false positieve "gedeelde opslag" fouten na "in agenda zetten".
+    queuedRuntimePersistAwaitTimeoutMs = 60000,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     parseNumberSafe = (value, fallback = null) => {
@@ -101,7 +103,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
   }
 
   async function awaitWithTimeout(promise, timeoutMs, errorMessage) {
-    const safeTimeoutMs = Math.max(1000, Math.min(60000, Number(timeoutMs) || 12000));
+    const safeTimeoutMs = Math.max(1000, Math.min(120000, Number(timeoutMs) || 12000));
     let timeoutId = null;
     try {
       return await Promise.race([
@@ -803,15 +805,35 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
 
   async function waitForQueuedRuntimeSnapshotPersist() {
     if (!isSupabaseConfigured()) return true;
+    const primaryTimeoutMs = Math.max(1000, Math.min(120000, Number(queuedRuntimePersistAwaitTimeoutMs) || 60000));
+    const primaryErrorMsg = `Wachten op gedeelde agenda-opslag duurde langer dan ${Math.round(primaryTimeoutMs / 1000)}s`;
     try {
-      return Boolean(await awaitWithTimeout(
-        runtimeState.supabasePersistChain,
-        queuedRuntimePersistAwaitTimeoutMs,
-        `Wachten op gedeelde agenda-opslag duurde langer dan ${Math.round(Math.max(1000, Math.min(60000, Number(queuedRuntimePersistAwaitTimeoutMs) || 15000)) / 1000)}s`
-      ));
+      return Boolean(await awaitWithTimeout(runtimeState.supabasePersistChain, primaryTimeoutMs, primaryErrorMsg));
     } catch (error) {
       logError('[Supabase][RuntimePersistAwaitError]', error?.message || error);
       runtimeState.supabaseLastPersistError = truncateText(error?.message || String(error), 500);
+      // Na timeout kan de keten alsnog succesvol aflopen; één extra wachtronde voorkomt valse 503's.
+      // Bij korte timeouts (contracttests) blijft de tail beperkt zodat tests niet minuten hangen.
+      const tailMs =
+        primaryTimeoutMs < 15000
+          ? Math.max(250, Math.min(5000, primaryTimeoutMs * 50))
+          : Math.max(primaryTimeoutMs, 45000);
+      const tailErrorMsg = `Persist-keten na timeout niet binnen ${Math.max(1, Math.round(tailMs / 1000))}s afgewacht`;
+      try {
+        const recovered = Boolean(await awaitWithTimeout(runtimeState.supabasePersistChain, tailMs, tailErrorMsg));
+        if (recovered) {
+          runtimeState.supabaseLastPersistError = '';
+          return true;
+        }
+      } catch (tailError) {
+        logError('[Supabase][RuntimePersistAwaitTailError]', tailError?.message || tailError);
+        const tailMsg = truncateText(tailError?.message || String(tailError), 400);
+        const prev = truncateText(runtimeState.supabaseLastPersistError || '', 400);
+        runtimeState.supabaseLastPersistError = truncateText(
+          prev ? `${prev} | tail: ${tailMsg}` : tailMsg,
+          500
+        );
+      }
       return false;
     }
   }

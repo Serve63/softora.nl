@@ -656,6 +656,7 @@
             const password = document.getElementById('password');
             const errorMsg = document.getElementById('errorMsg');
             const btn = document.querySelector('.login-btn');
+            if (!btn) return false;
 
             email.classList.remove('error');
             password.classList.remove('error');

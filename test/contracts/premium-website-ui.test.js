@@ -37,7 +37,7 @@ test('premium website toont een speelse krulpijl van hero richting wat we bouwen
 
   assert.match(source, /<div class="diensten-arrow-wrap" aria-hidden="true">/);
   assert.match(source, /<svg class="diensten-arrow-svg" viewBox="0 0 560 240"/);
-  assert.match(source, /\.diensten-arrow-wrap\s*\{[\s\S]*left:\s*clamp\(-6\.5rem,\s*-2vw,\s*-2\.25rem\);[\s\S]*top:\s*-9\.5rem;[\s\S]*width:\s*min\(44vw,\s*540px\);[\s\S]*pointer-events:\s*none;/s);
+  assert.match(source, /\.diensten-arrow-wrap\s*\{[\s\S]*left:\s*clamp\(-18rem,\s*-13vw,\s*-11rem\);[\s\S]*top:\s*-8rem;[\s\S]*width:\s*min\(44vw,\s*540px\);[\s\S]*pointer-events:\s*none;/s);
   assert.match(source, /\.diensten-arrow-path,\s*\.diensten-arrow-head\s*\{[\s\S]*stroke:\s*var\(--accent\);/s);
   assert.match(source, /@media \(max-width: 1024px\)\s*\{[\s\S]*\.diensten-arrow-wrap \{ display: none; \}/s);
 });
@@ -49,9 +49,12 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.doesNotMatch(source, /<section id="contact" class="cta-section">/);
   assert.doesNotMatch(source, /\.cta-section\s*\{/);
   assert.doesNotMatch(source, /Klaar voor de <span class="text-accent">volgende stap<\/span>\?/);
-  assert.match(source, /<footer id="contact">/);
-  assert.match(source, /\.footer-shell\s*\{[\s\S]*max-width:\s*900px;[\s\S]*margin:\s*0 auto;/s);
-  assert.match(source, /<div class="footer-shell">/);
+  assert.match(source, /<div class="footer-accent"><\/div>/);
+  assert.match(source, /<footer id="contact" class="footer">/);
+  assert.match(source, /<a href="#over">Over ons<\/a>/);
+  assert.match(source, /\.footer-grid\s*\{[\s\S]*grid-template-columns:\s*2fr 1fr 1fr 1fr;/s);
+  assert.match(source, /\.footer-logo\s*\{[\s\S]*font-family:\s*'Barlow Condensed', sans-serif;/s);
+  assert.match(source, /<div class="footer-copy">© 2026 <span>Softora\.nl<\/span> - Alle rechten voorbehouden · KvK: 12345678<\/div>/);
   assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
 });
 
@@ -61,11 +64,11 @@ test('premium website gebruikt een compactere herohoogte zodat de foto minder ve
 
   assert.match(
     source,
-    /\.hero\s*\{[\s\S]*min-height:\s*clamp\(680px,\s*86vh,\s*860px\);/s
+    /\.hero\s*\{[\s\S]*min-height:\s*clamp\(610px,\s*76vh,\s*760px\);/s
   );
   assert.match(
     source,
-    /\.hero-image\s*\{[\s\S]*height:\s*clamp\(680px,\s*86vh,\s*860px\);/s
+    /\.hero-image\s*\{[\s\S]*height:\s*clamp\(555px,\s*69vh,\s*725px\);/s
   );
   assert.match(
     source,
