@@ -174,9 +174,11 @@ function createFixture(overrides = {}) {
     },
     buildLeadToAgendaSummary: async (_summary, location) => `Lead ingepland op ${location}`,
     setGeneratedAgendaAppointmentAtIndex,
-    dismissInterestedLeadIdentity: (callId, rowLike, reason) => {
-      dismissCalls.push({ callId, rowLike, reason });
-    },
+    dismissInterestedLeadIdentity:
+      overrides.dismissInterestedLeadIdentity ||
+      ((callId, rowLike, reason) => {
+        dismissCalls.push({ callId, rowLike, reason });
+      }),
     appendDashboardActivity: (payload, reason) => {
       activityCalls.push({ payload, reason });
     },
@@ -308,6 +310,48 @@ test('agenda interested leads coordinator dismisses a lead and cancels open foll
   assert.equal(dismissCalls[0].reason, 'interested_lead_dismissed_manual');
   assert.equal(cancelCalls[0].reason, 'interested_lead_dismissed_manual_cancel');
   assert.equal(activityCalls[0].reason, 'dashboard_activity_interested_lead_removed');
+  assert.deepEqual(persistWaitCalls, ['waited']);
+});
+
+test('agenda interested leads coordinator responds accepted when dismiss persist stays pending but local lead is gone', async () => {
+  let dismissed = false;
+  const { cancelCalls, coordinator, dismissCalls, persistWaitCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+    persistWaitPromise: new Promise(() => {}),
+    findInterestedLeadRowByCallId: (callId) =>
+      dismissed || normalizeString(callId) !== 'call-1'
+        ? null
+        : {
+            callId: 'call-1',
+            company: 'Softora',
+            contact: 'Serve Creusen',
+            phone: '0612345678',
+          },
+    dismissInterestedLeadIdentity: (callId, rowLike, reason) => {
+      dismissed = true;
+      dismissCalls.push({ callId, rowLike, reason });
+    },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.dismissInterestedLeadResponse(
+    {
+      body: {
+        callId: 'call-1',
+        actor: 'Serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.dismissed, true);
+  assert.equal(res.body.persistencePending, true);
+  assert.equal(res.body.cancelledTasks, 2);
+  assert.equal(dismissCalls[0].reason, 'interested_lead_dismissed_manual');
+  assert.equal(cancelCalls[0].reason, 'interested_lead_dismissed_manual_cancel');
   assert.deepEqual(persistWaitCalls, ['waited']);
 });
 

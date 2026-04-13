@@ -543,13 +543,24 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     const persistOk = await ensureLeadMutationPersistedOrRespond(
       res,
       runtimeSnapshot,
-      'Leadverwijdering kon niet veilig in gedeelde opslag worden opgeslagen.'
+      'Leadverwijdering kon niet veilig in gedeelde opslag worden opgeslagen.',
+      {
+        allowPendingResponse: true,
+        pendingResponseAfterMs: 3000,
+        verifyPersisted: () => !findInterestedLeadRowByCallId(callId),
+      }
     );
+    if (typeof fetch === 'function') {
+      // #region agent log
+      fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:'server-mutation',hypothesisId:'H5',location:'server/services/agenda-interested-leads.js:503',message:'Server interested lead dismiss handled',data:{callIdPresent:Boolean(callId),leadFound:Boolean(leadRow),cancelledTasksCount:Array.isArray(cancelledTasks)?cancelledTasks.length:Number(cancelledTasks)||0,persistOk:Boolean(persistOk)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+    }
     if (!persistOk) return res;
 
-    return res.status(200).json({
+    return res.status(persistOk === 'pending' ? 202 : 200).json({
       ok: true,
       dismissed: true,
+      persistencePending: persistOk === 'pending',
       callId,
       cancelledTasks,
     });

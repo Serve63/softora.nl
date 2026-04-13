@@ -174,6 +174,48 @@ test('agenda interested lead read service filters dismissed rows from both mater
   assert.equal(service.findInterestedLeadRowByCallId('call-dismissed'), null);
 });
 
+test('agenda interested lead read service does not recreate a cancelled lead follow-up from call updates', () => {
+  const service = createServiceFixture({
+    generatedAgendaAppointments: [
+      {
+        id: 31,
+        confirmationTaskType: 'lead_follow_up',
+        type: 'lead_follow_up',
+        callId: 'call-cancelled',
+        company: 'Cancelled BV',
+        contact: 'Lead',
+        phone: '0612222222',
+        createdAt: '2026-04-08T09:00:00.000Z',
+        confirmationAppointmentCancelled: true,
+        confirmationAppointmentCancelledAt: '2026-04-08T09:05:00.000Z',
+      },
+    ],
+    recentCallUpdates: [
+      {
+        callId: 'call-cancelled',
+        company: 'Cancelled BV',
+        name: 'Lead',
+        phone: '0612222222',
+        summary: 'Lead toonde interesse',
+        updatedAt: '2026-04-08T12:00:00.000Z',
+      },
+    ],
+    mapAppointmentToConfirmationTask: (appointment) => {
+      if (appointment?.confirmationAppointmentCancelled || appointment?.confirmationAppointmentCancelledAt) {
+        return null;
+      }
+      return {
+        ...appointment,
+        id: Number(appointment?.id || 0) || 0,
+        appointmentId: Number(appointment?.id || 0) || 0,
+      };
+    },
+  });
+
+  assert.deepEqual(service.buildAllInterestedLeadRows(), []);
+  assert.equal(service.findInterestedLeadRowByCallId('call-cancelled'), null);
+});
+
 test('agenda interested lead read service still shows a newer call when only an older reusable key was dismissed', () => {
   const service = createServiceFixture({
     recentCallUpdates: [

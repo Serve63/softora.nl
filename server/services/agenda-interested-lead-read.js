@@ -208,9 +208,46 @@ function createAgendaInterestedLeadReadService(deps = {}) {
     return Array.from(map.values()).sort(compareConfirmationTasks);
   }
 
+  function buildHandledLeadFollowUpMatches() {
+    const callIds = new Set();
+    const keys = new Set();
+
+    getGeneratedAgendaAppointments().forEach((appointment) => {
+      if (!appointment || typeof appointment !== 'object') return;
+      const confirmationTaskType = normalizeString(
+        appointment?.confirmationTaskType || appointment?.taskType || appointment?.type || ''
+      ).toLowerCase();
+      if (confirmationTaskType !== 'lead_follow_up') return;
+      if (mapAppointmentToConfirmationTask(appointment)) return;
+
+      const callId = normalizeString(appointment?.callId || '');
+      if (callId && !callId.startsWith('demo-')) {
+        callIds.add(callId);
+        return;
+      }
+
+      const key = buildLeadFollowUpCandidateKey(appointment);
+      if (key) keys.add(key);
+    });
+
+    return { callIds, keys };
+  }
+
   function buildInterestedLeadCandidateRows(existingTasks = []) {
     const existingCallIds = new Set();
     const existingLatestTsByKey = new Map();
+    const handledLeadFollowUpMatches = buildHandledLeadFollowUpMatches();
+    const debugCounts = {
+      inputUpdates: 0,
+      skippedExistingOrSeenCall: 0,
+      skippedHandledLeadFollowUp: 0,
+      skippedDismissedPre: 0,
+      skippedNoFollowUp: 0,
+      skippedDismissedPost: 0,
+      skippedOlderByKey: 0,
+      skippedSeenKey: 0,
+      accepted: 0,
+    };
     (Array.isArray(existingTasks) ? existingTasks : []).forEach((task) => {
       const callId = normalizeString(task?.callId || '');
       if (callId) existingCallIds.add(callId);
@@ -237,12 +274,14 @@ function createAgendaInterestedLeadReadService(deps = {}) {
 
     const seenCallIds = new Set();
     const seenKeys = new Set();
-    const rows = getRecentCallUpdates()
+    const candidateUpdates = getRecentCallUpdates()
       .slice()
       .filter((item) => {
         const callId = normalizeString(item?.callId || '');
         return callId && !callId.startsWith('demo-');
-      })
+      });
+    debugCounts.inputUpdates = candidateUpdates.length;
+    const rows = candidateUpdates
       .sort((a, b) => {
         const aTs = Number(a?.updatedAtMs || 0) || Date.parse(normalizeString(a?.updatedAt || a?.endedAt || '')) || 0;
         const bTs = Number(b?.updatedAtMs || 0) || Date.parse(normalizeString(b?.updatedAt || b?.endedAt || '')) || 0;
@@ -250,7 +289,14 @@ function createAgendaInterestedLeadReadService(deps = {}) {
       })
       .map((callUpdate) => {
         const callId = normalizeString(callUpdate?.callId || '');
-        if (!callId || existingCallIds.has(callId) || seenCallIds.has(callId)) return null;
+        if (!callId || existingCallIds.has(callId) || seenCallIds.has(callId)) {
+          debugCounts.skippedExistingOrSeenCall += 1;
+          return null;
+        }
+        if (handledLeadFollowUpMatches.callIds.has(callId)) {
+          debugCounts.skippedHandledLeadFollowUp += 1;
+          return null;
+        }
         if (
           isInterestedLeadDismissedForRow(callId, {
             phone: callUpdate?.phone || '',
@@ -258,6 +304,7 @@ function createAgendaInterestedLeadReadService(deps = {}) {
             contact: callUpdate?.name || '',
           })
         ) {
+          debugCounts.skippedDismissedPre += 1;
           return null;
         }
 
@@ -270,7 +317,10 @@ function createAgendaInterestedLeadReadService(deps = {}) {
           null;
 
         const leadFollowUp = buildGeneratedLeadFollowUpFromCall(callUpdate, insight);
-        if (!leadFollowUp) return null;
+        if (!leadFollowUp) {
+          debugCounts.skippedNoFollowUp += 1;
+          return null;
+        }
 
         const coldcallingStack = normalizeColdcallingStack(
           leadFollowUp?.coldcallingStack || callUpdate?.stack || insight?.coldcallingStack || insight?.stack || ''
@@ -325,18 +375,37 @@ function createAgendaInterestedLeadReadService(deps = {}) {
           ...buildLeadOwnerFields(callId, leadFollowUp),
         };
         const key = buildLeadFollowUpCandidateKey(row);
-        if (isInterestedLeadDismissedForRow(callId, row)) return null;
+        if (key && handledLeadFollowUpMatches.keys.has(key)) {
+          debugCounts.skippedHandledLeadFollowUp += 1;
+          return null;
+        }
+        if (isInterestedLeadDismissedForRow(callId, row)) {
+          debugCounts.skippedDismissedPost += 1;
+          return null;
+        }
         const rowTs = getLeadLikeRecencyTimestamp(row);
-        if (key && Number(existingLatestTsByKey.get(key) || 0) >= rowTs) return null;
-        if (key && seenKeys.has(key)) return null;
+        if (key && Number(existingLatestTsByKey.get(key) || 0) >= rowTs) {
+          debugCounts.skippedOlderByKey += 1;
+          return null;
+        }
+        if (key && seenKeys.has(key)) {
+          debugCounts.skippedSeenKey += 1;
+          return null;
+        }
 
         seenCallIds.add(callId);
         if (key) seenKeys.add(key);
+        debugCounts.accepted += 1;
         return row;
       })
       .filter(Boolean);
 
     rows.sort(compareConfirmationTasks);
+    if (typeof fetch === 'function') {
+      // #region agent log
+      fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:'server-read',hypothesisId:'H3',location:'server/services/agenda-interested-lead-read.js:211',message:'Server interested lead candidates built',data:{existingTaskCount:Array.isArray(existingTasks)?existingTasks.length:0,inputUpdates:debugCounts.inputUpdates,accepted:debugCounts.accepted,skippedExistingOrSeenCall:debugCounts.skippedExistingOrSeenCall,skippedHandledLeadFollowUp:debugCounts.skippedHandledLeadFollowUp,skippedDismissedPre:debugCounts.skippedDismissedPre,skippedNoFollowUp:debugCounts.skippedNoFollowUp,skippedDismissedPost:debugCounts.skippedDismissedPost,skippedOlderByKey:debugCounts.skippedOlderByKey,skippedSeenKey:debugCounts.skippedSeenKey,returnedCount:rows.length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+    }
     return rows;
   }
 
@@ -422,6 +491,7 @@ function createAgendaInterestedLeadReadService(deps = {}) {
   function buildGroupedColdcallingLeadRows(existingTasks = []) {
     const existingCallIds = new Set();
     const existingLatestTsByKey = new Map();
+    const handledLeadFollowUpMatches = buildHandledLeadFollowUpMatches();
     (Array.isArray(existingTasks) ? existingTasks : []).forEach((task) => {
       const callId = normalizeString(task?.callId || '');
       if (callId) existingCallIds.add(callId);
@@ -572,6 +642,8 @@ function createAgendaInterestedLeadReadService(deps = {}) {
 
       const callId = normalizeString(row.callId || '');
       const key = buildLeadFollowUpCandidateKey(row);
+      if (callId && handledLeadFollowUpMatches.callIds.has(callId)) return;
+      if (!callId && key && handledLeadFollowUpMatches.keys.has(key)) return;
       if (isInterestedLeadDismissedForRow(callId, row)) return;
       if (callId && existingCallIds.has(callId)) return;
       if (key && Number(existingLatestTsByKey.get(key) || 0) >= getLeadLikeRecencyTimestamp(row)) return;

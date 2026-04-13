@@ -1492,6 +1492,9 @@
             // On the live leads page the count already reflects suppression (renderList handles it)
             if (requestId !== sidebarLeadsRefreshRequestId) return;
             sidebarLeadsZeroSnapshotStreak = 0;
+            // #region agent log
+            fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H4',location:'assets/personnel-theme.js:1479',message:'Sidebar leads count used live page source',data:{requestId,isLiveLeadsPage,liveLeadsPageCount,suppressedCount:suppressedKeys.size,zeroSnapshotStreak:sidebarLeadsZeroSnapshotStreak},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             paintSidebarCount("leads", Math.floor(liveLeadsPageCount), {
                 singular: "open lead",
                 plural: "open leads",
@@ -1538,6 +1541,9 @@
         const interestedRows = filterInterestedRowsForCount(interestedRowsRaw, pendingRows);
         const total = dedupeLeadRowsForCount([].concat(pendingRows, interestedRows)).length;
         const cachedLeadCount = readCachedSidebarCount("leads");
+        // #region agent log
+        fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H4',location:'assets/personnel-theme.js:1532',message:'Sidebar leads count fetched remote sources',data:{requestId,isLiveLeadsPage,suppressedCount:suppressedKeys.size,pendingCount:pendingRows.length,interestedRawCount:interestedRowsRaw.length,interestedCount:interestedRows.length,total,cachedLeadCount:Number.isFinite(cachedLeadCount)?cachedLeadCount:null,zeroSnapshotStreak:sidebarLeadsZeroSnapshotStreak},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         if (!isLiveLeadsPage && total <= 0 && Number.isFinite(cachedLeadCount) && cachedLeadCount > 0) {
             sidebarLeadsZeroSnapshotStreak += 1;
             if (sidebarLeadsZeroSnapshotStreak <= 2) {
