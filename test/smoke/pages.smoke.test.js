@@ -62,9 +62,11 @@ test('page smoke: premium-ai-coldmailing.html keeps pending lead removals visibl
   );
 });
 
-test('page smoke: premium-actieve-opdrachten.html defaults to in behandeling without an open tab', () => {
+test('page smoke: premium-actieve-opdrachten.html shows openstaande opdrachten as the primary tab label', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
+  assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
+  assert.match(html, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
   assert.match(html, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op in behandeling te staan.');
 });
 

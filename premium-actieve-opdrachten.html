@@ -1578,7 +1578,7 @@
 
             <div class="orders-filter-bar" aria-label="Opdrachten filter">
                 <button class="orders-filter-btn magnetic" type="button" data-order-filter="in_progress" aria-pressed="false">
-                    <span class="orders-filter-label"><span class="orders-filter-dot"></span>In behandeling</span>
+                    <span class="orders-filter-label"><span class="orders-filter-dot"></span>Openstaande opdrachten</span>
                     <span class="orders-filter-count" id="filterCountProgress">0</span>
                 </button>
                 <button class="orders-filter-btn magnetic" type="button" data-order-filter="completed" aria-pressed="false">
@@ -2293,7 +2293,7 @@
             if (!visibleCards.length) {
                 const emptyTextByFilter = {
                     completed: 'Geen voltooide opdrachten.',
-                    in_progress: 'Er is nu geen opdracht bezig.'
+                    in_progress: 'Geen openstaande opdrachten.'
                 };
                 if (!empty) {
                     empty = document.createElement('div');
