@@ -7,6 +7,7 @@
     const publicStorageKey = "softora_premium_public_theme_mode";
     const publicFallbackStorageKey = "softora_public_theme_mode";
     const sidebarCountCacheKey = "softora_sidebar_count_cache_v1";
+    const leadSuppressionCookieKey = "softora_hidden_leads_v1";
     const sidebarCountCacheState = (
         window[sidebarCountCacheKey] &&
         typeof window[sidebarCountCacheKey] === "object"
@@ -383,7 +384,7 @@
             return "active_orders";
         }
         if (p.indexOf("/premium-personeel-agenda") === 0) return "agenda";
-        if (p.indexOf("/premium-ai-coldmailing") === 0) return "leads";
+        if (p.indexOf("/premium-leads") === 0 || p.indexOf("/premium-ai-coldmailing") === 0) return "leads";
         if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldcalling";
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
@@ -444,7 +445,7 @@
             },
             {
                 key: "leads",
-                href: "/premium-ai-coldmailing",
+                href: "/premium-leads",
                 label: "Leads",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>',
             },
@@ -636,8 +637,15 @@
         return String(role || "").toLowerCase() === "admin" ? "Full Acces" : "Medewerker";
     }
 
-    function openSidebarNavigationTarget(url, event) {
+    function normalizeSidebarNavigationTarget(url) {
         const href = String(url || "").trim();
+        if (!href) return "";
+        if (href === "/premium-ai-coldmailing") return "/premium-leads";
+        return href;
+    }
+
+    function openSidebarNavigationTarget(url, event) {
+        const href = normalizeSidebarNavigationTarget(url);
         if (!href) return;
         const openInNewTab = Boolean(
             event &&
@@ -660,7 +668,7 @@
                 const href = String(anchor.getAttribute("href") || "").trim();
                 if (!href) return;
                 anchor.dataset.sidebarNavInit = "1";
-                anchor.dataset.sidebarHref = href;
+                anchor.dataset.sidebarHref = normalizeSidebarNavigationTarget(href);
                 anchor.removeAttribute("href");
                 anchor.setAttribute("role", "link");
                 anchor.setAttribute("tabindex", "0");
@@ -1143,14 +1151,37 @@
     }
 
     function readSuppressedLeadKeys() {
-        return new Map();
+        const map = new Map();
+        try {
+            const cookiePairs = String(document.cookie || "").split(/;\s*/);
+            const rawPair = cookiePairs.find(function (pair) {
+                return pair.indexOf(leadSuppressionCookieKey + "=") === 0;
+            });
+            if (!rawPair) return map;
+            const rawValue = rawPair.slice((leadSuppressionCookieKey + "=").length);
+            const decodedValue = decodeURIComponent(rawValue || "");
+            const parsed = decodedValue ? JSON.parse(decodedValue) : [];
+            const nowMs = Date.now();
+            if (Array.isArray(parsed)) {
+                parsed.forEach(function (entry) {
+                    if (!Array.isArray(entry) || entry.length < 2) return;
+                    const key = String(entry[0] || "").trim();
+                    const expiresAt = Number(entry[1]) || 0;
+                    if (!key || expiresAt <= nowMs) return;
+                    map.set(key, expiresAt);
+                });
+            }
+        } catch (_) {}
+        return map;
     }
 
     function isLeadRowSuppressed(row, suppressedKeys) {
         const rowId = Number(row && row.id) || 0;
         const callId = String(row && row.callId || "").trim();
+        const matchKey = buildLeadMatchKeyForCount(row);
         if (rowId !== 0 && suppressedKeys.has("id:" + rowId)) return true;
         if (callId && suppressedKeys.has("call:" + callId)) return true;
+        if (matchKey && suppressedKeys.has(matchKey)) return true;
         return false;
     }
 
@@ -1446,7 +1477,7 @@
         const pathName = String((window.location && window.location.pathname) || "").trim().toLowerCase();
         const liveLeadsPageCount = Number(window.__softoraLeadsPageCount);
         if (
-            pathName.indexOf("/premium-ai-coldmailing") === 0 &&
+            (pathName.indexOf("/premium-leads") === 0 || pathName.indexOf("/premium-ai-coldmailing") === 0) &&
             Number.isFinite(liveLeadsPageCount) &&
             liveLeadsPageCount >= 0
         ) {

@@ -6,6 +6,7 @@ const defaultLegacyPrettyPageRedirectEntries = Object.freeze([
   ['personeel-login', 'premium-personeel-login'],
   ['actieve-opdrachten', 'premium-actieve-opdrachten'],
   ['ai-coldmailing', 'premium-ai-coldmailing'],
+  ['premium-ai-coldmailing', 'premium-leads'],
   ['ai-lead-generator', 'premium-ai-lead-generator'],
   ['seo-crm-system', 'premium-seo-crm-system'],
   ['opdracht-preview', 'premium-opdracht-preview'],
@@ -28,11 +29,15 @@ function getKnownHtmlPageFiles(rootDir, logger = console) {
 }
 
 function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
-  return new Map(
+  const map = new Map(
     Array.from(knownHtmlPageFiles)
       .filter((file) => /\.html$/i.test(file))
       .map((file) => [file.replace(/\.html$/i, ''), file])
   );
+  if (map.has('premium-ai-coldmailing')) {
+    map.set('premium-leads', map.get('premium-ai-coldmailing'));
+  }
+  return map;
 }
 
 function toPrettyPagePathFromHtmlFile(fileName) {

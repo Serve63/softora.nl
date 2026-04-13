@@ -11,7 +11,7 @@ const criticalFlowChecklist = Object.freeze([
 const pageSmokeTargets = Object.freeze([
   { path: '/premium-personeel-login', marker: 'Softora | Personeel Login' },
   { path: '/premium-personeel-agenda', marker: 'Servé Digital | Agenda', allowLoginFallback: true },
-  { path: '/premium-ai-coldmailing', marker: 'Softora | Leads Overzicht — Premium', allowLoginFallback: true },
+  { path: '/premium-leads', marker: 'Softora | Leads Overzicht — Premium', allowLoginFallback: true },
   { path: '/premium-ai-lead-generator', marker: "Softora | Website's — Premium", allowLoginFallback: true },
   { path: '/premium-actieve-opdrachten', marker: 'Softora | Actieve Opdrachten — Premium', allowLoginFallback: true },
 ]);
