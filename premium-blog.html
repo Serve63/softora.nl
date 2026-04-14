@@ -263,157 +263,24 @@ nav {
 </div>
 
 <script>
-const blogs = [
-  {
-    id: 1,
-    cat: "Website's",
-    titel: 'Waarom je website in 2026 sneller moet zijn dan ooit',
-    excerpt: 'Google beoordeelt je website steeds meer op laadtijd. Ontdek wat je kunt doen om jouw site razendsnel te maken.',
-    datum: '10 april 2026',
-    read: '5 min lezen',
-    auteur: 'Servé Creusen',
-    kleur: 'linear-gradient(135deg, #1a1a2e 0%, #9b2355 100%)',
-    featured: true,
-    inhoud: `
-      <p>In 2026 is de laadtijd van je website niet meer alleen een technisch detail — het is een directe rankingfactor voor Google én een bepalende factor voor of bezoekers blijven of vertrekken.</p>
-      <h2>Waarom snelheid zo belangrijk is</h2>
-      <p>Onderzoek toont aan dat <strong>53% van de mobiele bezoekers</strong> een pagina verlaat als die langer dan 3 seconden laadt. Voor Google is de laadtijd onderdeel van de Core Web Vitals — een set signalen die bepalen hoe hoog jij in de zoekresultaten verschijnt.</p>
-      <p>Een trage website kost je dus niet alleen bezoekers, maar ook zichtbaarheid in Google. Dubbel verlies.</p>
-      <h2>Wat maakt een website traag?</h2>
-      <ul>
-        <li>Afbeeldingen die niet geoptimaliseerd zijn (te groot, verkeerd formaat)</li>
-        <li>Te veel plug-ins of externe scripts</li>
-        <li>Geen gebruik van caching</li>
-        <li>Een trage hostingserver</li>
-        <li>Geen gebruik van een CDN (Content Delivery Network)</li>
-      </ul>
-      <h2>Wat kun je er aan doen?</h2>
-      <p>Begin met het comprimeren van je afbeeldingen naar het WebP-formaat. Dit geeft gemiddeld <strong>30-50% kleinere bestanden</strong> zonder zichtbaar kwaliteitsverlies. Zorg vervolgens voor goede caching en een snelle hostingprovider.</p>
-      <p>Bij Softora.nl zorgen we standaard voor geoptimaliseerde laadtijden bij elk project. Onze websites scoren gemiddeld 90+ op Google PageSpeed — voor zowel mobiel als desktop.</p>
-      <h2>Conclusie</h2>
-      <p>Snelheid is geen luxe meer. Het is de basis. Zorg dat je website snel laadt, dan profiteer je van meer bezoekers, een betere Google-positie én een hogere conversie.</p>
-    `
-  },
-  {
-    id: 2,
-    cat: 'AI ontwikkelingen',
-    titel: 'De 5 SEO-fouten die MKB\'ers het meeste maken',
-    excerpt: 'Van ontbrekende meta descriptions tot het negeren van lokale SEO — deze fouten kosten je dagelijks bezoekers.',
-    datum: '3 april 2026',
-    read: '6 min lezen',
-    auteur: 'Servé Creusen',
-    kleur: 'linear-gradient(135deg, #0f3460 0%, #16213e 100%)',
-    featured: true,
-    inhoud: `
-      <p>SEO hoeft niet ingewikkeld te zijn. Maar veel MKB-ondernemers maken dezelfde fouten keer op keer, waardoor ze onnodig laag staan in Google. In dit artikel zetten we de vijf meest gemaakte fouten op een rij.</p>
-      <h2>1. Geen of slechte meta descriptions</h2>
-      <p>De meta description is het tekstje onder je pagina in Google. Het beïnvloedt niet direct je ranking, maar wel of mensen op jouw link klikken. Schrijf altijd een duidelijke, wervende meta description van 140–160 tekens.</p>
-      <h2>2. Geen aandacht voor lokale SEO</h2>
-      <p>Als je een lokaal bedrijf hebt, wil je gevonden worden door mensen in jouw regio. Zorg voor een compleet Google Business-profiel, gebruik locatiegerichte zoekwoorden en vraag klanten om reviews.</p>
-      <h2>3. Afbeeldingen zonder alt-tekst</h2>
-      <p>Google kan afbeeldingen niet "zien". Via de alt-tekst vertel je Google wat er op de afbeelding staat. Dit helpt zowel je SEO als de toegankelijkheid van je website.</p>
-      <h2>4. Te weinig content</h2>
-      <p>Pagina's met weinig of dunne content ranken slecht. Schrijf uitgebreide, waardevolle pagina's van minimaal 500 woorden. Een blog helpt enorm om regelmatig verse content toe te voegen.</p>
-      <h2>5. Geen interne linkstructuur</h2>
-      <p>Interne links helpen Google om je website beter te begrijpen en verdelen de "linkwaarde" over je pagina's. Link vanuit je blogs naar relevante dienstenpagina's en andersom.</p>
-    `
-  },
-  {
-    id: 3,
-    cat: 'Bedrijfssoftware',
-    titel: 'Zo zet je je website in als verkooptool',
-    excerpt: 'Je website is meer dan een visitekaartje. Met de juiste aanpak trekt hij 24/7 klanten aan.',
-    datum: '28 maart 2026',
-    read: '4 min lezen',
-    auteur: 'Servé Creusen',
-    kleur: 'linear-gradient(135deg, #2c3e50 0%, #9b2355 100%)',
-    featured: false,
-    inhoud: `
-      <p>Veel ondernemers zien hun website als een statisch visitekaartje. Maar een goed ingerichte website werkt 24 uur per dag, 7 dagen per week als verkoper — ook als jij slaapt.</p>
-      <h2>Duidelijke calls-to-action</h2>
-      <p>Elke pagina op je website moet een duidelijk doel hebben. Wat wil je dat de bezoeker doet? Bel je, vul een formulier in, vraag een offerte aan? Zorg voor <strong>duidelijke, opvallende knoppen</strong> die bezoekers aansturen.</p>
-      <h2>Sociale bewijslast</h2>
-      <p>Reviews, klantverhalen en logo's van bekende opdrachtgevers wekken vertrouwen. Mensen kopen liever bij een bedrijf dat anderen al positief hebben beoordeeld. Zorg dat dit prominent zichtbaar is op je website.</p>
-      <h2>Lead magnets</h2>
-      <p>Bied iets gratis aan in ruil voor een e-mailadres. Denk aan een gratis scan, checklist of adviesgesprek. Zo bouw je een lijst op van geïnteresseerde potentiële klanten.</p>
-    `
-  },
-  {
-    id: 4,
-    cat: 'Overig',
-    titel: 'Waarom website-onderhoud geen optie is maar een must',
-    excerpt: 'Een verouderde website is een beveiligingsrisico. Ontdek wat er kan misgaan en hoe je jezelf beschermt.',
-    datum: '21 maart 2026',
-    read: '4 min lezen',
-    auteur: 'Servé Creusen',
-    kleur: 'linear-gradient(135deg, #16733c 0%, #0f3460 100%)',
-    featured: false,
-    inhoud: `
-      <p>Veel ondernemers denken dat een website na de lancering "klaar" is. Niets is minder waar. Zonder regelmatig onderhoud is je website een open deur voor hackers en bugs.</p>
-      <h2>Beveiligingsrisico's</h2>
-      <p>WordPress, plug-ins en thema's worden continu bijgewerkt om beveiligingslekken te dichten. Als jij die updates niet uitvoert, blijf je kwetsbaar. Hackers scannen automatisch op verouderde versies.</p>
-      <h2>Prestatieproblemen</h2>
-      <p>Verouderde software werkt trager en minder stabiel. Regelmatige updates zorgen dat je website snel en betrouwbaar blijft werken.</p>
-      <h2>Wat omvat goed onderhoud?</h2>
-      <ul>
-        <li>Maandelijkse plug-in en thema updates</li>
-        <li>Dagelijkse backups</li>
-        <li>Uptime monitoring</li>
-        <li>Beveiligingsscans</li>
-        <li>Performance checks</li>
-      </ul>
-      <p>Bij Softora.nl bieden we onderhoudsabonnementen die dit alles regelen. Zo heb jij er geen omkijken naar.</p>
-    `
-  },
-  {
-    id: 5,
-    cat: "Website's",
-    titel: 'Mobiel vriendelijk of mobiel first? Het verschil uitgelegd',
-    excerpt: 'Google indexeert je website nu primair op mobiel. Weet jij wat dat voor jouw bedrijf betekent?',
-    datum: '14 maart 2026',
-    read: '3 min lezen',
-    auteur: 'Servé Creusen',
-    kleur: 'linear-gradient(135deg, #9b2355 0%, #4a1a6b 100%)',
-    featured: false,
-    inhoud: `
-      <p>Er is een groot verschil tussen een website die <em>werkt</em> op mobiel en een website die <em>gebouwd is</em> voor mobiel. Google maakt dit onderscheid ook — en beloont mobiel-first ontwerp.</p>
-      <h2>Wat is Mobile First?</h2>
-      <p>Mobile first betekent dat je bij het ontwerpen van een website begint met de mobiele versie en daarna uitbreidt naar desktop. Dit dwingt je tot heldere keuzes over content en navigatie.</p>
-      <h2>Waarom Google dit waardeert</h2>
-      <p>Meer dan 60% van het webverkeer komt van mobiele apparaten. Google gebruikt de mobiele versie van je site als primaire basis voor ranking (Mobile-First Indexing). Is je mobiele versie slecht? Dan rang je lager — ook op desktop.</p>
-      <h2>Checklist mobiel-vriendelijke website</h2>
-      <ul>
-        <li>Tekst leesbaar zonder in te zoomen</li>
-        <li>Knoppen groot genoeg om op te tikken</li>
-        <li>Geen horizontale scrollbalk</li>
-        <li>Snel laden op 4G/5G verbinding</li>
-        <li>Formulieren eenvoudig in te vullen op mobiel</li>
-      </ul>
-    `
-  },
-  {
-    id: 6,
-    cat: 'Voicesoftware',
-    titel: 'E-mail marketing voor MKB: zo begin je',
-    excerpt: 'E-mail heeft het hoogste ROI van alle marketingkanalen. Toch gebruiken weinig MKB\'ers het goed.',
-    datum: '7 maart 2026',
-    read: '5 min lezen',
-    auteur: 'Servé Creusen',
-    kleur: 'linear-gradient(135deg, #b45a00 0%, #1a1a2e 100%)',
-    featured: false,
-    inhoud: `
-      <p>E-mail marketing heeft gemiddeld een ROI van €42 voor elke €1 die je erin investeert. Toch zetten veel MKB-ondernemers het niet in, of doen het niet effectief.</p>
-      <h2>Begin met een lijst opbouwen</h2>
-      <p>Zonder lijst geen e-mail marketing. Zorg voor een zichtbare aanmeldoptie op je website. Bied iets waardevols in ruil — een gratis advies, korting of exclusieve content.</p>
-      <h2>Kies de juiste tool</h2>
-      <p>Voor MKB zijn Mailchimp, Brevo (voorheen Sendinblue) of MailerLite uitstekende opties. Ze zijn betaalbaar, gebruiksvriendelijk en hebben goede automatiseringen.</p>
-      <h2>Stuur waardevolle content</h2>
-      <p>Niemand zit te wachten op wekelijkse reclame. Stuur content die echt helpt — tips, inzichten, case studies. Daardoor blijven mensen ingeschreven én worden ze klant als het moment rijp is.</p>
-      <h2>Meet en optimaliseer</h2>
-      <p>Houd open rates en click rates bij. Test verschillende onderwerpregels. Kleine verbeteringen stapelen zich op tot significant betere resultaten over tijd.</p>
-    `
-  },
-];
+const blogs = [];
+
+const blogStructureTemplate = {
+  id: 1,
+  cat: "Website's", // "Website's" | "Bedrijfssoftware" | "Voicesoftware" | "AI ontwikkelingen" | "Overig"
+  titel: 'Titel van het artikel',
+  excerpt: 'Korte samenvatting voor de kaartweergave.',
+  datum: '14 april 2026',
+  read: '5 min lezen',
+  auteur: 'Softora Team',
+  kleur: 'linear-gradient(135deg, #1a1a2e 0%, #9b2355 100%)',
+  featured: false,
+  inhoud: `
+    <p>Openingsalinea van het artikel.</p>
+    <h2>Tussenkop</h2>
+    <p>Verdiepende tekst.</p>
+  `
+};
 
 let activeFilter = "Website's";
 let activeBlog = null;
