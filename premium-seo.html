@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Search Engine Optimization – Softora.nl</title>
+<link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
+<link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
+<title>SEO – Softora.nl</title>
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -833,14 +835,14 @@ body {
   </aside>
   <main class="main-content">
     <div class="page-shell">
-      <div class="page-title">Search Engine Optimization</div>
-      <div class="page-subtitle">Manage and improve search engine optimization for softora.nl</div>
+      <div class="page-title">SEO</div>
+      <div class="page-subtitle">Beheer en optimaliseer de SEO van softora.nl</div>
 
       <div class="tabs">
-        <button class="tab active" onclick="switchTab('scan', this)">SEO scan</button>
-        <button class="tab" onclick="switchTab('paginas', this)">Pages</button>
+        <button class="tab active" onclick="switchTab('scan', this)">SEO Scan</button>
+        <button class="tab" onclick="switchTab('paginas', this)">Pagina's</button>
+        <button class="tab" onclick="switchTab('productpaginas', this)">Productpagina's</button>
         <button class="tab" onclick="switchTab('blogs', this)">Blogs</button>
-        <button class="tab" onclick="switchTab('productpaginas', this)">Product pages</button>
         <button class="tab" onclick="switchTab('analytics', this)">Google Analytics</button>
       </div>
 
@@ -849,13 +851,13 @@ body {
           <input type="text" id="scan-url" value="https://softora.nl" placeholder="https://softora.nl">
           <button class="btn-scan" id="scan-btn" onclick="startScan()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            Start scan
+            Scan starten
           </button>
         </div>
         <div id="scan-result">
           <div class="scan-empty">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <p>Click &quot;Start scan&quot; to run a full SEO analysis of softora.nl</p>
+            <p>Klik op "Scan starten" om een volledige SEO-analyse te starten van softora.nl</p>
           </div>
         </div>
       </div>
@@ -867,73 +869,73 @@ body {
       <div class="tab-panel" id="tab-blogs">
         <div class="blog-campaign-wrap" id="blog-campaign-wrap" data-campaign-live="0">
           <div class="blog-campaign-intro">
-            <h3>AI blog campaign</h3>
-            <p>Set how often AI prepares a post for publication, the target length (words), and how many images per article. This is UI only — nothing is actually scheduled or published.</p>
+            <h3>AI blogcampagne</h3>
+            <p>Stel in hoe vaak AI een blog klaarzet voor publicatie, hoe lang het stuk ongeveer wordt (woorden), en met hoeveel foto’s per artikel. Dit is alleen de interface — er wordt nog niets echt gepland of gepubliceerd.</p>
           </div>
 
           <div class="blog-campaign-card ai-card">
             <div class="ai-card-head">
-              <div class="ai-card-title">Publishing &amp; media</div>
-              <div class="blog-status-pill draft" id="blog-campaign-status-pill" aria-live="polite">Draft</div>
+              <div class="ai-card-title">Publicatie &amp; media</div>
+              <div class="blog-status-pill draft" id="blog-campaign-status-pill" aria-live="polite">Concept</div>
             </div>
             <div class="ai-card-body">
-              <div class="field-label">Publish frequency</div>
+              <div class="field-label">Publicatiefrequentie</div>
               <div class="field-val field-val--select">
-                <select id="blog-frequency" class="blog-select" aria-label="Publish frequency">
-                  <option value="daily">Every day</option>
-                  <option value="every_other_day" selected>Every other day</option>
-                  <option value="twice_weekly">Twice a week</option>
-                  <option value="weekly">Once a week</option>
-                  <option value="biweekly">Every two weeks</option>
+                <select id="blog-frequency" class="blog-select" aria-label="Publicatiefrequentie">
+                  <option value="daily">Elke dag</option>
+                  <option value="every_other_day" selected>Om de dag</option>
+                  <option value="twice_weekly">2× per week</option>
+                  <option value="weekly">1× per week</option>
+                  <option value="biweekly">1× per twee weken</option>
                 </select>
               </div>
 
-              <div class="field-label">Target word count per post</div>
+              <div class="field-label">Beoogd aantal woorden per blog</div>
               <div class="field-val field-val--select">
-                <select id="blog-word-count" class="blog-select" aria-label="Target word count per post">
-                  <option value="350">± 350 words (short)</option>
-                  <option value="500">± 500 words</option>
-                  <option value="650" selected>± 650 words</option>
-                  <option value="800">± 800 words</option>
-                  <option value="1000">± 1,000 words</option>
-                  <option value="1300">± 1,300 words</option>
-                  <option value="1600">± 1,600 words</option>
-                  <option value="2000">± 2,000 words (long)</option>
+                <select id="blog-word-count" class="blog-select" aria-label="Beoogd aantal woorden per blog">
+                  <option value="350">± 350 woorden (kort)</option>
+                  <option value="500">± 500 woorden</option>
+                  <option value="650" selected>± 650 woorden</option>
+                  <option value="800">± 800 woorden</option>
+                  <option value="1000">± 1.000 woorden</option>
+                  <option value="1300">± 1.300 woorden</option>
+                  <option value="1600">± 1.600 woorden</option>
+                  <option value="2000">± 2.000 woorden (lang)</option>
                 </select>
               </div>
 
-              <div class="field-label">Images per post</div>
+              <div class="field-label">Aantal foto’s per blog</div>
               <div class="field-val field-val--select">
-                <select id="blog-photo-count" class="blog-select" aria-label="Images per post">
-                  <option value="0">None (text only)</option>
-                  <option value="1">1 image</option>
-                  <option value="2" selected>2 images</option>
-                  <option value="3">3 images</option>
-                  <option value="4">4 images</option>
-                  <option value="5">5 images</option>
-                  <option value="6">6 images</option>
+                <select id="blog-photo-count" class="blog-select" aria-label="Aantal foto’s per blog">
+                  <option value="0">Geen (alleen tekst)</option>
+                  <option value="1">1 foto</option>
+                  <option value="2" selected>2 foto’s</option>
+                  <option value="3">3 foto’s</option>
+                  <option value="4">4 foto’s</option>
+                  <option value="5">5 foto’s</option>
+                  <option value="6">6 foto’s</option>
                 </select>
               </div>
 
-              <div class="field-label">Preferred publish time (optional)</div>
+              <div class="field-label">Voorkeurstijd publicatie (optioneel)</div>
               <div class="field-val field-val--select">
-                <input type="time" id="blog-publish-time" class="blog-time-input" value="09:00" aria-label="Preferred publish time">
+                <input type="time" id="blog-publish-time" class="blog-time-input" value="09:00" aria-label="Voorkeurstijd">
               </div>
 
               <div class="blog-campaign-actions">
                 <button type="button" class="btn-ai" id="blog-activate-btn" onclick="activateBlogCampaign()">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  Launch campaign
+                  Campagne online zetten
                 </button>
                 <button type="button" class="btn-blog-secondary" id="blog-pause-btn" onclick="pauseBlogCampaignDemo()" style="display:none">
-                  Pause campaign (demo)
+                  Campagne pauzeren (demo)
                 </button>
               </div>
             </div>
           </div>
 
           <div class="blog-live-banner" id="blog-live-banner" hidden>
-            <strong>Live (UI demo)</strong> — <span id="blog-live-summary-text"></span>
+            <strong>Live (UI-demo)</strong> — <span id="blog-live-summary-text"></span>
           </div>
         </div>
       </div>
@@ -941,16 +943,16 @@ body {
       <div class="tab-panel" id="tab-productpaginas">
         <div class="blog-campaign-wrap">
           <div class="blog-campaign-intro">
-            <h3>Product pages</h3>
-            <p>Manage SEO for each product or service page: titles, meta descriptions, structured data, and images. Use this area for a catalog import or manual list — the block below is a placeholder until your feed is connected.</p>
+            <h3>Productpagina's</h3>
+            <p>Beheer SEO per product- of dienstenpagina: titels, meta descriptions, structured data en afbeeldingen. Dit scherm is de plek voor je catalogus-import of handmatige lijst — onderstaand blok is een startpunt tot de koppeling live staat.</p>
           </div>
           <div class="ai-card">
             <div class="ai-card-head">
-              <div class="ai-card-title">Product URLs</div>
+              <div class="ai-card-title">Product-URL's</div>
               <span style="font-size:11px;color:var(--text-light);letter-spacing:.06em;text-transform:uppercase">Demo</span>
             </div>
             <div class="ai-card-body">
-              <p style="font-size:14px;line-height:1.65;color:var(--text-mid);margin:0">No product pages linked yet. Add an API or import later to list rows with URL, title, and status here.</p>
+              <p style="font-size:14px;line-height:1.65;color:var(--text-mid);margin:0">Nog geen productpagina's gekoppeld. Voeg straks endpoints of een import toe om hier rijen met URL, titel en status te tonen.</p>
             </div>
           </div>
         </div>
@@ -960,41 +962,41 @@ body {
         <div class="gsc-import-wrap">
           <div class="blog-campaign-intro">
             <h3>Google Search Console</h3>
-            <p>Show data you import or sync from Google Search Console (clicks, impressions, CTR, position). The totals and chart below are <strong>sample data</strong> — replace with real metrics once connected.</p>
+            <p>Hier toon je data die je importeert of synchroniseert vanuit Google Search Console (klikken, vertoningen, CTR, positie). Onderstaande totalen en grafiek zijn <strong>voorbeelddata</strong> — na koppeling vervang je dit door echte metingen.</p>
           </div>
 
-          <div class="gsc-stat-grid" aria-label="Search Console summary (demo)">
+          <div class="gsc-stat-grid" aria-label="Samenvatting Search Console (demo)">
             <div class="gsc-stat-card">
-              <div class="gsc-stat-label">Total clicks</div>
-              <div class="gsc-stat-value">1,847</div>
-              <div class="gsc-stat-delta">+12% vs. previous period</div>
+              <div class="gsc-stat-label">Totale klikken</div>
+              <div class="gsc-stat-value">1.847</div>
+              <div class="gsc-stat-delta">+12% t.o.v. vorige periode</div>
             </div>
             <div class="gsc-stat-card">
-              <div class="gsc-stat-label">Impressions</div>
+              <div class="gsc-stat-label">Vertoningen</div>
               <div class="gsc-stat-value">64.2K</div>
-              <div class="gsc-stat-delta">+8% vs. previous period</div>
+              <div class="gsc-stat-delta">+8% t.o.v. vorige periode</div>
             </div>
             <div class="gsc-stat-card">
-              <div class="gsc-stat-label">Avg. CTR</div>
-              <div class="gsc-stat-value">2.9%</div>
-              <div class="gsc-stat-delta">+0.3 percentage points</div>
+              <div class="gsc-stat-label">Gem. CTR</div>
+              <div class="gsc-stat-value">2,9%</div>
+              <div class="gsc-stat-delta">+0,3 procentpunt</div>
             </div>
             <div class="gsc-stat-card">
-              <div class="gsc-stat-label">Avg. position</div>
-              <div class="gsc-stat-value">14.2</div>
-              <div class="gsc-stat-delta">Position improved (lower is better)</div>
+              <div class="gsc-stat-label">Gem. positie</div>
+              <div class="gsc-stat-value">14,2</div>
+              <div class="gsc-stat-delta">Positie verbeterd (lager is beter)</div>
             </div>
           </div>
 
           <div class="ai-card gsc-chart-card">
             <div class="ai-card-head">
-              <div class="ai-card-title">Clicks &amp; impressions</div>
-              <span style="font-size:11px;color:var(--text-light);letter-spacing:.06em;text-transform:uppercase">Last 12 weeks</span>
+              <div class="ai-card-title">Klikken &amp; vertoningen</div>
+              <span style="font-size:11px;color:var(--text-light);letter-spacing:.06em;text-transform:uppercase">Laatste 12 weken</span>
             </div>
             <div class="ai-card-body">
-              <p class="gsc-chart-note">Same idea as Search Console: impressions (blue) and clicks (burgundy). Axis: weeks.</p>
+              <p class="gsc-chart-note">Zelfde schaal als in Search Console: vertoningen (blauw) en klikken (bordeaux). As: weken.</p>
               <div class="gsc-chart-frame">
-                <svg viewBox="0 0 400 200" role="img" aria-label="Chart: clicks and impressions per week (sample data)">
+                <svg viewBox="0 0 400 200" role="img" aria-label="Grafiek: klikken en vertoningen per week (demodata)">
                   <g class="gsc-chart-grid">
                     <line x1="40" y1="50" x2="360" y2="50"/>
                     <line x1="40" y1="105" x2="360" y2="105"/>
@@ -1009,8 +1011,8 @@ body {
                 </svg>
               </div>
               <div class="gsc-legend">
-                <span class="gsc-legend-item"><span class="gsc-legend-swatch gsc-legend-swatch--impr" aria-hidden="true"></span>Impressions</span>
-                <span class="gsc-legend-item"><span class="gsc-legend-swatch gsc-legend-swatch--clicks" aria-hidden="true"></span>Clicks</span>
+                <span class="gsc-legend-item"><span class="gsc-legend-swatch gsc-legend-swatch--impr" aria-hidden="true"></span>Vertoningen</span>
+                <span class="gsc-legend-item"><span class="gsc-legend-swatch gsc-legend-swatch--clicks" aria-hidden="true"></span>Klikken</span>
               </div>
             </div>
           </div>
@@ -1031,11 +1033,11 @@ function switchTab(name, el) {
 }
 
 const BLOG_FREQ_LABELS = {
-  daily: 'every day',
-  every_other_day: 'every other day',
-  twice_weekly: 'twice a week',
-  weekly: 'once a week',
-  biweekly: 'every two weeks',
+  daily: 'elke dag',
+  every_other_day: 'om de dag',
+  twice_weekly: '2× per week',
+  weekly: '1× per week',
+  biweekly: '1× per twee weken',
 };
 
 function getBlogCampaignSummaryText() {
@@ -1047,11 +1049,11 @@ function getBlogCampaignSummaryText() {
   const wk = words && words.value;
   const pk = photos && photos.value;
   const freqLabel = BLOG_FREQ_LABELS[fk] || fk;
-  const wordTarget = wk ? `~${Number(wk).toLocaleString('en-US')} words` : '';
+  const wordTarget = wk ? `ca. ${Number(wk).toLocaleString('nl-NL')} woorden` : '';
   const n = Number(pk);
-  const photoLabel = n === 0 ? 'no images' : n === 1 ? '1 image' : `${n} images`;
-  const timePart = timeEl && timeEl.value ? `; around ${timeEl.value}` : '';
-  return `frequency: ${freqLabel}; ${wordTarget}; ${photoLabel} per post${timePart}`;
+  const photoLabel = n === 0 ? 'geen foto’s' : n === 1 ? '1 foto' : `${n} foto’s`;
+  const timePart = timeEl && timeEl.value ? `; rond ${timeEl.value}` : '';
+  return `frequentie: ${freqLabel}; ${wordTarget}; ${photoLabel} per artikel${timePart}`;
 }
 
 function activateBlogCampaign() {
@@ -1070,7 +1072,7 @@ function activateBlogCampaign() {
   banner.hidden = false;
   btnOn.style.display = 'none';
   btnOff.style.display = 'inline-flex';
-  toast('Campaign is live (UI only).');
+  toast('Campagne staat live (alleen UI).');
 }
 
 function pauseBlogCampaignDemo() {
@@ -1081,13 +1083,13 @@ function pauseBlogCampaignDemo() {
   const btnOff = document.getElementById('blog-pause-btn');
   if (!wrap || !pill || !banner || !btnOn || !btnOff) return;
   wrap.setAttribute('data-campaign-live', '0');
-  pill.textContent = 'Draft';
+  pill.textContent = 'Concept';
   pill.classList.add('draft');
   pill.classList.remove('live');
   banner.hidden = true;
   btnOn.style.display = 'inline-flex';
   btnOff.style.display = 'none';
-  toast('Campaign paused (demo).');
+  toast('Campagne gepauzeerd (demo).');
 }
 
 function charCount(inputId, countId, max) {
@@ -1101,133 +1103,133 @@ function charCount(inputId, countId, max) {
 
 const SEO_PAGES_DATA = [
   { slug: 'home', title: 'Homepage', path: 'https://softora.nl/' },
-  { slug: 'over', title: 'About us', path: 'https://softora.nl/#over' },
-  { slug: 'diensten', title: 'What we build', path: 'https://softora.nl/#diensten' },
+  { slug: 'over', title: 'Over ons', path: 'https://softora.nl/#over' },
+  { slug: 'diensten', title: 'Wat we bouwen', path: 'https://softora.nl/#diensten' },
   { slug: 'contact', title: 'Contact', path: 'https://softora.nl/#contact' },
 ];
 
 const seoPageDefaults = {
   home: {
-    metaTitle: 'Softora.nl – Professional websites & care',
-    metaDesc: 'Softora.nl builds professional websites for SMBs. From design to maintenance — fast, affordable, and tailored.',
-    ogTitle: 'Softora.nl – Websites that work',
-    ogDesc: 'We build fast, professional websites for SMBs. Request a quote today.',
-    h1: 'Professional websites for SMBs',
-    h2: 'What we do\nOur packages\nWhy Softora?\nGet in touch',
-    altHero: 'Professional website built by Softora for an SMB client',
-    altLogo: 'Softora.nl logo – web design and maintenance',
-    altTeam: 'The Softora.nl team, website specialists',
+    metaTitle: 'Softora.nl – Professionele Websites & Onderhoud',
+    metaDesc: 'Softora.nl bouwt professionele websites voor het MKB. Van ontwerp tot onderhoud — snel, betaalbaar en op maat gemaakt.',
+    ogTitle: 'Softora.nl – Websites die werken',
+    ogDesc: 'Wij bouwen snelle, professionele websites voor het MKB. Vraag vandaag nog een offerte aan.',
+    h1: 'Professionele websites voor het MKB',
+    h2: 'Wat wij doen\nOnze pakketten\nWaarom Softora?\nNeem contact op',
+    altHero: 'Professionele website gebouwd door Softora voor een MKB-klant',
+    altLogo: 'Softora.nl logo – website bouw en onderhoud',
+    altTeam: 'Het team van Softora.nl, specialist in website bouw',
   },
   over: {
-    metaTitle: 'About Softora.nl | Web agency for SMBs',
-    metaDesc: 'Meet our team and approach. Softora.nl builds fast, SEO-friendly websites with clear pricing and personal support.',
-    ogTitle: 'About Softora – SMB website partner',
-    ogDesc: 'Web agency focused on SMBs: design, build, and maintenance in one place.',
-    h1: 'About Softora.nl',
-    h2: 'Our mission\nThe team\nHow we work\nWhat we stand for',
-    altHero: 'Softora.nl team working on a business website',
+    metaTitle: 'Over Softora.nl | Websitebureau voor het MKB',
+    metaDesc: 'Leer ons team en aanpak kennen. Softora.nl bouwt snelle, SEO-vriendelijke websites met vaste prijzen en persoonlijke ondersteuning.',
+    ogTitle: 'Over Softora – partner voor MKB-websites',
+    ogDesc: 'Websitebureau met focus op MKB: ontwerp, bouw en onderhoud onder één dak.',
+    h1: 'Over Softora.nl',
+    h2: 'Onze missie\nHet team\nWerkwijze\nWaar we voor staan',
+    altHero: 'Team van Softora.nl bij werk aan een bedrijfswebsite',
     altLogo: 'Softora.nl logo',
-    altTeam: 'Team photo – Softora.nl website specialists',
+    altTeam: 'Teamfoto Softora.nl website specialisten',
   },
   diensten: {
-    metaTitle: 'Web design & packages | Softora.nl',
-    metaDesc: 'From one-pagers to custom builds: design, development, hosting, and maintenance. See what Softora.nl can do for your business.',
-    ogTitle: 'Services – tailored websites for SMBs',
-    ogDesc: 'Packages and custom work: fast sites, SEO basics, and ongoing care.',
-    h1: 'What we build for you',
-    h2: 'Website packages\nCustom & integrations\nCare & support\nFAQ',
-    altHero: 'Example of a professional business site by Softora',
-    altLogo: 'Softora.nl – web design services',
-    altTeam: 'Softora specialists on a web project',
+    metaTitle: 'Website laten bouwen | Softora.nl diensten & pakketten',
+    metaDesc: 'Van one-pager tot maatwerk: ontwerp, ontwikkeling, hosting en onderhoud. Bekijk wat Softora.nl voor uw bedrijf kan betekenen.',
+    ogTitle: 'Diensten – websites op maat voor het MKB',
+    ogDesc: 'Pakketten en maatwerk: snelle sites, SEO-basis en doorlopend onderhoud.',
+    h1: 'Wat we voor u bouwen',
+    h2: 'Website pakketten\nMaatwerk & integraties\nOnderhoud & support\nVeelgestelde vragen',
+    altHero: 'Voorbeeld van een professionele bedrijfswebsite door Softora',
+    altLogo: 'Softora.nl – diensten voor websitebouw',
+    altTeam: 'Softora specialisten bij een webproject',
   },
   contact: {
-    metaTitle: 'Contact | Softora.nl – quotes & questions',
-    metaDesc: 'Reach out for a no-obligation quote or advice on your website. We respond quickly and think along with you.',
+    metaTitle: 'Contact | Softora.nl – offerte & vragen',
+    metaDesc: 'Neem contact op voor een vrijblijvende offerte of advies over uw website. We reageren snel en denken mee.',
     ogTitle: 'Contact Softora.nl',
-    ogDesc: 'Request a quote or ask a question — personal reply within one business day.',
-    h1: 'Contact us',
-    h2: 'Request a quote\nCall or email\nLocation & availability\nFAQ',
-    altHero: 'Contact page – Softora.nl customer contact',
-    altLogo: 'Softora.nl contact logo',
-    altTeam: 'Softora support team available for clients',
+    ogDesc: 'Vraag een offerte aan of stel uw vraag — persoonlijk antwoord binnen één werkdag.',
+    h1: 'Neem contact op',
+    h2: 'Offerte aanvragen\nBel of mail ons\nLocatie & bereikbaarheid\nVeelgestelde vragen',
+    altHero: 'Contactpagina illustratie Softora.nl klantcontact',
+    altLogo: 'Softora.nl logo contact',
+    altTeam: 'Supportteam Softora.nl bereikbaar voor klanten',
   },
 };
 
 const aiSuggestionsByPage = {
   home: {
     meta: {
-      title: 'Need a website? Softora.nl – Fast & professional',
-      desc: 'Softora.nl builds professional, fast websites for SMBs. Request a free quote today. Tailored, SEO-friendly, and mobile-ready.',
+      title: 'Website laten bouwen? Softora.nl – Snel & Professioneel',
+      desc: 'Softora.nl bouwt professionele, snelle websites voor MKB-bedrijven. Vraag vandaag een gratis offerte aan. Op maat, SEO-vriendelijk en mobiel geoptimaliseerd.',
     },
     og: {
-      title: 'Softora.nl – Websites for SMBs',
-      desc: 'Professional sites that perform. Softora.nl helps SMBs grow online — fast, affordable, tailored.',
+      title: 'Softora.nl – Website laten bouwen voor het MKB',
+      desc: 'Professionele websites die scoren. Softora.nl helpt MKB-bedrijven met een sterke online aanwezigheid. Snel, betaalbaar en op maat gemaakt.',
     },
     h: {
-      h1: 'Get a professional website for your business',
-      h2: 'What we do for you\nPackages & pricing\nWhy Softora?\nSee our work\nRequest a free quote',
+      h1: 'Professionele website laten bouwen voor uw bedrijf',
+      h2: 'Wat wij voor u doen\nOnze website pakketten & prijzen\nWaarom kiezen voor Softora?\nBekijk onze referenties\nVraag een gratis offerte aan',
     },
     alt: {
-      hero: 'Professionally designed business website by Softora.nl for an SMB in the Netherlands',
-      logo: 'Softora.nl – web design and maintenance for SMBs',
-      team: 'The Softora.nl team helps businesses build a strong online presence',
+      hero: 'Professioneel ontworpen bedrijfswebsite gemaakt door Softora.nl voor een MKB-klant in Nederland',
+      logo: 'Softora.nl – specialist in website bouwen en website onderhoud voor het MKB',
+      team: 'Het professionele team van Softora.nl helpt bedrijven met een sterke online aanwezigheid',
     },
   },
   over: {
     meta: {
-      title: 'About us | Softora.nl – transparent web agency',
-      desc: 'Meet the people behind Softora: experienced builders for SMBs, clear pricing, and short lines. How we work on your site.',
+      title: 'Over ons | Softora.nl – transparant websitebureau',
+      desc: 'Ontdek wie achter Softora zit: ervaren webbouwers voor het MKB, vaste prijzen en korte lijnen. Zo werken wij samen aan uw site.',
     },
     og: {
-      title: 'The team behind Softora.nl',
-      desc: 'Personal contact, clear agreements, and sites that perform. Read how we work.',
+      title: 'Het team achter Softora.nl',
+      desc: 'Persoonlijk contact, duidelijke afspraken en websites die presteren. Lees meer over onze aanpak.',
     },
     h: {
-      h1: 'The team behind your new website',
-      h2: 'Our values\nHow we collaborate\nSMB experience\nClient stories',
+      h1: 'Het team achter uw nieuwe website',
+      h2: 'Onze waarden\nHoe we samenwerken\nErvaring in het MKB\nKlantverhalen',
     },
     alt: {
-      hero: 'Softora team working on responsive web design for SMBs',
-      logo: 'Softora.nl brand logo – web agency',
-      team: 'Softora.nl colleagues specialized in web development',
+      hero: 'Softora team aan het werk aan responsive webdesign voor MKB',
+      logo: 'Softora.nl merklogo websitebureau',
+      team: 'Collega’s van Softora.nl gespecialiseerd in webdevelopment',
     },
   },
   diensten: {
     meta: {
-      title: 'SMB websites & packages | Softora.nl',
-      desc: 'Pick the fit: from a fast one-pager to a full site with forms and SEO. Maintenance options available.',
+      title: 'MKB-websites & pakketten | Softora.nl',
+      desc: 'Kies het pakket dat past: van snelle one-pager tot uitgebreide site met formulieren en SEO. Inclusief onderhoudsopties.',
     },
     og: {
-      title: 'Our services: build, host, maintain',
-      desc: 'Everything for a professional site: design, tech, speed, and ongoing updates.',
+      title: 'Onze diensten: bouwen, hosten, onderhouden',
+      desc: 'Alles voor een professionele site: design, techniek, snelheid en doorlopende updates.',
     },
     h: {
-      h1: 'Websites and services tailored to founders',
-      h2: 'Starters & growers\nTech & speed\nSEO basics\nPost-launch support',
+      h1: 'Websites en diensten op maat voor ondernemers',
+      h2: 'Starters & groeiers\nTechniek & snelheid\nSEO-basis\nSupport na livegang',
     },
     alt: {
-      hero: 'Overview of Softora web services and packages',
-      logo: 'Softora services – design and care',
-      team: 'Softora experts implementing a client project',
+      hero: 'Overzicht van website-diensten en pakketten Softora',
+      logo: 'Softora diensten – webdesign en onderhoud',
+      team: 'Experts van Softora bij implementatie van een klantproject',
     },
   },
   contact: {
     meta: {
-      title: 'Free website quote | Contact Softora.nl',
-      desc: 'Email or call for advice or a no-obligation quote. We’ll help you with the next step online.',
+      title: 'Gratis offerte website | Contact Softora.nl',
+      desc: 'Mail of bel voor advies of een vrijblijvende offerte. We helpen u graag met de volgende stap voor uw online aanwezigheid.',
     },
     og: {
-      title: 'Contact Softora',
-      desc: 'Questions on price, timeline, or tech? We reply fast and think with you.',
+      title: 'Neem contact op met Softora',
+      desc: 'Vragen over prijs, planning of techniek? Wij reageren snel en denken met u mee.',
     },
     h: {
-      h1: 'Let’s talk about your website plans',
-      h2: 'Request a quote\nContact us\nHours & availability\nNext steps',
+      h1: 'Laten we uw websiteplannen bespreken',
+      h2: 'Offerte aanvragen\nDirect contact\nOpeningstijden\nVolgende stappen',
     },
     alt: {
-      hero: 'Contact Softora for a website quote',
-      logo: 'Softora contact – web design support',
-      team: 'Softora support ready for your site questions',
+      hero: 'Contact opnemen met Softora voor website offerte',
+      logo: 'Softora contact – klantenservice websitebouw',
+      team: 'Softora support klaar voor vragen over uw site',
     },
   },
 };
@@ -1243,7 +1245,7 @@ function renderSeoPagePanels() {
         <div class="seo-page-header-row">
           <button type="button" class="btn-ai seo-page-opt-btn" onclick="optimisePage('${s}', this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            Optimize page
+            Pagina optimaliseren
           </button>
           <div class="seo-page-header-text">
             <h4 class="seo-page-title">${p.title}</h4>
@@ -1258,12 +1260,12 @@ function renderSeoPagePanels() {
             <div id="${s}-meta-status"></div>
           </div>
           <div class="ai-card-body">
-            <div class="field-label">Title tag <span style="font-weight:400;text-transform:none;letter-spacing:0">(max 60 characters)</span></div>
+            <div class="field-label">Title tag <span style="font-weight:400;text-transform:none;letter-spacing:0">(max 60 tekens)</span></div>
             <div class="field-val">
               <textarea id="${s}-meta-title" rows="2" oninput="charCount('${s}-meta-title', '${s}-meta-title-count', 60)"></textarea>
             </div>
             <div class="char-count" id="${s}-meta-title-count"></div>
-            <div class="field-label">Meta description <span style="font-weight:400;text-transform:none;letter-spacing:0">(max 160 characters)</span></div>
+            <div class="field-label">Meta description <span style="font-weight:400;text-transform:none;letter-spacing:0">(max 160 tekens)</span></div>
             <div class="field-val">
               <textarea id="${s}-meta-desc" rows="3" oninput="charCount('${s}-meta-desc', '${s}-meta-desc-count', 160)"></textarea>
             </div>
@@ -1294,12 +1296,12 @@ function renderSeoPagePanels() {
             <div id="${s}-h-status"></div>
           </div>
           <div class="ai-card-body">
-            <div class="field-label">H1 (page title)</div>
+            <div class="field-label">H1 (hoofdtitel pagina)</div>
             <div class="field-val">
               <textarea id="${s}-h1" rows="2" oninput="charCount('${s}-h1', '${s}-h1-count', 70)"></textarea>
             </div>
             <div class="char-count" id="${s}-h1-count"></div>
-            <div class="field-label">H2 suggestions</div>
+            <div class="field-label">H2 suggesties</div>
             <div class="field-val">
               <textarea id="${s}-h2" rows="4"></textarea>
             </div>
@@ -1307,11 +1309,11 @@ function renderSeoPagePanels() {
         </div>
         <div class="ai-card">
           <div class="ai-card-head">
-            <div class="ai-card-title">Alt text</div>
+            <div class="ai-card-title">Alt Teksten</div>
             <div id="${s}-alt-status"></div>
           </div>
           <div class="ai-card-body">
-            <div class="field-label">Hero image</div>
+            <div class="field-label">Hero afbeelding</div>
             <div class="field-val">
               <textarea id="${s}-alt-hero" rows="2"></textarea>
             </div>
@@ -1319,7 +1321,7 @@ function renderSeoPagePanels() {
             <div class="field-val">
               <textarea id="${s}-alt-logo" rows="2"></textarea>
             </div>
-            <div class="field-label">Team / about</div>
+            <div class="field-label">Team / over ons</div>
             <div class="field-val">
               <textarea id="${s}-alt-team" rows="2"></textarea>
             </div>
@@ -1361,7 +1363,7 @@ function startScan() {
   document.getElementById('scan-result').innerHTML = `
     <div class="scan-loading">
       <div class="loader"></div>
-      <div class="loader-text">Scanning softora.nl…</div>
+      <div class="loader-text">Bezig met scannen van softora.nl…</div>
     </div>`;
 
   setTimeout(() => {
@@ -1376,26 +1378,26 @@ function renderScanResult() {
   const offset = circumference - (score / 100) * circumference;
   const scoreColor = score >= 75 ? '#16733c' : score >= 50 ? '#b45a00' : '#c0392b';
   const verdictClass = score >= 75 ? 'verdict-good' : score >= 50 ? 'verdict-mid' : 'verdict-bad';
-  const verdictText = score >= 75 ? 'Good' : score >= 50 ? 'Room to improve' : 'Critical';
+  const verdictText = score >= 75 ? 'Goed' : score >= 50 ? 'Verbetering mogelijk' : 'Kritiek';
 
   const metrics = [
-    { title: 'Load time', val: '2.4s', pct: 58, note: 'Target: under 2s', color: '#b45a00' },
-    { title: 'Mobile score', val: '74/100', pct: 74, note: 'Fair — can improve', color: '#b45a00' },
-    { title: 'Desktop score', val: '89/100', pct: 89, note: 'Good', color: '#16733c' },
-    { title: 'Backlinks', val: '12', pct: 24, note: 'Low — needs link building', color: '#c0392b' },
-    { title: 'Indexed pages', val: '8', pct: 80, note: 'Typical for SMB site', color: '#16733c' },
-    { title: 'Core Web Vitals', val: 'Average', pct: 55, note: 'Improve LCP & CLS', color: '#b45a00' },
+    { title: 'Laadtijd', val: '2.4s', pct: 58, note: 'Doel: onder 2s', color: '#b45a00' },
+    { title: 'Mobile score', val: '74/100', pct: 74, note: 'Redelijk — verbetering mogelijk', color: '#b45a00' },
+    { title: 'Desktop score', val: '89/100', pct: 89, note: 'Goed', color: '#16733c' },
+    { title: 'Backlinks', val: '12', pct: 24, note: 'Laag — meer linkbuilding nodig', color: '#c0392b' },
+    { title: "Geïndexeerde pagina's", val: '8', pct: 80, note: 'Normaal voor MKB site', color: '#16733c' },
+    { title: 'Core Web Vitals', val: 'Gemiddeld', pct: 55, note: 'LCP & CLS verbeteren', color: '#b45a00' },
   ];
 
   const issues = [
-    { level: 'error', text: 'Meta description missing on 3 pages', sub: '/services, /contact, /about', tag: 'Critical' },
-    { level: 'error', text: 'H1 missing on homepage', sub: 'No main heading found in HTML', tag: 'Critical' },
-    { level: 'warning', text: 'Images missing alt text (7)', sub: 'hero.jpg, team.jpg, and 5 others', tag: 'Warning' },
-    { level: 'warning', text: 'Load time over 2 seconds', sub: 'Average 2.4s — compress images and use caching', tag: 'Warning' },
-    { level: 'warning', text: 'No sitemap.xml found', sub: 'Add a sitemap and submit in Google Search Console', tag: 'Warning' },
-    { level: 'ok', text: 'SSL certificate active', sub: 'HTTPS configured correctly', tag: 'OK' },
-    { level: 'ok', text: 'robots.txt present', sub: 'Configured correctly', tag: 'OK' },
-    { level: 'ok', text: 'Mobile-friendly', sub: 'Page works on mobile screens', tag: 'OK' },
+    { level: 'error', text: "Meta description ontbreekt op 3 pagina's", sub: '/diensten, /contact, /over-ons', tag: 'Kritiek' },
+    { level: 'error', text: 'H1 tag ontbreekt op homepage', sub: 'Geen hoofdtitel gevonden in de HTML', tag: 'Kritiek' },
+    { level: 'warning', text: 'Afbeeldingen missen alt-teksten (7 stuks)', sub: 'hero.jpg, team.jpg en 5 andere afbeeldingen', tag: 'Waarschuwing' },
+    { level: 'warning', text: 'Laadtijd boven 2 seconden', sub: 'Gemiddeld 2.4s — comprimeer afbeeldingen en gebruik caching', tag: 'Waarschuwing' },
+    { level: 'warning', text: 'Geen sitemap.xml gevonden', sub: 'Voeg een sitemap toe en dien in bij Google Search Console', tag: 'Waarschuwing' },
+    { level: 'ok', text: 'SSL certificaat actief', sub: 'HTTPS correct geconfigureerd', tag: 'OK' },
+    { level: 'ok', text: 'robots.txt aanwezig', sub: 'Correct geconfigureerd', tag: 'OK' },
+    { level: 'ok', text: 'Mobile-friendly', sub: 'Pagina reageert correct op mobiele schermen', tag: 'OK' },
   ];
 
   document.getElementById('scan-result').innerHTML = `
@@ -1412,7 +1414,7 @@ function renderScanResult() {
           </svg>
           <div class="score-number" style="color:${scoreColor}">${score}</div>
         </div>
-        <div class="score-label">SEO score</div>
+        <div class="score-label">SEO Score</div>
         <div class="score-verdict ${verdictClass}">${verdictText}</div>
       </div>
       <div class="metrics-grid">
@@ -1426,7 +1428,7 @@ function renderScanResult() {
       </div>
     </div>
     <div class="issues-section">
-      <div class="issues-title">Findings (${issues.length})</div>
+      <div class="issues-title">Gevonden punten (${issues.length})</div>
       <div class="issues-list">
         ${issues.map((i) => `
           <div class="issue-item">
@@ -1453,9 +1455,9 @@ function setStatus(slug, type, state) {
   const el = document.getElementById(`${slug}-${type}-status`);
   if (!el) return;
   if (state === 'loading') {
-    el.innerHTML = '<div class="ai-status loading"><div class="ai-dot"></div> Working…</div>';
+    el.innerHTML = '<div class="ai-status loading"><div class="ai-dot"></div> Bezig…</div>';
   } else if (state === 'done') {
-    el.innerHTML = '<div class="ai-status done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Optimized</div>';
+    el.innerHTML = '<div class="ai-status done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Geoptimaliseerd</div>';
   } else {
     el.innerHTML = '';
   }
@@ -1491,7 +1493,7 @@ function optimiseField(slug, type, opts) {
       document.getElementById(`${slug}-alt-team`).value = s.team;
     }
     setStatus(slug, type, 'done');
-    if (!quiet) toast('✓ ' + type.toUpperCase() + ' optimized (' + slug + ')');
+    if (!quiet) toast('✓ ' + type.toUpperCase() + ' geoptimaliseerd (' + slug + ')');
   }, 1600);
 }
 
@@ -1499,10 +1501,10 @@ const BTN_SVG_LIGHTNING = '<svg viewBox="0 0 24 24" fill="none" stroke="currentC
 
 function optimisePage(slug, btnEl) {
   const types = ['meta', 'og', 'h', 'alt'];
-  const label = BTN_SVG_LIGHTNING + ' Optimize page';
+  const label = BTN_SVG_LIGHTNING + ' Pagina optimaliseren';
   if (btnEl) {
     btnEl.disabled = true;
-    btnEl.innerHTML = '<div class="loader" style="width:16px;height:16px;border-width:2px"></div> Working…';
+    btnEl.innerHTML = '<div class="loader" style="width:16px;height:16px;border-width:2px"></div> Bezig…';
   }
   let delay = 0;
   types.forEach((t) => {
@@ -1515,7 +1517,7 @@ function optimisePage(slug, btnEl) {
       btnEl.disabled = false;
       btnEl.innerHTML = label;
     }
-    toast('✓ Page optimized (demo)');
+    toast('✓ Pagina geoptimaliseerd (demo)');
   }, delay + 1700);
 }
 

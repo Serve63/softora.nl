@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
+    <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
         <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | SEO CRM System — Premium</title>
 
@@ -1967,7 +1969,7 @@
             const safeDesc = escapeHtml(metaDesc || '');
             const safeSlug = escapeHtml(slug || '');
             const safeBody = escapeHtml(content || '').replace(/\n/g, '<br>\n');
-            return `<!DOCTYPE html>\n<html lang="nl">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${safeTitle}</title>\n  <meta name="description" content="${safeDesc}">\n</head>\n<body>\n  <article>\n    <h1>${escapeHtml(title || 'Blog')}</h1>\n    <p style="color:#6b6b7b;">Slug: ${safeSlug}</p>\n    <div>${safeBody}</div>\n  </article>\n</body>\n</html>`;
+            return `<!DOCTYPE html>\n<html lang="nl">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">\n  <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">\n  <title>${safeTitle}</title>\n  <meta name="description" content="${safeDesc}">\n</head>\n<body>\n  <article>\n    <h1>${escapeHtml(title || 'Blog')}</h1>\n    <p style="color:#6b6b7b;">Slug: ${safeSlug}</p>\n    <div>${safeBody}</div>\n  </article>\n</body>\n</html>`;
         }
 
         blogSearch.addEventListener('input', renderBlogList);
