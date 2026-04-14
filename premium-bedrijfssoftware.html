@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bedrijfssoftware op maat – Softora.nl</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -17,12 +17,12 @@
   --light: #999;
   --border: #e8e5e0;
 }
-body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--dark); }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); }
 
 /* NAV */
 nav { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 80px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
-.nav-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
-.nav-cta { display: flex; align-items: center; gap: 8px; padding: 8px 20px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; text-decoration: none; transition: background .15s; }
+.nav-logo { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
+.nav-cta { display: flex; align-items: center; gap: 8px; padding: 8px 20px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; text-decoration: none; transition: background .15s; }
 .nav-cta:hover { background: var(--clight); }
 
 /* HERO */
@@ -54,28 +54,28 @@ nav { background: var(--white); border-bottom: 1px solid var(--border); padding:
 .hero-inner { max-width: 680px; position: relative; z-index: 1; }
 .hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
 .hero-eyebrow::before { content: ''; width: 32px; height: 2px; background: var(--crimson); border-radius: 1px; }
-.hero-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(52px, 6vw, 80px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 6px; }
+.hero-title { font-family: 'Oswald', sans-serif; font-size: clamp(52px, 6vw, 80px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 6px; }
 .hero-title em { color: var(--crimson); font-style: normal; }
 .hero-sub { font-size: 16px; color: rgba(255,255,255,.5); line-height: 1.7; margin: 24px 0 40px; max-width: 520px; }
 .hero-btns { display: flex; gap: 12px; flex-wrap: wrap; }
-.btn-primary { display: inline-flex; align-items: center; gap: 9px; padding: 14px 28px; background: var(--crimson); color: #fff; border: none; border-radius: 5px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; text-decoration: none; }
+.btn-primary { display: inline-flex; align-items: center; gap: 9px; padding: 14px 28px; background: var(--crimson); color: #fff; border: none; border-radius: 5px; font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; text-decoration: none; }
 .btn-primary:hover { background: var(--clight); }
 .btn-primary svg { width: 14px; height: 14px; }
-.btn-ghost { display: inline-flex; align-items: center; gap: 9px; padding: 13px 28px; background: none; color: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.15); border-radius: 5px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all .15s; text-decoration: none; }
+.btn-ghost { display: inline-flex; align-items: center; gap: 9px; padding: 13px 28px; background: none; color: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.15); border-radius: 5px; font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all .15s; text-decoration: none; }
 .btn-ghost:hover { border-color: rgba(255,255,255,.4); color: #fff; }
 
 /* STATS STRIP */
 .stats-strip { background: var(--crimson); padding: 28px 80px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
 .stat-item { text-align: center; padding: 0 20px; border-right: 1px solid rgba(255,255,255,.15); }
 .stat-item:last-child { border-right: none; }
-.stat-num { font-family: 'Barlow Condensed', sans-serif; font-size: 40px; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 4px; }
+.stat-num { font-family: 'Oswald', sans-serif; font-size: 40px; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 4px; }
 .stat-label { font-size: 11px; color: rgba(255,255,255,.65); font-weight: 500; }
 
 /* SECTION SHARED */
 .section { padding: 88px 80px; }
 .section-alt { background: var(--white); }
 .section-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--crimson); margin-bottom: 12px; }
-.section-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(36px, 4vw, 52px); font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; line-height: 1.05; color: var(--dark); margin-bottom: 16px; }
+.section-title { font-family: 'Oswald', sans-serif; font-size: clamp(36px, 4vw, 52px); font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; line-height: 1.05; color: var(--dark); margin-bottom: 16px; }
 .section-sub { font-size: 15px; color: var(--mid); line-height: 1.7; max-width: 560px; }
 
 /* WAT KAN IK VOOR JE DOEN */
@@ -84,7 +84,7 @@ nav { background: var(--white); border-bottom: 1px solid var(--border); padding:
 .dienst-card:hover { box-shadow: 0 6px 28px rgba(0,0,0,.08); border-color: rgba(155,35,85,.2); transform: translateY(-2px); }
 .dienst-icon { width: 44px; height: 44px; background: rgba(155,35,85,.08); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
 .dienst-icon svg { width: 20px; height: 20px; color: var(--crimson); }
-.dienst-name { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+.dienst-name { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
 .dienst-desc { font-size: 13px; color: var(--mid); line-height: 1.7; margin-bottom: 16px; }
 .dienst-list { list-style: none; display: flex; flex-direction: column; gap: 7px; }
 .dienst-list li { font-size: 12px; color: var(--mid); display: flex; align-items: flex-start; gap: 8px; line-height: 1.4; }
@@ -94,9 +94,9 @@ nav { background: var(--white); border-bottom: 1px solid var(--border); padding:
 .process-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 52px; position: relative; }
 .process-grid::before { content: ''; position: absolute; top: 28px; left: calc(12.5% + 16px); right: calc(12.5% + 16px); height: 1px; background: var(--border); z-index: 0; }
 .process-step { text-align: center; padding: 0 16px; position: relative; z-index: 1; }
-.step-num { width: 56px; height: 56px; border-radius: 50%; background: var(--white); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; color: var(--dark); transition: all .2s; }
+.step-num { width: 56px; height: 56px; border-radius: 50%; background: var(--white); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 800; color: var(--dark); transition: all .2s; }
 .process-step:first-child .step-num { background: var(--crimson); border-color: var(--crimson); color: #fff; }
-.step-title { font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.step-title { font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
 .step-desc { font-size: 13px; color: var(--mid); line-height: 1.6; }
 
 /* VOORBEELDEN */
@@ -105,14 +105,14 @@ nav { background: var(--white); border-bottom: 1px solid var(--border); padding:
 .example-visual { height: 180px; display: flex; align-items: center; justify-content: center; }
 .example-body { background: var(--white); padding: 20px 22px; }
 .example-tag { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--crimson); margin-bottom: 6px; }
-.example-name { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; }
+.example-name { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; }
 .example-desc { font-size: 13px; color: var(--mid); line-height: 1.6; }
 
 /* WAAROM SOFTORA */
 .why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px 80px; margin-top: 52px; }
 .why-item { display: flex; gap: 18px; align-items: flex-start; }
-.why-num { font-family: 'Barlow Condensed', sans-serif; font-size: 48px; font-weight: 800; color: rgba(155,35,85,.12); line-height: 1; flex-shrink: 0; width: 52px; }
-.why-title { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.why-num { font-family: 'Oswald', sans-serif; font-size: 48px; font-weight: 800; color: rgba(155,35,85,.12); line-height: 1; flex-shrink: 0; width: 52px; }
+.why-title { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
 .why-desc { font-size: 13px; color: var(--mid); line-height: 1.7; }
 
 /* CTA BLOCK */
@@ -126,7 +126,7 @@ nav { background: var(--white); border-bottom: 1px solid var(--border); padding:
 .cta-block::before { content: ''; position: absolute; top: -50%; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(155,35,85,.2) 0%, transparent 65%); pointer-events: none; }
 .cta-block-inner { position: relative; z-index: 1; }
 .cta-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 16px; }
-.cta-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(36px, 4vw, 56px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; color: #fff; line-height: 1.05; margin-bottom: 16px; }
+.cta-title { font-family: 'Oswald', sans-serif; font-size: clamp(36px, 4vw, 56px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; color: #fff; line-height: 1.05; margin-bottom: 16px; }
 .cta-sub { font-size: 15px; color: rgba(255,255,255,.5); line-height: 1.7; margin-bottom: 36px; max-width: 480px; margin-left: auto; margin-right: auto; }
 .cta-contact { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 24px; }
 .cta-tel { font-size: 14px; color: rgba(255,255,255,.4); }
@@ -134,7 +134,7 @@ nav { background: var(--white); border-bottom: 1px solid var(--border); padding:
 
 /* FOOTER */
 footer { background: var(--dark); border-top: 1px solid rgba(255,255,255,.06); padding: 24px 80px; display: flex; align-items: center; justify-content: space-between; }
-.footer-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
+.footer-logo { font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
 .footer-copy { font-size: 12px; color: rgba(255,255,255,.3); }
 
 /* SCROLL REVEAL */
