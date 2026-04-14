@@ -55,37 +55,34 @@ nav {
 .trustpilot-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.38rem 0.72rem 0.38rem 0.62rem;
-  border-radius: 6px;
-  border: 1px solid rgba(26, 26, 46, 0.09);
+  gap: 0.5rem;
+  padding: 0.4rem 0;
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 1px 2px rgba(15, 17, 28, 0.04);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  border: none;
+  background: none;
+  box-shadow: none;
+  transition: opacity 0.2s ease;
 }
-.trustpilot-badge:hover {
-  border-color: rgba(0, 182, 122, 0.35);
-  box-shadow: 0 4px 16px rgba(15, 17, 28, 0.07);
+.trustpilot-badge:hover { opacity: 0.88; }
+.trustpilot-dots { display: inline-flex; gap: 3px; align-items: center; }
+.trustpilot-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #00b67a;
+  display: block;
 }
-.trustpilot-badge-inner { display: flex; align-items: center; gap: 0.55rem; }
-.trustpilot-stars-row { display: flex; gap: 3px; align-items: flex-end; height: 14px; }
-.trustpilot-star-bar { width: 5px; height: 12px; border-radius: 1px; background: #00b67a; }
-.trustpilot-badge-text { display: flex; flex-direction: column; gap: 1px; line-height: 1.12; text-align: left; }
-.trustpilot-rating-num {
+.trustpilot-line {
   font-family: 'Inter', sans-serif;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--dark);
-  letter-spacing: -0.02em;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--mid);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
-.trustpilot-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 0.5625rem;
-  font-weight: 600;
-  color: var(--light);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
+.trustpilot-line .tp-score { font-weight: 600; color: var(--dark); }
+.trustpilot-line .tp-sep { margin: 0 0.2em; color: var(--light); font-weight: 400; }
+.trustpilot-line .tp-name { color: #00b67a; font-weight: 600; }
 .nav-start-btn {
   display: inline-flex;
   align-items: center;
@@ -137,19 +134,8 @@ nav {
   <a href="/" class="logo">SOFTORA.NL</a>
   <div class="nav-links">
     <a href="https://nl.trustpilot.com/review/softora.nl" class="trustpilot-badge" target="_blank" rel="noopener noreferrer" aria-label="Bekijk Softora reviews op Trustpilot">
-      <span class="trustpilot-badge-inner">
-        <span class="trustpilot-stars-row" aria-hidden="true">
-          <span class="trustpilot-star-bar"></span>
-          <span class="trustpilot-star-bar"></span>
-          <span class="trustpilot-star-bar"></span>
-          <span class="trustpilot-star-bar"></span>
-          <span class="trustpilot-star-bar"></span>
-        </span>
-        <span class="trustpilot-badge-text">
-          <strong class="trustpilot-rating-num">4,9</strong>
-          <span class="trustpilot-label">Trustpilot</span>
-        </span>
-      </span>
+      <span class="trustpilot-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="trustpilot-line"><span class="tp-score">4,9</span><span class="tp-sep">·</span><span class="tp-name">Trustpilot</span></span>
     </a>
     <a href="/#contact" class="nav-start-btn">Start Project</a>
   </div>
