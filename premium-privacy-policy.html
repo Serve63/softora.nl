@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy – Softora.nl</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f4f1; --white: #fff; --crimson: #9b2355;
+  --dark: #1a1a2e; --mid: #555; --light: #999; --border: #e8e5e0;
+}
+body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--dark); }
+
+nav { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 80px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+.nav-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
+.nav-link { font-size: 13px; color: var(--light); text-decoration: none; transition: color .15s; }
+.nav-link:hover { color: var(--crimson); }
+
+.hero-strip { background: var(--dark); padding: 56px 80px 52px; }
+.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.8); margin-bottom: 14px; }
+.hero-title { font-family: 'Barlow Condensed', sans-serif; font-size: 52px; font-weight: 800; text-transform: uppercase; letter-spacing: -1px; color: #fff; line-height: 1; margin-bottom: 12px; }
+.hero-meta { font-size: 13px; color: rgba(255,255,255,.4); }
+
+.layout { display: grid; grid-template-columns: 240px 1fr; gap: 0; max-width: 1100px; margin: 0 auto; padding: 60px 40px 100px; align-items: start; }
+
+.toc { position: sticky; top: 80px; padding-right: 40px; }
+.toc-title { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--light); margin-bottom: 14px; }
+.toc-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.toc-list li a { font-size: 12px; color: var(--light); text-decoration: none; display: block; padding: 4px 0 4px 12px; border-left: 2px solid transparent; transition: all .15s; line-height: 1.4; }
+.toc-list li a:hover { color: var(--crimson); border-left-color: var(--crimson); }
+.toc-list li a.active { color: var(--crimson); border-left-color: var(--crimson); font-weight: 600; }
+
+.content { max-width: 680px; }
+.av-section { margin-bottom: 48px; }
+.av-section-num { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--crimson); margin-bottom: 6px; }
+.av-section-title { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--dark); margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.av-section p { font-size: 14px; color: var(--mid); line-height: 1.85; margin-bottom: 14px; }
+.av-section p:last-child { margin-bottom: 0; }
+.av-section ul { padding-left: 20px; margin-bottom: 14px; }
+.av-section ul li { font-size: 14px; color: var(--mid); line-height: 1.85; margin-bottom: 6px; }
+.av-section strong { color: var(--dark); font-weight: 600; }
+
+.info-box { background: var(--white); border: 1px solid var(--border); border-left: 3px solid var(--crimson); border-radius: 0 6px 6px 0; padding: 14px 18px; margin-bottom: 14px; font-size: 13px; color: var(--mid); line-height: 1.7; }
+.info-box strong { color: var(--dark); }
+
+.data-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 13px; }
+.data-table th { text-align: left; padding: 9px 14px; background: var(--bg); border: 1px solid var(--border); font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--light); }
+.data-table td { padding: 10px 14px; border: 1px solid var(--border); color: var(--mid); background: var(--white); vertical-align: top; line-height: 1.5; }
+.data-table tr:hover td { background: var(--bg); }
+
+footer { background: var(--dark); padding: 24px 80px; display: flex; align-items: center; justify-content: space-between; }
+.footer-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
+.footer-copy { font-size: 12px; color: rgba(255,255,255,.3); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">SOFTORA.NL</div>
+  <a class="nav-link" href="mailto:info@softora.nl">info@softora.nl</a>
+</nav>
+
+<div class="hero-strip">
+  <div class="hero-eyebrow">Softora.nl</div>
+  <div class="hero-title">Privacy<br>Policy</div>
+  <div class="hero-meta">Versie 1.0 · Geldig vanaf 1 januari 2026 · Softora.nl, Oisterwijk</div>
+</div>
+
+<div class="layout">
+  <aside class="toc">
+    <div class="toc-title">Inhoudsopgave</div>
+    <ul class="toc-list">
+      <li><a href="#art1">1. Wie zijn wij?</a></li>
+      <li><a href="#art2">2. Welke gegevens verzamelen we?</a></li>
+      <li><a href="#art3">3. Waarom verwerken we gegevens?</a></li>
+      <li><a href="#art4">4. Grondslagen voor verwerking</a></li>
+      <li><a href="#art5">5. Hoe lang bewaren we gegevens?</a></li>
+      <li><a href="#art6">6. Delen met derden</a></li>
+      <li><a href="#art7">7. Cookies</a></li>
+      <li><a href="#art8">8. Beveiliging</a></li>
+      <li><a href="#art9">9. Jouw rechten</a></li>
+      <li><a href="#art10">10. Klachten</a></li>
+      <li><a href="#art11">11. Wijzigingen</a></li>
+      <li><a href="#art12">12. Contact</a></li>
+    </ul>
+  </aside>
+
+  <main class="content">
+
+    <div class="info-box">
+      Softora.nl hecht grote waarde aan de bescherming van jouw persoonsgegevens. In deze privacy policy leggen wij uit welke gegevens wij verzamelen, waarom we dat doen en hoe we daarmee omgaan. Wij verwerken persoonsgegevens in overeenstemming met de <strong>Algemene Verordening Gegevensbescherming (AVG)</strong>.
+    </div>
+
+    <div class="av-section" id="art1">
+      <div class="av-section-num">Artikel 1</div>
+      <div class="av-section-title">Wie zijn wij?</div>
+      <p>Softora.nl is verantwoordelijk voor de verwerking van persoonsgegevens zoals beschreven in deze privacy policy.</p>
+      <div class="info-box">
+        <strong>Softora.nl</strong><br>
+        Oisterwijk, Nederland<br>
+        KvK: 12345678<br>
+        E-mail: <strong>info@softora.nl</strong><br>
+        Telefoon: <strong>+31 6 2991 7185</strong><br>
+        Website: <strong>www.softora.nl</strong>
+      </div>
+    </div>
+
+    <div class="av-section" id="art2">
+      <div class="av-section-num">Artikel 2</div>
+      <div class="av-section-title">Welke gegevens verzamelen we?</div>
+      <p>Wij verzamelen en verwerken de volgende categorieën persoonsgegevens, afhankelijk van hoe je gebruik maakt van onze diensten:</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Categorie</th>
+            <th>Gegevens</th>
+            <th>Situatie</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Contactgegevens</strong></td>
+            <td>Naam, e-mailadres, telefoonnummer, bedrijfsnaam</td>
+            <td>Bij contactopname, offerte of opdracht</td>
+          </tr>
+          <tr>
+            <td><strong>Factuurgegevens</strong></td>
+            <td>Naam, adres, KvK-nummer, BTW-nummer, IBAN</td>
+            <td>Bij het aangaan van een zakelijke overeenkomst</td>
+          </tr>
+          <tr>
+            <td><strong>Communicatiegegevens</strong></td>
+            <td>E-mailberichten, WhatsApp-berichten, notities</td>
+            <td>Bij onderlinge communicatie</td>
+          </tr>
+          <tr>
+            <td><strong>Websitegegevens</strong></td>
+            <td>IP-adres, browsertype, bezochte pagina's, duur bezoek</td>
+            <td>Via cookies op softora.nl</td>
+          </tr>
+          <tr>
+            <td><strong>Inloggegevens</strong></td>
+            <td>Gebruikersnaam, wachtwoord (versleuteld)</td>
+            <td>Bij gebruik van het personeelsportaal</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Wij verzamelen geen bijzondere persoonsgegevens zoals gezondheidsinformatie, politieke opvattingen of biometrische gegevens.</p>
+    </div>
+
+    <div class="av-section" id="art3">
+      <div class="av-section-num">Artikel 3</div>
+      <div class="av-section-title">Waarom verwerken we gegevens?</div>
+      <p>Softora.nl verwerkt persoonsgegevens voor de volgende doeleinden:</p>
+      <ul>
+        <li><strong>Uitvoering van de overeenkomst</strong> — om opdrachten correct uit te kunnen voeren, offertes te sturen en facturen te verwerken.</li>
+        <li><strong>Communicatie</strong> — om contact op te nemen over lopende of toekomstige opdrachten en vragen te beantwoorden.</li>
+        <li><strong>Administratie & boekhouding</strong> — om te voldoen aan wettelijke verplichtingen op het gebied van financiële administratie.</li>
+        <li><strong>Verbetering van onze diensten</strong> — om inzicht te krijgen in het gebruik van onze website en diensten te verbeteren.</li>
+        <li><strong>Marketing</strong> — om relevante informatie over onze diensten te delen, uitsluitend met jouw toestemming of op basis van een gerechtvaardigd belang.</li>
+      </ul>
+    </div>
+
+    <div class="av-section" id="art4">
+      <div class="av-section-num">Artikel 4</div>
+      <div class="av-section-title">Grondslagen voor verwerking</div>
+      <p>Wij verwerken persoonsgegevens op basis van de volgende rechtsgrondslagen uit de AVG:</p>
+      <ul>
+        <li><strong>Uitvoering van een overeenkomst (art. 6 lid 1 sub b AVG)</strong> — voor de verwerking die noodzakelijk is voor het uitvoeren van een opdracht of het aangaan van een overeenkomst.</li>
+        <li><strong>Wettelijke verplichting (art. 6 lid 1 sub c AVG)</strong> — voor verwerking die noodzakelijk is om te voldoen aan wettelijke verplichtingen, zoals de bewaarplicht voor facturen.</li>
+        <li><strong>Gerechtvaardigd belang (art. 6 lid 1 sub f AVG)</strong> — voor het verbeteren van onze diensten en het bijhouden van zakelijke relaties.</li>
+        <li><strong>Toestemming (art. 6 lid 1 sub a AVG)</strong> — voor het plaatsen van niet-noodzakelijke cookies en het versturen van marketingcommunicatie.</li>
+      </ul>
+    </div>
+
+    <div class="av-section" id="art5">
+      <div class="av-section-num">Artikel 5</div>
+      <div class="av-section-title">Hoe lang bewaren we gegevens?</div>
+      <p>Softora.nl bewaart persoonsgegevens niet langer dan noodzakelijk voor het doel waarvoor ze zijn verzameld, of zolang de wet dit vereist.</p>
+      <ul>
+        <li><strong>Klant- en opdrachtgegevens</strong> — 7 jaar na afloop van de opdracht (fiscale bewaarplicht).</li>
+        <li><strong>Facturen en boekhoudkundige gegevens</strong> — 7 jaar conform de wettelijke bewaarplicht.</li>
+        <li><strong>Communicatiegegevens</strong> — 2 jaar na het laatste contact, tenzij een actieve klantrelatie bestaat.</li>
+        <li><strong>Websitegegevens (cookies)</strong> — maximaal 12 maanden, afhankelijk van het type cookie.</li>
+        <li><strong>Sollicitaties</strong> — maximaal 4 weken na afwijzing, tenzij toestemming is gegeven voor een langere bewaartermijn.</li>
+      </ul>
+      <p>Na het verstrijken van de bewaartermijn worden gegevens veilig verwijderd of geanonimiseerd.</p>
+    </div>
+
+    <div class="av-section" id="art6">
+      <div class="av-section-num">Artikel 6</div>
+      <div class="av-section-title">Delen met derden</div>
+      <p>Softora.nl verstrekt jouw persoonsgegevens niet aan derden zonder jouw toestemming, tenzij dit noodzakelijk is voor de uitvoering van de opdracht of wettelijk verplicht is.</p>
+      <p>Wij kunnen gebruik maken van de volgende categorieën verwerkers:</p>
+      <ul>
+        <li><strong>Hostingproviders</strong> — voor het hosten van onze website en systemen.</li>
+        <li><strong>Boekhoudkundige software</strong> — voor het verwerken van facturen en financiële administratie.</li>
+        <li><strong>E-maildiensten</strong> — voor het verzenden en ontvangen van e-mail (bijv. Google Workspace).</li>
+        <li><strong>Betalingsdiensten</strong> — voor het verwerken van betalingen.</li>
+      </ul>
+      <p>Met alle verwerkers die namens ons persoonsgegevens verwerken, sluiten wij een verwerkersovereenkomst af. Wij verstrekken geen gegevens aan partijen buiten de Europese Economische Ruimte (EER), tenzij passende waarborgen zijn getroffen.</p>
+    </div>
+
+    <div class="av-section" id="art7">
+      <div class="av-section-num">Artikel 7</div>
+      <div class="av-section-title">Cookies</div>
+      <p>Onze website maakt gebruik van cookies — kleine tekstbestanden die op jouw apparaat worden opgeslagen. Wij gebruiken de volgende typen cookies:</p>
+      <ul>
+        <li><strong>Functionele cookies</strong> — noodzakelijk voor het correct functioneren van de website. Deze cookies vereisen geen toestemming.</li>
+        <li><strong>Analytische cookies</strong> — voor het meten van websitebezoek en het verbeteren van onze diensten (bijv. Google Analytics). Hiervoor vragen wij jouw toestemming.</li>
+        <li><strong>Marketing cookies</strong> — voor het tonen van relevante advertenties. Wij plaatsen deze uitsluitend met jouw expliciete toestemming.</li>
+      </ul>
+      <p>Je kunt jouw cookievoorkeuren op elk moment aanpassen via de cookieinstellingen op onze website of via de instellingen van jouw browser.</p>
+    </div>
+
+    <div class="av-section" id="art8">
+      <div class="av-section-num">Artikel 8</div>
+      <div class="av-section-title">Beveiliging</div>
+      <p>Softora.nl neemt passende technische en organisatorische maatregelen om persoonsgegevens te beschermen tegen verlies, ongeautoriseerde toegang of misbruik. Dit omvat onder andere:</p>
+      <ul>
+        <li>Gebruik van beveiligde HTTPS-verbindingen (SSL);</li>
+        <li>Versleuteling van wachtwoorden en gevoelige gegevens;</li>
+        <li>Toegangsbeperking — alleen bevoegde medewerkers hebben toegang tot persoonsgegevens;</li>
+        <li>Regelmatige back-ups van gegevens;</li>
+        <li>Up-to-date software en beveiligingsupdates.</li>
+      </ul>
+      <p>Bij een datalek dat mogelijk gevolgen heeft voor jouw rechten en vrijheden, zullen wij je hierover informeren conform de AVG-meldplicht.</p>
+    </div>
+
+    <div class="av-section" id="art9">
+      <div class="av-section-num">Artikel 9</div>
+      <div class="av-section-title">Jouw rechten</div>
+      <p>Op grond van de AVG heb je de volgende rechten met betrekking tot jouw persoonsgegevens:</p>
+      <ul>
+        <li><strong>Recht op inzage</strong> — je kunt opvragen welke gegevens wij van jou verwerken.</li>
+        <li><strong>Recht op rectificatie</strong> — je kunt onjuiste gegevens laten corrigeren.</li>
+        <li><strong>Recht op verwijdering</strong> — je kunt verzoeken jouw gegevens te verwijderen, tenzij wij wettelijk verplicht zijn deze te bewaren.</li>
+        <li><strong>Recht op beperking van verwerking</strong> — je kunt de verwerking van jouw gegevens (tijdelijk) laten beperken.</li>
+        <li><strong>Recht op dataportabiliteit</strong> — je kunt jouw gegevens opvragen in een gestructureerd, gangbaar formaat.</li>
+        <li><strong>Recht van bezwaar</strong> — je kunt bezwaar maken tegen de verwerking van jouw gegevens op basis van gerechtvaardigd belang of voor direct marketing.</li>
+        <li><strong>Recht op intrekking van toestemming</strong> — indien verwerking is gebaseerd op toestemming, kun je deze te allen tijde intrekken.</li>
+      </ul>
+      <p>Om gebruik te maken van jouw rechten kun je contact opnemen via <strong>info@softora.nl</strong>. Wij reageren binnen <strong>4 weken</strong> op jouw verzoek.</p>
+    </div>
+
+    <div class="av-section" id="art10">
+      <div class="av-section-num">Artikel 10</div>
+      <div class="av-section-title">Klachten</div>
+      <p>Heb je een klacht over de manier waarop Softora.nl met jouw persoonsgegevens omgaat? Neem dan eerst contact met ons op via <strong>info@softora.nl</strong>. Wij proberen er samen met jou uit te komen.</p>
+      <p>Kom je er niet uit met ons? Dan heb je het recht een klacht in te dienen bij de <strong>Autoriteit Persoonsgegevens</strong> (AP), de toezichthoudende autoriteit op het gebied van privacy in Nederland:</p>
+      <div class="info-box">
+        <strong>Autoriteit Persoonsgegevens</strong><br>
+        Postbus 93374, 2509 AJ Den Haag<br>
+        Telefoon: 0900 – 2001 201<br>
+        Website: <strong>autoriteitpersoonsgegevens.nl</strong>
+      </div>
+    </div>
+
+    <div class="av-section" id="art11">
+      <div class="av-section-num">Artikel 11</div>
+      <div class="av-section-title">Wijzigingen</div>
+      <p>Softora.nl behoudt zich het recht voor deze privacy policy te wijzigen. Wijzigingen worden gepubliceerd op onze website met vermelding van de ingangsdatum. Wij raden je aan deze pagina regelmatig te raadplegen.</p>
+      <p>Bij ingrijpende wijzigingen zullen wij je hierover actief informeren via e-mail of een melding op onze website.</p>
+      <p>Deze privacy policy is voor het laatst bijgewerkt op <strong>1 januari 2026</strong>.</p>
+    </div>
+
+    <div class="av-section" id="art12">
+      <div class="av-section-num">Artikel 12</div>
+      <div class="av-section-title">Contact</div>
+      <p>Voor vragen, opmerkingen of verzoeken met betrekking tot deze privacy policy of de verwerking van jouw persoonsgegevens kun je contact opnemen via:</p>
+      <div class="info-box">
+        <strong>Softora.nl</strong><br>
+        Oisterwijk, Nederland<br>
+        E-mail: <strong>info@softora.nl</strong><br>
+        Telefoon: <strong>+31 6 2991 7185</strong><br>
+        Website: <strong>www.softora.nl</strong>
+      </div>
+      <p>Wij streven ernaar jouw verzoek binnen <strong>5 werkdagen</strong> te beantwoorden.</p>
+    </div>
+
+  </main>
+</div>
+
+<footer>
+  <div class="footer-logo">SOFTORA.NL</div>
+  <div class="footer-copy">© 2026 Softora.nl · Privacy Policy · Versie 1.0</div>
+</footer>
+
+<script>
+const sections = document.querySelectorAll('.av-section');
+const links = document.querySelectorAll('.toc-list a');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector(`.toc-list a[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>
