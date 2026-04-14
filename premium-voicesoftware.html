@@ -92,12 +92,11 @@ nav {
   background: var(--nav-cta-hover);
 }
 
-/* HERO */
+/* HERO — zelfde opbouw als premium-bedrijfssoftware: foto + paarse wash (geen groene stock-cast) */
 .hero {
   margin-top: 78px;
-  background:
-    linear-gradient(90deg, rgba(10,14,25,.9) 0%, rgba(10,14,25,.78) 46%, rgba(10,14,25,.48) 100%),
-    url('https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1800&q=85') center/cover no-repeat;
+  width: 100%;
+  background: #0a0e19;
   padding: 100px 80px;
   position: relative;
   overflow: hidden;
@@ -108,24 +107,29 @@ nav {
 .hero::before {
   content: '';
   position: absolute;
-  top: -20%; right: 5%;
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(139,34,82,.2) 0%, transparent 65%);
+  inset: 0;
+  background: url('https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=2000&q=85') center center / cover no-repeat;
   pointer-events: none;
+  z-index: 0;
 }
 .hero::after {
   content: '';
   position: absolute;
-  bottom: -10%; left: 30%;
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(139,34,82,.08) 0%, transparent 70%);
+  inset: 0;
+  background:
+    radial-gradient(circle at 92% 20%, rgba(139,34,82,.14) 0%, transparent 50%),
+    radial-gradient(circle at 28% 88%, rgba(139,34,82,.08) 0%, transparent 50%),
+    linear-gradient(90deg, rgba(10,14,25,.94) 0%, rgba(10,14,25,.78) 32%, rgba(10,14,25,.35) 52%, rgba(10,14,25,.08) 78%, rgba(10,14,25,.06) 100%);
   pointer-events: none;
+  z-index: 0;
 }
 .hero-inner { max-width: 660px; position: relative; z-index: 1; }
 @media (max-width: 960px) {
   .hero {
     padding: 80px 24px 96px;
     min-height: 0;
+  }
+  .hero::before {
     background-position: 66% center;
   }
 }
