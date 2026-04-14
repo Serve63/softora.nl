@@ -36,8 +36,8 @@ test('premium website toont een speelse krulpijl van hero richting wat we bouwen
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.match(source, /<div class="diensten-arrow-wrap" aria-hidden="true">/);
-  assert.match(source, /<svg class="diensten-arrow-svg" viewBox="0 0 450 180"/);
-  assert.match(source, /\.diensten-arrow-wrap\s*\{[\s\S]*left:\s*clamp\(-13rem,\s*-9\.6vw,\s*-6\.4rem\);[\s\S]*top:\s*-7\.9rem;[\s\S]*width:\s*min\(34vw,\s*410px\);[\s\S]*pointer-events:\s*none;/s);
+  assert.match(source, /<svg class="diensten-arrow-svg" viewBox="0 0 500 180"/);
+  assert.match(source, /\.diensten-arrow-wrap\s*\{[\s\S]*left:\s*clamp\(-10rem,\s*-7vw,\s*-2rem\);[\s\S]*top:\s*-4\.75rem;[\s\S]*width:\s*min\(43vw,\s*455px\);[\s\S]*pointer-events:\s*none;/s);
   assert.match(source, /\.diensten-arrow-path,\s*\.diensten-arrow-head\s*\{[\s\S]*stroke:\s*var\(--accent\);/s);
   assert.match(source, /@media \(max-width: 1024px\)\s*\{[\s\S]*\.diensten-arrow-wrap \{ display: none; \}/s);
 });
@@ -58,7 +58,7 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
 });
 
-test('premium website gebruikt een compactere herohoogte zodat de foto minder ver doorloopt', () => {
+test('premium website hero is full-bleed workspace-foto met donkere overlay en leesbare tekst', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
@@ -68,16 +68,16 @@ test('premium website gebruikt een compactere herohoogte zodat de foto minder ve
   );
   assert.match(
     source,
-    /\.hero-image\s*\{[\s\S]*height:\s*clamp\(555px,\s*69vh,\s*725px\);/s
+    /\.hero::before\s*\{[\s\S]*url\('assets\/hero-workspace-1254\.jpg\?v=20260409a'\)[\s\S]*cover no-repeat;/s
   );
   assert.match(
     source,
-    /\.hero-image img\s*\{[\s\S]*object-position:\s*center 24%;/s
+    /\.hero::after\s*\{[\s\S]*background:\s*linear-gradient\(90deg,\s*rgba\(0,\s*0,\s*0,\s*0\.9\)/s
   );
-  assert.match(
-    source,
-    /src="assets\/hero-workspace-1254\.jpg\?v=20260409a"[\s\S]*srcset="assets\/hero-workspace-640\.jpg\?v=20260409a 640w,\s*assets\/hero-workspace-960\.jpg\?v=20260409a 960w,\s*assets\/hero-workspace-1254\.jpg\?v=20260409a 1254w"/s
-  );
+  assert.match(source, /section\.hero\s*\{[\s\S]*padding:\s*clamp\(5\.75rem,/s);
+  assert.match(source, /\.hero h1\s*\{[\s\S]*color:\s*#fff;/s);
+  assert.match(source, /\.hero p\s*\{[\s\S]*color:\s*rgba\(255,\s*255,\s*255,\s*0\.72\);/s);
+  assert.doesNotMatch(source, /class="hero-image"/);
   assert.match(source, /\.perf-deferred-section\s*\{[\s\S]*content-visibility:\s*auto;[\s\S]*contain-intrinsic-size:\s*920px;/s);
   assert.match(source, /<section id="diensten" class="perf-deferred-section"/);
 });

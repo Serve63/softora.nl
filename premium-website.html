@@ -354,35 +354,35 @@
         }
 
         .hero {
+            width: 100%;
             min-height: clamp(610px, 76vh, 760px);
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+            display: flex;
             align-items: center;
-            padding: 0;
             position: relative;
             overflow: hidden;
         }
 
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url('assets/hero-workspace-1254.jpg?v=20260409a') center 28% / cover no-repeat;
+            z-index: 0;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.68) 38%, rgba(0, 0, 0, 0.42) 100%);
+            z-index: 1;
+        }
+
         .hero-content {
-            padding: 0 4rem;
+            padding: 0;
             max-width: 700px;
             position: relative;
             z-index: 2;
-        }
-
-        .hero-image {
-            position: relative;
-            align-self: start;
-            height: clamp(555px, 69vh, 725px);
-            clip-path: polygon(15% 0, 100% 0, 100% 100%, 0% 100%);
-        }
-
-        .hero-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: center 24%;
-            filter: none;
         }
 
         .perf-deferred-section {
@@ -399,13 +399,6 @@
         #diensten-overzicht {
             content-visibility: visible;
             contain-intrinsic-size: auto;
-        }
-
-        .hero-image::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: none;
         }
 
         .eyebrow {
@@ -426,6 +419,7 @@
 
         .hero h1 {
             margin-bottom: 2rem;
+            color: #fff;
             opacity: 1;
             transform: none;
             animation: none;
@@ -433,7 +427,7 @@
 
         .hero p {
             font-size: 1.2rem;
-            color: var(--text-secondary);
+            color: rgba(255, 255, 255, 0.72);
             max-width: 500px;
             margin-bottom: 3rem;
             line-height: 1.8;
@@ -441,6 +435,18 @@
             opacity: 1;
             transform: none;
             animation: none;
+        }
+
+        .hero .magnetic-btn.secondary {
+            border-color: rgba(255, 255, 255, 0.45);
+            color: #fff;
+        }
+
+        .hero .magnetic-btn.secondary:hover {
+            border-color: var(--accent-light);
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.35);
         }
 
         .hero-buttons {
@@ -461,6 +467,10 @@
         section {
             position: relative;
             padding: 10rem 4rem;
+        }
+
+        section.hero {
+            padding: clamp(5.75rem, 14vh, 8.5rem) 4rem clamp(4rem, 10vh, 6rem);
         }
 
         @supports (content-visibility: auto) {
@@ -1477,9 +1487,16 @@
         }
 
         @media (max-width: 1024px) {
-            .hero { grid-template-columns: 1fr; }
-            .hero-image { display: none; }
-            .hero-content { padding: 10rem 2rem; max-width: 100%; }
+            section.hero {
+                padding: 6.5rem 2rem 3.5rem;
+            }
+            .hero {
+                min-height: clamp(520px, 88vh, 720px);
+            }
+            .hero::before {
+                background-position: 62% center;
+            }
+            .hero-content { max-width: 100%; }
             .grid-3, .pricing-grid { grid-template-columns: 1fr; flex-direction: column; }
             .grid-2, .image-text-frame { grid-template-columns: 1fr; }
             .werkwijze-copy, .werkwijze-stats { width: 100%; }
@@ -1573,9 +1590,6 @@
                 <a href="#contact" class="magnetic-btn magnetic">Start Project</a>
                 <a href="#werkwijze" class="magnetic-btn magnetic secondary">Bekijk Werkwijze</a>
             </div>
-        </div>
-        <div class="hero-image">
-            <img src="assets/hero-workspace-1254.jpg?v=20260409a" srcset="assets/hero-workspace-640.jpg?v=20260409a 640w, assets/hero-workspace-960.jpg?v=20260409a 960w, assets/hero-workspace-1254.jpg?v=20260409a 1254w" sizes="(max-width: 980px) 92vw, 46vw" alt="Creatieve design-workspace" width="1254" height="1254" loading="eager" decoding="async" fetchpriority="high">
         </div>
     </section>
 
