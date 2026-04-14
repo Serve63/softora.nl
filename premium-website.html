@@ -387,6 +387,11 @@
             contain-intrinsic-size: 920px;
         }
 
+        /* Pijl steekt met negatieve top uit boven deze sectie; content-visibility:auto kan die dan onterecht overslaan. */
+        #diensten {
+            content-visibility: visible;
+        }
+
         .hero-image::after {
             content: '';
             position: absolute;
@@ -470,11 +475,11 @@
         .diensten-arrow-wrap {
             position: absolute;
             left: clamp(-20rem, -15vw, -10rem);
-            top: -20.5rem;
+            top: -17.5rem;
             width: min(50vw, 600px);
             height: 270px;
             pointer-events: none;
-            z-index: 0;
+            z-index: 3;
             opacity: 0.9;
         }
 
