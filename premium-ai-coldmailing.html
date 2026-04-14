@@ -2355,7 +2355,7 @@
                 const leadDateValue = String(lead.date || '').slice(0, 10);
                 const leadTimeValue = normalizeTimeValue(lead.time || '09:00') || '09:00';
                 const leadLocationValue = String(lead.location || '').trim();
-                const leadWhatsappInfoValue = String(lead.whatsappInfo || '').trim();
+                const leadWhatsappInfoValue = '';
                 modalSub.textContent = '';
                 modalSub.hidden = true;
                 modalDate.value = '';
@@ -2415,7 +2415,6 @@
                         const detailDateValue = String(taskDetail?.date || '').slice(0, 10);
                         const detailTimeValue = normalizeTimeValue(taskDetail?.time || '') || '';
                         const detailLocationValue = String(taskDetail?.location || '').trim();
-                        const detailWhatsappInfoValue = String(taskDetail?.whatsappInfo || '').trim();
 
                         // date left empty intentionally
                         // time left empty intentionally
@@ -2428,12 +2427,7 @@
                         ) {
                             modalLocation.value = detailLocationValue || leadLocationValue;
                         }
-                        if (
-                            !String(modalWhatsappInfo.value || '').trim() ||
-                            String(modalWhatsappInfo.value || '').trim() === leadWhatsappInfoValue
-                        ) {
-                            modalWhatsappInfo.value = detailWhatsappInfoValue || leadWhatsappInfoValue;
-                        }
+                        modalWhatsappInfo.value = leadWhatsappInfoValue;
                     }
 
                     const callBackedDetail = isCallBackedLead || Boolean(recoveredCallId)
@@ -2467,7 +2461,6 @@
                     const detailDateValue = String(detail?.date || '').slice(0, 10);
                     const detailTimeValue = normalizeTimeValue(detail?.time || '') || '';
                     const detailLocationValue = String(detail?.location || '').trim();
-                    const detailWhatsappInfoValue = String(detail?.whatsappInfo || '').trim();
                     const recoveredCallId = resolveLeadCallId(lead, detail);
                     const allowRecoveredLocationPrefill = allowLocationPrefill && !recoveredCallId;
                     const recoveredLead = recoveredCallId
@@ -2502,12 +2495,7 @@
                     ) {
                         modalLocation.value = detailLocationValue || leadLocationValue;
                     }
-                    if (
-                        !String(modalWhatsappInfo.value || '').trim() ||
-                        String(modalWhatsappInfo.value || '').trim() === leadWhatsappInfoValue
-                    ) {
-                        modalWhatsappInfo.value = detailWhatsappInfoValue || leadWhatsappInfoValue;
-                    }
+                    modalWhatsappInfo.value = leadWhatsappInfoValue;
 
                     if (recoveredCallId) {
                         delete leadDetailsById[String(normalizedTaskId)];
