@@ -404,6 +404,12 @@ body {
   justify-content: center;
   padding: 12px 18px;
   font-size: 13px;
+}
+
+.seo-paginas-actions {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
   margin-bottom: 24px;
 }
 
@@ -421,6 +427,20 @@ body {
   padding: 4px 2px 0;
   border-bottom: 1px solid var(--border);
   padding-bottom: 14px;
+}
+.seo-page-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+  width: 100%;
+}
+.seo-page-header-text {
+  flex: 1;
+  min-width: min(100%, 220px);
+}
+.seo-page-opt-btn {
+  flex-shrink: 0;
 }
 .seo-page-title {
   font-family: 'Oswald', sans-serif;
@@ -836,6 +856,7 @@ body {
         <button class="tab active" onclick="switchTab('scan', this)">SEO Scan</button>
         <button class="tab" onclick="switchTab('paginas', this)">Pagina's</button>
         <button class="tab" onclick="switchTab('blogs', this)">Blogs</button>
+        <button class="tab" onclick="switchTab('productpaginas', this)">Productpagina's</button>
         <button class="tab" onclick="switchTab('analytics', this)">Google Analytics</button>
       </div>
 
@@ -856,10 +877,12 @@ body {
       </div>
 
       <div class="tab-panel" id="tab-paginas">
-        <button class="btn-ai btn-ai-all" id="btn-all" onclick="optimiseAllPages()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Alles optimaliseren
-        </button>
+        <div class="seo-paginas-actions">
+          <button class="btn-ai btn-ai-all" id="btn-all" onclick="optimiseAllPages()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Alles optimaliseren
+          </button>
+        </div>
         <div class="seo-pages-root" id="seo-pages-root"></div>
       </div>
 
@@ -933,6 +956,24 @@ body {
 
           <div class="blog-live-banner" id="blog-live-banner" hidden>
             <strong>Live (UI-demo)</strong> — <span id="blog-live-summary-text"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-productpaginas">
+        <div class="blog-campaign-wrap">
+          <div class="blog-campaign-intro">
+            <h3>Productpagina's</h3>
+            <p>Beheer SEO per product- of dienstenpagina: titels, meta descriptions, structured data en afbeeldingen. Dit scherm is de plek voor je catalogus-import of handmatige lijst — onderstaand blok is een startpunt tot de koppeling live staat.</p>
+          </div>
+          <div class="ai-card">
+            <div class="ai-card-head">
+              <div class="ai-card-title">Product-URL's</div>
+              <span style="font-size:11px;color:var(--text-light);letter-spacing:.06em;text-transform:uppercase">Demo</span>
+            </div>
+            <div class="ai-card-body">
+              <p style="font-size:14px;line-height:1.65;color:var(--text-mid);margin:0">Nog geen productpagina's gekoppeld. Voeg straks endpoints of een import toe om hier rijen met URL, titel en status te tonen.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1216,14 +1257,21 @@ const aiSuggestionsByPage = {
 function renderSeoPagePanels() {
   const root = document.getElementById('seo-pages-root');
   if (!root) return;
-  const svgAi = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
   root.innerHTML = SEO_PAGES_DATA.map((p) => {
     const s = p.slug;
     return `
     <section class="seo-page-block" data-seo-page="${s}">
       <header class="seo-page-header">
-        <h4 class="seo-page-title">${p.title}</h4>
-        <div class="seo-page-path">${p.path}</div>
+        <div class="seo-page-header-row">
+          <button type="button" class="btn-ai seo-page-opt-btn" onclick="optimisePage('${s}', this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Pagina optimaliseren
+          </button>
+          <div class="seo-page-header-text">
+            <h4 class="seo-page-title">${p.title}</h4>
+            <div class="seo-page-path">${p.path}</div>
+          </div>
+        </div>
       </header>
       <div class="ai-grid">
         <div class="ai-card">
@@ -1242,9 +1290,6 @@ function renderSeoPagePanels() {
               <textarea id="${s}-meta-desc" rows="3" oninput="charCount('${s}-meta-desc', '${s}-meta-desc-count', 160)"></textarea>
             </div>
             <div class="char-count" id="${s}-meta-desc-count"></div>
-            <div style="margin-top:14px">
-              <button type="button" class="btn-ai" onclick="optimiseField('${s}','meta')">${svgAi} AI verbeteren</button>
-            </div>
           </div>
         </div>
         <div class="ai-card">
@@ -1263,9 +1308,6 @@ function renderSeoPagePanels() {
               <textarea id="${s}-og-desc" rows="3" oninput="charCount('${s}-og-desc', '${s}-og-desc-count', 200)"></textarea>
             </div>
             <div class="char-count" id="${s}-og-desc-count"></div>
-            <div style="margin-top:14px">
-              <button type="button" class="btn-ai" onclick="optimiseField('${s}','og')">${svgAi} AI verbeteren</button>
-            </div>
           </div>
         </div>
         <div class="ai-card">
@@ -1282,9 +1324,6 @@ function renderSeoPagePanels() {
             <div class="field-label">H2 suggesties</div>
             <div class="field-val">
               <textarea id="${s}-h2" rows="4"></textarea>
-            </div>
-            <div style="margin-top:14px">
-              <button type="button" class="btn-ai" onclick="optimiseField('${s}','h')">${svgAi} AI verbeteren</button>
             </div>
           </div>
         </div>
@@ -1305,9 +1344,6 @@ function renderSeoPagePanels() {
             <div class="field-label">Team / over ons</div>
             <div class="field-val">
               <textarea id="${s}-alt-team" rows="2"></textarea>
-            </div>
-            <div style="margin-top:14px">
-              <button type="button" class="btn-ai" onclick="optimiseField('${s}','alt')">${svgAi} AI verbeteren</button>
             </div>
           </div>
         </div>
@@ -1481,10 +1517,33 @@ function optimiseField(slug, type, opts) {
   }, 1600);
 }
 
+const BTN_SVG_LIGHTNING = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+
+function optimisePage(slug, btnEl) {
+  const types = ['meta', 'og', 'h', 'alt'];
+  const label = BTN_SVG_LIGHTNING + ' Pagina optimaliseren';
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.innerHTML = '<div class="loader" style="width:16px;height:16px;border-width:2px"></div> Bezig…';
+  }
+  let delay = 0;
+  types.forEach((t) => {
+    setStatus(slug, t, 'loading');
+    setTimeout(() => optimiseField(slug, t, { quiet: true }), delay);
+    delay += 550;
+  });
+  setTimeout(() => {
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.innerHTML = label;
+    }
+    toast('✓ Pagina geoptimaliseerd (demo)');
+  }, delay + 1700);
+}
+
 function optimiseAllPages() {
   const btn = document.getElementById('btn-all');
   const types = ['meta', 'og', 'h', 'alt'];
-  const svgAll = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
   btn.disabled = true;
   btn.innerHTML = '<div class="loader" style="width:16px;height:16px;border-width:2px"></div> Bezig…';
   let delay = 0;
@@ -1497,7 +1556,7 @@ function optimiseAllPages() {
   });
   setTimeout(() => {
     btn.disabled = false;
-    btn.innerHTML = svgAll + ' Alles optimaliseren';
+    btn.innerHTML = BTN_SVG_LIGHTNING + ' Alles optimaliseren';
     toast("✓ Alle pagina's bijgewerkt (demo)");
   }, delay + 1700);
 }
