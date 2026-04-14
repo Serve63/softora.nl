@@ -11,16 +11,17 @@
 :root {
   --bg: #f5f4f1;
   --white: #fff;
-  --crimson: #1a56db;
-  --clight: #1e429f;
+  /* Zelfde accent als premium homepage (paars/bordeaux) */
+  --crimson: #8B2252;
+  --clight: #A62D65;
   --dark: #1a1a2e;
   --mid: #555;
   --light: #999;
   --border: #e8e5e0;
   --nav-accent: #8B2252;
   --nav-accent-hover: #A62D65;
-  --nav-cta: #1a56db;
-  --nav-cta-hover: #1e429f;
+  --nav-cta: #8B2252;
+  --nav-cta-hover: #A62D65;
 }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); }
 
@@ -116,8 +117,8 @@ nav {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 92% 20%, rgba(155,35,85,.14) 0%, transparent 50%),
-    radial-gradient(circle at 28% 88%, rgba(155,35,85,.08) 0%, transparent 50%),
+    radial-gradient(circle at 92% 20%, rgba(139,34,82,.14) 0%, transparent 50%),
+    radial-gradient(circle at 28% 88%, rgba(139,34,82,.08) 0%, transparent 50%),
     linear-gradient(90deg, rgba(10,14,25,.94) 0%, rgba(10,14,25,.78) 32%, rgba(10,14,25,.35) 52%, rgba(10,14,25,.08) 78%, rgba(10,14,25,.06) 100%);
   pointer-events: none;
   z-index: 0;
@@ -132,7 +133,7 @@ nav {
     background-position: 70% center;
   }
 }
-.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(139,34,82,.9); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
 .hero-eyebrow::before { content: ''; width: 32px; height: 2px; background: var(--crimson); border-radius: 1px; }
 .hero-title { font-family: 'Oswald', sans-serif; font-size: clamp(48px, 5.2vw, 72px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 6px; }
 .hero-title em { color: var(--crimson); font-style: normal; }
@@ -169,8 +170,8 @@ nav {
 .dienst-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 28px 24px; transition: all .2s; overflow: hidden; }
 .dienst-thumb { height: 140px; margin: -28px -24px 18px -24px; overflow: hidden; background: var(--dark); }
 .dienst-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.dienst-card:hover { box-shadow: 0 6px 28px rgba(0,0,0,.08); border-color: rgba(155,35,85,.2); transform: translateY(-2px); }
-.dienst-icon { width: 44px; height: 44px; background: rgba(155,35,85,.08); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+.dienst-card:hover { box-shadow: 0 6px 28px rgba(0,0,0,.08); border-color: rgba(139,34,82,.2); transform: translateY(-2px); }
+.dienst-icon { width: 44px; height: 44px; background: rgba(139,34,82,.08); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
 .dienst-icon svg { width: 20px; height: 20px; color: var(--crimson); }
 .dienst-name { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
 .dienst-desc { font-size: 13px; color: var(--mid); line-height: 1.7; margin-bottom: 16px; }
@@ -202,7 +203,7 @@ nav {
 /* WAAROM SOFTORA */
 .why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px 80px; margin-top: 52px; }
 .why-item { display: flex; gap: 18px; align-items: flex-start; }
-.why-num { font-family: 'Oswald', sans-serif; font-size: 48px; font-weight: 800; color: rgba(155,35,85,.12); line-height: 1; flex-shrink: 0; width: 52px; }
+.why-num { font-family: 'Oswald', sans-serif; font-size: 48px; font-weight: 800; color: rgba(139,34,82,.12); line-height: 1; flex-shrink: 0; width: 52px; }
 .why-title { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
 .why-desc { font-size: 13px; color: var(--mid); line-height: 1.7; }
 
@@ -216,9 +217,9 @@ nav {
   position: relative;
   overflow: hidden;
 }
-.cta-block::before { content: ''; position: absolute; top: -50%; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(155,35,85,.25) 0%, transparent 65%); pointer-events: none; }
+.cta-block::before { content: ''; position: absolute; top: -50%; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(139,34,82,.25) 0%, transparent 65%); pointer-events: none; }
 .cta-block-inner { position: relative; z-index: 1; }
-.cta-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 16px; }
+.cta-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(139,34,82,.9); margin-bottom: 16px; }
 .cta-title { font-family: 'Oswald', sans-serif; font-size: clamp(36px, 4vw, 56px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; color: #fff; line-height: 1.05; margin-bottom: 16px; }
 .cta-sub { font-size: 15px; color: rgba(255,255,255,.5); line-height: 1.7; margin-bottom: 36px; max-width: 480px; margin-left: auto; margin-right: auto; }
 .cta-contact { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 24px; }
