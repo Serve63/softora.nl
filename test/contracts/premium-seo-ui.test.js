@@ -12,5 +12,7 @@ test('premium seo toont blogs-tab direct na keywords met eigen paneel', () => {
     /<button class="tab active" onclick="switchTab\('scan', this\)">SEO Scan<\/button>\s*<button class="tab" onclick="switchTab\('optimalisatie', this\)">AI Optimalisatie<\/button>\s*<button class="tab" onclick="switchTab\('keywords', this\)">Keywords<\/button>\s*<button class="tab" onclick="switchTab\('blogs', this\)">Blogs<\/button>/
   );
   assert.match(source, /<div class="tab-panel" id="tab-blogs">/);
-  assert.match(source, /blogonderwerpen, concepten en publicatieplanning te beheren/i);
+  assert.match(source, /id="blog-campaign-wrap"/);
+  assert.match(source, /Campagne online zetten/);
+  assert.match(source, /activateBlogCampaign\(\)/);
 });

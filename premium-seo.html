@@ -431,6 +431,108 @@ body {
 .diff-mid { background: rgba(180,90,0,.1); color: var(--orange); }
 .diff-high { background: rgba(192,57,43,.1); color: var(--red); }
 
+.blog-campaign-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 720px;
+}
+.blog-campaign-intro p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-mid);
+  margin-top: 8px;
+  max-width: 62ch;
+}
+.blog-campaign-intro h3 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dark);
+}
+.field-val--select {
+  padding: 0;
+  overflow: hidden;
+}
+.blog-select,
+.blog-time-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--text-dark);
+  outline: none;
+  cursor: pointer;
+}
+.blog-time-input { cursor: text; }
+.blog-campaign-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+  align-items: center;
+}
+.btn-blog-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 22px;
+  background: var(--card);
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.btn-blog-secondary:hover {
+  border-color: rgba(139, 34, 82, 0.35);
+  color: var(--crimson);
+ background: var(--tag);
+}
+.blog-status-pill {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+.blog-status-pill.draft {
+  background: rgba(26, 26, 46, 0.08);
+  color: var(--text-mid);
+}
+.blog-status-pill.live {
+  background: rgba(22, 115, 60, 0.12);
+  color: var(--green);
+}
+.blog-live-banner {
+  padding: 16px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(22, 115, 60, 0.28);
+  background: rgba(22, 115, 60, 0.06);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-dark);
+}
+.blog-live-banner strong {
+  color: var(--green);
+  font-weight: 700;
+}
+.blog-campaign-wrap[data-campaign-live="1"] .blog-campaign-card {
+  border-color: rgba(22, 115, 60, 0.22);
+}
+
 .toast {
   position: fixed;
   bottom: 24px;
@@ -455,7 +557,8 @@ body {
 .scan-empty,
 .scan-loading,
 .ai-card,
-.kw-item {
+.kw-item,
+.blog-campaign-card {
   box-shadow: var(--seo-shadow);
 }
 
@@ -466,6 +569,7 @@ body {
 .scan-loading,
 .ai-card,
 .kw-item,
+.blog-campaign-card,
 .field-val {
   border-radius: 18px;
 }
@@ -762,9 +866,62 @@ Neem contact op</textarea>
       </div>
 
       <div class="tab-panel" id="tab-blogs">
-        <div class="scan-empty" style="min-height:320px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4h9l3 3v13H6z"/><path d="M15 4v3h3"/><path d="M9 11h6"/><path d="M9 15h6"/></svg>
-          <p>Klik binnenkort op deze tab om blogonderwerpen, concepten en publicatieplanning te beheren.</p>
+        <div class="blog-campaign-wrap" id="blog-campaign-wrap" data-campaign-live="0">
+          <div class="blog-campaign-intro">
+            <h3>AI blogcampagne</h3>
+            <p>Stel in hoe vaak AI een blog klaarzet voor publicatie en met hoeveel foto’s per artikel. Dit is alleen de interface — er wordt nog niets echt gepland of gepubliceerd.</p>
+          </div>
+
+          <div class="blog-campaign-card ai-card">
+            <div class="ai-card-head">
+              <div class="ai-card-title">Publicatie &amp; media</div>
+              <div class="blog-status-pill draft" id="blog-campaign-status-pill" aria-live="polite">Concept</div>
+            </div>
+            <div class="ai-card-body">
+              <div class="field-label">Publicatiefrequentie</div>
+              <div class="field-val field-val--select">
+                <select id="blog-frequency" class="blog-select" aria-label="Publicatiefrequentie">
+                  <option value="daily">Elke dag</option>
+                  <option value="every_other_day" selected>Om de dag</option>
+                  <option value="twice_weekly">2× per week</option>
+                  <option value="weekly">1× per week</option>
+                  <option value="biweekly">1× per twee weken</option>
+                </select>
+              </div>
+
+              <div class="field-label">Aantal foto’s per blog</div>
+              <div class="field-val field-val--select">
+                <select id="blog-photo-count" class="blog-select" aria-label="Aantal foto’s per blog">
+                  <option value="0">Geen (alleen tekst)</option>
+                  <option value="1">1 foto</option>
+                  <option value="2" selected>2 foto’s</option>
+                  <option value="3">3 foto’s</option>
+                  <option value="4">4 foto’s</option>
+                  <option value="5">5 foto’s</option>
+                  <option value="6">6 foto’s</option>
+                </select>
+              </div>
+
+              <div class="field-label">Voorkeurstijd publicatie (optioneel)</div>
+              <div class="field-val field-val--select">
+                <input type="time" id="blog-publish-time" class="blog-time-input" value="09:00" aria-label="Voorkeurstijd">
+              </div>
+
+              <div class="blog-campaign-actions">
+                <button type="button" class="btn-ai" id="blog-activate-btn" onclick="activateBlogCampaign()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  Campagne online zetten
+                </button>
+                <button type="button" class="btn-blog-secondary" id="blog-pause-btn" onclick="pauseBlogCampaignDemo()" style="display:none">
+                  Campagne pauzeren (demo)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="blog-live-banner" id="blog-live-banner" hidden>
+            <strong>Live (UI-demo)</strong> — <span id="blog-live-summary-text"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -780,6 +937,63 @@ function switchTab(name, el) {
   document.getElementById('tab-' + name).classList.add('active');
   el.classList.add('active');
   if (name === 'keywords') renderKeywords();
+}
+
+const BLOG_FREQ_LABELS = {
+  daily: 'elke dag',
+  every_other_day: 'om de dag',
+  twice_weekly: '2× per week',
+  weekly: '1× per week',
+  biweekly: '1× per twee weken',
+};
+
+function getBlogCampaignSummaryText() {
+  const freq = document.getElementById('blog-frequency');
+  const photos = document.getElementById('blog-photo-count');
+  const timeEl = document.getElementById('blog-publish-time');
+  const fk = freq && freq.value;
+  const pk = photos && photos.value;
+  const freqLabel = BLOG_FREQ_LABELS[fk] || fk;
+  const n = Number(pk);
+  const photoLabel = n === 0 ? 'geen foto’s' : n === 1 ? '1 foto' : `${n} foto’s`;
+  const timePart = timeEl && timeEl.value ? `; rond ${timeEl.value}` : '';
+  return `frequentie: ${freqLabel}; ${photoLabel} per artikel${timePart}`;
+}
+
+function activateBlogCampaign() {
+  const wrap = document.getElementById('blog-campaign-wrap');
+  const pill = document.getElementById('blog-campaign-status-pill');
+  const banner = document.getElementById('blog-live-banner');
+  const summary = document.getElementById('blog-live-summary-text');
+  const btnOn = document.getElementById('blog-activate-btn');
+  const btnOff = document.getElementById('blog-pause-btn');
+  if (!wrap || !pill || !banner || !summary || !btnOn || !btnOff) return;
+  wrap.setAttribute('data-campaign-live', '1');
+  pill.textContent = 'Live';
+  pill.classList.remove('draft');
+  pill.classList.add('live');
+  summary.textContent = getBlogCampaignSummaryText();
+  banner.hidden = false;
+  btnOn.style.display = 'none';
+  btnOff.style.display = 'inline-flex';
+  toast('Campagne staat live (alleen UI).');
+}
+
+function pauseBlogCampaignDemo() {
+  const wrap = document.getElementById('blog-campaign-wrap');
+  const pill = document.getElementById('blog-campaign-status-pill');
+  const banner = document.getElementById('blog-live-banner');
+  const btnOn = document.getElementById('blog-activate-btn');
+  const btnOff = document.getElementById('blog-pause-btn');
+  if (!wrap || !pill || !banner || !btnOn || !btnOff) return;
+  wrap.setAttribute('data-campaign-live', '0');
+  pill.textContent = 'Concept';
+  pill.classList.add('draft');
+  pill.classList.remove('live');
+  banner.hidden = true;
+  btnOn.style.display = 'inline-flex';
+  btnOff.style.display = 'none';
+  toast('Campagne gepauzeerd (demo).');
 }
 
 function charCount(inputId, countId, max) {

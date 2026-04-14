@@ -134,6 +134,59 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
   .main-content { margin-left: 0; width: 100%; }
   .mail-page-shell { min-height: auto; max-height: none; }
 }
+
+/* Mailbox-account naast sidebar-link (alleen deze pagina) */
+.sidebar-mailbox-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin: 0 0 2px;
+  padding: 0 10px 0 0;
+}
+.sidebar-mailbox-row .sidebar-link {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar-mailbox-select {
+  align-self: center;
+  flex-shrink: 0;
+  width: min(132px, 38vw);
+  max-width: 132px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--text-dark);
+  cursor: pointer;
+  line-height: 1.2;
+}
+.sidebar-mailbox-select:focus {
+  outline: none;
+  border-color: var(--crimson);
+  box-shadow: 0 0 0 2px rgba(155, 35, 85, 0.15);
+}
+.topbar-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.topbar-mailbox-account {
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--crimson);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
 </style>
 </head>
 <body>
@@ -153,7 +206,13 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
       <div class="sidebar-section">
         <div class="sidebar-section-label">Beheer</div>
         <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
-        <a href="/premium-mailbox" class="sidebar-link magnetic active" data-sidebar-key="mailbox"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Mailbox</span></a>
+        <div class="sidebar-mailbox-row">
+          <a href="/premium-mailbox" class="sidebar-link magnetic active" data-sidebar-key="mailbox"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Mailbox</span></a>
+          <select id="mailbox-account-select" class="sidebar-mailbox-select" title="Mailbox-account" aria-label="Kies mailbox-account">
+            <option value="info@softora.nl">info@softora.nl</option>
+            <option value="software@softora.nl">software@softora.nl</option>
+          </select>
+        </div>
         <a href="/premium-seo" class="sidebar-link magnetic" data-sidebar-key="seo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span class="sidebar-link-text">SEO</span></a>
         <a href="/premium-pakketten" class="sidebar-link magnetic" data-sidebar-key="packages"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg><span class="sidebar-link-text">Pakketten</span></a>
         <a href="/premium-pdfs" class="sidebar-link magnetic" data-sidebar-key="pdfs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span class="sidebar-link-text">PDF'S</span></a>
@@ -188,7 +247,10 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 
 <!-- TOP BAR -->
 <div class="topbar">
-  <div class="topbar-title">Mailbox</div>
+  <div class="topbar-title-wrap">
+    <div class="topbar-title">Mailbox</div>
+    <span class="topbar-mailbox-account" id="topbar-mailbox-account"></span>
+  </div>
   <div class="topbar-search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     <input type="text" placeholder="Zoeken in mailbox…" id="search-input" oninput="filterMails()">
@@ -270,11 +332,19 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 </div>
 
 <script>
+const MAILBOX_ACCOUNT_STORAGE = 'softora_mailbox_account';
+const MAILBOX_ACCOUNT_DEFAULT = 'info@softora.nl';
+
 const avatarColors = ['#9b2355','#1a5f8a','#16733c','#7b3f00','#4a1a6b','#b45a00','#2c6e49'];
 const getColor = str => avatarColors[str.charCodeAt(0) % avatarColors.length];
 const initials = name => name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
 
-const mails = [
+function cloneMails(list) {
+  return JSON.parse(JSON.stringify(list));
+}
+
+const MAILBOX_DEMO_BY_ACCOUNT = {
+  'info@softora.nl': [
   { id:1, folder:'inbox', from:'De Vries Installaties', email:'info@devries-inst.nl', subject:'Offerte aanvraag website', preview:'Goedemiddag, wij zijn geïnteresseerd in een nieuwe bedrijfswebsite…', body:`Goedemiddag,
 
 Wij zijn een installatiebedrijf gevestigd in Breda en zijn op zoek naar een nieuwe, professionele bedrijfswebsite.
@@ -359,11 +429,88 @@ Hierbij de maandelijkse update van Softora.nl.
 
 Met vriendelijke groet,
 Softora.nl`, time:'31 mrt', date:'31 maart', unread:false, starred:false, tags:[] },
-];
+  ],
+  'software@softora.nl': [
+  { id:101, folder:'inbox', from:'CI pipeline', email:'notifications@github.com', subject:'[Softora/crm] Workflow run failed on main', preview:'Build #482 failed: Typecheck error in server/routes/agenda.js…', body:`Repository: Softora/crm
+Workflow: verify
+Branch: main
+
+De laatste run is mislukt. Controleer de logs in GitHub Actions.
+
+— GitHub`, time:'11:02', date:'Vandaag', unread:true, starred:false, tags:[] },
+  { id:102, folder:'inbox', from:'Sentry', email:'alerts@sentry.io', subject:'New issue: TypeError in /api/agenda/appointments', preview:'Project softora-prod — 12 events in the last hour…', body:`Issue: TypeError: Cannot read properties of undefined
+Environment: production
+URL: /api/agenda/appointments
+
+Bekijk het issue in Sentry voor stack trace en breadcrumbs.
+
+— Sentry`, time:'10:18', date:'Vandaag', unread:true, starred:false, tags:[] },
+  { id:103, folder:'inbox', from:'Lena Vermeulen', email:'l.vermeulen@techpartners.nl', subject:'Vraag over API-rate limits klantenportaal', preview:'Hoi, we willen het portaal koppelen aan ons ERP. Wat zijn jullie limits…', body:`Hoi,
+
+We willen het klantenportaal koppelen aan ons ERP via jullie REST API.
+Kunnen jullie aangeven wat de rate limits zijn en of er een sandbox-omgeving is?
+
+Alvast bedankt,
+Lena Vermeulen`, time:'Gist.', date:'Gisteren', unread:true, starred:true, tags:['klant'] },
+  { id:104, folder:'inbox', from:'Supabase', email:'no-reply@supabase.io', subject:'Project usage summary — March 2026', preview:'Database size, egress and auth usage for project softora-prod…', body:`Your monthly usage summary is available in the Supabase dashboard.
+
+— Supabase`, time:'01 apr', date:'1 april', unread:false, starred:false, tags:[] },
+  { id:105, folder:'inbox', from:'Dependabot', email:'49699333+dependabot[bot]@users.noreply.github.com', subject:'Bump nodemailer from 6.9.15 to 6.9.16', preview:'Updates nodemailer — opens a pull request…', body:`Dependabot heeft een PR aangemaakt om nodemailer bij te werken.
+
+— GitHub Dependabot`, time:'30 mrt', date:'30 maart', unread:false, starred:false, tags:[] },
+  { id:106, folder:'sent', from:'Jij (Softora.nl)', email:'software@softora.nl', subject:'Re: API-rate limits klantenportaal', preview:'Hi Lena, rate limits staan in de docs onder “Fair use”. Sandbox: …', body:`Hi Lena,
+
+Rate limits: standaard 120 req/min per API-key; hoger op aanvraag.
+Sandbox: we sturen je een aparte base-URL + testkey; reply als je akkoord bent.
+
+Groet,
+Softora`, time:'Gist.', date:'Gisteren', unread:false, starred:false, tags:[] },
+  { id:107, folder:'drafts', from:'Concept', email:'', subject:'Release notes v2.4 (intern)', preview:'– Agenda sync fixes\n– Mailbox account switcher…', body:`[CONCEPT — NOG NIET VERZONDEN]
+
+Release notes v2.4
+- Agenda sync hardening
+- Mailbox: meerdere accounts`, time:'29 mrt', date:'29 maart', unread:false, starred:false, tags:[] },
+  ],
+};
+
+function getMailboxAccount() {
+  try {
+    const v = localStorage.getItem(MAILBOX_ACCOUNT_STORAGE);
+    if (v && MAILBOX_DEMO_BY_ACCOUNT[v]) return v;
+  } catch (_) { /* ignore */ }
+  return MAILBOX_ACCOUNT_DEFAULT;
+}
+
+function setMailboxAccountUi(email) {
+  const sel = document.getElementById('mailbox-account-select');
+  const top = document.getElementById('topbar-mailbox-account');
+  if (sel && MAILBOX_DEMO_BY_ACCOUNT[email]) sel.value = email;
+  if (top) top.textContent = email;
+}
+
+let mails = [];
 
 let activeFolder = 'inbox';
 let activeMail = null;
 let filteredMails = [];
+
+function resetDetailEmpty() {
+  document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
+}
+
+function applyMailboxAccount(email) {
+  if (!MAILBOX_DEMO_BY_ACCOUNT[email]) return;
+  try {
+    localStorage.setItem(MAILBOX_ACCOUNT_STORAGE, email);
+  } catch (_) { /* ignore */ }
+  mails = cloneMails(MAILBOX_DEMO_BY_ACCOUNT[email]);
+  activeFolder = 'inbox';
+  activeMail = null;
+  document.querySelectorAll('.folder-item').forEach((f, i) => f.classList.toggle('active', i === 0));
+  setMailboxAccountUi(email);
+  resetDetailEmpty();
+  renderList();
+}
 
 function setFolder(folder, el) {
   activeFolder = folder;
@@ -373,7 +520,7 @@ function setFolder(folder, el) {
   const labels = { inbox:'Inbox', starred:'Gemarkeerd', sent:'Verzonden', drafts:'Concepten', spam:'Spam', trash:'Prullenbak', offerte:'Offertes', factuur:'Facturen', klant:'Klanten' };
   const folderLabelEl = document.getElementById('folder-label');
   if (folderLabelEl) folderLabelEl.textContent = labels[folder] || folder;
-  document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
+  resetDetailEmpty();
   renderList();
 }
 
@@ -465,7 +612,7 @@ function deleteMail(id) {
   if (!m) return;
   m.folder = 'trash';
   activeMail = null;
-  document.getElementById('mail-detail').innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
+  resetDetailEmpty();
   renderList();
   toast('Mail verplaatst naar prullenbak');
 }
@@ -486,7 +633,8 @@ function sendMail() {
   const to = document.getElementById('c-to').value.trim();
   const subject = document.getElementById('c-subject').value.trim();
   if (!to || !subject) { toast('Vul ontvanger en onderwerp in'); return; }
-  mails.push({ id: Date.now(), folder:'sent', from:'Jij (Softora.nl)', email:'info@softora.nl', subject, preview: document.getElementById('c-body').value.slice(0,80)+'…', body: document.getElementById('c-body').value, time:'Zojuist', date:'Vandaag', unread:false, starred:false, tags:[] });
+  const acc = getMailboxAccount();
+  mails.push({ id: Date.now(), folder:'sent', from:'Jij (Softora.nl)', email: acc, subject, preview: document.getElementById('c-body').value.slice(0,80)+'…', body: document.getElementById('c-body').value, time:'Zojuist', date:'Vandaag', unread:false, starred:false, tags:[] });
   closeCompose();
   toast('✓ Mail verzonden');
 }
@@ -499,6 +647,16 @@ function toast(msg) {
 document.getElementById('compose-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('compose-overlay')) closeCompose();
 });
+
+(function initMailboxAccount() {
+  const sel = document.getElementById('mailbox-account-select');
+  const acc = getMailboxAccount();
+  setMailboxAccountUi(acc);
+  mails = cloneMails(MAILBOX_DEMO_BY_ACCOUNT[acc]);
+  if (sel) {
+    sel.addEventListener('change', () => applyMailboxAccount(sel.value));
+  }
+})();
 
 renderList();
 </script>
