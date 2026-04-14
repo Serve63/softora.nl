@@ -37,7 +37,7 @@ test('premium website toont een speelse krulpijl van hero richting wat we bouwen
 
   assert.match(source, /<div class="diensten-arrow-wrap" aria-hidden="true">/);
   assert.match(source, /<svg class="diensten-arrow-svg" viewBox="0 0 560 240"/);
-  assert.match(source, /\.diensten-arrow-wrap\s*\{[\s\S]*left:\s*clamp\(-18rem,\s*-13vw,\s*-11rem\);[\s\S]*top:\s*-8rem;[\s\S]*width:\s*min\(44vw,\s*540px\);[\s\S]*pointer-events:\s*none;/s);
+  assert.match(source, /\.diensten-arrow-wrap\s*\{[\s\S]*left:\s*clamp\(-21rem,\s*-17vw,\s*-13\.5rem\);[\s\S]*top:\s*-12\.2rem;[\s\S]*width:\s*min\(52vw,\s*640px\);[\s\S]*pointer-events:\s*none;/s);
   assert.match(source, /\.diensten-arrow-path,\s*\.diensten-arrow-head\s*\{[\s\S]*stroke:\s*var\(--accent\);/s);
   assert.match(source, /@media \(max-width: 1024px\)\s*\{[\s\S]*\.diensten-arrow-wrap \{ display: none; \}/s);
 });
@@ -53,7 +53,7 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.match(source, /<footer id="contact" class="footer">/);
   assert.match(source, /<a href="#over">Over ons<\/a>/);
   assert.match(source, /\.footer-grid\s*\{[\s\S]*grid-template-columns:\s*2fr 1fr 1fr 1fr;/s);
-  assert.match(source, /\.footer-logo\s*\{[\s\S]*font-family:\s*'Barlow Condensed', sans-serif;/s);
+  assert.match(source, /\.footer-logo\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;/s);
   assert.match(source, /<div class="footer-copy">© 2026 <span>Softora\.nl<\/span> - Alle rechten voorbehouden · KvK: 12345678<\/div>/);
   assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
 });
@@ -87,8 +87,8 @@ test('premium website whatsapp-widget gebruikt een verfijnde stijl en opent het 
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.match(source, /\.whatsapp-widget-label\s*\{/);
-  assert.match(source, /box-shadow:\s*0 16px 34px rgba\(20, 22, 34, 0\.12\);/);
-  assert.match(source, /backdrop-filter:\s*blur\(18px\);/);
+  assert.match(source, /box-shadow:\s*0 12px 24px rgba\(20, 22, 34, 0\.1\);/);
+  assert.match(source, /backdrop-filter:\s*blur\(12px\);/);
   assert.match(
     source,
     /\.whatsapp-widget-btn\s*\{[\s\S]*width:\s*64px;[\s\S]*height:\s*64px;[\s\S]*background:\s*linear-gradient\(145deg,\s*#30df6c 0%,\s*#19bf57 100%\);/s
