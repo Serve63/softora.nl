@@ -481,10 +481,10 @@
 
         .diensten-arrow-wrap {
             position: absolute;
-            left: clamp(-6rem, -4vw, -2rem);
-            top: -10rem;
-            width: min(56vw, 640px);
-            height: 260px;
+            left: clamp(-18rem, -13vw, -5rem);
+            top: -9rem;
+            width: min(46vw, 500px);
+            height: 180px;
             pointer-events: none;
             z-index: 3;
             opacity: 0.9;
@@ -1581,16 +1581,16 @@
     <section id="diensten" class="perf-deferred-section" style="padding: 1.5rem 4rem 10rem;">
         <div class="diensten-shell">
             <div class="diensten-arrow-wrap" aria-hidden="true">
-                <svg class="diensten-arrow-svg" viewBox="0 0 640 260" role="presentation" focusable="false">
-                    <!-- staart: begint rechts van de "Start Project" knop -->
-                    <path class="diensten-arrow-tail" d="M 10 54 C 24 53, 36 53, 50 54"></path>
-                    <circle class="diensten-arrow-dot" cx="52" cy="54" r="5"></circle>
-                    <!-- boog: zakt omlaag en loopt door naar "Wat We Bouwen" rechts -->
-                    <path class="diensten-arrow-trail" d="M 52 54 C 28 90, 36 170, 110 200 C 190 228, 330 210, 470 220 C 538 224, 594 232, 624 242"></path>
-                    <path class="diensten-arrow-path"  d="M 52 54 C 28 90, 36 170, 110 200 C 190 228, 330 210, 470 220 C 538 224, 594 232, 624 242"></path>
+                <svg class="diensten-arrow-svg" viewBox="0 0 500 180" role="presentation" focusable="false">
+                    <!-- staart: begint bij "Start Project" knop (linksboven in de wrapper) -->
+                    <path class="diensten-arrow-tail" d="M 14 38 C 28 37, 40 37, 54 38"></path>
+                    <circle class="diensten-arrow-dot" cx="56" cy="38" r="5"></circle>
+                    <!-- vloeiende boog: gaat omlaag en loopt naar rechts, eindigt net voor "Wat We Bouwen" -->
+                    <path class="diensten-arrow-trail" d="M 56 38 C 30 72, 48 128, 120 148 C 196 168, 320 150, 450 158 C 468 159, 482 161, 488 163"></path>
+                    <path class="diensten-arrow-path"  d="M 56 38 C 30 72, 48 128, 120 148 C 196 168, 320 150, 450 158 C 468 159, 482 161, 488 163"></path>
                     <!-- pijlpunt -->
-                    <path class="diensten-arrow-head" d="M 594 226 C 610 232, 620 237, 624 242"></path>
-                    <path class="diensten-arrow-head" d="M 598 258 C 612 252, 620 247, 624 242"></path>
+                    <path class="diensten-arrow-head" d="M 460 150 C 474 155, 484 160, 488 163"></path>
+                    <path class="diensten-arrow-head" d="M 464 176 C 476 170, 484 165, 488 163"></path>
                 </svg>
             </div>
             <div class="section-header is-centered fade-up">
