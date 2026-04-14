@@ -43,6 +43,17 @@
   --score-bad: #c0392b;
   --seo-shadow: 0 18px 40px rgba(26, 26, 46, 0.06);
 }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 body {
   font-family: 'Inter', sans-serif;
   background: var(--bg);
@@ -684,6 +695,106 @@ body {
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 
+.seo-goal-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.seo-goal-modal[hidden] {
+  display: none !important;
+}
+.seo-goal-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 15, 28, 0.45);
+  backdrop-filter: blur(4px);
+}
+.seo-goal-modal__card {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px 24px 20px;
+  box-shadow: var(--seo-shadow);
+}
+.seo-goal-modal__card h3 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dark);
+  margin-bottom: 8px;
+}
+.seo-goal-modal__hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-mid);
+  margin-bottom: 14px;
+}
+.seo-goal-modal__card textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-dark);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+.seo-goal-modal__card textarea:focus {
+  outline: none;
+  border-color: var(--crimson);
+  box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.12);
+}
+.seo-goal-modal__count {
+  font-size: 11px;
+  color: var(--text-light);
+  margin-top: 6px;
+  letter-spacing: 0.04em;
+}
+.seo-goal-modal__error {
+  min-height: 1.25em;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--red);
+}
+.seo-goal-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.seo-goal-modal__actions button {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-dark);
+}
+.seo-goal-modal__actions button[type="button"].seo-goal-modal__primary {
+  background: var(--crimson);
+  color: #fff;
+  border-color: var(--crimson);
+}
+.seo-goal-modal__actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .score-card,
 .metric-card,
 .issue-item,
@@ -841,7 +952,6 @@ body {
       <div class="tabs">
         <button class="tab active" onclick="switchTab('scan', this)">SEO Scan</button>
         <button class="tab" onclick="switchTab('paginas', this)">Pagina's</button>
-        <button class="tab" onclick="switchTab('productpaginas', this)">Productpagina's</button>
         <button class="tab" onclick="switchTab('blogs', this)">Blogs</button>
         <button class="tab" onclick="switchTab('analytics', this)">Google Analytics</button>
       </div>
@@ -940,24 +1050,6 @@ body {
         </div>
       </div>
 
-      <div class="tab-panel" id="tab-productpaginas">
-        <div class="blog-campaign-wrap">
-          <div class="blog-campaign-intro">
-            <h3>Productpagina's</h3>
-            <p>Beheer SEO per product- of dienstenpagina: titels, meta descriptions, structured data en afbeeldingen. Dit scherm is de plek voor je catalogus-import of handmatige lijst — onderstaand blok is een startpunt tot de koppeling live staat.</p>
-          </div>
-          <div class="ai-card">
-            <div class="ai-card-head">
-              <div class="ai-card-title">Product-URL's</div>
-              <span style="font-size:11px;color:var(--text-light);letter-spacing:.06em;text-transform:uppercase">Demo</span>
-            </div>
-            <div class="ai-card-body">
-              <p style="font-size:14px;line-height:1.65;color:var(--text-mid);margin:0">Nog geen productpagina's gekoppeld. Voeg straks endpoints of een import toe om hier rijen met URL, titel en status te tonen.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div class="tab-panel" id="tab-analytics">
         <div class="gsc-import-wrap">
           <div class="blog-campaign-intro">
@@ -1024,7 +1116,25 @@ body {
 
 <div class="toast" id="toast"></div>
 
+<div class="seo-goal-modal" id="seo-goal-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="seo-goal-modal-title">
+  <div class="seo-goal-modal__backdrop" onclick="closeSeoGoalModal()" aria-hidden="true"></div>
+  <div class="seo-goal-modal__card">
+    <h3 id="seo-goal-modal-title">Doel van deze pagina</h3>
+    <p class="seo-goal-modal__hint">Beschrijf kort wat deze pagina voor jou moet bereiken (bijv. meer offertes, uitleg product X, aanmelden nieuwsbrief). Minimaal 10 tekens.</p>
+    <label for="seo-goal-input" class="visually-hidden">Paginadoel</label>
+    <textarea id="seo-goal-input" maxlength="500" rows="4" placeholder="Bijvoorbeeld: bezoekers overtuigen om een gratis kennismakingsgesprek te plannen…" oninput="updateSeoGoalCharCount()"></textarea>
+    <div class="seo-goal-modal__count" id="seo-goal-count" aria-live="polite">0 tekens (min. 10)</div>
+    <div class="seo-goal-modal__error" id="seo-goal-error" role="alert"></div>
+    <div class="seo-goal-modal__actions">
+      <button type="button" onclick="closeSeoGoalModal()">Annuleren</button>
+      <button type="button" id="seo-goal-submit" class="seo-goal-modal__primary" onclick="confirmSeoGoalAndOptimise()" disabled>Optimaliseren</button>
+    </div>
+  </div>
+</div>
+
 <script>
+let seoGoalModalPending = { slug: null, btnEl: null };
+
 function switchTab(name, el) {
   document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
@@ -1463,16 +1573,63 @@ function setStatus(slug, type, state) {
   }
 }
 
-function getAiSuggestions(slug, type) {
+function clampSeoText(value, max) {
+  const t = String(value || '').replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  return t.slice(0, Math.max(0, max - 1)) + '…';
+}
+
+function buildGoalTailoredSuggestions(slug, pageGoal) {
+  const base = aiSuggestionsByPage[slug] || aiSuggestionsByPage.home;
+  const g = String(pageGoal || '').trim();
+  const gShort = clampSeoText(g, 72);
+  const gTitleTail = clampSeoText(g, 48);
+
+  const metaTitleBase = base.meta.title;
+  const sep = ' — ';
+  const roomTitle = Math.max(0, 60 - metaTitleBase.length - sep.length);
+  const metaTitle =
+    roomTitle >= 8
+      ? clampSeoText(metaTitleBase + sep + g.slice(0, roomTitle), 60)
+      : clampSeoText(metaTitleBase, 60);
+  const metaDesc = clampSeoText(`${base.meta.desc} Doelpagina: ${gShort}`, 160);
+
+  const ogTitleBase = base.og.title;
+  const ogRoom = Math.max(0, 60 - ogTitleBase.length - 3);
+  const ogTitle =
+    ogRoom >= 6 ? clampSeoText(`${ogTitleBase} | ${g.slice(0, ogRoom)}`, 60) : clampSeoText(ogTitleBase, 60);
+  const ogDesc = clampSeoText(`${base.og.desc} Gericht op: ${gShort}`, 200);
+
+  const h1 = clampSeoText(`${base.h.h1} (${gTitleTail})`, 70);
+  const h2 = `${base.h.h2}\n\n— Paginadoel —\n${g}`;
+
+  const altSuffix = ` — ${clampSeoText(g, 80)}`;
+  return {
+    meta: { title: metaTitle, desc: metaDesc },
+    og: { title: ogTitle, desc: ogDesc },
+    h: { h1, h2 },
+    alt: {
+      hero: clampSeoText(base.alt.hero + altSuffix, 220),
+      logo: clampSeoText(base.alt.logo + altSuffix, 220),
+      team: clampSeoText(base.alt.team + altSuffix, 220),
+    },
+  };
+}
+
+function getAiSuggestions(slug, type, pageGoal) {
   const page = aiSuggestionsByPage[slug] || aiSuggestionsByPage.home;
-  return page[type] || page.meta;
+  const raw = page[type] || page.meta;
+  if (!pageGoal || String(pageGoal).trim().length < 10) return raw;
+  const tailored = buildGoalTailoredSuggestions(slug, pageGoal);
+  return tailored[type] || tailored.meta;
 }
 
 function optimiseField(slug, type, opts) {
   const quiet = opts && opts.quiet;
+  const pageGoal = opts && opts.pageGoal;
   setStatus(slug, type, 'loading');
   setTimeout(() => {
-    const s = getAiSuggestions(slug, type);
+    const s = getAiSuggestions(slug, type, pageGoal);
     if (type === 'meta') {
       document.getElementById(`${slug}-meta-title`).value = s.title;
       document.getElementById(`${slug}-meta-desc`).value = s.desc;
@@ -1499,7 +1656,79 @@ function optimiseField(slug, type, opts) {
 
 const BTN_SVG_LIGHTNING = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
 
+function updateSeoGoalCharCount() {
+  const inp = document.getElementById('seo-goal-input');
+  const el = document.getElementById('seo-goal-count');
+  const btn = document.getElementById('seo-goal-submit');
+  if (!inp || !el) return;
+  const n = inp.value.trim().length;
+  el.textContent = n + ' tekens' + (n < 10 ? ' (min. 10 nodig)' : '');
+  if (btn) btn.disabled = n < 10;
+}
+
+function openSeoGoalModal(slug, btnEl) {
+  seoGoalModalPending = { slug, btnEl: btnEl || null };
+  const modal = document.getElementById('seo-goal-modal');
+  const inp = document.getElementById('seo-goal-input');
+  const err = document.getElementById('seo-goal-error');
+  if (err) err.textContent = '';
+  if (inp) {
+    inp.value = '';
+    inp.focus();
+  }
+  updateSeoGoalCharCount();
+  if (modal) {
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+  }
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSeoGoalModal() {
+  const modal = document.getElementById('seo-goal-modal');
+  const inp = document.getElementById('seo-goal-input');
+  const err = document.getElementById('seo-goal-error');
+  if (inp) inp.value = '';
+  if (err) err.textContent = '';
+  if (modal) {
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  document.body.style.overflow = '';
+  seoGoalModalPending = { slug: null, btnEl: null };
+  updateSeoGoalCharCount();
+}
+
+function confirmSeoGoalAndOptimise() {
+  const inp = document.getElementById('seo-goal-input');
+  const err = document.getElementById('seo-goal-error');
+  const v = inp && inp.value ? inp.value.trim() : '';
+  if (v.length < 10) {
+    if (err) err.textContent = 'Vul minimaal 10 tekens in om het doel te beschrijven.';
+    return;
+  }
+  const slug = seoGoalModalPending.slug;
+  const btnEl = seoGoalModalPending.btnEl;
+  if (!slug) return;
+  if (err) err.textContent = '';
+  closeSeoGoalModal();
+  runOptimisePage(slug, btnEl, v);
+}
+
+document.addEventListener('keydown', (e) => {
+  const modal = document.getElementById('seo-goal-modal');
+  if (!modal || modal.hidden) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeSeoGoalModal();
+  }
+});
+
 function optimisePage(slug, btnEl) {
+  openSeoGoalModal(slug, btnEl);
+}
+
+function runOptimisePage(slug, btnEl, pageGoal) {
   const types = ['meta', 'og', 'h', 'alt'];
   const label = BTN_SVG_LIGHTNING + ' Pagina optimaliseren';
   if (btnEl) {
@@ -1509,7 +1738,7 @@ function optimisePage(slug, btnEl) {
   let delay = 0;
   types.forEach((t) => {
     setStatus(slug, t, 'loading');
-    setTimeout(() => optimiseField(slug, t, { quiet: true }), delay);
+    setTimeout(() => optimiseField(slug, t, { quiet: true, pageGoal }), delay);
     delay += 550;
   });
   setTimeout(() => {
@@ -1517,7 +1746,7 @@ function optimisePage(slug, btnEl) {
       btnEl.disabled = false;
       btnEl.innerHTML = label;
     }
-    toast('✓ Pagina geoptimaliseerd (demo)');
+    toast('✓ Pagina geoptimaliseerd op basis van jouw doel (demo)');
   }, delay + 1700);
 }
 
