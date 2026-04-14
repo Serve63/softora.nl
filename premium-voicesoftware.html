@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voicesoftware op maat – Softora.nl</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f4f1;
+  --white: #fff;
+  --crimson: #057a55;
+  --clight: #046c4e;
+  --dark: #1a1a2e;
+  --mid: #555;
+  --light: #999;
+  --border: #e8e5e0;
+}
+body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--dark); }
+
+/* NAV */
+nav { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 80px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+.nav-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
+.nav-cta { display: flex; align-items: center; gap: 8px; padding: 8px 20px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; text-decoration: none; transition: background .15s; }
+.nav-cta:hover { background: var(--clight); }
+
+/* HERO */
+.hero {
+  background: var(--dark);
+  padding: 100px 80px;
+  position: relative;
+  overflow: hidden;
+  min-height: 580px;
+  display: flex;
+  align-items: center;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -20%; right: 5%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(155,35,85,.2) 0%, transparent 65%);
+  pointer-events: none;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  bottom: -10%; left: 30%;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(155,35,85,.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-inner { max-width: 680px; position: relative; z-index: 1; }
+.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+.hero-eyebrow::before { content: ''; width: 32px; height: 2px; background: var(--crimson); border-radius: 1px; }
+.hero-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(52px, 6vw, 80px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 6px; }
+.hero-title em { color: var(--crimson); font-style: normal; }
+.hero-sub { font-size: 16px; color: rgba(255,255,255,.5); line-height: 1.7; margin: 24px 0 40px; max-width: 520px; }
+.hero-btns { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn-primary { display: inline-flex; align-items: center; gap: 9px; padding: 14px 28px; background: var(--crimson); color: #fff; border: none; border-radius: 5px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; text-decoration: none; }
+.btn-primary:hover { background: var(--clight); }
+.btn-primary svg { width: 14px; height: 14px; }
+.btn-ghost { display: inline-flex; align-items: center; gap: 9px; padding: 13px 28px; background: none; color: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.15); border-radius: 5px; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all .15s; text-decoration: none; }
+.btn-ghost:hover { border-color: rgba(255,255,255,.4); color: #fff; }
+
+/* STATS STRIP */
+.stats-strip { background: var(--crimson); padding: 28px 80px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+.stat-item { text-align: center; padding: 0 20px; border-right: 1px solid rgba(255,255,255,.15); }
+.stat-item:last-child { border-right: none; }
+.stat-num { font-family: 'Barlow Condensed', sans-serif; font-size: 40px; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 4px; }
+.stat-label { font-size: 11px; color: rgba(255,255,255,.65); font-weight: 500; }
+
+/* SECTION SHARED */
+.section { padding: 88px 80px; }
+.section-alt { background: var(--white); }
+.section-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--crimson); margin-bottom: 12px; }
+.section-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(36px, 4vw, 52px); font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; line-height: 1.05; color: var(--dark); margin-bottom: 16px; }
+.section-sub { font-size: 15px; color: var(--mid); line-height: 1.7; max-width: 560px; }
+
+/* WAT KAN IK VOOR JE DOEN */
+.diensten-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 52px; }
+.dienst-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 28px 24px; transition: all .2s; }
+.dienst-card:hover { box-shadow: 0 6px 28px rgba(0,0,0,.08); border-color: rgba(155,35,85,.2); transform: translateY(-2px); }
+.dienst-icon { width: 44px; height: 44px; background: rgba(155,35,85,.08); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+.dienst-icon svg { width: 20px; height: 20px; color: var(--crimson); }
+.dienst-name { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+.dienst-desc { font-size: 13px; color: var(--mid); line-height: 1.7; margin-bottom: 16px; }
+.dienst-list { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.dienst-list li { font-size: 12px; color: var(--mid); display: flex; align-items: flex-start; gap: 8px; line-height: 1.4; }
+.dienst-list li::before { content: ''; width: 5px; height: 5px; background: var(--crimson); border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+
+/* HOE WERKT HET */
+.process-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 52px; position: relative; }
+.process-grid::before { content: ''; position: absolute; top: 28px; left: calc(12.5% + 16px); right: calc(12.5% + 16px); height: 1px; background: var(--border); z-index: 0; }
+.process-step { text-align: center; padding: 0 16px; position: relative; z-index: 1; }
+.step-num { width: 56px; height: 56px; border-radius: 50%; background: var(--white); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; color: var(--dark); transition: all .2s; }
+.process-step:first-child .step-num { background: var(--crimson); border-color: var(--crimson); color: #fff; }
+.step-title { font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.step-desc { font-size: 13px; color: var(--mid); line-height: 1.6; }
+
+/* VOORBEELDEN */
+.examples-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 52px; }
+.example-card { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+.example-visual { height: 180px; display: flex; align-items: center; justify-content: center; }
+.example-body { background: var(--white); padding: 20px 22px; }
+.example-tag { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--crimson); margin-bottom: 6px; }
+.example-name { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; }
+.example-desc { font-size: 13px; color: var(--mid); line-height: 1.6; }
+
+/* WAAROM SOFTORA */
+.why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px 80px; margin-top: 52px; }
+.why-item { display: flex; gap: 18px; align-items: flex-start; }
+.why-num { font-family: 'Barlow Condensed', sans-serif; font-size: 48px; font-weight: 800; color: rgba(155,35,85,.12); line-height: 1; flex-shrink: 0; width: 52px; }
+.why-title { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.why-desc { font-size: 13px; color: var(--mid); line-height: 1.7; }
+
+/* CTA BLOCK */
+.cta-block {
+  background: var(--dark);
+  padding: 80px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.cta-block::before { content: ''; position: absolute; top: -50%; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(155,35,85,.2) 0%, transparent 65%); pointer-events: none; }
+.cta-block-inner { position: relative; z-index: 1; }
+.cta-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 16px; }
+.cta-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(36px, 4vw, 56px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; color: #fff; line-height: 1.05; margin-bottom: 16px; }
+.cta-sub { font-size: 15px; color: rgba(255,255,255,.5); line-height: 1.7; margin-bottom: 36px; max-width: 480px; margin-left: auto; margin-right: auto; }
+.cta-contact { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 24px; }
+.cta-tel { font-size: 14px; color: rgba(255,255,255,.4); }
+.cta-tel a { color: var(--crimson); text-decoration: none; font-weight: 600; }
+
+/* FOOTER */
+footer { background: var(--dark); border-top: 1px solid rgba(255,255,255,.06); padding: 24px 80px; display: flex; align-items: center; justify-content: space-between; }
+.footer-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
+.footer-copy { font-size: 12px; color: rgba(255,255,255,.3); }
+
+/* SCROLL REVEAL */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">SOFTORA.NL</div>
+  <a class="nav-cta" href="mailto:info@softora.nl">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    Vrijblijvend gesprek
+  </a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-eyebrow">Voicesoftware op maat</div>
+    <div class="hero-title">Voicesoftware<br><em>die werkt</em><br>voor jou</div>
+    <div class="hero-sub">Van slimme AI voice-agents tot volledig geautomatiseerde telefonie — Softora.nl bouwt voicesoftware die jouw klantcontact en interne communicatie naar een hoger niveau tilt.</div>
+    <div class="hero-btns">
+      <a class="btn-primary" href="mailto:info@softora.nl">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Neem contact op
+      </a>
+      <a class="btn-ghost" href="tel:+31629917185">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6z"/></svg>
+        +31 6 2991 7185
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-strip">
+  <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">Op maat gemaakt</div></div>
+  <div class="stat-item"><div class="stat-num">2–6</div><div class="stat-label">Weken bouwtijd</div></div>
+  <div class="stat-item"><div class="stat-num">∞</div><div class="stat-label">Schaalbaarheid</div></div>
+  <div class="stat-item"><div class="stat-num">24/7</div><div class="stat-label">Toegang & support</div></div>
+</div>
+
+<!-- WAT KAN IK VOOR JE DOEN -->
+<div class="section reveal" id="diensten">
+  <div class="section-eyebrow">Wat wij voor je doen</div>
+  <div class="section-title">Voice die jouw<br>bedrijf versnelt</div>
+  <div class="section-sub">Of je nu een AI-telefonist wil, geautomatiseerde klantgesprekken of een volledig voice-platform — Softora.nl bouwt het. Precies zoals jij het wil.</div>
+
+  <div class="diensten-grid">
+    <div class="dienst-card">
+      <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+      <div class="dienst-name">Bedrijfsdashboards</div>
+      <div class="dienst-desc">Een overzichtelijk dashboard dat je KPI's, omzet, leads en activiteiten realtime bijhoudt. Alles op één plek, altijd inzicht.</div>
+      <ul class="dienst-list">
+        <li>Realtime data & statistieken</li>
+        <li>Rapportages op maat</li>
+        <li>Koppeling met bestaande systemen</li>
+        <li>Inlogbeveiliging per medewerker</li>
+      </ul>
+    </div>
+    <div class="dienst-card">
+      <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+      <div class="dienst-name">Klantenportalen</div>
+      <div class="dienst-desc">Geef klanten een eigen omgeving waar ze hun bestelling, facturen, documenten of project kunnen volgen. Professioneel en gebranded.</div>
+      <ul class="dienst-list">
+        <li>Klantlogin & persoonlijk account</li>
+        <li>Documenten & facturenoverzicht</li>
+        <li>Communicatiemodule</li>
+        <li>Volledig in jouw huisstijl</li>
+      </ul>
+    </div>
+    <div class="dienst-card">
+      <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+      <div class="dienst-name">Personeelssystemen</div>
+      <div class="dienst-desc">Een intern platform voor je team. Van urenregistratie en taakbeheer tot communicatie en documentenbeheer — alles gecentraliseerd.</div>
+      <ul class="dienst-list">
+        <li>Interne dashboards & tools</li>
+        <li>Rollen & rechten per medewerker</li>
+        <li>Taak- en projectbeheer</li>
+        <li>Documentenopslag & beheer</li>
+      </ul>
+    </div>
+    <div class="dienst-card">
+      <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+      <div class="dienst-name">Offertes & Facturatie</div>
+      <div class="dienst-desc">Automatisch offertes genereren, versturen en opvolgen. Facturen aanmaken met één klik. Gekoppeld aan je klantendatabase.</div>
+      <ul class="dienst-list">
+        <li>Automatische PDF-generatie</li>
+        <li>Digitale handtekening</li>
+        <li>Betalingsherinneringen</li>
+        <li>Overzicht openstaande posten</li>
+      </ul>
+    </div>
+    <div class="dienst-card">
+      <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+      <div class="dienst-name">AI-integraties</div>
+      <div class="dienst-desc">Voeg AI toe aan je werkprocessen. Van automatische mailrespons en lead scoring tot het genereren van offertes of contentcreatie.</div>
+      <ul class="dienst-list">
+        <li>Automatische tekstgeneratie</li>
+        <li>Slimme chatbots & e-mail AI</li>
+        <li>Lead kwalificatie op autopilot</li>
+        <li>Integratie met Claude / GPT API</li>
+      </ul>
+    </div>
+    <div class="dienst-card">
+      <div class="dienst-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div>
+      <div class="dienst-name">Maatwerk platforms</div>
+      <div class="dienst-desc">Heb je een specifiek idee of proces dat nergens in past? Dan bouwen we het van nul op. Volledig op maat, precies zoals jij het wil.</div>
+      <ul class="dienst-list">
+        <li>Volledig custom ontwikkeld</li>
+        <li>Schaalbaar & toekomstbestendig</li>
+        <li>API-koppelingen mogelijk</li>
+        <li>Doorlopende doorontwikkeling</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- HOE WERKT HET -->
+<div class="section section-alt reveal">
+  <div class="section-eyebrow">Werkwijze</div>
+  <div class="section-title">Van idee naar<br>werkende software</div>
+  <div class="section-sub">Geen lange trajecten of onduidelijke processen. Softora.nl zet jouw voice-oplossing snel en transparant op.</div>
+
+  <div class="process-grid">
+    <div class="process-step">
+      <div class="step-num">1</div>
+      <div class="step-title">Intake gesprek</div>
+      <div class="step-desc">We bespreken je wensen, processen en doelen. Ik stel de juiste vragen om precies te begrijpen wat je nodig hebt.</div>
+    </div>
+    <div class="process-step">
+      <div class="step-num">2</div>
+      <div class="step-title">Ontwerp & Plan</div>
+      <div class="step-desc">Je krijgt een helder voorstel met scope, tijdlijn en prijs. Na jouw akkoord starten we direct.</div>
+    </div>
+    <div class="process-step">
+      <div class="step-num">3</div>
+      <div class="step-title">Bouwen & Testen</div>
+      <div class="step-desc">Ik bouw de software en laat je tussentijds meekijken. Jouw feedback wordt direct verwerkt.</div>
+    </div>
+    <div class="process-step">
+      <div class="step-num">4</div>
+      <div class="step-title">Live & Support</div>
+      <div class="step-desc">Na oplevering blijf ik beschikbaar voor aanpassingen, uitbreidingen en support. Jouw platform groeit mee.</div>
+    </div>
+  </div>
+</div>
+
+<!-- VOORBEELDEN -->
+<div class="section reveal">
+  <div class="section-eyebrow">Mogelijkheden</div>
+  <div class="section-title">Wat wij voor<br>jou bouwen</div>
+  <div class="section-sub">Een greep uit de voice-oplossingen die Softora.nl voor MKB-bedrijven bouwt.</div>
+
+  <div class="examples-grid">
+    <div class="example-card">
+      <div class="example-visual" style="background:linear-gradient(135deg,#1a1a2e,#9b2355)">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </div>
+      <div class="example-body">
+        <div class="example-tag">Intern platform</div>
+        <div class="example-name">Personeel Dashboard</div>
+        <div class="example-desc">Een volledig intern bedrijfsplatform met CRM, facturatie, PDF-generator, mailbox, SEO-beheer, boekhouding en personeelsbeheer — alles in één systeem.</div>
+      </div>
+    </div>
+    <div class="example-card">
+      <div class="example-visual" style="background:linear-gradient(135deg,#0f3460,#16733c)">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      </div>
+      <div class="example-body">
+        <div class="example-tag">AI Automatisering</div>
+        <div class="example-name">AI Coldmailing Systeem</div>
+        <div class="example-desc">Een AI-gestuurd systeem dat prospects automatisch benadert, opvolgt, afspraken inplant en leads aanmaakt — zonder handmatig werk.</div>
+      </div>
+    </div>
+    <div class="example-card">
+      <div class="example-visual" style="background:linear-gradient(135deg,#9b2355,#b45a00)">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <div class="example-body">
+        <div class="example-tag">PDF Automatisering</div>
+        <div class="example-name">Offerte & Factuur Generator</div>
+        <div class="example-desc">Live preview terwijl je typt. Professionele PDF's voor offertes, facturen en betalingsherinneringen in één klik gegenereerd en klaar om te versturen.</div>
+      </div>
+    </div>
+    <div class="example-card">
+      <div class="example-visual" style="background:linear-gradient(135deg,#1a5f8a,#1a1a2e)">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <div class="example-body">
+        <div class="example-tag">Website Tool</div>
+        <div class="example-name">AI Website Generator</div>
+        <div class="example-desc">AI scant een website en genereert automatisch een complete nieuwe homepage als live preview. Inclusief downloadbare HTML en deelbare testlink.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- WAAROM SOFTORA -->
+<div class="section section-alt reveal">
+  <div class="section-eyebrow">Waarom Softora.nl</div>
+  <div class="section-title">Jouw voice,<br>onze expertise.</div>
+  <div class="section-sub">Softora.nl bouwt voicesoftware op maat voor het MKB. Geen grote bureaus, geen tussenpersonen — direct resultaat.</div>
+
+  <div class="why-grid">
+    <div class="why-item">
+      <div class="why-num">01</div>
+      <div class="why-content">
+        <div class="why-title">Snel & direct</div>
+        <div class="why-desc">Geen weken wachten op een voorstel. Na het intakegesprek heb je binnen 48 uur een helder plan met prijs en tijdlijn.</div>
+      </div>
+    </div>
+    <div class="why-item">
+      <div class="why-num">02</div>
+      <div class="why-content">
+        <div class="why-title">Vaste prijs</div>
+        <div class="why-desc">Je weet van tevoren wat het kost. Geen verrassingen achteraf, geen uurtje-factuurtje. We spreken een vaste prijs af.</div>
+      </div>
+    </div>
+    <div class="why-item">
+      <div class="why-num">03</div>
+      <div class="why-content">
+        <div class="why-title">Altijd bereikbaar</div>
+        <div class="why-desc">Direct contact met je vaste contactpersoon bij Softora. Geen helpdesk of ticketsysteem — gewoon snel schakelen.</div>
+      </div>
+    </div>
+    <div class="why-item">
+      <div class="why-num">04</div>
+      <div class="why-content">
+        <div class="why-title">Meedenken</div>
+        <div class="why-desc">Wij bouwen niet alleen wat je vraagt — we denken actief mee over wat jouw bedrijf verder helpt.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta-block reveal">
+  <div class="cta-block-inner">
+    <div class="cta-eyebrow">Klaar om te starten?</div>
+    <div class="cta-title">Start met voice<br>automatisering</div>
+    <div class="cta-sub">Vertel ons wat je wil automatiseren. Wij komen met een concreet voorstel voor jouw voice-oplossing — vrijblijvend en gratis.</div>
+    <a class="btn-primary" href="mailto:info@softora.nl" style="margin:0 auto;display:inline-flex">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Stuur een bericht
+    </a>
+    <div class="cta-contact">
+      <div class="cta-tel">Of bel direct: <a href="tel:+31629917185">+31 6 2991 7185</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">SOFTORA.NL</div>
+  <div class="footer-copy">© 2026 Softora.nl — Voicesoftware op maat</div>
+</footer>
+
+<script>
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
