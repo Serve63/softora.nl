@@ -270,47 +270,63 @@
         .trustpilot-badge {
             display: inline-flex;
             align-items: center;
-            gap: 0.65rem;
-            padding: 0.5rem 0.85rem;
-            border: 1px solid rgba(0, 182, 122, 0.2);
-            border-radius: 999px;
+            padding: 0.38rem 0.72rem 0.38rem 0.62rem;
+            border-radius: 6px;
+            border: 1px solid rgba(26, 26, 46, 0.09);
             text-decoration: none;
-            background: rgba(255, 255, 255, 0.95);
-            color: var(--text-primary);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.71rem;
-            font-weight: 600;
-            letter-spacing: 0.01em;
-            line-height: 1;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            background: rgba(255, 255, 255, 0.82);
+            box-shadow: 0 1px 2px rgba(15, 17, 28, 0.04);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         .trustpilot-badge:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+            border-color: rgba(0, 182, 122, 0.35);
+            box-shadow: 0 4px 16px rgba(15, 17, 28, 0.07);
         }
 
-        .trustpilot-badge-stars {
-            color: #00b67a;
-            font-size: 0.74rem;
-            letter-spacing: 0.06em;
+        .trustpilot-badge-inner {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
         }
 
-        .trustpilot-badge-copy {
-            display: inline-flex;
-            align-items: baseline;
-            gap: 0.32rem;
-            color: var(--text-secondary);
+        .trustpilot-stars-row {
+            display: flex;
+            gap: 3px;
+            align-items: flex-end;
+            height: 14px;
         }
 
-        .trustpilot-badge-score {
+        .trustpilot-star-bar {
+            width: 5px;
+            height: 12px;
+            border-radius: 1px;
+            background: #00b67a;
+        }
+
+        .trustpilot-badge-text {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            line-height: 1.12;
+            text-align: left;
+        }
+
+        .trustpilot-rating-num {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8125rem;
+            font-weight: 700;
             color: var(--text-primary);
-            font-weight: 700;
+            letter-spacing: -0.02em;
         }
 
-        .trustpilot-badge-brand {
-            color: #00b67a;
-            font-weight: 700;
+        .trustpilot-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.5625rem;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         .nav-link {
@@ -1603,10 +1619,18 @@
         <a href="#" class="logo">SOFTORA.NL</a>
         <div class="nav-links">
             <a href="https://nl.trustpilot.com/review/softora.nl" class="trustpilot-badge" target="_blank" rel="noopener noreferrer" aria-label="Bekijk Softora reviews op Trustpilot">
-                <span class="trustpilot-badge-stars">★★★★★</span>
-                <span class="trustpilot-badge-copy">
-                    <span class="trustpilot-badge-score">4.9/5</span>
-                    <span class="trustpilot-badge-brand">Trustpilot</span>
+                <span class="trustpilot-badge-inner">
+                    <span class="trustpilot-stars-row" aria-hidden="true">
+                        <span class="trustpilot-star-bar"></span>
+                        <span class="trustpilot-star-bar"></span>
+                        <span class="trustpilot-star-bar"></span>
+                        <span class="trustpilot-star-bar"></span>
+                        <span class="trustpilot-star-bar"></span>
+                    </span>
+                    <span class="trustpilot-badge-text">
+                        <strong class="trustpilot-rating-num">4,9</strong>
+                        <span class="trustpilot-label">Trustpilot</span>
+                    </span>
                 </span>
             </a>
             <a href="#contact" class="magnetic-btn magnetic" style="padding: 0.8rem 1.5rem; font-size: 0.85rem;">Start Project</a>
