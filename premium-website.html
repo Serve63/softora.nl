@@ -41,6 +41,8 @@
             --accent-dark: #6B1A3F;
             --accent-glow: rgba(139, 34, 82, 0.4);
             --accent-light: #A62D65;
+            --nav-cta: var(--accent);
+            --nav-cta-hover: var(--accent-light);
             --text-primary: #1a1a2e;
             --text-secondary: #606272;
             --text-tertiary: #9599a8;
@@ -250,7 +252,7 @@
             left: 0;
             width: 3.2ch;
             height: 3px;
-            background: var(--accent);
+            background: var(--nav-cta);
             transform: scaleX(1);
             transform-origin: left;
             transition: transform 0.4s var(--ease-out-expo);
@@ -303,7 +305,7 @@
             align-items: center;
             gap: 0.75rem;
             padding: 1.2rem 3rem;
-            background: var(--accent);
+            background: var(--nav-cta);
             color: white;
             text-decoration: none;
             font-family: 'Oswald', sans-serif;
@@ -332,7 +334,7 @@
         .magnetic-btn:hover {
             box-shadow: 0 0 40px var(--accent-glow);
             transform: translateY(-2px);
-            background: var(--accent-light);
+            background: var(--nav-cta-hover);
         }
 
         .magnetic-btn:hover::before {
@@ -1144,7 +1146,7 @@
         .faq-contact-form .magnetic-btn {
             width: 100%;
             padding: 14px;
-            background: var(--accent);
+            background: var(--nav-cta);
             color: #fff;
             border: none;
             border-radius: 5px;
@@ -1162,7 +1164,7 @@
         }
 
         .faq-contact-form .magnetic-btn:hover {
-            background: #c4346a;
+            background: var(--nav-cta-hover);
         }
 
         .send-success {

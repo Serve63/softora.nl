@@ -18,6 +18,8 @@
   --mid: #555;
   --light: #999;
   --border: #e8e5e0;
+  --nav-cta: var(--crimson);
+  --nav-cta-hover: var(--clight);
 }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); }
 
@@ -56,10 +58,10 @@ nav {
   left: 0;
   width: 3.2ch;
   height: 3px;
-  background: var(--crimson);
+  background: var(--nav-cta);
 }
 .nav-back { display: none; align-items: center; gap: 8px; font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--light); background: none; border: none; cursor: pointer; transition: color .15s; }
-.nav-back:hover { color: var(--crimson); }
+.nav-back:hover { color: var(--nav-cta); }
 .nav-back svg { width: 14px; height: 14px; }
 .nav-back.show { display: flex; }
 
