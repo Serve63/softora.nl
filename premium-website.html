@@ -901,24 +901,25 @@
         }
 
         .faq-eyebrow {
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 3px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: var(--accent);
+            color: var(--text-tertiary);
             margin-bottom: 20px;
-            font-family: 'Barlow', sans-serif;
+            font-family: 'Oswald', sans-serif;
         }
 
         .faq-title {
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: clamp(52px, 6vw, 80px);
-            font-weight: 800;
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2.5rem, 5vw, 4.6rem);
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: -1px;
-            line-height: 1;
+            letter-spacing: 0.02em;
+            line-height: 0.95;
             color: var(--text-primary);
             margin-bottom: 12px;
+            white-space: nowrap;
         }
 
         .faq-title-accent {
@@ -959,10 +960,10 @@
         }
 
         .faq-q-text {
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 17px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.02rem;
             font-weight: 700;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.02em;
             text-transform: uppercase;
             color: var(--text-primary);
             transition: color 0.2s;
@@ -1010,11 +1011,11 @@
 
         .faq-answer-inner {
             padding: 0 0 22px;
-            font-size: 14px;
-            color: #555;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
             line-height: 1.8;
             max-width: 480px;
-            font-family: 'Barlow', sans-serif;
+            font-family: 'Inter', sans-serif;
         }
 
         .faq-aside {
@@ -1049,34 +1050,34 @@
         }
 
         .faq-contact-card .eyebrow {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 3px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: #999;
+            color: var(--text-tertiary);
             margin-bottom: 8px;
             border: none;
             padding: 0;
-            font-family: 'Barlow', sans-serif;
+            font-family: 'Oswald', sans-serif;
         }
 
         .faq-contact-card h3 {
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 32px;
-            font-weight: 800;
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2rem, 2.8vw, 2.45rem);
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            line-height: 1.1;
+            letter-spacing: 0.02em;
+            line-height: 0.96;
             margin-bottom: 10px;
             color: var(--text-primary);
         }
 
         .faq-contact-lead {
-            font-size: 13px;
-            color: #555;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
             line-height: 1.7;
             margin-bottom: 24px;
-            font-family: 'Barlow', sans-serif;
+            font-family: 'Inter', sans-serif;
         }
 
         .faq-contact-form {
@@ -1093,12 +1094,12 @@
         }
 
         .faq-field label {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 1.5px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            color: #999;
-            font-family: 'Barlow', sans-serif;
+            color: var(--text-tertiary);
+            font-family: 'Oswald', sans-serif;
         }
 
         .faq-field input,
@@ -1106,8 +1107,8 @@
             padding: 11px 14px;
             border: 1px solid #e8e5e0;
             border-radius: 5px;
-            font-family: 'Barlow', sans-serif;
-            font-size: 13px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.92rem;
             color: var(--text-primary);
             background: var(--bg-primary);
             outline: none;
@@ -1135,10 +1136,10 @@
             color: #fff;
             border: none;
             border-radius: 5px;
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 14px;
-            font-weight: 800;
-            letter-spacing: 2px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.86rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
             cursor: pointer;
             transition: background 0.2s;
@@ -1183,19 +1184,19 @@
         }
 
         .success-title {
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 22px;
-            font-weight: 800;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.55rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.02em;
             color: var(--text-primary);
         }
 
         .success-sub {
-            font-size: 13px;
-            color: #555;
+            font-size: 0.92rem;
+            color: var(--text-secondary);
             line-height: 1.6;
-            font-family: 'Barlow', sans-serif;
+            font-family: 'Inter', sans-serif;
         }
 
         .footer-accent {
@@ -1518,6 +1519,7 @@
             }
             .faq-title {
                 font-size: clamp(42px, 11vw, 62px);
+                white-space: normal;
             }
             .faq-title-accent {
                 margin-bottom: 34px;
