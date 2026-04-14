@@ -1,13 +1,7 @@
 name: Verify Critical
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: '15 5 * * *'
 
 jobs:
   verify-critical:
