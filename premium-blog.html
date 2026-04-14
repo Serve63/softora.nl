@@ -45,6 +45,9 @@ nav {
   padding: 72px 80px;
   position: relative;
   overflow: hidden;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
 }
 .hero-banner::before {
   content: '';
@@ -54,9 +57,15 @@ nav {
   background: radial-gradient(circle, rgba(155,35,85,.25) 0%, transparent 70%);
   pointer-events: none;
 }
-.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.8); margin-bottom: 16px; }
-.hero-title { font-family: 'Oswald', sans-serif; font-size: clamp(48px, 5vw, 72px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 16px; }
-.hero-sub { font-size: 15px; color: rgba(255,255,255,.5); max-width: 500px; line-height: 1.7; }
+.hero-content {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+}
+.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.8); }
+.hero-title { font-family: 'Oswald', sans-serif; font-size: clamp(48px, 5vw, 72px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; }
+.hero-sub { font-size: 15px; color: rgba(255,255,255,.6); max-width: 760px; line-height: 1.7; }
 
 .filter-bar {
   padding: 28px 80px 0;
@@ -197,6 +206,7 @@ nav {
   .featured-row,
   .blog-grid,
   .meer-grid { grid-template-columns: 1fr; }
+  .hero-banner { min-height: 250px; }
 }
 </style>
 </head>
@@ -212,9 +222,11 @@ nav {
 
 <div class="screen active" id="screen-overzicht">
   <div class="hero-banner">
-    <div class="hero-eyebrow">Softora.nl — Blog</div>
-    <div class="hero-title">Kennis &<br>Inspiratie</div>
-    <div class="hero-sub">Tips, inzichten en nieuws over websites, SEO en online groei voor het MKB.</div>
+    <div class="hero-content">
+      <div class="hero-eyebrow">Softora.nl — Blog</div>
+      <div class="hero-title">Kennis &<br>Inspiratie</div>
+      <div class="hero-sub">Tips, inzichten en nieuws over websites, SEO en online groei voor het MKB.</div>
+    </div>
   </div>
 
   <div class="filter-bar" id="filter-bar">
