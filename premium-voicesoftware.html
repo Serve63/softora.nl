@@ -213,10 +213,6 @@ nav {
 .cta-tel a { color: var(--crimson); text-decoration: none; font-weight: 600; }
 
 /* FOOTER */
-footer { background: var(--dark); border-top: 1px solid rgba(255,255,255,.06); padding: 24px 80px; display: flex; align-items: center; justify-content: space-between; }
-.footer-logo { font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
-.footer-copy { font-size: 12px; color: rgba(255,255,255,.3); }
-
 /* SCROLL REVEAL */
 .reveal { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
 .reveal.visible { opacity: 1; transform: translateY(0); }
@@ -477,11 +473,6 @@ footer { background: var(--dark); border-top: 1px solid rgba(255,255,255,.06); p
 </div>
 
 <!-- FOOTER -->
-<footer>
-  <div class="footer-logo">SOFTORA.NL</div>
-  <div class="footer-copy">© 2026 Softora.nl — Voicesoftware op maat</div>
-</footer>
-
 <script>
 const observer = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
