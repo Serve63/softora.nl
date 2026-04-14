@@ -20,6 +20,7 @@ const {
   normalizeAbsoluteHttpUrl,
   normalizeWebsitePreviewTargetUrl,
 } = require('./server/security/public-url');
+const { createPremiumPublicHtmlFilesSet } = require('./server/config/premium-public-html-files');
 const { createPremiumHtmlPageAccessController } = require('./server/security/premium-pages');
 const {
   createPremiumApiAccessGuard,
@@ -215,7 +216,7 @@ const PREMIUM_ENFORCE_SAME_ORIGIN_REQUESTS = !/^(0|false|no)$/i.test(
 const PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES = /^(1|true|yes)$/i.test(
   String(process.env.PREMIUM_ENABLE_RUNTIME_DEBUG_ROUTES || '')
 );
-const PREMIUM_PUBLIC_HTML_FILES = new Set(['premium-website.html', 'premium-personeel-login.html']);
+const PREMIUM_PUBLIC_HTML_FILES = createPremiumPublicHtmlFilesSet();
 const NOINDEX_HEADER_VALUE = 'noindex, nofollow, noarchive, nosnippet';
 const SECURITY_CONTACT_EMAIL = String(process.env.SECURITY_CONTACT_EMAIL || 'info@softora.nl').trim();
 const PREMIUM_AUTH_USERS_ROW_KEY = 'premium_auth_users';

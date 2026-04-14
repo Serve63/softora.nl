@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const { createPremiumPublicHtmlFilesSet } = require('../../server/config/premium-public-html-files');
 const { createPremiumHtmlPageAccessController } = require('../../server/security/premium-pages');
 
 function createResponseRecorder() {
@@ -39,6 +40,17 @@ test('premium html page access controller recognizes protected premium html file
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-personeel-agenda.html'), true);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-personeel-login.html'), false);
   assert.equal(controller.isPremiumProtectedHtmlFile('index.html'), false);
+});
+
+test('marketing premium landing pages are not auth-gated', () => {
+  const controller = createPremiumHtmlPageAccessController({
+    premiumPublicHtmlFiles: createPremiumPublicHtmlFilesSet(),
+  });
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-bedrijfssoftware.html'), false);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-voicesoftware.html'), false);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-websites.html'), false);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-blog.html'), false);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-personeel-dashboard.html'), true);
 });
 
 test('premium login page redirects authenticated users to a safe next path', async () => {
