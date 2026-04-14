@@ -11,12 +11,83 @@
   --bg: #f5f4f1; --white: #fff; --crimson: #9b2355;
   --dark: #1a1a2e; --mid: #555; --light: #999; --border: #e8e5e0;
 }
-body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); padding-top: 86px; }
 
-nav { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 80px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
-.nav-logo { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 1px; color: var(--crimson); }
-.nav-link { font-size: 13px; color: var(--light); text-decoration: none; transition: color .15s; }
-.nav-link:hover { color: var(--crimson); }
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 4rem;
+  background: rgba(248, 247, 244, 0.78);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.logo {
+  font-family: 'Oswald', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--dark);
+  text-decoration: none;
+  letter-spacing: -0.02em;
+  position: relative;
+  line-height: 1;
+}
+.logo::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 3.2ch;
+  height: 3px;
+  background: var(--crimson);
+}
+.nav-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.trustpilot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid rgba(0, 182, 122, 0.2);
+  border-radius: 999px;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--dark);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.71rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+.trustpilot-badge-stars { color: #00b67a; font-size: 0.74rem; letter-spacing: 0.06em; }
+.trustpilot-badge-copy { display: inline-flex; align-items: baseline; gap: 0.32rem; color: #6b6b7b; }
+.trustpilot-badge-score { color: var(--dark); font-weight: 700; }
+.trustpilot-badge-brand { color: #00b67a; font-weight: 700; }
+.nav-start-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 1.5rem;
+  background: var(--crimson);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
 
 .hero-strip { background: var(--dark); padding: 56px 80px 52px; }
 .hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.8); margin-bottom: 14px; }
@@ -57,9 +128,18 @@ footer { background: var(--dark); padding: 24px 80px; display: flex; align-items
 </head>
 <body>
 
-<nav>
-  <div class="nav-logo">SOFTORA.NL</div>
-  <a class="nav-link" href="mailto:info@softora.nl">info@softora.nl</a>
+<nav id="navbar">
+  <a href="/" class="logo">SOFTORA.NL</a>
+  <div class="nav-links">
+    <a href="https://nl.trustpilot.com/review/softora.nl" class="trustpilot-badge" target="_blank" rel="noopener noreferrer" aria-label="Bekijk Softora reviews op Trustpilot">
+      <span class="trustpilot-badge-stars">★★★★★</span>
+      <span class="trustpilot-badge-copy">
+        <span class="trustpilot-badge-score">4.9/5</span>
+        <span class="trustpilot-badge-brand">Trustpilot</span>
+      </span>
+    </a>
+    <a href="/#contact" class="nav-start-btn">Start Project</a>
+  </div>
 </nav>
 
 <div class="hero-strip">
