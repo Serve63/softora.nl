@@ -85,55 +85,50 @@ nav {
   text-decoration: none;
 }
 
-/* HERO */
+/* HERO — foto full-bleed over volledige breedte, tekst boven overlay */
 .hero {
   margin-top: 78px;
-  background: var(--dark);
+  width: 100%;
+  background: #0a0e19;
   padding: 100px 80px;
   position: relative;
   overflow: hidden;
   min-height: 580px;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: 48px 64px;
 }
 .hero::before {
   content: '';
   position: absolute;
-  top: -20%; right: 5%;
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(155,35,85,.2) 0%, transparent 65%);
+  inset: 0;
+  background: url('https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=2000&q=85') center/cover no-repeat;
   pointer-events: none;
+  z-index: 0;
 }
 .hero::after {
   content: '';
   position: absolute;
-  bottom: -10%; left: 30%;
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(155,35,85,.08) 0%, transparent 70%);
+  inset: 0;
+  background:
+    radial-gradient(circle at 95% 18%, rgba(155,35,85,.2) 0%, transparent 55%),
+    radial-gradient(circle at 28% 88%, rgba(155,35,85,.08) 0%, transparent 50%),
+    linear-gradient(90deg, rgba(10,14,25,.92) 0%, rgba(10,14,25,.76) 46%, rgba(10,14,25,.42) 100%);
   pointer-events: none;
+  z-index: 0;
 }
-.hero-inner { max-width: 640px; flex: 1 1 340px; position: relative; z-index: 1; }
-.hero-media {
-  flex: 1 1 300px;
-  max-width: 520px;
-  position: relative;
-  z-index: 1;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,.12);
-  box-shadow: 0 28px 70px rgba(0,0,0,.4);
-}
-.hero-media img { width: 100%; height: auto; display: block; aspect-ratio: 4 / 3; object-fit: cover; }
+.hero-inner { max-width: 660px; position: relative; z-index: 1; }
 @media (max-width: 960px) {
-  .hero { padding: 80px 24px 96px; min-height: 0; }
-  .hero-media { max-width: 100%; flex-basis: 100%; }
+  .hero {
+    padding: 80px 24px 96px;
+    min-height: 0;
+  }
+  .hero::before {
+    background-position: 70% center;
+  }
 }
 .hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
 .hero-eyebrow::before { content: ''; width: 32px; height: 2px; background: var(--crimson); border-radius: 1px; }
-.hero-title { font-family: 'Oswald', sans-serif; font-size: clamp(52px, 6vw, 80px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 6px; }
+.hero-title { font-family: 'Oswald', sans-serif; font-size: clamp(48px, 5.2vw, 72px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 6px; }
 .hero-title em { color: var(--crimson); font-style: normal; }
 .hero-title .nowrap { white-space: nowrap; display: inline-block; }
 .hero-sub { font-size: 16px; color: rgba(255,255,255,.5); line-height: 1.7; margin: 24px 0 40px; max-width: 520px; }
@@ -241,7 +236,7 @@ nav {
 <div class="hero">
   <div class="hero-inner">
     <div class="hero-eyebrow">Premium Websites voor het MKB</div>
-    <div class="hero-title"><span class="nowrap">Een website <em>die werkt</em></span><br>voor jou</div>
+    <div class="hero-title">Een website<br><em>die werkt</em> voor jou</div>
     <div class="hero-sub">Van een strakke zakelijke website tot een volledig maatwerk webplatform — Softora.nl bouwt websites die er niet alleen mooi uitzien, maar ook echt klanten opleveren.</div>
     <div class="hero-btns">
       <a class="btn-primary" href="mailto:info@softora.nl">
@@ -253,9 +248,6 @@ nav {
         +31 6 2991 7185
       </a>
     </div>
-  </div>
-  <div class="hero-media">
-    <img src="https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=1200&q=85" alt="Webdesign en laptop op een creatieve werkplek" width="1200" height="900" loading="eager" decoding="async" fetchpriority="high" referrerpolicy="no-referrer">
   </div>
 </div>
 
