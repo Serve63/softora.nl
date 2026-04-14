@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Blog – Softora.nl</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -17,7 +17,7 @@
   --light: #999;
   --border: #e8e5e0;
 }
-body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--dark); }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); }
 
 .screen { display: none; }
 .screen.active { display: block; }
@@ -32,8 +32,8 @@ nav {
   justify-content: space-between;
   position: sticky; top: 0; z-index: 50;
 }
-.nav-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); cursor: pointer; }
-.nav-back { display: none; align-items: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--light); background: none; border: none; cursor: pointer; transition: color .15s; }
+.nav-logo { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); cursor: pointer; }
+.nav-back { display: none; align-items: center; gap: 8px; font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--light); background: none; border: none; cursor: pointer; transition: color .15s; }
 .nav-back:hover { color: var(--crimson); }
 .nav-back svg { width: 14px; height: 14px; }
 .nav-back.show { display: flex; }
@@ -55,7 +55,7 @@ nav {
   pointer-events: none;
 }
 .hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.8); margin-bottom: 16px; }
-.hero-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(48px, 5vw, 72px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 16px; }
+.hero-title { font-family: 'Oswald', sans-serif; font-size: clamp(48px, 5vw, 72px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 16px; }
 .hero-sub { font-size: 15px; color: rgba(255,255,255,.5); max-width: 500px; line-height: 1.7; }
 
 .filter-bar {
@@ -66,7 +66,7 @@ nav {
   background: var(--white);
 }
 .filter-tab {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
   padding: 10px 18px;
   border: none; background: none;
@@ -103,7 +103,7 @@ nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 1px;
@@ -127,7 +127,7 @@ nav {
 
 .blog-card-body { padding: 18px 20px 20px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .blog-card-cat { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--crimson); }
-.blog-card-title { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: .3px; line-height: 1.2; color: var(--dark); }
+.blog-card-title { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: .3px; line-height: 1.2; color: var(--dark); }
 .blog-card.featured .blog-card-title { font-size: 26px; }
 .blog-card-excerpt { font-size: 13px; color: var(--mid); line-height: 1.6; flex: 1; }
 .blog-card-meta { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
@@ -147,7 +147,7 @@ nav {
   padding-right: 80px;
 }
 .artikel-cat { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--crimson); margin-bottom: 16px; }
-.artikel-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(36px, 5vw, 58px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1.05; color: var(--dark); margin-bottom: 20px; }
+.artikel-title { font-family: 'Oswald', sans-serif; font-size: clamp(36px, 5vw, 58px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1.05; color: var(--dark); margin-bottom: 20px; }
 .artikel-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--light); margin-bottom: 36px; }
 .artikel-meta-dot { width: 3px; height: 3px; background: var(--border); border-radius: 50%; }
 
@@ -156,7 +156,7 @@ nav {
   aspect-ratio: 16/7;
   border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 14px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
   color: rgba(255,255,255,.4);
   margin-bottom: 48px;
@@ -172,7 +172,7 @@ nav {
   color: var(--mid);
 }
 .artikel-body h2 {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: 'Oswald', sans-serif;
   font-size: 26px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
   color: var(--dark);
   margin: 40px 0 14px;
@@ -283,7 +283,7 @@ const blogs = [
   {
     id: 2,
     cat: 'SEO',
-    titel: 'De 5 SEO-fouten die MKB\\'ers het meeste maken',
+    titel: 'De 5 SEO-fouten die MKB\'ers het meeste maken',
     excerpt: 'Van ontbrekende meta descriptions tot het negeren van lokale SEO — deze fouten kosten je dagelijks bezoekers.',
     datum: '3 april 2026',
     read: '6 min lezen',
@@ -381,7 +381,7 @@ const blogs = [
     id: 6,
     cat: 'Marketing',
     titel: 'E-mail marketing voor MKB: zo begin je',
-    excerpt: 'E-mail heeft het hoogste ROI van alle marketingkanalen. Toch gebruiken weinig MKB\\'ers het goed.',
+    excerpt: 'E-mail heeft het hoogste ROI van alle marketingkanalen. Toch gebruiken weinig MKB\'ers het goed.',
     datum: '7 maart 2026',
     read: '5 min lezen',
     auteur: 'Servé Creusen',
