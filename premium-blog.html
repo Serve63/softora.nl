@@ -232,11 +232,11 @@ nav {
   </div>
 
   <div class="filter-bar" id="filter-bar">
-    <button class="filter-tab active" onclick="filterCat('Alle', this)">Alle</button>
-    <button class="filter-tab" onclick="filterCat('Website', this)">Website</button>
-    <button class="filter-tab" onclick="filterCat('SEO', this)">SEO</button>
-    <button class="filter-tab" onclick="filterCat('Marketing', this)">Marketing</button>
-    <button class="filter-tab" onclick="filterCat('Onderhoud', this)">Onderhoud</button>
+    <button class="filter-tab active" onclick="filterCat('Website\\'s', this)">Website's</button>
+    <button class="filter-tab" onclick="filterCat('Bedrijfssoftware', this)">Bedrijfssoftware</button>
+    <button class="filter-tab" onclick="filterCat('Voicesoftware', this)">Voicesoftware</button>
+    <button class="filter-tab" onclick="filterCat('AI ontwikkelingen', this)">AI ontwikkelingen</button>
+    <button class="filter-tab" onclick="filterCat('Overig', this)">Overig</button>
   </div>
 
   <div class="blog-grid-wrap" id="grid-wrap"></div>
@@ -266,7 +266,7 @@ nav {
 const blogs = [
   {
     id: 1,
-    cat: 'Website',
+    cat: "Website's",
     titel: 'Waarom je website in 2026 sneller moet zijn dan ooit',
     excerpt: 'Google beoordeelt je website steeds meer op laadtijd. Ontdek wat je kunt doen om jouw site razendsnel te maken.',
     datum: '10 april 2026',
@@ -296,7 +296,7 @@ const blogs = [
   },
   {
     id: 2,
-    cat: 'SEO',
+    cat: 'AI ontwikkelingen',
     titel: 'De 5 SEO-fouten die MKB\'ers het meeste maken',
     excerpt: 'Van ontbrekende meta descriptions tot het negeren van lokale SEO — deze fouten kosten je dagelijks bezoekers.',
     datum: '3 april 2026',
@@ -320,7 +320,7 @@ const blogs = [
   },
   {
     id: 3,
-    cat: 'Marketing',
+    cat: 'Bedrijfssoftware',
     titel: 'Zo zet je je website in als verkooptool',
     excerpt: 'Je website is meer dan een visitekaartje. Met de juiste aanpak trekt hij 24/7 klanten aan.',
     datum: '28 maart 2026',
@@ -340,7 +340,7 @@ const blogs = [
   },
   {
     id: 4,
-    cat: 'Onderhoud',
+    cat: 'Overig',
     titel: 'Waarom website-onderhoud geen optie is maar een must',
     excerpt: 'Een verouderde website is een beveiligingsrisico. Ontdek wat er kan misgaan en hoe je jezelf beschermt.',
     datum: '21 maart 2026',
@@ -367,7 +367,7 @@ const blogs = [
   },
   {
     id: 5,
-    cat: 'Website',
+    cat: "Website's",
     titel: 'Mobiel vriendelijk of mobiel first? Het verschil uitgelegd',
     excerpt: 'Google indexeert je website nu primair op mobiel. Weet jij wat dat voor jouw bedrijf betekent?',
     datum: '14 maart 2026',
@@ -393,7 +393,7 @@ const blogs = [
   },
   {
     id: 6,
-    cat: 'Marketing',
+    cat: 'Voicesoftware',
     titel: 'E-mail marketing voor MKB: zo begin je',
     excerpt: 'E-mail heeft het hoogste ROI van alle marketingkanalen. Toch gebruiken weinig MKB\'ers het goed.',
     datum: '7 maart 2026',
@@ -415,11 +415,11 @@ const blogs = [
   },
 ];
 
-let activeFilter = 'Alle';
+let activeFilter = "Website's";
 let activeBlog = null;
 
 function renderGrid() {
-  const filtered = activeFilter === 'Alle' ? blogs : blogs.filter((b) => b.cat === activeFilter);
+  const filtered = blogs.filter((b) => b.cat === activeFilter);
   const featured = filtered.filter((b) => b.featured);
   const rest = filtered.filter((b) => !b.featured);
   let html = '';
