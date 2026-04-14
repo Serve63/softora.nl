@@ -20,13 +20,70 @@
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); }
 
 /* NAV */
-nav { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 80px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
-.nav-logo { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); }
-.nav-cta { display: flex; align-items: center; gap: 8px; padding: 8px 20px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; text-decoration: none; transition: background .15s; }
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 1rem 4rem;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-transform: uppercase;
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: 0.1em;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 8px 28px rgba(15, 17, 28, 0.08);
+}
+
+.nav-logo {
+  font-family: 'Oswald', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--dark);
+  text-decoration: none;
+  letter-spacing: -0.02em;
+  position: relative;
+  line-height: 1;
+}
+
+.nav-logo::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 3.2ch;
+  height: 3px;
+  background: var(--crimson);
+}
+
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.8rem 1.5rem;
+  background: var(--crimson);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .15s;
+}
+
 .nav-cta:hover { background: var(--clight); }
 
 /* HERO */
 .hero {
+  margin-top: 78px;
   background: var(--dark);
   padding: 100px 80px;
   position: relative;
