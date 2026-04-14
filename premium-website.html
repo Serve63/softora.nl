@@ -882,9 +882,165 @@
             font-size: 0.8rem;
         }
 
-        .faq-container {
-            max-width: 900px;
+        .faq-section {
+            background: var(--bg-secondary);
+            padding: 2.5rem 4rem 5.5rem;
+        }
+
+        .faq-section-inner {
+            max-width: 1240px;
             margin: 0 auto;
+        }
+
+        .faq-split {
+            display: grid;
+            grid-template-columns: minmax(0, 1.12fr) minmax(280px, 0.78fr);
+            gap: clamp(2rem, 4.5vw, 3.75rem);
+            align-items: start;
+        }
+
+        .faq-section-head {
+            text-align: left;
+            margin-bottom: 2.25rem;
+        }
+
+        .faq-section-head .eyebrow {
+            display: block;
+            margin-bottom: 0.5rem;
+            border: none;
+            padding: 0;
+            color: var(--text-tertiary);
+            font-size: 0.9rem;
+            letter-spacing: 0.14em;
+        }
+
+        .faq-section-head h2 {
+            margin: 0.35rem 0 0;
+            position: relative;
+            display: inline-block;
+        }
+
+        .faq-section-head h2::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: var(--accent);
+        }
+
+        .faq-aside {
+            position: sticky;
+            top: 6.5rem;
+        }
+
+        .faq-contact-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-top: 3px solid var(--accent);
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent), 0 18px 40px rgba(15, 17, 28, 0.06);
+            padding: 1.85rem 1.75rem 1.95rem;
+            border-radius: 0;
+            clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+        }
+
+        .faq-contact-card .eyebrow {
+            border: none;
+            padding: 0;
+            color: var(--text-tertiary);
+            font-size: 0.78rem;
+            letter-spacing: 0.14em;
+            margin-bottom: 0.35rem;
+        }
+
+        .faq-contact-card h3 {
+            font-size: clamp(1.35rem, 2.2vw, 1.65rem);
+            margin: 0 0 0.65rem;
+            color: var(--text-primary);
+        }
+
+        .faq-contact-lead {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.92rem;
+            color: var(--text-secondary);
+            line-height: 1.65;
+            margin: 0 0 1.35rem;
+            font-weight: 300;
+        }
+
+        .faq-contact-form {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .faq-field {
+            display: grid;
+            gap: 0.35rem;
+        }
+
+        .faq-field label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .faq-field input,
+        .faq-field textarea {
+            width: 100%;
+            font: inherit;
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            padding: 0.72rem 0.85rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .faq-field textarea {
+            min-height: 118px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .faq-field input:focus,
+        .faq-field textarea:focus {
+            outline: none;
+            border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+        }
+
+        .faq-contact-form .magnetic-btn {
+            margin-top: 0.35rem;
+            width: 100%;
+            justify-content: center;
+            padding: 0.9rem 1.25rem;
+        }
+
+        .faq-contact-note {
+            font-size: 0.78rem;
+            color: var(--text-tertiary);
+            margin: 0.75rem 0 0;
+            line-height: 1.45;
+            font-weight: 300;
+        }
+
+        .faq-contact-note a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .faq-contact-note a:hover {
+            text-decoration: underline;
+        }
+
+        .faq-container {
+            max-width: none;
+            margin: 0;
         }
 
         .faq-item {
@@ -969,7 +1125,8 @@
             line-height: 1.6;
             padding-top: 0;
             padding-bottom: 0;
-            padding-right: 40px;
+            padding-left: 1.35rem;
+            padding-right: 3rem;
             font-weight: 300;
             font-size: 0.95rem;
         }
@@ -1264,6 +1421,17 @@
             body { cursor: auto; }
             .cursor, .cursor-dot { display: none; }
             .diensten-arrow-wrap { display: none; }
+            .faq-split {
+                grid-template-columns: 1fr;
+                gap: 2.5rem;
+            }
+            .faq-aside {
+                position: static;
+                order: 2;
+            }
+            .faq-split-main {
+                order: 1;
+            }
         }
 
         @media (max-width: 768px) {
@@ -1283,6 +1451,16 @@
             .whatsapp-widget-btn {
                 width: 58px;
                 height: 58px;
+            }
+            .faq-section {
+                padding: 2rem 1.25rem 4rem;
+            }
+            .faq-question {
+                padding: 1.15rem 44px 1.15rem 1rem;
+                font-size: 0.92rem;
+            }
+            .faq-icon {
+                right: 6px;
             }
         }
     </style>
@@ -1490,53 +1668,80 @@
     </section>
 
     <!-- FAQ -->
-    <section id="faq" class="perf-deferred-section" style="background: var(--bg-secondary); padding: 2.5rem 4rem 5.5rem;">
-        <div style="max-width: 900px; margin: 0 auto;">
-            <div class="section-header fade-up" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
-                <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">FAQ</span>
-                <h2 style="text-align: center;">Veelgestelde Vragen</h2>
-            </div>
+    <section id="faq" class="faq-section perf-deferred-section">
+        <div class="faq-section-inner">
+            <div class="faq-split">
+                <div class="faq-split-main fade-up">
+                    <div class="faq-section-head">
+                        <span class="eyebrow">FAQ</span>
+                        <h2>Veelgestelde Vragen</h2>
+                    </div>
+                    <div class="faq-container">
+                        <div class="faq-item fade-up">
+                            <button type="button" class="faq-question magnetic">
+                                Hoe snel wordt mijn project opgeleverd?
+                                <span class="faq-icon" aria-hidden="true"></span>
+                            </button>
+                            <div class="faq-answer">
+                                <p>Dat hangt af van wat je nodig hebt. Een website is er doorgaans in 2 tot 3 weken. Bedrijfssoftware en voiceprojecten duren gemiddeld 3 tot 5 weken. We bespreken de planning altijd vooraf — geen verrassingen.</p>
+                            </div>
+                        </div>
 
-            <div class="faq-container" style="margin-top: 2rem;">
-                <div class="faq-item fade-up">
-                    <button class="faq-question magnetic">
-                        Hoe snel wordt mijn project opgeleverd?
-                        <span class="faq-icon"></span>
-                    </button>
-                    <div class="faq-answer">
-                        <p>Dat hangt af van wat je nodig hebt. Een website is er doorgaans in 2 tot 3 weken. Bedrijfssoftware en voiceprojecten duren gemiddeld 3 tot 5 weken. We bespreken de planning altijd vooraf — geen verrassingen.</p>
+                        <div class="faq-item fade-up" style="transition-delay: 0.1s">
+                            <button type="button" class="faq-question magnetic">
+                                Kan ik maar één dienst afnemen of moeten ze combineren?
+                                <span class="faq-icon" aria-hidden="true"></span>
+                            </button>
+                            <div class="faq-answer">
+                                <p>Gewoon losse diensten afnemen kan prima. Sommige klanten starten met een website, anderen beginnen meteen met software of een voiceagent. Als je later combineert werkt alles naadloos samen — maar dat hoeft niet.</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item fade-up" style="transition-delay: 0.2s">
+                            <button type="button" class="faq-question magnetic">
+                                Werken jullie met bestaande systemen of bouwen jullie alles nieuw?
+                                <span class="faq-icon" aria-hidden="true"></span>
+                            </button>
+                            <div class="faq-answer">
+                                <p>Beide. We koppelen graag aan wat er al staat — CRM, agenda, boekhoudpakket. Als er nog niets is, bouwen we het op maat. We kiezen altijd de aanpak die het meeste oplevert voor jouw situatie.</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item fade-up" style="transition-delay: 0.3s">
+                            <button type="button" class="faq-question magnetic">
+                                Bieden jullie ook onderhoud na oplevering?
+                                <span class="faq-icon" aria-hidden="true"></span>
+                            </button>
+                            <div class="faq-answer">
+                                <p>Ja. Voor alle drie de diensten bieden we onderhoudsabonnementen aan — van updates en monitoring tot doorontwikkeling. Zo blijft wat we bouwen ook goed werken.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="faq-item fade-up" style="transition-delay: 0.1s">
-                    <button class="faq-question magnetic">
-                        Kan ik maar één dienst afnemen of moeten ze combineren?
-                        <span class="faq-icon"></span>
-                    </button>
-                    <div class="faq-answer">
-                        <p>Gewoon losse diensten afnemen kan prima. Sommige klanten starten met een website, anderen beginnen meteen met software of een voiceagent. Als je later combineert werkt alles naadloos samen — maar dat hoeft niet.</p>
+                <aside class="faq-aside fade-up" style="transition-delay: 0.08s" aria-labelledby="faq-contact-title">
+                    <div class="faq-contact-card">
+                        <span class="eyebrow">Contact</span>
+                        <h3 id="faq-contact-title">Heb je een vraag?</h3>
+                        <p class="faq-contact-lead">Stuur je vraag hieronder. We nemen zo snel mogelijk contact met je op — meestal binnen één werkdag.</p>
+                        <form id="faq-contact-form" class="faq-contact-form" novalidate>
+                            <div class="faq-field">
+                                <label for="faq-contact-name">Naam</label>
+                                <input id="faq-contact-name" name="name" type="text" autocomplete="name" required maxlength="120" placeholder="Je naam">
+                            </div>
+                            <div class="faq-field">
+                                <label for="faq-contact-email">E-mail</label>
+                                <input id="faq-contact-email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="200" placeholder="jij@voorbeeld.nl">
+                            </div>
+                            <div class="faq-field">
+                                <label for="faq-contact-message">Je vraag</label>
+                                <textarea id="faq-contact-message" name="message" required maxlength="4000" placeholder="Waar kunnen we je mee helpen?"></textarea>
+                            </div>
+                            <button type="submit" class="magnetic-btn magnetic">Verstuur vraag</button>
+                        </form>
+                        <p class="faq-contact-note">Je mailprogramma opent met een voorbeeldbericht. Liever direct bellen? <a href="tel:+31629917185">+31 6 2991 7185</a></p>
                     </div>
-                </div>
-
-                <div class="faq-item fade-up" style="transition-delay: 0.2s">
-                    <button class="faq-question magnetic">
-                        Werken jullie met bestaande systemen of bouwen jullie alles nieuw?
-                        <span class="faq-icon"></span>
-                    </button>
-                    <div class="faq-answer">
-                        <p>Beide. We koppelen graag aan wat er al staat — CRM, agenda, boekhoudpakket. Als er nog niets is, bouwen we het op maat. We kiezen altijd de aanpak die het meeste oplevert voor jouw situatie.</p>
-                    </div>
-                </div>
-
-                <div class="faq-item fade-up" style="transition-delay: 0.3s">
-                    <button class="faq-question magnetic">
-                        Bieden jullie ook onderhoud na oplevering?
-                        <span class="faq-icon"></span>
-                    </button>
-                    <div class="faq-answer">
-                        <p>Ja. Voor alle drie de diensten bieden we onderhoudsabonnementen aan — van updates en monitoring tot doorontwikkeling. Zo blijft wat we bouwen ook goed werken.</p>
-                    </div>
-                </div>
+                </aside>
             </div>
         </div>
     </section>
@@ -1800,6 +2005,25 @@
                 setFaqState(item, true);
             });
         });
+
+        const faqContactForm = document.getElementById("faq-contact-form");
+        if (faqContactForm) {
+            faqContactForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+                if (!faqContactForm.reportValidity()) return;
+                const name = String(document.getElementById("faq-contact-name")?.value || "").trim();
+                const email = String(document.getElementById("faq-contact-email")?.value || "").trim();
+                const message = String(document.getElementById("faq-contact-message")?.value || "").trim();
+                const body =
+                    "Naam: " + name + "\n" + "E-mail: " + email + "\n\n" + message + "\n";
+                const subject = "Vraag via softora.nl (FAQ)";
+                window.location.href =
+                    "mailto:info@softora.nl?subject=" +
+                    encodeURIComponent(subject) +
+                    "&body=" +
+                    encodeURIComponent(body);
+            });
+        }
 
         anchors.forEach(function (anchor) {
             anchor.addEventListener("click", function (event) {
