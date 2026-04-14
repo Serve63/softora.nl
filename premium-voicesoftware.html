@@ -19,6 +19,8 @@
   --border: #e8e5e0;
   --nav-accent: #8B2252;
   --nav-accent-hover: #A62D65;
+  --nav-cta: #057a55;
+  --nav-cta-hover: #046c4e;
 }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); }
 
@@ -61,6 +63,32 @@ nav {
   width: 3.2ch;
   height: 3px;
   background: var(--nav-accent);
+}
+
+.nav-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.nav-start-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 1.5rem;
+  background: var(--nav-cta);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.nav-start-btn:hover {
+  background: var(--nav-cta-hover);
 }
 
 /* HERO */
@@ -201,6 +229,9 @@ nav {
 <!-- NAV -->
 <nav>
   <a class="nav-logo" href="/">SOFTORA.NL</a>
+  <div class="nav-links">
+    <a href="/#contact" class="nav-start-btn">Start Project</a>
+  </div>
 </nav>
 
 <!-- HERO -->

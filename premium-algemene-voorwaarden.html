@@ -10,6 +10,8 @@
 :root {
   --bg: #f5f4f1; --white: #fff; --crimson: #9b2355;
   --dark: #1a1a2e; --mid: #555; --light: #999; --border: #e8e5e0;
+  --nav-cta: #9b2355;
+  --nav-cta-hover: #c4346a;
 }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); padding-top: 86px; }
 
@@ -47,6 +49,31 @@ nav {
   height: 3px;
   background: var(--crimson);
 }
+.nav-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.nav-start-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 1.5rem;
+  background: var(--nav-cta);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.nav-start-btn:hover {
+  background: var(--nav-cta-hover);
+}
 .hero-strip { background: var(--dark); padding: 56px 80px 52px; }
 .hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.8); margin-bottom: 14px; }
 .hero-title { font-family: 'Oswald', sans-serif; font-size: 52px; font-weight: 700; text-transform: uppercase; letter-spacing: -1px; color: #fff; line-height: 1; margin-bottom: 12px; }
@@ -79,6 +106,9 @@ nav {
 
 <nav id="navbar">
   <a href="/" class="logo">SOFTORA.NL</a>
+  <div class="nav-links">
+    <a href="/#contact" class="nav-start-btn">Start Project</a>
+  </div>
 </nav>
 
 <div class="hero-strip">
