@@ -353,11 +353,16 @@
             box-shadow: 0 0 30px rgba(139, 34, 82, 0.2);
         }
 
-        .hero {
+        /* section.hero: hogere specificiteit + !important wint o.a. van iphone-optimizations (.hero { display:flex !important }) */
+        section.hero {
             width: 100%;
             min-height: clamp(610px, 76vh, 760px);
             display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap !important;
             align-items: center;
+            justify-content: center !important;
+            text-align: center;
             position: relative;
             overflow: hidden;
         }
@@ -374,13 +379,18 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(90deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.68) 38%, rgba(0, 0, 0, 0.42) 100%);
+            background: linear-gradient(90deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.52) 50%, rgba(0, 0, 0, 0.78) 100%);
             z-index: 1;
         }
 
         .hero-content {
             padding: 0;
-            max-width: 700px;
+            /* Geen width:100%: anders vult het flex-child de hele sectie en lijkt alles 'links' in het blok te zitten */
+            width: auto;
+            flex: 0 1 auto;
+            max-width: min(72rem, calc(100vw - 8rem));
+            margin-inline: auto;
+            text-align: center !important;
             position: relative;
             z-index: 2;
         }
@@ -419,6 +429,7 @@
         .hero h1 {
             margin-bottom: 2rem;
             color: #fff;
+            text-align: center !important;
             opacity: 1;
             transform: none;
             animation: none;
@@ -427,8 +438,11 @@
         .hero p {
             font-size: 1.2rem;
             color: rgba(255, 255, 255, 0.72);
-            max-width: 500px;
+            max-width: none;
+            margin-left: auto;
+            margin-right: auto;
             margin-bottom: 3rem;
+            text-align: center !important;
             line-height: 1.8;
             font-weight: 300;
             opacity: 1;
@@ -451,6 +465,8 @@
         .hero-buttons {
             display: flex;
             gap: 1.5rem;
+            justify-content: center !important;
+            flex-wrap: wrap;
             opacity: 1;
             transform: none;
             animation: none;
@@ -469,7 +485,7 @@
         }
 
         section.hero {
-            padding: clamp(5.75rem, 14vh, 8.5rem) 4rem clamp(4rem, 10vh, 6rem);
+            padding: clamp(5.75rem, 14vh, 8.5rem) clamp(1.5rem, 4vw, 4rem) clamp(4rem, 10vh, 6rem);
         }
 
         @supports (content-visibility: auto) {

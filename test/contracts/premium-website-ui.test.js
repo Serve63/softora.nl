@@ -60,7 +60,7 @@ test('premium website hero is full-bleed workspace-foto met donkere overlay en l
 
   assert.match(
     source,
-    /\.hero\s*\{[\s\S]*min-height:\s*clamp\(610px,\s*76vh,\s*760px\);/s
+    /section\.hero\s*\{[\s\S]*min-height:\s*clamp\(610px,\s*76vh,\s*760px\);/s
   );
   assert.match(
     source,
@@ -68,8 +68,10 @@ test('premium website hero is full-bleed workspace-foto met donkere overlay en l
   );
   assert.match(
     source,
-    /\.hero::after\s*\{[\s\S]*background:\s*linear-gradient\(90deg,\s*rgba\(0,\s*0,\s*0,\s*0\.9\)/s
+    /\.hero::after\s*\{[\s\S]*background:\s*linear-gradient\(90deg,\s*rgba\(0,\s*0,\s*0,\s*0\.78\)\s*0%,\s*rgba\(0,\s*0,\s*0,\s*0\.52\)\s*50%,/s
   );
+  assert.match(source, /section\.hero\s*\{[\s\S]*justify-content:\s*center !important;/s);
+  assert.match(source, /\.hero-content\s*\{[\s\S]*text-align:\s*center;/s);
   assert.match(source, /section\.hero\s*\{[\s\S]*padding:\s*clamp\(5\.75rem,/s);
   assert.match(source, /\.hero h1\s*\{[\s\S]*color:\s*#fff;/s);
   assert.match(source, /\.hero p\s*\{[\s\S]*color:\s*rgba\(255,\s*255,\s*255,\s*0\.72\);/s);
