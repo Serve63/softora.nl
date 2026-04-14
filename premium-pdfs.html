@@ -52,7 +52,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 
 /* -- TOP BAR -- */
 .topbar {
-  height: 56px;
+  height: 62px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -70,8 +70,8 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 }
 .doc-tab {
   font-family: 'Oswald', sans-serif;
-  font-size: 12px; font-weight: 500;
-  padding: 6px 16px;
+  font-size: 13px; font-weight: 500;
+  padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
   color: var(--muted);
@@ -84,11 +84,11 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .topbar-right { margin-left: auto; }
 .btn-dl {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 20px;
+  padding: 9px 20px;
   background: var(--crimson); color: #fff;
   border: none; border-radius: 5px;
   font-family: 'Oswald', sans-serif;
-  font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   cursor: pointer; transition: opacity .15s;
 }
 .btn-dl:hover { opacity: .88; }
@@ -106,18 +106,18 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 /* -- FORM PANEL -- */
 .form-panel {
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
   min-height: 0;
   background: var(--panel);
   border-right: 1px solid var(--border);
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px 20px 32px;
+  padding: 22px 22px 34px;
 }
 
 .section-title {
-  font-size: 9px; font-weight: 700;
-  letter-spacing: 2px; text-transform: uppercase;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--light);
   margin: 24px 0 12px;
 }
@@ -128,17 +128,17 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 }
 .field label {
   display: block;
-  font-size: 11px; font-weight: 500;
+  font-size: 12px; font-weight: 500;
   color: var(--muted);
   margin-bottom: 4px;
 }
 .field input, .field textarea, .field select {
   width: 100%;
-  padding: 8px 10px;
+  padding: 9px 11px;
   border: 1px solid var(--border);
   border-radius: 4px;
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   background: var(--input-bg);
   outline: none;
@@ -206,13 +206,13 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 }
 .preview-panel-head {
   flex-shrink: 0;
-  padding: 12px 16px 10px;
+  padding: 13px 18px 11px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   background: var(--preview-bg);
 }
 .preview-hint {
   font-size: 10px; font-weight: 700;
-  letter-spacing: 2px; text-transform: uppercase;
+  letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--light);
   margin: 0;
 }
@@ -225,7 +225,8 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 16px 12px 24px;
+  padding: 20px 16px 28px;
+  background: rgba(255,255,255,0.42);
 }
 .a4-scale-wrap {
   flex-shrink: 0;
