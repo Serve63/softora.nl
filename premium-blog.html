@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog – Softora.nl</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f4f1;
+  --white: #fff;
+  --crimson: #9b2355;
+  --clight: #c4346a;
+  --dark: #1a1a2e;
+  --mid: #555;
+  --light: #999;
+  --border: #e8e5e0;
+}
+body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--dark); }
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+nav {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 0 80px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 50;
+}
+.nav-logo { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: var(--crimson); cursor: pointer; }
+.nav-back { display: none; align-items: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--light); background: none; border: none; cursor: pointer; transition: color .15s; }
+.nav-back:hover { color: var(--crimson); }
+.nav-back svg { width: 14px; height: 14px; }
+.nav-back.show { display: flex; }
+
+#screen-overzicht { min-height: 100vh; }
+
+.hero-banner {
+  background: var(--dark);
+  padding: 72px 80px;
+  position: relative;
+  overflow: hidden;
+}
+.hero-banner::before {
+  content: '';
+  position: absolute;
+  top: -40%; right: -10%;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(155,35,85,.25) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.8); margin-bottom: 16px; }
+.hero-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(48px, 5vw, 72px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1; color: #fff; margin-bottom: 16px; }
+.hero-sub { font-size: 15px; color: rgba(255,255,255,.5); max-width: 500px; line-height: 1.7; }
+
+.filter-bar {
+  padding: 28px 80px 0;
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--white);
+}
+.filter-tab {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  padding: 10px 18px;
+  border: none; background: none;
+  color: var(--light);
+  cursor: pointer;
+  position: relative;
+  transition: color .15s;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.filter-tab:hover { color: var(--dark); }
+.filter-tab.active { color: var(--crimson); border-bottom-color: var(--crimson); }
+
+.blog-grid-wrap { padding: 48px 80px 80px; }
+
+.featured-row { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; margin-bottom: 24px; }
+.blog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+.blog-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all .2s;
+  display: flex;
+  flex-direction: column;
+}
+.blog-card:hover { box-shadow: 0 8px 40px rgba(0,0,0,.1); transform: translateY(-3px); }
+
+.blog-card-img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.6);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.blog-card-img.featured { aspect-ratio: 16/8; }
+.blog-card-img-label {
+  position: absolute;
+  bottom: 12px; left: 14px;
+  font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 3px;
+  backdrop-filter: blur(4px);
+}
+
+.blog-card-body { padding: 18px 20px 20px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.blog-card-cat { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--crimson); }
+.blog-card-title { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: .3px; line-height: 1.2; color: var(--dark); }
+.blog-card.featured .blog-card-title { font-size: 26px; }
+.blog-card-excerpt { font-size: 13px; color: var(--mid); line-height: 1.6; flex: 1; }
+.blog-card-meta { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.blog-card-date { font-size: 11px; color: var(--light); }
+.blog-card-read { font-size: 11px; color: var(--light); }
+.blog-card-dot { width: 3px; height: 3px; background: var(--border); border-radius: 50%; }
+.blog-card-arrow { margin-left: auto; color: var(--border); transition: color .15s, transform .15s; }
+.blog-card:hover .blog-card-arrow { color: var(--crimson); transform: translateX(3px); }
+
+#screen-artikel { min-height: 100vh; }
+
+.artikel-hero {
+  padding: 60px 0 0;
+  max-width: 760px;
+  margin: 0 auto;
+  padding-left: 80px;
+  padding-right: 80px;
+}
+.artikel-cat { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--crimson); margin-bottom: 16px; }
+.artikel-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(36px, 5vw, 58px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; line-height: 1.05; color: var(--dark); margin-bottom: 20px; }
+.artikel-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--light); margin-bottom: 36px; }
+.artikel-meta-dot { width: 3px; height: 3px; background: var(--border); border-radius: 50%; }
+
+.artikel-img {
+  width: 100%;
+  aspect-ratio: 16/7;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: rgba(255,255,255,.4);
+  margin-bottom: 48px;
+  overflow: hidden;
+}
+
+.artikel-body {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 80px 80px;
+  font-size: 16px;
+  line-height: 1.85;
+  color: var(--mid);
+}
+.artikel-body h2 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 26px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--dark);
+  margin: 40px 0 14px;
+}
+.artikel-body p { margin-bottom: 18px; }
+.artikel-body ul { padding-left: 20px; margin-bottom: 18px; }
+.artikel-body ul li { margin-bottom: 8px; }
+.artikel-body strong { color: var(--dark); font-weight: 600; }
+
+.meer-wrap { background: var(--white); border-top: 1px solid var(--border); padding: 48px 80px; }
+.meer-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--light); margin-bottom: 20px; }
+.meer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+@media (max-width: 980px) {
+  nav,
+  .hero-banner,
+  .filter-bar,
+  .blog-grid-wrap,
+  .meer-wrap,
+  .artikel-hero,
+  .artikel-body { padding-left: 20px; padding-right: 20px; }
+  .featured-row,
+  .blog-grid,
+  .meer-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo" onclick="goOverzicht()">SOFTORA.NL</div>
+  <button class="nav-back" id="nav-back" onclick="goOverzicht()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+    Terug naar blog
+  </button>
+</nav>
+
+<div class="screen active" id="screen-overzicht">
+  <div class="hero-banner">
+    <div class="hero-eyebrow">Softora.nl — Blog</div>
+    <div class="hero-title">Kennis &<br>Inspiratie</div>
+    <div class="hero-sub">Tips, inzichten en nieuws over websites, SEO en online groei voor het MKB.</div>
+  </div>
+
+  <div class="filter-bar" id="filter-bar">
+    <button class="filter-tab active" onclick="filterCat('Alle', this)">Alle</button>
+    <button class="filter-tab" onclick="filterCat('Website', this)">Website</button>
+    <button class="filter-tab" onclick="filterCat('SEO', this)">SEO</button>
+    <button class="filter-tab" onclick="filterCat('Marketing', this)">Marketing</button>
+    <button class="filter-tab" onclick="filterCat('Onderhoud', this)">Onderhoud</button>
+  </div>
+
+  <div class="blog-grid-wrap" id="grid-wrap"></div>
+</div>
+
+<div class="screen" id="screen-artikel">
+  <div class="artikel-hero">
+    <div class="artikel-cat" id="art-cat"></div>
+    <div class="artikel-title" id="art-title"></div>
+    <div class="artikel-meta">
+      <span id="art-datum"></span>
+      <div class="artikel-meta-dot"></div>
+      <span id="art-read"></span>
+      <div class="artikel-meta-dot"></div>
+      <span id="art-auteur"></span>
+    </div>
+  </div>
+  <div class="artikel-img" id="art-img"></div>
+  <div class="artikel-body" id="art-body"></div>
+  <div class="meer-wrap">
+    <div class="meer-label">Meer artikelen</div>
+    <div class="meer-grid" id="meer-grid"></div>
+  </div>
+</div>
+
+<script>
+const blogs = [
+  {
+    id: 1,
+    cat: 'Website',
+    titel: 'Waarom je website in 2026 sneller moet zijn dan ooit',
+    excerpt: 'Google beoordeelt je website steeds meer op laadtijd. Ontdek wat je kunt doen om jouw site razendsnel te maken.',
+    datum: '10 april 2026',
+    read: '5 min lezen',
+    auteur: 'Servé Creusen',
+    kleur: 'linear-gradient(135deg, #1a1a2e 0%, #9b2355 100%)',
+    featured: true,
+    inhoud: `
+      <p>In 2026 is de laadtijd van je website niet meer alleen een technisch detail — het is een directe rankingfactor voor Google én een bepalende factor voor of bezoekers blijven of vertrekken.</p>
+      <h2>Waarom snelheid zo belangrijk is</h2>
+      <p>Onderzoek toont aan dat <strong>53% van de mobiele bezoekers</strong> een pagina verlaat als die langer dan 3 seconden laadt. Voor Google is de laadtijd onderdeel van de Core Web Vitals — een set signalen die bepalen hoe hoog jij in de zoekresultaten verschijnt.</p>
+      <p>Een trage website kost je dus niet alleen bezoekers, maar ook zichtbaarheid in Google. Dubbel verlies.</p>
+      <h2>Wat maakt een website traag?</h2>
+      <ul>
+        <li>Afbeeldingen die niet geoptimaliseerd zijn (te groot, verkeerd formaat)</li>
+        <li>Te veel plug-ins of externe scripts</li>
+        <li>Geen gebruik van caching</li>
+        <li>Een trage hostingserver</li>
+        <li>Geen gebruik van een CDN (Content Delivery Network)</li>
+      </ul>
+      <h2>Wat kun je er aan doen?</h2>
+      <p>Begin met het comprimeren van je afbeeldingen naar het WebP-formaat. Dit geeft gemiddeld <strong>30-50% kleinere bestanden</strong> zonder zichtbaar kwaliteitsverlies. Zorg vervolgens voor goede caching en een snelle hostingprovider.</p>
+      <p>Bij Softora.nl zorgen we standaard voor geoptimaliseerde laadtijden bij elk project. Onze websites scoren gemiddeld 90+ op Google PageSpeed — voor zowel mobiel als desktop.</p>
+      <h2>Conclusie</h2>
+      <p>Snelheid is geen luxe meer. Het is de basis. Zorg dat je website snel laadt, dan profiteer je van meer bezoekers, een betere Google-positie én een hogere conversie.</p>
+    `
+  },
+  {
+    id: 2,
+    cat: 'SEO',
+    titel: 'De 5 SEO-fouten die MKB\\'ers het meeste maken',
+    excerpt: 'Van ontbrekende meta descriptions tot het negeren van lokale SEO — deze fouten kosten je dagelijks bezoekers.',
+    datum: '3 april 2026',
+    read: '6 min lezen',
+    auteur: 'Servé Creusen',
+    kleur: 'linear-gradient(135deg, #0f3460 0%, #16213e 100%)',
+    featured: true,
+    inhoud: `
+      <p>SEO hoeft niet ingewikkeld te zijn. Maar veel MKB-ondernemers maken dezelfde fouten keer op keer, waardoor ze onnodig laag staan in Google. In dit artikel zetten we de vijf meest gemaakte fouten op een rij.</p>
+      <h2>1. Geen of slechte meta descriptions</h2>
+      <p>De meta description is het tekstje onder je pagina in Google. Het beïnvloedt niet direct je ranking, maar wel of mensen op jouw link klikken. Schrijf altijd een duidelijke, wervende meta description van 140–160 tekens.</p>
+      <h2>2. Geen aandacht voor lokale SEO</h2>
+      <p>Als je een lokaal bedrijf hebt, wil je gevonden worden door mensen in jouw regio. Zorg voor een compleet Google Business-profiel, gebruik locatiegerichte zoekwoorden en vraag klanten om reviews.</p>
+      <h2>3. Afbeeldingen zonder alt-tekst</h2>
+      <p>Google kan afbeeldingen niet "zien". Via de alt-tekst vertel je Google wat er op de afbeelding staat. Dit helpt zowel je SEO als de toegankelijkheid van je website.</p>
+      <h2>4. Te weinig content</h2>
+      <p>Pagina's met weinig of dunne content ranken slecht. Schrijf uitgebreide, waardevolle pagina's van minimaal 500 woorden. Een blog helpt enorm om regelmatig verse content toe te voegen.</p>
+      <h2>5. Geen interne linkstructuur</h2>
+      <p>Interne links helpen Google om je website beter te begrijpen en verdelen de "linkwaarde" over je pagina's. Link vanuit je blogs naar relevante dienstenpagina's en andersom.</p>
+    `
+  },
+  {
+    id: 3,
+    cat: 'Marketing',
+    titel: 'Zo zet je je website in als verkooptool',
+    excerpt: 'Je website is meer dan een visitekaartje. Met de juiste aanpak trekt hij 24/7 klanten aan.',
+    datum: '28 maart 2026',
+    read: '4 min lezen',
+    auteur: 'Servé Creusen',
+    kleur: 'linear-gradient(135deg, #2c3e50 0%, #9b2355 100%)',
+    featured: false,
+    inhoud: `
+      <p>Veel ondernemers zien hun website als een statisch visitekaartje. Maar een goed ingerichte website werkt 24 uur per dag, 7 dagen per week als verkoper — ook als jij slaapt.</p>
+      <h2>Duidelijke calls-to-action</h2>
+      <p>Elke pagina op je website moet een duidelijk doel hebben. Wat wil je dat de bezoeker doet? Bel je, vul een formulier in, vraag een offerte aan? Zorg voor <strong>duidelijke, opvallende knoppen</strong> die bezoekers aansturen.</p>
+      <h2>Sociale bewijslast</h2>
+      <p>Reviews, klantverhalen en logo's van bekende opdrachtgevers wekken vertrouwen. Mensen kopen liever bij een bedrijf dat anderen al positief hebben beoordeeld. Zorg dat dit prominent zichtbaar is op je website.</p>
+      <h2>Lead magnets</h2>
+      <p>Bied iets gratis aan in ruil voor een e-mailadres. Denk aan een gratis scan, checklist of adviesgesprek. Zo bouw je een lijst op van geïnteresseerde potentiële klanten.</p>
+    `
+  },
+  {
+    id: 4,
+    cat: 'Onderhoud',
+    titel: 'Waarom website-onderhoud geen optie is maar een must',
+    excerpt: 'Een verouderde website is een beveiligingsrisico. Ontdek wat er kan misgaan en hoe je jezelf beschermt.',
+    datum: '21 maart 2026',
+    read: '4 min lezen',
+    auteur: 'Servé Creusen',
+    kleur: 'linear-gradient(135deg, #16733c 0%, #0f3460 100%)',
+    featured: false,
+    inhoud: `
+      <p>Veel ondernemers denken dat een website na de lancering "klaar" is. Niets is minder waar. Zonder regelmatig onderhoud is je website een open deur voor hackers en bugs.</p>
+      <h2>Beveiligingsrisico's</h2>
+      <p>WordPress, plug-ins en thema's worden continu bijgewerkt om beveiligingslekken te dichten. Als jij die updates niet uitvoert, blijf je kwetsbaar. Hackers scannen automatisch op verouderde versies.</p>
+      <h2>Prestatieproblemen</h2>
+      <p>Verouderde software werkt trager en minder stabiel. Regelmatige updates zorgen dat je website snel en betrouwbaar blijft werken.</p>
+      <h2>Wat omvat goed onderhoud?</h2>
+      <ul>
+        <li>Maandelijkse plug-in en thema updates</li>
+        <li>Dagelijkse backups</li>
+        <li>Uptime monitoring</li>
+        <li>Beveiligingsscans</li>
+        <li>Performance checks</li>
+      </ul>
+      <p>Bij Softora.nl bieden we onderhoudsabonnementen die dit alles regelen. Zo heb jij er geen omkijken naar.</p>
+    `
+  },
+  {
+    id: 5,
+    cat: 'Website',
+    titel: 'Mobiel vriendelijk of mobiel first? Het verschil uitgelegd',
+    excerpt: 'Google indexeert je website nu primair op mobiel. Weet jij wat dat voor jouw bedrijf betekent?',
+    datum: '14 maart 2026',
+    read: '3 min lezen',
+    auteur: 'Servé Creusen',
+    kleur: 'linear-gradient(135deg, #9b2355 0%, #4a1a6b 100%)',
+    featured: false,
+    inhoud: `
+      <p>Er is een groot verschil tussen een website die <em>werkt</em> op mobiel en een website die <em>gebouwd is</em> voor mobiel. Google maakt dit onderscheid ook — en beloont mobiel-first ontwerp.</p>
+      <h2>Wat is Mobile First?</h2>
+      <p>Mobile first betekent dat je bij het ontwerpen van een website begint met de mobiele versie en daarna uitbreidt naar desktop. Dit dwingt je tot heldere keuzes over content en navigatie.</p>
+      <h2>Waarom Google dit waardeert</h2>
+      <p>Meer dan 60% van het webverkeer komt van mobiele apparaten. Google gebruikt de mobiele versie van je site als primaire basis voor ranking (Mobile-First Indexing). Is je mobiele versie slecht? Dan rang je lager — ook op desktop.</p>
+      <h2>Checklist mobiel-vriendelijke website</h2>
+      <ul>
+        <li>Tekst leesbaar zonder in te zoomen</li>
+        <li>Knoppen groot genoeg om op te tikken</li>
+        <li>Geen horizontale scrollbalk</li>
+        <li>Snel laden op 4G/5G verbinding</li>
+        <li>Formulieren eenvoudig in te vullen op mobiel</li>
+      </ul>
+    `
+  },
+  {
+    id: 6,
+    cat: 'Marketing',
+    titel: 'E-mail marketing voor MKB: zo begin je',
+    excerpt: 'E-mail heeft het hoogste ROI van alle marketingkanalen. Toch gebruiken weinig MKB\\'ers het goed.',
+    datum: '7 maart 2026',
+    read: '5 min lezen',
+    auteur: 'Servé Creusen',
+    kleur: 'linear-gradient(135deg, #b45a00 0%, #1a1a2e 100%)',
+    featured: false,
+    inhoud: `
+      <p>E-mail marketing heeft gemiddeld een ROI van €42 voor elke €1 die je erin investeert. Toch zetten veel MKB-ondernemers het niet in, of doen het niet effectief.</p>
+      <h2>Begin met een lijst opbouwen</h2>
+      <p>Zonder lijst geen e-mail marketing. Zorg voor een zichtbare aanmeldoptie op je website. Bied iets waardevols in ruil — een gratis advies, korting of exclusieve content.</p>
+      <h2>Kies de juiste tool</h2>
+      <p>Voor MKB zijn Mailchimp, Brevo (voorheen Sendinblue) of MailerLite uitstekende opties. Ze zijn betaalbaar, gebruiksvriendelijk en hebben goede automatiseringen.</p>
+      <h2>Stuur waardevolle content</h2>
+      <p>Niemand zit te wachten op wekelijkse reclame. Stuur content die echt helpt — tips, inzichten, case studies. Daardoor blijven mensen ingeschreven én worden ze klant als het moment rijp is.</p>
+      <h2>Meet en optimaliseer</h2>
+      <p>Houd open rates en click rates bij. Test verschillende onderwerpregels. Kleine verbeteringen stapelen zich op tot significant betere resultaten over tijd.</p>
+    `
+  },
+];
+
+let activeFilter = 'Alle';
+let activeBlog = null;
+
+function renderGrid() {
+  const filtered = activeFilter === 'Alle' ? blogs : blogs.filter((b) => b.cat === activeFilter);
+  const featured = filtered.filter((b) => b.featured);
+  const rest = filtered.filter((b) => !b.featured);
+  let html = '';
+
+  if (featured.length) {
+    html += '<div class="featured-row">';
+    featured.forEach((b) => { html += card(b, true); });
+    html += '</div>';
+  }
+  if (rest.length) {
+    html += '<div class="blog-grid">';
+    rest.forEach((b) => { html += card(b, false); });
+    html += '</div>';
+  }
+  if (!filtered.length) {
+    html = '<div style="padding:60px 0;text-align:center;color:var(--light);font-size:14px">Geen artikelen gevonden in deze categorie.</div>';
+  }
+  document.getElementById('grid-wrap').innerHTML = html;
+}
+
+function card(b, featured) {
+  return `<div class="blog-card${featured ? ' featured' : ''}" onclick="openBlog(${b.id})">
+    <div class="blog-card-img${featured ? ' featured' : ''}" style="background:${b.kleur}">
+      <div class="blog-card-img-label">${b.cat}</div>
+    </div>
+    <div class="blog-card-body">
+      <div class="blog-card-cat">${b.cat}</div>
+      <div class="blog-card-title">${b.titel}</div>
+      <div class="blog-card-excerpt">${b.excerpt}</div>
+      <div class="blog-card-meta">
+        <div class="blog-card-date">${b.datum}</div>
+        <div class="blog-card-dot"></div>
+        <div class="blog-card-read">${b.read}</div>
+        <div class="blog-card-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function filterCat(cat, el) {
+  activeFilter = cat;
+  document.querySelectorAll('.filter-tab').forEach((t) => t.classList.remove('active'));
+  el.classList.add('active');
+  renderGrid();
+}
+
+function openBlog(id) {
+  const b = blogs.find((x) => x.id === id);
+  if (!b) return;
+  activeBlog = b;
+
+  document.getElementById('art-cat').textContent = b.cat;
+  document.getElementById('art-title').textContent = b.titel;
+  document.getElementById('art-datum').textContent = b.datum;
+  document.getElementById('art-read').textContent = b.read;
+  document.getElementById('art-auteur').textContent = b.auteur;
+  document.getElementById('art-img').style.background = b.kleur;
+  document.getElementById('art-img').textContent = b.titel;
+  document.getElementById('art-body').innerHTML = b.inhoud;
+
+  const meer = blogs.filter((x) => x.id !== id).slice(0, 3);
+  document.getElementById('meer-grid').innerHTML = meer.map((m) => card(m, false)).join('');
+
+  document.getElementById('screen-overzicht').classList.remove('active');
+  document.getElementById('screen-artikel').classList.add('active');
+  document.getElementById('nav-back').classList.add('show');
+  window.scrollTo(0, 0);
+}
+
+function goOverzicht() {
+  activeBlog = null;
+  document.getElementById('screen-artikel').classList.remove('active');
+  document.getElementById('screen-overzicht').classList.add('active');
+  document.getElementById('nav-back').classList.remove('show');
+  window.scrollTo(0, 0);
+}
+
+renderGrid();
+</script>
+</body>
+</html>
