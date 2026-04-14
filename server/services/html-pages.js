@@ -8,12 +8,9 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   `<link rel="preload" href="/assets/fonts/oswald-latin.woff2?v=${LOCAL_FONT_VERSION}" as="font" type="font/woff2" crossorigin>`,
   `<link rel="stylesheet" href="${LOCAL_FONT_STYLESHEET_HREF}">`,
 ].join('\n');
-const HOMEPAGE_HERO_IMAGE_PRELOAD = [
-  '<link rel="preload" as="image"',
-  `href="/assets/hero-workspace-1254.jpg?v=${LOCAL_FONT_VERSION}"`,
-  `imagesrcset="/assets/hero-workspace-640.jpg?v=${LOCAL_FONT_VERSION} 640w, /assets/hero-workspace-960.jpg?v=${LOCAL_FONT_VERSION} 960w, /assets/hero-workspace-1254.jpg?v=${LOCAL_FONT_VERSION} 1254w"`,
-  'imagesizes="(max-width: 980px) 92vw, 46vw">',
-].join(' ');
+const HOMEPAGE_HERO_IMAGE_URL =
+  'https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=2000&q=85';
+const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}" crossorigin>`;
 
 function createHtmlPageCoordinator(options = {}) {
   const {
