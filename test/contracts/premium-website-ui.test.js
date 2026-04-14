@@ -37,7 +37,7 @@ test('premium website toont een speelse krulpijl van hero richting wat we bouwen
 
   assert.match(source, /<div class="diensten-arrow-wrap" aria-hidden="true">/);
   assert.match(source, /<svg class="diensten-arrow-svg" viewBox="0 0 560 240"/);
-  assert.match(source, /\.diensten-arrow-wrap\s*\{[\s\S]*left:\s*clamp\(-20rem,\s*-15vw,\s*-10rem\);[\s\S]*top:\s*-17\.5rem;[\s\S]*width:\s*min\(50vw,\s*600px\);[\s\S]*pointer-events:\s*none;/s);
+  assert.match(source, /\.diensten-arrow-wrap\s*\{[\s\S]*left:\s*clamp\(-17rem,\s*-13vw,\s*-9rem\);[\s\S]*top:\s*-11\.2rem;[\s\S]*width:\s*min\(46vw,\s*560px\);[\s\S]*pointer-events:\s*none;/s);
   assert.match(source, /\.diensten-arrow-path,\s*\.diensten-arrow-head\s*\{[\s\S]*stroke:\s*var\(--accent\);/s);
   assert.match(source, /@media \(max-width: 1024px\)\s*\{[\s\S]*\.diensten-arrow-wrap \{ display: none; \}/s);
 });
