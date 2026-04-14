@@ -204,13 +204,15 @@ nav {
 
 /* CTA BLOCK */
 .cta-block {
-  background: var(--dark);
+  background:
+    linear-gradient(180deg, rgba(10,14,25,.82) 0%, rgba(10,14,25,.86) 100%),
+    url('https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?auto=format&fit=crop&w=1800&q=85') center/cover no-repeat;
   padding: 80px;
   text-align: center;
   position: relative;
   overflow: hidden;
 }
-.cta-block::before { content: ''; position: absolute; top: -50%; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(155,35,85,.2) 0%, transparent 65%); pointer-events: none; }
+.cta-block::before { content: ''; position: absolute; top: -50%; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(155,35,85,.25) 0%, transparent 65%); pointer-events: none; }
 .cta-block-inner { position: relative; z-index: 1; }
 .cta-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: rgba(155,35,85,.9); margin-bottom: 16px; }
 .cta-title { font-family: 'Oswald', sans-serif; font-size: clamp(36px, 4vw, 56px); font-weight: 800; text-transform: uppercase; letter-spacing: -1px; color: #fff; line-height: 1.05; margin-bottom: 16px; }
