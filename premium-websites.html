@@ -16,6 +16,8 @@
   --mid: #555;
   --light: #999;
   --border: #e8e5e0;
+  --nav-accent: #8B2252;
+  --nav-accent-hover: #A62D65;
 }
 body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); }
 
@@ -57,7 +59,7 @@ nav {
   left: 0;
   width: 3.2ch;
   height: 3px;
-  background: var(--crimson);
+  background: var(--nav-accent);
 }
 
 .nav-cta {
@@ -65,7 +67,7 @@ nav {
   align-items: center;
   gap: 8px;
   padding: 0.8rem 1.5rem;
-  background: var(--crimson);
+  background: var(--nav-accent);
   color: #fff;
   border: none;
   border-radius: 5px;
@@ -79,7 +81,7 @@ nav {
   transition: background .15s;
 }
 
-.nav-cta:hover { background: var(--clight); }
+.nav-cta:hover { background: var(--nav-accent-hover); }
 
 /* HERO */
 .hero {
@@ -203,7 +205,7 @@ footer { background: var(--dark); border-top: 1px solid rgba(255,255,255,.06); p
 
 <!-- NAV -->
 <nav>
-  <div class="nav-logo">SOFTORA.NL</div>
+  <a class="nav-logo" href="/">SOFTORA.NL</a>
   <a class="nav-cta" href="mailto:info@softora.nl">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     Vrijblijvend gesprek
