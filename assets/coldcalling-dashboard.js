@@ -1460,6 +1460,9 @@
     remoteUiStateLastError = '';
   }
 
+  const FIXED_TOPBAR_TITLE = 'Coldcalling';
+  const FIXED_TOPBAR_SUBTITLE = 'Start en beheer je AI-campagne voor gerichte zakelijke gesprekken.';
+
   function applyBusinessModeUi() {
     const mode = getCurrentBusinessMode();
     const ui = getBusinessModeUiConfig(mode);
@@ -1470,8 +1473,8 @@
     const leadListOpenLabel = byId('leadListOpenLabel');
     const dbHint = byId('leadDatabaseHeaderHint');
 
-    if (topTitle) topTitle.textContent = ui.title;
-    if (topSubtitle) topSubtitle.textContent = ui.subtitle;
+    if (topTitle) topTitle.textContent = FIXED_TOPBAR_TITLE;
+    if (topSubtitle) topSubtitle.textContent = FIXED_TOPBAR_SUBTITLE;
     if (leadListGroupLabel) leadListGroupLabel.textContent = ui.leadListGroup;
     if (leadListOpenLabel) leadListOpenLabel.textContent = ui.leadListLabel;
     if (dbHint) dbHint.textContent = ui.dbHint;
