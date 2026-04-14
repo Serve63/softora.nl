@@ -439,6 +439,12 @@
             content-visibility: visible;
         }
 
+        /* Voorkomt kunstmatige lege ruimte tussen diensten-overzicht en FAQ */
+        #diensten-overzicht {
+            content-visibility: visible;
+            contain-intrinsic-size: auto;
+        }
+
         .hero-image::after {
             content: '';
             position: absolute;
