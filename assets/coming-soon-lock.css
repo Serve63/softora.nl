@@ -17,6 +17,10 @@
   backdrop-filter: blur(10px);
 }
 
+.coming-soon-lock-overlay-with-sidebar {
+  left: var(--coming-soon-sidebar-offset, 0px);
+}
+
 .coming-soon-lock-card {
   width: min(560px, 100%);
   border: 1px solid rgba(255, 255, 255, 0.16);

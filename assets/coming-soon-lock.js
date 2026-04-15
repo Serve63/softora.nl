@@ -27,8 +27,31 @@
   overlay.setAttribute("aria-label", "Coming soon melding");
 
   function closeOverlay() {
+    window.removeEventListener("resize", positionOverlay);
     if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
     document.body.classList.remove("coming-soon-lock-active");
+  }
+
+  function getSidebarOffset() {
+    var sidebar = document.querySelector(".sidebar");
+    if (!sidebar) return 0;
+    if (window.innerWidth < 1000) return 0;
+    var computed = window.getComputedStyle(sidebar);
+    if (computed.display === "none" || computed.visibility === "hidden") return 0;
+    var rect = sidebar.getBoundingClientRect();
+    if (rect.width < 120) return 0;
+    return Math.max(0, Math.round(rect.right));
+  }
+
+  function positionOverlay() {
+    var offset = getSidebarOffset();
+    if (offset > 0) {
+      overlay.classList.add("coming-soon-lock-overlay-with-sidebar");
+      overlay.style.setProperty("--coming-soon-sidebar-offset", offset + "px");
+      return;
+    }
+    overlay.classList.remove("coming-soon-lock-overlay-with-sidebar");
+    overlay.style.removeProperty("--coming-soon-sidebar-offset");
   }
 
   function tryUnlock() {
@@ -64,6 +87,8 @@
   ].join("");
 
   document.body.appendChild(overlay);
+  positionOverlay();
+  window.addEventListener("resize", positionOverlay);
   var unlockBtn = overlay.querySelector("[data-unlock-soon]");
   if (unlockBtn) unlockBtn.addEventListener("click", tryUnlock);
 })();
