@@ -401,11 +401,6 @@ function createAgendaInterestedLeadReadService(deps = {}) {
       .filter(Boolean);
 
     rows.sort(compareConfirmationTasks);
-    if (typeof fetch === 'function') {
-      // #region agent log
-      fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:'server-read',hypothesisId:'H3',location:'server/services/agenda-interested-lead-read.js:211',message:'Server interested lead candidates built',data:{existingTaskCount:Array.isArray(existingTasks)?existingTasks.length:0,inputUpdates:debugCounts.inputUpdates,accepted:debugCounts.accepted,skippedExistingOrSeenCall:debugCounts.skippedExistingOrSeenCall,skippedHandledLeadFollowUp:debugCounts.skippedHandledLeadFollowUp,skippedDismissedPre:debugCounts.skippedDismissedPre,skippedNoFollowUp:debugCounts.skippedNoFollowUp,skippedDismissedPost:debugCounts.skippedDismissedPost,skippedOlderByKey:debugCounts.skippedOlderByKey,skippedSeenKey:debugCounts.skippedSeenKey,returnedCount:rows.length},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-    }
     return rows;
   }
 

@@ -512,3 +512,71 @@ test('runtime state sync coordinator syncs newer remote state and queues call up
     true
   );
 });
+
+test('runtime state sync coordinator preserves local dismissed leads when remote payload has empty dismissed sets', () => {
+  const dismissedInterestedLeadCallIds = new Set(['call-local-dismissed']);
+  const dismissedInterestedLeadKeys = new Set(['lead-local-dismissed']);
+  const fixture = createFixture({
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+  });
+
+  fixture.coordinator.applyRuntimeStateSnapshotPayload(
+    {
+      savedAt: '2026-04-08T11:00:00.000Z',
+      recentWebhookEvents: [],
+      recentCallUpdates: [],
+      recentAiCallInsights: [],
+      recentDashboardActivities: [],
+      recentSecurityAuditEvents: [],
+      generatedAgendaAppointments: [],
+      dismissedInterestedLeadCallIds: [],
+      dismissedInterestedLeadKeys: [],
+      leadOwnerAssignments: [],
+      nextLeadOwnerRotationIndex: 0,
+      nextGeneratedAgendaAppointmentId: 100000,
+    },
+    { updatedAt: '2026-04-08T11:00:00.000Z' }
+  );
+
+  assert.equal(dismissedInterestedLeadCallIds.has('call-local-dismissed'), true,
+    'Local dismissed callId should survive sync with empty remote set');
+  assert.equal(dismissedInterestedLeadKeys.has('lead-local-dismissed'), true,
+    'Local dismissed leadKey should survive sync with empty remote set');
+});
+
+test('runtime state sync coordinator merges remote dismissed leads with local dismissed leads', () => {
+  const dismissedInterestedLeadCallIds = new Set(['call-local']);
+  const dismissedInterestedLeadKeys = new Set(['lead-local']);
+  const fixture = createFixture({
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+  });
+
+  fixture.coordinator.applyRuntimeStateSnapshotPayload(
+    {
+      savedAt: '2026-04-08T11:00:00.000Z',
+      recentWebhookEvents: [],
+      recentCallUpdates: [],
+      recentAiCallInsights: [],
+      recentDashboardActivities: [],
+      recentSecurityAuditEvents: [],
+      generatedAgendaAppointments: [],
+      dismissedInterestedLeadCallIds: ['call-remote'],
+      dismissedInterestedLeadKeys: ['lead-remote'],
+      leadOwnerAssignments: [],
+      nextLeadOwnerRotationIndex: 0,
+      nextGeneratedAgendaAppointmentId: 100000,
+    },
+    { updatedAt: '2026-04-08T11:00:00.000Z' }
+  );
+
+  assert.equal(dismissedInterestedLeadCallIds.has('call-local'), true,
+    'Local dismissed callId should be preserved');
+  assert.equal(dismissedInterestedLeadCallIds.has('call-remote'), true,
+    'Remote dismissed callId should be added');
+  assert.equal(dismissedInterestedLeadKeys.has('lead-local'), true,
+    'Local dismissed leadKey should be preserved');
+  assert.equal(dismissedInterestedLeadKeys.has('lead-remote'), true,
+    'Remote dismissed leadKey should be added');
+});

@@ -550,11 +550,6 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
         verifyPersisted: () => !findInterestedLeadRowByCallId(callId),
       }
     );
-    if (typeof fetch === 'function') {
-      // #region agent log
-      fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:'server-mutation',hypothesisId:'H5',location:'server/services/agenda-interested-leads.js:503',message:'Server interested lead dismiss handled',data:{callIdPresent:Boolean(callId),leadFound:Boolean(leadRow),cancelledTasksCount:Array.isArray(cancelledTasks)?cancelledTasks.length:Number(cancelledTasks)||0,persistState:persistOk === 'pending' ? 'pending' : persistOk === true ? 'persisted' : 'failed',persistencePending:persistOk === 'pending'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-    }
     if (!persistOk) return res;
 
     return res.status(persistOk === 'pending' ? 202 : 200).json({

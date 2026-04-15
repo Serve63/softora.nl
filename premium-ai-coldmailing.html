@@ -2908,9 +2908,6 @@
                     rollbackLeadMutation(rollbackSnapshot);
                     setStatus(`Lead verwijderen mislukt: ${String(error?.message || 'onbekende fout')}`, 'error');
                 } finally {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H5',location:'premium-ai-coldmailing.html:2841',message:'Lead remove completed',data:{taskId,hasCallBackedLead:isCallBackedLead,hasTaskActions,removeLeadSucceeded,removeLeadPersistencePending,errorMessage:removeLeadErrorMessage,remainingCount:Array.isArray(allLeads)?allLeads.length:0},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
                     setModalBusy(false);
                 }
             }
@@ -3042,9 +3039,6 @@
                 }
                 const currentLeadCount = Array.isArray(allLeads) ? allLeads.length : 0;
                 window.__softoraLeadsPageCount = currentLeadCount;
-                // #region agent log
-                fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H4',location:'premium-ai-coldmailing.html:3035',message:'Lead list rendered',data:{displayedCount:currentLeadCount,callBackedCount:(Array.isArray(allLeads)?allLeads:[]).filter((row)=>Boolean(String(row?.callId||'').trim())).length,taskBackedCount:(Array.isArray(allLeads)?allLeads:[]).filter((row)=>(Number(row?.id)||0)>0).length,suppressedCount:manuallySuppressedLeadKeys.size},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 if (!allLeads.length) {
                     listEl.innerHTML = '<div class="lead-empty">Nog geen leads gevonden.</div>';
                     if (
@@ -3340,9 +3334,6 @@
                 } catch (_) {}
                 purgeExpiredSuppressedLeadKeys();
                 persistSuppressedLeadRows();
-                // #region agent log
-                fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H1',location:'premium-ai-coldmailing.html:3290',message:'Hydrated lead suppressions',data:{totalSuppressed:manuallySuppressedLeadKeys.size,callSuppressed:Array.from(manuallySuppressedLeadKeys.keys()).filter((key)=>String(key||'').startsWith('call:')).length,idSuppressed:Array.from(manuallySuppressedLeadKeys.keys()).filter((key)=>String(key||'').startsWith('id:')).length},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
             }
 
             function suppressLeadRowLocally(item, ttlMs = MANUAL_LEAD_SUPPRESSION_TTL_MS) {
@@ -3403,9 +3394,6 @@
                 });
                 if (!keysToClear.size) return 0;
                 clearSuppressedLeadKeys(Array.from(keysToClear));
-                // #region agent log
-                fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H1',location:'premium-ai-coldmailing.html:3363',message:'Cleared stale suppressions for server-visible leads',data:{clearedKeyCount:keysToClear.size,rowCount:rows.length,graceMs:SERVER_VISIBLE_LEAD_SUPPRESSION_GRACE_MS},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 return keysToClear.size;
             }
 
@@ -3744,9 +3732,6 @@
                             return true;
                         })
                         .sort(sortByDateDesc);
-                    // #region agent log
-                    fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H2',location:'premium-ai-coldmailing.html:3655',message:'Interested leads direct fetch resolved',data:{source:'direct',rawCount:Array.isArray(data?.leads)?data.leads.length:0,returnedCount:directRows.length,existingTaskIdentityCount:existingLatestTsByKey.size,seenCallCount:seenCallIds.size},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
                     return directRows;
                 } catch (endpointError) {
                     // Fallback: leid kandidaten client-side af wanneer de nieuwe serverroute nog niet beschikbaar is.
@@ -3801,9 +3786,6 @@
                 });
 
                 const fallbackRows = rows.sort(sortByDateDesc);
-                // #region agent log
-                fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H2',location:'premium-ai-coldmailing.html:3673',message:'Interested leads fallback resolved',data:{source:'fallback',updatesCount:updates.length,insightsCount:insights.length,returnedCount:fallbackRows.length,existingTaskIdentityCount:existingLatestTsByKey.size,seenCallCount:seenCallIds.size},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 return fallbackRows;
             }
 
@@ -4032,9 +4014,6 @@
                         leadRetryTimer = null;
                     }
                     const shouldRerender = leadRowsDiffer(allLeads, resolvedLeads);
-                    // #region agent log
-                    fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H4',location:'premium-ai-coldmailing.html:3925',message:'Lead load resolved',data:{beforeCount:Array.isArray(allLeads)?allLeads.length:0,freshCount:Array.isArray(freshLeads)?freshLeads.length:0,resolvedCount:Array.isArray(resolvedLeads)?resolvedLeads.length:0,keptVisibleRowsOnTransientEmpty,shouldRerender,queuedReload,consecutiveEmptyLeadSnapshots},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
                     allLeads = resolvedLeads;
                     if (shouldRerender || !allLeads.length) {
                         renderList();

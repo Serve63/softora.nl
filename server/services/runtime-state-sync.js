@@ -483,9 +483,6 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
 
     generatedAgendaAppointments.splice(0, generatedAgendaAppointments.length, ...nextAppointments);
     agendaAppointmentIdByCallId.clear();
-    dismissedInterestedLeadCallIds.clear();
-    dismissedInterestedLeadKeys.clear();
-    leadOwnerAssignmentsByCallId.clear();
     nextDismissedInterestedLeadCallIds.forEach((item) => {
       const callId = normalizeString(item);
       if (callId) dismissedInterestedLeadCallIds.add(callId);
@@ -494,6 +491,15 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       const leadKey = normalizeString(item);
       if (leadKey) dismissedInterestedLeadKeys.add(leadKey);
     });
+    if (dismissedInterestedLeadCallIds.size > 1000) {
+      const excess = Array.from(dismissedInterestedLeadCallIds).slice(0, dismissedInterestedLeadCallIds.size - 1000);
+      excess.forEach((id) => dismissedInterestedLeadCallIds.delete(id));
+    }
+    if (dismissedInterestedLeadKeys.size > 2000) {
+      const excess = Array.from(dismissedInterestedLeadKeys).slice(0, dismissedInterestedLeadKeys.size - 2000);
+      excess.forEach((key) => dismissedInterestedLeadKeys.delete(key));
+    }
+    leadOwnerAssignmentsByCallId.clear();
     nextLeadOwnerAssignments.forEach((item) => {
       const callId = normalizeString(item?.callId || '');
       const owner = normalizeLeadOwnerRecord(item?.owner || item);

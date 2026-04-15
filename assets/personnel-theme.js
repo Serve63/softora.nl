@@ -643,9 +643,6 @@
         pruneDeprecatedSidebarLinks(sidebar);
         neutralizeSidebarAnchors();
         sidebar.dataset.sidebarReady = "true";
-        // #region agent log
-        fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraSidebarDebugRunId || (window.__softoraSidebarDebugRunId = 'sidebar-ui-' + Date.now()),hypothesisId:'H14',location:'assets/personnel-theme.js:620',message:'Unified premium sidebar rebuilt for page load',data:{pathname,activeKey,staticSidebar:false,sidebarReady:sidebar.dataset.sidebarReady === 'true'},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
     }
 
     function mergeSidebarCountState() {
@@ -1611,9 +1608,6 @@
             // On the live leads page the count already reflects suppression (renderList handles it)
             if (requestId !== sidebarLeadsRefreshRequestId) return;
             sidebarLeadsZeroSnapshotStreak = 0;
-            // #region agent log
-            fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H4',location:'assets/personnel-theme.js:1479',message:'Sidebar leads count used live page source',data:{requestId,isLiveLeadsPage,liveLeadsPageCount,suppressedCount:suppressedKeys.size,zeroSnapshotStreak:sidebarLeadsZeroSnapshotStreak},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
             paintSidebarCount("leads", Math.floor(liveLeadsPageCount), {
                 singular: "open lead",
                 plural: "open leads",
@@ -1664,9 +1658,6 @@
         const interestedRows = filterInterestedRowsForCount(interestedRowsRaw, pendingRows);
         const total = dedupeLeadRowsForCount([].concat(pendingRows, interestedRows)).length;
         const cachedLeadCount = readCachedSidebarCount("leads");
-        // #region agent log
-        fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraLeadDebugRunId || (window.__softoraLeadDebugRunId = 'lead-ui-' + Date.now()),hypothesisId:'H4',location:'assets/personnel-theme.js:1532',message:'Sidebar leads count fetched remote sources',data:{requestId,isLiveLeadsPage,suppressedCount:suppressedKeys.size,pendingCount:pendingRows.length,interestedRawCount:interestedRowsRaw.length,interestedCount:interestedRows.length,total,cachedLeadCount:Number.isFinite(cachedLeadCount)?cachedLeadCount:null,zeroSnapshotStreak:sidebarLeadsZeroSnapshotStreak},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         if (!isLiveLeadsPage && total <= 0 && Number.isFinite(cachedLeadCount) && cachedLeadCount > 0) {
             sidebarLeadsZeroSnapshotStreak += 1;
             if (sidebarLeadsZeroSnapshotStreak <= 2) {
@@ -1687,9 +1678,6 @@
         if (!appointmentsData) {
             const cachedAgendaCount = readCachedSidebarCount("agenda");
             if (Number.isFinite(cachedAgendaCount) && cachedAgendaCount >= 0) {
-                // #region agent log
-                fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraSidebarDebugRunId || (window.__softoraSidebarDebugRunId = 'sidebar-ui-' + Date.now()),hypothesisId:'H13',location:'assets/personnel-theme.js:1559',message:'Sidebar agenda count reused cached value',data:{cachedAgendaCount},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 paintSidebarCount("agenda", cachedAgendaCount, { singular: "afspraak", plural: "afspraken" });
                 return;
             }
@@ -1812,9 +1800,6 @@
 
         const cachedActiveOrdersCount = readCachedSidebarCount("active_orders");
         if (Number.isFinite(cachedActiveOrdersCount) && cachedActiveOrdersCount >= 0) {
-            // #region agent log
-            fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraSidebarDebugRunId || (window.__softoraSidebarDebugRunId = 'sidebar-ui-' + Date.now()),hypothesisId:'H13',location:'assets/personnel-theme.js:1668',message:'Sidebar active orders count reused cached value',data:{cachedActiveOrdersCount},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
             paintSidebarCount("active_orders", cachedActiveOrdersCount, {
                 singular: "actieve opdracht",
                 plural: "actieve opdrachten",
@@ -1861,9 +1846,6 @@
             paintedFromCacheKeys.push("leads");
         }
         const sidebar = document.querySelector(".sidebar");
-        // #region agent log
-        fetch('http://127.0.0.1:7417/ingest/2cb9e6a4-2f89-4847-90e9-548786463c87',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f2db0f'},body:JSON.stringify({sessionId:'f2db0f',runId:window.__softoraSidebarDebugRunId || (window.__softoraSidebarDebugRunId = 'sidebar-ui-' + Date.now()),hypothesisId:'H12',location:'assets/personnel-theme.js:1693',message:'Sidebar notification counts initialized',data:{pathName,isLiveLeadsPage,cachedLeadCount:Number.isFinite(cachedLeadCount)?cachedLeadCount:null,cachedAgendaCount:Number.isFinite(cachedAgendaCount)?cachedAgendaCount:null,cachedActiveOrdersCount:Number.isFinite(cachedActiveOrdersCount)?cachedActiveOrdersCount:null,paintedFromCacheKeys,sidebarReady:Boolean(sidebar && sidebar.dataset && sidebar.dataset.sidebarReady === 'true')},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         refreshSidebarNotificationCounts();
         window.setInterval(refreshSidebarNotificationCounts, 45000);
         window.addEventListener("focus", refreshSidebarNotificationCounts);
