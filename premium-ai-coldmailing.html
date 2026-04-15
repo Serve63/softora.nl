@@ -2894,21 +2894,8 @@
                     setStatus('Lead verwijderen...', '');
                     const removeLeadResult = await removeLeadRequest();
                     removeLeadPersistencePending = Boolean(removeLeadResult?.persistencePending);
-                    if (removeLeadPersistencePending) {
-                        rollbackLeadMutation(rollbackSnapshot);
-                        rollbackSnapshot = null;
-                        setStatus(
-                            'Leadverwijdering wordt nog verwerkt. De lead blijft zichtbaar tot dit overal is opgeslagen.',
-                            ''
-                        );
-                        try {
-                            await loadLeads({ silent: true });
-                        } catch (refreshError) {
-                            console.warn('[softora-leads] Pending leadverwijdering kon niet direct worden ververst.', refreshError);
-                        }
-                        return;
-                    }
                     promoteLeadRowSuppression(lead);
+                    rollbackSnapshot = null;
                     removeLeadSucceeded = true;
 
                     if (allLeads.length > 0) {

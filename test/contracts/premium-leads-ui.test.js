@@ -46,7 +46,7 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   );
   assert.match(
     pageSource,
-    /async function removeLead\(\) \{[\s\S]*let rollbackSnapshot = null;[\s\S]*rollbackSnapshot = buildLeadMutationRollbackSnapshot\(taskId\);[\s\S]*finalizeLeadMutation\(taskId\);[\s\S]*setStatus\('Lead verwijderen\.\.\.', ''\);[\s\S]*await removeLeadRequest\(\);[\s\S]*catch \(error\) \{[\s\S]*rollbackLeadMutation\(rollbackSnapshot\);[\s\S]*setStatus\(`Lead verwijderen mislukt: \$\{String\(error\?\.message \|\| 'onbekende fout'\)\}`, 'error'\);/
+    /async function removeLead\(\) \{[\s\S]*let rollbackSnapshot = null;[\s\S]*rollbackSnapshot = buildLeadMutationRollbackSnapshot\(taskId\);[\s\S]*finalizeLeadMutation\(taskId\);[\s\S]*setStatus\('Lead verwijderen\.\.\.', ''\);[\s\S]*await removeLeadRequest\(\);[\s\S]*promoteLeadRowSuppression\(lead\);[\s\S]*removeLeadSucceeded = true;[\s\S]*catch \(error\) \{[\s\S]*rollbackLeadMutation\(rollbackSnapshot\);[\s\S]*setStatus\(`Lead verwijderen mislukt: \$\{String\(error\?\.message \|\| 'onbekende fout'\)\}`, 'error'\);/
   );
   assert.match(
     pageSource,

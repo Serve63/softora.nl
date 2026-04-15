@@ -52,13 +52,13 @@ for (const filePath of unifiedPersonnelThemeTargets) {
   });
 }
 
-test('page smoke: premium-ai-coldmailing.html keeps pending lead removals visible until shared persist completes', () => {
+test('page smoke: premium-ai-coldmailing.html promotes suppression after lead removal regardless of persistence state', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
-  assert.match(html, /removeLeadResult\?\.persistencePending/, 'Pending removal branch ontbreekt.');
-  assert.match(
+  assert.match(html, /promoteLeadRowSuppression\(lead\)/, 'Lead suppression promotion na verwijdering ontbreekt.');
+  assert.doesNotMatch(
     html,
     /Leadverwijdering wordt nog verwerkt\. De lead blijft zichtbaar tot dit overal is opgeslagen\./,
-    'Pending removal status ontbreekt.'
+    'Oude pending-rollback melding hoort niet meer voor te komen.'
   );
 });
 
