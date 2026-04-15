@@ -62,5 +62,10 @@ test('premium maandelijkse kosten toont coldcalling en coldmailing bovenaan met 
   assert.match(pageSource, /naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
   assert.match(pageSource, /naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
+  assert.match(pageSource, /\.cost-amount-wrap\.is-static\s*\{[\s\S]*justify-content:\s*flex-end;/);
   assert.match(pageSource, /const rowClassName = item\.highlighted \? 'cost-row cost-row-accent' : 'cost-row';/);
+  assert.match(pageSource, /const displayFreqLabel = item\.highlighted && item\.freq === 'maandelijks'[\s\S]*'Deze maand'[\s\S]*freqLabel\[item\.freq\] \|\| item\.freq \|\| '-';/);
+  assert.match(pageSource, /const amountWrapClassName = item\.highlighted \? 'cost-amount-wrap is-static' : 'cost-amount-wrap';/);
+  assert.match(pageSource, /const rowActionsMarkup = item\.highlighted \? '' : `[\s\S]*class="row-actions"[\s\S]*data-action="edit"[\s\S]*data-action="delete"/);
+  assert.match(pageSource, /<div class="\$\{amountWrapClassName\}">[\s\S]*<div class="cost-amount">\$\{fmtEur\(item\.bedrag\)\}<\/div>[\s\S]*\$\{rowActionsMarkup\}/);
 });

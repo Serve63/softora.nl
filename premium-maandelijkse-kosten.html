@@ -231,6 +231,9 @@ body {
   justify-content: space-between;
   gap: 10px;
 }
+.cost-amount-wrap.is-static {
+  justify-content: flex-end;
+}
 .row-actions {
   display: inline-flex;
   align-items: center;
@@ -673,15 +676,11 @@ function render() {
       <div id="rows-${key}">
         ${items.map((item) => {
           const rowClassName = item.highlighted ? 'cost-row cost-row-accent' : 'cost-row';
-          return `
-          <div class="${rowClassName}" id="item-${item.id}">
-            <div>
-              <div class="cost-name">${escapeHtml(item.naam)}</div>
-              <div class="cost-note">${escapeHtml(item.note || '')}</div>
-            </div>
-            <div class="cost-freq">${escapeHtml(freqLabel[item.freq] || item.freq || '-')}</div>
-            <div class="cost-amount-wrap">
-              <div class="cost-amount">${fmtEur(item.bedrag)}</div>
+          const displayFreqLabel = item.highlighted && item.freq === 'maandelijks'
+            ? 'Deze maand'
+            : (freqLabel[item.freq] || item.freq || '-');
+          const amountWrapClassName = item.highlighted ? 'cost-amount-wrap is-static' : 'cost-amount-wrap';
+          const rowActionsMarkup = item.highlighted ? '' : `
               <div class="row-actions">
                 <button class="btn-edit" type="button" data-action="edit" data-cat-key="${escapeHtml(key)}" data-item-id="${item.id}" title="Bewerken">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
@@ -689,7 +688,17 @@ function render() {
                 <button class="btn-del" type="button" data-action="delete" data-cat-key="${escapeHtml(key)}" data-item-id="${item.id}" title="Verwijderen">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
                 </button>
-              </div>
+              </div>`;
+          return `
+          <div class="${rowClassName}" id="item-${item.id}">
+            <div>
+              <div class="cost-name">${escapeHtml(item.naam)}</div>
+              <div class="cost-note">${escapeHtml(item.note || '')}</div>
+            </div>
+            <div class="cost-freq">${escapeHtml(displayFreqLabel)}</div>
+            <div class="${amountWrapClassName}">
+              <div class="cost-amount">${fmtEur(item.bedrag)}</div>
+              ${rowActionsMarkup}
             </div>
           </div>`;
         }).join('')}
