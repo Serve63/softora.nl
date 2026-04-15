@@ -8,8 +8,18 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /<title>PDF's - Softora\.nl<\/title>/);
-  assert.match(pageSource, /body \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/);
+  assert.match(pageSource, /assets\/personnel-theme\.css\?v=20260411a/);
+  assert.match(pageSource, /assets\/personnel-theme\.js\?v=20260414a/);
+  assert.match(pageSource, /family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700/);
+  assert.match(pageSource, /body \{[\s\S]*font-family:\s*'Inter', sans-serif;[\s\S]*min-height:\s*100vh;/);
+  assert.match(pageSource, /<div class="dashboard-layout" data-sidebar-shell="canonical">/);
+  assert.match(pageSource, /<aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">/);
+  assert.match(pageSource, /<a href="\/premium-pdfs" class="sidebar-link magnetic active" data-sidebar-key="pdfs">/);
+  assert.match(pageSource, /\.main-content \{[\s\S]*margin-left:\s*280px;[\s\S]*width:\s*calc\(100% - 280px\);/);
+  assert.match(pageSource, /\.pdf-builder-shell \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/);
   assert.match(pageSource, /<div class="topbar">/);
+  assert.match(pageSource, /\.topbar-logo \{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*text-transform:\s*uppercase;/);
+  assert.match(pageSource, /\.btn-dl \{[\s\S]*font-family:\s*'Oswald', sans-serif;/);
   assert.match(pageSource, /--preview-scale:\s*1;/);
   assert.match(pageSource, /--a4-width:\s*595px;/);
   assert.match(pageSource, /--a4-height:\s*842px;/);
@@ -26,7 +36,5 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   assert.match(pageSource, /function fitPreviewToViewport\(\) \{[\s\S]*const availableWidth = Math\.max\(240, stage\.clientWidth\);[\s\S]*const availableHeight = Math\.max\(240, stage\.clientHeight\);[\s\S]*const scale = Math\.min\(1, availableWidth \/ A4_PREVIEW_WIDTH, availableHeight \/ A4_PREVIEW_HEIGHT\);/);
   assert.match(pageSource, /function setupPreviewAutoFit\(\) \{[\s\S]*new ResizeObserver\(\(\) => fitPreviewToViewport\(\)\);/);
   assert.match(pageSource, /buildForm\(\);\s*setupPreviewAutoFit\(\);\s*fitPreviewToViewport\(\);/);
-  assert.doesNotMatch(pageSource, /data-sidebar-shell="canonical"/);
-  assert.doesNotMatch(pageSource, /personnel-theme/);
   assert.doesNotMatch(pageSource, /EUR /);
 });
