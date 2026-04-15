@@ -3,77 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
-<link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
 <title>PDF's - Softora.nl</title>
-<link rel="stylesheet" href="/assets/iphone-optimizations.css">
-<link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
-<script>
-  (function () {
-    document.documentElement.setAttribute("data-personnel-loading", "true");
-    try {
-      document.documentElement.setAttribute("data-theme-mode", "light");
-      document.documentElement.setAttribute("data-theme", "light");
-    } catch (_) {
-      /* ignore */
-    }
-  })();
-</script>
-<script src="assets/personnel-theme.js?v=20260414a" defer></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: var(--bg-primary, #f8f7f4);
-  --panel: var(--bg-secondary, #ffffff);
-  --preview-bg: var(--bg-primary, #f8f7f4);
-  --crimson: var(--accent, #8b2252);
-  --crimson-light: var(--accent-light, #a62d65);
-  --border: rgba(0, 0, 0, 0.08);
-  --text: var(--text-primary, #1a1a2e);
-  --muted: var(--text-secondary, #606272);
-  --light: var(--text-tertiary, #9a9cac);
+  --bg: #f5f4f1;
+  --panel: #ffffff;
+  --preview-bg: #e8e6e1;
+  --crimson: #9b2355;
+  --border: #e0ddd8;
+  --text: #1a1a2e;
+  --muted: #888;
+  --light: #bbb;
   --input-bg: #faf9f7;
 }
-html, body { height: 100%; }
-body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
-.dashboard-layout { height: 100%; display: flex; min-height: 100vh; }
-.sidebar { width: 280px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; display: flex; flex-direction: column; }
-.main-content {
-  margin-left: 280px;
-  width: calc(100% - 280px);
-  min-width: 0;
-  min-height: 0;
-  height: 100vh;
-  max-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
+html, body { height: 100%; overflow: hidden; }
+body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
 
 /* -- TOP BAR -- */
 .topbar {
-  height: 62px;
+  height: 56px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 20px 0 16px;
-  gap: 12px;
+  padding: 0 32px;
+  gap: 24px;
   flex-shrink: 0;
 }
-.doc-tabs {
-  display: flex;
-  gap: 2px;
-  flex: 0 1 auto;
-  justify-content: flex-start;
-  min-width: 0;
+.topbar-logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px; font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--crimson);
+  margin-right: 8px;
 }
+.doc-tabs { display: flex; gap: 2px; }
 .doc-tab {
-  font-family: 'Oswald', sans-serif;
-  font-size: 13px; font-weight: 500;
-  padding: 8px 16px;
+  font-size: 12px; font-weight: 500;
+  padding: 6px 16px;
   border-radius: 4px;
   cursor: pointer;
   color: var(--muted);
@@ -81,45 +51,37 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   transition: all .15s;
 }
 .doc-tab:hover { color: var(--text); background: var(--bg); }
-.doc-tab.active { color: var(--crimson); background: rgba(139,34,82,.07); font-weight: 600; }
+.doc-tab.active { color: var(--crimson); background: rgba(155,35,85,.07); font-weight: 600; }
 
 .topbar-right { margin-left: auto; }
 .btn-dl {
   display: flex; align-items: center; gap: 8px;
-  padding: 9px 20px;
+  padding: 8px 20px;
   background: var(--crimson); color: #fff;
   border: none; border-radius: 5px;
-  font-family: 'Oswald', sans-serif;
-  font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
   cursor: pointer; transition: opacity .15s;
 }
 .btn-dl:hover { opacity: .88; }
 .btn-dl svg { width: 13px; height: 13px; }
 
 /* -- SPLIT -- */
-.split {
-  display: grid;
-  grid-template-columns: minmax(280px, min(380px, 34vw)) minmax(0, 1fr);
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
+.split { display: flex; flex: 1; overflow: hidden; }
 
 /* -- FORM PANEL -- */
 .form-panel {
-  width: 100%;
-  max-width: 460px;
-  min-height: 0;
+  width: 340px;
+  flex-shrink: 0;
   background: var(--panel);
   border-right: 1px solid var(--border);
   overflow-y: auto;
-  overflow-x: hidden;
-  padding: 22px 22px 34px;
+  padding: 28px 24px 40px;
 }
 
 .section-title {
-  font-size: 10px; font-weight: 700;
-  letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
   color: var(--light);
   margin: 24px 0 12px;
 }
@@ -130,17 +92,17 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 }
 .field label {
   display: block;
-  font-size: 12px; font-weight: 500;
+  font-size: 11px; font-weight: 500;
   color: var(--muted);
   margin-bottom: 4px;
 }
 .field input, .field textarea, .field select {
   width: 100%;
-  padding: 9px 11px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
   color: var(--text);
   background: var(--input-bg);
   outline: none;
@@ -163,7 +125,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   padding: 7px 8px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Barlow', sans-serif;
   font-size: 12px;
   color: var(--text);
   background: var(--input-bg);
@@ -186,7 +148,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .btn-add-regel {
   font-size: 11px; font-weight: 600;
   color: var(--crimson);
-  background: none; border: 1px dashed rgba(139,34,82,.3);
+  background: none; border: 1px dashed rgba(155,35,85,.3);
   border-radius: 4px;
   padding: 6px 12px;
   cursor: pointer;
@@ -194,46 +156,25 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   transition: all .15s;
   margin-top: 4px;
 }
-.btn-add-regel:hover { border-color: var(--crimson); background: rgba(139,34,82,.04); }
+.btn-add-regel:hover { border-color: var(--crimson); background: rgba(155,35,85,.04); }
 
 /* -- PREVIEW PANEL -- */
 .preview-panel {
-  min-width: 0;
-  min-height: 0;
+  flex: 1;
   background: var(--preview-bg);
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding: 0;
-}
-.preview-panel-head {
-  flex-shrink: 0;
-  padding: 13px 18px 11px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  background: var(--preview-bg);
+  align-items: center;
+  padding: 32px 24px;
+  gap: 0;
 }
 .preview-hint {
   font-size: 10px; font-weight: 700;
-  letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--light);
-  margin: 0;
-}
-.a4-stage {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  position: relative;
-  overflow: auto;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 20px 16px 28px;
-  background: rgba(255,255,255,0.42);
-}
-.a4-scale-wrap {
-  flex-shrink: 0;
-  margin: 0 auto;
-  overflow: hidden;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: #aaa;
+  margin-bottom: 16px;
+  align-self: flex-start;
 }
 
 /* -- A4 PAGE -- */
@@ -245,8 +186,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  font-family: 'Inter', sans-serif;
-  transform-origin: top left;
+  font-family: 'Barlow', sans-serif;
 }
 
 /* PDF HEADER */
@@ -258,7 +198,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   justify-content: space-between;
 }
 .pdf-logo {
-  font-family: 'Oswald', sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-size: 18px; font-weight: 800;
   letter-spacing: 1px;
   color: #fff;
@@ -325,8 +265,8 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   width: 240px;
   border-radius: 2px;
 }
-.pdf-total-grand-label { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-.pdf-total-grand-amount { font-family: 'Oswald', sans-serif; font-size: 15px; font-weight: 700; }
+.pdf-total-grand-label { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.pdf-total-grand-amount { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 800; }
 
 /* NOTES */
 .pdf-notes { margin-top: 20px; }
@@ -346,31 +286,13 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 /* TOAST */
 .toast { position: fixed; bottom: 20px; right: 20px; background: #1a1a2e; color: #fff; padding: 10px 16px; border-radius: 5px; font-size: 12px; opacity: 0; transform: translateY(6px); transition: all .2s; pointer-events: none; z-index: 99; }
 .toast.show { opacity: 1; transform: none; }
-
-@media (max-width: 900px) {
-  .main-content { margin-left: 0; width: 100%; max-height: none; height: auto; min-height: 100vh; }
-  .sidebar { display: none; }
-  .form-panel { max-width: none; }
-  .split { grid-template-columns: 1fr; }
-  .a4-stage { min-height: 420px; }
-  .a4 { width: min(595px, calc(100vw - 32px)); min-height: auto; }
-  .a4-scale-wrap {
-    overflow: visible !important;
-    width: auto !important;
-    height: auto !important;
-    margin: 0 auto;
-  }
-  .a4 { transform: none !important; }
-}
 </style>
 </head>
 <body>
 
 <!-- TOP BAR -->
-<div class="dashboard-layout" data-sidebar-shell="canonical">
-<aside class="sidebar"></aside>
-<main class="main-content">
 <div class="topbar">
+  <div class="topbar-logo">SOFTORA.NL</div>
   <div class="doc-tabs">
     <button class="doc-tab active" onclick="setDoc('offerte',this)">Offerte</button>
     <button class="doc-tab" onclick="setDoc('factuur',this)">Factuur</button>
@@ -378,7 +300,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   </div>
   <div class="topbar-right">
     <button class="btn-dl" onclick="downloadPDF()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       PDF Downloaden
     </button>
   </div>
@@ -394,20 +316,12 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 
   <!-- PREVIEW -->
   <div class="preview-panel">
-    <div class="preview-panel-head">
-      <div class="preview-hint">Live preview</div>
-    </div>
-    <div class="a4-stage" id="a4-stage">
-      <div class="a4-scale-wrap" id="a4-scale-wrap">
-        <div class="a4" id="a4">
-          <!-- filled by JS -->
-        </div>
-      </div>
+    <div class="preview-hint">Live preview</div>
+    <div class="a4" id="a4">
+      <!-- filled by JS -->
     </div>
   </div>
 
-</div>
-</main>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -420,8 +334,8 @@ let rc = 2;
 
 const fields = {};
 function v(id) { return (fields[id] && fields[id].value) || ''; }
-function fmtEur(n) { return '€\u00a0' + (isNaN(n)?'0,00':n.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2})); }
-function fmtDate(s) { if(!s) return '—'; const[y,m,d]=s.split('-'); return `${d}-${m}-${y}`; }
+function fmtEur(n) { return 'EUR ' + (isNaN(n)?'0,00':n.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2})); }
+function fmtDate(s) { if(!s) return '-'; const[y,m,d]=s.split('-'); return `${d}-${m}-${y}`; }
 function today() { return new Date().toISOString().split('T')[0]; }
 function addDays(n) { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
 
@@ -483,7 +397,7 @@ function buildForm() {
       { id:'factnr',   label:'Factuurnummer',          placeholder:'FACT-2026-001' },
       { id:'factdatum',label:'Factuurdatum',           type:'date', default: addDays(-30) },
       { id:'verval',   label:'Vervallen op',           type:'date', default: addDays(-16) },
-      { id:'bedrag',   label:'Openstaand bedrag',      placeholder:'€ 1.813,50' },
+      { id:'bedrag',   label:'Openstaand bedrag',      placeholder:'EUR 1.813,50' },
       { id:'nieuwdat', label:'Nieuwe betaaldatum',     type:'date', default: addDays(7) },
       { id:'iban',     label:'IBAN',                   placeholder:'NL91 ABNA 0417 ...' },
       { id:'htype',    label:'Type herinnering',       select: ['1e Herinnering - vriendelijk','2e Herinnering - dringend','Aanmaning - formeel'] },
@@ -557,14 +471,14 @@ function update() {
     const d3label  = isOff ? 'Geldig tot' : 'Vervaldatum';
     const d3val    = isOff ? fmtDate(v('geldig')) : fmtDate(v('verval'));
     const d4label  = isOff ? 'Onderwerp' : 'Referentie';
-    const d4val    = isOff ? (v('onderwerp')||'—') : (v('ref')||'—');
+    const d4val    = isOff ? (v('onderwerp')||'-') : (v('ref')||'-');
     const addr2extra = !isOff && v('btwnum') ? `<div class="pdf-addr-line">BTW: ${v('btwnum')}</div>` : '';
     const ibanLine = !isOff && v('iban') ? `<div class="pdf-addr-line">IBAN: ${v('iban')}</div>` : '';
 
     const rows = regels.length === 0
       ? `<tr class="empty-row"><td colspan="4">Nog geen regels...</td></tr>`
       : regels.map(r=>`<tr>
-          <td>${r.omschrijving||'—'}</td>
+          <td>${r.omschrijving||'-'}</td>
           <td style="text-align:right">${r.aantal}</td>
           <td style="text-align:right">${fmtEur(r.prijs)}</td>
           <td style="text-align:right;font-weight:600">${fmtEur(r.aantal*r.prijs)}</td>
@@ -589,7 +503,7 @@ function update() {
           </div>
           <div class="pdf-addr">
             <div class="pdf-addr-label">Aan</div>
-            <div class="pdf-addr-name">${v('bedrijf')||'—'}</div>
+            <div class="pdf-addr-name">${v('bedrijf')||'-'}</div>
             ${v('contact')?`<div class="pdf-addr-line">${v('contact')}</div>`:''}
             ${v('adres')?`<div class="pdf-addr-line">${v('adres')}</div>`:''}
             ${v('email')?`<div class="pdf-addr-line">${v('email')}</div>`:''}
@@ -598,7 +512,7 @@ function update() {
           </div>
         </div>
         <div class="pdf-meta">
-          <div class="pdf-meta-cell"><div class="pdf-meta-key">${numLabel}</div><div class="pdf-meta-val">${v('nummer')||'—'}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">${numLabel}</div><div class="pdf-meta-val">${v('nummer')||'-'}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">${datLabel}</div><div class="pdf-meta-val">${fmtDate(v('datum'))}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">${d3label}</div><div class="pdf-meta-val">${d3val}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">${d4label}</div><div class="pdf-meta-val">${d4val}</div></div>
@@ -614,7 +528,7 @@ function update() {
         </div>
         ${notes}
       </div>
-      <div class="pdf-footer">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
+      <div class="pdf-footer">Softora.nl - info@softora.nl - www.softora.nl - KvK: 12345678</div>`;
 
   } else {
     // HERINNERING
@@ -644,76 +558,31 @@ function update() {
           </div>
           <div class="pdf-addr">
             <div class="pdf-addr-label">Aan</div>
-            <div class="pdf-addr-name">${v('bedrijf')||'—'}</div>
+            <div class="pdf-addr-name">${v('bedrijf')||'-'}</div>
             ${v('contact')?`<div class="pdf-addr-line">${v('contact')}</div>`:''}
             ${v('adres')?`<div class="pdf-addr-line">${v('adres')}</div>`:''}
             ${v('email')?`<div class="pdf-addr-line">${v('email')}</div>`:''}
           </div>
         </div>
-        <div style="background:${col};color:#fff;border-radius:3px;padding:8px 14px;font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px">${hlabels[htype]}</div>
+        <div style="background:${col};color:#fff;border-radius:3px;padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px">${hlabels[htype]}</div>
         <div style="font-size:11px;color:#555;line-height:1.9;margin-bottom:18px">${msgs[htype].replace(/\n/g,'<br>')}</div>
         <div class="pdf-meta" style="margin-bottom:16px">
-          <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurnummer</div><div class="pdf-meta-val">${v('factnr')||'—'}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurnummer</div><div class="pdf-meta-val">${v('factnr')||'-'}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">Factuurdatum</div><div class="pdf-meta-val">${fmtDate(v('factdatum'))}</div></div>
           <div class="pdf-meta-cell"><div class="pdf-meta-key">Vervallen op</div><div class="pdf-meta-val">${fmtDate(v('verval'))}</div></div>
-          <div class="pdf-meta-cell"><div class="pdf-meta-key">Openstaand</div><div class="pdf-meta-val" style="color:${col}">${v('bedrag')||'—'}</div></div>
+          <div class="pdf-meta-cell"><div class="pdf-meta-key">Openstaand</div><div class="pdf-meta-val" style="color:${col}">${v('bedrag')||'-'}</div></div>
         </div>
         <div style="background:${col};color:#fff;border-radius:3px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div style="font-size:11px;line-height:1.7">
             <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.7;margin-bottom:2px">Betaal uiterlijk</div>
-            <strong>${fmtDate(v('nieuwdat'))}</strong> · IBAN: ${v('iban')||'—'}
+            <strong>${fmtDate(v('nieuwdat'))}</strong> - IBAN: ${v('iban')||'-'}
           </div>
-          <div style="font-family:'Oswald',sans-serif;font-size:20px;font-weight:700">${v('bedrag')||'—'}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800">${v('bedrag')||'-'}</div>
         </div>
         ${v('notities')?`<div class="pdf-notes"><div class="pdf-notes-label">Toelichting</div><div class="pdf-notes-text">${v('notities').replace(/\n/g,'<br>')}</div></div>`:''}
       </div>
-      <div class="pdf-footer">Softora.nl · info@softora.nl · www.softora.nl · KvK: 12345678</div>`;
+      <div class="pdf-footer">Softora.nl - info@softora.nl - www.softora.nl - KvK: 12345678</div>`;
   }
-  scheduleFitPreview();
-}
-
-function scheduleFitPreview() {
-  requestAnimationFrame(function () {
-    requestAnimationFrame(fitPreview);
-  });
-}
-
-function fitPreview() {
-  const stage = document.getElementById('a4-stage');
-  const wrap = document.getElementById('a4-scale-wrap');
-  const a4 = document.getElementById('a4');
-  if (!stage || !wrap || !a4) return;
-
-  if (window.innerWidth <= 900) {
-    a4.style.transform = '';
-    wrap.style.width = '';
-    wrap.style.height = '';
-    wrap.style.overflow = '';
-    stage.style.minHeight = '';
-    return;
-  }
-
-  const padX = 32;
-  const padY = 24;
-  const availW = Math.max(120, stage.clientWidth - padX);
-
-  const baseW = 595;
-  const baseH = Math.max(842, a4.offsetHeight || 842);
-
-  // Keep the page visually large in fullscreen: fit on width, allow vertical scroll.
-  let scale = Math.min(availW / baseW, 1);
-  scale = Math.max(scale, 0.42);
-
-  const scaledW = Math.ceil(baseW * scale);
-  const scaledH = Math.ceil(baseH * scale);
-
-  wrap.style.width = scaledW + 'px';
-  wrap.style.height = scaledH + 'px';
-  wrap.style.overflow = 'hidden';
-
-  a4.style.transform = 'scale(' + scale + ')';
-  a4.style.transformOrigin = 'top left';
-  stage.style.minHeight = '';
 }
 
 // -- DOWNLOAD --
@@ -721,8 +590,8 @@ function downloadPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'a4' });
   const W=210, PL=20, PR=190;
-  const CR=[139,34,82], DK=[26,26,46], MD=[100,100,110], BG=[249,248,246];
-  const fmtD=s=>{ if(!s) return '—'; const[y,m,d]=s.split('-'); return `${d}-${m}-${y}`; };
+  const CR=[155,35,85], DK=[26,26,46], MD=[100,100,110], BG=[249,248,246];
+  const fmtD=s=>{ if(!s) return '-'; const[y,m,d]=s.split('-'); return `${d}-${m}-${y}`; };
   const fmtN=n=>n.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2});
 
   // header
@@ -738,7 +607,7 @@ function downloadPDF() {
     const isOff = docType==='offerte';
     // address boxes
     const van=['Softora.nl','info@softora.nl','www.softora.nl','KvK: 12345678'];
-    const aan=[v('bedrijf')||'—',v('contact'),v('adres'),v('email'),v('kvk')?'KvK: '+v('kvk'):null].filter(Boolean);
+    const aan=[v('bedrijf')||'-',v('contact'),v('adres'),v('email'),v('kvk')?'KvK: '+v('kvk'):null].filter(Boolean);
     [[PL,van,'VAN'],[112,aan,'AAN']].forEach(([x,lines,lbl])=>{
       doc.setFillColor(...BG); doc.rect(x,y,78,36,'F');
       doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(...MD); doc.text(lbl,x+3,y+5);
@@ -752,8 +621,8 @@ function downloadPDF() {
 
     // meta strip
     const metas = isOff
-      ? [['OFFERTENUMMER',v('nummer')||'—'],['DATUM',fmtD(v('datum'))],['GELDIG TOT',fmtD(v('geldig'))],['ONDERWERP',v('onderwerp')||'—']]
-      : [['FACTUURNUMMER',v('nummer')||'—'],['FACTUURDATUM',fmtD(v('datum'))],['VERVALDATUM',fmtD(v('verval'))],['REFERENTIE',v('ref')||'—']];
+      ? [['OFFERTENUMMER',v('nummer')||'-'],['DATUM',fmtD(v('datum'))],['GELDIG TOT',fmtD(v('geldig'))],['ONDERWERP',v('onderwerp')||'-']]
+      : [['FACTUURNUMMER',v('nummer')||'-'],['FACTUURDATUM',fmtD(v('datum'))],['VERVALDATUM',fmtD(v('verval'))],['REFERENTIE',v('ref')||'-']];
     doc.setFillColor(...BG); doc.rect(PL,y,170,14,'F');
     metas.forEach(([k,val],i)=>{
       const x=PL+3+i*43;
@@ -772,21 +641,21 @@ function downloadPDF() {
       const bg=i%2===0?[255,255,255]:BG;
       doc.setFillColor(...bg); doc.rect(PL,y,170,7,'F');
       doc.setFontSize(8.5);doc.setFont('helvetica','normal');doc.setTextColor(...DK);
-      doc.text(r.omschrijving||'—',PL+3,y+4.8);
+      doc.text(r.omschrijving||'-',PL+3,y+4.8);
       doc.text(String(r.aantal),134,y+4.8,{align:'right'});
-      doc.text('€'+fmtN(r.prijs),162,y+4.8,{align:'right'});
-      doc.setFont('helvetica','bold'); doc.text('€'+fmtN(r.aantal*r.prijs),188,y+4.8,{align:'right'});
+      doc.text('EUR'+fmtN(r.prijs),162,y+4.8,{align:'right'});
+      doc.setFont('helvetica','bold'); doc.text('EUR'+fmtN(r.aantal*r.prijs),188,y+4.8,{align:'right'});
       y+=7;
     });
 
     const sub=getSubtotal(),btw=sub*.21,grand=sub+btw;
     y+=4;
     doc.setFontSize(8.5);doc.setFont('helvetica','normal');doc.setTextColor(...MD);
-    doc.text('Subtotaal excl. BTW:',142,y);doc.text('€'+fmtN(sub),188,y,{align:'right'}); y+=5.5;
-    doc.text('BTW (21%):',142,y);doc.text('€'+fmtN(btw),188,y,{align:'right'}); y+=3;
+    doc.text('Subtotaal excl. BTW:',142,y);doc.text('EUR'+fmtN(sub),188,y,{align:'right'}); y+=5.5;
+    doc.text('BTW (21%):',142,y);doc.text('EUR'+fmtN(btw),188,y,{align:'right'}); y+=3;
     doc.setFillColor(...CR);doc.rect(142,y,48,9,'F');
     doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
-    doc.text('TOTAAL',145,y+6.2);doc.text('€'+fmtN(grand),188,y+6.2,{align:'right'});
+    doc.text('TOTAAL',145,y+6.2);doc.text('EUR'+fmtN(grand),188,y+6.2,{align:'right'});
     y+=14;
 
     if(v('notities')){ doc.setFillColor(...BG);doc.rect(PL,y,170,6,'F'); doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(...MD);doc.text('OPMERKINGEN',PL+3,y+4);y+=6; doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(70,70,80); const ls=doc.splitTextToSize(v('notities'),164);doc.text(ls,PL+3,y+5); }
@@ -797,7 +666,7 @@ function downloadPDF() {
     const hcols={1:[22,115,60],2:[180,90,0],3:[192,57,43]};
     const hlabels={1:'1E BETALINGSHERINNERING',2:'2E BETALINGSHERINNERING - DRINGEND',3:'AANMANING'};
     const hc=hcols[htype];
-    [[PL,['Softora.nl','info@softora.nl','www.softora.nl'],'VAN'],[112,[v('bedrijf')||'—',v('contact'),v('adres'),v('email')].filter(Boolean),'AAN']].forEach(([x,lines,lbl])=>{
+    [[PL,['Softora.nl','info@softora.nl','www.softora.nl'],'VAN'],[112,[v('bedrijf')||'-',v('contact'),v('adres'),v('email')].filter(Boolean),'AAN']].forEach(([x,lines,lbl])=>{
       doc.setFillColor(...BG);doc.rect(x,y,78,30,'F');
       doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(...MD);doc.text(lbl,x+3,y+4.5);
       lines.forEach((l,i)=>{if(i===0){doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(...DK);}else{doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(...MD);}doc.text(String(l),x+3,y+9+i*5);});
@@ -811,20 +680,20 @@ function downloadPDF() {
     doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(...MD);
     [[PL+2,'FACTUURNR'],[57,'FACTUURDATUM'],[100,'VERVALLEN OP'],[143,'OPENSTAAND']].forEach(([x,l])=>doc.text(l,x,y+4.8));
     y+=8;doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(...DK);
-    doc.text(v('factnr')||'—',PL+2,y+5);doc.text(fmtD(v('factdatum')),57,y+5);doc.text(fmtD(v('verval')),100,y+5);
-    doc.setFont('helvetica','bold');doc.setTextColor(...hc);doc.text(v('bedrag')||'—',143,y+5);y+=14;
+    doc.text(v('factnr')||'-',PL+2,y+5);doc.text(fmtD(v('factdatum')),57,y+5);doc.text(fmtD(v('verval')),100,y+5);
+    doc.setFont('helvetica','bold');doc.setTextColor(...hc);doc.text(v('bedrag')||'-',143,y+5);y+=14;
     doc.setFillColor(...hc);doc.rect(PL,y,170,11,'F');
     doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
-    doc.text('Betaal uiterlijk: '+fmtD(v('nieuwdat')),PL+4,y+5);doc.text('IBAN: '+(v('iban')||'—'),PL+4,y+9.5);
-    doc.text(v('bedrag')||'—',188,y+7,{align:'right'});
+    doc.text('Betaal uiterlijk: '+fmtD(v('nieuwdat')),PL+4,y+5);doc.text('IBAN: '+(v('iban')||'-'),PL+4,y+9.5);
+    doc.text(v('bedrag')||'-',188,y+7,{align:'right'});
   }
 
   doc.setFillColor(...BG);doc.rect(0,284,W,13,'F');
   doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(180,175,168);
-  doc.text('Softora.nl  ·  info@softora.nl  ·  www.softora.nl  ·  KvK: 12345678',W/2,291,{align:'center'});
+  doc.text('Softora.nl  -  info@softora.nl  -  www.softora.nl  -  KvK: 12345678',W/2,291,{align:'center'});
 
   doc.save(`${docType}-${new Date().toISOString().split('T')[0]}.pdf`);
-  showToast('✓ PDF gedownload');
+  showToast('PDF gedownload');
 }
 
 function showToast(msg) {
@@ -834,20 +703,6 @@ function showToast(msg) {
 
 // init
 buildForm();
-window.addEventListener('resize', scheduleFitPreview);
-
-(function initPreviewFit() {
-  const stage = document.getElementById('a4-stage');
-  if (!stage || typeof ResizeObserver === 'undefined') {
-    window.addEventListener('load', scheduleFitPreview);
-    return;
-  }
-  var ro = new ResizeObserver(function () {
-    scheduleFitPreview();
-  });
-  ro.observe(stage);
-  window.addEventListener('load', scheduleFitPreview);
-})();
 </script>
 </body>
 </html>
