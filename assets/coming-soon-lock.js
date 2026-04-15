@@ -7,11 +7,7 @@
     "/premium-voicesoftware",
     "/premium-websites",
     "/premium-blog",
-    "/premium-over-softora",
-    "/premium-bevestigingsmails",
-    "/premium-websitegenerator",
-    "/premium-seo",
-    "/premium-boekhouding"
+    "/premium-over-softora"
   ]);
 
   if (!lockedPaths.has(path)) return;
