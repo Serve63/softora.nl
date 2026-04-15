@@ -247,22 +247,12 @@ nav {
 }
 .overlay-logo {
   font-family: 'Oswald', sans-serif;
-  font-size: 2rem;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--dark);
-  margin-bottom: 40px;
-  line-height: 1;
-  position: relative;
-}
-.overlay-logo::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 3.2ch;
-  height: 3px;
-  background: var(--nav-cta);
+  letter-spacing: 1.5px;
+  color: #8B2252;
+  margin-bottom: 48px;
+  text-transform: uppercase;
 }
 .login-box {
   width: 100%;
@@ -320,7 +310,7 @@ nav {
 </head>
 <body>
 <div class="overlay" id="overlay">
-  <div class="overlay-logo">SOFTORA.NL</div>
+  <div class="overlay-logo">Binnenkort beschikbaar</div>
   <div class="login-box">
     <div class="login-label">Toegangscode</div>
     <input class="login-inp" type="password" id="code-inp" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')login()">
