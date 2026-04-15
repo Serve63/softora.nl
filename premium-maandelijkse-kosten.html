@@ -194,6 +194,13 @@ body {
 }
 .cost-row:last-child { border-bottom: none; }
 .cost-row:hover { background: var(--tag); }
+.cost-row.cost-row-accent {
+  margin: 10px 12px 0;
+  border: 1px dashed var(--crimson);
+  border-radius: 6px;
+  background: rgba(139, 34, 82, 0.04);
+}
+.cost-row.cost-row-accent:hover { background: rgba(139, 34, 82, 0.08); }
 .cost-row.head {
   padding: 6px 18px;
   background: var(--tag);
@@ -590,12 +597,14 @@ body {
 <script>
 let data = {
   'Hosting & Domeinen': [
-    { id:1, naam:'Hostinger VPS', note:'Webhosting server', freq:'maandelijks', bedrag:9.99, status:'active' },
-    { id:2, naam:'softora.nl domein', note:'Jaarlijkse verlenging', freq:'jaarlijks', bedrag:1.25, status:'yearly' },
-    { id:3, naam:'TransIP backup', note:'Extra opslag', freq:'maandelijks', bedrag:3.00, status:'active' },
+    { id:1, naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
+    { id:2, naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
+    { id:3, naam:'Hostinger VPS', note:'Webhosting server', freq:'maandelijks', bedrag:9.99, status:'active' },
+    { id:4, naam:'softora.nl domein', note:'Jaarlijkse verlenging', freq:'jaarlijks', bedrag:1.25, status:'yearly' },
+    { id:5, naam:'TransIP backup', note:'Extra opslag', freq:'maandelijks', bedrag:3.00, status:'active' },
   ],
 };
-let nextId = 4;
+let nextId = 6;
 let editingContext = null;
 let deletingContext = null;
 
@@ -662,8 +671,10 @@ function render() {
         <span>Post</span><span>Frequentie</span><span style="text-align:right">Bedrag</span>
       </div>
       <div id="rows-${key}">
-        ${items.map((item) => `
-          <div class="cost-row" id="item-${item.id}">
+        ${items.map((item) => {
+          const rowClassName = item.highlighted ? 'cost-row cost-row-accent' : 'cost-row';
+          return `
+          <div class="${rowClassName}" id="item-${item.id}">
             <div>
               <div class="cost-name">${escapeHtml(item.naam)}</div>
               <div class="cost-note">${escapeHtml(item.note || '')}</div>
@@ -680,7 +691,8 @@ function render() {
                 </button>
               </div>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
       <div class="add-row">
         <div class="add-inputs">
