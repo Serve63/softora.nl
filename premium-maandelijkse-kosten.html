@@ -224,6 +224,11 @@ body {
   justify-content: space-between;
   gap: 10px;
 }
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .add-row {
   padding: 9px 18px;
@@ -285,6 +290,22 @@ body {
 }
 .btn-del:hover { color: #a12d21; }
 .btn-del svg { width: 13px; height: 13px; }
+
+.btn-edit {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s;
+  padding: 0;
+}
+.btn-edit:hover { color: var(--crimson); }
+.btn-edit svg { width: 13px; height: 13px; }
 
 .toast {
   position: fixed;
@@ -399,7 +420,7 @@ body {
           <div class="totaal-amount red" id="totaal-maand">€0,00</div>
         </div>
         <div class="totaal-card">
-          <div class="totaal-label">Per jaar (schatting)</div>
+          <div class="totaal-label">Per jaar</div>
           <div class="totaal-amount" id="totaal-jaar">€0,00</div>
         </div>
         <div class="totaal-card">
@@ -480,9 +501,14 @@ function render() {
             <div class="cost-freq">${freqLabel[item.freq]}</div>
             <div class="cost-amount-wrap">
               <div class="cost-amount">${fmtEur(item.bedrag)}</div>
-              <button class="btn-del" onclick="deleteItem(${JSON.stringify(cat)},${item.id})" title="Verwijderen">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
-              </button>
+              <div class="row-actions">
+                <button class="btn-edit" onclick="editItem(${JSON.stringify(cat)},${item.id})" title="Bewerken">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+                <button class="btn-del" onclick="deleteItem(${JSON.stringify(cat)},${item.id})" title="Verwijderen">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+                </button>
+              </div>
             </div>
           </div>`).join('')}
       </div>
@@ -516,9 +542,45 @@ function addItem(cat) {
 }
 
 function deleteItem(cat, id) {
+  const item = data[cat]?.find((i) => i.id === id);
+  if (!item) return;
+  const confirmed = window.confirm(`Weet je zeker dat je "${item.naam}" wilt verwijderen?`);
+  if (!confirmed) return;
   data[cat] = data[cat].filter((i) => i.id !== id);
   render();
   showToast('✓ Post verwijderd');
+}
+
+function editItem(cat, id) {
+  const item = data[cat]?.find((i) => i.id === id);
+  if (!item) return;
+
+  const nieuweNaamRaw = window.prompt('Naam van de post:', item.naam);
+  if (nieuweNaamRaw === null) return;
+  const nieuweNaam = nieuweNaamRaw.trim();
+  if (!nieuweNaam) return showToast('Naam is verplicht');
+
+  const nieuweNoteRaw = window.prompt('Omschrijving (optioneel):', item.note || '');
+  if (nieuweNoteRaw === null) return;
+  const nieuweNote = nieuweNoteRaw.trim();
+
+  const freqHint = 'maandelijks, jaarlijks of kwartaal';
+  const nieuweFreqRaw = window.prompt(`Frequentie (${freqHint}):`, item.freq);
+  if (nieuweFreqRaw === null) return;
+  const nieuweFreq = nieuweFreqRaw.trim().toLowerCase();
+  if (!freqLabel[nieuweFreq]) return showToast('Gebruik: maandelijks, jaarlijks of kwartaal');
+
+  const nieuweBedragRaw = window.prompt('Bedrag (bijv. 9.99):', String(item.bedrag).replace('.', ','));
+  if (nieuweBedragRaw === null) return;
+  const nieuweBedrag = parseFloat(nieuweBedragRaw.replace(',', '.'));
+  if (!Number.isFinite(nieuweBedrag) || nieuweBedrag <= 0) return showToast('Vul een geldig bedrag in');
+
+  item.naam = nieuweNaam;
+  item.note = nieuweNote;
+  item.freq = nieuweFreq;
+  item.bedrag = Math.round(nieuweBedrag * 100) / 100;
+  render();
+  showToast('✓ Post bijgewerkt');
 }
 
 function showToast(msg) {
