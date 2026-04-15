@@ -69,7 +69,6 @@ function createAgendaAppointmentUpsertService(deps = {}) {
 
   function upsertGeneratedAgendaAppointment(appointment, callId) {
     if (!appointment || !callId) return null;
-    clearDismissedInterestedLeadCallId(callId);
 
     const existingId = agendaAppointmentIdByCallId.get(callId);
     if (existingId) {

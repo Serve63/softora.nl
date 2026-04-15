@@ -148,7 +148,7 @@ test('agenda appointment upsert service preserves committed schedule data on map
   assert.equal(updated.contactEmail, 'nieuw@example.com');
   assert.equal(updated.confirmationEmailDraft, 'Oude draft');
   assert.equal(agendaAppointmentIdByCallId.get('call-11'), 11);
-  assert.deepEqual(clearedCallIds, ['call-11']);
+  assert.deepEqual(clearedCallIds, []);
   assert.deepEqual(persistReasons, ['agenda_appointment_upsert']);
   assert.equal(generatedAgendaAppointments[0].company, 'Softora Updated');
 });
@@ -192,7 +192,7 @@ test('agenda appointment upsert service reuses matching lead follow-up appointme
   assert.equal(reused.confirmationEmailDraftSource, 'template-auto');
   assert.equal(agendaAppointmentIdByCallId.has('old-call'), false);
   assert.equal(agendaAppointmentIdByCallId.get('new-call'), 22);
-  assert.deepEqual(clearedCallIds, ['new-call', 'new-call']);
+  assert.deepEqual(clearedCallIds, ['new-call']);
   assert.deepEqual(persistReasons, ['agenda_appointment_reuse_upsert']);
 });
 
@@ -225,6 +225,6 @@ test('agenda appointment upsert service inserts new appointments with stable def
   assert.equal(inserted.postCallStatus, 'completed');
   assert.equal(generatedAgendaAppointments.length, 1);
   assert.equal(agendaAppointmentIdByCallId.get('call-new'), 501);
-  assert.deepEqual(clearedCallIds, ['call-new']);
+  assert.deepEqual(clearedCallIds, []);
   assert.deepEqual(persistReasons, ['agenda_appointment_insert']);
 });
