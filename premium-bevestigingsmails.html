@@ -416,6 +416,77 @@
             text-align: center;
         }
 
+        .topbar-cost-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.28rem;
+        }
+
+        .topbar-cost-card {
+            width: 13.4rem;
+            min-width: 13.4rem;
+            max-width: 13.4rem;
+            min-height: 2.2rem;
+            padding: 0.49rem 0.85rem;
+            border: 1px solid var(--border);
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .topbar-cost-stack {
+            display: flex;
+            align-items: center;
+            gap: 0.58rem;
+            min-width: 0;
+        }
+
+        .topbar-cost-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 10px var(--green-glow);
+            flex: 0 0 8px;
+        }
+
+        .topbar-cost-card[data-state="error"] .topbar-cost-dot {
+            background: var(--accent-light);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .topbar-cost-copy {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.12rem;
+        }
+
+        .topbar-cost-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            line-height: 1;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        .topbar-cost-meta {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.52rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            line-height: 1;
+            color: var(--text-tertiary);
+            white-space: nowrap;
+        }
+
         .topbar-left h1 {
             font-size: 2rem;
             font-weight: 700;
@@ -1831,6 +1902,18 @@
                             <option value="more_coming" disabled>Meer volgt...</option>
                         </select>
                     </div>
+                    <div class="topbar-cost-group" data-retell-cost-root>
+                        <span class="topbar-select-label">Retell kosten</span>
+                        <div class="topbar-cost-card" data-state="loading" aria-live="polite">
+                            <div class="topbar-cost-stack">
+                                <span class="topbar-cost-dot" aria-hidden="true"></span>
+                                <div class="topbar-cost-copy">
+                                    <div class="topbar-cost-value" data-retell-cost-value>$0.00</div>
+                                    <div class="topbar-cost-meta" data-retell-cost-meta>Ophalen...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="generator-grid">
@@ -2610,5 +2693,6 @@
         }
     </script>
     <!-- Geen coldcalling-dashboard: coldmailing is een eigen pagina zonder outbound-call runtime. -->
+    <script src="assets/retell-cost-widget.js?v=20260415a" defer></script>
 </body>
 </html>

@@ -13,8 +13,42 @@ function createCustomersPageBootstrapService(deps = {}) {
     return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
   }
 
+  function normalizeSearchValue(value) {
+    return normalizeString(value).toLowerCase();
+  }
+
   function normalizeActiveValue(value) {
     return normalizeString(value).toLowerCase() === 'nee' ? 'Nee' : 'Ja';
+  }
+
+  function parseResponsibleValue(value) {
+    const normalized = normalizeString(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    if (normalized.includes('martijn')) return 'Martijn';
+    if (normalized.includes('serve')) return 'Serve';
+    return '';
+  }
+
+  function normalizeResponsibleValue(value) {
+    return parseResponsibleValue(value) || 'Serve';
+  }
+
+  function getResponsibleSourceValue(raw) {
+    if (!raw || typeof raw !== 'object') return '';
+    return normalizeString(
+      raw.verantwoordelijk ||
+        raw.responsible ||
+        raw.claimedBy ||
+        raw.leadOwnerName ||
+        raw.leadOwnerFullName ||
+        raw.assignedToName ||
+        raw.assignedToFullName ||
+        ''
+    );
   }
 
   function normalizeOptionalAmount(value) {
@@ -65,6 +99,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       bedrag,
       status,
       actief: normalizeActiveValue(raw && raw.actief),
+      verantwoordelijk: normalizeResponsibleValue(getResponsibleSourceValue(raw)),
       datum: normalizeDate(raw && raw.datum),
     };
   }
@@ -118,6 +153,9 @@ function createCustomersPageBootstrapService(deps = {}) {
             prompt: normalizeString(item && item.prompt),
             amount: Number.isFinite(amount) && amount > 0 ? Math.round(amount) : 0,
             status: normalizeString(item && item.status).toLowerCase(),
+            claimedBy: normalizeString(
+              item && (item.claimedBy || item.leadOwnerName || item.leadOwnerFullName)
+            ),
             paidAt: normalizeString(item && item.paidAt),
           };
         })
@@ -142,24 +180,42 @@ function createCustomersPageBootstrapService(deps = {}) {
       : 'Website';
   }
 
+  function buildCustomerIdentityKey(raw) {
+    return [
+      normalizeSearchValue(raw?.bedrijf),
+      normalizeSearchValue(raw?.naam),
+      normalizeSearchValue(raw?.telefoon),
+    ].join('|');
+  }
+
+  function buildDerivedCustomerSeedFromOrder(order) {
+    const explicitCompany = normalizeString(order?.companyName);
+    const explicitContact = normalizeString(order?.contactName);
+    const explicitPhone = normalizeString(order?.contactPhone);
+    const legacyClientName = normalizeString(order?.clientName);
+    const legacyLocation = normalizeString(order?.location);
+    const hasExplicitIdentity = Boolean(explicitCompany || explicitContact || explicitPhone);
+    const customerName = hasExplicitIdentity
+      ? explicitContact || legacyLocation || legacyClientName || 'Onbekend'
+      : legacyClientName || 'Onbekend';
+    const customerCompany = hasExplicitIdentity
+      ? explicitCompany || legacyClientName || legacyLocation || '-'
+      : legacyLocation || '-';
+    const customerPhone = explicitPhone || '-';
+    return {
+      naam: customerName,
+      bedrijf: customerCompany,
+      telefoon: customerPhone,
+      verantwoordelijk: normalizeResponsibleValue(order?.claimedBy),
+    };
+  }
+
   function deriveCustomersFromOrders(orders) {
     const seen = new Map();
 
     orders.forEach((order) => {
-      const explicitCompany = normalizeString(order?.companyName);
-      const explicitContact = normalizeString(order?.contactName);
-      const explicitPhone = normalizeString(order?.contactPhone);
-      const legacyClientName = normalizeString(order?.clientName);
-      const legacyLocation = normalizeString(order?.location);
-      const hasExplicitIdentity = Boolean(explicitCompany || explicitContact || explicitPhone);
-      const customerName = hasExplicitIdentity
-        ? explicitContact || legacyLocation || legacyClientName || 'Onbekend'
-        : legacyClientName || 'Onbekend';
-      const customerCompany = hasExplicitIdentity
-        ? explicitCompany || legacyClientName || legacyLocation || '-'
-        : legacyLocation || '-';
-      const customerPhone = explicitPhone || '-';
-      const key = `${normalizeString(customerCompany).toLowerCase()}|${normalizeString(customerName).toLowerCase()}|${normalizeString(customerPhone).toLowerCase()}`;
+      const customerSeed = buildDerivedCustomerSeedFromOrder(order);
+      const key = buildCustomerIdentityKey(customerSeed);
       if (!key || seen.has(key)) return;
 
       const paidDate = normalizeString(order?.paidAt).slice(0, 10);
@@ -169,14 +225,15 @@ function createCustomersPageBootstrapService(deps = {}) {
         key,
         normalizeCustomer({
           id: `seed-${order.id}`,
-          naam: customerName,
-          bedrijf: customerCompany,
-          telefoon: customerPhone,
+          naam: customerSeed.naam,
+          bedrijf: customerSeed.bedrijf,
+          telefoon: customerSeed.telefoon,
           type: inferTypeFromOrder(order),
           website: order.title || '-',
           bedrag: order.amount || 0,
           status,
           actief: 'Ja',
+          verantwoordelijk: customerSeed.verantwoordelijk,
           datum: paidDate,
         })
       );
@@ -185,21 +242,52 @@ function createCustomersPageBootstrapService(deps = {}) {
     return sortCustomers(Array.from(seen.values()));
   }
 
+  function mergeCustomersWithResponsible(customers, orders) {
+    if (!Array.isArray(customers) || !customers.length) return [];
+    if (!Array.isArray(orders) || !orders.length) return sortCustomers(customers);
+
+    const responsibleByCustomerKey = new Map();
+    orders.forEach((order) => {
+      const customerSeed = buildDerivedCustomerSeedFromOrder(order);
+      const key = buildCustomerIdentityKey(customerSeed);
+      const responsible = parseResponsibleValue(customerSeed.verantwoordelijk);
+      if (!key || !responsible || responsibleByCustomerKey.has(key)) return;
+      responsibleByCustomerKey.set(key, responsible);
+    });
+
+    return sortCustomers(
+      customers.map((customer, index) => {
+        const normalizedCustomer = normalizeCustomer(customer, `klant-responsible-${index}`);
+        const key = buildCustomerIdentityKey(normalizedCustomer);
+        const explicitResponsible = parseResponsibleValue(getResponsibleSourceValue(customer));
+        const matchedResponsible =
+          explicitResponsible || responsibleByCustomerKey.get(key) || normalizedCustomer.verantwoordelijk;
+        if (matchedResponsible === normalizedCustomer.verantwoordelijk) {
+          return normalizedCustomer;
+        }
+        return {
+          ...normalizedCustomer,
+          verantwoordelijk: matchedResponsible,
+        };
+      })
+    );
+  }
+
   async function buildCustomersBootstrapPayload() {
     const remoteState = await getUiStateValues(customerScope);
     const remoteCustomers = parseCustomers(remoteState?.values?.[customerKey]);
+    const orderState = await getUiStateValues(orderScope);
+    const orders = parseOrders(orderState?.values?.[orderKey]);
 
     if (remoteCustomers.length) {
       return {
         ok: true,
         loadedAt: new Date().toISOString(),
         source: 'customers',
-        customers: remoteCustomers,
+        customers: mergeCustomersWithResponsible(remoteCustomers, orders),
       };
     }
 
-    const orderState = await getUiStateValues(orderScope);
-    const orders = parseOrders(orderState?.values?.[orderKey]);
     const customers = deriveCustomersFromOrders(orders);
 
     return {

@@ -1356,6 +1356,8 @@
         }
         if (!Array.isArray(parsed)) parsed = [];
 
+        const previousIds = knownActiveOrderIds;
+        const previousByAppointment = knownActiveOrderByAppointmentId;
         const nextIds = new Set();
         const nextByAppointment = new Map();
         parsed.forEach((item) => {
@@ -1369,8 +1371,18 @@
             }
         });
 
+        const indexChanged = previousIds.size !== nextIds.size
+            || previousByAppointment.size !== nextByAppointment.size
+            || Array.from(nextIds).some((id) => !previousIds.has(id))
+            || Array.from(nextByAppointment.entries()).some(
+                ([appointmentId, orderId]) => previousByAppointment.get(appointmentId) !== orderId
+            );
         knownActiveOrderIds = nextIds;
         knownActiveOrderByAppointmentId = nextByAppointment;
+        if (indexChanged) {
+            renderCalendar();
+            refreshWorkspacePrimaryButtonLabel();
+        }
         return { ids: nextIds, byAppointment: nextByAppointment };
     }
 
@@ -1973,7 +1985,7 @@
         if (!apt || typeof apt !== 'object') return false;
         const status = String(apt?.postCallStatus || '').trim().toLowerCase();
         if (status === 'no_deal') return true;
-        if (Number(apt?.activeOrderId || 0) > 0) return true;
+        if (Number(getLinkedOrderIdForAppointment(apt) || 0) > 0) return true;
         if (String(apt?.activeOrderAddedAt || '').trim()) return true;
         return false;
     }

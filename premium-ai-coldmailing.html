@@ -690,6 +690,12 @@
             display: flex;
         }
 
+        .lead-modal.dismiss-locked .lead-modal-close {
+            display: none !important;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
         @keyframes leadSpin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
@@ -1157,12 +1163,18 @@
 
             let allLeads = [];
             let pollTimer = null;
+            let leadRefreshBurstTimerIds = [];
             let activeTaskId = 0;
+            let activeLeadSnapshot = null;
             let modalBusy = false;
+            let modalLoadingActive = false;
             let agendaSubmitInFlight = false;
             const leadsBootstrapPayload = readLeadsBootstrapPayload();
             const LEADS_MEMORY_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24;
             const LEADS_LOAD_RETRY_DELAY_MS = 4000;
+            const LEADS_POLL_INTERVAL_MS = 5000;
+            const LEADS_POST_ACTION_REFRESH_BURST_INTERVAL_MS = 1200;
+            const LEADS_POST_ACTION_REFRESH_BURST_COUNT = 6;
             const LEADS_EMPTY_SNAPSHOT_GRACE_ROUNDS = 2;
             const LEADS_EMPTY_SNAPSHOT_GRACE_MS = 1000 * 60;
             const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 * 60 * 2;
@@ -1172,6 +1184,7 @@
             const LEAD_DATABASE_UI_SCOPE = 'coldcalling';
             const LEAD_MODAL_REQUEST_TIMEOUT_MS = 20000;
             const LEAD_MODAL_AGENDA_SUBMIT_TIMEOUT_MS = 20000;
+            const LEAD_TRACE_TTL_MS = 1000 * 60 * 5;
             const LEAD_DATABASE_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
             const leadDetailsById = Object.create(null);
             const leadAiCopyById = Object.create(null);
@@ -1191,6 +1204,7 @@
             let lastLeadStatusTimestamp = 0;
             let consecutiveEmptyLeadSnapshots = 0;
             let lastNonEmptyLeadSnapshotAtMs = 0;
+            let leadTraceContext = null;
             const manuallySuppressedLeadKeys = new Map();
             const suppressedLeadCreatedAtByKey = new Map();
 
@@ -1343,6 +1357,52 @@
                 if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return '';
                 if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return '';
                 return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            }
+
+            function normalizeLeadTracePhone(value) {
+                return String(value || '').replace(/\D+/g, '');
+            }
+
+            function normalizeLeadTraceCompany(value) {
+                return normalize(String(value || ''));
+            }
+
+            function getActiveLeadTraceContext() {
+                if (!leadTraceContext) return null;
+                if (Number(leadTraceContext.expiresAtMs || 0) <= Date.now()) {
+                    leadTraceContext = null;
+                    return null;
+                }
+                return leadTraceContext;
+            }
+
+            function startLeadTrace(trigger, lead) {
+                const context = {
+                    enabled: true,
+                    traceId: `lead-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    trigger: String(trigger || 'unknown').trim() || 'unknown',
+                    callId: resolveLeadCallId(lead),
+                    phone: normalizeLeadTracePhone(lead?.phone || ''),
+                    company: normalizeLeadTraceCompany(lead?.company || ''),
+                    createdAtMs: Date.now(),
+                    expiresAtMs: Date.now() + LEAD_TRACE_TTL_MS,
+                };
+                leadTraceContext = context;
+                return context;
+            }
+
+            function buildLeadTraceHeaders(explicitTrace = null) {
+                const trace = explicitTrace || getActiveLeadTraceContext();
+                if (!trace || trace.enabled !== true) return {};
+                const headers = {
+                    'x-softora-lead-trace': '1',
+                    'x-softora-lead-trace-id': String(trace.traceId || 'lead-trace'),
+                    'x-softora-lead-trace-trigger': String(trace.trigger || 'unknown'),
+                };
+                if (trace.callId) headers['x-softora-lead-trace-call-id'] = String(trace.callId);
+                if (trace.phone) headers['x-softora-lead-trace-phone'] = String(trace.phone);
+                if (trace.company) headers['x-softora-lead-trace-company'] = String(trace.company);
+                return headers;
             }
 
             function looksLikeTranscriptText(value) {
@@ -1670,7 +1730,7 @@
 
                 callBackedLeadSourcesLoadPromise = (async () => {
                     const results = await Promise.allSettled([
-                        fetchTasksJson('/api/agenda/interested-leads?limit=500', 8000),
+                        fetchTasksJson('/api/agenda/interested-leads?fresh=1&limit=500', 8000),
                         fetchTasksJson('/api/coldcalling/call-updates?limit=500', 8000),
                         fetchTasksJson('/api/ai/call-insights?limit=500', 8000),
                     ]);
@@ -2054,15 +2114,47 @@
                 return allLeads.find((item) => Number(item.id) === id) || null;
             }
 
+            function getModalActiveLead(taskId) {
+                const normalizedTaskId = Number(taskId) || 0;
+                if (!normalizedTaskId) return null;
+                const currentLead = getLeadById(normalizedTaskId);
+                if (currentLead) return currentLead;
+                if (Number(activeLeadSnapshot?.id) === normalizedTaskId) {
+                    return normalizeLeadRow(activeLeadSnapshot);
+                }
+                return null;
+            }
+
             function setModalBusy(nextBusy) {
                 modalBusy = Boolean(nextBusy);
                 modalSubmitBtn.disabled = modalBusy;
                 modalDeleteBtn.disabled = modalBusy;
             }
 
+            function isLeadModalDismissLocked() {
+                return agendaSubmitInFlight || modalLoadingActive;
+            }
+
+            function syncLeadModalDismissState() {
+                const dismissLocked = isLeadModalDismissLocked();
+                modalOverlay.classList.toggle('dismiss-locked', dismissLocked);
+                modalOverlay.dataset.dismissLocked = dismissLocked ? '1' : '0';
+                modalContainer.classList.toggle('dismiss-locked', dismissLocked);
+                modalContainer.dataset.dismissLocked = dismissLocked ? '1' : '0';
+                modalCloseBtn.hidden = dismissLocked;
+                modalCloseBtn.disabled = dismissLocked;
+                modalCloseBtn.style.display = dismissLocked ? 'none' : '';
+                modalCloseBtn.setAttribute('aria-hidden', dismissLocked ? 'true' : 'false');
+                if (dismissLocked) {
+                    modalCloseBtn.setAttribute('tabindex', '-1');
+                } else {
+                    modalCloseBtn.removeAttribute('tabindex');
+                }
+            }
+
             function setAgendaSubmitUiState(nextPending) {
                 agendaSubmitInFlight = Boolean(nextPending);
-                modalCloseBtn.hidden = agendaSubmitInFlight;
+                syncLeadModalDismissState();
             }
 
             function setModalTaskActionsEnabled(nextEnabled) {
@@ -2188,9 +2280,12 @@
 
             function setModalLoading(nextLoading, message) {
                 const isLoading = Boolean(nextLoading);
+                modalLoadingActive = isLoading;
                 modalContainer.classList.toggle('loading', isLoading);
                 modalLoading.hidden = !isLoading;
                 modalContent.hidden = isLoading;
+                modalContainer.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+                syncLeadModalDismissState();
                 if (message) {
                     modalLoadingText.textContent = String(message);
                 }
@@ -2204,6 +2299,7 @@
             function closeLeadModal() {
                 modalOpenSequence += 1;
                 activeTaskId = 0;
+                activeLeadSnapshot = null;
                 modalAudioPlayer.pause();
                 modalAudioPlayer.currentTime = 0;
                 setAgendaSubmitUiState(false);
@@ -2320,7 +2416,12 @@
                 modalOverlay.scrollTop = 0;
                 modalContainer.scrollTop = 0;
                 window.setTimeout(() => {
-                    if (modalCloseBtn && typeof modalCloseBtn.focus === 'function') {
+                    if (
+                        modalCloseBtn &&
+                        !modalCloseBtn.hidden &&
+                        !modalCloseBtn.disabled &&
+                        typeof modalCloseBtn.focus === 'function'
+                    ) {
                         try {
                             modalCloseBtn.focus({ preventScroll: true });
                             return;
@@ -2344,6 +2445,7 @@
                 if (!normalizedTaskId) return;
                 const lead = getLeadById(normalizedTaskId);
                 if (!lead) return;
+                activeLeadSnapshot = normalizeLeadRow(lead);
                 const hasPersistedTask = hasPersistedLeadTask(lead);
                 const isCallBackedLead = hasCallBackedLead(lead);
                 const hasTaskActions = hasPersistedTask || isCallBackedLead;
@@ -2405,6 +2507,7 @@
                             ),
                         }
                         : lead;
+                    activeLeadSnapshot = normalizeLeadRow(recoveredLead);
 
                     if (recoveredCallId && !String(lead?.callId || '').trim()) {
                         const leadIndex = allLeads.findIndex((item) => Number(item?.id) === normalizedTaskId);
@@ -2479,6 +2582,7 @@
                             ),
                         }
                         : lead;
+                    activeLeadSnapshot = normalizeLeadRow(recoveredLead);
 
                     if (recoveredCallId && !String(lead?.callId || '').trim()) {
                         const leadIndex = allLeads.findIndex((item) => Number(item?.id) === normalizedTaskId);
@@ -2555,6 +2659,7 @@
             async function postJsonWithFallback(endpoints, body, options = {}) {
                 const list = Array.isArray(endpoints) ? endpoints : [endpoints];
                 let lastError = null;
+                const traceHeaders = buildLeadTraceHeaders(options?.traceContext || null);
                 const timeoutMs = Math.max(
                     1000,
                     Math.min(
@@ -2568,7 +2673,10 @@
                     try {
                         const response = await fetch(endpoint, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...traceHeaders,
+                            },
                             body: JSON.stringify(body || {}),
                             signal: controller ? controller.signal : undefined,
                         });
@@ -2627,7 +2735,7 @@
             function finalizeLeadMutation(taskId) {
                 const normalizedTaskId = Number(taskId) || 0;
                 if (!normalizedTaskId) return;
-                const currentLead = getLeadById(normalizedTaskId);
+                const currentLead = getModalActiveLead(normalizedTaskId);
                 if (currentLead) {
                     suppressLeadRowLocally(currentLead);
                 }
@@ -2652,7 +2760,7 @@
             function applyOptimisticLeadRemovalFromOverview(taskId) {
                 const normalizedTaskId = Number(taskId) || 0;
                 if (!normalizedTaskId) return;
-                const currentLead = getLeadById(normalizedTaskId);
+                const currentLead = getModalActiveLead(normalizedTaskId);
                 if (currentLead) {
                     suppressLeadRowLocally(currentLead);
                 }
@@ -2678,13 +2786,14 @@
                 if (!normalizedTaskId) return null;
 
                 const leadIndex = allLeads.findIndex((item) => Number(item?.id) === normalizedTaskId);
-                if (leadIndex < 0) return null;
+                const fallbackLead = getModalActiveLead(normalizedTaskId);
+                if (leadIndex < 0 && !fallbackLead) return null;
 
                 const cacheKey = String(normalizedTaskId);
                 return {
                     taskId: normalizedTaskId,
-                    leadIndex,
-                    lead: normalizeLeadRow(allLeads[leadIndex]),
+                    leadIndex: leadIndex < 0 ? 0 : leadIndex,
+                    lead: normalizeLeadRow(leadIndex >= 0 ? allLeads[leadIndex] : fallbackLead),
                     detail: leadDetailsById[cacheKey] && typeof leadDetailsById[cacheKey] === 'object'
                         ? { ...leadDetailsById[cacheKey] }
                         : null,
@@ -2726,8 +2835,11 @@
             async function submitLeadToAgenda() {
                 const taskId = Number(activeTaskId) || 0;
                 if (!taskId || modalBusy) return;
-                const lead = getLeadById(taskId);
-                if (!lead) return;
+                const lead = getModalActiveLead(taskId);
+                if (!lead) {
+                    setModalStatus('Deze lead is niet meer beschikbaar. Vernieuw de pagina en probeer opnieuw.', 'error');
+                    return;
+                }
                 const isCallBackedLead = hasCallBackedLead(lead);
                 const hasTaskActions = hasPersistedLeadTask(lead) && !isCallBackedLead;
 
@@ -2820,6 +2932,7 @@
                     promoteLeadRowSuppression(lead);
                     setModalLoading(false);
                     closeLeadModal();
+                    scheduleLeadRefreshBurst();
                 } catch (error) {
                     rollbackLeadMutation(snapshot);
                     setModalLoading(false);
@@ -2833,11 +2946,15 @@
             async function removeLead() {
                 const taskId = Number(activeTaskId) || 0;
                 if (!taskId || modalBusy) return;
-                const lead = getLeadById(taskId);
-                if (!lead) return;
+                const lead = getModalActiveLead(taskId);
+                if (!lead) {
+                    setModalStatus('Deze lead is niet meer beschikbaar. Vernieuw de pagina en probeer opnieuw.', 'error');
+                    return;
+                }
                 const isCallBackedLead = hasCallBackedLead(lead);
                 const hasTaskActions = hasPersistedLeadTask(lead) && !isCallBackedLead;
                 const company = String(lead?.company || 'deze lead');
+                const traceContext = startLeadTrace('dismiss', lead);
                 const confirmed =
                     window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
                         ? await window.SoftoraDialogs.confirm(
@@ -2872,7 +2989,8 @@
                             {
                                 callId,
                                 actor: 'Leads pagina',
-                            }
+                            },
+                            { traceContext }
                         );
                     } else if (hasTaskActions) {
                         removeLeadRequest = () => postJsonWithFallback(
@@ -2883,22 +3001,27 @@
                             {
                                 actor: 'Leads pagina',
                                 reason: 'Handmatig verwijderd via lead-popup',
-                            }
+                            },
+                            { traceContext }
                         );
                     } else {
                         throw new Error('Deze lead heeft geen geldige taak of callId.');
                     }
 
-                    rollbackSnapshot = buildLeadMutationRollbackSnapshot(taskId);
-                    finalizeLeadMutation(taskId);
                     setStatus('Lead verwijderen...', '');
                     const removeLeadResult = await removeLeadRequest();
                     removeLeadPersistencePending = Boolean(removeLeadResult?.persistencePending);
+                    rollbackSnapshot = buildLeadMutationRollbackSnapshot(taskId);
+                    finalizeLeadMutation(taskId);
                     promoteLeadRowSuppression(lead);
                     rollbackSnapshot = null;
                     removeLeadSucceeded = true;
+                    closeLeadModal();
+                    scheduleLeadRefreshBurst();
 
-                    if (allLeads.length > 0) {
+                    if (removeLeadPersistencePending) {
+                        setStatus('Lead verwijderd. We verwerken de gedeelde opslag nog even...', '');
+                    } else if (allLeads.length > 0) {
                         setStatusLastUpdatedNow();
                     } else {
                         setStatus('Nog geen leads gevonden.', '');
@@ -3041,6 +3164,7 @@
                 window.__softoraLeadsPageCount = currentLeadCount;
                 if (!allLeads.length) {
                     listEl.innerHTML = '<div class="lead-empty">Nog geen leads gevonden.</div>';
+                    listEl.style.visibility = '';
                     if (
                         window.SoftoraPersonnelTheme &&
                         typeof window.SoftoraPersonnelTheme.refreshSidebarLeadsCount === 'function'
@@ -3718,7 +3842,7 @@
                 const seenCallIds = new Set();
 
                 try {
-                    const data = await fetchTasksJson('/api/agenda/interested-leads?limit=500', 10000);
+                    const data = await fetchTasksJson('/api/agenda/interested-leads?fresh=1&limit=500', 10000);
                     const directRows = (Array.isArray(data?.leads) ? data.leads : [])
                         .map((item) => applyLeadDatabaseIdentity(normalizeLeadRow(item)))
                         .filter((row) => {
@@ -3734,59 +3858,8 @@
                         .sort(sortByDateDesc);
                     return directRows;
                 } catch (endpointError) {
-                    // Fallback: leid kandidaten client-side af wanneer de nieuwe serverroute nog niet beschikbaar is.
+                    throw endpointError;
                 }
-
-                const responses = await Promise.allSettled([
-                    fetchTasksJson('/api/coldcalling/call-updates?limit=500', 10000),
-                    fetchTasksJson('/api/ai/call-insights?limit=500', 10000),
-                ]);
-                const updatesData = responses[0]?.status === 'fulfilled' ? responses[0].value : null;
-                const insightsData = responses[1]?.status === 'fulfilled' ? responses[1].value : null;
-                const updates = Array.isArray(updatesData?.updates) ? updatesData.updates : [];
-                const insights = Array.isArray(insightsData?.insights) ? insightsData.insights : [];
-                if (!updates.length && responses[0]?.status === 'rejected' && responses[1]?.status === 'rejected') {
-                    throw responses[0].reason || responses[1].reason || new Error('Interesse leads laden mislukt');
-                }
-
-                const insightByCallId = new Map();
-                const insightByPhoneKey = new Map();
-                const insightByCompanyKey = new Map();
-
-                insights.forEach((insight) => {
-                    const callId = String(insight?.callId || '').trim();
-                    const phoneKey = normalizePhoneDigits(insight?.phone || '');
-                    const companyKey = normalize(insight?.company || insight?.leadCompany || '');
-                    if (callId && !insightByCallId.has(callId)) insightByCallId.set(callId, insight);
-                    if (phoneKey && !insightByPhoneKey.has(phoneKey)) insightByPhoneKey.set(phoneKey, insight);
-                    if (companyKey && !insightByCompanyKey.has(companyKey)) insightByCompanyKey.set(companyKey, insight);
-                });
-
-                const rows = [];
-                updates.forEach((update) => {
-                    const callId = String(update?.callId || '').trim();
-                    const phoneKey = normalizePhoneDigits(update?.phone || '');
-                    const companyKey = normalize(update?.company || '');
-                    const insight =
-                        insightByCallId.get(callId) ||
-                        insightByPhoneKey.get(phoneKey) ||
-                        insightByCompanyKey.get(companyKey) ||
-                        null;
-                    if (!isInterestedCall(update, insight)) return;
-
-                    const row = applyLeadDatabaseIdentity(normalizeInterestedLeadRow(update, insight));
-                    const matchKey = buildLeadMatchKey(row);
-                    if (matchKey && Number(existingLatestTsByKey.get(matchKey) || 0) >= buildLeadRecencyTimestamp(row)) return;
-                    if (matchKey && seenKeys.has(matchKey)) return;
-                    if (callId && seenCallIds.has(callId)) return;
-
-                    if (matchKey) seenKeys.add(matchKey);
-                    if (callId) seenCallIds.add(callId);
-                    rows.push(row);
-                });
-
-                const fallbackRows = rows.sort(sortByDateDesc);
-                return fallbackRows;
             }
 
             function dedupe(rows) {
@@ -3819,12 +3892,6 @@
             }
 
             function loadCachedLeads() {
-                const bootstrapLeads = Array.isArray(leadsBootstrapPayload?.leads)
-                    ? filterSuppressedLeadRows(
-                        leadsBootstrapPayload.leads.map((item) => normalizeLeadRow(item))
-                    ).sort(sortByDateDesc)
-                    : [];
-                const bootstrapSavedAt = Date.parse(String(leadsBootstrapPayload?.loadedAt || '').trim()) || 0;
                 let memoryCache = {
                     leads: Array.isArray(leadOverviewCacheState.leads)
                         ? filterSuppressedLeadRows(
@@ -3839,17 +3906,6 @@
                     Date.now() - memoryCache.savedAt > LEADS_MEMORY_CACHE_MAX_AGE_MS
                 ) {
                     memoryCache = { leads: [], savedAt: 0 };
-                }
-
-                if (memoryCache.leads.length > 0 && memoryCache.savedAt > bootstrapSavedAt) {
-                    return memoryCache;
-                }
-
-                if (bootstrapLeads.length > 0) {
-                    return {
-                        leads: bootstrapLeads,
-                        savedAt: bootstrapSavedAt || Date.now(),
-                    };
                 }
 
                 return memoryCache;
@@ -3891,27 +3947,24 @@
                 }, Math.max(1000, Number(delayMs) || LEADS_LOAD_RETRY_DELAY_MS));
             }
 
-            function shouldKeepVisibleLeadsOnTransientEmptySnapshot(freshRows) {
-                if (!Array.isArray(freshRows) || freshRows.length > 0) {
-                    if (Array.isArray(freshRows) && freshRows.length > 0) {
-                        consecutiveEmptyLeadSnapshots = 0;
-                        lastNonEmptyLeadSnapshotAtMs = Date.now();
-                    }
-                    return false;
-                }
-                if (!Array.isArray(allLeads) || allLeads.length === 0) {
-                    consecutiveEmptyLeadSnapshots += 1;
-                    return false;
-                }
+            function clearLeadRefreshBurstTimers() {
+                if (!Array.isArray(leadRefreshBurstTimerIds) || !leadRefreshBurstTimerIds.length) return;
+                leadRefreshBurstTimerIds.forEach((timerId) => {
+                    window.clearTimeout(timerId);
+                });
+                leadRefreshBurstTimerIds = [];
+            }
 
-                const nowMs = Date.now();
-                consecutiveEmptyLeadSnapshots += 1;
-                const ageSinceLastNonEmptyMs =
-                    lastNonEmptyLeadSnapshotAtMs > 0 ? nowMs - lastNonEmptyLeadSnapshotAtMs : Number.POSITIVE_INFINITY;
-                return (
-                    consecutiveEmptyLeadSnapshots <= LEADS_EMPTY_SNAPSHOT_GRACE_ROUNDS ||
-                    ageSinceLastNonEmptyMs <= LEADS_EMPTY_SNAPSHOT_GRACE_MS
-                );
+            function shouldKeepVisibleLeadsOnTransientEmptySnapshot(freshRows) {
+                if (Array.isArray(freshRows) && freshRows.length > 0) {
+                    consecutiveEmptyLeadSnapshots = 0;
+                    lastNonEmptyLeadSnapshotAtMs = Date.now();
+                    return false;
+                }
+                if (Array.isArray(freshRows)) {
+                    consecutiveEmptyLeadSnapshots += 1;
+                }
+                return false;
             }
 
             async function fetchTasksJson(url, timeoutMs) {
@@ -3922,6 +3975,7 @@
                 try {
                     const response = await fetch(url, {
                         cache: 'no-store',
+                        headers: buildLeadTraceHeaders(),
                         signal: controller.signal,
                     });
                     const data = await response.json().catch(() => ({}));
@@ -3942,9 +3996,9 @@
             async function fetchLeadRows() {
                 const databaseByPhone = await ensureLeadDatabaseIdentityByPhone();
                 const endpoints = [
-                    { url: '/api/agenda/confirmation-tasks?quick=1&limit=400', timeoutMs: 7000 },
-                    { url: '/api/agenda/confirmation-tasks?fast=1&limit=400', timeoutMs: 7000 },
-                    { url: '/api/agenda/confirmation-tasks?limit=400', timeoutMs: 12000 },
+                    { url: '/api/agenda/confirmation-tasks?fresh=1&quick=1&limit=400', timeoutMs: 7000 },
+                    { url: '/api/agenda/confirmation-tasks?fresh=1&fast=1&limit=400', timeoutMs: 7000 },
+                    { url: '/api/agenda/confirmation-tasks?fresh=1&limit=400', timeoutMs: 12000 },
                 ];
                 let taskError = null;
                 let pendingRows = [];
@@ -3992,24 +4046,12 @@
                 }
                 loadLeadsPromise = (async () => {
                     const freshLeads = filterSuppressedLeadRows(await fetchLeadRows());
-                    let resolvedLeads = freshLeads;
-                    let keptVisibleRowsOnTransientEmpty = false;
-                    if (shouldKeepVisibleLeadsOnTransientEmptySnapshot(freshLeads)) {
-                        keptVisibleRowsOnTransientEmpty = true;
-                        resolvedLeads = Array.isArray(allLeads) ? allLeads.slice() : [];
-                        scheduleLeadRetry(Math.min(2500, LEADS_LOAD_RETRY_DELAY_MS));
-                        console.warn(
-                            '[softora-leads] Lege live snapshot tijdelijk genegeerd om UI-flicker te voorkomen.',
-                            {
-                                consecutiveEmptyLeadSnapshots,
-                                ageSinceLastNonEmptyMs:
-                                    lastNonEmptyLeadSnapshotAtMs > 0
-                                        ? Date.now() - lastNonEmptyLeadSnapshotAtMs
-                                        : null,
-                            }
-                        );
-                    }
-                    if (leadRetryTimer && !keptVisibleRowsOnTransientEmpty) {
+                    const resolvedLeads = shouldKeepVisibleLeadsOnTransientEmptySnapshot(freshLeads)
+                        ? Array.isArray(allLeads)
+                            ? allLeads.slice()
+                            : []
+                        : freshLeads;
+                    if (leadRetryTimer) {
                         window.clearTimeout(leadRetryTimer);
                         leadRetryTimer = null;
                     }
@@ -4019,13 +4061,7 @@
                         renderList();
                     }
                     persistCachedLeads(allLeads);
-                    if (keptVisibleRowsOnTransientEmpty) {
-                        if (lastLeadStatusTimestamp > 0) {
-                            setStatusLastUpdatedNow(new Date(lastLeadStatusTimestamp));
-                        } else {
-                            setStatus('Leads staan klaar.', '');
-                        }
-                    } else if (allLeads.length > 0) {
+                    if (allLeads.length > 0) {
                         setStatusLastUpdatedNow();
                     } else {
                         setStatus('Nog geen leads gevonden.', '');
@@ -4034,23 +4070,18 @@
                     .catch((error) => {
                         const message = String(error?.message || error || 'onbekende fout');
                         if (allLeads.length > 0) {
-                            console.warn('[softora-leads] Live refresh overgeslagen; zichtbare leads blijven staan.', message);
                             if (lastLeadStatusTimestamp > 0) {
                                 setStatusLastUpdatedNow(new Date(lastLeadStatusTimestamp));
                             } else {
                                 setStatus('Leads staan klaar.', '');
                             }
+                            scheduleLeadRetry();
                             return;
                         }
-                        const cached = loadCachedLeads();
-                        if (cached.leads.length > 0) {
-                            allLeads = cached.leads;
-                            consecutiveEmptyLeadSnapshots = 0;
-                            lastNonEmptyLeadSnapshotAtMs = Date.now();
-                            renderList();
-                            setStatusLastUpdatedNow(new Date(cached.savedAt));
-                            return;
-                        }
+                        allLeads = [];
+                        consecutiveEmptyLeadSnapshots = 0;
+                        lastNonEmptyLeadSnapshotAtMs = 0;
+                        renderList();
                         if (isLeadLoadTimeoutError(error)) {
                             setStatus('Leads laden duurt langer dan verwacht. We proberen automatisch opnieuw...', '');
                             renderList();
@@ -4058,7 +4089,7 @@
                             return;
                         }
                         setStatus(`Leads laden mislukt: ${message}`, 'error');
-                        renderList();
+                        scheduleLeadRetry();
                     })
                     .finally(() => {
                         loadLeadsPromise = null;
@@ -4072,18 +4103,18 @@
             }
 
             modalCloseBtn.addEventListener('click', () => {
-                if (agendaSubmitInFlight) return;
+                if (isLeadModalDismissLocked()) return;
                 closeLeadModal();
             });
 
             modalCancelBtn.addEventListener('click', () => {
-                if (agendaSubmitInFlight) return;
+                if (isLeadModalDismissLocked()) return;
                 closeLeadModal();
             });
 
             modalOverlay.addEventListener('click', (event) => {
                 if (event.target === modalOverlay) {
-                    if (agendaSubmitInFlight) return;
+                    if (isLeadModalDismissLocked()) return;
                     closeLeadModal();
                 }
             });
@@ -4099,7 +4130,7 @@
             window.addEventListener('keydown', (event) => {
                 if (event.key !== 'Escape') return;
                 if (!modalOverlay.classList.contains('show')) return;
-                if (agendaSubmitInFlight) return;
+                if (isLeadModalDismissLocked()) return;
                 event.preventDefault();
                 closeLeadModal();
             });
@@ -4111,6 +4142,8 @@
                 lastNonEmptyLeadSnapshotAtMs = Date.now();
                 renderList();
                 setStatusLastUpdatedNow(new Date(cachedLeads.savedAt));
+            } else {
+                setStatus('Leads laden...', '');
             }
 
             loadLeads({ silent: cachedLeads.leads.length > 0 });
@@ -4123,9 +4156,21 @@
                 paintLocalLeadsBadge(Array.isArray(allLeads) ? allLeads.length : 0);
             }
 
+            function scheduleLeadRefreshBurst() {
+                clearLeadRefreshBurstTimers();
+                refreshLeadSurfaces();
+                for (let index = 1; index < LEADS_POST_ACTION_REFRESH_BURST_COUNT; index += 1) {
+                    const timerId = window.setTimeout(() => {
+                        leadRefreshBurstTimerIds = leadRefreshBurstTimerIds.filter((value) => value !== timerId);
+                        refreshLeadSurfaces();
+                    }, index * LEADS_POST_ACTION_REFRESH_BURST_INTERVAL_MS);
+                    leadRefreshBurstTimerIds.push(timerId);
+                }
+            }
+
             pollTimer = window.setInterval(() => {
-                loadLeads({ silent: true });
-            }, 20000);
+                refreshLeadSurfaces();
+            }, LEADS_POLL_INTERVAL_MS);
 
             window.addEventListener('focus', refreshLeadSurfaces);
             window.addEventListener('pageshow', refreshLeadSurfaces);
@@ -4141,6 +4186,7 @@
                     window.__softoraLeadsPageCount = undefined;
                 }
                 if (leadRetryTimer) window.clearTimeout(leadRetryTimer);
+                clearLeadRefreshBurstTimers();
                 if (pollTimer) window.clearInterval(pollTimer);
             });
 

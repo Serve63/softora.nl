@@ -989,6 +989,7 @@
                                     <th>Website</th>
                                     <th>Onderhoud</th>
                                     <th>Status</th>
+                                    <th>Verantwoordelijk</th>
                                     <th>Actief</th>
                                     <th>Betaaldatum</th>
                                     <th></th>
@@ -1074,6 +1075,14 @@
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label class="form-label" for="fieldResponsible">Verantwoordelijk</label>
+                        <select class="form-select" id="fieldResponsible" name="verantwoordelijk" required>
+                            <option value="Serve" selected>Serve</option>
+                            <option value="Martijn">Martijn</option>
+                        </select>
+                    </div>
+
                     <div class="form-group is-full">
                         <label class="form-label" for="fieldDate">Betaaldatum</label>
                         <input class="form-input" id="fieldDate" name="datum" type="date" required>
@@ -1140,6 +1149,7 @@
             fieldMaintenanceAmount: document.getElementById("fieldMaintenanceAmount"),
             fieldStatus: document.getElementById("fieldStatus"),
             fieldActive: document.getElementById("fieldActive"),
+            fieldResponsible: document.getElementById("fieldResponsible"),
             fieldDate: document.getElementById("fieldDate")
         };
 
@@ -1153,6 +1163,36 @@
 
         function normalizeSearchValue(value) {
             return normalizeString(value).toLowerCase();
+        }
+
+        function parseResponsibleValue(value) {
+            const normalized = normalizeString(value)
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]+/g, " ")
+                .trim();
+            if (normalized.indexOf("martijn") !== -1) return "Martijn";
+            if (normalized.indexOf("serve") !== -1) return "Serve";
+            return "";
+        }
+
+        function normalizeResponsibleValue(value) {
+            return parseResponsibleValue(value) || "Serve";
+        }
+
+        function getResponsibleSourceValue(raw) {
+            if (!raw || typeof raw !== "object") return "";
+            return normalizeString(
+                raw.verantwoordelijk
+                || raw.responsible
+                || raw.claimedBy
+                || raw.leadOwnerName
+                || raw.leadOwnerFullName
+                || raw.assignedToName
+                || raw.assignedToFullName
+                || ""
+            );
         }
 
         function normalizeDate(value) {
@@ -1189,6 +1229,7 @@
                 nodes.fieldMaintenanceAmount,
                 nodes.fieldStatus,
                 nodes.fieldActive,
+                nodes.fieldResponsible,
                 nodes.fieldDate
             ].filter(Boolean);
         }
@@ -1243,6 +1284,7 @@
                 bedrag: bedrag,
                 status: status,
                 actief: normalizeActiveValue(raw && raw.actief),
+                verantwoordelijk: normalizeResponsibleValue(getResponsibleSourceValue(raw)),
                 datum: normalizeDate(raw && raw.datum)
             };
         }
@@ -1286,6 +1328,14 @@
                 month: "short",
                 year: "numeric"
             }).format(date);
+        }
+
+        function buildCustomerIdentityKey(raw) {
+            return [
+                normalizeSearchValue(raw && raw.bedrijf),
+                normalizeSearchValue(raw && raw.naam),
+                normalizeSearchValue(raw && raw.telefoon)
+            ].join("|");
         }
 
         function customerHasWebsite(customer) {
@@ -1482,6 +1532,7 @@
                             prompt: normalizeString(item && item.prompt),
                             amount: Number.isFinite(amount) && amount > 0 ? Math.round(amount) : 0,
                             status: normalizeString(item && item.status).toLowerCase(),
+                            claimedBy: normalizeString(item && (item.claimedBy || item.leadOwnerName || item.leadOwnerFullName)),
                             paidAt: normalizeString(item && item.paidAt),
                             lastRunAt: normalizeString(item && item.lastRunAt)
                         };
@@ -1504,24 +1555,34 @@
             }) ? "Website + onderhoud" : "Website";
         }
 
+        function buildDerivedCustomerSeedFromOrder(order) {
+            const explicitCompany = normalizeString(order && order.companyName);
+            const explicitContact = normalizeString(order && order.contactName);
+            const explicitPhone = normalizeString(order && order.contactPhone);
+            const legacyClientName = normalizeString(order && order.clientName);
+            const legacyLocation = normalizeString(order && order.location);
+            const hasExplicitIdentity = Boolean(explicitCompany || explicitContact || explicitPhone);
+            const customerName = hasExplicitIdentity
+                ? (explicitContact || legacyLocation || legacyClientName || "Onbekend")
+                : (legacyClientName || "Onbekend");
+            const customerCompany = hasExplicitIdentity
+                ? (explicitCompany || legacyClientName || legacyLocation || "-")
+                : (legacyLocation || "-");
+            const customerPhone = explicitPhone || "-";
+            return {
+                naam: customerName,
+                bedrijf: customerCompany,
+                telefoon: customerPhone,
+                verantwoordelijk: normalizeResponsibleValue(order && order.claimedBy)
+            };
+        }
+
         function deriveCustomersFromOrders(orders) {
             const seen = new Map();
 
             orders.forEach(function (order) {
-                const explicitCompany = normalizeString(order.companyName);
-                const explicitContact = normalizeString(order.contactName);
-                const explicitPhone = normalizeString(order.contactPhone);
-                const legacyClientName = normalizeString(order.clientName);
-                const legacyLocation = normalizeString(order.location);
-                const hasExplicitIdentity = Boolean(explicitCompany || explicitContact || explicitPhone);
-                const customerName = hasExplicitIdentity
-                    ? (explicitContact || legacyLocation || legacyClientName || "Onbekend")
-                    : (legacyClientName || "Onbekend");
-                const customerCompany = hasExplicitIdentity
-                    ? (explicitCompany || legacyClientName || legacyLocation || "-")
-                    : (legacyLocation || "-");
-                const customerPhone = explicitPhone || "-";
-                const key = normalizeSearchValue(customerCompany) + "|" + normalizeSearchValue(customerName) + "|" + normalizeSearchValue(customerPhone);
+                const customerSeed = buildDerivedCustomerSeedFromOrder(order);
+                const key = buildCustomerIdentityKey(customerSeed);
                 if (seen.has(key)) return;
 
                 const paidDate = normalizeString(order.paidAt).slice(0, 10);
@@ -1529,19 +1590,48 @@
 
                 seen.set(key, normalizeCustomer({
                     id: "seed-" + order.id,
-                    naam: customerName,
-                    bedrijf: customerCompany,
-                    telefoon: customerPhone,
+                    naam: customerSeed.naam,
+                    bedrijf: customerSeed.bedrijf,
+                    telefoon: customerSeed.telefoon,
                     type: inferTypeFromOrder(order),
                     website: order.title || "-",
                     bedrag: order.amount || 0,
                     status: status,
                     actief: "Ja",
+                    verantwoordelijk: customerSeed.verantwoordelijk,
                     datum: paidDate
                 }));
             });
 
             return sortCustomers(Array.from(seen.values()));
+        }
+
+        function mergeCustomersWithResponsible(customers, orders) {
+            if (!Array.isArray(customers) || !customers.length) return [];
+            if (!Array.isArray(orders) || !orders.length) return sortCustomers(customers);
+
+            const responsibleByCustomerKey = new Map();
+            orders.forEach(function (order) {
+                const customerSeed = buildDerivedCustomerSeedFromOrder(order);
+                const key = buildCustomerIdentityKey(customerSeed);
+                const responsible = parseResponsibleValue(customerSeed.verantwoordelijk);
+                if (!key || !responsible || responsibleByCustomerKey.has(key)) return;
+                responsibleByCustomerKey.set(key, responsible);
+            });
+
+            return sortCustomers(customers.map(function (customer, index) {
+                const normalizedCustomer = normalizeCustomer(customer, "klant-responsible-" + index);
+                const key = buildCustomerIdentityKey(normalizedCustomer);
+                const explicitResponsible = parseResponsibleValue(getResponsibleSourceValue(customer));
+                const matchedResponsible = explicitResponsible || responsibleByCustomerKey.get(key) || normalizedCustomer.verantwoordelijk;
+                if (matchedResponsible === normalizedCustomer.verantwoordelijk) {
+                    return normalizedCustomer;
+                }
+                return {
+                    ...normalizedCustomer,
+                    verantwoordelijk: matchedResponsible
+                };
+            }));
         }
 
         function resolveBootstrapCustomers() {
@@ -1598,6 +1688,7 @@
                     customer.website,
                     customer.type,
                     customer.status,
+                    customer.verantwoordelijk,
                     customer.actief
                 ].join(" ").toLowerCase();
                 return haystack.indexOf(query) !== -1;
@@ -1642,6 +1733,7 @@
                             renderServiceCell(customer, "maintenance"),
                         "</td>",
                         "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
+                        "<td data-label=\"Verantwoordelijk\" class=\"muted-cell\">" + escapeHtml(customer.verantwoordelijk || "Serve") + "</td>",
                         "<td data-label=\"Actief\"><span class=\"active-text " + activeClass + "\">" + escapeHtml(customer.actief || "Ja") + "</span></td>",
                         "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td class=\"cell-actions\" data-label=\"Acties\">",
@@ -1664,6 +1756,7 @@
             nodes.fieldType.value = "Website";
             nodes.fieldStatus.value = "Betaald";
             if (nodes.fieldActive) nodes.fieldActive.value = "Ja";
+            if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Serve";
             nodes.fieldDate.value = "";
             if (nodes.fieldWebsiteAmount) nodes.fieldWebsiteAmount.value = "";
             if (nodes.fieldMaintenanceAmount) nodes.fieldMaintenanceAmount.value = "";
@@ -1704,6 +1797,7 @@
                 }
                 nodes.fieldStatus.value = customer.status;
                 if (nodes.fieldActive) nodes.fieldActive.value = customer.actief || "Ja";
+                if (nodes.fieldResponsible) nodes.fieldResponsible.value = customer.verantwoordelijk || "Serve";
                 nodes.fieldDate.value = customer.datum || "";
                 updateAmountFieldVisibility();
             } else {
@@ -1782,6 +1876,7 @@
                 onderhoudPerMaand: onderhoudPerMaand,
                 status: nodes.fieldStatus.value,
                 actief: nodes.fieldActive ? nodes.fieldActive.value : "Ja",
+                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : "Serve",
                 datum: nodes.fieldDate.value
             });
         }
@@ -1865,10 +1960,25 @@
                 const remoteCustomers = parseCustomers(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
 
                 if (remoteCustomers.length) {
-                    const shouldRerender = customerListsDiffer(remoteCustomers);
-                    state.klanten = remoteCustomers;
+                    let enrichedCustomers = remoteCustomers;
+                    try {
+                        const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
+                        const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
+                        enrichedCustomers = mergeCustomersWithResponsible(remoteCustomers, orders);
+                    } catch (error) {
+                        console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
+                    }
+
+                    const shouldRerender = customerListsDiffer(enrichedCustomers);
+                    state.klanten = enrichedCustomers;
                     if (shouldRerender || !hadBootstrapCustomers) {
                         renderPage();
+                    }
+                    if (serializeCustomerList(remoteCustomers) !== serializeCustomerList(enrichedCustomers)) {
+                        const persistResult = await persistCustomerList(enrichedCustomers);
+                        if (!persistResult.ok) {
+                            console.error("Klant-verantwoordelijke backfill opslaan mislukt:", persistResult.error);
+                        }
                     }
                     setStatusMessage("");
                     return;

@@ -62,3 +62,21 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
     /window\.addEventListener\('keydown', \(event\) => \{[\s\S]*if \(!modalElement\.classList\.contains\('show'\)\) return;[\s\S]*if \(event\.key !== 'Escape'\) return;[\s\S]*if \(!isWorkspaceExitLocked\(\)\) return;[\s\S]*event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(\);[\s\S]*\}, true\);/
   );
 });
+
+test('premium agenda keeps appointment color in sync with existing dossiers', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(
+    pageSource,
+    /async function refreshKnownActiveOrdersIndex\(\) \{[\s\S]*const previousIds = knownActiveOrderIds;[\s\S]*const previousByAppointment = knownActiveOrderByAppointmentId;[\s\S]*const indexChanged = previousIds\.size !== nextIds\.size[\s\S]*renderCalendar\(\);[\s\S]*refreshWorkspacePrimaryButtonLabel\(\);[\s\S]*return \{ ids: nextIds, byAppointment: nextByAppointment \};/s
+  );
+  assert.match(
+    pageSource,
+    /function isAppointmentCompleted\(apt\) \{[\s\S]*if \(Number\(getLinkedOrderIdForAppointment\(apt\) \|\| 0\) > 0\) return true;[\s\S]*\}/s
+  );
+  assert.match(
+    pageSource,
+    /const appointmentClass = isAppointmentCompleted\(apt\)\s*\? 'appointment completed magnetic'\s*: 'appointment meeting magnetic';/
+  );
+});

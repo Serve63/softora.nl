@@ -14,16 +14,28 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /document\.getElementById\('softoraLeadsBootstrap'\)/);
   assert.match(pageSource, /const leadsBootstrapPayload = readLeadsBootstrapPayload\(\);/);
   assert.match(pageSource, /const LEADS_MEMORY_CACHE_MAX_AGE_MS = 1000 \* 60 \* 60 \* 24;/);
+  assert.match(pageSource, /const LEADS_POLL_INTERVAL_MS = 5000;/);
+  assert.match(pageSource, /const LEADS_POST_ACTION_REFRESH_BURST_INTERVAL_MS = 1200;/);
+  assert.match(pageSource, /const LEADS_POST_ACTION_REFRESH_BURST_COUNT = 6;/);
   assert.match(pageSource, /const sharedCallSummaryCacheByCallId = Object\.create\(null\);/);
   assert.match(pageSource, /const leadOverviewCacheState = \{ leads: \[\], savedAt: 0 \};/);
   assert.match(
     pageSource,
-    /function loadCachedLeads\(\) \{[\s\S]*const bootstrapLeads = Array\.isArray\(leadsBootstrapPayload\?\.leads\)/
+    /function loadCachedLeads\(\) \{[\s\S]*let memoryCache = \{[\s\S]*leadOverviewCacheState\.leads/
   );
-  assert.match(pageSource, /if \(memoryCache\.leads\.length > 0 && memoryCache\.savedAt > bootstrapSavedAt\) \{/);
+  assert.doesNotMatch(pageSource, /const bootstrapLeads = Array\.isArray\(leadsBootstrapPayload\?\.leads\)/);
+  assert.doesNotMatch(pageSource, /const bootstrapSavedAt = Date\.parse\(String\(leadsBootstrapPayload\?\.loadedAt \|\| ''\)\.trim\(\)\) \|\| 0;/);
+  assert.doesNotMatch(pageSource, /if \(memoryCache\.leads\.length > 0 && memoryCache\.savedAt > bootstrapSavedAt\) \{/);
+  assert.match(pageSource, /if \(!allLeads\.length\) \{[\s\S]*listEl\.innerHTML = '<div class="lead-empty">Nog geen leads gevonden\.<\/div>';[\s\S]*listEl\.style\.visibility = '';/);
+  assert.match(pageSource, /if \(cachedLeads\.leads\.length > 0\) \{[\s\S]*setStatusLastUpdatedNow\(new Date\(cachedLeads\.savedAt\)\);[\s\S]*\} else \{[\s\S]*setStatus\('Leads laden\.\.\.', ''\);[\s\S]*\}/);
   assert.match(pageSource, /const LEADS_LOAD_RETRY_DELAY_MS = 4000;/);
   assert.match(pageSource, /const MANUAL_LEAD_SUPPRESSION_TTL_MS = 1000 \* 60 \* 2;/);
   assert.match(pageSource, /const SERVER_VISIBLE_LEAD_SUPPRESSION_GRACE_MS = 1000 \* 60 \* 2;/);
+  assert.match(
+    pageSource,
+    /function shouldKeepVisibleLeadsOnTransientEmptySnapshot\(freshRows\) \{[\s\S]*if \(Array\.isArray\(freshRows\) && freshRows\.length > 0\) \{[\s\S]*return false;[\s\S]*if \(Array\.isArray\(freshRows\)\) \{[\s\S]*consecutiveEmptyLeadSnapshots \+= 1;[\s\S]*return false;[\s\S]*\}/
+  );
+  assert.doesNotMatch(pageSource, /Lege live snapshot tijdelijk genegeerd om UI-flicker te voorkomen/);
   assert.match(pageSource, /function persistSuppressedLeadRows\(\) \{[\s\S]*purgeExpiredSuppressedLeadKeys\(\);[\s\S]*JSON\.stringify\(entries\)/);
   assert.match(pageSource, /function hydrateSuppressedLeadRows\(\) \{[\s\S]*suppressedLeadCreatedAtByKey\.clear\(\);[\s\S]*purgeExpiredSuppressedLeadKeys\(\);[\s\S]*persistSuppressedLeadRows\(\);/);
   assert.match(pageSource, /function suppressLeadRowLocally\(item(?:, ttlMs = MANUAL_LEAD_SUPPRESSION_TTL_MS)?\) \{/);
@@ -46,7 +58,15 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   );
   assert.match(
     pageSource,
-    /async function removeLead\(\) \{[\s\S]*let rollbackSnapshot = null;[\s\S]*rollbackSnapshot = buildLeadMutationRollbackSnapshot\(taskId\);[\s\S]*finalizeLeadMutation\(taskId\);[\s\S]*setStatus\('Lead verwijderen\.\.\.', ''\);[\s\S]*await removeLeadRequest\(\);[\s\S]*promoteLeadRowSuppression\(lead\);[\s\S]*removeLeadSucceeded = true;[\s\S]*catch \(error\) \{[\s\S]*rollbackLeadMutation\(rollbackSnapshot\);[\s\S]*setStatus\(`Lead verwijderen mislukt: \$\{String\(error\?\.message \|\| 'onbekende fout'\)\}`, 'error'\);/
+    /\.lead-modal\.dismiss-locked \.lead-modal-close \{[\s\S]*display:\s*none !important;[\s\S]*pointer-events:\s*none;/
+  );
+  assert.match(
+    pageSource,
+    /function syncLeadModalDismissState\(\) \{[\s\S]*modalOverlay\.classList\.toggle\('dismiss-locked', dismissLocked\);[\s\S]*modalContainer\.classList\.toggle\('dismiss-locked', dismissLocked\);[\s\S]*modalCloseBtn\.hidden = dismissLocked;[\s\S]*modalCloseBtn\.style\.display = dismissLocked \? 'none' : '';/
+  );
+  assert.match(
+    pageSource,
+    /async function removeLead\(\) \{[\s\S]*let rollbackSnapshot = null;[\s\S]*setStatus\('Lead verwijderen\.\.\.', ''\);[\s\S]*await removeLeadRequest\(\);[\s\S]*rollbackSnapshot = buildLeadMutationRollbackSnapshot\(taskId\);[\s\S]*finalizeLeadMutation\(taskId\);[\s\S]*promoteLeadRowSuppression\(lead\);[\s\S]*removeLeadSucceeded = true;[\s\S]*closeLeadModal\(\);[\s\S]*catch \(error\) \{[\s\S]*rollbackLeadMutation\(rollbackSnapshot\);[\s\S]*setStatus\(`Lead verwijderen mislukt: \$\{String\(error\?\.message \|\| 'onbekende fout'\)\}`, 'error'\);/
   );
   assert.match(
     pageSource,
@@ -63,12 +83,14 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   );
   assert.match(pageSource, /function isLeadLoadTimeoutError\(error\) \{/);
   assert.match(pageSource, /function scheduleLeadRetry\(delayMs = LEADS_LOAD_RETRY_DELAY_MS\) \{/);
-  assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?quick=1&limit=400', timeoutMs: 7000/);
-  assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?fast=1&limit=400', timeoutMs: 7000/);
-  assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?limit=400', timeoutMs: 12000/);
-  assert.match(pageSource, /\/api\/agenda\/interested-leads\?limit=500', 10000/);
-  assert.match(pageSource, /\/api\/coldcalling\/call-updates\?limit=500', 10000/);
-  assert.match(pageSource, /\/api\/ai\/call-insights\?limit=500', 10000/);
+  assert.match(pageSource, /function clearLeadRefreshBurstTimers\(\) \{/);
+  assert.match(pageSource, /function scheduleLeadRefreshBurst\(\) \{/);
+  assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?fresh=1&quick=1&limit=400', timeoutMs: 7000/);
+  assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?fresh=1&fast=1&limit=400', timeoutMs: 7000/);
+  assert.match(pageSource, /\/api\/agenda\/confirmation-tasks\?fresh=1&limit=400', timeoutMs: 12000/);
+  assert.match(pageSource, /\/api\/agenda\/interested-leads\?fresh=1&limit=500', 10000/);
+  assert.doesNotMatch(pageSource, /\/api\/coldcalling\/call-updates\?limit=500', 10000/);
+  assert.doesNotMatch(pageSource, /\/api\/ai\/call-insights\?limit=500', 10000/);
   assert.match(pageSource, /function leadRowsDiffer\(a, b\)/);
   assert.match(pageSource, /let lastLeadStatusTimestamp = 0;/);
   assert.match(pageSource, /lastLeadStatusTimestamp = safeDate\.getTime\(\);/);
@@ -90,8 +112,10 @@ test('premium leads page bootstraps leads before async refresh starts', () => {
   assert.match(pageSource, /void ensureCallBackedModalCopy\(normalizedTaskId, recoveredLead, effectiveDetail\)\.then\(\(summaryText\) => \{/);
   assert.match(
     pageSource,
-    /if \(allLeads\.length > 0\) \{[\s\S]*console\.warn\('\[softora-leads\] Live refresh overgeslagen; zichtbare leads blijven staan\.', message\);[\s\S]*setStatusLastUpdatedNow\(new Date\(lastLeadStatusTimestamp\)\);/
+    /\.catch\(\(error\) => \{[\s\S]*if \(allLeads\.length > 0\) \{[\s\S]*scheduleLeadRetry\(\);[\s\S]*return;[\s\S]*allLeads = \[\];[\s\S]*renderList\(\);[\s\S]*scheduleLeadRetry\(\);/
   );
+  assert.doesNotMatch(pageSource, /Live refresh overgeslagen; zichtbare leads blijven staan/);
+  assert.match(pageSource, /pollTimer = window\.setInterval\(\(\) => \{[\s\S]*refreshLeadSurfaces\(\);[\s\S]*\}, LEADS_POLL_INTERVAL_MS\);/);
   assert.match(
     pageSource,
     /if \(isLeadLoadTimeoutError\(error\)\) \{[\s\S]*setStatus\('Leads laden duurt langer dan verwacht\. We proberen automatisch opnieuw\.\.\.', ''\);[\s\S]*scheduleLeadRetry\(\);[\s\S]*return;/

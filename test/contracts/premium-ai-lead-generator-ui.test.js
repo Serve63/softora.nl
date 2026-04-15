@@ -11,7 +11,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260415a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260415b" defer><\/script>/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
   assert.match(pageSource, /id="statBooked"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_BOOKED --><\/div>/);
   assert.match(pageSource, /id="statInterested"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_INTERESTED --><\/div>/);
@@ -78,6 +78,38 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /void leadDatabaseModal\.prewarmLeadDatabase\(\);/);
   assert.match(dashboardSource, /function prewarmLeadDatabaseCallDetails\(limit = 1\) \{/);
   assert.match(dashboardSource, /prewarmLeadDatabaseCallDetails\(4\);/);
+  assert.match(
+    dashboardSource,
+    /function syncSequentialClientDispatchButtonState\(\) \{[\s\S]*setButtonLoading\(true, 'Coldcalling bezig\.\.\.'\);[\s\S]*setButtonLoading\(false\);/
+  );
+  assert.match(
+    dashboardSource,
+    /function clearCompletedSequentialClientDispatchUi\(\) \{[\s\S]*setStatusPill\('idle', ''\);[\s\S]*setStatusMessage\('', ''\);/
+  );
+  assert.match(
+    dashboardSource,
+    /function isTerminalCallUpdateForSequentialClient\(update\) \{[\s\S]*const endedAt = String\(update\.endedAt \|\| ''\)\.trim\(\);[\s\S]*if \(endedAt\) return true;/
+  );
+  assert.match(
+    dashboardSource,
+    /setStatusPill\('loading', 'Coldcalling bezig'\);[\s\S]*Wacht tot het huidige gesprek is afgelopen/
+  );
+  assert.match(dashboardSource, /Volgende call wordt voorbereid\.\.\./);
+  assert.match(
+    dashboardSource,
+    /messageType: 'direct\.call\.status',[\s\S]*endedAt: String\(data\.endedAt \|\| ''\)\.trim\(\),[\s\S]*durationSeconds: Number\(data\.durationSeconds \|\| 0\) \|\| 0/
+  );
+  assert.match(
+    dashboardSource,
+    /function setButtonLoading\(isLoading, label = 'Coldcalling bezig\.\.\.'\) \{/
+  );
+  assert.match(dashboardSource, /Bezig met coldcallen via \$\{stackLabel\}\.\.\./);
+  assert.match(
+    dashboardSource,
+    /addUiLog\(\s*'success',[\s\S]*Coldcalling afgerond[\s\S]*activeSequentialClientDispatch = null;[\s\S]*clearCompletedSequentialClientDispatchUi\(\);/
+  );
+  assert.doesNotMatch(dashboardSource, /Campagne wordt gestart via \$\{stackLabel\}\.\.\./);
+  assert.doesNotMatch(dashboardSource, /Campagne starten\.\.\./);
   assert.match(dashboardSource, /looksLikeDirectSpeechConversationSummary/);
   assert.match(dashboardSource, /Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst/);
   assert.match(dashboardSource, /const sharedCallSummaryCacheByCallId = Object\.create\(null\);/);
@@ -161,6 +193,28 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /const activeDotColor = String\([\s\S]*selectedOption\?\.dataset\?\.dotColor[\s\S]*wrapper\.dataset\.dotColor = activeDotColor;/);
   assert.doesNotMatch(dashboardSource, /window\.localStorage/);
   assert.doesNotMatch(dashboardSource, /window\.sessionStorage/);
+});
+
+test('premium ai lead generator includes a live Retell cost counter', () => {
+  const pagePath = path.join(__dirname, '../../premium-ai-lead-generator.html');
+  const costWidgetPath = path.join(__dirname, '../../assets/retell-cost-widget.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const costWidgetSource = fs.readFileSync(costWidgetPath, 'utf8');
+
+  assert.match(pageSource, /<span class="topbar-select-label">Retell kosten<\/span>/);
+  assert.match(pageSource, /<div class="topbar-cost-group" data-retell-cost-root>/);
+  assert.match(pageSource, /<div class="topbar-cost-value" data-retell-cost-value>\$0\.00<\/div>/);
+  assert.match(pageSource, /<div class="topbar-cost-meta" data-retell-cost-meta>Ophalen\.\.\.<\/div>/);
+  assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260415a" defer><\/script>/);
+  assert.match(costWidgetSource, /const CALL_UPDATES_ENDPOINT = '\/api\/coldcalling\/call-updates\?limit=500';/);
+  assert.match(costWidgetSource, /const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0\.07;/);
+  assert.match(costWidgetSource, /currency:\s*'USD'/);
+  assert.match(costWidgetSource, /function buildRetellCostSummary\(updates\)/);
+  assert.match(costWidgetSource, /window\.refreshRetellCostSummary = refreshRetellCostSummary;/);
+  assert.match(
+    costWidgetSource,
+    /window\.setInterval\(function \(\) \{[\s\S]*refreshRetellCostSummary\(\{ silent: true \}\);[\s\S]*\}, POLL_INTERVAL_MS\);/
+  );
 });
 
 test('premium ai lead generator persists dashboard config and stats through Supabase-only flows', () => {

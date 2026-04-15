@@ -50,6 +50,7 @@ test('customers page bootstrap prefers stored customer database rows', async () 
     payload.customers.map((customer) => customer.naam),
     ['Linsey Klaus', 'Maarten Van Gemert']
   );
+  assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
 });
 
@@ -96,6 +97,7 @@ test('customers page bootstrap falls back to deriving customers from active orde
   assert.equal(payload.customers[0].bedrijf, 'Breda');
   assert.equal(payload.customers[0].type, 'Website');
   assert.equal(payload.customers[0].status, 'Betaald');
+  assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
 });
 
 test('customers page bootstrap prefers explicit order customer identity fields when available', async () => {
@@ -143,4 +145,106 @@ test('customers page bootstrap prefers explicit order customer identity fields w
   assert.equal(payload.customers[0].naam, 'Servé Creusen');
   assert.equal(payload.customers[0].bedrijf, 'Softora B.V.');
   assert.equal(payload.customers[0].telefoon, '+31 6 12 34 56 78');
+  assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
+});
+
+test('customers page bootstrap derives verantwoordelijke from active order claim owner', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: '[]',
+          },
+        };
+      }
+
+      if (scope === 'premium_active_orders') {
+        return {
+          values: {
+            softora_custom_orders_premium_v1: JSON.stringify([
+              {
+                id: 31,
+                companyName: 'Alpha B.V.',
+                contactName: 'Iris de Boer',
+                contactPhone: '+31 6 11 22 33 44',
+                title: 'Website opdracht',
+                description: 'Nieuwe website bouwen',
+                amount: 3200,
+                status: 'betaald',
+                paidAt: '2026-04-08T10:00:00.000Z',
+                claimedBy: 'Martijn van de Ven',
+              },
+            ]),
+          },
+        };
+      }
+
+      return null;
+    },
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'orders');
+  assert.equal(payload.customers.length, 1);
+  assert.equal(payload.customers[0].verantwoordelijk, 'Martijn');
+});
+
+test('customers page bootstrap backfills verantwoordelijke for stored rows from matching active orders', async () => {
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => {
+      if (scope === 'premium_customers_database') {
+        return {
+          values: {
+            softora_customers_premium_v1: JSON.stringify([
+              {
+                id: 'klant-11',
+                naam: 'Iris de Boer',
+                bedrijf: 'Alpha B.V.',
+                telefoon: '+31 6 11 22 33 44',
+                type: 'Website',
+                website: 'alpha.nl',
+                bedrag: 3200,
+                status: 'Betaald',
+                actief: 'Ja',
+                datum: '2026-04-08',
+              },
+            ]),
+          },
+        };
+      }
+
+      if (scope === 'premium_active_orders') {
+        return {
+          values: {
+            softora_custom_orders_premium_v1: JSON.stringify([
+              {
+                id: 31,
+                companyName: 'Alpha B.V.',
+                contactName: 'Iris de Boer',
+                contactPhone: '+31 6 11 22 33 44',
+                title: 'Website opdracht',
+                description: 'Nieuwe website bouwen',
+                amount: 3200,
+                status: 'betaald',
+                paidAt: '2026-04-08T10:00:00.000Z',
+                claimedBy: 'Martijn van de Ven',
+              },
+            ]),
+          },
+        };
+      }
+
+      return null;
+    },
+  });
+
+  const payload = await service.buildCustomersBootstrapPayload();
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.source, 'customers');
+  assert.equal(payload.customers.length, 1);
+  assert.equal(payload.customers[0].verantwoordelijk, 'Martijn');
 });

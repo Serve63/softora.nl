@@ -389,6 +389,30 @@ body {
   justify-content: flex-end;
   gap: 8px;
 }
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 28, 0.48);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1210;
+}
+.confirm-modal-overlay.open { display: flex; }
+.confirm-modal {
+  width: min(420px, 100%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  padding: 18px;
+}
+.confirm-modal-text {
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--text-mid);
+}
 .btn-modal {
   padding: 7px 12px;
   border-radius: 4px;
@@ -547,8 +571,18 @@ body {
       </div>
     </div>
     <div class="edit-modal-actions">
-      <button class="btn-modal btn-modal-cancel" type="button" onclick="closeEditModal()">Annuleren</button>
-      <button class="btn-modal btn-modal-save" type="button" onclick="saveEditModal()">Opslaan</button>
+      <button class="btn-modal btn-modal-cancel" id="edit-modal-cancel" type="button">Annuleren</button>
+      <button class="btn-modal btn-modal-save" id="edit-modal-save" type="button">Opslaan</button>
+    </div>
+  </div>
+</div>
+<div class="confirm-modal-overlay" id="delete-modal-overlay" aria-hidden="true">
+  <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+    <div class="edit-modal-title" id="delete-modal-title">Post verwijderen</div>
+    <div class="confirm-modal-text" id="delete-modal-text">Weet je zeker dat je deze post wilt verwijderen?</div>
+    <div class="edit-modal-actions">
+      <button class="btn-modal btn-modal-cancel" id="delete-modal-cancel" type="button">Annuleren</button>
+      <button class="btn-modal btn-modal-save" id="delete-modal-confirm" type="button">Verwijderen</button>
     </div>
   </div>
 </div>
@@ -563,11 +597,29 @@ let data = {
 };
 let nextId = 4;
 let editingContext = null;
+let deletingContext = null;
 
 const freqLabel = { maandelijks:'Maandelijks', jaarlijks:'Jaarlijks', kwartaal:'Per kwartaal' };
 
 function catKey(cat) {
   return String(cat).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function resolveCategoryName(categoryKey) {
+  return Object.keys(data).find((name) => catKey(name) === String(categoryKey || '')) || '';
+}
+
+function getCostItem(cat, id) {
+  return data[cat]?.find((item) => item.id === id) || null;
 }
 
 function toMonthly(item) {
@@ -603,7 +655,7 @@ function render() {
     block.className = 'category';
     block.innerHTML = `
       <div class="category-header">
-        <div class="category-title">${cat}</div>
+        <div class="category-title">${escapeHtml(cat)}</div>
         <div class="category-total">${fmtEur(catTotal)}<span style="font-size:11px;font-weight:400;color:var(--text-light);margin-left:4px">/mnd</span></div>
       </div>
       <div class="cost-row head">
@@ -613,17 +665,17 @@ function render() {
         ${items.map((item) => `
           <div class="cost-row" id="item-${item.id}">
             <div>
-              <div class="cost-name">${item.naam}</div>
-              <div class="cost-note">${item.note}</div>
+              <div class="cost-name">${escapeHtml(item.naam)}</div>
+              <div class="cost-note">${escapeHtml(item.note || '')}</div>
             </div>
-            <div class="cost-freq">${freqLabel[item.freq]}</div>
+            <div class="cost-freq">${escapeHtml(freqLabel[item.freq] || item.freq || '-')}</div>
             <div class="cost-amount-wrap">
               <div class="cost-amount">${fmtEur(item.bedrag)}</div>
               <div class="row-actions">
-                <button class="btn-edit" onclick="editItem(${JSON.stringify(cat)},${item.id})" title="Bewerken">
+                <button class="btn-edit" type="button" data-action="edit" data-cat-key="${escapeHtml(key)}" data-item-id="${item.id}" title="Bewerken">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                 </button>
-                <button class="btn-del" onclick="deleteItem(${JSON.stringify(cat)},${item.id})" title="Verwijderen">
+                <button class="btn-del" type="button" data-action="delete" data-cat-key="${escapeHtml(key)}" data-item-id="${item.id}" title="Verwijderen">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
                 </button>
               </div>
@@ -640,7 +692,7 @@ function render() {
           </select>
           <input type="number" placeholder="Bedrag" step="0.01" min="0" id="new-bedrag-${key}">
         </div>
-        <button class="btn-add" onclick="addItem(${JSON.stringify(cat)})">+ Toevoegen</button>
+        <button class="btn-add" type="button" data-action="add" data-cat-key="${escapeHtml(key)}">+ Toevoegen</button>
       </div>`;
     wrap.appendChild(block);
   });
@@ -660,17 +712,37 @@ function addItem(cat) {
 }
 
 function deleteItem(cat, id) {
-  const item = data[cat]?.find((i) => i.id === id);
+  const item = getCostItem(cat, id);
   if (!item) return;
-  const confirmed = window.confirm(`Weet je zeker dat je "${item.naam}" wilt verwijderen?`);
-  if (!confirmed) return;
+  deletingContext = { cat, id };
+  const overlay = document.getElementById('delete-modal-overlay');
+  document.getElementById('delete-modal-text').textContent =
+    `Weet je zeker dat je "${item.naam}" wilt verwijderen?`;
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.getElementById('delete-modal-confirm').focus();
+}
+
+function closeDeleteModal() {
+  deletingContext = null;
+  const overlay = document.getElementById('delete-modal-overlay');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function confirmDeleteModal() {
+  if (!deletingContext) return;
+  const { cat, id } = deletingContext;
+  const item = getCostItem(cat, id);
+  if (!item) return closeDeleteModal();
   data[cat] = data[cat].filter((i) => i.id !== id);
+  closeDeleteModal();
   render();
   showToast('✓ Post verwijderd');
 }
 
 function editItem(cat, id) {
-  const item = data[cat]?.find((i) => i.id === id);
+  const item = getCostItem(cat, id);
   if (!item) return;
   editingContext = { cat, id };
   document.getElementById('edit-naam').value = item.naam || '';
@@ -693,7 +765,7 @@ function closeEditModal() {
 function saveEditModal() {
   if (!editingContext) return;
   const { cat, id } = editingContext;
-  const item = data[cat]?.find((i) => i.id === id);
+  const item = getCostItem(cat, id);
   if (!item) return closeEditModal();
 
   const nieuweNaam = document.getElementById('edit-naam').value.trim();
@@ -729,11 +801,51 @@ document.getElementById('edit-modal-overlay').addEventListener('click', (event) 
   if (event.target.id === 'edit-modal-overlay') closeEditModal();
 });
 
+document.getElementById('delete-modal-overlay').addEventListener('click', (event) => {
+  if (event.target.id === 'delete-modal-overlay') closeDeleteModal();
+});
+
+document.getElementById('edit-modal-cancel').addEventListener('click', closeEditModal);
+document.getElementById('edit-modal-save').addEventListener('click', saveEditModal);
+document.getElementById('delete-modal-cancel').addEventListener('click', closeDeleteModal);
+document.getElementById('delete-modal-confirm').addEventListener('click', confirmDeleteModal);
+
+document.getElementById('categories-wrap').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-action]');
+  if (!button) return;
+  const action = String(button.dataset.action || '').trim();
+  const cat = resolveCategoryName(button.dataset.catKey);
+  const id = Number(button.dataset.itemId || 0) || 0;
+  if (!cat) return;
+  if (action === 'add') {
+    addItem(cat);
+    return;
+  }
+  if (action === 'edit' && id > 0) {
+    editItem(cat, id);
+    return;
+  }
+  if (action === 'delete' && id > 0) {
+    deleteItem(cat, id);
+  }
+});
+
 document.addEventListener('keydown', (event) => {
-  const overlay = document.getElementById('edit-modal-overlay');
-  if (!overlay.classList.contains('open')) return;
-  if (event.key === 'Escape') closeEditModal();
-  if (event.key === 'Enter') saveEditModal();
+  const editOverlay = document.getElementById('edit-modal-overlay');
+  const deleteOverlay = document.getElementById('delete-modal-overlay');
+  if (event.key === 'Escape') {
+    if (deleteOverlay.classList.contains('open')) closeDeleteModal();
+    if (editOverlay.classList.contains('open')) closeEditModal();
+    return;
+  }
+  if (event.key !== 'Enter') return;
+  if (deleteOverlay.classList.contains('open')) {
+    confirmDeleteModal();
+    return;
+  }
+  if (editOverlay.classList.contains('open')) {
+    saveEditModal();
+  }
 });
 
 render();
