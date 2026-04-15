@@ -1847,10 +1847,7 @@ function toast(msg) {
 
 const CONTENT_LOCK_CODE = 'Andre2Fritz2!';
 const CONTENT_LOCK_STORAGE_KEY = 'cs-auth-premium-seo';
-if (sessionStorage.getItem(CONTENT_LOCK_STORAGE_KEY) === '1') {
-  const existingOverlay = document.getElementById('contentLockOverlay');
-  if (existingOverlay) existingOverlay.style.display = 'none';
-}
+sessionStorage.removeItem(CONTENT_LOCK_STORAGE_KEY);
 
 function unlockSeoContentArea() {
   const input = document.getElementById('contentLockInput');
