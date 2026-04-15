@@ -2276,7 +2276,8 @@
         initCustomFormSelects();
 
         const CONTENT_LOCK_CODE = 'Andre2Fritz2!';
-        if (sessionStorage.getItem('cs-auth') === '1') {
+        const CONTENT_LOCK_STORAGE_KEY = 'cs-auth-premium-bevestigingsmails';
+        if (sessionStorage.getItem(CONTENT_LOCK_STORAGE_KEY) === '1') {
             const existingOverlay = document.getElementById('contentLockOverlay');
             if (existingOverlay) existingOverlay.style.display = 'none';
         }
@@ -2288,7 +2289,7 @@
             if (!input || !error || !overlay) return;
 
             if (input.value === CONTENT_LOCK_CODE) {
-                sessionStorage.setItem('cs-auth', '1');
+                sessionStorage.setItem(CONTENT_LOCK_STORAGE_KEY, '1');
                 overlay.style.display = 'none';
                 return;
             }
