@@ -29,9 +29,9 @@ test('premium bevestigingsmails shows the shared Retell cost counter without loa
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /<span class="topbar-select-label">Retell kosten<\/span>/);
+  assert.match(pageSource, /<span class="topbar-select-label">Totale kosten coldcalling<\/span>/);
   assert.match(pageSource, /<div class="topbar-cost-group" data-retell-cost-root>/);
-  assert.match(pageSource, /<div class="topbar-cost-value" data-retell-cost-value>\$0\.00<\/div>/);
+  assert.match(pageSource, /<div class="topbar-cost-value" data-retell-cost-value>€0,00<\/div>/);
   assert.match(pageSource, /<div class="topbar-cost-meta" data-retell-cost-meta>Ophalen\.\.\.<\/div>/);
   assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260415a" defer><\/script>/);
   assert.doesNotMatch(pageSource, /<script[^>]+src=["']assets\/coldcalling-dashboard\.js[^"']*["'][^>]*>/);

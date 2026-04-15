@@ -421,19 +421,20 @@
             flex-direction: column;
             align-items: center;
             gap: 0.28rem;
+            min-width: 15.5rem;
         }
 
         .topbar-cost-card {
-            width: 13.4rem;
-            min-width: 13.4rem;
-            max-width: 13.4rem;
-            min-height: 2.2rem;
-            padding: 0.49rem 0.85rem;
-            border: 1px solid var(--border);
+            width: 15.5rem;
+            min-width: 15.5rem;
+            max-width: 15.5rem;
+            min-height: auto;
+            padding: 0;
+            border: none;
             background: transparent;
             display: flex;
             align-items: center;
-            justify-content: flex-start;
+            justify-content: center;
         }
 
         .topbar-cost-stack {
@@ -485,6 +486,11 @@
             line-height: 1;
             color: var(--text-tertiary);
             white-space: nowrap;
+        }
+
+        .topbar-cost-group .topbar-select-label {
+            font-size: 0.5rem;
+            letter-spacing: 0.14em;
         }
 
         .topbar-left h1 {
@@ -1903,12 +1909,12 @@
                         </select>
                     </div>
                     <div class="topbar-cost-group" data-retell-cost-root>
-                        <span class="topbar-select-label">Retell kosten</span>
+                        <span class="topbar-select-label">Totale kosten coldcalling</span>
                         <div class="topbar-cost-card" data-state="loading" aria-live="polite">
                             <div class="topbar-cost-stack">
                                 <span class="topbar-cost-dot" aria-hidden="true"></span>
                                 <div class="topbar-cost-copy">
-                                    <div class="topbar-cost-value" data-retell-cost-value>$0.00</div>
+                                    <div class="topbar-cost-value" data-retell-cost-value>€0,00</div>
                                     <div class="topbar-cost-meta" data-retell-cost-meta>Ophalen...</div>
                                 </div>
                             </div>
