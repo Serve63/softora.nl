@@ -59,7 +59,6 @@
     '  <div class="coming-soon-lock-actions">',
     '    <a class="coming-soon-lock-btn coming-soon-lock-btn-primary" href="/">Terug naar home</a>',
     '    <button type="button" class="coming-soon-lock-btn coming-soon-lock-btn-secondary" data-unlock-soon>Ontgrendelen</button>',
-    '    <a class="coming-soon-lock-btn coming-soon-lock-btn-secondary" href="mailto:info@softora.nl">Contact</a>',
     "  </div>",
     "</div>"
   ].join("");
