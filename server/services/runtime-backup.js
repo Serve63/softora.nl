@@ -69,6 +69,7 @@ function createRuntimeBackupCoordinator(deps = {}) {
     generatedAgendaAppointments = [],
     dismissedInterestedLeadCallIds = new Set(),
     dismissedInterestedLeadKeys = new Set(),
+    dismissedInterestedLeadKeyUpdatedAtMsByKey = new Map(),
     leadOwnerAssignmentsByCallId = new Map(),
     getNextLeadOwnerRotationIndex = () => 0,
     getNextGeneratedAgendaAppointmentId = () => 100000,
@@ -394,6 +395,15 @@ function createRuntimeBackupCoordinator(deps = {}) {
         .slice(0, maxDismissedLeadKeys)
         .map((item) => normalizeString(item))
         .filter(Boolean),
+      dismissedInterestedLeadKeyUpdatedAtMsByKey: Object.fromEntries(
+        Array.from(dismissedInterestedLeadKeyUpdatedAtMsByKey.entries())
+          .slice(0, maxDismissedLeadKeys)
+          .map(([leadKey, updatedAtMs]) => [
+            normalizeString(leadKey),
+            Number(updatedAtMs || 0) || 0,
+          ])
+          .filter(([leadKey, updatedAtMs]) => leadKey && Number.isFinite(updatedAtMs) && updatedAtMs > 0)
+      ),
       leadOwnerAssignments: Array.from(leadOwnerAssignmentsByCallId.entries())
         .slice(0, maxLeadOwnerAssignments)
         .map(([callId, owner]) => ({

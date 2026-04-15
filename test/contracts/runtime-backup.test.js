@@ -33,6 +33,9 @@ test('runtime backup coordinator builds compact snapshot payloads with stable li
   const leadOwnerAssignmentsByCallId = new Map([
     ['call-1', { key: 'owner-1', name: 'Servé' }],
   ]);
+  const dismissedInterestedLeadKeyUpdatedAtMsByKey = new Map([
+    ['lead-1', Date.parse('2026-04-15T15:00:00.000Z')],
+  ]);
   const coordinator = createRuntimeBackupCoordinator({
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength),
@@ -105,6 +108,7 @@ test('runtime backup coordinator builds compact snapshot payloads with stable li
     ],
     dismissedInterestedLeadCallIds: new Set(['call-1']),
     dismissedInterestedLeadKeys: new Set(['lead-1']),
+    dismissedInterestedLeadKeyUpdatedAtMsByKey,
     leadOwnerAssignmentsByCallId,
     getNextLeadOwnerRotationIndex: () => 3,
     getNextGeneratedAgendaAppointmentId: () => 120000,
@@ -130,6 +134,10 @@ test('runtime backup coordinator builds compact snapshot payloads with stable li
   assert.equal(snapshot.recentCallUpdates.length, 1);
   assert.equal(snapshot.recentCallUpdates[0].summary.length, 1400);
   assert.equal(snapshot.generatedAgendaAppointments[0].durationSeconds, 95);
+  assert.equal(
+    snapshot.dismissedInterestedLeadKeyUpdatedAtMsByKey['lead-1'],
+    Date.parse('2026-04-15T15:00:00.000Z')
+  );
   assert.equal(snapshot.leadOwnerAssignments[0].owner.key, 'owner-1');
   assert.equal(snapshot.nextLeadOwnerRotationIndex, 3);
   assert.equal(snapshot.nextGeneratedAgendaAppointmentId, 120000);

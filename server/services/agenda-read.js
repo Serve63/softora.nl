@@ -51,8 +51,11 @@ function createAgendaReadCoordinator(deps) {
 
   async function prepareConfirmationTasks(options = {}) {
     const quickMode = Boolean(options.quickMode);
+    const freshSharedState = Boolean(options.freshSharedState);
     await ensureHydratedIfNeeded();
-    await deps.syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: deps.runtimeSyncCooldownMs });
+    await deps.syncRuntimeStateFromSupabaseIfNewer({
+      maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
+    });
     if (!quickMode && deps.isImapMailConfigured()) {
       await deps.syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
     }
@@ -66,9 +69,12 @@ function createAgendaReadCoordinator(deps) {
     }
   }
 
-  async function prepareInterestedLeads() {
+  async function prepareInterestedLeads(options = {}) {
+    const freshSharedState = Boolean(options.freshSharedState);
     await ensureHydratedIfNeeded();
-    await deps.syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: deps.runtimeSyncCooldownMs });
+    await deps.syncRuntimeStateFromSupabaseIfNewer({
+      maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
+    });
     deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
   }
 
@@ -94,7 +100,7 @@ function createAgendaReadCoordinator(deps) {
     const countOnly = Boolean(options.countOnly);
     const limit = Math.max(1, Math.min(1000, Number(options.limit) || 100));
 
-    await prepareConfirmationTasks({ quickMode });
+    await prepareConfirmationTasks({ quickMode, freshSharedState: Boolean(options.freshSharedState) });
 
     const tasks = deps
       .getGeneratedAgendaAppointments()
@@ -107,7 +113,6 @@ function createAgendaReadCoordinator(deps) {
       .map(deps.mapAppointmentToConfirmationTask)
       .filter(Boolean)
       .filter((task) => {
-        if (task.type !== 'lead_follow_up') return true;
         if (typeof deps.isInterestedLeadDismissedForRow !== 'function') return true;
         const callId = deps.normalizeString(task?.callId || '');
         return !deps.isInterestedLeadDismissedForRow(callId, task);
@@ -136,7 +141,7 @@ function createAgendaReadCoordinator(deps) {
     const countOnly = Boolean(options.countOnly);
     const limit = Math.max(1, Math.min(1000, Number(options.limit) || 100));
 
-    await prepareInterestedLeads();
+    await prepareInterestedLeads({ freshSharedState: Boolean(options.freshSharedState) });
     const interestedLeads = deps.buildAllInterestedLeadRows();
 
     if (countOnly) {

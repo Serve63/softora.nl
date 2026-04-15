@@ -1,3 +1,10 @@
+const {
+  buildLeadTraceContext,
+  hasLeadTraceContext,
+  logLeadTrace,
+  summarizeLeadRow,
+} = require('./lead-trace');
+
 function createAgendaInterestedLeadsCoordinator(deps = {}) {
   const {
     isSupabaseConfigured = () => false,
@@ -16,6 +23,9 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     getGeneratedAppointmentIndexById = () => -1,
     getGeneratedAgendaAppointments = () => [],
     findInterestedLeadRowByCallId = () => null,
+    buildAllInterestedLeadRows = () => [],
+    buildLeadFollowUpCandidateKey = () => '',
+    collectInterestedLeadCallIdsByIdentity = () => [],
     getLatestCallUpdateByCallId = () => null,
     aiCallInsightsByCallId = new Map(),
     buildGeneratedLeadFollowUpFromCall = () => null,
@@ -34,6 +44,7 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     buildLeadToAgendaSummary = async (summary = '') => normalizeString(summary),
     setGeneratedAgendaAppointmentAtIndex = () => null,
     dismissInterestedLeadIdentity = () => {},
+    persistDismissedLeadsToSupabase = async () => false,
     appendDashboardActivity = () => {},
     cancelOpenLeadFollowUpTasksByIdentity = () => [],
     buildRuntimeStateSnapshotPayload = () => null,
@@ -54,6 +65,20 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     const idx = getGeneratedAppointmentIndexById(id);
     if (idx < 0) return null;
     return getGeneratedAgendaAppointments()[idx] || null;
+  }
+
+  function hasVisibleInterestedLeadIdentity(callId, rowLike) {
+    const normalizedCallId = normalizeString(callId || '');
+    const normalizedLeadKey = normalizeString(buildLeadFollowUpCandidateKey(rowLike || {}));
+    if (!normalizedCallId && !normalizedLeadKey) return false;
+
+    return buildAllInterestedLeadRows().some((row) => {
+      const rowCallId = normalizeString(row?.callId || '');
+      const rowLeadKey = normalizeString(buildLeadFollowUpCandidateKey(row || {}));
+      if (normalizedCallId && rowCallId && rowCallId === normalizedCallId) return true;
+      if (normalizedLeadKey && rowLeadKey && rowLeadKey === normalizedLeadKey) return true;
+      return false;
+    });
   }
 
   function doesAgendaMutationMatchAppointment(expected, candidate) {
@@ -511,17 +536,34 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
     }
 
+    const trace = buildLeadTraceContext(req);
     const leadRow = findInterestedLeadRowByCallId(callId);
+    const leadIdentity = leadRow || getLatestCallUpdateByCallId(callId) || {};
+    const relatedCallIds = collectInterestedLeadCallIdsByIdentity(callId, leadIdentity);
     const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
     const runtimeSnapshot = takeRuntimeMutationSnapshot();
+    if (hasLeadTraceContext(trace)) {
+      logLeadTrace('dismiss', 'request', {
+        traceId: trace.traceId,
+        trigger: trace.trigger,
+        callId,
+        actor,
+        leadRow: summarizeLeadRow(leadRow),
+        leadIdentity: summarizeLeadRow(leadIdentity),
+        relatedCallIds,
+      });
+    }
     dismissInterestedLeadIdentity(
       callId,
-      leadRow || getLatestCallUpdateByCallId(callId) || {},
-      'interested_lead_dismissed_manual'
+      leadIdentity,
+      'interested_lead_dismissed_manual',
+      {
+        relatedCallIds,
+      }
     );
     const cancelledTasks = cancelOpenLeadFollowUpTasksByIdentity(
       callId,
-      leadRow || getLatestCallUpdateByCallId(callId) || {},
+      leadIdentity,
       actor,
       'interested_lead_dismissed_manual_cancel'
     );
@@ -540,22 +582,51 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       'dashboard_activity_interested_lead_removed'
     );
 
-    const persistOk = await ensureLeadMutationPersistedOrRespond(
-      res,
-      runtimeSnapshot,
-      'Leadverwijdering kon niet veilig in gedeelde opslag worden opgeslagen.',
-      {
-        allowPendingResponse: true,
-        pendingResponseAfterMs: 3000,
-        verifyPersisted: () => !findInterestedLeadRowByCallId(callId),
-      }
-    );
+    const locallyHiddenAfterDismiss = !hasVisibleInterestedLeadIdentity(callId, leadIdentity);
+    const dedicatedDismissedPersistOk = isSupabaseConfigured()
+      ? await persistDismissedLeadsToSupabase('interested_lead_dismissed_manual_route_confirm').catch(() => false)
+      : false;
+
+    if (hasLeadTraceContext(trace)) {
+      logLeadTrace('dismiss', 'checkpoint', {
+        traceId: trace.traceId,
+        trigger: trace.trigger,
+        callId,
+        locallyHiddenAfterDismiss,
+        dedicatedDismissedPersistOk,
+      });
+    }
+
+    let persistOk = false;
+    if (isSupabaseConfigured() && dedicatedDismissedPersistOk && locallyHiddenAfterDismiss) {
+      invalidateSupabaseSyncTimestamp();
+      persistOk = true;
+    } else {
+      persistOk = await ensureLeadMutationPersistedOrRespond(
+        res,
+        runtimeSnapshot,
+        'Leadverwijdering kon niet veilig in gedeelde opslag worden bevestigd.',
+        {
+          verifyPersisted: () => !hasVisibleInterestedLeadIdentity(callId, leadIdentity),
+        }
+      );
+    }
     if (!persistOk) return res;
 
-    return res.status(persistOk === 'pending' ? 202 : 200).json({
+    if (hasLeadTraceContext(trace)) {
+      logLeadTrace('dismiss', 'response', {
+        traceId: trace.traceId,
+        trigger: trace.trigger,
+        callId,
+        cancelledTasks,
+        stillVisibleAfterPersist: hasVisibleInterestedLeadIdentity(callId, leadIdentity),
+      });
+    }
+
+    return res.status(200).json({
       ok: true,
       dismissed: true,
-      persistencePending: persistOk === 'pending',
+      persistencePending: false,
       callId,
       cancelledTasks,
     });

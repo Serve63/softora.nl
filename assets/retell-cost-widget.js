@@ -5,6 +5,7 @@
   const CALL_UPDATES_ENDPOINT = '/api/coldcalling/call-updates?limit=500';
   const POLL_INTERVAL_MS = 15000;
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
+  const DEFAULT_USD_TO_EUR_RATE = 0.92;
 
   let refreshPromise = null;
   let pollTimer = null;
@@ -32,6 +33,15 @@
     return Number.isFinite(override) && override > 0
       ? override
       : DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD;
+  }
+
+  function getUsdToEurRate() {
+    const override = Number(window.SOFTORA_RETELL_USD_TO_EUR_RATE);
+    return Number.isFinite(override) && override > 0 ? override : DEFAULT_USD_TO_EUR_RATE;
+  }
+
+  function convertUsdToEur(amountUsd) {
+    return Math.max(0, Number(amountUsd) || 0) * getUsdToEurRate();
   }
 
   function getOccurredAtMs(item) {
@@ -137,18 +147,16 @@
     return {
       callCount,
       totalDurationSeconds,
-      costUsd: (totalDurationSeconds / 60) * getRetellEstimatedCostPerMinuteUsd(),
+      costEur: convertUsdToEur((totalDurationSeconds / 60) * getRetellEstimatedCostPerMinuteUsd()),
     };
   }
 
-  function formatUsdCost(amount) {
+  function formatEurCost(amount) {
     const safeAmount = Number.isFinite(Number(amount)) ? Number(amount) : 0;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    return `€${safeAmount.toLocaleString('nl-NL', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(safeAmount);
+    })}`;
   }
 
   function formatDuration(totalSeconds) {
@@ -174,7 +182,7 @@
     }
 
     if (Number(summary.callCount || 0) <= 0) {
-      return 'Nog geen calls';
+      return 'Nog geen gesprekken';
     }
 
     const callLabel = Number(summary.callCount || 0) === 1 ? '1 gesprek' : `${Number(summary.callCount || 0)} gesprekken`;
@@ -194,7 +202,7 @@
         card.dataset.state = normalizeString(state) || 'ready';
       }
       if (valueEl) {
-        valueEl.textContent = formatUsdCost(summary && summary.costUsd);
+        valueEl.textContent = formatEurCost(summary && summary.costEur);
       }
       if (metaEl) {
         metaEl.textContent = formatMetaText(summary, fallbackText);
@@ -211,7 +219,7 @@
       return {};
     });
     if (!response.ok || !data || data.ok !== true || !Array.isArray(data.updates)) {
-      throw new Error(String((data && (data.error || data.detail)) || 'Retell kosten konden niet geladen worden.'));
+      throw new Error(String((data && (data.error || data.detail)) || 'Coldcalling-kosten konden niet geladen worden.'));
     }
     return data.updates;
   }
@@ -226,7 +234,7 @@
     }
 
     if (!silent && !lastSummary) {
-      renderSummary({ costUsd: 0, callCount: 0, totalDurationSeconds: 0 }, 'loading', 'Ophalen...');
+      renderSummary({ costEur: 0, callCount: 0, totalDurationSeconds: 0 }, 'loading', 'Ophalen...');
     }
 
     refreshPromise = (async function () {
@@ -239,14 +247,14 @@
       } catch (error) {
         if (!lastSummary) {
           renderSummary(
-            { costUsd: 0, callCount: 0, totalDurationSeconds: 0 },
+            { costEur: 0, callCount: 0, totalDurationSeconds: 0 },
             'error',
             normalizeString(error && error.message) || 'Niet beschikbaar'
           );
         }
         return {
           ok: false,
-          error: normalizeString(error && error.message) || 'Retell kosten konden niet geladen worden.',
+          error: normalizeString(error && error.message) || 'Coldcalling-kosten konden niet geladen worden.',
         };
       } finally {
         refreshPromise = null;

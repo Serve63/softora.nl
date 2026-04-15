@@ -46,6 +46,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     agendaAppointmentIdByCallId = new Map(),
     dismissedInterestedLeadCallIds = new Set(),
     dismissedInterestedLeadKeys = new Set(),
+    dismissedInterestedLeadKeyUpdatedAtMsByKey = new Map(),
     leadOwnerAssignmentsByCallId = new Map(),
     upsertRecentCallUpdate = () => null,
     logger = console,
@@ -303,6 +304,21 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     )
       .map((item) => normalizeString(item))
       .filter(Boolean);
+    const localDismissedLeadKeyUpdatedAtMsByKey =
+      safeLocal.dismissedInterestedLeadKeyUpdatedAtMsByKey &&
+      typeof safeLocal.dismissedInterestedLeadKeyUpdatedAtMsByKey === 'object'
+        ? safeLocal.dismissedInterestedLeadKeyUpdatedAtMsByKey
+        : safeLocal.dismissedLeadKeyUpdatedAtMsByKey && typeof safeLocal.dismissedLeadKeyUpdatedAtMsByKey === 'object'
+          ? safeLocal.dismissedLeadKeyUpdatedAtMsByKey
+          : {};
+    const remoteDismissedLeadKeyUpdatedAtMsByKey =
+      safeRemote.dismissedInterestedLeadKeyUpdatedAtMsByKey &&
+      typeof safeRemote.dismissedInterestedLeadKeyUpdatedAtMsByKey === 'object'
+        ? safeRemote.dismissedInterestedLeadKeyUpdatedAtMsByKey
+        : safeRemote.dismissedLeadKeyUpdatedAtMsByKey &&
+            typeof safeRemote.dismissedLeadKeyUpdatedAtMsByKey === 'object'
+          ? safeRemote.dismissedLeadKeyUpdatedAtMsByKey
+          : {};
 
     const leadOwnerAssignments = mergeRuntimeSnapshotArraysByKey(
       localLeadOwnerAssignments,
@@ -360,6 +376,16 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     const mergedDismissedLeadKeys = Array.from(
       new Set([...remoteDismissedLeadKeys, ...localDismissedLeadKeys].filter(Boolean))
     ).slice(0, 2000);
+    const mergedDismissedLeadKeyUpdatedAtMsByKey = Object.fromEntries(
+      mergedDismissedLeadKeys
+        .map((leadKey) => {
+          const localMs = Number(localDismissedLeadKeyUpdatedAtMsByKey?.[leadKey] || 0);
+          const remoteMs = Number(remoteDismissedLeadKeyUpdatedAtMsByKey?.[leadKey] || 0);
+          const nextMs = Math.max(localMs, remoteMs);
+          return [leadKey, Number.isFinite(nextMs) && nextMs > 0 ? Math.round(nextMs) : 0];
+        })
+        .filter(([, updatedAtMs]) => Number.isFinite(updatedAtMs) && updatedAtMs > 0)
+    );
 
     return {
       version: Math.max(Number(safeLocal.version || 0), Number(safeRemote.version || 0), 5),
@@ -372,6 +398,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       generatedAgendaAppointments: mergedAppointments,
       dismissedInterestedLeadCallIds: mergedDismissedCallIds,
       dismissedInterestedLeadKeys: mergedDismissedLeadKeys,
+      dismissedInterestedLeadKeyUpdatedAtMsByKey: mergedDismissedLeadKeyUpdatedAtMsByKey,
       leadOwnerAssignments,
       nextLeadOwnerRotationIndex: Math.max(
         0,
@@ -456,6 +483,12 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     const nextDismissedInterestedLeadKeys = Array.isArray(payload.dismissedInterestedLeadKeys)
       ? payload.dismissedInterestedLeadKeys.slice(0, 2000)
       : [];
+    const defaultDismissedLeadKeyUpdatedAtMs = resolveRuntimeStateVersionMs(options?.updatedAt || '', payload);
+    const rawDismissedLeadKeyUpdatedAtMsByKey =
+      payload.dismissedInterestedLeadKeyUpdatedAtMsByKey &&
+      typeof payload.dismissedInterestedLeadKeyUpdatedAtMsByKey === 'object'
+        ? payload.dismissedInterestedLeadKeyUpdatedAtMsByKey
+        : {};
     const nextLeadOwnerAssignments = Array.isArray(payload.leadOwnerAssignments)
       ? payload.leadOwnerAssignments.slice(0, 5000)
       : [];
@@ -492,6 +525,13 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     nextDismissedInterestedLeadKeys.forEach((item) => {
       const leadKey = normalizeString(item);
       if (leadKey) dismissedInterestedLeadKeys.add(leadKey);
+      const updatedAtMs = Number(rawDismissedLeadKeyUpdatedAtMsByKey?.[leadKey] || defaultDismissedLeadKeyUpdatedAtMs || 0);
+      if (leadKey && Number.isFinite(updatedAtMs) && updatedAtMs > 0) {
+        const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(leadKey) || 0);
+        if (updatedAtMs >= currentMs) {
+          dismissedInterestedLeadKeyUpdatedAtMsByKey.set(leadKey, Math.round(updatedAtMs));
+        }
+      }
     });
     if (dismissedInterestedLeadCallIds.size > 1000) {
       const excess = Array.from(dismissedInterestedLeadCallIds).slice(0, dismissedInterestedLeadCallIds.size - 1000);
@@ -499,7 +539,10 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     }
     if (dismissedInterestedLeadKeys.size > 2000) {
       const excess = Array.from(dismissedInterestedLeadKeys).slice(0, dismissedInterestedLeadKeys.size - 2000);
-      excess.forEach((key) => dismissedInterestedLeadKeys.delete(key));
+      excess.forEach((key) => {
+        dismissedInterestedLeadKeys.delete(key);
+        dismissedInterestedLeadKeyUpdatedAtMsByKey.delete(key);
+      });
     }
     leadOwnerAssignmentsByCallId.clear();
     nextLeadOwnerAssignments.forEach((item) => {
@@ -1079,6 +1122,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     if (!row || !row.payload || typeof row.payload !== 'object') {
       runtimeState.supabaseStateHydrated = true;
       runtimeState.supabaseLastHydrateError = '';
+      await hydrateDismissedLeadsFromSupabase();
       return false;
     }
 
@@ -1095,11 +1139,13 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
 
     if (!shouldApply) {
       await syncCallUpdatesFromSupabaseRows({ force, maxAgeMs });
+      await hydrateDismissedLeadsFromSupabase();
       return false;
     }
 
     const applied = applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
     await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
+    await hydrateDismissedLeadsFromSupabase();
     return applied;
   }
 
@@ -1112,12 +1158,21 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return false;
     const callIds = Array.from(dismissedInterestedLeadCallIds).filter(Boolean).slice(0, 1000);
     const leadKeys = Array.from(dismissedInterestedLeadKeys).filter(Boolean).slice(0, 2000);
+    const leadKeyUpdatedAtMsByKey = Object.fromEntries(
+      leadKeys
+        .map((leadKey) => {
+          const updatedAtMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(leadKey) || 0);
+          return [leadKey, Number.isFinite(updatedAtMs) && updatedAtMs > 0 ? Math.round(updatedAtMs) : 0];
+        })
+        .filter(([, updatedAtMs]) => Number.isFinite(updatedAtMs) && updatedAtMs > 0)
+    );
     if (!callIds.length && !leadKeys.length) return true;
     try {
+      const updatedAt = new Date().toISOString();
       const result = await upsertSupabaseRowViaRest({
         state_key: supabaseDismissedLeadsStateKey,
-        payload: { callIds, leadKeys, updatedAt: new Date().toISOString(), reason },
-        updated_at: new Date().toISOString(),
+        payload: { callIds, leadKeys, leadKeyUpdatedAtMsByKey, updatedAt, reason },
+        updated_at: updatedAt,
       });
       return Boolean(result?.ok);
     } catch (error) {
@@ -1135,6 +1190,12 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       if (!row?.payload || typeof row.payload !== 'object') return false;
       const callIds = Array.isArray(row.payload.callIds) ? row.payload.callIds : [];
       const leadKeys = Array.isArray(row.payload.leadKeys) ? row.payload.leadKeys : [];
+      const fallbackUpdatedAtMs =
+        Date.parse(normalizeString(row?.payload?.updatedAt || row?.updated_at || row?.updatedAt || '')) || 0;
+      const leadKeyUpdatedAtMsByKey =
+        row.payload.leadKeyUpdatedAtMsByKey && typeof row.payload.leadKeyUpdatedAtMsByKey === 'object'
+          ? row.payload.leadKeyUpdatedAtMsByKey
+          : {};
       callIds.forEach((item) => {
         const callId = normalizeString(item);
         if (callId) dismissedInterestedLeadCallIds.add(callId);
@@ -1142,6 +1203,13 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       leadKeys.forEach((item) => {
         const leadKey = normalizeString(item);
         if (leadKey) dismissedInterestedLeadKeys.add(leadKey);
+        const updatedAtMs = Number(leadKeyUpdatedAtMsByKey?.[leadKey] || fallbackUpdatedAtMs || 0);
+        if (leadKey && Number.isFinite(updatedAtMs) && updatedAtMs > 0) {
+          const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(leadKey) || 0);
+          if (updatedAtMs >= currentMs) {
+            dismissedInterestedLeadKeyUpdatedAtMsByKey.set(leadKey, Math.round(updatedAtMs));
+          }
+        }
       });
       return true;
     } catch (error) {

@@ -304,6 +304,7 @@ const generatedAgendaAppointments = [];
 const agendaAppointmentIdByCallId = new Map();
 const dismissedInterestedLeadCallIds = new Set();
 const dismissedInterestedLeadKeys = new Set();
+const dismissedInterestedLeadKeyUpdatedAtMsByKey = new Map();
 const leadOwnerAssignmentsByCallId = new Map();
 let nextLeadOwnerRotationIndex = 0;
 let nextGeneratedAgendaAppointmentId = 100000;
@@ -1182,6 +1183,7 @@ const runtimeBackupCoordinator = createRuntimeBackupCoordinator({
   generatedAgendaAppointments,
   dismissedInterestedLeadCallIds,
   dismissedInterestedLeadKeys,
+  dismissedInterestedLeadKeyUpdatedAtMsByKey,
   leadOwnerAssignmentsByCallId,
   getNextLeadOwnerRotationIndex: () => nextLeadOwnerRotationIndex,
   getNextGeneratedAgendaAppointmentId: () => nextGeneratedAgendaAppointmentId,
@@ -1251,6 +1253,7 @@ const runtimeStateSyncCoordinator = createRuntimeStateSyncCoordinator({
   agendaAppointmentIdByCallId,
   dismissedInterestedLeadCallIds,
   dismissedInterestedLeadKeys,
+  dismissedInterestedLeadKeyUpdatedAtMsByKey,
   leadOwnerAssignmentsByCallId,
   upsertRecentCallUpdate,
   logger: console,
@@ -6711,6 +6714,7 @@ async function syncConfirmationMailResponse(req, res) {
 agendaInterestedLeadStateService = createAgendaInterestedLeadStateService({
   dismissedInterestedLeadCallIds,
   dismissedInterestedLeadKeys,
+  dismissedInterestedLeadKeyUpdatedAtMsByKey,
   normalizeString,
   buildLeadFollowUpCandidateKey: (...args) =>
     agendaInterestedLeadReadService?.buildLeadFollowUpCandidateKey(...args) || '',
@@ -6756,6 +6760,7 @@ agendaInterestedLeadReadService = createAgendaInterestedLeadReadService({
 
 const {
   buildAllInterestedLeadRows,
+  collectInterestedLeadCallIdsByIdentity,
   buildLatestInterestedLeadRowsByKey,
   buildLeadFollowUpCandidateKey,
   findInterestedLeadRowByCallId,
@@ -6822,6 +6827,9 @@ const agendaInterestedLeadsCoordinator = createAgendaInterestedLeadsCoordinator(
   getGeneratedAppointmentIndexById,
   getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
   findInterestedLeadRowByCallId,
+  buildAllInterestedLeadRows,
+  buildLeadFollowUpCandidateKey,
+  collectInterestedLeadCallIdsByIdentity,
   getLatestCallUpdateByCallId,
   aiCallInsightsByCallId,
   buildGeneratedLeadFollowUpFromCall,
@@ -6839,6 +6847,7 @@ const agendaInterestedLeadsCoordinator = createAgendaInterestedLeadsCoordinator(
   buildLeadToAgendaSummary,
   setGeneratedAgendaAppointmentAtIndex,
   dismissInterestedLeadIdentity,
+  persistDismissedLeadsToSupabase,
   appendDashboardActivity,
   cancelOpenLeadFollowUpTasksByIdentity,
   buildRuntimeStateSnapshotPayload,
@@ -6997,6 +7006,9 @@ const customersPageBootstrapService = createCustomersPageBootstrapService({
 
 const leadsPageBootstrapService = createLeadsPageBootstrapService({
   agendaReadCoordinator,
+  isSupabaseConfigured,
+  getSupabaseStateHydrated: () => supabaseStateHydrated,
+  forceHydrateRuntimeStateWithRetries,
   getUiStateValues,
   normalizeString,
   leadDatabaseUiScope: 'coldcalling',

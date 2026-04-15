@@ -242,6 +242,54 @@ test('agenda interested lead read service still shows a newer call when only an 
   assert.equal(rows[0].callId, 'call-fresh');
 });
 
+test('agenda interested lead read service collects all related call ids for one reusable lead identity', () => {
+  const service = createServiceFixture({
+    generatedAgendaAppointments: [
+      {
+        id: 41,
+        confirmationTaskType: 'lead_follow_up',
+        callId: 'call-appointment',
+        company: 'Softora',
+        contact: 'Serve Creusen',
+        phone: '0612345678',
+      },
+    ],
+    recentCallUpdates: [
+      {
+        callId: 'call-update',
+        company: 'Softora',
+        name: 'Serve Creusen',
+        phone: '0612345678',
+        updatedAt: '2026-04-08T12:00:00.000Z',
+      },
+      {
+        callId: 'call-other',
+        company: 'Andere Lead',
+        name: 'Test',
+        phone: '0611111111',
+        updatedAt: '2026-04-08T12:05:00.000Z',
+      },
+    ],
+    recentAiCallInsights: [
+      {
+        callId: 'call-insight',
+        company: 'Softora',
+        contactName: 'Serve Creusen',
+        phone: '0612345678',
+        analyzedAt: '2026-04-08T12:10:00.000Z',
+      },
+    ],
+  });
+
+  const callIds = service.collectInterestedLeadCallIdsByIdentity('call-primary', {
+    company: 'Softora',
+    contact: 'Serve Creusen',
+    phone: '0612345678',
+  });
+
+  assert.deepEqual(callIds, ['call-primary', 'call-appointment', 'call-update', 'call-insight']);
+});
+
 test('agenda interested lead read service tracks the latest row per reusable lead key', () => {
   const service = createServiceFixture({
     recentCallUpdates: [

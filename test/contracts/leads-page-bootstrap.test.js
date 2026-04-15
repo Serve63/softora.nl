@@ -4,9 +4,12 @@ const assert = require('node:assert/strict');
 const { createLeadsPageBootstrapService } = require('../../server/services/leads-page-bootstrap');
 
 test('leads page bootstrap merges confirmation tasks, interested leads and lead database identity', async () => {
+  const confirmationTaskCalls = [];
+  const interestedLeadCalls = [];
   const service = createLeadsPageBootstrapService({
     agendaReadCoordinator: {
-      async listConfirmationTasks() {
+      async listConfirmationTasks(options = {}) {
+        confirmationTaskCalls.push(options);
         return {
           ok: true,
           tasks: [
@@ -24,7 +27,8 @@ test('leads page bootstrap merges confirmation tasks, interested leads and lead 
           ],
         };
       },
-      async listInterestedLeads() {
+      async listInterestedLeads(options = {}) {
+        interestedLeadCalls.push(options);
         return {
           ok: true,
           leads: [
@@ -76,6 +80,8 @@ test('leads page bootstrap merges confirmation tasks, interested leads and lead 
   assert.equal(payload.leads[0].website, 'softora.nl');
   assert.equal(payload.leads[0].createdAt, '2026-04-10T14:48:00.000Z');
   assert.equal(payload.leads[0].id, 12);
+  assert.equal(confirmationTaskCalls[0]?.freshSharedState, true);
+  assert.equal(interestedLeadCalls[0]?.freshSharedState, true);
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
   assert.match(String(htmlReplacements.SOFTORA_LEADS_STATUS || ''), /^Laatste update: /);
   assert.match(String(htmlReplacements.SOFTORA_LEADS_LIST || ''), /lead-item/);
@@ -155,4 +161,90 @@ test('leads page bootstrap strips agenda follow-up instructions from visible sum
     payload.leads[0].summary,
     'Ruben Nijhuis besprak de website en de prospect wilde een afspraak inplannen.'
   );
+});
+
+test('leads page bootstrap hydrates first when supabase state is cold', async () => {
+  let hydrateCalls = 0;
+  const service = createLeadsPageBootstrapService({
+    isSupabaseConfigured: () => true,
+    getSupabaseStateHydrated: () => hydrateCalls > 0,
+    forceHydrateRuntimeStateWithRetries: async () => {
+      hydrateCalls += 1;
+    },
+    agendaReadCoordinator: {
+      async listConfirmationTasks() {
+        return { ok: true, tasks: [] };
+      },
+      async listInterestedLeads() {
+        return {
+          ok: true,
+          leads: [
+            {
+              id: 0,
+              callId: 'call-hydrated',
+              company: 'Hydrated Lead',
+              phone: '0612345678',
+              date: '2026-04-10',
+              time: '10:00',
+              summary: 'Interesse na hydrate',
+            },
+          ],
+        };
+      },
+    },
+    getUiStateValues: async () => null,
+  });
+
+  const payload = await service.buildLeadsBootstrapPayload();
+
+  assert.equal(hydrateCalls, 1);
+  assert.equal(payload.leads.length, 1);
+  assert.equal(payload.leads[0].company, 'Hydrated Lead');
+});
+
+test('leads page bootstrap retries once after transient list errors before returning empty', async () => {
+  let confirmationCalls = 0;
+  let interestedCalls = 0;
+  let hydrateCalls = 0;
+  const service = createLeadsPageBootstrapService({
+    isSupabaseConfigured: () => true,
+    getSupabaseStateHydrated: () => true,
+    forceHydrateRuntimeStateWithRetries: async () => {
+      hydrateCalls += 1;
+    },
+    agendaReadCoordinator: {
+      async listConfirmationTasks() {
+        confirmationCalls += 1;
+        if (confirmationCalls === 1) throw new Error('tijdelijke bootstrap mismatch');
+        return { ok: true, tasks: [] };
+      },
+      async listInterestedLeads() {
+        interestedCalls += 1;
+        if (interestedCalls === 1) throw new Error('tijdelijke bootstrap mismatch');
+        return {
+          ok: true,
+          leads: [
+            {
+              id: 0,
+              callId: 'call-retry',
+              company: 'Retry Lead',
+              phone: '0612345678',
+              date: '2026-04-10',
+              time: '10:00',
+              summary: 'Interesse na retry',
+            },
+          ],
+        };
+      },
+    },
+    getUiStateValues: async () => null,
+  });
+
+  const payload = await service.buildLeadsBootstrapPayload();
+
+  assert.equal(hydrateCalls, 1);
+  assert.equal(confirmationCalls, 2);
+  assert.equal(interestedCalls, 2);
+  assert.equal(payload.leads.length, 1);
+  assert.equal(payload.leads[0].company, 'Retry Lead');
 });

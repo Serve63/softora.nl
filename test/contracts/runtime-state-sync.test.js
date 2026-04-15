@@ -34,6 +34,8 @@ function createFixture(overrides = {}) {
   const agendaAppointmentIdByCallId = overrides.agendaAppointmentIdByCallId || new Map();
   const dismissedInterestedLeadCallIds = overrides.dismissedInterestedLeadCallIds || new Set();
   const dismissedInterestedLeadKeys = overrides.dismissedInterestedLeadKeys || new Set();
+  const dismissedInterestedLeadKeyUpdatedAtMsByKey =
+    overrides.dismissedInterestedLeadKeyUpdatedAtMsByKey || new Map();
   const leadOwnerAssignmentsByCallId = overrides.leadOwnerAssignmentsByCallId || new Map();
   const runtimeState = overrides.runtimeState || createRuntimeState();
   const persistedRows = [];
@@ -81,6 +83,10 @@ function createFixture(overrides = {}) {
     supabaseCallUpdateRowsFetchLimit: 100,
     runtimeStateSupabaseSyncCooldownMs: 1000,
     runtimeStateRemoteNewerThresholdMs: 250,
+    supabaseClientPersistTimeoutMs:
+      overrides.supabaseClientPersistTimeoutMs === undefined ? 12000 : overrides.supabaseClientPersistTimeoutMs,
+    queuedRuntimePersistAwaitTimeoutMs:
+      overrides.queuedRuntimePersistAwaitTimeoutMs === undefined ? 60000 : overrides.queuedRuntimePersistAwaitTimeoutMs,
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength),
     parseNumberSafe: (value, fallback = null) => {
@@ -175,6 +181,7 @@ function createFixture(overrides = {}) {
     agendaAppointmentIdByCallId,
     dismissedInterestedLeadCallIds,
     dismissedInterestedLeadKeys,
+    dismissedInterestedLeadKeyUpdatedAtMsByKey,
     leadOwnerAssignmentsByCallId,
     upsertRecentCallUpdate:
       overrides.upsertRecentCallUpdate ||
@@ -206,6 +213,7 @@ function createFixture(overrides = {}) {
     coordinator,
     dismissedInterestedLeadCallIds,
     dismissedInterestedLeadKeys,
+    dismissedInterestedLeadKeyUpdatedAtMsByKey,
     generatedAgendaAppointments,
     leadOwnerAssignmentsByCallId,
     logs,
@@ -239,6 +247,9 @@ test('runtime state sync coordinator applies snapshot payloads into in-memory ru
       generatedAgendaAppointments: [{ id: 44, callId: 'call-1', company: 'Alpha BV' }],
       dismissedInterestedLeadCallIds: ['call-1'],
       dismissedInterestedLeadKeys: ['lead-1'],
+      dismissedInterestedLeadKeyUpdatedAtMsByKey: {
+        'lead-1': Date.parse('2026-04-08T11:15:00.000Z'),
+      },
       leadOwnerAssignments: [{ callId: 'call-1', owner: { key: 'owner-1', name: 'Servé' } }],
       nextLeadOwnerRotationIndex: 7,
       nextGeneratedAgendaAppointmentId: 120000,
@@ -255,6 +266,10 @@ test('runtime state sync coordinator applies snapshot payloads into in-memory ru
   assert.equal(fixture.agendaAppointmentIdByCallId.get('call-1'), 44);
   assert.equal(fixture.dismissedInterestedLeadCallIds.has('call-1'), true);
   assert.equal(fixture.dismissedInterestedLeadKeys.has('lead-1'), true);
+  assert.equal(
+    fixture.dismissedInterestedLeadKeyUpdatedAtMsByKey.get('lead-1'),
+    Date.parse('2026-04-08T11:15:00.000Z')
+  );
   assert.equal(fixture.leadOwnerAssignmentsByCallId.get('call-1').key, 'owner-1');
   assert.equal(fixture.runtimeState.nextLeadOwnerRotationIndex, 7);
   assert.equal(fixture.runtimeState.nextGeneratedAgendaAppointmentId, 120000);
@@ -520,9 +535,13 @@ test('runtime state sync coordinator syncs newer remote state and queues call up
 test('runtime state sync coordinator preserves local dismissed leads when remote payload has empty dismissed sets', () => {
   const dismissedInterestedLeadCallIds = new Set(['call-local-dismissed']);
   const dismissedInterestedLeadKeys = new Set(['lead-local-dismissed']);
+  const dismissedInterestedLeadKeyUpdatedAtMsByKey = new Map([
+    ['lead-local-dismissed', Date.parse('2026-04-08T10:30:00.000Z')],
+  ]);
   const fixture = createFixture({
     dismissedInterestedLeadCallIds,
     dismissedInterestedLeadKeys,
+    dismissedInterestedLeadKeyUpdatedAtMsByKey,
   });
 
   fixture.coordinator.applyRuntimeStateSnapshotPayload(
@@ -547,14 +566,22 @@ test('runtime state sync coordinator preserves local dismissed leads when remote
     'Local dismissed callId should survive sync with empty remote set');
   assert.equal(dismissedInterestedLeadKeys.has('lead-local-dismissed'), true,
     'Local dismissed leadKey should survive sync with empty remote set');
+  assert.equal(
+    dismissedInterestedLeadKeyUpdatedAtMsByKey.get('lead-local-dismissed'),
+    Date.parse('2026-04-08T10:30:00.000Z')
+  );
 });
 
 test('runtime state sync coordinator merges remote dismissed leads with local dismissed leads', () => {
   const dismissedInterestedLeadCallIds = new Set(['call-local']);
   const dismissedInterestedLeadKeys = new Set(['lead-local']);
+  const dismissedInterestedLeadKeyUpdatedAtMsByKey = new Map([
+    ['lead-local', Date.parse('2026-04-08T10:15:00.000Z')],
+  ]);
   const fixture = createFixture({
     dismissedInterestedLeadCallIds,
     dismissedInterestedLeadKeys,
+    dismissedInterestedLeadKeyUpdatedAtMsByKey,
   });
 
   fixture.coordinator.applyRuntimeStateSnapshotPayload(
@@ -568,6 +595,9 @@ test('runtime state sync coordinator merges remote dismissed leads with local di
       generatedAgendaAppointments: [],
       dismissedInterestedLeadCallIds: ['call-remote'],
       dismissedInterestedLeadKeys: ['lead-remote'],
+      dismissedInterestedLeadKeyUpdatedAtMsByKey: {
+        'lead-remote': Date.parse('2026-04-08T11:00:00.000Z'),
+      },
       leadOwnerAssignments: [],
       nextLeadOwnerRotationIndex: 0,
       nextGeneratedAgendaAppointmentId: 100000,
@@ -583,15 +613,27 @@ test('runtime state sync coordinator merges remote dismissed leads with local di
     'Local dismissed leadKey should be preserved');
   assert.equal(dismissedInterestedLeadKeys.has('lead-remote'), true,
     'Remote dismissed leadKey should be added');
+  assert.equal(
+    dismissedInterestedLeadKeyUpdatedAtMsByKey.get('lead-local'),
+    Date.parse('2026-04-08T10:15:00.000Z')
+  );
+  assert.equal(
+    dismissedInterestedLeadKeyUpdatedAtMsByKey.get('lead-remote'),
+    Date.parse('2026-04-08T11:00:00.000Z')
+  );
 });
 
 test('runtime state sync coordinator persists dismissed leads to a dedicated Supabase key', async () => {
   const persistedRows = [];
   const dismissedInterestedLeadCallIds = new Set(['call-dismissed-1', 'call-dismissed-2']);
   const dismissedInterestedLeadKeys = new Set(['lead-dismissed-1']);
+  const dismissedInterestedLeadKeyUpdatedAtMsByKey = new Map([
+    ['lead-dismissed-1', Date.parse('2026-04-15T10:00:00.000Z')],
+  ]);
   const fixture = createFixture({
     dismissedInterestedLeadCallIds,
     dismissedInterestedLeadKeys,
+    dismissedInterestedLeadKeyUpdatedAtMsByKey,
     upsertSupabaseRowViaRest: async (row) => {
       persistedRows.push(row);
       return { ok: true, status: 200 };
@@ -605,6 +647,9 @@ test('runtime state sync coordinator persists dismissed leads to a dedicated Sup
   assert.equal(persistedRows[0].state_key, 'core:dismissed_leads');
   assert.deepStrictEqual(persistedRows[0].payload.callIds.sort(), ['call-dismissed-1', 'call-dismissed-2']);
   assert.deepStrictEqual(persistedRows[0].payload.leadKeys, ['lead-dismissed-1']);
+  assert.deepStrictEqual(persistedRows[0].payload.leadKeyUpdatedAtMsByKey, {
+    'lead-dismissed-1': Date.parse('2026-04-15T10:00:00.000Z'),
+  });
   assert.equal(persistedRows[0].payload.reason, 'test_persist');
 });
 
@@ -621,6 +666,9 @@ test('runtime state sync coordinator hydrates dismissed leads from dedicated Sup
         payload: {
           callIds: ['call-from-supabase-1', 'call-from-supabase-2'],
           leadKeys: ['lead-from-supabase-1'],
+          leadKeyUpdatedAtMsByKey: {
+            'lead-from-supabase-1': Date.parse('2026-04-15T10:00:00.000Z'),
+          },
           updatedAt: '2026-04-15T10:00:00.000Z',
         },
       }],
@@ -633,6 +681,72 @@ test('runtime state sync coordinator hydrates dismissed leads from dedicated Sup
   assert.equal(dismissedInterestedLeadCallIds.has('call-from-supabase-1'), true);
   assert.equal(dismissedInterestedLeadCallIds.has('call-from-supabase-2'), true);
   assert.equal(dismissedInterestedLeadKeys.has('lead-from-supabase-1'), true);
+  assert.equal(
+    fixture.dismissedInterestedLeadKeyUpdatedAtMsByKey.get('lead-from-supabase-1'),
+    Date.parse('2026-04-15T10:00:00.000Z')
+  );
+});
+
+test('runtime state sync coordinator refreshes dedicated dismissed leads even when the core snapshot is skipped as not newer', async () => {
+  const dismissedInterestedLeadCallIds = new Set(['call-old-local']);
+  const dismissedInterestedLeadKeys = new Set(['lead-old-local']);
+  const fixture = createFixture({
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+    runtimeState: createRuntimeState({
+      supabaseStateHydrated: true,
+      runtimeStateObservedAtMs: Date.parse('2026-04-15T13:58:00.000Z'),
+    }),
+    fetchSupabaseStateRowViaRest: async () => ({
+      ok: true,
+      status: 200,
+      body: [{
+        payload: {
+          savedAt: '2026-04-15T13:55:00.000Z',
+          recentWebhookEvents: [],
+          recentCallUpdates: [],
+          recentAiCallInsights: [],
+          recentDashboardActivities: [],
+          recentSecurityAuditEvents: [],
+          generatedAgendaAppointments: [],
+          dismissedInterestedLeadCallIds: ['call-only-in-core'],
+          dismissedInterestedLeadKeys: ['lead-only-in-core'],
+          leadOwnerAssignments: [],
+          nextLeadOwnerRotationIndex: 0,
+          nextGeneratedAgendaAppointmentId: 100000,
+        },
+        updated_at: '2026-04-15T13:55:00.000Z',
+      }],
+    }),
+    fetchSupabaseRowByKeyViaRest: async () => ({
+      ok: true,
+      status: 200,
+      body: [{
+        payload: {
+          callIds: ['call-only-in-dedicated-row'],
+          leadKeys: ['lead-only-in-dedicated-row'],
+          leadKeyUpdatedAtMsByKey: {
+            'lead-only-in-dedicated-row': Date.parse('2026-04-15T13:59:00.000Z'),
+          },
+          updatedAt: '2026-04-15T13:59:00.000Z',
+        },
+      }],
+    }),
+  });
+
+  const synced = await fixture.coordinator.syncRuntimeStateFromSupabaseIfNewer({ force: false, maxAgeMs: 0 });
+
+  assert.equal(synced, false);
+  assert.equal(dismissedInterestedLeadCallIds.has('call-old-local'), true);
+  assert.equal(dismissedInterestedLeadKeys.has('lead-old-local'), true);
+  assert.equal(dismissedInterestedLeadCallIds.has('call-only-in-dedicated-row'), true);
+  assert.equal(dismissedInterestedLeadKeys.has('lead-only-in-dedicated-row'), true);
+  assert.equal(
+    fixture.dismissedInterestedLeadKeyUpdatedAtMsByKey.get('lead-only-in-dedicated-row'),
+    Date.parse('2026-04-15T13:59:00.000Z')
+  );
+  assert.equal(dismissedInterestedLeadCallIds.has('call-only-in-core'), false,
+    'Core snapshot should stay skipped when it is not newer');
 });
 
 test('runtime state sync coordinator merges dedicated dismissed leads with existing in-memory state', async () => {
@@ -648,6 +762,9 @@ test('runtime state sync coordinator merges dedicated dismissed leads with exist
         payload: {
           callIds: ['call-from-supabase'],
           leadKeys: ['lead-from-supabase'],
+          leadKeyUpdatedAtMsByKey: {
+            'lead-from-supabase': Date.parse('2026-04-15T10:00:00.000Z'),
+          },
           updatedAt: '2026-04-15T10:00:00.000Z',
         },
       }],
@@ -664,4 +781,8 @@ test('runtime state sync coordinator merges dedicated dismissed leads with exist
     'Existing local lead key should be preserved');
   assert.equal(dismissedInterestedLeadKeys.has('lead-from-supabase'), true,
     'Supabase lead key should be added');
+  assert.equal(
+    fixture.dismissedInterestedLeadKeyUpdatedAtMsByKey.get('lead-from-supabase'),
+    Date.parse('2026-04-15T10:00:00.000Z')
+  );
 });

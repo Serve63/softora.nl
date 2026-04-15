@@ -6,6 +6,9 @@ const {
 function createLeadsPageBootstrapService(deps = {}) {
   const {
     agendaReadCoordinator = null,
+    isSupabaseConfigured = () => false,
+    getSupabaseStateHydrated = () => true,
+    forceHydrateRuntimeStateWithRetries = async () => {},
     getUiStateValues = async () => null,
     normalizeString = (value) => String(value || '').trim(),
     leadDatabaseUiScope = 'coldcalling',
@@ -510,33 +513,57 @@ function createLeadsPageBootstrapService(deps = {}) {
       };
     }
 
-    const databaseByPhone = await loadLeadDatabaseIdentityMap();
-    const [tasksResult, interestedResult] = await Promise.allSettled([
+    async function collectLeadRows(databaseByPhone) {
+      const [tasksResult, interestedResult] = await Promise.allSettled([
       agendaReadCoordinator.listConfirmationTasks({
         quickMode: true,
         includeDemo: false,
         countOnly: false,
+        freshSharedState: true,
         limit: confirmationTaskLimit,
       }),
       agendaReadCoordinator.listInterestedLeads({
         countOnly: false,
+        freshSharedState: true,
         limit: interestedLeadLimit,
       }),
-    ]);
+      ]);
 
-    const taskRows =
-      tasksResult.status === 'fulfilled' && Array.isArray(tasksResult.value?.tasks)
-        ? tasksResult.value.tasks.map((item) =>
-            applyLeadDatabaseIdentity(normalizeLeadRow(item), databaseByPhone)
-          )
-        : [];
+      const taskRows =
+        tasksResult.status === 'fulfilled' && Array.isArray(tasksResult.value?.tasks)
+          ? tasksResult.value.tasks.map((item) =>
+              applyLeadDatabaseIdentity(normalizeLeadRow(item), databaseByPhone)
+            )
+          : [];
 
-    const interestedRows =
-      interestedResult.status === 'fulfilled' && Array.isArray(interestedResult.value?.leads)
-        ? interestedResult.value.leads.map((item) =>
-            applyLeadDatabaseIdentity(normalizeLeadRow(item), databaseByPhone)
-          )
-        : [];
+      const interestedRows =
+        interestedResult.status === 'fulfilled' && Array.isArray(interestedResult.value?.leads)
+          ? interestedResult.value.leads.map((item) =>
+              applyLeadDatabaseIdentity(normalizeLeadRow(item), databaseByPhone)
+            )
+          : [];
+
+      return {
+        taskRows,
+        interestedRows,
+        hadError:
+          tasksResult.status === 'rejected' || interestedResult.status === 'rejected',
+      };
+    }
+
+    if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
+      await forceHydrateRuntimeStateWithRetries(3);
+    }
+
+    const databaseByPhone = await loadLeadDatabaseIdentityMap();
+    let { taskRows, interestedRows, hadError } = await collectLeadRows(databaseByPhone);
+
+    if (!taskRows.length && !interestedRows.length && hadError) {
+      if (isSupabaseConfigured()) {
+        await forceHydrateRuntimeStateWithRetries(1);
+      }
+      ({ taskRows, interestedRows } = await collectLeadRows(databaseByPhone));
+    }
 
     if (!taskRows.length && !interestedRows.length) {
       return {

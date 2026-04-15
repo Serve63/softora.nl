@@ -16,7 +16,12 @@ test('premium leads modal submit flow has explicit timeout, error and finally ha
   assert.match(pageSource, /function applyOptimisticLeadRemovalFromOverview\(taskId\)/);
   assert.match(pageSource, /function promoteLeadRowSuppression\(item\) \{\s*suppressLeadRowLocally\(item, COMPLETED_LEAD_SUPPRESSION_TTL_MS\);/);
   assert.match(pageSource, /let agendaSubmitInFlight = false;/);
-  assert.match(pageSource, /function setAgendaSubmitUiState\(nextPending\) \{[\s\S]*modalCloseBtn\.hidden = agendaSubmitInFlight;/);
+  assert.match(pageSource, /function isLeadModalDismissLocked\(\) \{\s*return agendaSubmitInFlight \|\| modalLoadingActive;\s*\}/);
+  assert.match(
+    pageSource,
+    /function syncLeadModalDismissState\(\) \{[\s\S]*modalOverlay\.classList\.toggle\('dismiss-locked', dismissLocked\);[\s\S]*modalContainer\.classList\.toggle\('dismiss-locked', dismissLocked\);[\s\S]*modalCloseBtn\.hidden = dismissLocked;[\s\S]*modalCloseBtn\.style\.display = dismissLocked \? 'none' : '';/s
+  );
+  assert.match(pageSource, /function setAgendaSubmitUiState\(nextPending\) \{[\s\S]*syncLeadModalDismissState\(\);/s);
   assert.match(
     pageSource,
     /async function submitLeadToAgenda\(\) \{[\s\S]*const snapshot = buildLeadMutationRollbackSnapshot\(taskId\);[\s\S]*setAgendaSubmitUiState\(true\);[\s\S]*applyOptimisticLeadRemovalFromOverview\(taskId\);[\s\S]*setModalLoading\(true, 'Bezig met invoegen in de agenda'\);[\s\S]*await postJsonWithFallback\([\s\S]*timeoutMs:\s*LEAD_MODAL_AGENDA_SUBMIT_TIMEOUT_MS[\s\S]*promoteLeadRowSuppression\(lead\);[\s\S]*setModalLoading\(false\);[\s\S]*closeLeadModal\(\);[\s\S]*catch \(error\) \{[\s\S]*rollbackLeadMutation\(snapshot\);[\s\S]*setModalStatus\(String\(error\?\.message \|\| 'Invoegen in agenda mislukt\.'\), 'error'\);[\s\S]*finally \{[\s\S]*setAgendaSubmitUiState\(false\);/s

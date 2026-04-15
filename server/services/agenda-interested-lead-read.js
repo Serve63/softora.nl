@@ -30,12 +30,28 @@ function createAgendaInterestedLeadReadService(deps = {}) {
     resolveAgendaLocationValue = (...values) =>
       values.map((value) => String(value || '').trim()).find(Boolean) || '',
     isInterestedLeadDismissedForRow = () => false,
-    hasNegativeInterestSignal = () => false,
-    hasPositiveInterestSignal = () => false,
+    hasNegativeInterestSignal = (value) => {
+      const text = normalizeLeadIdentityText(value);
+      if (!text) return false;
+      return /(niet meer bellen|bel( me)? niet|geen interesse|geen behoefte|niet geinteresseerd|niet geïnteresseerd|stop( met)? bellen|do not call|dnc|remove from list|uit bellijst|geen prioriteit|geen tijd voor|zijn voorzien|al voorzien|tevreden met huidige partij)/.test(
+        text
+      );
+    },
+    hasPositiveInterestSignal = (value) => {
+      const text = normalizeLeadIdentityText(value);
+      if (!text) return false;
+      return /(interesse|geinteresseerd|geïnteresseerd|afspraak|demo|offerte|voorstel|prijsopgave|kennismaking|stuur (de )?(offerte|informatie|info|voorstel)|mail .* (offerte|informatie|info|voorstel)|callback|terugbellen|terugbel)/.test(
+        text
+      );
+    },
   } = deps;
 
+  function normalizeSearchText(value) {
+    return normalizeLeadIdentityText(value);
+  }
+
   function looksLikeAgendaConfirmationSummary(value) {
-    const text = normalizeString(value || '').toLowerCase();
+    const text = normalizeSearchText(value);
     if (!text) return false;
     return /(^op \d{4}-\d{2}-\d{2}\b|^namens\b|afspraak ingepland|bevestigingsbericht|definitieve bevestiging|twee collega|langskomen|volgactie|bevestigingsmail sturen|stuur(?:\s+\w+){0,3}\s+bevestigingsmail|gedetecteerde afspraak|afspraakbevestiging|agenda-item)/.test(
       text
@@ -43,7 +59,7 @@ function createAgendaInterestedLeadReadService(deps = {}) {
   }
 
   function isGenericConversationSummaryPlaceholder(value) {
-    const text = normalizeString(value || '').toLowerCase();
+    const text = normalizeSearchText(value);
     if (!text) return false;
     return (
       text === 'nog geen gesprekssamenvatting beschikbaar.' ||
@@ -68,18 +84,24 @@ function createAgendaInterestedLeadReadService(deps = {}) {
   }
 
   function getLeadLikeRecencyTimestamp(value) {
-    const explicit = Date.parse(
-      normalizeString(
-        value?.confirmationTaskCreatedAt ||
-          value?.createdAt ||
-          value?.updatedAt ||
-          value?.endedAt ||
-          value?.analyzedAt ||
-          value?.startedAt ||
-          ''
-      )
-    );
-    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+    const explicitMs = Number(value?.updatedAtMs || value?.analyzedAtMs || 0);
+    if (Number.isFinite(explicitMs) && explicitMs > 0) return explicitMs;
+
+    const candidateFields = [
+      value?.confirmationTaskCreatedAt,
+      value?.createdAt,
+      value?.updatedAt,
+      value?.endedAt,
+      value?.analyzedAt,
+      value?.startedAt,
+      value?.confirmationResponseReceivedAt,
+      value?.confirmationEmailSentAt,
+    ];
+
+    for (const candidate of candidateFields) {
+      const parsed = Date.parse(normalizeString(candidate || ''));
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
 
     const date = normalizeDateYyyyMmDd(value?.date || '');
     const time = normalizeTimeHhMm(value?.time || '') || '00:00';
@@ -87,7 +109,306 @@ function createAgendaInterestedLeadReadService(deps = {}) {
       const parsed = Date.parse(`${date}T${time}:00`);
       if (Number.isFinite(parsed) && parsed > 0) return parsed;
     }
+
     return 0;
+  }
+
+  function toIsoStringFromTimestamp(timestampMs) {
+    const safeMs = Number(timestampMs || 0);
+    if (Number.isFinite(safeMs) && safeMs > 0) {
+      return new Date(safeMs).toISOString();
+    }
+    return '';
+  }
+
+  function resolveCandidateDate(timestampMs, fallbackValues = []) {
+    for (const value of fallbackValues) {
+      const normalized = normalizeDateYyyyMmDd(value || '');
+      if (normalized) return normalized;
+    }
+    const iso = toIsoStringFromTimestamp(timestampMs);
+    return iso ? iso.slice(0, 10) : '';
+  }
+
+  function resolveCandidateTime(timestampMs, fallbackValues = []) {
+    for (const value of fallbackValues) {
+      const normalized = normalizeTimeHhMm(value || '');
+      if (normalized) return normalized;
+    }
+    const iso = toIsoStringFromTimestamp(timestampMs);
+    return iso ? iso.slice(11, 16) : '09:00';
+  }
+
+  function buildOwnerFieldsForOccurrence(callId, preferredValues = null) {
+    if (preferredValues && typeof preferredValues === 'object') {
+      const explicit = buildLeadOwnerFields(callId, preferredValues);
+      if (explicit && typeof explicit === 'object') return explicit;
+    }
+    return buildLeadOwnerFields(callId) || {};
+  }
+
+  function buildInterestSearchText(update, insight) {
+    return normalizeSearchText(
+      [
+        update?.status,
+        update?.messageType,
+        update?.endedReason,
+        update?.summary,
+        update?.transcriptSnippet,
+        update?.transcriptFull,
+        insight?.summary,
+        insight?.followUpReason,
+      ]
+        .map((item) => normalizeString(item || ''))
+        .filter(Boolean)
+        .join(' ')
+    );
+  }
+
+  function isInterestedOccurrence(update, insight) {
+    const searchText = buildInterestSearchText(update, insight);
+    if (hasNegativeInterestSignal(searchText)) return false;
+
+    if (
+      toBooleanSafe(insight?.appointmentBooked, false) ||
+      toBooleanSafe(insight?.appointment_booked, false) ||
+      toBooleanSafe(insight?.followUpRequired, false) ||
+      toBooleanSafe(insight?.follow_up_required, false)
+    ) {
+      return true;
+    }
+
+    if (hasPositiveInterestSignal(searchText)) return true;
+    return false;
+  }
+
+  function buildOpenLeadFollowUpRows() {
+    return getGeneratedAgendaAppointments()
+      .slice()
+      .map((appointment) => {
+        if (!appointment || typeof appointment !== 'object') return null;
+        const task = mapAppointmentToConfirmationTask(appointment);
+        if (!task) return null;
+
+        const callId = normalizeString(task?.callId || appointment?.callId || '');
+        if (callId.startsWith('demo-')) return null;
+
+        const occurredAtMs = getLeadLikeRecencyTimestamp(task || appointment);
+        const occurredAtIso =
+          normalizeString(
+            task?.confirmationTaskCreatedAt ||
+              task?.createdAt ||
+              appointment?.confirmationTaskCreatedAt ||
+              appointment?.createdAt ||
+              task?.updatedAt ||
+              appointment?.updatedAt ||
+              ''
+          ) || toIsoStringFromTimestamp(occurredAtMs);
+
+        const ownerFields = buildOwnerFieldsForOccurrence(callId, {
+          key: task?.leadOwnerKey || appointment?.leadOwnerKey || '',
+          displayName: task?.leadOwnerName || appointment?.leadOwnerName || '',
+          fullName: task?.leadOwnerFullName || appointment?.leadOwnerFullName || '',
+          userId: task?.leadOwnerUserId || appointment?.leadOwnerUserId || '',
+          email: task?.leadOwnerEmail || appointment?.leadOwnerEmail || '',
+        });
+
+        const row = {
+          id: Number(task?.id || appointment?.id || 0) || 0,
+          appointmentId: Number(task?.appointmentId || appointment?.id || 0) || 0,
+          callId,
+          company: normalizeString(task?.company || appointment?.company || '') || 'Onbekende lead',
+          contact: normalizeString(task?.contact || appointment?.contact || ''),
+          phone: normalizeString(task?.phone || appointment?.phone || ''),
+          contactEmail: normalizeString(task?.contactEmail || appointment?.contactEmail || ''),
+          branche: normalizeString(task?.branche || appointment?.branche || ''),
+          province: normalizeString(task?.province || appointment?.province || ''),
+          address: normalizeString(task?.address || appointment?.address || ''),
+          date: resolveCandidateDate(occurredAtMs, [task?.date, appointment?.date]),
+          time: resolveCandidateTime(occurredAtMs, [task?.time, appointment?.time]),
+          source:
+            normalizeString(task?.source || appointment?.source || 'Lead opvolging') || 'Lead opvolging',
+          summary: pickReadableLeadSummary(task?.summary, appointment?.summary),
+          location: resolveAgendaLocationValue(
+            sanitizeAppointmentLocation(task?.location || appointment?.location || appointment?.appointmentLocation || ''),
+            task?.summary || '',
+            task?.whatsappInfo || appointment?.whatsappInfo || ''
+          ),
+          whatsappInfo: sanitizeAppointmentWhatsappInfo(
+            task?.whatsappInfo || appointment?.whatsappInfo || appointment?.whatsappNotes || ''
+          ),
+          recordingUrl: resolvePreferredRecordingUrl(task, appointment),
+          durationSeconds: resolveCallDurationSeconds(task, appointment),
+          provider: normalizeString(task?.provider || appointment?.provider || '').toLowerCase(),
+          providerLabel: normalizeString(task?.providerLabel || appointment?.providerLabel || ''),
+          coldcallingStack: normalizeColdcallingStack(
+            task?.coldcallingStack || appointment?.coldcallingStack || ''
+          ),
+          coldcallingStackLabel: normalizeString(
+            task?.coldcallingStackLabel || appointment?.coldcallingStackLabel || task?.providerLabel || ''
+          ),
+          leadType: normalizeString(task?.leadType || appointment?.leadType || ''),
+          leadChipLabel: 'INTERESSE',
+          leadChipClass: 'confirmed',
+          createdAt: occurredAtIso || new Date().toISOString(),
+          confirmationTaskCreatedAt: occurredAtIso || null,
+          updatedAtMs: occurredAtMs,
+          ...ownerFields,
+        };
+
+        if (!buildLeadFollowUpCandidateKey(row)) return null;
+        if (isInterestedLeadDismissedForRow(callId, row)) return null;
+        return row;
+      })
+      .filter(Boolean);
+  }
+
+  function buildCancelledLeadFollowUpKeys() {
+    const keys = new Set();
+    getGeneratedAgendaAppointments().forEach((appointment) => {
+      if (!appointment || typeof appointment !== 'object') return;
+      const taskType = normalizeString(
+        appointment?.confirmationTaskType || appointment?.taskType || appointment?.type || ''
+      ).toLowerCase();
+      if (taskType !== 'lead_follow_up') return;
+      const cancelled = Boolean(
+        appointment?.confirmationAppointmentCancelled || appointment?.confirmationAppointmentCancelledAt
+      );
+      if (!cancelled) return;
+      const key = buildLeadFollowUpCandidateKey(appointment);
+      if (key) keys.add(key);
+    });
+    return keys;
+  }
+
+  function buildInterestedOccurrenceRows() {
+    const latestUpdateByCallId = new Map();
+    getRecentCallUpdates().forEach((update) => {
+      const callId = normalizeString(update?.callId || '');
+      if (!callId || callId.startsWith('demo-')) return;
+      const existing = latestUpdateByCallId.get(callId) || null;
+      if (!existing || getLeadLikeRecencyTimestamp(update) >= getLeadLikeRecencyTimestamp(existing)) {
+        latestUpdateByCallId.set(callId, update);
+      }
+    });
+
+    const latestInsightByCallId = new Map();
+    getRecentAiCallInsights().forEach((insight) => {
+      const callId = normalizeString(insight?.callId || '');
+      if (!callId || callId.startsWith('demo-')) return;
+      const existing = latestInsightByCallId.get(callId) || null;
+      if (!existing || getLeadLikeRecencyTimestamp(insight) >= getLeadLikeRecencyTimestamp(existing)) {
+        latestInsightByCallId.set(callId, insight);
+      }
+    });
+
+    const allCallIds = new Set([...latestUpdateByCallId.keys(), ...latestInsightByCallId.keys()]);
+    const cancelledLeadKeys = buildCancelledLeadFollowUpKeys();
+
+    return Array.from(allCallIds)
+      .map((callId) => {
+        const update = latestUpdateByCallId.get(callId) || null;
+        const insight = latestInsightByCallId.get(callId) || null;
+        if (!update && !insight) return null;
+
+        const occurredAtMs = Math.max(
+          getLeadLikeRecencyTimestamp(update),
+          getLeadLikeRecencyTimestamp(insight),
+          0
+        );
+        const occurredAtIso =
+          normalizeString(update?.updatedAt || update?.endedAt || insight?.analyzedAt || '') ||
+          toIsoStringFromTimestamp(occurredAtMs);
+        const derivedFollowUp = buildGeneratedLeadFollowUpFromCall(update, insight) || null;
+        const hasDerivedFollowUp = Boolean(derivedFollowUp && typeof derivedFollowUp === 'object');
+        if (!hasDerivedFollowUp && !isInterestedOccurrence(update, insight)) return null;
+        const coldcallingStack = normalizeColdcallingStack(
+          update?.stack || insight?.coldcallingStack || insight?.stack || derivedFollowUp?.coldcallingStack || ''
+        );
+        const coldcallingStackLabel = normalizeString(
+          update?.stackLabel ||
+            insight?.coldcallingStackLabel ||
+            insight?.stackLabel ||
+            derivedFollowUp?.coldcallingStackLabel ||
+            getColdcallingStackLabel(coldcallingStack)
+        );
+        const row = {
+          id: 0,
+          appointmentId: 0,
+          callId,
+          company:
+            normalizeString(
+              derivedFollowUp?.company || update?.company || insight?.company || insight?.leadCompany || ''
+            ) || 'Onbekende lead',
+          contact:
+            normalizeString(
+              derivedFollowUp?.contact || update?.name || insight?.contactName || insight?.leadName || ''
+            ),
+          phone: normalizeString(derivedFollowUp?.phone || update?.phone || insight?.phone || ''),
+          contactEmail: normalizeString(
+            derivedFollowUp?.contactEmail || insight?.contactEmail || insight?.email || insight?.leadEmail || ''
+          ),
+          branche: normalizeString(update?.branche || insight?.branche || derivedFollowUp?.branche || ''),
+          province: normalizeString(update?.province || insight?.province || derivedFollowUp?.province || ''),
+          address: normalizeString(update?.address || insight?.address || derivedFollowUp?.address || ''),
+          date: resolveCandidateDate(occurredAtMs, [derivedFollowUp?.date]),
+          time: resolveCandidateTime(occurredAtMs, [derivedFollowUp?.time]),
+          source:
+            normalizeString(derivedFollowUp?.source || update?.source || insight?.source || 'Coldcalling interesse') ||
+            'Coldcalling interesse',
+          summary: pickReadableLeadSummary(
+            insight?.summary,
+            derivedFollowUp?.summary,
+            update?.summary,
+            update?.transcriptSnippet,
+            update?.transcriptFull
+          ),
+          location: resolveAgendaLocationValue(
+            sanitizeAppointmentLocation(
+              derivedFollowUp?.location ||
+                derivedFollowUp?.appointmentLocation ||
+                update?.location ||
+                insight?.location ||
+                ''
+            ),
+            derivedFollowUp?.summary || update?.summary || insight?.summary || '',
+            insight?.followUpReason || ''
+          ),
+          whatsappInfo: sanitizeAppointmentWhatsappInfo(
+            insight?.followUpReason || derivedFollowUp?.whatsappInfo || ''
+          ),
+          recordingUrl: resolvePreferredRecordingUrl(derivedFollowUp, update, insight),
+          durationSeconds: resolveCallDurationSeconds(derivedFollowUp, update, insight),
+          provider: normalizeString(derivedFollowUp?.provider || update?.provider || insight?.provider || '').toLowerCase(),
+          providerLabel: coldcallingStackLabel || '',
+          coldcallingStack: coldcallingStack || '',
+          coldcallingStackLabel: coldcallingStackLabel || '',
+          leadType: normalizeString(
+            derivedFollowUp?.leadType ||
+              insight?.businessMode ||
+              insight?.business_mode ||
+              insight?.serviceType ||
+              insight?.service_type ||
+              update?.businessMode ||
+              update?.business_mode ||
+              update?.serviceType ||
+              update?.service_type ||
+              ''
+          ),
+          leadChipLabel: 'INTERESSE',
+          leadChipClass: 'confirmed',
+          createdAt: occurredAtIso || new Date().toISOString(),
+          confirmationTaskCreatedAt: occurredAtIso || null,
+          updatedAtMs: occurredAtMs,
+          ...buildOwnerFieldsForOccurrence(callId),
+        };
+
+        if (!buildLeadFollowUpCandidateKey(row)) return null;
+        if (cancelledLeadKeys.has(buildLeadFollowUpCandidateKey(row))) return null;
+        if (isInterestedLeadDismissedForRow(callId, row)) return null;
+        return row;
+      })
+      .filter(Boolean);
   }
 
   function isInterestedLeadRowPreferred(candidate, existing) {
@@ -95,9 +416,9 @@ function createAgendaInterestedLeadReadService(deps = {}) {
     const existingTs = getLeadLikeRecencyTimestamp(existing);
     if (candidateTs !== existingTs) return candidateTs > existingTs;
 
-    const candidateConfirmed = normalizeString(candidate?.leadChipClass || '').toLowerCase() === 'confirmed';
-    const existingConfirmed = normalizeString(existing?.leadChipClass || '').toLowerCase() === 'confirmed';
-    if (candidateConfirmed !== existingConfirmed) return candidateConfirmed;
+    const candidateHasSummary = Boolean(normalizeString(candidate?.summary || ''));
+    const existingHasSummary = Boolean(normalizeString(existing?.summary || ''));
+    if (candidateHasSummary !== existingHasSummary) return candidateHasSummary;
 
     const candidateHasTaskId =
       Number(candidate?.id || 0) > 0 || Number(candidate?.appointmentId || 0) > 0;
@@ -123,40 +444,33 @@ function createAgendaInterestedLeadReadService(deps = {}) {
     const secondaryAppointmentId = Number(secondary?.appointmentId || 0) || 0;
     const mergedId = preferredId || secondaryId || preferredAppointmentId || secondaryAppointmentId || 0;
     const mergedAppointmentId = preferredAppointmentId || secondaryAppointmentId || mergedId || 0;
+    const mergedSummary = pickReadableLeadSummary(
+      preferred?.summary,
+      secondary?.summary,
+      preferred?.conversationSummary,
+      secondary?.conversationSummary
+    );
 
     return {
       ...secondary,
       ...preferred,
       id: mergedId,
       appointmentId: mergedAppointmentId,
-      type: normalizeString(preferred?.type || secondary?.type || ''),
-      confirmationTaskType: normalizeString(
-        preferred?.confirmationTaskType || secondary?.confirmationTaskType || preferred?.type || secondary?.type || ''
-      ),
+      callId: normalizeString(preferred?.callId || secondary?.callId || ''),
       company: normalizeString(preferred?.company || secondary?.company || '') || 'Onbekende lead',
       contact: normalizeString(preferred?.contact || secondary?.contact || ''),
       phone: normalizeString(preferred?.phone || secondary?.phone || ''),
+      contactEmail: normalizeString(preferred?.contactEmail || secondary?.contactEmail || ''),
+      branche: normalizeString(preferred?.branche || secondary?.branche || ''),
+      province: normalizeString(preferred?.province || secondary?.province || ''),
+      address: normalizeString(preferred?.address || secondary?.address || ''),
       date: normalizeDateYyyyMmDd(preferred?.date || secondary?.date || '') || '',
       time: normalizeTimeHhMm(preferred?.time || secondary?.time || '') || '09:00',
       source: normalizeString(preferred?.source || secondary?.source || ''),
-      summary: truncateText(normalizeString(preferred?.summary || secondary?.summary || ''), 900),
-      location: resolveAppointmentLocation(preferred, secondary),
-      durationSeconds: resolveCallDurationSeconds(preferred, secondary),
+      summary: mergedSummary || '',
+      conversationSummary: mergedSummary || '',
+      location: normalizeString(preferred?.location || secondary?.location || ''),
       whatsappInfo: sanitizeAppointmentWhatsappInfo(preferred?.whatsappInfo || secondary?.whatsappInfo || ''),
-      recordingUrl: resolvePreferredRecordingUrl(preferred, secondary),
-      provider: normalizeString(preferred?.provider || secondary?.provider || '').toLowerCase(),
-      providerLabel: normalizeString(preferred?.providerLabel || secondary?.providerLabel || ''),
-      coldcallingStack: normalizeColdcallingStack(preferred?.coldcallingStack || secondary?.coldcallingStack || ''),
-      coldcallingStackLabel: normalizeString(
-        preferred?.coldcallingStackLabel ||
-          secondary?.coldcallingStackLabel ||
-          preferred?.providerLabel ||
-          secondary?.providerLabel ||
-          ''
-      ),
-      leadType: normalizeString(preferred?.leadType || secondary?.leadType || ''),
-      leadChipLabel: normalizeString(preferred?.leadChipLabel || secondary?.leadChipLabel || ''),
-      leadChipClass: normalizeString(preferred?.leadChipClass || secondary?.leadChipClass || ''),
       createdAt:
         normalizeString(
           preferred?.createdAt ||
@@ -173,6 +487,18 @@ function createAgendaInterestedLeadReadService(deps = {}) {
             secondary?.createdAt ||
             ''
         ) || null,
+      recordingUrl: normalizeString(preferred?.recordingUrl || secondary?.recordingUrl || ''),
+      durationSeconds: resolveCallDurationSeconds(preferred, secondary),
+      provider: normalizeString(preferred?.provider || secondary?.provider || '').toLowerCase(),
+      providerLabel: normalizeString(preferred?.providerLabel || secondary?.providerLabel || ''),
+      coldcallingStack: normalizeColdcallingStack(preferred?.coldcallingStack || secondary?.coldcallingStack || ''),
+      coldcallingStackLabel: normalizeString(
+        preferred?.coldcallingStackLabel || secondary?.coldcallingStackLabel || ''
+      ),
+      leadType: normalizeString(preferred?.leadType || secondary?.leadType || ''),
+      leadChipLabel: normalizeString(preferred?.leadChipLabel || secondary?.leadChipLabel || ''),
+      leadChipClass: normalizeString(preferred?.leadChipClass || secondary?.leadChipClass || ''),
+      updatedAtMs: Math.max(getLeadLikeRecencyTimestamp(preferred), getLeadLikeRecencyTimestamp(secondary)),
       leadOwnerKey: normalizeString(preferred?.leadOwnerKey || secondary?.leadOwnerKey || ''),
       leadOwnerName: normalizeString(preferred?.leadOwnerName || secondary?.leadOwnerName || ''),
       leadOwnerFullName: normalizeString(preferred?.leadOwnerFullName || secondary?.leadOwnerFullName || ''),
@@ -186,7 +512,6 @@ function createAgendaInterestedLeadReadService(deps = {}) {
 
     (Array.isArray(rows) ? rows : []).forEach((row) => {
       if (!row || typeof row !== 'object') return;
-
       const rowId = Number(row?.id || row?.appointmentId || 0) || 0;
       const callId = normalizeString(row?.callId || '');
       const key =
@@ -205,467 +530,46 @@ function createAgendaInterestedLeadReadService(deps = {}) {
       map.set(key, mergeInterestedLeadRows(preferred, secondary));
     });
 
-    return Array.from(map.values()).sort(compareConfirmationTasks);
+    return Array.from(map.values()).sort((a, b) => {
+      const diff = getLeadLikeRecencyTimestamp(b) - getLeadLikeRecencyTimestamp(a);
+      if (diff !== 0) return diff;
+      return compareConfirmationTasks(a, b);
+    });
   }
 
-  function buildHandledLeadFollowUpMatches() {
-    const callIds = new Set();
-    const keys = new Set();
-
-    getGeneratedAgendaAppointments().forEach((appointment) => {
-      if (!appointment || typeof appointment !== 'object') return;
-      const confirmationTaskType = normalizeString(
-        appointment?.confirmationTaskType || appointment?.taskType || appointment?.type || ''
-      ).toLowerCase();
-      if (confirmationTaskType !== 'lead_follow_up') return;
-      if (mapAppointmentToConfirmationTask(appointment)) return;
-
-      const callId = normalizeString(appointment?.callId || '');
-      if (callId && !callId.startsWith('demo-')) {
-        callIds.add(callId);
-        return;
-      }
-
-      const key = buildLeadFollowUpCandidateKey(appointment);
-      if (key) keys.add(key);
-    });
-
-    return { callIds, keys };
+  function getMaterializedInterestedLeadRows() {
+    return dedupeInterestedLeadRows(buildOpenLeadFollowUpRows());
   }
 
   function buildInterestedLeadCandidateRows(existingTasks = []) {
     const existingCallIds = new Set();
-    const existingLatestTsByKey = new Map();
-    const handledLeadFollowUpMatches = buildHandledLeadFollowUpMatches();
-    const debugCounts = {
-      inputUpdates: 0,
-      skippedExistingOrSeenCall: 0,
-      skippedHandledLeadFollowUp: 0,
-      skippedDismissedPre: 0,
-      skippedNoFollowUp: 0,
-      skippedDismissedPost: 0,
-      skippedOlderByKey: 0,
-      skippedSeenKey: 0,
-      accepted: 0,
-    };
+    const existingKeys = new Set();
     (Array.isArray(existingTasks) ? existingTasks : []).forEach((task) => {
       const callId = normalizeString(task?.callId || '');
-      if (callId) existingCallIds.add(callId);
       const key = buildLeadFollowUpCandidateKey(task);
-      if (key) {
-        existingLatestTsByKey.set(
-          key,
-          Math.max(Number(existingLatestTsByKey.get(key) || 0), getLeadLikeRecencyTimestamp(task))
-        );
-      }
+      if (callId) existingCallIds.add(callId);
+      if (key) existingKeys.add(key);
     });
 
-    const insightByCallId = new Map();
-    const insightByPhoneKey = new Map();
-    const insightByCompanyKey = new Map();
-    getRecentAiCallInsights().forEach((insight) => {
-      const callId = normalizeString(insight?.callId || '');
-      const phoneKey = normalizeLeadLikePhoneKey(insight?.phone || '');
-      const companyKey = normalizeLeadIdentityText(insight?.company || insight?.leadCompany || '');
-      if (callId && !insightByCallId.has(callId)) insightByCallId.set(callId, insight);
-      if (phoneKey && !insightByPhoneKey.has(phoneKey)) insightByPhoneKey.set(phoneKey, insight);
-      if (companyKey && !insightByCompanyKey.has(companyKey)) insightByCompanyKey.set(companyKey, insight);
+    return buildInterestedOccurrenceRows().filter((row) => {
+      const callId = normalizeString(row?.callId || '');
+      const key = buildLeadFollowUpCandidateKey(row);
+      if (callId && existingCallIds.has(callId)) return false;
+      if (key && existingKeys.has(key)) return false;
+      return true;
     });
-
-    const seenCallIds = new Set();
-    const seenKeys = new Set();
-    const candidateUpdates = getRecentCallUpdates()
-      .slice()
-      .filter((item) => {
-        const callId = normalizeString(item?.callId || '');
-        return callId && !callId.startsWith('demo-');
-      });
-    debugCounts.inputUpdates = candidateUpdates.length;
-    const rows = candidateUpdates
-      .sort((a, b) => {
-        const aTs = Number(a?.updatedAtMs || 0) || Date.parse(normalizeString(a?.updatedAt || a?.endedAt || '')) || 0;
-        const bTs = Number(b?.updatedAtMs || 0) || Date.parse(normalizeString(b?.updatedAt || b?.endedAt || '')) || 0;
-        return bTs - aTs;
-      })
-      .map((callUpdate) => {
-        const callId = normalizeString(callUpdate?.callId || '');
-        if (!callId || existingCallIds.has(callId) || seenCallIds.has(callId)) {
-          debugCounts.skippedExistingOrSeenCall += 1;
-          return null;
-        }
-        if (handledLeadFollowUpMatches.callIds.has(callId)) {
-          debugCounts.skippedHandledLeadFollowUp += 1;
-          return null;
-        }
-        if (
-          isInterestedLeadDismissedForRow(callId, {
-            phone: callUpdate?.phone || '',
-            company: callUpdate?.company || '',
-            contact: callUpdate?.name || '',
-          })
-        ) {
-          debugCounts.skippedDismissedPre += 1;
-          return null;
-        }
-
-        const phoneKey = normalizeLeadLikePhoneKey(callUpdate?.phone || '');
-        const companyKey = normalizeLeadIdentityText(callUpdate?.company || '');
-        const insight =
-          insightByCallId.get(callId) ||
-          (phoneKey ? insightByPhoneKey.get(phoneKey) : null) ||
-          (companyKey ? insightByCompanyKey.get(companyKey) : null) ||
-          null;
-
-        const leadFollowUp = buildGeneratedLeadFollowUpFromCall(callUpdate, insight);
-        if (!leadFollowUp) {
-          debugCounts.skippedNoFollowUp += 1;
-          return null;
-        }
-
-        const coldcallingStack = normalizeColdcallingStack(
-          leadFollowUp?.coldcallingStack || callUpdate?.stack || insight?.coldcallingStack || insight?.stack || ''
-        );
-        const coldcallingStackLabel = normalizeString(
-          leadFollowUp?.coldcallingStackLabel ||
-            callUpdate?.stackLabel ||
-            insight?.coldcallingStackLabel ||
-            insight?.stackLabel ||
-            getColdcallingStackLabel(coldcallingStack)
-        );
-        const row = {
-          id: 0,
-          callId,
-          company: normalizeString(leadFollowUp?.company || '') || 'Onbekende lead',
-          contact: normalizeString(leadFollowUp?.contact || ''),
-          phone: normalizeString(leadFollowUp?.phone || ''),
-          date: normalizeDateYyyyMmDd(leadFollowUp?.date) || '',
-          time: normalizeTimeHhMm(leadFollowUp?.time) || '09:00',
-          source: 'Coldcalling interesse',
-          summary: pickReadableLeadSummary(
-            insight?.summary,
-            callUpdate?.summary,
-            callUpdate?.transcriptSnippet,
-            callUpdate?.transcriptFull,
-            leadFollowUp?.summary
-          ),
-          location: resolveAppointmentLocation(leadFollowUp, callUpdate, insight),
-          durationSeconds: resolveCallDurationSeconds(leadFollowUp, callUpdate, insight),
-          whatsappInfo: truncateText(normalizeString(insight?.followUpReason || ''), 6000),
-          recordingUrl: resolvePreferredRecordingUrl(leadFollowUp, callUpdate, insight),
-          provider: normalizeString(leadFollowUp?.provider || callUpdate?.provider || '').toLowerCase(),
-          providerLabel: coldcallingStackLabel || '',
-          coldcallingStack: coldcallingStack || '',
-          coldcallingStackLabel: coldcallingStackLabel || '',
-          leadType: normalizeString(
-            insight?.businessMode ||
-              insight?.business_mode ||
-              insight?.serviceType ||
-              insight?.service_type ||
-              callUpdate?.businessMode ||
-              callUpdate?.business_mode ||
-              callUpdate?.serviceType ||
-              callUpdate?.service_type ||
-              ''
-          ),
-          leadChipLabel: 'INTERESSE',
-          leadChipClass: 'confirmed',
-          createdAt:
-            normalizeString(leadFollowUp?.createdAt || callUpdate?.endedAt || callUpdate?.updatedAt || '') ||
-            new Date().toISOString(),
-          ...buildLeadOwnerFields(callId, leadFollowUp),
-        };
-        const key = buildLeadFollowUpCandidateKey(row);
-        if (key && handledLeadFollowUpMatches.keys.has(key)) {
-          debugCounts.skippedHandledLeadFollowUp += 1;
-          return null;
-        }
-        if (isInterestedLeadDismissedForRow(callId, row)) {
-          debugCounts.skippedDismissedPost += 1;
-          return null;
-        }
-        const rowTs = getLeadLikeRecencyTimestamp(row);
-        if (key && Number(existingLatestTsByKey.get(key) || 0) >= rowTs) {
-          debugCounts.skippedOlderByKey += 1;
-          return null;
-        }
-        if (key && seenKeys.has(key)) {
-          debugCounts.skippedSeenKey += 1;
-          return null;
-        }
-
-        seenCallIds.add(callId);
-        if (key) seenKeys.add(key);
-        debugCounts.accepted += 1;
-        return row;
-      })
-      .filter(Boolean);
-
-    rows.sort(compareConfirmationTasks);
-    return rows;
-  }
-
-  function normalizeColdcallingLeadDecision(value) {
-    const raw = normalizeString(value || '').trim().toLowerCase();
-    if (!raw) return '';
-    if (/^(pending|nieuw|new|not_called|nog[-_ ]?niet[-_ ]?gebeld)$/.test(raw)) return 'pending';
-    if (/^(called|gebeld)$/.test(raw)) return 'called';
-    if (/^(no_answer|niet[-_ ]?opgenomen|geen[-_ ]?gehoor|busy|voicemail|missed)$/.test(raw)) return 'no_answer';
-    if (/^(callback|terugbellen|follow[-_ ]?up)$/.test(raw)) return 'callback';
-    if (/^(appointment|afspraak|meeting)$/.test(raw)) return 'appointment';
-    if (/^(customer|klant|closed|won)$/.test(raw)) return 'customer';
-    if (/^(do_not_call|dnc|uit[-_ ]?bellijst|stop|blacklist|remove)$/.test(raw)) return 'do_not_call';
-    return '';
-  }
-
-  function normalizeColdcallingLeadSearch(value) {
-    return normalizeLeadIdentityText(value);
-  }
-
-  function isServeCreusenLeadLikeServer(row) {
-    const haystack = normalizeColdcallingLeadSearch(
-      [row?.company || row?.name || '', row?.contact || row?.contactName || row?.leadName || ''].join(' ')
-    );
-    return /\bserve creusen\b/.test(haystack);
-  }
-
-  function inferColdcallingLeadDecisionFromSignals({ callCount = 0, latestUpdate = null, latestInsight = null }) {
-    const updateStatusText = normalizeColdcallingLeadSearch(
-      `${latestUpdate?.status || ''} ${latestUpdate?.messageType || ''} ${latestUpdate?.endedReason || ''}`
-    );
-    const combinedText = normalizeColdcallingLeadSearch(
-      [
-        latestInsight?.summary,
-        latestInsight?.followUpReason,
-        latestUpdate?.summary,
-        latestUpdate?.transcriptSnippet,
-        latestUpdate?.transcriptFull,
-      ]
-        .map((item) => String(item || '').trim())
-        .filter(Boolean)
-        .join(' ')
-    );
-
-    if (toBooleanSafe(latestInsight?.appointmentBooked, false)) return 'appointment';
-    if (hasNegativeInterestSignal(combinedText)) return 'do_not_call';
-    if (
-      /(is klant|klant geworden|geworden klant|deal gesloten|offerte akkoord|getekend|abonnement afgesloten|conversie naar klant)/.test(
-        combinedText
-      )
-    ) {
-      return 'customer';
-    }
-    if (/(afspraak|intake gepland|meeting gepland|demo gepland|belafspraak|call ingepland|kalender afspraak)/.test(combinedText)) {
-      return 'appointment';
-    }
-    if (/(terugbellen|bel later|later terugbellen|follow up|follow-up|volgende week|later deze week|stuur mail|mail sturen)/.test(combinedText)) {
-      return 'callback';
-    }
-    if (hasPositiveInterestSignal(combinedText)) return 'callback';
-    if (
-      /(no[-_ ]?answer|geen gehoor|voicemail|busy|bezet|failed|dial failed|dial_failed|rejected|cancelled|canceled|unanswered)/.test(
-        updateStatusText
-      )
-    ) {
-      return 'no_answer';
-    }
-    if (Number(callCount) > 0) return 'called';
-    return 'pending';
-  }
-
-  function getCallLikeUpdatedAtMsServer(item) {
-    const explicit = Number(item?.updatedAtMs || 0);
-    if (Number.isFinite(explicit) && explicit > 0) return explicit;
-    const analyzedAt = Date.parse(normalizeString(item?.analyzedAt || ''));
-    if (Number.isFinite(analyzedAt) && analyzedAt > 0) return analyzedAt;
-    const updatedAt = Date.parse(
-      normalizeString(item?.updatedAt || item?.endedAt || item?.startedAt || item?.createdAt || '')
-    );
-    return Number.isFinite(updatedAt) ? updatedAt : 0;
   }
 
   function buildGroupedColdcallingLeadRows(existingTasks = []) {
-    const existingCallIds = new Set();
-    const existingLatestTsByKey = new Map();
-    const handledLeadFollowUpMatches = buildHandledLeadFollowUpMatches();
-    (Array.isArray(existingTasks) ? existingTasks : []).forEach((task) => {
-      const callId = normalizeString(task?.callId || '');
-      if (callId) existingCallIds.add(callId);
-      const key = buildLeadFollowUpCandidateKey(task);
-      if (key) {
-        existingLatestTsByKey.set(
-          key,
-          Math.max(Number(existingLatestTsByKey.get(key) || 0), getLeadLikeRecencyTimestamp(task))
-        );
-      }
-    });
-    const seenKeys = new Set();
-
-    const groups = new Map();
-    function ensureGroup(key, seed = {}) {
-      if (!groups.has(key)) {
-        groups.set(key, {
-          key,
-          phone: normalizeString(seed.phone || ''),
-          company: normalizeString(seed.company || ''),
-          contact: normalizeString(seed.contact || ''),
-          updates: [],
-          insights: [],
-        });
-      }
-      const group = groups.get(key);
-      if (!group.phone && seed.phone) group.phone = normalizeString(seed.phone || '');
-      if (!group.company && seed.company) group.company = normalizeString(seed.company || '');
-      if (!group.contact && seed.contact) group.contact = normalizeString(seed.contact || '');
-      return group;
-    }
-
-    getRecentCallUpdates().forEach((update) => {
-      const phoneDigits = normalizeLeadLikePhoneKey(update?.phone || '');
-      const companyKey = normalizeColdcallingLeadSearch(update?.company || '');
-      const key = phoneDigits ? `phone:${phoneDigits}` : companyKey ? `company:${companyKey}` : '';
-      if (!key) return;
-      const group = ensureGroup(key, {
-        phone: update?.phone,
-        company: update?.company,
-        contact: update?.name,
-      });
-      group.updates.push(update);
-    });
-
-    getRecentAiCallInsights().forEach((insight) => {
-      const phoneDigits = normalizeLeadLikePhoneKey(insight?.phone || '');
-      const companyKey = normalizeColdcallingLeadSearch(insight?.company || insight?.leadCompany || '');
-      const key = phoneDigits ? `phone:${phoneDigits}` : companyKey ? `company:${companyKey}` : '';
-      if (!key) return;
-      const group = ensureGroup(key, {
-        phone: insight?.phone,
-        company: insight?.company || insight?.leadCompany,
-        contact: insight?.contactName || insight?.leadName,
-      });
-      group.insights.push(insight);
-    });
-
-    const rows = [];
-    groups.forEach((group) => {
-      const sortedUpdates = group.updates
-        .slice()
-        .sort((a, b) => getCallLikeUpdatedAtMsServer(b) - getCallLikeUpdatedAtMsServer(a));
-      const sortedInsights = group.insights
-        .slice()
-        .sort((a, b) => getCallLikeUpdatedAtMsServer(b) - getCallLikeUpdatedAtMsServer(a));
-      const latestUpdate = sortedUpdates[0] || null;
-      const latestInsight = sortedInsights[0] || null;
-      const serveCreusenMatch = isServeCreusenLeadLikeServer({
-        company: group.company,
-        contact: group.contact || latestInsight?.contactName || latestUpdate?.name || '',
-      });
-      const autoDecision = inferColdcallingLeadDecisionFromSignals({
-        callCount: sortedUpdates.length,
-        latestUpdate,
-        latestInsight,
-      });
-      const decision = serveCreusenMatch ? 'callback' : normalizeColdcallingLeadDecision(autoDecision || 'pending');
-      if (!['callback', 'appointment', 'customer'].includes(decision)) return;
-
-      const row = normalizeString(group.phone || group.company)
-        ? {
-            id: 0,
-            callId: normalizeString(latestUpdate?.callId || latestInsight?.callId || ''),
-            company:
-              normalizeString(
-                group.company || latestUpdate?.company || latestInsight?.company || latestInsight?.leadCompany || ''
-              ) || 'Onbekende lead',
-            contact:
-              normalizeString(
-                group.contact || latestUpdate?.name || latestInsight?.contactName || latestInsight?.leadName || ''
-              ),
-            phone: normalizeString(group.phone || latestUpdate?.phone || latestInsight?.phone || ''),
-            date:
-              normalizeDateYyyyMmDd(latestUpdate?.endedAt || latestUpdate?.updatedAt || latestInsight?.analyzedAt || '') ||
-              '',
-            time:
-              normalizeTimeHhMm(
-                normalizeString(latestUpdate?.endedAt || latestUpdate?.updatedAt || latestInsight?.analyzedAt || '').slice(11, 16)
-              ) || '09:00',
-            source: 'Coldcalling lead',
-            summary: pickReadableLeadSummary(
-              latestInsight?.summary,
-              latestUpdate?.summary,
-              latestUpdate?.transcriptSnippet,
-              latestUpdate?.transcriptFull
-            ),
-            location: resolveAppointmentLocation(latestUpdate, latestInsight),
-            whatsappInfo: truncateText(normalizeString(latestInsight?.followUpReason || ''), 6000),
-            recordingUrl: resolvePreferredRecordingUrl(latestUpdate, latestInsight),
-            provider: normalizeString(latestUpdate?.provider || latestInsight?.provider || '').toLowerCase(),
-            providerLabel: normalizeString(
-              latestUpdate?.stackLabel || latestInsight?.coldcallingStackLabel || latestInsight?.stackLabel || ''
-            ),
-            coldcallingStack: normalizeColdcallingStack(
-              latestUpdate?.stack || latestInsight?.coldcallingStack || latestInsight?.stack || ''
-            ),
-            coldcallingStackLabel: normalizeString(
-              latestUpdate?.stackLabel ||
-                latestInsight?.coldcallingStackLabel ||
-                latestInsight?.stackLabel ||
-                getColdcallingStackLabel(
-                  normalizeColdcallingStack(
-                    latestUpdate?.stack || latestInsight?.coldcallingStack || latestInsight?.stack || ''
-                  )
-                )
-            ),
-            leadType: normalizeString(
-              latestInsight?.businessMode ||
-                latestInsight?.business_mode ||
-                latestInsight?.serviceType ||
-                latestInsight?.service_type ||
-                latestUpdate?.businessMode ||
-                latestUpdate?.business_mode ||
-                latestUpdate?.serviceType ||
-                latestUpdate?.service_type ||
-                ''
-            ),
-            leadChipLabel: 'INTERESSE',
-            leadChipClass: 'confirmed',
-            createdAt:
-              normalizeString(latestUpdate?.updatedAt || latestUpdate?.endedAt || latestInsight?.analyzedAt || '') ||
-              new Date().toISOString(),
-            ...buildLeadOwnerFields(normalizeString(latestUpdate?.callId || latestInsight?.callId || '')),
-          }
-        : null;
-      if (!row) return;
-
-      const callId = normalizeString(row.callId || '');
-      const key = buildLeadFollowUpCandidateKey(row);
-      if (callId && handledLeadFollowUpMatches.callIds.has(callId)) return;
-      if (!callId && key && handledLeadFollowUpMatches.keys.has(key)) return;
-      if (isInterestedLeadDismissedForRow(callId, row)) return;
-      if (callId && existingCallIds.has(callId)) return;
-      if (key && Number(existingLatestTsByKey.get(key) || 0) >= getLeadLikeRecencyTimestamp(row)) return;
-      if (key && seenKeys.has(key)) return;
-      existingCallIds.add(callId);
-      if (key) seenKeys.add(key);
-      rows.push(row);
-    });
-
-    rows.sort(compareConfirmationTasks);
-    return rows;
+    return buildInterestedLeadCandidateRows(existingTasks);
   }
 
-  function getOpenInterestedLeadTasks() {
-    return getGeneratedAgendaAppointments()
-      .filter((appointment) => {
-        const callId = normalizeString(appointment?.callId || '');
-        return !callId.startsWith('demo-');
-      })
-      .map(mapAppointmentToConfirmationTask)
-      .filter(Boolean);
+  function buildAllInterestedLeadRows() {
+    return dedupeInterestedLeadRows([].concat(getMaterializedInterestedLeadRows(), buildInterestedOccurrenceRows()));
   }
 
   function buildLatestInterestedLeadRowsByKey() {
-    const rows = dedupeInterestedLeadRows(
-      [].concat(buildInterestedLeadCandidateRows([]), buildGroupedColdcallingLeadRows([]))
-    );
+    const rows = buildAllInterestedLeadRows();
     const map = new Map();
     rows.forEach((row) => {
       const key = buildLeadFollowUpCandidateKey(row);
@@ -674,86 +578,59 @@ function createAgendaInterestedLeadReadService(deps = {}) {
     return map;
   }
 
-  function getMaterializedInterestedLeadRows() {
-    const rows = [];
-    const seenCallIds = new Set();
-    const seenKeys = new Set();
-
-    getGeneratedAgendaAppointments()
-      .slice()
-      .sort((a, b) => getLeadLikeRecencyTimestamp(b) - getLeadLikeRecencyTimestamp(a))
-      .forEach((appointment) => {
-        const callId = normalizeString(appointment?.callId || '');
-        if (callId && callId.startsWith('demo-')) return;
-        if (isInterestedLeadDismissedForRow(callId, appointment)) return;
-
-        const pendingTask = mapAppointmentToConfirmationTask(appointment);
-        if (!pendingTask) return;
-
-        const row =
-          pendingTask ||
-          {
-            id: Number(appointment?.id || 0) || 0,
-            appointmentId: Number(appointment?.id || 0) || 0,
-            type: normalizeString(appointment?.type || 'meeting') || 'meeting',
-            confirmationTaskType: normalizeString(appointment?.confirmationTaskType || appointment?.type || ''),
-            company: normalizeString(appointment?.company || '') || 'Onbekende lead',
-            contact: normalizeString(appointment?.contact || '') || 'Onbekend',
-            phone: normalizeString(appointment?.phone || ''),
-            date: normalizeDateYyyyMmDd(appointment?.date || '') || '',
-            time: normalizeTimeHhMm(appointment?.time || '') || '09:00',
-            source: normalizeString(appointment?.source || 'Agenda afspraak'),
-            summary: truncateText(normalizeString(appointment?.summary || ''), 900),
-            location: resolveAgendaLocationValue(
-              sanitizeAppointmentLocation(appointment?.location || appointment?.appointmentLocation || ''),
-              appointment?.summary || '',
-              appointment?.whatsappInfo || ''
-            ),
-            whatsappInfo: sanitizeAppointmentWhatsappInfo(
-              appointment?.whatsappInfo || appointment?.whatsappNotes || appointment?.whatsapp || ''
-            ),
-            durationSeconds: resolveCallDurationSeconds(appointment),
-            recordingUrl: resolvePreferredRecordingUrl(appointment),
-            createdAt:
-              normalizeString(
-                appointment?.updatedAt ||
-                  appointment?.confirmationResponseReceivedAt ||
-                  appointment?.confirmationEmailSentAt ||
-                  appointment?.createdAt ||
-                  ''
-              ) || new Date().toISOString(),
-            callId,
-          };
-
-        if (isInterestedLeadDismissedForRow(callId, row)) return;
-
-        const rowKey = buildLeadFollowUpCandidateKey(row);
-        if (callId && seenCallIds.has(callId)) return;
-        if (rowKey && seenKeys.has(rowKey)) return;
-
-        if (callId) seenCallIds.add(callId);
-        if (rowKey) seenKeys.add(rowKey);
-        rows.push(row);
-      });
-
-    return rows;
-  }
-
-  function buildAllInterestedLeadRows() {
-    const existingMaterializedRows = getMaterializedInterestedLeadRows();
-    const interestedLeadTasks = buildInterestedLeadCandidateRows(existingMaterializedRows);
-    const groupedLeadRows = buildGroupedColdcallingLeadRows(existingMaterializedRows.concat(interestedLeadTasks));
-    return dedupeInterestedLeadRows(existingMaterializedRows.concat(interestedLeadTasks, groupedLeadRows));
-  }
-
   function findInterestedLeadRowByCallId(callId) {
-    const normalizedCallId = normalizeString(callId);
+    const normalizedCallId = normalizeString(callId || '');
     if (!normalizedCallId) return null;
-    return buildAllInterestedLeadRows().find((item) => normalizeString(item?.callId || '') === normalizedCallId) || null;
+    return buildAllInterestedLeadRows().find((row) => normalizeString(row?.callId || '') === normalizedCallId) || null;
+  }
+
+  function collectInterestedLeadCallIdsByIdentity(callId, rowLike = {}) {
+    const normalizedCallId = normalizeString(callId || '');
+    const identityKey =
+      buildLeadFollowUpCandidateKey(rowLike || {}) ||
+      buildLeadFollowUpCandidateKey(findInterestedLeadRowByCallId(normalizedCallId) || {});
+    const collected = new Set();
+
+    function maybeCollect(candidateCallId, candidateLike = {}) {
+      const safeCallId = normalizeString(candidateCallId || '');
+      if (!safeCallId || safeCallId.startsWith('demo-')) return;
+      if (normalizedCallId && safeCallId === normalizedCallId) {
+        collected.add(safeCallId);
+        return;
+      }
+      if (!identityKey) return;
+      const candidateKey = buildLeadFollowUpCandidateKey(candidateLike || {});
+      if (candidateKey && candidateKey === identityKey) {
+        collected.add(safeCallId);
+      }
+    }
+
+    if (normalizedCallId) collected.add(normalizedCallId);
+
+    getGeneratedAgendaAppointments().forEach((appointment) => {
+      maybeCollect(appointment?.callId, appointment);
+    });
+    getRecentCallUpdates().forEach((update) => {
+      maybeCollect(update?.callId, {
+        company: update?.company || '',
+        contact: update?.name || '',
+        phone: update?.phone || '',
+      });
+    });
+    getRecentAiCallInsights().forEach((insight) => {
+      maybeCollect(insight?.callId, {
+        company: insight?.company || insight?.leadCompany || '',
+        contact: insight?.contactName || insight?.leadName || '',
+        phone: insight?.phone || '',
+      });
+    });
+
+    return Array.from(collected);
   }
 
   return {
     buildAllInterestedLeadRows,
+    collectInterestedLeadCallIdsByIdentity,
     buildGroupedColdcallingLeadRows,
     buildInterestedLeadCandidateRows,
     buildLatestInterestedLeadRowsByKey,
@@ -762,7 +639,7 @@ function createAgendaInterestedLeadReadService(deps = {}) {
     findInterestedLeadRowByCallId,
     getLeadLikeRecencyTimestamp,
     getMaterializedInterestedLeadRows,
-    getOpenInterestedLeadTasks,
+    getOpenInterestedLeadTasks: () => getMaterializedInterestedLeadRows(),
     normalizeLeadLikePhoneKey,
   };
 }

@@ -37,6 +37,14 @@ function truncateText(value, maxLength = 500) {
   return normalizeString(value).slice(0, maxLength);
 }
 
+function buildLeadFollowUpCandidateKey(item) {
+  const phone = normalizeString(item?.phone || '').replace(/\D/g, '');
+  if (phone) return `phone:${phone}`;
+  const company = normalizeString(item?.company || '').toLowerCase();
+  const contact = normalizeString(item?.contact || '').toLowerCase();
+  return company || contact ? `name:${company}|${contact}` : '';
+}
+
 function createResponseRecorder() {
   return {
     statusCode: null,
@@ -73,9 +81,33 @@ function createFixture(overrides = {}) {
   const syncRuntimeCalls = [];
   const upsertCalls = [];
   const cancelCalls = [];
+  const dismissPersistCalls = [];
   const persistWaitCalls = [];
   const snapshotCalls = [];
   const applySnapshotCalls = [];
+  const defaultFindInterestedLeadRowByCallId =
+    overrides.findInterestedLeadRowByCallId ||
+    ((callId) =>
+      callId === 'call-1'
+        ? {
+            callId: 'call-1',
+            company: 'Softora',
+            contact: 'Serve Creusen',
+            phone: '0612345678',
+            source: 'AI Cold Calling',
+            summary: 'Lead toonde interesse in een nieuwe website.',
+            leadOwnerKey: 'owner-1',
+          }
+        : null);
+  const defaultBuildAllInterestedLeadRows =
+    overrides.buildAllInterestedLeadRows ||
+    (() => {
+      const lead = defaultFindInterestedLeadRowByCallId('call-1');
+      return lead ? [lead] : [];
+    });
+  const defaultCollectInterestedLeadCallIdsByIdentity =
+    overrides.collectInterestedLeadCallIdsByIdentity ||
+    ((callId) => (normalizeString(callId) ? [normalizeString(callId)] : []));
 
   function setGeneratedAgendaAppointmentAtIndex(idx, nextValue, _reason) {
     appointments[idx] = {
@@ -105,20 +137,10 @@ function createFixture(overrides = {}) {
     getGeneratedAppointmentIndexById: (raw) =>
       appointments.findIndex((item) => Number(item?.id || 0) === Number(raw)),
     getGeneratedAgendaAppointments: () => appointments,
-    findInterestedLeadRowByCallId:
-      overrides.findInterestedLeadRowByCallId ||
-      ((callId) =>
-        callId === 'call-1'
-          ? {
-              callId: 'call-1',
-              company: 'Softora',
-              contact: 'Serve Creusen',
-              phone: '0612345678',
-              source: 'AI Cold Calling',
-              summary: 'Lead toonde interesse in een nieuwe website.',
-              leadOwnerKey: 'owner-1',
-            }
-          : null),
+    findInterestedLeadRowByCallId: defaultFindInterestedLeadRowByCallId,
+    buildAllInterestedLeadRows: defaultBuildAllInterestedLeadRows,
+    buildLeadFollowUpCandidateKey,
+    collectInterestedLeadCallIdsByIdentity: defaultCollectInterestedLeadCallIdsByIdentity,
     getLatestCallUpdateByCallId:
       overrides.getLatestCallUpdateByCallId ||
       ((callId) =>
@@ -176,9 +198,18 @@ function createFixture(overrides = {}) {
     setGeneratedAgendaAppointmentAtIndex,
     dismissInterestedLeadIdentity:
       overrides.dismissInterestedLeadIdentity ||
-      ((callId, rowLike, reason) => {
-        dismissCalls.push({ callId, rowLike, reason });
+      ((callId, rowLike, reason, options) => {
+        dismissCalls.push({ callId, rowLike, reason, options });
       }),
+    persistDismissedLeadsToSupabase: async (reason) => {
+      dismissPersistCalls.push(reason);
+      if (overrides.persistDismissedLeadsPromise) {
+        return await overrides.persistDismissedLeadsPromise;
+      }
+      return overrides.persistDismissedLeadsResult !== undefined
+        ? Boolean(overrides.persistDismissedLeadsResult)
+        : false;
+    },
     appendDashboardActivity: (payload, reason) => {
       activityCalls.push({ payload, reason });
     },
@@ -213,6 +244,7 @@ function createFixture(overrides = {}) {
     appointments,
     cancelCalls,
     coordinator,
+    dismissPersistCalls,
     dismissCalls,
     hydrateCalls,
     persistWaitCalls,
@@ -290,7 +322,9 @@ test('agenda interested leads coordinator responds accepted when shared persist 
 });
 
 test('agenda interested leads coordinator dismisses a lead and cancels open follow-up tasks', async () => {
-  const { activityCalls, cancelCalls, coordinator, dismissCalls, persistWaitCalls } = createFixture();
+  const { activityCalls, cancelCalls, coordinator, dismissCalls, persistWaitCalls } = createFixture({
+    collectInterestedLeadCallIdsByIdentity: () => ['call-1', 'call-legacy'],
+  });
   const res = createResponseRecorder();
 
   await coordinator.dismissInterestedLeadResponse(
@@ -308,30 +342,19 @@ test('agenda interested leads coordinator dismisses a lead and cancels open foll
   assert.equal(res.body.dismissed, true);
   assert.equal(res.body.cancelledTasks, 2);
   assert.equal(dismissCalls[0].reason, 'interested_lead_dismissed_manual');
+  assert.deepEqual(dismissCalls[0].options?.relatedCallIds, ['call-1', 'call-legacy']);
   assert.equal(cancelCalls[0].reason, 'interested_lead_dismissed_manual_cancel');
   assert.equal(activityCalls[0].reason, 'dashboard_activity_interested_lead_removed');
   assert.deepEqual(persistWaitCalls, ['waited']);
 });
 
-test('agenda interested leads coordinator responds accepted when dismiss persist stays pending but local lead is gone', async () => {
-  let dismissed = false;
-  const { cancelCalls, coordinator, dismissCalls, persistWaitCalls } = createFixture({
+test('agenda interested leads coordinator confirms dismissal after shared sync when local persist fails', async () => {
+  const { cancelCalls, coordinator, dismissCalls, persistWaitCalls, syncRuntimeCalls } = createFixture({
     supabaseConfigured: true,
     supabaseHydrated: true,
-    persistWaitPromise: new Promise(() => {}),
-    findInterestedLeadRowByCallId: (callId) =>
-      dismissed || normalizeString(callId) !== 'call-1'
-        ? null
-        : {
-            callId: 'call-1',
-            company: 'Softora',
-            contact: 'Serve Creusen',
-            phone: '0612345678',
-          },
-    dismissInterestedLeadIdentity: (callId, rowLike, reason) => {
-      dismissed = true;
-      dismissCalls.push({ callId, rowLike, reason });
-    },
+    persistWaitResult: false,
+    syncRuntimeResult: true,
+    buildAllInterestedLeadRows: () => [],
   });
   const res = createResponseRecorder();
 
@@ -345,14 +368,74 @@ test('agenda interested leads coordinator responds accepted when dismiss persist
     res
   );
 
-  assert.equal(res.statusCode, 202);
+  assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.dismissed, true);
-  assert.equal(res.body.persistencePending, true);
+  assert.equal(res.body.persistencePending, false);
   assert.equal(res.body.cancelledTasks, 2);
   assert.equal(dismissCalls[0].reason, 'interested_lead_dismissed_manual');
   assert.equal(cancelCalls[0].reason, 'interested_lead_dismissed_manual_cancel');
   assert.deepEqual(persistWaitCalls, ['waited']);
+  assert.deepEqual(syncRuntimeCalls, [{ force: true, maxAgeMs: 0 }]);
+});
+
+test('agenda interested leads coordinator confirms dismissal once the dedicated dismissed row is persisted', async () => {
+  const { coordinator, dismissPersistCalls, persistWaitCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+    persistDismissedLeadsResult: true,
+    buildAllInterestedLeadRows: () => [],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.dismissInterestedLeadResponse(
+    {
+      body: {
+        callId: 'call-1',
+        actor: 'Serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.dismissed, true);
+  assert.deepEqual(dismissPersistCalls, ['interested_lead_dismissed_manual_route_confirm']);
+  assert.deepEqual(persistWaitCalls, []);
+});
+
+test('agenda interested leads coordinator keeps dismiss unsafe when the same lead stays visible under another call id', async () => {
+  const { applySnapshotCalls, coordinator, dismissCalls, persistWaitCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+    persistWaitResult: false,
+    buildAllInterestedLeadRows: () => [
+      {
+        callId: 'call-2',
+        company: 'Softora',
+        contact: 'Serve Creusen',
+        phone: '0612345678',
+      },
+    ],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.dismissInterestedLeadResponse(
+    {
+      body: {
+        callId: 'call-1',
+        actor: 'Serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.equal(dismissCalls[0].reason, 'interested_lead_dismissed_manual');
+  assert.deepEqual(persistWaitCalls, ['waited']);
+  assert.equal(applySnapshotCalls.length, 1);
 });
 
 test('agenda interested leads coordinator hydrates first when supabase runtime is configured but cold', async () => {

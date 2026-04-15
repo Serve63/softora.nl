@@ -30,6 +30,7 @@ function validateConfirmationTasksListRequest(req) {
       includeDemo: String(parseBooleanQuery(req.query?.includeDemo)),
       quick: String(parseBooleanQuery(req.query?.quick || req.query?.fast)),
       countOnly: String(parseBooleanQuery(req.query?.countOnly || req.query?.count_only)),
+      fresh: String(parseBooleanQuery(req.query?.fresh || req.query?.forceSync)),
       limit: String(parseLimit(req.query?.limit, 100)),
     },
   };
@@ -40,6 +41,7 @@ function validateInterestedLeadsListRequest(req) {
     ok: true,
     query: {
       countOnly: String(parseBooleanQuery(req.query?.countOnly || req.query?.count_only)),
+      fresh: String(parseBooleanQuery(req.query?.fresh || req.query?.forceSync)),
       limit: String(parseLimit(req.query?.limit, 100)),
     },
   };
