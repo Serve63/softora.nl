@@ -31,6 +31,10 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   assert.match(pageSource, /<button class="modal-close magnetic" id="modalCloseBtn"/);
   assert.match(
     pageSource,
+    /\.modal-overlay\.dismiss-locked \.modal-close,\s*\.modal\.dismiss-locked \.modal-close \{[\s\S]*display:\s*none !important;[\s\S]*pointer-events:\s*none;/
+  );
+  assert.match(
+    pageSource,
     /function isWorkspaceLoadingVisible\(\) \{\s*return Boolean\(workspaceLoadingOverlay && workspaceLoadingOverlay\.classList\.contains\('show'\)\);\s*\}/
   );
   assert.match(
@@ -39,13 +43,25 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   );
   assert.match(
     pageSource,
-    /function syncWorkspaceExitControls\(\) \{[\s\S]*modalCloseBtn\.hidden = shouldLockExit;[\s\S]*modalSecondaryBtn\.disabled = shouldLockExit;/
+    /function syncWorkspaceExitControls\(\) \{[\s\S]*modalElement\.classList\.toggle\('dismiss-locked', shouldLockExit\);[\s\S]*modalCloseBtn\.hidden = shouldLockExit;[\s\S]*modalCloseBtn\.style\.display = shouldLockExit \? 'none' : '';[\s\S]*modalCloseBtn\.setAttribute\('aria-hidden', shouldLockExit \? 'true' : 'false'\);[\s\S]*modalSecondaryBtn\.disabled = shouldLockExit;/
   );
   assert.match(
     pageSource,
     /function setWorkspaceLoading\(loading\) \{[\s\S]*workspaceLoadingOverlay\.classList\.toggle\('show', loading\);[\s\S]*workspaceLoadingOverlay\.setAttribute\('aria-hidden', loading \? 'false' : 'true'\);[\s\S]*syncWorkspaceExitControls\(\);[\s\S]*\}/
   );
+  assert.match(
+    pageSource,
+    /wsCustomerAddedCheck\.addEventListener\('change', function\(\) \{[\s\S]*workspacePendingCustomerCheck = !this\.checked;[\s\S]*refreshWorkspacePrimaryButtonLabel\(\);[\s\S]*syncWorkspaceExitControls\(\);[\s\S]*\}\);/
+  );
   assert.match(pageSource, /workspaceSuccessTitle\.hidden = true;/);
+  assert.match(
+    pageSource,
+    /function showWorkspaceSuccess\(customerName, successMessage\) \{[\s\S]*workspacePendingCustomerCheck = true;[\s\S]*refreshWorkspacePrimaryButtonLabel\(\);[\s\S]*syncWorkspaceExitControls\(\);[\s\S]*\}/
+  );
+  assert.match(
+    pageSource,
+    /function hideWorkspaceSuccess\(\) \{[\s\S]*workspacePendingCustomerCheck = false;[\s\S]*syncWorkspaceExitControls\(\);[\s\S]*\}/
+  );
   assert.match(
     pageSource,
     /modalPrimaryBtn\.textContent = workspacePendingCustomerCheck \? 'Dossier aanmaken' : 'Open dossier';/

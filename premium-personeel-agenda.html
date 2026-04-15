@@ -317,6 +317,12 @@
         }
         .modal-close:hover { border-color: var(--red); color: var(--red); }
         .modal-close svg { width: 16px; height: 16px; }
+        .modal-overlay.dismiss-locked .modal-close,
+        .modal.dismiss-locked .modal-close {
+            display: none !important;
+            visibility: hidden;
+            pointer-events: none;
+        }
 
         .modal-type-badge {
             font-family: 'Oswald', sans-serif; font-size: 0.7rem; font-weight: 500;
@@ -1168,6 +1174,7 @@
 
     const monthNames = ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'];
     const modalElement = document.getElementById('modal');
+    const modalCardElement = modalElement ? modalElement.querySelector('.modal') : null;
     const modalOverviewElement = document.getElementById('modalOverview');
     const modalWorkspaceElement = document.getElementById('modalWorkspace');
     const modalPrimaryBtn = document.getElementById('modalPrimaryBtn');
@@ -1214,6 +1221,7 @@
         wsCustomerAddedCheck.addEventListener('change', function() {
             workspacePendingCustomerCheck = !this.checked;
             refreshWorkspacePrimaryButtonLabel();
+            syncWorkspaceExitControls();
         });
     }
 
@@ -1227,9 +1235,24 @@
 
     function syncWorkspaceExitControls() {
         const shouldLockExit = isWorkspaceExitLocked();
+        if (modalElement) {
+            modalElement.classList.toggle('dismiss-locked', shouldLockExit);
+            modalElement.dataset.dismissLocked = shouldLockExit ? '1' : '0';
+        }
+        if (modalCardElement) {
+            modalCardElement.classList.toggle('dismiss-locked', shouldLockExit);
+            modalCardElement.dataset.dismissLocked = shouldLockExit ? '1' : '0';
+        }
         if (modalCloseBtn) {
             modalCloseBtn.hidden = shouldLockExit;
             modalCloseBtn.disabled = shouldLockExit;
+            modalCloseBtn.style.display = shouldLockExit ? 'none' : '';
+            modalCloseBtn.setAttribute('aria-hidden', shouldLockExit ? 'true' : 'false');
+            if (shouldLockExit) {
+                modalCloseBtn.setAttribute('tabindex', '-1');
+            } else {
+                modalCloseBtn.removeAttribute('tabindex');
+            }
         }
         if (modalSecondaryBtn) {
             modalSecondaryBtn.disabled = shouldLockExit;
@@ -1660,6 +1683,7 @@
         if (workspaceSuccessState) workspaceSuccessState.classList.add('show');
         workspacePendingCustomerCheck = true;
         refreshWorkspacePrimaryButtonLabel();
+        syncWorkspaceExitControls();
     }
 
     function hideWorkspaceSuccess() {
@@ -1667,6 +1691,7 @@
         if (workspaceInputArea) workspaceInputArea.style.display = '';
         if (workspaceSuccessTitle) workspaceSuccessTitle.hidden = false;
         workspacePendingCustomerCheck = false;
+        syncWorkspaceExitControls();
     }
 
     function setVoiceStatus(message, variant = '') {
