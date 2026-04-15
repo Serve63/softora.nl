@@ -356,6 +356,74 @@
             display: none;
         }
 
+        .database-toolbar-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .leaderboard-card {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.8rem;
+            min-width: 0;
+            padding: 0.78rem 0.95rem;
+            border: 1px solid rgba(139, 34, 82, 0.22);
+            background: rgba(139, 34, 82, 0.06);
+        }
+
+        .leaderboard-icon {
+            width: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(139, 34, 82, 0.14);
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .leaderboard-icon svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .leaderboard-copy {
+            display: grid;
+            gap: 0.12rem;
+            min-width: 0;
+        }
+
+        .leaderboard-label {
+            color: var(--text-tertiary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.62rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            line-height: 1.1;
+        }
+
+        .leaderboard-value {
+            color: var(--text-primary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.94rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+
+        .leaderboard-meta {
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            font-weight: 500;
+            line-height: 1.2;
+        }
+
         .btn-primary,
         .btn-secondary,
         .btn-danger,
@@ -483,7 +551,7 @@
 
         .table-wrap {
             padding: 0;
-            overflow-x: hidden;
+            overflow-x: auto;
         }
 
         table {
@@ -522,14 +590,15 @@
             padding-right: 1rem;
         }
 
-        thead th:nth-child(1) { width: 19%; }
-        thead th:nth-child(2) { width: 15%; }
-        thead th:nth-child(3) { width: 12%; }
-        thead th:nth-child(4) { width: 13%; }
-        thead th:nth-child(5) { width: 9%; }
-        thead th:nth-child(6) { width: 8%; }
-        thead th:nth-child(7) { width: 12%; }
+        thead th:nth-child(1) { width: 18%; }
+        thead th:nth-child(2) { width: 14%; }
+        thead th:nth-child(3) { width: 11%; }
+        thead th:nth-child(4) { width: 11%; }
+        thead th:nth-child(5) { width: 8%; }
+        thead th:nth-child(6) { width: 13%; white-space: normal; line-height: 1.25; }
+        thead th:nth-child(7) { width: 7%; }
         thead th:nth-child(8) { width: 12%; }
+        thead th:nth-child(9) { width: 6%; }
 
         tbody tr:hover td {
             background: var(--table-hover);
@@ -635,17 +704,26 @@
         .actions {
             display: flex;
             justify-content: flex-end;
+            align-items: center;
             gap: 0.5rem;
         }
 
         .action-btn {
             border: 1px solid var(--border);
-            padding: 0.38rem 0.6rem;
+            width: 34px;
+            height: 34px;
+            padding: 0;
             background: transparent;
             color: var(--text-secondary);
-            font-size: 0.74rem;
-            font-weight: 500;
-            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .action-btn svg {
+            width: 13px;
+            height: 13px;
         }
 
         .action-btn:hover {
@@ -814,6 +892,14 @@
                 align-items: stretch;
             }
 
+            .database-toolbar-actions {
+                justify-content: flex-start;
+            }
+
+            .leaderboard-card {
+                width: 100%;
+            }
+
             .search-wrap {
                 max-width: none;
             }
@@ -963,8 +1049,19 @@
                         <div class="database-toolbar-copy">
                             <h2 id="databaseTitle">Klantenbestand</h2>
                         </div>
-
-                        <button type="button" class="btn-primary" id="addCustomerButton">Klant toevoegen</button>
+                        <div class="database-toolbar-actions">
+                            <div class="leaderboard-card" id="leaderboardCard">
+                                <div class="leaderboard-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v3a5 5 0 0 1-10 0V4Z"/><path d="M17 6h2a2 2 0 0 1 0 4h-2"/><path d="M7 6H5a2 2 0 1 0 0 4h2"/></svg>
+                                </div>
+                                <div class="leaderboard-copy">
+                                    <div class="leaderboard-label">Meeste opdrachten</div>
+                                    <div class="leaderboard-value" id="leaderboardValue">Serve</div>
+                                    <div class="leaderboard-meta" id="leaderboardMeta">0 opdrachten</div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-primary" id="addCustomerButton">Klant toevoegen</button>
+                        </div>
                     </div>
 
                     <div class="filter-row">
@@ -989,7 +1086,7 @@
                                     <th>Website</th>
                                     <th>Onderhoud</th>
                                     <th>Status</th>
-                                    <th>Verantwoordelijk</th>
+                                    <th>Toegewezen aan</th>
                                     <th>Actief</th>
                                     <th>Betaaldatum</th>
                                     <th></th>
@@ -1076,7 +1173,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="fieldResponsible">Verantwoordelijk</label>
+                        <label class="form-label" for="fieldResponsible">Toegewezen aan</label>
                         <select class="form-select" id="fieldResponsible" name="verantwoordelijk" required>
                             <option value="Serve" selected>Serve</option>
                             <option value="Martijn">Martijn</option>
@@ -1130,6 +1227,9 @@
             empty: document.getElementById("emptyState"),
             search: document.getElementById("searchInput"),
             statusBanner: document.getElementById("statusBanner"),
+            leaderboardCard: document.getElementById("leaderboardCard"),
+            leaderboardValue: document.getElementById("leaderboardValue"),
+            leaderboardMeta: document.getElementById("leaderboardMeta"),
             modalOverlay: document.getElementById("modalOverlay"),
             modalTitle: document.getElementById("modalTitle"),
             modalError: document.getElementById("modalError"),
@@ -1695,8 +1795,37 @@
             });
         }
 
+        function updateLeaderboard() {
+            if (!nodes.leaderboardCard || !nodes.leaderboardValue || !nodes.leaderboardMeta) return;
+
+            const counts = state.klanten.reduce(function (result, customer) {
+                const responsible = normalizeResponsibleValue(customer && customer.verantwoordelijk);
+                result[responsible] = (result[responsible] || 0) + 1;
+                return result;
+            }, { Serve: 0, Martijn: 0 });
+
+            const entries = [
+                { name: "Serve", count: Number(counts.Serve || 0) },
+                { name: "Martijn", count: Number(counts.Martijn || 0) }
+            ].sort(function (a, b) {
+                if (b.count !== a.count) return b.count - a.count;
+                return a.name.localeCompare(b.name, "nl");
+            });
+
+            const leader = entries[0] || { name: "Serve", count: 0 };
+            const runnerUp = entries[1] || { name: "", count: 0 };
+            const isTie = leader.count > 0 && leader.count === runnerUp.count;
+            const assignmentLabel = leader.count === 1 ? "opdracht" : "opdrachten";
+
+            nodes.leaderboardCard.hidden = false;
+            nodes.leaderboardValue.textContent = isTie ? "Serve & Martijn" : leader.name;
+            nodes.leaderboardMeta.textContent = isTie
+                ? leader.count + " " + assignmentLabel + " elk"
+                : leader.count + " " + assignmentLabel;
+        }
+
         function updateStats() {
-            return;
+            updateLeaderboard();
         }
 
         function renderTable() {
@@ -1733,12 +1862,14 @@
                             renderServiceCell(customer, "maintenance"),
                         "</td>",
                         "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
-                        "<td data-label=\"Verantwoordelijk\" class=\"muted-cell\">" + escapeHtml(customer.verantwoordelijk || "Serve") + "</td>",
+                        "<td data-label=\"Toegewezen aan\" class=\"muted-cell\">" + escapeHtml(customer.verantwoordelijk || "Serve") + "</td>",
                         "<td data-label=\"Actief\"><span class=\"active-text " + activeClass + "\">" + escapeHtml(customer.actief || "Ja") + "</span></td>",
                         "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td class=\"cell-actions\" data-label=\"Acties\">",
                             "<div class=\"actions\">",
-                                "<button type=\"button\" class=\"action-btn\" data-action=\"edit\" data-id=\"" + escapeHtml(customer.id) + "\">Bewerk</button>",
+                                "<button type=\"button\" class=\"action-btn\" data-action=\"edit\" data-id=\"" + escapeHtml(customer.id) + "\" title=\"Bewerken\" aria-label=\"Klant bewerken\">",
+                                    "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z\"/></svg>",
+                                "</button>",
                             "</div>",
                         "</td>",
                     "</tr>"
