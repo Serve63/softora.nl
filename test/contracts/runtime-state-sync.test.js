@@ -71,7 +71,11 @@ function createFixture(overrides = {}) {
         persistedRows.push(row);
         return { ok: true, status: 200 };
       }),
+    fetchSupabaseRowByKeyViaRest:
+      overrides.fetchSupabaseRowByKeyViaRest ||
+      (async () => ({ ok: false, status: 404, body: null })),
     supabaseStateTable: 'runtime_state',
+    supabaseDismissedLeadsStateKey: overrides.supabaseDismissedLeadsStateKey || 'core:dismissed_leads',
     supabaseStateKey: 'runtime_state_main',
     supabaseCallUpdateStateKeyPrefix: 'call_update:',
     supabaseCallUpdateRowsFetchLimit: 100,
@@ -579,4 +583,85 @@ test('runtime state sync coordinator merges remote dismissed leads with local di
     'Local dismissed leadKey should be preserved');
   assert.equal(dismissedInterestedLeadKeys.has('lead-remote'), true,
     'Remote dismissed leadKey should be added');
+});
+
+test('runtime state sync coordinator persists dismissed leads to a dedicated Supabase key', async () => {
+  const persistedRows = [];
+  const dismissedInterestedLeadCallIds = new Set(['call-dismissed-1', 'call-dismissed-2']);
+  const dismissedInterestedLeadKeys = new Set(['lead-dismissed-1']);
+  const fixture = createFixture({
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+    upsertSupabaseRowViaRest: async (row) => {
+      persistedRows.push(row);
+      return { ok: true, status: 200 };
+    },
+  });
+
+  const ok = await fixture.coordinator.persistDismissedLeadsToSupabase('test_persist');
+
+  assert.equal(ok, true);
+  assert.equal(persistedRows.length, 1);
+  assert.equal(persistedRows[0].state_key, 'core:dismissed_leads');
+  assert.deepStrictEqual(persistedRows[0].payload.callIds.sort(), ['call-dismissed-1', 'call-dismissed-2']);
+  assert.deepStrictEqual(persistedRows[0].payload.leadKeys, ['lead-dismissed-1']);
+  assert.equal(persistedRows[0].payload.reason, 'test_persist');
+});
+
+test('runtime state sync coordinator hydrates dismissed leads from dedicated Supabase key', async () => {
+  const dismissedInterestedLeadCallIds = new Set();
+  const dismissedInterestedLeadKeys = new Set();
+  const fixture = createFixture({
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+    fetchSupabaseRowByKeyViaRest: async () => ({
+      ok: true,
+      status: 200,
+      body: [{
+        payload: {
+          callIds: ['call-from-supabase-1', 'call-from-supabase-2'],
+          leadKeys: ['lead-from-supabase-1'],
+          updatedAt: '2026-04-15T10:00:00.000Z',
+        },
+      }],
+    }),
+  });
+
+  const ok = await fixture.coordinator.hydrateDismissedLeadsFromSupabase();
+
+  assert.equal(ok, true);
+  assert.equal(dismissedInterestedLeadCallIds.has('call-from-supabase-1'), true);
+  assert.equal(dismissedInterestedLeadCallIds.has('call-from-supabase-2'), true);
+  assert.equal(dismissedInterestedLeadKeys.has('lead-from-supabase-1'), true);
+});
+
+test('runtime state sync coordinator merges dedicated dismissed leads with existing in-memory state', async () => {
+  const dismissedInterestedLeadCallIds = new Set(['call-already-local']);
+  const dismissedInterestedLeadKeys = new Set(['lead-already-local']);
+  const fixture = createFixture({
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+    fetchSupabaseRowByKeyViaRest: async () => ({
+      ok: true,
+      status: 200,
+      body: [{
+        payload: {
+          callIds: ['call-from-supabase'],
+          leadKeys: ['lead-from-supabase'],
+          updatedAt: '2026-04-15T10:00:00.000Z',
+        },
+      }],
+    }),
+  });
+
+  await fixture.coordinator.hydrateDismissedLeadsFromSupabase();
+
+  assert.equal(dismissedInterestedLeadCallIds.has('call-already-local'), true,
+    'Existing local dismissal should be preserved');
+  assert.equal(dismissedInterestedLeadCallIds.has('call-from-supabase'), true,
+    'Supabase dismissal should be added');
+  assert.equal(dismissedInterestedLeadKeys.has('lead-already-local'), true,
+    'Existing local lead key should be preserved');
+  assert.equal(dismissedInterestedLeadKeys.has('lead-from-supabase'), true,
+    'Supabase lead key should be added');
 });

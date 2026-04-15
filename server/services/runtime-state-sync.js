@@ -6,8 +6,10 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     upsertSupabaseStateRowViaRest = async () => ({ ok: false }),
     fetchSupabaseCallUpdateRowsViaRest = async () => ({ ok: false }),
     upsertSupabaseRowViaRest = async () => ({ ok: false }),
+    fetchSupabaseRowByKeyViaRest = async () => ({ ok: false }),
     supabaseStateTable = '',
     supabaseStateKey = '',
+    supabaseDismissedLeadsStateKey = '',
     supabaseCallUpdateStateKeyPrefix = '',
     supabaseCallUpdateRowsFetchLimit = 500,
     runtimeStateSupabaseSyncCooldownMs = 4000,
@@ -610,6 +612,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
             applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
           }
           await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
+          await hydrateDismissedLeadsFromSupabase();
           runtimeState.supabaseStateHydrated = true;
           runtimeState.supabaseLastHydrateError = '';
           runtimeState.supabaseHydrateRetryNotBeforeMs = 0;
@@ -633,6 +636,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
         }
 
         await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
+        await hydrateDismissedLeadsFromSupabase();
 
         runtimeState.supabaseStateHydrated = true;
         runtimeState.supabaseLastHydrateError = '';
@@ -1104,13 +1108,57 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     runtimeState.supabaseCallUpdatesLastSyncCheckMs = 0;
   }
 
+  async function persistDismissedLeadsToSupabase(reason = 'dismissed_leads_persist') {
+    if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return false;
+    const callIds = Array.from(dismissedInterestedLeadCallIds).filter(Boolean).slice(0, 1000);
+    const leadKeys = Array.from(dismissedInterestedLeadKeys).filter(Boolean).slice(0, 2000);
+    if (!callIds.length && !leadKeys.length) return true;
+    try {
+      const result = await upsertSupabaseRowViaRest({
+        state_key: supabaseDismissedLeadsStateKey,
+        payload: { callIds, leadKeys, updatedAt: new Date().toISOString(), reason },
+        updated_at: new Date().toISOString(),
+      });
+      return Boolean(result?.ok);
+    } catch (error) {
+      logError('[Supabase][DismissedLeadsPersistError]', error?.message || error);
+      return false;
+    }
+  }
+
+  async function hydrateDismissedLeadsFromSupabase() {
+    if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return false;
+    try {
+      const result = await fetchSupabaseRowByKeyViaRest(supabaseDismissedLeadsStateKey, 'payload');
+      if (!result?.ok) return false;
+      const row = Array.isArray(result.body) ? result.body[0] || null : result.body;
+      if (!row?.payload || typeof row.payload !== 'object') return false;
+      const callIds = Array.isArray(row.payload.callIds) ? row.payload.callIds : [];
+      const leadKeys = Array.isArray(row.payload.leadKeys) ? row.payload.leadKeys : [];
+      callIds.forEach((item) => {
+        const callId = normalizeString(item);
+        if (callId) dismissedInterestedLeadCallIds.add(callId);
+      });
+      leadKeys.forEach((item) => {
+        const leadKey = normalizeString(item);
+        if (leadKey) dismissedInterestedLeadKeys.add(leadKey);
+      });
+      return true;
+    } catch (error) {
+      logError('[Supabase][DismissedLeadsHydrateError]', error?.message || error);
+      return false;
+    }
+  }
+
   return {
     applyRuntimeStateSnapshotPayload,
     buildCallUpdateRowPersistMeta,
     ensureRuntimeStateHydratedFromSupabase,
     forceHydrateRuntimeStateWithRetries,
+    hydrateDismissedLeadsFromSupabase,
     invalidateSupabaseSyncTimestamp,
     mergeCallUpdatesFromSupabaseRows,
+    persistDismissedLeadsToSupabase,
     persistRuntimeStateToSupabase,
     persistSingleCallUpdateRowToSupabase,
     queueCallUpdateRowPersist,

@@ -12,6 +12,7 @@ function createFixture(overrides = {}) {
   const dismissedInterestedLeadKeys = overrides.dismissedInterestedLeadKeys || new Set();
   const generatedAgendaAppointments = overrides.generatedAgendaAppointments || [];
   const persistReasons = [];
+  const dedicatedPersistReasons = [];
 
   function buildLeadFollowUpCandidateKey(item) {
     const phone = normalizeString(item?.phone || '').replace(/\D/g, '');
@@ -34,6 +35,10 @@ function createFixture(overrides = {}) {
     queueRuntimeStatePersist: (reason) => {
       persistReasons.push(reason);
     },
+    persistDismissedLeadsToSupabase: async (reason) => {
+      dedicatedPersistReasons.push(reason);
+      return true;
+    },
     getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
     mapAppointmentToConfirmationTask: (appointment) => {
       const taskType = normalizeString(appointment?.confirmationTaskType || appointment?.type || '').toLowerCase();
@@ -43,6 +48,7 @@ function createFixture(overrides = {}) {
   });
 
   return {
+    dedicatedPersistReasons,
     dismissedInterestedLeadCallIds,
     dismissedInterestedLeadKeys,
     generatedAgendaAppointments,
@@ -141,4 +147,33 @@ test('agenda interested lead state service cancels matching open lead follow-up 
   assert.equal(generatedAgendaAppointments[1].confirmationAppointmentCancelled, true);
   assert.equal(generatedAgendaAppointments[2].confirmationAppointmentCancelled, undefined);
   assert.equal(generatedAgendaAppointments[0].confirmationAppointmentCancelledBy, 'Serve');
+});
+
+test('agenda interested lead state service triggers dedicated Supabase persist on dismiss', () => {
+  const { dedicatedPersistReasons, service } = createFixture();
+
+  service.dismissInterestedLeadIdentity(
+    'call-persist-test',
+    { company: 'PersistCo', phone: '0699999999' },
+    'manual_dismiss'
+  );
+
+  assert.equal(dedicatedPersistReasons.length, 1);
+  assert.equal(dedicatedPersistReasons[0], 'manual_dismiss');
+});
+
+test('agenda interested lead state service does not trigger dedicated persist for duplicate dismiss', () => {
+  const { dedicatedPersistReasons, service } = createFixture({
+    dismissedInterestedLeadCallIds: new Set(['call-already-dismissed']),
+    dismissedInterestedLeadKeys: new Set(['phone:0699999999']),
+  });
+
+  service.dismissInterestedLeadIdentity(
+    'call-already-dismissed',
+    { phone: '0699999999' },
+    'duplicate_dismiss'
+  );
+
+  assert.equal(dedicatedPersistReasons.length, 0,
+    'Should not persist when nothing changed');
 });

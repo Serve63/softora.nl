@@ -186,6 +186,7 @@ const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY |
 const SUPABASE_STATE_TABLE = String(process.env.SUPABASE_STATE_TABLE || 'softora_runtime_state').trim();
 const SUPABASE_STATE_KEY = String(process.env.SUPABASE_STATE_KEY || 'core').trim();
 const SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX = `${SUPABASE_STATE_KEY}:call_update:`;
+const SUPABASE_DISMISSED_LEADS_STATE_KEY = `${SUPABASE_STATE_KEY}:dismissed_leads`;
 const SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT = 1000;
 const DEFAULT_TWILIO_MEDIA_WS_URL = 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media';
 const PREMIUM_LOGIN_EMAILS = Array.from(
@@ -1220,8 +1221,10 @@ const runtimeStateSyncCoordinator = createRuntimeStateSyncCoordinator({
   upsertSupabaseStateRowViaRest,
   fetchSupabaseCallUpdateRowsViaRest,
   upsertSupabaseRowViaRest,
+  fetchSupabaseRowByKeyViaRest,
   supabaseStateTable: SUPABASE_STATE_TABLE,
   supabaseStateKey: SUPABASE_STATE_KEY,
+  supabaseDismissedLeadsStateKey: SUPABASE_DISMISSED_LEADS_STATE_KEY,
   supabaseCallUpdateStateKeyPrefix: SUPABASE_CALL_UPDATE_STATE_KEY_PREFIX,
   supabaseCallUpdateRowsFetchLimit: SUPABASE_CALL_UPDATE_ROWS_FETCH_LIMIT,
   runtimeStateSupabaseSyncCooldownMs: RUNTIME_STATE_SUPABASE_SYNC_COOLDOWN_MS,
@@ -1270,6 +1273,7 @@ const {
   waitForQueuedCallUpdateRowPersist,
   waitForQueuedRuntimeSnapshotPersist,
   waitForQueuedRuntimeStatePersist,
+  persistDismissedLeadsToSupabase,
 } = runtimeStateSyncCoordinator;
 
 function queueRuntimeStatePersist(reason = 'unknown') {
@@ -6714,6 +6718,7 @@ agendaInterestedLeadStateService = createAgendaInterestedLeadStateService({
   buildLeadFollowUpCandidateKey: (...args) =>
     agendaInterestedLeadReadService?.buildLeadFollowUpCandidateKey(...args) || '',
   queueRuntimeStatePersist,
+  persistDismissedLeadsToSupabase,
   getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
   mapAppointmentToConfirmationTask,
   setGeneratedAgendaAppointmentAtIndex,

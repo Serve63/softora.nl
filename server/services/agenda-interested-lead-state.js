@@ -5,6 +5,7 @@ function createAgendaInterestedLeadStateService(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     buildLeadFollowUpCandidateKey = () => '',
     queueRuntimeStatePersist = () => null,
+    persistDismissedLeadsToSupabase = async () => false,
     getGeneratedAgendaAppointments = () => [],
     mapAppointmentToConfirmationTask = () => null,
     setGeneratedAgendaAppointmentAtIndex = () => null,
@@ -49,6 +50,9 @@ function createAgendaInterestedLeadStateService(deps = {}) {
     const leadKey = buildLeadFollowUpCandidateKey(rowLike || {});
     const byCall = normalizedCallId ? dismissInterestedLeadCallId(normalizedCallId, reason) : false;
     const byKey = leadKey ? dismissInterestedLeadKey(leadKey, reason) : false;
+    if (byCall || byKey) {
+      persistDismissedLeadsToSupabase(reason).catch(() => {});
+    }
     return Boolean(byCall || byKey);
   }
 
