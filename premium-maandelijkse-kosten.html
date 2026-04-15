@@ -325,6 +325,92 @@ body {
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 
+.edit-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 28, 0.48);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1200;
+}
+.edit-modal-overlay.open { display: flex; }
+.edit-modal {
+  width: min(460px, 100%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  padding: 18px;
+}
+.edit-modal-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.edit-modal-grid {
+  display: grid;
+  gap: 10px;
+}
+.edit-modal-field label {
+  display: block;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 4px;
+}
+.edit-modal-field input,
+.edit-modal-field select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.88rem;
+  color: var(--text-dark);
+  background: var(--bg);
+  outline: none;
+}
+.edit-modal-field input:focus,
+.edit-modal-field select:focus {
+  border-color: var(--crimson);
+  background: #fff;
+}
+.edit-modal-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.btn-modal {
+  padding: 7px 12px;
+  border-radius: 4px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.btn-modal-cancel {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+}
+.btn-modal-save {
+  border: none;
+  background: var(--crimson);
+  color: #fff;
+}
+.btn-modal-save:hover { background: var(--crimson-light); }
+
 @media (max-width: 1100px) {
   .sidebar {
     position: static;
@@ -435,6 +521,37 @@ body {
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="edit-modal-overlay" id="edit-modal-overlay" aria-hidden="true">
+  <div class="edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+    <div class="edit-modal-title" id="edit-modal-title">Post bewerken</div>
+    <div class="edit-modal-grid">
+      <div class="edit-modal-field">
+        <label for="edit-naam">Naam</label>
+        <input type="text" id="edit-naam" placeholder="Naam">
+      </div>
+      <div class="edit-modal-field">
+        <label for="edit-note">Omschrijving (optioneel)</label>
+        <input type="text" id="edit-note" placeholder="Omschrijving">
+      </div>
+      <div class="edit-modal-field">
+        <label for="edit-freq">Frequentie</label>
+        <select id="edit-freq">
+          <option value="maandelijks">Maandelijks</option>
+          <option value="jaarlijks">Jaarlijks</option>
+          <option value="kwartaal">Per kwartaal</option>
+        </select>
+      </div>
+      <div class="edit-modal-field">
+        <label for="edit-bedrag">Bedrag</label>
+        <input type="number" id="edit-bedrag" step="0.01" min="0" placeholder="9.99">
+      </div>
+    </div>
+    <div class="edit-modal-actions">
+      <button class="btn-modal btn-modal-cancel" type="button" onclick="closeEditModal()">Annuleren</button>
+      <button class="btn-modal btn-modal-save" type="button" onclick="saveEditModal()">Opslaan</button>
+    </div>
+  </div>
+</div>
 
 <script>
 let data = {
@@ -445,6 +562,7 @@ let data = {
   ],
 };
 let nextId = 4;
+let editingContext = null;
 
 const freqLabel = { maandelijks:'Maandelijks', jaarlijks:'Jaarlijks', kwartaal:'Per kwartaal' };
 
@@ -554,31 +672,44 @@ function deleteItem(cat, id) {
 function editItem(cat, id) {
   const item = data[cat]?.find((i) => i.id === id);
   if (!item) return;
+  editingContext = { cat, id };
+  document.getElementById('edit-naam').value = item.naam || '';
+  document.getElementById('edit-note').value = item.note || '';
+  document.getElementById('edit-freq').value = item.freq || 'maandelijks';
+  document.getElementById('edit-bedrag').value = String(item.bedrag ?? '');
+  const overlay = document.getElementById('edit-modal-overlay');
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.getElementById('edit-naam').focus();
+}
 
-  const nieuweNaamRaw = window.prompt('Naam van de post:', item.naam);
-  if (nieuweNaamRaw === null) return;
-  const nieuweNaam = nieuweNaamRaw.trim();
+function closeEditModal() {
+  editingContext = null;
+  const overlay = document.getElementById('edit-modal-overlay');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function saveEditModal() {
+  if (!editingContext) return;
+  const { cat, id } = editingContext;
+  const item = data[cat]?.find((i) => i.id === id);
+  if (!item) return closeEditModal();
+
+  const nieuweNaam = document.getElementById('edit-naam').value.trim();
+  const nieuweNote = document.getElementById('edit-note').value.trim();
+  const nieuweFreq = document.getElementById('edit-freq').value;
+  const nieuweBedrag = parseFloat(document.getElementById('edit-bedrag').value);
+
   if (!nieuweNaam) return showToast('Naam is verplicht');
-
-  const nieuweNoteRaw = window.prompt('Omschrijving (optioneel):', item.note || '');
-  if (nieuweNoteRaw === null) return;
-  const nieuweNote = nieuweNoteRaw.trim();
-
-  const freqHint = 'maandelijks, jaarlijks of kwartaal';
-  const nieuweFreqRaw = window.prompt(`Frequentie (${freqHint}):`, item.freq);
-  if (nieuweFreqRaw === null) return;
-  const nieuweFreq = nieuweFreqRaw.trim().toLowerCase();
-  if (!freqLabel[nieuweFreq]) return showToast('Gebruik: maandelijks, jaarlijks of kwartaal');
-
-  const nieuweBedragRaw = window.prompt('Bedrag (bijv. 9.99):', String(item.bedrag).replace('.', ','));
-  if (nieuweBedragRaw === null) return;
-  const nieuweBedrag = parseFloat(nieuweBedragRaw.replace(',', '.'));
+  if (!freqLabel[nieuweFreq]) return showToast('Kies een geldige frequentie');
   if (!Number.isFinite(nieuweBedrag) || nieuweBedrag <= 0) return showToast('Vul een geldig bedrag in');
 
   item.naam = nieuweNaam;
   item.note = nieuweNote;
   item.freq = nieuweFreq;
   item.bedrag = Math.round(nieuweBedrag * 100) / 100;
+  closeEditModal();
   render();
   showToast('✓ Post bijgewerkt');
 }
@@ -593,6 +724,17 @@ function showToast(msg) {
 const now = new Date();
 document.getElementById('last-updated').textContent =
   'Bijgewerkt: ' + now.toLocaleDateString('nl-NL', { day:'numeric', month:'long', year:'numeric' });
+
+document.getElementById('edit-modal-overlay').addEventListener('click', (event) => {
+  if (event.target.id === 'edit-modal-overlay') closeEditModal();
+});
+
+document.addEventListener('keydown', (event) => {
+  const overlay = document.getElementById('edit-modal-overlay');
+  if (!overlay.classList.contains('open')) return;
+  if (event.key === 'Escape') closeEditModal();
+  if (event.key === 'Enter') saveEditModal();
+});
 
 render();
 </script>
