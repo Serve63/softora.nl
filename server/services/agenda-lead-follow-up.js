@@ -16,7 +16,6 @@ function createAgendaLeadFollowUpService(deps = {}) {
     sanitizeAppointmentWhatsappInfo = (value) => String(value || '').trim(),
     resolvePreferredRecordingUrl = () => '',
     normalizeColdcallingStack = (value) => String(value || '').trim(),
-    clearDismissedInterestedLeadCallId = () => false,
     queueRuntimeStatePersist = () => null,
   } = deps;
 
@@ -128,7 +127,6 @@ function createAgendaLeadFollowUpService(deps = {}) {
       }
       if (appointmentId > 0 && nextCallId) {
         agendaAppointmentIdByCallId.set(nextCallId, appointmentId);
-        clearDismissedInterestedLeadCallId(nextCallId);
       }
 
       touched += 1;

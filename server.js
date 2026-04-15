@@ -1072,9 +1072,6 @@ const agendaAppointmentStateService = createAgendaAppointmentStateService({
   getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
   agendaAppointmentIdByCallId,
   getRecentDashboardActivities: () => recentDashboardActivities,
-  mapAppointmentToConfirmationTask,
-  clearDismissedInterestedLeadCallId: (...args) =>
-    agendaInterestedLeadStateService?.clearDismissedInterestedLeadCallId(...args) || false,
   queueRuntimeStatePersist,
   normalizeString,
   normalizeDateYyyyMmDd,
@@ -6726,7 +6723,6 @@ agendaInterestedLeadStateService = createAgendaInterestedLeadStateService({
 
 const {
   cancelOpenLeadFollowUpTasksByIdentity,
-  clearDismissedInterestedLeadCallId,
   dismissInterestedLeadIdentity,
   isInterestedLeadDismissedForRow,
 } = agendaInterestedLeadStateService;
@@ -6783,7 +6779,6 @@ const agendaLeadFollowUpService = createAgendaLeadFollowUpService({
   sanitizeAppointmentWhatsappInfo,
   resolvePreferredRecordingUrl,
   normalizeColdcallingStack,
-  clearDismissedInterestedLeadCallId,
   queueRuntimeStatePersist,
 });
 
@@ -6797,7 +6792,6 @@ const agendaAppointmentUpsertService = createAgendaAppointmentUpsertService({
   agendaAppointmentIdByCallId,
   getGeneratedAppointmentIndexById,
   setGeneratedAgendaAppointmentAtIndex,
-  clearDismissedInterestedLeadCallId,
   findReusableLeadFollowUpAppointmentIndex,
   buildConfirmationEmailDraftFallback,
   takeNextGeneratedAgendaAppointmentId: () => nextGeneratedAgendaAppointmentId++,
@@ -6978,6 +6972,8 @@ const agendaReadCoordinator = createAgendaReadCoordinator({
   ensureConfirmationEmailDraftAtIndex,
   compareConfirmationTasks,
   buildAllInterestedLeadRows,
+  isInterestedLeadDismissedForRow: (...args) =>
+    agendaInterestedLeadStateService.isInterestedLeadDismissedForRow(...args),
   normalizeString,
 });
 

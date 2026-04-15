@@ -4,7 +4,6 @@ function createAgendaAppointmentUpsertService(deps = {}) {
     agendaAppointmentIdByCallId = new Map(),
     getGeneratedAppointmentIndexById = () => -1,
     setGeneratedAgendaAppointmentAtIndex = () => null,
-    clearDismissedInterestedLeadCallId = () => false,
     findReusableLeadFollowUpAppointmentIndex = () => -1,
     buildConfirmationEmailDraftFallback = () => '',
     takeNextGeneratedAgendaAppointmentId = () => 1,

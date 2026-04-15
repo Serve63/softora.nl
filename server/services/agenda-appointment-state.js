@@ -3,8 +3,6 @@ function createAgendaAppointmentStateService(deps = {}) {
     getGeneratedAgendaAppointments = () => [],
     agendaAppointmentIdByCallId = new Map(),
     getRecentDashboardActivities = () => [],
-    mapAppointmentToConfirmationTask = () => null,
-    clearDismissedInterestedLeadCallId = () => false,
     queueRuntimeStatePersist = () => null,
     normalizeString = (value) => String(value || '').trim(),
     normalizeDateYyyyMmDd = (value) => String(value || '').trim(),
@@ -38,10 +36,6 @@ function createAgendaAppointmentStateService(deps = {}) {
 
     if (Number.isFinite(id) && id > 0 && callId) {
       agendaAppointmentIdByCallId.set(callId, id);
-      const hasOpenLeadTask = Boolean(mapAppointmentToConfirmationTask(nextValue));
-      if (hasOpenLeadTask) {
-        clearDismissedInterestedLeadCallId(callId);
-      }
     }
 
     queueRuntimeStatePersist(reason);

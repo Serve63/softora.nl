@@ -25,14 +25,8 @@ function toBooleanSafe(value, fallback = false) {
 function createFixture(overrides = {}) {
   const generatedAgendaAppointments = overrides.generatedAgendaAppointments || [];
   const agendaAppointmentIdByCallId = new Map(overrides.agendaAppointmentIdByCallId || []);
-  const clearedCallIds = [];
   const persistReasons = [];
   let nextGeneratedAgendaAppointmentId = Number(overrides.nextGeneratedAgendaAppointmentId || 9000);
-
-  const clearDismissedInterestedLeadCallId = (callId) => {
-    clearedCallIds.push(normalizeString(callId));
-    return true;
-  };
 
   const appointmentStateService = createAgendaAppointmentStateService({
     getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
@@ -55,7 +49,6 @@ function createFixture(overrides = {}) {
       if ((!needsConfirmation && taskType !== 'lead_follow_up') || alreadyDone) return null;
       return appointment;
     },
-    clearDismissedInterestedLeadCallId,
     queueRuntimeStatePersist: (reason) => {
       persistReasons.push(reason);
     },
@@ -70,7 +63,6 @@ function createFixture(overrides = {}) {
     agendaAppointmentIdByCallId,
     getGeneratedAppointmentIndexById: appointmentStateService.getGeneratedAppointmentIndexById,
     setGeneratedAgendaAppointmentAtIndex: appointmentStateService.setGeneratedAgendaAppointmentAtIndex,
-    clearDismissedInterestedLeadCallId,
     findReusableLeadFollowUpAppointmentIndex: overrides.findReusableLeadFollowUpAppointmentIndex || (() => -1),
     buildConfirmationEmailDraftFallback: (appointment) =>
       `Draft voor ${normalizeString(appointment?.company || 'Onbekende lead')}`,
@@ -89,7 +81,6 @@ function createFixture(overrides = {}) {
 
   return {
     agendaAppointmentIdByCallId,
-    clearedCallIds,
     generatedAgendaAppointments,
     persistReasons,
     service,
@@ -97,7 +88,7 @@ function createFixture(overrides = {}) {
 }
 
 test('agenda appointment upsert service preserves committed schedule data on mapped updates', () => {
-  const { agendaAppointmentIdByCallId, clearedCallIds, generatedAgendaAppointments, persistReasons, service } =
+  const { agendaAppointmentIdByCallId, generatedAgendaAppointments, persistReasons, service } =
     createFixture({
       generatedAgendaAppointments: [
         {
@@ -148,13 +139,12 @@ test('agenda appointment upsert service preserves committed schedule data on map
   assert.equal(updated.contactEmail, 'nieuw@example.com');
   assert.equal(updated.confirmationEmailDraft, 'Oude draft');
   assert.equal(agendaAppointmentIdByCallId.get('call-11'), 11);
-  assert.deepEqual(clearedCallIds, []);
   assert.deepEqual(persistReasons, ['agenda_appointment_upsert']);
   assert.equal(generatedAgendaAppointments[0].company, 'Softora Updated');
 });
 
 test('agenda appointment upsert service reuses matching lead follow-up appointments safely', () => {
-  const { agendaAppointmentIdByCallId, clearedCallIds, persistReasons, service } = createFixture({
+  const { agendaAppointmentIdByCallId, persistReasons, service } = createFixture({
     generatedAgendaAppointments: [
       {
         id: 22,
@@ -192,12 +182,11 @@ test('agenda appointment upsert service reuses matching lead follow-up appointme
   assert.equal(reused.confirmationEmailDraftSource, 'template-auto');
   assert.equal(agendaAppointmentIdByCallId.has('old-call'), false);
   assert.equal(agendaAppointmentIdByCallId.get('new-call'), 22);
-  assert.deepEqual(clearedCallIds, ['new-call']);
   assert.deepEqual(persistReasons, ['agenda_appointment_reuse_upsert']);
 });
 
 test('agenda appointment upsert service inserts new appointments with stable defaults', () => {
-  const { agendaAppointmentIdByCallId, clearedCallIds, generatedAgendaAppointments, persistReasons, service } =
+  const { agendaAppointmentIdByCallId, generatedAgendaAppointments, persistReasons, service } =
     createFixture({
       nextGeneratedAgendaAppointmentId: 501,
     });
@@ -225,6 +214,5 @@ test('agenda appointment upsert service inserts new appointments with stable def
   assert.equal(inserted.postCallStatus, 'completed');
   assert.equal(generatedAgendaAppointments.length, 1);
   assert.equal(agendaAppointmentIdByCallId.get('call-new'), 501);
-  assert.deepEqual(clearedCallIds, []);
   assert.deepEqual(persistReasons, ['agenda_appointment_insert']);
 });

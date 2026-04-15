@@ -105,7 +105,13 @@ function createAgendaReadCoordinator(deps) {
         return !callId.startsWith('demo-');
       })
       .map(deps.mapAppointmentToConfirmationTask)
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((task) => {
+        if (task.type !== 'lead_follow_up') return true;
+        if (typeof deps.isInterestedLeadDismissedForRow !== 'function') return true;
+        const callId = deps.normalizeString(task?.callId || '');
+        return !deps.isInterestedLeadDismissedForRow(callId, task);
+      });
 
     if (countOnly) {
       const dedupe = new Set();

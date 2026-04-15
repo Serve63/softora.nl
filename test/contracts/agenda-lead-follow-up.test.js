@@ -20,7 +20,6 @@ function normalizeTimeHhMm(value) {
 function createFixture(overrides = {}) {
   const generatedAgendaAppointments = overrides.generatedAgendaAppointments || [];
   const agendaAppointmentIdByCallId = new Map(overrides.agendaAppointmentIdByCallId || []);
-  const clearedDismissedCallIds = [];
   const persistReasons = [];
 
   function buildLeadFollowUpCandidateKey(item) {
@@ -63,10 +62,6 @@ function createFixture(overrides = {}) {
     resolvePreferredRecordingUrl: (...values) =>
       values.map((value) => normalizeString(value?.recordingUrl || '')).find(Boolean) || '',
     normalizeColdcallingStack: (value) => normalizeString(value).toLowerCase(),
-    clearDismissedInterestedLeadCallId: (callId) => {
-      clearedDismissedCallIds.push(normalizeString(callId));
-      return true;
-    },
     queueRuntimeStatePersist: (reason) => {
       persistReasons.push(reason);
     },
@@ -74,7 +69,6 @@ function createFixture(overrides = {}) {
 
   return {
     agendaAppointmentIdByCallId,
-    clearedDismissedCallIds,
     generatedAgendaAppointments,
     persistReasons,
     service,
@@ -129,7 +123,7 @@ test('agenda lead follow-up service identifies open lead follow-up appointments 
 });
 
 test('agenda lead follow-up service backfills open lead follow-up appointments from newer interested-lead rows', () => {
-  const { agendaAppointmentIdByCallId, clearedDismissedCallIds, generatedAgendaAppointments, persistReasons, service } =
+  const { agendaAppointmentIdByCallId, generatedAgendaAppointments, persistReasons, service } =
     createFixture({
       generatedAgendaAppointments: [
         {
@@ -173,7 +167,6 @@ test('agenda lead follow-up service backfills open lead follow-up appointments f
   assert.equal(generatedAgendaAppointments[0].time, '13:30');
   assert.equal(agendaAppointmentIdByCallId.has('call-old'), false);
   assert.equal(agendaAppointmentIdByCallId.get('call-new'), 41);
-  assert.deepEqual(clearedDismissedCallIds, ['call-new']);
   assert.deepEqual(persistReasons, ['lead_follow_up_latest_call_backfill']);
 });
 
