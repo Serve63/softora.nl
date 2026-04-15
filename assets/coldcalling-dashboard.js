@@ -84,13 +84,28 @@
     return true;
   }
 
+  function prewarmLeadDatabaseFromCampaignControl(options = {}) {
+    const dbModal = ensureLeadDatabaseModal();
+    if (!dbModal || typeof dbModal.prewarmLeadDatabase !== 'function') return false;
+    void dbModal.prewarmLeadDatabase(options);
+    return true;
+  }
+
   function bindLeadDatabaseOpenControl() {
     window.openLeadDatabaseModalFromCampaign = openLeadDatabaseFromCampaignControl;
     const button = byId('openLeadListModalBtn');
     if (button && button.dataset.dbOpenBound !== '1') {
       button.dataset.dbOpenBound = '1';
+      const warmupLeadDatabase = () => {
+        prewarmLeadDatabaseFromCampaignControl();
+      };
+      button.addEventListener('pointerenter', warmupLeadDatabase, { passive: true });
+      button.addEventListener('focus', warmupLeadDatabase);
+      button.addEventListener('touchstart', warmupLeadDatabase, { passive: true });
+      button.addEventListener('pointerdown', warmupLeadDatabase, { passive: true });
       button.addEventListener('click', (event) => {
         event.preventDefault();
+        warmupLeadDatabase();
         openLeadDatabaseFromCampaignControl();
       });
     }
@@ -4599,6 +4614,7 @@
 
     const state = {
       loading: false,
+      opening: false,
       importing: false,
       error: '',
       info: '',
@@ -4613,6 +4629,7 @@
       lastRefreshedAt: '',
       detailCallId: '',
       forceReloadAfterLoad: false,
+      openRequestId: 0,
     };
     const callDetailSummaryByCallId = new Map();
     const callDetailSummaryPromiseByCallId = new Map();
@@ -5996,14 +6013,14 @@
       const closeBtn = byId('leadDatabaseCancelBtn');
       if (!tableWrap || !summaryCards || !statusBar) return;
 
-      const busy = state.importing || state.loading;
+      const busy = state.importing || state.loading || state.opening;
       if (refreshInfo) {
         refreshInfo.textContent = state.lastRefreshedAt
           ? `Verversd om ${new Date(state.lastRefreshedAt).toLocaleTimeString('nl-NL', {
               hour: '2-digit',
               minute: '2-digit',
             })}`
-          : state.loading
+          : state.loading || state.opening
             ? 'Database laden...'
             : 'Nog niet ververst';
       }
@@ -6072,7 +6089,7 @@
         statusBar.textContent = '';
       }
 
-      if (state.loading && state.records.length === 0) {
+      if ((state.loading || state.opening) && state.records.length === 0) {
         tableWrap.innerHTML = `<div class="lead-db-empty">Database laden...</div>`;
         return;
       }
@@ -6346,6 +6363,8 @@
 
     function closeModal() {
       closeCallDetail();
+      state.opening = false;
+      state.openRequestId += 1;
       modal.style.display = 'none';
       document.body.style.overflow = '';
       if (state.pollTimer) {
@@ -6357,13 +6376,28 @@
     async function openModal() {
       applyTheme();
       state.filter = 'callback';
-      if (!hasLeadDatabaseSnapshot()) {
-        await prewarmLeadDatabase();
-      }
+      const hadSnapshot = hasLeadDatabaseSnapshot();
+      const openRequestId = state.openRequestId + 1;
+      state.openRequestId = openRequestId;
       modal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
-      render();
-      void prewarmLeadDatabase({ force: true });
+      if (!hadSnapshot) {
+        state.opening = true;
+        state.error = '';
+        render();
+        if (!remoteUiStateLoaded || remoteUiStateLoadingPromise) {
+          await loadRemoteUiState();
+        }
+        if (state.openRequestId !== openRequestId || modal.style.display === 'none') return;
+        state.opening = false;
+        render();
+        await loadData(true);
+      } else {
+        state.opening = false;
+        render();
+        void prewarmLeadDatabase({ force: true });
+      }
+      if (state.openRequestId !== openRequestId || modal.style.display === 'none') return;
       if (state.pollTimer) {
         window.clearInterval(state.pollTimer);
       }

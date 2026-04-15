@@ -11,7 +11,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260413a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260415a" defer><\/script>/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
   assert.match(pageSource, /id="statBooked"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_BOOKED --><\/div>/);
   assert.match(pageSource, /id="statInterested"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_INTERESTED --><\/div>/);
@@ -64,7 +64,17 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /statusEl\.style\.margin = '14px 0 18px';/);
   assert.match(dashboardSource, /\/api\/coldcalling\/call-detail\?callId=\$\{encodeURIComponent\(normalizedCallId\)\}/);
   assert.match(dashboardSource, /function prewarmLeadDatabase\(options = \{\}\) \{/);
-  assert.match(dashboardSource, /if \(!hasLeadDatabaseSnapshot\(\)\) \{\s*await prewarmLeadDatabase\(\);/);
+  assert.match(dashboardSource, /function prewarmLeadDatabaseFromCampaignControl\(options = \{\}\) \{[\s\S]*ensureLeadDatabaseModal\(\)[\s\S]*dbModal\.prewarmLeadDatabase\(options\);/);
+  assert.match(dashboardSource, /opening:\s*false,[\s\S]*openRequestId:\s*0,/);
+  assert.match(
+    dashboardSource,
+    /const busy = state\.importing \|\| state\.loading \|\| state\.opening;[\s\S]*: state\.loading \|\| state\.opening[\s\S]*Database laden\.\.\./
+  );
+  assert.match(dashboardSource, /\(state\.loading \|\| state\.opening\) && state\.records\.length === 0/);
+  assert.match(
+    dashboardSource,
+    /async function openModal\(\) \{[\s\S]*modal\.style\.display = 'flex';[\s\S]*if \(!hadSnapshot\) \{[\s\S]*state\.opening = true;[\s\S]*render\(\);[\s\S]*await loadRemoteUiState\(\);[\s\S]*state\.opening = false;[\s\S]*await loadData\(true\);/
+  );
   assert.match(dashboardSource, /void leadDatabaseModal\.prewarmLeadDatabase\(\);/);
   assert.match(dashboardSource, /function prewarmLeadDatabaseCallDetails\(limit = 1\) \{/);
   assert.match(dashboardSource, /prewarmLeadDatabaseCallDetails\(4\);/);
@@ -137,7 +147,10 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   );
   assert.match(dashboardSource, /bevestigingsmail sturen/);
   assert.match(dashboardSource, /function openLeadDatabaseFromCampaignControl\(\) \{[\s\S]*ensureLeadDatabaseModal\(\)[\s\S]*dbModal\.openLeadDatabaseModal\(\);/);
-  assert.match(dashboardSource, /function bindLeadDatabaseOpenControl\(\) \{[\s\S]*window\.openLeadDatabaseModalFromCampaign = openLeadDatabaseFromCampaignControl;[\s\S]*button\.dataset\.dbOpenBound !== '1'/);
+  assert.match(
+    dashboardSource,
+    /function bindLeadDatabaseOpenControl\(\) \{[\s\S]*window\.openLeadDatabaseModalFromCampaign = openLeadDatabaseFromCampaignControl;[\s\S]*button\.dataset\.dbOpenBound !== '1'[\s\S]*button\.addEventListener\('pointerenter', warmupLeadDatabase, \{ passive: true \}\);[\s\S]*button\.addEventListener\('focus', warmupLeadDatabase\);[\s\S]*button\.addEventListener\('touchstart', warmupLeadDatabase, \{ passive: true \}\);/
+  );
   assert.match(dashboardSource, /bindLeadDatabaseOpenControl\(\);\s*void bootstrapColdcallingUi\(\);/);
   assert.match(dashboardSource, /const CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY = 'softora_campaign_regio_custom_km';/);
   assert.match(dashboardSource, /const DEFAULT_CAMPAIGN_REGIO_VALUE = 'unlimited';/);
