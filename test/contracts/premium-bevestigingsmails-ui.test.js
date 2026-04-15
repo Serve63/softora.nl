@@ -32,8 +32,8 @@ test('premium bevestigingsmails shows the shared Retell cost counter without loa
   assert.match(pageSource, /<span class="topbar-select-label">Totale kosten coldcalling<\/span>/);
   assert.match(pageSource, /<div class="topbar-cost-group" data-retell-cost-root>/);
   assert.match(pageSource, /<div class="topbar-cost-value" data-retell-cost-value>€0,00<\/div>/);
-  assert.match(pageSource, /<div class="topbar-cost-meta" data-retell-cost-meta>Ophalen\.\.\.<\/div>/);
   assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260415b" defer><\/script>/);
   assert.doesNotMatch(pageSource, /topbar-cost-dot/);
+  assert.doesNotMatch(pageSource, /data-retell-cost-meta/);
   assert.doesNotMatch(pageSource, /<script[^>]+src=["']assets\/coldcalling-dashboard\.js[^"']*["'][^>]*>/);
 });

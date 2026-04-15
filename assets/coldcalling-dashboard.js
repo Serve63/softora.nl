@@ -6730,20 +6730,8 @@
     const run = activeSequentialClientDispatch;
     if (!run || run.completed) return;
     syncSequentialClientDispatchButtonState();
-
-    const processed = run.started + run.failed;
-    const total = run.total;
-    if (run.waiting) {
-      setStatusPill('loading', 'Coldcalling bezig');
-      setStatusMessage(
-        'loading',
-        `1 voor 1 actief: ${processed}/${total} verwerkt. Wacht tot het huidige gesprek is afgelopen om de volgende call te starten.`
-      );
-      return;
-    }
-
     setStatusPill('loading', 'Coldcalling bezig');
-    setStatusMessage('loading', `1 voor 1 actief: ${processed}/${total} verwerkt. Volgende call wordt voorbereid...`);
+    setStatusMessage('', '');
   }
 
   function matchesSequentialClientWaitingUpdate(run, update) {
@@ -7134,7 +7122,6 @@
       }
 
       const campaign = collectCampaignFormData();
-      const stackLabel = campaign.coldcallingStackLabel || getColdcallingStackLabel(campaign.coldcallingStack);
       const leadSelection = await getManualLeadsFromDashboard(campaign.amount);
       const leads = leadSelection.leads;
       campaign.amount = leads.length;
@@ -7142,7 +7129,7 @@
       isSubmitting = true;
       setButtonLoading(true, 'Coldcalling bezig...');
       setStatusPill('loading', 'Coldcalling bezig');
-      setStatusMessage('loading', `Bezig met coldcallen via ${stackLabel}...`);
+      setStatusMessage('', '');
       if (leadSelection.parsed.errors.length > 0) {
         addUiLog(
           'skip',
@@ -7197,10 +7184,7 @@
         };
 
         setStatusPill('loading', '1 voor 1 actief');
-        setStatusMessage(
-          'loading',
-          `1 voor 1 actief: 0/${leads.length} verwerkt. Eerste call wordt voorbereid...`
-        );
+        setStatusMessage('', '');
 
         await advanceSequentialClientDispatch('start-request');
         return;

@@ -92,9 +92,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   );
   assert.match(
     dashboardSource,
-    /setStatusPill\('loading', 'Coldcalling bezig'\);[\s\S]*Wacht tot het huidige gesprek is afgelopen/
+    /function updateSequentialClientDispatchStatus\(\) \{[\s\S]*setStatusPill\('loading', 'Coldcalling bezig'\);[\s\S]*setStatusMessage\('', ''\);/
   );
-  assert.match(dashboardSource, /Volgende call wordt voorbereid\.\.\./);
   assert.match(
     dashboardSource,
     /messageType: 'direct\.call\.status',[\s\S]*endedAt: String\(data\.endedAt \|\| ''\)\.trim\(\),[\s\S]*durationSeconds: Number\(data\.durationSeconds \|\| 0\) \|\| 0/
@@ -103,11 +102,22 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     dashboardSource,
     /function setButtonLoading\(isLoading, label = 'Coldcalling bezig\.\.\.'\) \{/
   );
-  assert.match(dashboardSource, /Bezig met coldcallen via \$\{stackLabel\}\.\.\./);
+  assert.match(
+    dashboardSource,
+    /setButtonLoading\(true, 'Coldcalling bezig\.\.\.'\);[\s\S]*setStatusPill\('loading', 'Coldcalling bezig'\);[\s\S]*setStatusMessage\('', ''\);/
+  );
+  assert.match(
+    dashboardSource,
+    /setStatusPill\('loading', '1 voor 1 actief'\);[\s\S]*setStatusMessage\('', ''\);[\s\S]*await advanceSequentialClientDispatch\('start-request'\);/
+  );
   assert.match(
     dashboardSource,
     /addUiLog\(\s*'success',[\s\S]*Coldcalling afgerond[\s\S]*activeSequentialClientDispatch = null;[\s\S]*clearCompletedSequentialClientDispatchUi\(\);/
   );
+  assert.doesNotMatch(dashboardSource, /Bezig met coldcallen via \$\{stackLabel\}\.\.\./);
+  assert.doesNotMatch(dashboardSource, /Wacht tot het huidige gesprek is afgelopen/);
+  assert.doesNotMatch(dashboardSource, /Volgende call wordt voorbereid\.\.\./);
+  assert.doesNotMatch(dashboardSource, /Eerste call wordt voorbereid\.\.\./);
   assert.doesNotMatch(dashboardSource, /Campagne wordt gestart via \$\{stackLabel\}\.\.\./);
   assert.doesNotMatch(dashboardSource, /Campagne starten\.\.\./);
   assert.match(dashboardSource, /looksLikeDirectSpeechConversationSummary/);
@@ -204,9 +214,9 @@ test('premium ai lead generator includes a live Retell cost counter', () => {
   assert.match(pageSource, /<span class="topbar-select-label">Totale kosten coldcalling<\/span>/);
   assert.match(pageSource, /<div class="topbar-cost-group" data-retell-cost-root>/);
   assert.match(pageSource, /<div class="topbar-cost-value" data-retell-cost-value>€0,00<\/div>/);
-  assert.match(pageSource, /<div class="topbar-cost-meta" data-retell-cost-meta>Ophalen\.\.\.<\/div>/);
   assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260415b" defer><\/script>/);
   assert.doesNotMatch(pageSource, /topbar-cost-dot/);
+  assert.doesNotMatch(pageSource, /data-retell-cost-meta/);
   assert.match(costWidgetSource, /const CALL_UPDATES_ENDPOINT = '\/api\/coldcalling\/call-updates\?limit=500';/);
   assert.match(costWidgetSource, /const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0\.07;/);
   assert.match(costWidgetSource, /const DEFAULT_USD_TO_EUR_RATE = 0\.92;/);
