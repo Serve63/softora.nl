@@ -1217,8 +1217,12 @@
         });
     }
 
+    function isWorkspaceLoadingVisible() {
+        return Boolean(workspaceLoadingOverlay && workspaceLoadingOverlay.classList.contains('show'));
+    }
+
     function isWorkspaceExitLocked() {
-        return modalWorkspaceMode && (workspaceBusy || workspacePendingCustomerCheck);
+        return modalWorkspaceMode && (workspaceBusy || workspacePendingCustomerCheck || isWorkspaceLoadingVisible());
     }
 
     function syncWorkspaceExitControls() {
@@ -1623,7 +1627,11 @@
     }
 
     function setWorkspaceLoading(loading) {
-        if (workspaceLoadingOverlay) workspaceLoadingOverlay.classList.toggle('show', loading);
+        if (workspaceLoadingOverlay) {
+            workspaceLoadingOverlay.classList.toggle('show', loading);
+            workspaceLoadingOverlay.setAttribute('aria-hidden', loading ? 'false' : 'true');
+        }
+        syncWorkspaceExitControls();
     }
 
     function showWorkspaceSuccess(customerName, successMessage) {
@@ -1862,7 +1870,7 @@
         modalSecondaryBtn.textContent = 'Terug';
 
         if (linkedOrderId) {
-            modalPrimaryBtn.textContent = 'Open dossier';
+            modalPrimaryBtn.textContent = workspacePendingCustomerCheck ? 'Dossier aanmaken' : 'Open dossier';
             modalPrimaryBtn.disabled = workspaceBusy || workspacePendingCustomerCheck;
             syncWorkspaceExitControls();
             return;

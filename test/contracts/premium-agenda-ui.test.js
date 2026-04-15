@@ -31,13 +31,25 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   assert.match(pageSource, /<button class="modal-close magnetic" id="modalCloseBtn"/);
   assert.match(
     pageSource,
-    /function isWorkspaceExitLocked\(\) \{\s*return modalWorkspaceMode && \(workspaceBusy \|\| workspacePendingCustomerCheck\);\s*\}/
+    /function isWorkspaceLoadingVisible\(\) \{\s*return Boolean\(workspaceLoadingOverlay && workspaceLoadingOverlay\.classList\.contains\('show'\)\);\s*\}/
+  );
+  assert.match(
+    pageSource,
+    /function isWorkspaceExitLocked\(\) \{\s*return modalWorkspaceMode && \(workspaceBusy \|\| workspacePendingCustomerCheck \|\| isWorkspaceLoadingVisible\(\)\);\s*\}/
   );
   assert.match(
     pageSource,
     /function syncWorkspaceExitControls\(\) \{[\s\S]*modalCloseBtn\.hidden = shouldLockExit;[\s\S]*modalSecondaryBtn\.disabled = shouldLockExit;/
   );
+  assert.match(
+    pageSource,
+    /function setWorkspaceLoading\(loading\) \{[\s\S]*workspaceLoadingOverlay\.classList\.toggle\('show', loading\);[\s\S]*workspaceLoadingOverlay\.setAttribute\('aria-hidden', loading \? 'false' : 'true'\);[\s\S]*syncWorkspaceExitControls\(\);[\s\S]*\}/
+  );
   assert.match(pageSource, /workspaceSuccessTitle\.hidden = true;/);
+  assert.match(
+    pageSource,
+    /modalPrimaryBtn\.textContent = workspacePendingCustomerCheck \? 'Dossier aanmaken' : 'Open dossier';/
+  );
   assert.match(pageSource, /modalPrimaryBtn\.disabled = workspaceBusy \|\| workspacePendingCustomerCheck;/);
   assert.match(pageSource, /function closeModal\(\) \{\s*if \(isWorkspaceExitLocked\(\)\) return;/);
   assert.match(pageSource, /function handleModalSecondaryAction\(\) \{\s*if \(isWorkspaceExitLocked\(\)\) return;/);
