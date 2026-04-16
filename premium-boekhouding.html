@@ -115,26 +115,6 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 #screen-map { display: none; flex-direction: column; }
 #screen-map.active { display: flex; }
 
-.map-bar {
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  padding: 0 48px;
-  height: 52px;
-  display: flex; align-items: center;
-  gap: 16px;
-  position: sticky; top: 0; z-index: 10;
-  flex-shrink: 0;
-}
-.back-btn { display: flex; align-items: center; gap: 7px; font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--light); background: none; border: none; cursor: pointer; transition: color .15s; padding: 0; }
-.back-btn:hover { color: var(--crimson); }
-.back-btn svg { width: 13px; height: 13px; }
-.map-bar-title { font-family: 'Oswald', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--dark); }
-.map-bar-period { font-size: 12px; color: var(--light); margin-left: 4px; }
-.map-bar-right { margin-left: auto; display: flex; gap: 10px; }
-.btn-add { display: flex; align-items: center; gap: 7px; padding: 7px 16px; background: var(--crimson); color: #fff; border: none; border-radius: 4px; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
-.btn-add:hover { background: var(--clight); }
-.btn-add svg { width: 12px; height: 12px; }
-
 .map-body { padding: 32px 48px 60px; flex: 1; }
 
 /* DROPZONE */
@@ -145,7 +125,24 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 .dropzone span { color: var(--crimson); font-weight: 600; }
 
 /* FILES */
-.files-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.files-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.files-header-copy { display: grid; gap: 3px; }
+.files-tools { display: flex; align-items: center; gap: 8px; }
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--light);
+  cursor: pointer;
+  transition: all .15s;
+}
+.icon-btn:hover { color: var(--crimson); border-color: rgba(155,35,85,.2); }
+.icon-btn svg { width: 14px; height: 14px; }
 .files-title { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--light); }
 .files-count { font-size: 11px; color: var(--light); }
 
@@ -246,28 +243,21 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 
 <!-- SCHERM 2: MAP -->
 <div class="screen" id="screen-map">
-  <div class="map-bar">
-    <button class="back-btn" onclick="goBack()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
-      Terug
-    </button>
-    <div>
-      <span class="map-bar-title" id="map-title"></span>
-      <span class="map-bar-period" id="map-period"></span>
-    </div>
-    <div class="map-bar-right">
-      <button class="btn-add" onclick="document.getElementById('file-inp').click()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Toevoegen
-      </button>
-      <input type="file" multiple id="file-inp" style="display:none" onchange="addFiles(this.files)">
-    </div>
-  </div>
-
   <div class="map-body">
     <div class="files-header">
-      <div class="files-title">Bestanden</div>
-      <div class="files-count" id="files-count"></div>
+      <div class="files-header-copy">
+        <div class="files-title">Bestanden</div>
+        <div class="files-count" id="files-count"></div>
+      </div>
+      <div class="files-tools">
+        <button class="icon-btn" type="button" onclick="goBack()" aria-label="Naar overzicht">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="icon-btn" type="button" onclick="document.getElementById('file-inp').click()" aria-label="Upload bestanden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+        <input type="file" multiple id="file-inp" style="display:none" onchange="addFiles(this.files)">
+      </div>
     </div>
     <div class="files-grid" id="files-grid"></div>
 
@@ -297,14 +287,55 @@ function entry(id) { return st[id] || { checked:false, files:[], notes:'' }; }
 function upd(id, d) { st[id] = { ...entry(id), ...d }; save(); }
 
 // AANGIFTES
-function aangiftes(y) {
-  return [
-    { id:`btw1-${y}`, naam:'BTW Aangifte', period:`1e kwartaal ${y} (jan - mrt)`, deadline:`${y}-04-30`, cat:'Omzetbelasting (BTW)' },
-    { id:`btw2-${y}`, naam:'BTW Aangifte', period:`2e kwartaal ${y} (apr - jun)`, deadline:`${y}-07-31`, cat:'Omzetbelasting (BTW)' },
-    { id:`btw3-${y}`, naam:'BTW Aangifte', period:`3e kwartaal ${y} (jul - sep)`, deadline:`${y}-10-31`, cat:'Omzetbelasting (BTW)' },
-    { id:`btw4-${y}`, naam:'BTW Aangifte', period:`4e kwartaal ${y} (okt - dec)`, deadline:`${y+1}-01-31`, cat:'Omzetbelasting (BTW)' },
-    { id:`ib-${y}`,   naam:'Inkomstenbelasting', period:`Belastingjaar ${y}`,      deadline:`${y+1}-05-01`, cat:'Inkomstenbelasting' },
+const BTW_DEADLINE_COUNT = 35;
+const INCOME_TAX_DEADLINE_COUNT = 35;
+const BTW_START_YEAR = 2026;
+const INCOME_TAX_START_YEAR = 2025;
+
+function buildBtwAangiftes() {
+  const quarters = [
+    { quarter:1, label:'1e kwartaal', months:'jan - mrt', deadlineSuffix:'04-30', deadlineYearOffset:0 },
+    { quarter:2, label:'2e kwartaal', months:'apr - jun', deadlineSuffix:'07-31', deadlineYearOffset:0 },
+    { quarter:3, label:'3e kwartaal', months:'jul - sep', deadlineSuffix:'10-31', deadlineYearOffset:0 },
+    { quarter:4, label:'4e kwartaal', months:'okt - dec', deadlineSuffix:'01-31', deadlineYearOffset:1 }
   ];
+
+  return Array.from({ length: BTW_DEADLINE_COUNT }, (_, index) => {
+    const periodYear = BTW_START_YEAR + Math.floor(index / 4);
+    const quarter = quarters[index % 4];
+    const deadlineYear = periodYear + quarter.deadlineYearOffset;
+
+    return {
+      id:`btw${quarter.quarter}-${periodYear}`,
+      naam:'BTW Aangifte',
+      period:`${quarter.label} ${periodYear} (${quarter.months})`,
+      deadline:`${deadlineYear}-${quarter.deadlineSuffix}`,
+      cat:'Omzetbelasting (BTW)'
+    };
+  });
+}
+
+function buildIncomeTaxAangiftes() {
+  return Array.from({ length: INCOME_TAX_DEADLINE_COUNT }, (_, index) => {
+    const taxYear = INCOME_TAX_START_YEAR + index;
+
+    return {
+      id:`ib-${taxYear}`,
+      naam:'Inkomstenbelasting',
+      period:`Belastingjaar ${taxYear}`,
+      deadline:`${taxYear + 1}-05-01`,
+      cat:'Inkomstenbelasting'
+    };
+  });
+}
+
+const ALL_AANGIFTES = [...buildBtwAangiftes(), ...buildIncomeTaxAangiftes()].sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
+const AVAILABLE_YEARS = [...new Set(ALL_AANGIFTES.map(a => Number(String(a.deadline).slice(0,4))))].sort((a,b) => a - b);
+function clampYear(nextYear) { return Math.max(AVAILABLE_YEARS[0], Math.min(AVAILABLE_YEARS[AVAILABLE_YEARS.length - 1], nextYear)); }
+year = clampYear(year);
+
+function aangiftes(y) {
+  return ALL_AANGIFTES.filter(a => Number(String(a.deadline).slice(0,4)) === y);
 }
 
 // HELPERS
@@ -397,17 +428,14 @@ function toggleCheck(id) {
 }
 
 // JAAR
-function changeYear(d) { year += d; renderList(); }
+function changeYear(d) { year = clampYear(year + d); renderList(); }
 
 // OPEN MAP
 function openMap(id) {
   openId = id;
-  const all = aangiftes(year);
-  const a = all.find(x => x.id === id); if (!a) return;
+  const a = ALL_AANGIFTES.find(x => x.id === id); if (!a) return;
   const e = entry(id);
 
-  document.getElementById('map-title').textContent = a.naam;
-  document.getElementById('map-period').textContent = a.period || '';
   document.getElementById('notes-ta').value = e.notes || '';
   renderFiles();
 
