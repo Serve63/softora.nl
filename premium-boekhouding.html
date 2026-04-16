@@ -407,7 +407,7 @@ function openMap(id) {
   const e = entry(id);
 
   document.getElementById('map-title').textContent = a.naam;
-  document.getElementById('map-period').textContent = ' - ' + a.period;
+  document.getElementById('map-period').textContent = a.period || '';
   document.getElementById('notes-ta').value = e.notes || '';
   renderFiles();
 
