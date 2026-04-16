@@ -1121,7 +1121,13 @@
             function normalizeDossierPairLabel(value) {
                 const label = String(value || '').replace(/\s+/g, ' ').trim();
                 if (!label) return '';
-                return label.toLowerCase() === 'geclaimd door' ? 'Aangewezen aan' : label;
+                const normalized = label
+                    .toLowerCase()
+                    .replace(/[-_]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                if (normalized === 'accounthouder softora' || normalized === 'softora contactpersoon') return '';
+                return normalized === 'geclaimd door' ? 'Aangewezen aan' : label;
             }
 
             function buildFallbackLayout(baseData) {

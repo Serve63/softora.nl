@@ -3084,7 +3084,13 @@ function shouldHideOrderDossierBlockTitle(value) {
 function normalizeOrderDossierPairLabel(value) {
   const label = normalizeString(value || '').replace(/\s+/g, ' ').trim();
   if (!label) return '';
-  return label.toLowerCase() === 'geclaimd door' ? 'Aangewezen aan' : label;
+  const normalized = label
+    .toLowerCase()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (normalized === 'accounthouder softora' || normalized === 'softora contactpersoon') return '';
+  return normalized === 'geclaimd door' ? 'Aangewezen aan' : label;
 }
 
 function buildOrderDossierFallbackLayout(options = {}) {
@@ -3206,6 +3212,7 @@ function buildAnthropicOrderDossierPrompts(options = {}) {
     '- Gebruik alleen content die direct uit de input volgt; voeg geen generieke projectfasen of teamrichtlijnen toe.',
     '- Gebruik een indeling die past bij de hoeveelheid inhoud (dynamisch, niet template-achtig).',
     '- Gebruik geen bloktitels zoals "Uitvoerplan", "Ontbrekende informatie" of "Praktische aandachtspunten".',
+    '- Voeg geen interne velden toe zoals "Accounthouder Softora" of "Softora-contactpersoon".',
     '- Lever een direct copy-paste prompt voor Claude Opus 4.6 die exact 1 zin lang is.',
     '- Gebruik NOOIT ellipsis zoals "...".',
     '- Geef ALLEEN geldig JSON terug, zonder markdown of extra tekst.',
@@ -3251,6 +3258,7 @@ function buildAnthropicOrderDossierPrompts(options = {}) {
     '- Zorg dat er altijd minimaal 1 meta-block en 1 inhoudsblock aanwezig is.',
     '- Gebruik alleen dossierblokken die direct op de invoer zijn gebaseerd.',
     '- Laat blokken met algemene projectplanning, ontbrekende-informatie-lijsten en praktische teamnotities weg.',
+    '- Laat interne Softora-contactvelden zoals account- of contactpersoonlabels weg.',
     '- opusPrompt moet direct bruikbaar zijn voor Claude Opus 4.6 en exact 1 zin lang zijn.',
     '</required_output>',
     '<fallback_reference>',
