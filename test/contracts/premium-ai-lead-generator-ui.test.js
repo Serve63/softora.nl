@@ -11,7 +11,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260416b" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260416c" defer><\/script>/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
   assert.match(pageSource, /id="statBooked"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_BOOKED --><\/div>/);
   assert.match(pageSource, /id="statInterested"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_INTERESTED --><\/div>/);
@@ -121,6 +121,11 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.doesNotMatch(dashboardSource, /Eerste call wordt voorbereid\.\.\./);
   assert.doesNotMatch(dashboardSource, /Campagne wordt gestart via \$\{stackLabel\}\.\.\./);
   assert.doesNotMatch(dashboardSource, /Campagne starten\.\.\./);
+  assert.match(
+    dashboardSource,
+    /const campaign = collectCampaignFormData\(\);[\s\S]*const stackLabel = String\([\s\S]*campaign\.coldcallingStackLabel \|\| getColdcallingStackLabel\(campaign\.coldcallingStack\) \|\| ''[\s\S]*\)\.trim\(\);/
+  );
+  assert.match(dashboardSource, /via \$\{escapeHtml\(stackLabel \|\| 'onbekende provider'\)\}\./);
   assert.match(dashboardSource, /looksLikeDirectSpeechConversationSummary/);
   assert.match(dashboardSource, /Eindig altijd met een volledige zin en nooit met ellips of afgebroken tekst/);
   assert.match(dashboardSource, /const sharedCallSummaryCacheByCallId = Object\.create\(null\);/);
