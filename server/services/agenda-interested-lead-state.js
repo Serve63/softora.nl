@@ -90,6 +90,16 @@ function createAgendaInterestedLeadStateService(deps = {}) {
       if (!dismissedByCallId && dismissedByKey) {
         const dismissedAtMs = getInterestedLeadKeyDismissedAtMs(leadKey);
         const rowTimestampMs = getInterestedLeadRowTimestampMs(rowLike || {});
+        if (dismissedAtMs > 0 && rowTimestampMs <= 0) {
+          logLeadTrace('dismiss-state', 'call-id-hidden-while-key-dismissed-without-row-timestamp', {
+            callId: normalizedCallId,
+            leadKey,
+            dismissedAtMs,
+            rowTimestampMs: 0,
+            row: summarizeLeadRow(rowLike),
+          });
+          return true;
+        }
         if (dismissedAtMs > 0 && rowTimestampMs > 0 && rowTimestampMs <= dismissedAtMs) {
           return true;
         }

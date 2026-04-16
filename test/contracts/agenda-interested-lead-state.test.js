@@ -128,8 +128,27 @@ test('agenda interested lead state service allows truly newer same-phone calls a
   );
 });
 
+test('agenda interested lead state service hides same-phone rows without a trustworthy timestamp after dismiss', () => {
+  const { service } = createFixture({
+    dismissedInterestedLeadKeys: new Set(['phone:0612345678']),
+    dismissedInterestedLeadKeyUpdatedAtMsByKey: new Map([
+      ['phone:0612345678', Date.parse('2026-04-15T15:10:00.000Z')],
+    ]),
+  });
+
+  assert.equal(
+    service.isInterestedLeadDismissedForRow('call-stale', {
+      company: 'Softora',
+      contact: 'Serve',
+      phone: '0612345678',
+    }),
+    true
+  );
+});
+
 test('agenda interested lead state service can dismiss multiple related call ids without blocking future call ids', () => {
   const { dismissedInterestedLeadCallIds, dismissedInterestedLeadKeys, persistReasons, service } = createFixture();
+  const futureUpdatedAtMs = Date.now() + 60 * 1000;
 
   const changed = service.dismissInterestedLeadIdentity(
     'call-primary',
@@ -150,6 +169,7 @@ test('agenda interested lead state service can dismiss multiple related call ids
       company: 'Softora',
       contact: 'Serve',
       phone: '0612345678',
+      updatedAtMs: futureUpdatedAtMs,
     }),
     false
   );
