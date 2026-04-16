@@ -307,8 +307,22 @@
         }
 
         .hero {
-            display: block;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1.5rem;
             margin-bottom: 2.5rem;
+        }
+
+        .hero-copy {
+            min-width: 0;
+        }
+
+        .hero-side {
+            margin-left: auto;
+            display: flex;
+            justify-content: flex-end;
+            flex-shrink: 0;
         }
 
         .hero-title {
@@ -366,9 +380,10 @@
 
         .leaderboard-card {
             display: inline-flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.8rem;
             min-width: 0;
+            width: min(320px, 100%);
             padding: 0.78rem 0.95rem;
             border: 1px solid rgba(139, 34, 82, 0.22);
             background: rgba(139, 34, 82, 0.06);
@@ -393,8 +408,9 @@
 
         .leaderboard-copy {
             display: grid;
-            gap: 0.12rem;
+            gap: 0.45rem;
             min-width: 0;
+            width: 100%;
         }
 
         .leaderboard-label {
@@ -406,7 +422,23 @@
             line-height: 1.1;
         }
 
-        .leaderboard-value {
+        .leaderboard-list {
+            display: grid;
+            gap: 0.42rem;
+        }
+
+        .leaderboard-entry {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.8rem;
+        }
+
+        .leaderboard-entry.is-leading .leaderboard-entry-name {
+            color: var(--accent);
+        }
+
+        .leaderboard-entry-name {
             color: var(--text-primary);
             font-family: 'Oswald', sans-serif;
             font-size: 0.94rem;
@@ -417,11 +449,13 @@
             white-space: nowrap;
         }
 
-        .leaderboard-meta {
+        .leaderboard-entry-count {
             color: var(--text-secondary);
             font-size: 0.78rem;
             font-weight: 500;
             line-height: 1.2;
+            text-align: right;
+            white-space: nowrap;
         }
 
         .btn-primary,
@@ -853,7 +887,13 @@
 
         @media (max-width: 1100px) {
             .hero {
-                display: block;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .hero-side {
+                margin-left: 0;
+                justify-content: flex-start;
             }
         }
 
@@ -1040,8 +1080,30 @@
         <main class="page-shell">
             <div class="page-content">
                 <section class="hero">
-                    <h1 class="hero-title">Klanten</h1>
-                    <p class="hero-text">Overzicht van al je klanten en betalingen.</p>
+                    <div class="hero-copy">
+                        <h1 class="hero-title">Klanten</h1>
+                        <p class="hero-text">Overzicht van al je klanten en betalingen.</p>
+                    </div>
+                    <div class="hero-side">
+                        <div class="leaderboard-card" id="leaderboardCard">
+                            <div class="leaderboard-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v3a5 5 0 0 1-10 0V4Z"/><path d="M17 6h2a2 2 0 0 1 0 4h-2"/><path d="M7 6H5a2 2 0 1 0 0 4h2"/></svg>
+                            </div>
+                            <div class="leaderboard-copy">
+                                <div class="leaderboard-label">Meeste opdrachten</div>
+                                <div class="leaderboard-list" id="leaderboardList">
+                                    <div class="leaderboard-entry is-leading">
+                                        <span class="leaderboard-entry-name">Servé</span>
+                                        <span class="leaderboard-entry-count">0 opdrachten</span>
+                                    </div>
+                                    <div class="leaderboard-entry">
+                                        <span class="leaderboard-entry-name">Martijn</span>
+                                        <span class="leaderboard-entry-count">0 opdrachten</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="database-card" aria-labelledby="databaseTitle">
@@ -1050,16 +1112,6 @@
                             <h2 id="databaseTitle">Klantenbestand</h2>
                         </div>
                         <div class="database-toolbar-actions">
-                            <div class="leaderboard-card" id="leaderboardCard">
-                                <div class="leaderboard-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v3a5 5 0 0 1-10 0V4Z"/><path d="M17 6h2a2 2 0 0 1 0 4h-2"/><path d="M7 6H5a2 2 0 1 0 0 4h2"/></svg>
-                                </div>
-                                <div class="leaderboard-copy">
-                                    <div class="leaderboard-label">Meeste opdrachten</div>
-                                    <div class="leaderboard-value" id="leaderboardValue">Serve</div>
-                                    <div class="leaderboard-meta" id="leaderboardMeta">0 opdrachten</div>
-                                </div>
-                            </div>
                             <button type="button" class="btn-primary" id="addCustomerButton">Klant toevoegen</button>
                         </div>
                     </div>
@@ -1175,7 +1227,7 @@
                     <div class="form-group">
                         <label class="form-label" for="fieldResponsible">Toegewezen aan</label>
                         <select class="form-select" id="fieldResponsible" name="verantwoordelijk" required>
-                            <option value="Serve" selected>Serve</option>
+                            <option value="Serve" selected>Servé</option>
                             <option value="Martijn">Martijn</option>
                         </select>
                     </div>
@@ -1228,8 +1280,7 @@
             search: document.getElementById("searchInput"),
             statusBanner: document.getElementById("statusBanner"),
             leaderboardCard: document.getElementById("leaderboardCard"),
-            leaderboardValue: document.getElementById("leaderboardValue"),
-            leaderboardMeta: document.getElementById("leaderboardMeta"),
+            leaderboardList: document.getElementById("leaderboardList"),
             modalOverlay: document.getElementById("modalOverlay"),
             modalTitle: document.getElementById("modalTitle"),
             modalError: document.getElementById("modalError"),
@@ -1279,6 +1330,11 @@
 
         function normalizeResponsibleValue(value) {
             return parseResponsibleValue(value) || "Serve";
+        }
+
+        function formatResponsibleDisplayName(value) {
+            const normalized = parseResponsibleValue(value);
+            return normalized === "Martijn" ? "Martijn" : "Servé";
         }
 
         function getResponsibleSourceValue(raw) {
@@ -1796,7 +1852,7 @@
         }
 
         function updateLeaderboard() {
-            if (!nodes.leaderboardCard || !nodes.leaderboardValue || !nodes.leaderboardMeta) return;
+            if (!nodes.leaderboardCard || !nodes.leaderboardList) return;
 
             const counts = state.klanten.reduce(function (result, customer) {
                 const responsible = normalizeResponsibleValue(customer && customer.verantwoordelijk);
@@ -1805,23 +1861,24 @@
             }, { Serve: 0, Martijn: 0 });
 
             const entries = [
-                { name: "Serve", count: Number(counts.Serve || 0) },
-                { name: "Martijn", count: Number(counts.Martijn || 0) }
+                { name: "Serve", displayName: formatResponsibleDisplayName("Serve"), count: Number(counts.Serve || 0) },
+                { name: "Martijn", displayName: formatResponsibleDisplayName("Martijn"), count: Number(counts.Martijn || 0) }
             ].sort(function (a, b) {
                 if (b.count !== a.count) return b.count - a.count;
-                return a.name.localeCompare(b.name, "nl");
+                return a.displayName.localeCompare(b.displayName, "nl");
             });
 
-            const leader = entries[0] || { name: "Serve", count: 0 };
-            const runnerUp = entries[1] || { name: "", count: 0 };
-            const isTie = leader.count > 0 && leader.count === runnerUp.count;
-            const assignmentLabel = leader.count === 1 ? "opdracht" : "opdrachten";
-
             nodes.leaderboardCard.hidden = false;
-            nodes.leaderboardValue.textContent = isTie ? "Serve & Martijn" : leader.name;
-            nodes.leaderboardMeta.textContent = isTie
-                ? leader.count + " " + assignmentLabel + " elk"
-                : leader.count + " " + assignmentLabel;
+            nodes.leaderboardList.innerHTML = entries.map(function (entry, index) {
+                const assignmentLabel = entry.count === 1 ? "opdracht" : "opdrachten";
+                const rowClassName = index === 0 ? "leaderboard-entry is-leading" : "leaderboard-entry";
+                return [
+                    "<div class=\"" + rowClassName + "\">",
+                        "<span class=\"leaderboard-entry-name\">" + escapeHtml(entry.displayName) + "</span>",
+                        "<span class=\"leaderboard-entry-count\">" + escapeHtml(entry.count + " " + assignmentLabel) + "</span>",
+                    "</div>"
+                ].join("");
+            }).join("");
         }
 
         function updateStats() {
@@ -1862,7 +1919,7 @@
                             renderServiceCell(customer, "maintenance"),
                         "</td>",
                         "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
-                        "<td data-label=\"Toegewezen aan\" class=\"muted-cell\">" + escapeHtml(customer.verantwoordelijk || "Serve") + "</td>",
+                        "<td data-label=\"Toegewezen aan\" class=\"muted-cell\">" + escapeHtml(formatResponsibleDisplayName(customer.verantwoordelijk || "Serve")) + "</td>",
                         "<td data-label=\"Actief\"><span class=\"active-text " + activeClass + "\">" + escapeHtml(customer.actief || "Ja") + "</span></td>",
                         "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td class=\"cell-actions\" data-label=\"Acties\">",
