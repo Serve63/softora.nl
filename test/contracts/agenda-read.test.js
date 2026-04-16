@@ -107,3 +107,50 @@ test('agenda read coordinator forces a fresh shared-state sync for leads when re
   assert.equal(syncCalls[0]?.maxAgeMs, 0);
   assert.equal(syncCalls[1]?.maxAgeMs, 0);
 });
+
+test('agenda read coordinator hydrate dedicated dismissed-leads bij ELKE lees (Vercel multi-instance regressietest)', async () => {
+  // Repro: warme instance B heeft sinds zijn cold start nooit meer remote
+  // dismisses gezien. Zonder per-read hydrate blijven dismisses van instance A
+  // onzichtbaar voor B, en re-appearen leads bij elke refresh.
+  const dismissedFreshCalls = [];
+  const coordinator = createAgendaReadCoordinator({
+    runtimeSyncCooldownMs: 4000,
+    demoConfirmationTaskEnabled: false,
+    isSupabaseConfigured: () => true,
+    getSupabaseStateHydrated: () => true,
+    forceHydrateRuntimeStateWithRetries: async () => {},
+    syncRuntimeStateFromSupabaseIfNewer: async () => false,
+    ensureDismissedLeadsFreshFromSupabase: async (options = {}) => {
+      dismissedFreshCalls.push(options);
+      return true;
+    },
+    isImapMailConfigured: () => false,
+    syncInboundConfirmationEmailsFromImap: async () => {},
+    backfillInsightsAndAppointmentsFromRecentCallUpdates: () => {},
+    refreshAgendaAppointmentCallSourcesIfNeeded: async () => {},
+    backfillGeneratedAgendaAppointmentsMetadataIfNeeded: () => {},
+    refreshGeneratedAgendaSummariesIfNeeded: async () => {},
+    getGeneratedAgendaAppointments: () => [],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+    compareAgendaAppointments: () => 0,
+    mapAppointmentToConfirmationTask: (appointment) => appointment,
+    ensureConfirmationEmailDraftAtIndex: () => {},
+    compareConfirmationTasks,
+    buildAllInterestedLeadRows: () => [],
+    isInterestedLeadDismissedForRow: () => false,
+    normalizeString,
+  });
+
+  await coordinator.listConfirmationTasks({ limit: 20 });
+  await coordinator.listInterestedLeads({ limit: 20 });
+  await coordinator.listInterestedLeads({ limit: 20, freshSharedState: true });
+
+  assert.equal(dismissedFreshCalls.length, 3,
+    'Elke lees-pas moet de dedicated dismissed-leads-tabel bevragen (binnen TTL)');
+  assert.equal(dismissedFreshCalls[0]?.maxAgeMs, 2000,
+    'Warm pad gebruikt korte TTL-dedupe');
+  assert.equal(dismissedFreshCalls[1]?.maxAgeMs, 2000,
+    'Warm pad gebruikt korte TTL-dedupe');
+  assert.equal(dismissedFreshCalls[2]?.maxAgeMs, 0,
+    'freshSharedState forceert directe hydrate zonder TTL');
+});

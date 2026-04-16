@@ -786,3 +786,107 @@ test('runtime state sync coordinator merges dedicated dismissed leads with exist
     Date.parse('2026-04-15T10:00:00.000Z')
   );
 });
+
+test('persistDismissedLeadsToSupabase is read-modify-write zodat een instance met een kleinere lokale set NOOIT remote dismisses overschrijft (Vercel multi-instance regressietest)', async () => {
+  // Reproduceer: instance B is recent gestart en kent alleen 1 lokale dismiss,
+  // terwijl Supabase (gevuld door instance A) er al twee bevat. Na persist
+  // moet de Supabase row de UNION bevatten — niet de overschrijving van B.
+  const persistedRows = [];
+  const dismissedInterestedLeadCallIds = new Set(['call-instance-b-only']);
+  const dismissedInterestedLeadKeys = new Set(['lead-instance-b-only']);
+  const dismissedInterestedLeadKeyUpdatedAtMsByKey = new Map([
+    ['lead-instance-b-only', Date.parse('2026-04-16T10:05:00.000Z')],
+  ]);
+
+  const fixture = createFixture({
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+    dismissedInterestedLeadKeyUpdatedAtMsByKey,
+    fetchSupabaseRowByKeyViaRest: async () => ({
+      ok: true,
+      status: 200,
+      body: [{
+        payload: {
+          callIds: ['call-from-instance-a-1', 'call-from-instance-a-2'],
+          leadKeys: ['lead-from-instance-a-1'],
+          leadKeyUpdatedAtMsByKey: {
+            'lead-from-instance-a-1': Date.parse('2026-04-16T10:00:00.000Z'),
+          },
+          updatedAt: '2026-04-16T10:00:00.000Z',
+        },
+      }],
+    }),
+    upsertSupabaseRowViaRest: async (row) => {
+      persistedRows.push(row);
+      return { ok: true, status: 200 };
+    },
+  });
+
+  const ok = await fixture.coordinator.persistDismissedLeadsToSupabase('instance_b_dismiss');
+
+  assert.equal(ok, true, 'Persist hoort succesvol te zijn');
+  assert.equal(persistedRows.length, 1, 'Er moet exact één upsert plaatsvinden');
+  assert.deepStrictEqual(
+    persistedRows[0].payload.callIds.slice().sort(),
+    ['call-from-instance-a-1', 'call-from-instance-a-2', 'call-instance-b-only'],
+    'Geüpserte callIds moeten de UNION zijn van remote (A) + lokaal (B)'
+  );
+  assert.deepStrictEqual(
+    persistedRows[0].payload.leadKeys.slice().sort(),
+    ['lead-from-instance-a-1', 'lead-instance-b-only'],
+    'Geüpserte leadKeys moeten de UNION zijn van remote (A) + lokaal (B)'
+  );
+  assert.equal(
+    persistedRows[0].payload.leadKeyUpdatedAtMsByKey['lead-from-instance-a-1'],
+    Date.parse('2026-04-16T10:00:00.000Z'),
+    'Remote timestamps moeten behouden blijven na merge'
+  );
+  assert.equal(
+    persistedRows[0].payload.leadKeyUpdatedAtMsByKey['lead-instance-b-only'],
+    Date.parse('2026-04-16T10:05:00.000Z'),
+    'Lokale timestamps moeten behouden blijven na merge'
+  );
+
+  // En de in-memory state moet ook de remote dismisses bevatten zodat verdere
+  // filter-passes op deze instance ze direct zien.
+  assert.equal(dismissedInterestedLeadCallIds.has('call-from-instance-a-1'), true,
+    'Lokale set moet remote dismiss A1 hebben overgenomen na persist');
+  assert.equal(dismissedInterestedLeadCallIds.has('call-from-instance-a-2'), true,
+    'Lokale set moet remote dismiss A2 hebben overgenomen na persist');
+  assert.equal(dismissedInterestedLeadKeys.has('lead-from-instance-a-1'), true,
+    'Lokale leadKeys-set moet remote leadKey hebben overgenomen na persist');
+});
+
+test('ensureDismissedLeadsFreshFromSupabase respecteert TTL maar dwingt fetch af bij force=true', async () => {
+  let fetchCount = 0;
+  const dismissedInterestedLeadCallIds = new Set();
+  const dismissedInterestedLeadKeys = new Set();
+  const fixture = createFixture({
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+    fetchSupabaseRowByKeyViaRest: async () => {
+      fetchCount += 1;
+      return {
+        ok: true,
+        status: 200,
+        body: [{
+          payload: {
+            callIds: ['call-fresh'],
+            leadKeys: ['lead-fresh'],
+            leadKeyUpdatedAtMsByKey: { 'lead-fresh': Date.parse('2026-04-16T10:00:00.000Z') },
+            updatedAt: '2026-04-16T10:00:00.000Z',
+          },
+        }],
+      };
+    },
+  });
+
+  await fixture.coordinator.ensureDismissedLeadsFreshFromSupabase({ maxAgeMs: 5000 });
+  await fixture.coordinator.ensureDismissedLeadsFreshFromSupabase({ maxAgeMs: 5000 });
+  await fixture.coordinator.ensureDismissedLeadsFreshFromSupabase({ maxAgeMs: 5000 });
+
+  assert.equal(fetchCount, 1, 'Tijdens TTL-window mag er maar één fetch gebeuren');
+
+  await fixture.coordinator.ensureDismissedLeadsFreshFromSupabase({ force: true });
+  assert.equal(fetchCount, 2, 'Met force=true moet altijd opnieuw worden gefetcht');
+});

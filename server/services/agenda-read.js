@@ -49,6 +49,17 @@ function createAgendaReadCoordinator(deps) {
     await deps.refreshGeneratedAgendaSummariesIfNeeded();
   }
 
+  // Vercel serverless: elke warme instance heeft eigen in-memory dismissed-sets.
+  // Daarom bij élke lees ook de dedicated dismissed-leads row uit Supabase
+  // refreshen (met een korte TTL-dedupe). Zonder dit blijft een dismiss die op
+  // instance A is gezet onzichtbaar voor instance B tot de eerstvolgende volledige
+  // snapshot-sync — wat "dismisses komen terug" of "verschillende tabs zien
+  // verschillende dingen" veroorzaakt.
+  async function ensureDismissedLeadsFresh(options = {}) {
+    if (typeof deps.ensureDismissedLeadsFreshFromSupabase !== 'function') return false;
+    return deps.ensureDismissedLeadsFreshFromSupabase(options || {});
+  }
+
   async function prepareConfirmationTasks(options = {}) {
     const quickMode = Boolean(options.quickMode);
     const freshSharedState = Boolean(options.freshSharedState);
@@ -56,6 +67,7 @@ function createAgendaReadCoordinator(deps) {
     await deps.syncRuntimeStateFromSupabaseIfNewer({
       maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
     });
+    await ensureDismissedLeadsFresh({ maxAgeMs: freshSharedState ? 0 : 2000 });
     if (!quickMode && deps.isImapMailConfigured()) {
       await deps.syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
     }
@@ -75,6 +87,7 @@ function createAgendaReadCoordinator(deps) {
     await deps.syncRuntimeStateFromSupabaseIfNewer({
       maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
     });
+    await ensureDismissedLeadsFresh({ maxAgeMs: freshSharedState ? 0 : 2000 });
     deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
   }
 

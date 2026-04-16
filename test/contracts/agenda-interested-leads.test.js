@@ -85,6 +85,7 @@ function createFixture(overrides = {}) {
   const persistWaitCalls = [];
   const snapshotCalls = [];
   const applySnapshotCalls = [];
+  const dismissedFreshCalls = [];
   const defaultFindInterestedLeadRowByCallId =
     overrides.findInterestedLeadRowByCallId ||
     ((callId) =>
@@ -210,6 +211,12 @@ function createFixture(overrides = {}) {
         ? Boolean(overrides.persistDismissedLeadsResult)
         : false;
     },
+    ensureDismissedLeadsFreshFromSupabase: async (options) => {
+      dismissedFreshCalls.push(options);
+      return overrides.ensureDismissedLeadsFreshResult !== undefined
+        ? Boolean(overrides.ensureDismissedLeadsFreshResult)
+        : true;
+    },
     appendDashboardActivity: (payload, reason) => {
       activityCalls.push({ payload, reason });
     },
@@ -246,6 +253,7 @@ function createFixture(overrides = {}) {
     coordinator,
     dismissPersistCalls,
     dismissCalls,
+    dismissedFreshCalls,
     hydrateCalls,
     persistWaitCalls,
     snapshotCalls,
@@ -403,6 +411,38 @@ test('agenda interested leads coordinator confirms dismissal once the dedicated 
   assert.equal(res.body.dismissed, true);
   assert.deepEqual(dismissPersistCalls, ['interested_lead_dismissed_manual_route_confirm']);
   assert.deepEqual(persistWaitCalls, []);
+});
+
+test('agenda interested leads coordinator forceert remote dismissed-leads hydrate vóór elke dismiss (Vercel multi-instance regressietest)', async () => {
+  // Repro: instance B is warm en kent alleen zijn eigen lokale dismisses. Zonder
+  // vooraf-hydrate persisteert B met een onvolledige set en overschrijft de
+  // dismisses van instance A. We eisen daarom dat de dismiss-route áltijd eerst
+  // de remote dedicated state forceert te lezen, zodat de daaropvolgende persist
+  // de UNION schrijft (zie persistDismissedLeadsToSupabase contracttest).
+  const { coordinator, dismissedFreshCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+    persistDismissedLeadsResult: true,
+    buildAllInterestedLeadRows: () => [],
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.dismissInterestedLeadResponse(
+    {
+      body: {
+        callId: 'call-1',
+        actor: 'Serve',
+      },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.ok(dismissedFreshCalls.length >= 1,
+    'dismiss-route moet eerst de remote dedicated dismissed-leads ophalen');
+  assert.equal(dismissedFreshCalls[0]?.force, true,
+    'dismiss-route moet de TTL omzeilen via force=true zodat we niet stale persisten');
 });
 
 test('agenda interested leads coordinator keeps dismiss unsafe when the same lead stays visible under another call id', async () => {
