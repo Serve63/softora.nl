@@ -1704,7 +1704,7 @@
     }
 
     setStatusPill('success', 'Reset opgeslagen');
-    setStatusMessage('success', 'Dashboard-reset is opgeslagen in Supabase.');
+    setStatusMessage('', '');
     addUiLog('skip', '<strong>Dashboard</strong> - Statistiekrij is gereset en opgeslagen in Supabase.');
     return true;
   }

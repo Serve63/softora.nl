@@ -240,7 +240,8 @@ test('premium ai lead generator persists dashboard config and stats through Supa
   assert.match(dashboardSource, /async function loadSavedStatusPillModeFromSupabase\(\) \{[\s\S]*fetchUiStateGetWithFallback\(REMOTE_UI_STATE_SCOPE_PREFERENCES\)[\s\S]*source !== 'supabase'/);
   assert.match(dashboardSource, /async function persistStatusPillModeToSupabase\(mode\) \{[\s\S]*fetchUiStateSetWithFallback\(REMOTE_UI_STATE_SCOPE_PREFERENCES[\s\S]*source !== 'supabase'/);
   assert.match(dashboardSource, /if \(patchKeys\.length === 0\) \{[\s\S]*remoteUiStateLastSource === 'supabase'[\s\S]*Dashboardconfiguratie is nog niet vanuit Supabase geladen\./);
-  assert.match(dashboardSource, /async function resetStatsRowToZero\(\) \{[\s\S]*setStatsResetBaselineState\(latestStatsSummary\)[\s\S]*const saveResult = await persistRemoteUiStateNow\(\)[\s\S]*Dashboard-reset is opgeslagen in Supabase\./);
+  assert.match(dashboardSource, /async function resetStatsRowToZero\(\) \{[\s\S]*setStatsResetBaselineState\(latestStatsSummary\)[\s\S]*const saveResult = await persistRemoteUiStateNow\(\)[\s\S]*setStatusPill\('success', 'Reset opgeslagen'\);[\s\S]*setStatusMessage\('', ''\);/);
+  assert.doesNotMatch(dashboardSource, /Dashboard-reset is opgeslagen in Supabase\./);
   assert.match(dashboardSource, /button\.addEventListener\('click', async \(event\) => \{[\s\S]*await resetStatsRowToZero\(\);/);
   assert.match(dashboardSource, /function buildDashboardStatsSummaryFromPersistedSources\(data\) \{/);
   assert.match(dashboardSource, /if \(!dashboardStatsPollTimer\) \{[\s\S]*refreshDashboardStatsFromSupabase\(\{ silent: true \}\)[\s\S]*12000/);
