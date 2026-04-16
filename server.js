@@ -88,6 +88,7 @@ const { createSeoCore } = require('./server/services/seo-core');
 const { createSeoReadCoordinator } = require('./server/services/seo-read');
 const { createSeoWriteCoordinator } = require('./server/services/seo-write');
 const { createUiStateStore } = require('./server/services/ui-state');
+const { createOrderDossierPromptHelpers } = require('./server/services/order-dossier-prompt');
 const { createWebsiteGenerationHelpers } = require('./server/services/website-generation');
 const { createWebsiteLinkCoordinator } = require('./server/services/website-links');
 const { createWebsiteInputHelpers } = require('./server/services/website-inputs');
@@ -1017,6 +1018,10 @@ const { parseImageDataUrl, sanitizeReferenceImages, sanitizeLaunchDomainName, sl
     normalizeString,
     truncateText,
   });
+const { buildShortOrderDossierOpusPrompt } = createOrderDossierPromptHelpers({
+  normalizeString,
+  clipText,
+});
 const {
   buildAnthropicWebsiteHtmlPrompts,
   buildLocalWebsiteBlueprint,
@@ -3061,10 +3066,6 @@ function buildOrderDossierNarrative(input) {
   return 'Nog geen uitgebreide klantwensen vastgelegd. Neem direct contact op met de klant om ontbrekende details te verzamelen.';
 }
 
-function buildShortOrderDossierOpusPrompt(options = {}) {
-  return 'Werk deze opdracht in Claude Opus 4.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie.';
-}
-
 function normalizeOrderDossierBlockTitle(value) {
   return normalizeString(value || '')
     .replace(/\s+/g, ' ')
@@ -3213,7 +3214,7 @@ function buildAnthropicOrderDossierPrompts(options = {}) {
     '- Gebruik een indeling die past bij de hoeveelheid inhoud (dynamisch, niet template-achtig).',
     '- Gebruik geen bloktitels zoals "Uitvoerplan", "Ontbrekende informatie" of "Praktische aandachtspunten".',
     '- Voeg geen interne velden toe zoals "Accounthouder Softora" of "Softora-contactpersoon".',
-    '- Lever een direct copy-paste prompt voor Claude Opus 4.6 die exact 1 zin lang is.',
+    '- Lever een direct copy-paste prompt voor AI die maximaal 2 zinnen lang is en alle expliciete klantwensen bundelt.',
     '- Gebruik NOOIT ellipsis zoals "...".',
     '- Geef ALLEEN geldig JSON terug, zonder markdown of extra tekst.',
     '',
@@ -3259,7 +3260,7 @@ function buildAnthropicOrderDossierPrompts(options = {}) {
     '- Gebruik alleen dossierblokken die direct op de invoer zijn gebaseerd.',
     '- Laat blokken met algemene projectplanning, ontbrekende-informatie-lijsten en praktische teamnotities weg.',
     '- Laat interne Softora-contactvelden zoals account- of contactpersoonlabels weg.',
-    '- opusPrompt moet direct bruikbaar zijn voor Claude Opus 4.6 en exact 1 zin lang zijn.',
+    '- opusPrompt moet direct bruikbaar zijn voor AI, maximaal 2 zinnen lang zijn en alle expliciete klantwensen bundelen in een direct bouwbare prompt.',
     '</required_output>',
     '<fallback_reference>',
     JSON.stringify(fallback),

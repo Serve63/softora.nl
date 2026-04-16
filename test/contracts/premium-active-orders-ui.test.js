@@ -73,8 +73,13 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.match(source, /layoutVersion: DOSSIER_LAYOUT_SCHEMA_VERSION,/);
   assert.match(source, /function getCachedDossierLayoutResponse\(rawValue, orderId, fingerprint\) \{/);
   assert.match(source, /const expectedFingerprint = String\(fingerprint \|\| ''\)\.trim\(\);[\s\S]*if \(!entryFingerprint \|\| !expectedFingerprint \|\| entryFingerprint !== expectedFingerprint\) \{[\s\S]*return null;/);
+  assert.match(source, /function normalizePromptFragment\(value\) \{/);
+  assert.match(source, /function buildPromptSubject\(baseData\) \{/);
+  assert.match(source, /function collectPromptWishFragments\(baseData\) \{/);
   assert.match(source, /function buildShortOpusPrompt\(baseData\) \{/);
-  assert.match(source, /return 'Werk deze opdracht in Claude Opus 4\.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie\.';/);
+  assert.match(source, /const wishFragments = collectPromptWishFragments\(baseData\);/);
+  assert.match(source, /Bouw een professionele website voor \$\{subject\} op basis van uitsluitend deze bekende klantwensen: \$\{wishSummary\}\./);
+  assert.match(source, /Verwerk alle expliciete inhoudelijke, functionele en visuele wensen uit dit dossier, laat ontbrekende details als TODO of placeholder staan en neem geen interne afspraken of contactlogistiek mee in de build\./);
   assert.match(source, /function shouldHideLegacyDossierBlockTitle\(value\) \{[\s\S]*normalized === 'uitvoerplan'[\s\S]*normalized === 'uitvoerfocus'[\s\S]*normalized\.startsWith\('ontbrekende informatie'\)[\s\S]*normalized\.startsWith\('praktische aandachtspunten'\)/);
   assert.match(source, /function normalizeDossierPairLabel\(value\) \{[\s\S]*normalized === 'accounthouder softora' \|\| normalized === 'softora contactpersoon'[\s\S]*return ''[\s\S]*normalized === 'geclaimd door' \? 'Aangewezen aan' : label;/);
   assert.match(source, /const prompt = buildShortOpusPrompt\(baseData\);/);
@@ -92,28 +97,41 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.doesNotMatch(source, /source-chip/);
   assert.doesNotMatch(source, /Dynamisch via/);
   assert.doesNotMatch(source, /Klantwensen \(bron\):/);
+  assert.match(source, /<h2 class="section-title">Prompt voor AI<\/h2>/);
+  assert.doesNotMatch(source, /Prompt voor Claude Opus 4\.6/);
   assert.doesNotMatch(source, /Werk praktisch en concreet, zonder vage algemeenheden\./);
   assert.doesNotMatch(source, /title: 'Uitvoerfocus'/);
 });
 
-test('server opdrachtdossier filtert legacy planningsblokken en houdt de opus prompt kort', () => {
-  const filePath = path.join(__dirname, '../../server.js');
-  const source = fs.readFileSync(filePath, 'utf8');
+test('server opdrachtdossier filtert legacy planningsblokken en houdt de AI-prompt compact', () => {
+  const serverFilePath = path.join(__dirname, '../../server.js');
+  const serverSource = fs.readFileSync(serverFilePath, 'utf8');
+  const promptHelperFilePath = path.join(__dirname, '../../server/services/order-dossier-prompt.js');
+  const promptHelperSource = fs.readFileSync(promptHelperFilePath, 'utf8');
 
-  assert.match(source, /function buildShortOrderDossierOpusPrompt\(options = \{\}\) \{/);
-  assert.match(source, /return 'Werk deze opdracht in Claude Opus 4\.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie\.';/);
-  assert.match(source, /function shouldHideOrderDossierBlockTitle\(value\) \{[\s\S]*normalized === 'uitvoerplan'[\s\S]*normalized === 'uitvoerfocus'[\s\S]*normalized\.startsWith\('ontbrekende informatie'\)[\s\S]*normalized\.startsWith\('praktische aandachtspunten'\)/);
-  assert.match(source, /function normalizeOrderDossierPairLabel\(value\) \{[\s\S]*normalized === 'accounthouder softora' \|\| normalized === 'softora contactpersoon'[\s\S]*return ''[\s\S]*normalized === 'geclaimd door' \? 'Aangewezen aan' : label;/);
-  assert.match(source, /const promptText = buildShortOrderDossierOpusPrompt\(input\);/);
-  assert.match(source, /const opusPrompt = buildShortOrderDossierOpusPrompt\(fallbackOptions\);/);
-  assert.match(source, /if \(shouldHideOrderDossierBlockTitle\(title\)\) return null;/);
-  assert.match(source, /label: 'Aangewezen aan', value: input\.claimedBy \|\| '—'/);
-  assert.match(source, /Gebruik geen bloktitels zoals "Uitvoerplan", "Ontbrekende informatie" of "Praktische aandachtspunten"\./);
-  assert.match(source, /Voeg geen interne velden toe zoals "Accounthouder Softora" of "Softora-contactpersoon"\./);
-  assert.match(source, /Laat interne Softora-contactvelden zoals account- of contactpersoonlabels weg\./);
-  assert.match(source, /- opusPrompt moet direct bruikbaar zijn voor Claude Opus 4\.6 en exact 1 zin lang zijn\./);
-  assert.doesNotMatch(source, /Klantwensen \(bron\):/);
-  assert.doesNotMatch(source, /title: 'Uitvoerfocus'/);
+  assert.match(serverSource, /const \{ createOrderDossierPromptHelpers \} = require\('\.\/server\/services\/order-dossier-prompt'\);/);
+  assert.match(serverSource, /const \{ buildShortOrderDossierOpusPrompt \} = createOrderDossierPromptHelpers\(\{[\s\S]*normalizeString,[\s\S]*clipText,[\s\S]*\}\);/);
+  assert.match(promptHelperSource, /function createOrderDossierPromptHelpers\(deps = \{\}\) \{/);
+  assert.match(promptHelperSource, /function normalizeOrderDossierPromptFragment\(value\) \{/);
+  assert.match(promptHelperSource, /function buildOrderDossierPromptSubject\(input\) \{/);
+  assert.match(promptHelperSource, /function collectOrderDossierPromptFragments\(input\) \{/);
+  assert.match(promptHelperSource, /function buildShortOrderDossierOpusPrompt\(input = \{\}\) \{/);
+  assert.match(promptHelperSource, /const wishFragments = collectOrderDossierPromptFragments\(input\);/);
+  assert.match(promptHelperSource, /Bouw een professionele website voor \$\{subject\} op basis van uitsluitend deze bekende klantwensen: \$\{wishSummary\}\./);
+  assert.match(promptHelperSource, /Verwerk alle expliciete inhoudelijke, functionele en visuele wensen uit dit dossier, laat ontbrekende details als TODO of placeholder staan en neem geen interne afspraken of contactlogistiek mee in de build\./);
+  assert.match(serverSource, /function shouldHideOrderDossierBlockTitle\(value\) \{[\s\S]*normalized === 'uitvoerplan'[\s\S]*normalized === 'uitvoerfocus'[\s\S]*normalized\.startsWith\('ontbrekende informatie'\)[\s\S]*normalized\.startsWith\('praktische aandachtspunten'\)/);
+  assert.match(serverSource, /function normalizeOrderDossierPairLabel\(value\) \{[\s\S]*normalized === 'accounthouder softora' \|\| normalized === 'softora contactpersoon'[\s\S]*return ''[\s\S]*normalized === 'geclaimd door' \? 'Aangewezen aan' : label;/);
+  assert.match(serverSource, /const promptText = buildShortOrderDossierOpusPrompt\(input\);/);
+  assert.match(serverSource, /const opusPrompt = buildShortOrderDossierOpusPrompt\(fallbackOptions\);/);
+  assert.match(serverSource, /if \(shouldHideOrderDossierBlockTitle\(title\)\) return null;/);
+  assert.match(serverSource, /label: 'Aangewezen aan', value: input\.claimedBy \|\| '—'/);
+  assert.match(serverSource, /Gebruik geen bloktitels zoals "Uitvoerplan", "Ontbrekende informatie" of "Praktische aandachtspunten"\./);
+  assert.match(serverSource, /Voeg geen interne velden toe zoals "Accounthouder Softora" of "Softora-contactpersoon"\./);
+  assert.match(serverSource, /Laat interne Softora-contactvelden zoals account- of contactpersoonlabels weg\./);
+  assert.match(serverSource, /- Lever een direct copy-paste prompt voor AI die maximaal 2 zinnen lang is en alle expliciete klantwensen bundelt\./);
+  assert.match(serverSource, /- opusPrompt moet direct bruikbaar zijn voor AI, maximaal 2 zinnen lang zijn en alle expliciete klantwensen bundelen in een direct bouwbare prompt\./);
+  assert.doesNotMatch(serverSource, /Klantwensen \(bron\):/);
+  assert.doesNotMatch(serverSource, /title: 'Uitvoerfocus'/);
 });
 
 test('premium opdrachtdossier toont de pdf-knop rechtsboven en laat de pagina volledig uitlopen', () => {

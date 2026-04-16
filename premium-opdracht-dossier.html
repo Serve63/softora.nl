@@ -1098,8 +1098,78 @@
                 return 'Nog geen uitgebreide klantwensen vastgelegd. Neem direct contact op met de klant om ontbrekende details te verzamelen.';
             }
 
+            function normalizePromptFragment(value) {
+                return clipText(
+                    String(value || '')
+                        .replace(/\s+/g, ' ')
+                        .replace(/^[,;:.\-\s]+|[,;:.\-\s]+$/g, '')
+                        .trim(),
+                    320
+                );
+            }
+
+            function buildPromptSubject(baseData) {
+                const company = String(baseData?.company || '').trim();
+                const title = String(baseData?.title || '').trim();
+                const domainName = String(baseData?.domainName || '').trim();
+                const parts = [];
+
+                if (company && company.toLowerCase() !== 'onbekend') parts.push(company);
+                if (title && !/^opdracht #\d+$/i.test(title) && (!company || title.toLowerCase() !== company.toLowerCase())) {
+                    parts.push(title);
+                }
+                if (domainName) parts.push(`domein ${domainName}`);
+
+                return parts.length ? parts.join(' - ') : 'deze klant';
+            }
+
+            function collectPromptWishFragments(baseData) {
+                const source = normalizeText([baseData?.description || '', baseData?.transcript || ''].filter(Boolean).join('\n'));
+                if (!source) return [];
+
+                const wishPattern = /\b(website|site|landingspagina|pagina|kleur|kleurenschema|stijl|design|branding|huisstijl|logo|inhoud|functional|functie|formulier|contactformulier|cta|seo|tekst|copy|beeld|foto|video|responsive|mobiel|desktop|meertalig|integrat|agenda|kalender|boeking|reserver|offerte|portfolio|cases|review|testimonial|webshop|shop|afspraakmodule|lead|uitstraling|sfeer|typografie|tone-of-voice|conversie)\b/i;
+                const intentPattern = /\b(moet|moeten|wil|willen|wens|wensen|gewenst|graag|nodig|belangrijk|voorkeur)\b/i;
+                const ignorePattern = /\b(whatsapp|afspraak|aankloppen|aankomst|bevestigd|bevestiging|gepland|datum|tijdstip|tijd|locatie|adres|route|bel aan)\b/i;
+                const vaguePattern = /\b(wordt|worden)\s+besproken\b/i;
+                const seen = new Set();
+
+                const fragments = source
+                    .replace(/\u2022/g, '\n')
+                    .replace(/\n\s*[-*]\s+/g, '\n')
+                    .split(/\n+/)
+                    .flatMap((line) => String(line || '').split(/[.!?]+\s+/))
+                    .map((fragment) => normalizePromptFragment(fragment))
+                    .filter(Boolean)
+                    .filter((fragment) => {
+                        const key = fragment.toLowerCase();
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        if (vaguePattern.test(fragment)) return false;
+                        const matchesWish = wishPattern.test(fragment);
+                        const matchesIntent = intentPattern.test(fragment);
+                        if (ignorePattern.test(fragment) && !matchesWish) return false;
+                        return matchesWish || matchesIntent;
+                    })
+                    .slice(0, 8);
+
+                if (fragments.length) return fragments;
+                return [];
+            }
+
             function buildShortOpusPrompt(baseData) {
-                return 'Werk deze opdracht in Claude Opus 4.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie.';
+                const subject = buildPromptSubject(baseData);
+                const wishFragments = collectPromptWishFragments(baseData);
+                if (!wishFragments.length) {
+                    return `Bouw een professionele website voor ${subject} op basis van uitsluitend de gekoppelde lead- en dossierinformatie. Verwerk alleen expliciete klantwensen, laat ontbrekende details als TODO of placeholder staan en neem geen interne afspraken of contactlogistiek mee in de build.`;
+                }
+                const wishSummary = clipText(
+                    wishFragments
+                        .map((fragment) => fragment.replace(/[.!?]+$/g, '').trim())
+                        .filter(Boolean)
+                        .join('; '),
+                    1400
+                );
+                return `Bouw een professionele website voor ${subject} op basis van uitsluitend deze bekende klantwensen: ${wishSummary}. Verwerk alle expliciete inhoudelijke, functionele en visuele wensen uit dit dossier, laat ontbrekende details als TODO of placeholder staan en neem geen interne afspraken of contactlogistiek mee in de build.`;
             }
 
             function normalizeDossierBlockTitle(value) {
@@ -1405,7 +1475,7 @@
                                     ${blocksHtml}
 
                                     <section class="layout-block">
-                                        <div class="layout-block-head"><h2 class="section-title">Prompt voor Claude Opus 4.6</h2></div>
+                                        <div class="layout-block-head"><h2 class="section-title">Prompt voor AI</h2></div>
                                         <pre class="prompt-box" id="opusPromptDisplay">${esc(opusPrompt)}</pre>
                                     </section>
                                 </div>
