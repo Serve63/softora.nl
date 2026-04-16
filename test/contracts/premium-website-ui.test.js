@@ -86,6 +86,8 @@ test('premium website hero is full-bleed workspace-foto met donkere overlay en l
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
+  assert.match(source, /<div class="nav-links">\s*<a href="#contact" class="magnetic-btn magnetic"[\s\S]*Start Project<\/a>\s*<\/div>/);
+  assert.match(source, /@media \(max-width: 1024px\) \{[\s\S]*\.nav-links \{\s*display:\s*none;\s*\}/);
   assert.match(
     source,
     /section\.hero\s*\{[\s\S]*min-height:\s*clamp\(610px,\s*76vh,\s*760px\);/s

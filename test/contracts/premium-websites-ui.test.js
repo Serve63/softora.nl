@@ -10,6 +10,6 @@ test('premium websites verbergt de header startknop op mobiel', () => {
   assert.match(source, /<a href="\/#contact" class="nav-start-btn">Start Project<\/a>/);
   assert.match(
     source,
-    /@media \(max-width: 768px\) \{[\s\S]*\.nav-start-btn \{[\s\S]*display:\s*none;[\s\S]*\}/
+    /@media \(max-width: 960px\) \{[\s\S]*\.nav-start-btn \{[\s\S]*display:\s*none;[\s\S]*\}/
   );
 });
