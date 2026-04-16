@@ -22,6 +22,8 @@ function createFixture(overrides = {}) {
   const agendaAppointmentIdByCallId = new Map(overrides.agendaAppointmentIdByCallId || []);
   const recentDashboardActivities = overrides.recentDashboardActivities || [];
   const persistReasons = [];
+  const nowMs =
+    Number(overrides.nowMs || 0) || Date.parse('2026-04-08T12:00:00.000Z');
 
   const service = createAgendaAppointmentStateService({
     getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
@@ -30,6 +32,7 @@ function createFixture(overrides = {}) {
     queueRuntimeStatePersist: (reason) => {
       persistReasons.push(reason);
     },
+    getCurrentTimestampMs: () => nowMs,
     normalizeString,
     normalizeDateYyyyMmDd,
     normalizeTimeHhMm,
@@ -78,6 +81,45 @@ test('agenda appointment state service resolves indexes and updates mappings whe
   assert.equal(agendaAppointmentIdByCallId.get('call-new'), 11);
   assert.deepEqual(persistReasons, ['agenda_appointment_update']);
   assert.equal(generatedAgendaAppointments[0].callId, 'call-new');
+});
+
+test('agenda appointment state service stamps updatedAt on every mutation so newer agenda schedule always wins snapshot merges', () => {
+  const mutationMs = Date.parse('2026-04-16T19:22:00.000Z');
+  const { generatedAgendaAppointments, service } = createFixture({
+    nowMs: mutationMs,
+    generatedAgendaAppointments: [
+      {
+        id: 31,
+        callId: 'call-31',
+        company: 'Lead 31',
+        createdAt: '2026-04-16T17:29:00.000Z',
+        updatedAt: '2026-04-16T17:29:00.000Z',
+        updatedAtMs: Date.parse('2026-04-16T17:29:00.000Z'),
+        date: '',
+        time: '',
+      },
+    ],
+    agendaAppointmentIdByCallId: [['call-31', 31]],
+  });
+
+  const updated = service.setGeneratedAgendaAppointmentAtIndex(
+    0,
+    {
+      ...generatedAgendaAppointments[0],
+      date: '2026-04-22',
+      time: '22:22',
+      location: 'Amsterdam',
+      appointmentLocation: 'Amsterdam',
+      confirmationResponseReceived: true,
+      confirmationResponseReceivedAt: '2026-04-16T19:22:00.000Z',
+    },
+    'interested_lead_set_in_agenda'
+  );
+
+  assert.equal(updated.date, '2026-04-22');
+  assert.equal(updated.time, '22:22');
+  assert.equal(updated.updatedAt, '2026-04-16T19:22:00.000Z');
+  assert.equal(updated.updatedAtMs, mutationMs);
 });
 
 test('agenda appointment state service parses dashboard activity schedule details safely', () => {

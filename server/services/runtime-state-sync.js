@@ -135,11 +135,11 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       item?.receivedAt,
       item?.endedAt,
       item?.startedAt,
-      item?.createdAt,
       item?.confirmationEmailSentAt,
       item?.confirmationResponseReceivedAt,
       item?.confirmationAppointmentCancelledAt,
       item?.postCallUpdatedAt,
+      item?.createdAt,
     ];
 
     for (const candidate of candidateFields) {

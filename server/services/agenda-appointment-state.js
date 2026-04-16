@@ -4,6 +4,7 @@ function createAgendaAppointmentStateService(deps = {}) {
     agendaAppointmentIdByCallId = new Map(),
     getRecentDashboardActivities = () => [],
     queueRuntimeStatePersist = () => null,
+    getCurrentTimestampMs = () => Date.now(),
     normalizeString = (value) => String(value || '').trim(),
     normalizeDateYyyyMmDd = (value) => String(value || '').trim(),
     normalizeTimeHhMm = (value) => String(value || '').trim(),
@@ -16,6 +17,38 @@ function createAgendaAppointmentStateService(deps = {}) {
     return getGeneratedAgendaAppointments().findIndex((item) => Number(item?.id) === taskId);
   }
 
+  function parseTimestampMs(value) {
+    const parsedMs = Date.parse(normalizeString(value || ''));
+    return Number.isFinite(parsedMs) && parsedMs > 0 ? Math.round(parsedMs) : 0;
+  }
+
+  function resolveMutationTimestampMs(nextValue, previous) {
+    const previousUpdatedAtMs = Math.max(
+      Number(previous?.updatedAtMs || 0) || 0,
+      parseTimestampMs(previous?.updatedAt || '')
+    );
+    const hintedUpdatedAtMs = Math.max(
+      Number(nextValue?.updatedAtMs || 0) || 0,
+      parseTimestampMs(nextValue?.updatedAt || ''),
+      parseTimestampMs(nextValue?.confirmationEmailSentAt || ''),
+      parseTimestampMs(nextValue?.confirmationResponseReceivedAt || ''),
+      parseTimestampMs(nextValue?.confirmationAppointmentCancelledAt || ''),
+      parseTimestampMs(nextValue?.postCallUpdatedAt || '')
+    );
+    const nowMsRaw = Number(getCurrentTimestampMs());
+    const nowMs = Number.isFinite(nowMsRaw) && nowMsRaw > 0 ? Math.round(nowMsRaw) : Date.now();
+    return Math.max(nowMs, hintedUpdatedAtMs, previousUpdatedAtMs + 1);
+  }
+
+  function stampAppointmentMutation(nextValue, previous) {
+    const updatedAtMs = resolveMutationTimestampMs(nextValue, previous);
+    return {
+      ...nextValue,
+      updatedAt: new Date(updatedAtMs).toISOString(),
+      updatedAtMs,
+    };
+  }
+
   function setGeneratedAgendaAppointmentAtIndex(idx, nextValue, reason = 'agenda_appointment_update') {
     const appointments = getGeneratedAgendaAppointments();
     if (!Number.isInteger(idx) || idx < 0 || idx >= appointments.length) return null;
@@ -23,10 +56,10 @@ function createAgendaAppointmentStateService(deps = {}) {
 
     const previous = appointments[idx];
     const previousCallId = normalizeString(previous?.callId || '');
-    appointments[idx] = nextValue;
+    appointments[idx] = stampAppointmentMutation(nextValue, previous);
 
-    const id = Number(nextValue.id);
-    const callId = normalizeString(nextValue.callId || '');
+    const id = Number(appointments[idx]?.id);
+    const callId = normalizeString(appointments[idx]?.callId || '');
     if (previousCallId && previousCallId !== callId) {
       const mappedId = agendaAppointmentIdByCallId.get(previousCallId);
       if (Number(mappedId || 0) === Number(id || 0)) {

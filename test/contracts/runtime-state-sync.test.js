@@ -161,13 +161,15 @@ function createFixture(overrides = {}) {
       updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
       type: String(item?.type || ''),
     }),
-    compactRuntimeSnapshotGeneratedAgendaAppointment: (item) => ({
-      id: Number(item?.id || 0) || 0,
-      callId: String(item?.callId || ''),
-      updatedAt: String(item?.updatedAt || item?.createdAt || ''),
-      updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
-      company: String(item?.company || ''),
-    }),
+    compactRuntimeSnapshotGeneratedAgendaAppointment:
+      overrides.compactRuntimeSnapshotGeneratedAgendaAppointment ||
+      ((item) => ({
+        id: Number(item?.id || 0) || 0,
+        callId: String(item?.callId || ''),
+        updatedAt: String(item?.updatedAt || item?.createdAt || ''),
+        updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
+        company: String(item?.company || ''),
+      })),
     normalizeLeadOwnerRecord: (value) =>
       value && value.key ? { key: String(value.key), name: String(value.name || '') } : null,
     recentWebhookEvents,
@@ -452,6 +454,114 @@ test('runtime state sync coordinator persists merged runtime snapshots and updat
   assert.equal(fixture.persistedRows[0].payload.recentCallUpdates.length, 2);
   assert.equal(fixture.persistedRows[0].payload.recentWebhookEvents.length, 1);
   assert.ok(fixture.runtimeState.runtimeStateObservedAtMs > 0);
+});
+
+test('runtime state sync coordinator laat bij agenda-appointment merge een latere confirmationResponseReceivedAt winnen boven een oudere createdAt-versie (Vercel stale-instance regressietest)', async () => {
+  // Repro:
+  // - Instance A plant een lead echt in op 2026-04-22 22:22.
+  // - Instance B draait nog met een oude pending appointment-versie voor dezelfde
+  //   task/call (zelfde id + createdAt), en persisteert later zijn snapshot.
+  // Zonder juiste per-item timestampkeuze wint B's stale versie omdat createdAt
+  // gelijk is; dan verdwijnt de nieuwe agenda-datum weer uit Supabase.
+  const fixture = createFixture({
+    buildRuntimeStateSnapshotPayloadWithLimits: () => ({
+      version: 5,
+      savedAt: '2026-04-16T19:25:00.000Z',
+      recentWebhookEvents: [],
+      recentCallUpdates: [],
+      recentAiCallInsights: [],
+      recentDashboardActivities: [],
+      recentSecurityAuditEvents: [],
+      generatedAgendaAppointments: [
+        {
+          id: 77,
+          callId: 'call-77',
+          company: 'Softora',
+          createdAt: '2026-04-16T17:29:00.000Z',
+          date: '2026-04-10',
+          time: '09:00',
+          location: 'Utrecht',
+          needsConfirmationEmail: true,
+          confirmationResponseReceived: false,
+          confirmationResponseReceivedAt: '',
+          updatedAt: '',
+          updatedAtMs: 0,
+        },
+      ],
+      dismissedInterestedLeadCallIds: [],
+      dismissedInterestedLeadKeys: [],
+      leadOwnerAssignments: [],
+      nextLeadOwnerRotationIndex: 0,
+      nextGeneratedAgendaAppointmentId: 100500,
+    }),
+    compactRuntimeSnapshotGeneratedAgendaAppointment: (item) => ({
+      id: Number(item?.id || 0) || 0,
+      callId: String(item?.callId || ''),
+      company: String(item?.company || ''),
+      createdAt: String(item?.createdAt || ''),
+      updatedAt: String(item?.updatedAt || ''),
+      updatedAtMs: Number(item?.updatedAtMs || 0) || 0,
+      date: String(item?.date || ''),
+      time: String(item?.time || ''),
+      location: String(item?.location || ''),
+      needsConfirmationEmail: Boolean(item?.needsConfirmationEmail),
+      confirmationResponseReceived: Boolean(item?.confirmationResponseReceived),
+      confirmationResponseReceivedAt: String(item?.confirmationResponseReceivedAt || ''),
+    }),
+    fetchSupabaseStateRowViaRest: async () => ({
+      ok: true,
+      status: 200,
+      body: [
+        {
+          updated_at: '2026-04-16T19:26:00.000Z',
+          payload: {
+            version: 5,
+            savedAt: '2026-04-16T19:26:00.000Z',
+            recentWebhookEvents: [],
+            recentCallUpdates: [],
+            recentAiCallInsights: [],
+            recentDashboardActivities: [],
+            recentSecurityAuditEvents: [],
+            generatedAgendaAppointments: [
+              {
+                id: 77,
+                callId: 'call-77',
+                company: 'Softora',
+                createdAt: '2026-04-16T17:29:00.000Z',
+                date: '2026-04-22',
+                time: '22:22',
+                location: 'Amsterdam',
+                needsConfirmationEmail: false,
+                confirmationResponseReceived: true,
+                confirmationResponseReceivedAt: '2026-04-16T19:22:00.000Z',
+                updatedAt: '',
+                updatedAtMs: 0,
+              },
+            ],
+            dismissedInterestedLeadCallIds: [],
+            dismissedInterestedLeadKeys: [],
+            leadOwnerAssignments: [],
+            nextLeadOwnerRotationIndex: 0,
+            nextGeneratedAgendaAppointmentId: 100500,
+          },
+        },
+      ],
+    }),
+  });
+
+  const ok = await fixture.coordinator.persistRuntimeStateToSupabase('agenda_schedule_merge_contract');
+
+  assert.equal(ok, true);
+  assert.equal(fixture.persistedRows.length, 1);
+  assert.equal(fixture.persistedRows[0].payload.generatedAgendaAppointments.length, 1);
+  assert.equal(
+    fixture.persistedRows[0].payload.generatedAgendaAppointments[0].date,
+    '2026-04-22',
+    'De nieuwere ingeplande datum moet de stale lokale datum overschrijven'
+  );
+  assert.equal(fixture.persistedRows[0].payload.generatedAgendaAppointments[0].time, '22:22');
+  assert.equal(fixture.persistedRows[0].payload.generatedAgendaAppointments[0].location, 'Amsterdam');
+  assert.equal(fixture.persistedRows[0].payload.generatedAgendaAppointments[0].confirmationResponseReceived, true);
 });
 
 test('runtime state sync coordinator syncs newer remote state and queues call update row persists safely', async () => {

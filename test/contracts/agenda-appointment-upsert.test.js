@@ -27,6 +27,8 @@ function createFixture(overrides = {}) {
   const agendaAppointmentIdByCallId = new Map(overrides.agendaAppointmentIdByCallId || []);
   const persistReasons = [];
   let nextGeneratedAgendaAppointmentId = Number(overrides.nextGeneratedAgendaAppointmentId || 9000);
+  const nowMs =
+    Number(overrides.nowMs || 0) || Date.parse('2026-04-08T12:00:00.000Z');
 
   const appointmentStateService = createAgendaAppointmentStateService({
     getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
@@ -52,6 +54,7 @@ function createFixture(overrides = {}) {
     queueRuntimeStatePersist: (reason) => {
       persistReasons.push(reason);
     },
+    getCurrentTimestampMs: () => nowMs,
     normalizeString,
     normalizeDateYyyyMmDd,
     normalizeTimeHhMm,
@@ -70,6 +73,7 @@ function createFixture(overrides = {}) {
     queueRuntimeStatePersist: (reason) => {
       persistReasons.push(reason);
     },
+    getCurrentTimestampMs: () => nowMs,
     normalizeString,
     normalizeDateYyyyMmDd,
     normalizeTimeHhMm,
@@ -189,6 +193,7 @@ test('agenda appointment upsert service inserts new appointments with stable def
   const { agendaAppointmentIdByCallId, generatedAgendaAppointments, persistReasons, service } =
     createFixture({
       nextGeneratedAgendaAppointmentId: 501,
+      nowMs: Date.parse('2026-04-16T19:22:00.000Z'),
     });
 
   const inserted = service.upsertGeneratedAgendaAppointment(
@@ -212,6 +217,8 @@ test('agenda appointment upsert service inserts new appointments with stable def
   assert.equal(inserted.confirmationEmailDraftSource, 'template-auto');
   assert.equal(inserted.confirmationTaskCreatedAt, inserted.createdAt);
   assert.equal(inserted.postCallStatus, 'completed');
+  assert.equal(inserted.updatedAt, '2026-04-16T19:22:00.000Z');
+  assert.equal(inserted.updatedAtMs, Date.parse('2026-04-16T19:22:00.000Z'));
   assert.equal(generatedAgendaAppointments.length, 1);
   assert.equal(agendaAppointmentIdByCallId.get('call-new'), 501);
   assert.deepEqual(persistReasons, ['agenda_appointment_insert']);

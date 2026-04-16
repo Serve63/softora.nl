@@ -8,6 +8,7 @@ function createAgendaAppointmentUpsertService(deps = {}) {
     buildConfirmationEmailDraftFallback = () => '',
     takeNextGeneratedAgendaAppointmentId = () => 1,
     queueRuntimeStatePersist = () => null,
+    getCurrentTimestampMs = () => Date.now(),
     normalizeString = (value) => String(value || '').trim(),
     normalizeDateYyyyMmDd = (value) => String(value || '').trim(),
     normalizeTimeHhMm = (value) => String(value || '').trim(),
@@ -64,6 +65,11 @@ function createAgendaAppointmentUpsertService(deps = {}) {
       confirmationEmailDraftSource:
         normalizeString(appointment?.confirmationEmailDraftSource || '') || 'template-auto',
     };
+  }
+
+  function parseTimestampMs(value) {
+    const parsedMs = Date.parse(normalizeString(value || ''));
+    return Number.isFinite(parsedMs) && parsedMs > 0 ? Math.round(parsedMs) : 0;
   }
 
   function upsertGeneratedAgendaAppointment(appointment, callId) {
@@ -208,6 +214,15 @@ function createAgendaAppointmentUpsertService(deps = {}) {
 
     const appointments = getGeneratedAgendaAppointments();
     const createdAtIso = normalizeString(appointment?.createdAt) || new Date().toISOString();
+    const hintedUpdatedAtMs = Math.max(
+      Number(appointment?.updatedAtMs || 0) || 0,
+      parseTimestampMs(appointment?.updatedAt || ''),
+      parseTimestampMs(createdAtIso)
+    );
+    const nowMsRaw = Number(getCurrentTimestampMs());
+    const nowMs = Number.isFinite(nowMsRaw) && nowMsRaw > 0 ? Math.round(nowMsRaw) : Date.now();
+    const updatedAtMs = Math.max(nowMs, hintedUpdatedAtMs);
+    const updatedAtIso = new Date(updatedAtMs).toISOString();
     const needsConfirmationEmail = toBooleanSafe(
       appointment?.needsConfirmationEmail,
       toBooleanSafe(appointment?.aiGenerated, false)
@@ -216,6 +231,8 @@ function createAgendaAppointmentUpsertService(deps = {}) {
       ...appointment,
       id: Number(takeNextGeneratedAgendaAppointmentId()) || 0,
       createdAt: createdAtIso,
+      updatedAt: updatedAtIso,
+      updatedAtMs,
       needsConfirmationEmail,
       confirmationEmailSent: false,
       confirmationEmailSentAt: null,
