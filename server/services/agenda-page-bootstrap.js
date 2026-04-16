@@ -3,6 +3,7 @@ function createAgendaPageBootstrapService(deps = {}) {
     isSupabaseConfigured = () => false,
     getSupabaseStateHydrated = () => true,
     forceHydrateRuntimeStateWithRetries = async () => {},
+    syncRuntimeStateFromSupabaseIfNewer = async () => false,
     getGeneratedAgendaAppointments = () => [],
     isGeneratedAppointmentVisibleForAgenda = () => true,
     compareAgendaAppointments = () => 0,
@@ -13,6 +14,16 @@ function createAgendaPageBootstrapService(deps = {}) {
 
     if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
       await forceHydrateRuntimeStateWithRetries(3);
+    }
+
+    // Vercel multi-instance: ook al is de instance gehydrateerd, z'n lokale
+    // state kan achterlopen op Supabase (bv. afspraak die zojuist via
+    // "in agenda zetten" op instance A is geschreven). We dwingen daarom
+    // altijd een verse sync vóór we de bootstrap-payload samenstellen, zodat
+    // een gebruiker die direct na het inplannen naar /premium-personeel-agenda
+    // navigeert de afspraak meteen ziet.
+    if (isSupabaseConfigured()) {
+      await syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: 0 });
     }
 
     const appointments = getGeneratedAgendaAppointments()

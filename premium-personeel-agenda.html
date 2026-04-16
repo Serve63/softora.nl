@@ -2372,12 +2372,22 @@
         }
     }
 
-    async function loadServerAppointments() {
+    async function loadServerAppointments(options = {}) {
         if (loadServerAppointmentsPromise) return loadServerAppointmentsPromise;
+
+        // Met ?fresh=1 omzeilt de server zijn runtime-state cooldown, zodat
+        // afspraken die zojuist op een andere Vercel-instance zijn ingepland
+        // (bv. vanuit /premium-leads via "in agenda zetten") direct zichtbaar
+        // worden. De periodieke 10s-poll laten we zonder fresh draaien voor
+        // efficiency.
+        const fresh = Boolean(options && options.fresh);
+        const url = fresh
+            ? '/api/agenda/appointments?limit=250&fresh=1'
+            : '/api/agenda/appointments?limit=250';
 
         loadServerAppointmentsPromise = (async () => {
             try {
-                const response = await fetch('/api/agenda/appointments?limit=250', { cache: 'no-store' });
+                const response = await fetch(url, { cache: 'no-store' });
                 const data = await response.json();
                 if (!response.ok || !data?.ok || !Array.isArray(data.appointments)) return;
                 if (mergeServerAppointments(data.appointments)) {
@@ -2590,13 +2600,17 @@
     renderCalendar();
     renderWorkspaceReferenceImages();
     void refreshKnownActiveOrdersIndex();
-    void loadServerAppointments();
+    // Eerste load + elke user-getriggerde refresh forceert fresh, zodat
+    // afspraken die zojuist via een andere instance (of een andere tab)
+    // zijn ingepland direct in de agenda verschijnen. De achtergrond-poll
+    // van 10s blijft cached om server-load te besparen.
+    void loadServerAppointments({ fresh: true });
     window.setInterval(() => { void loadServerAppointments(); }, 10000);
-    window.addEventListener('focus', () => { void loadServerAppointments(); });
-    window.addEventListener('pageshow', () => { void loadServerAppointments(); });
+    window.addEventListener('focus', () => { void loadServerAppointments({ fresh: true }); });
+    window.addEventListener('pageshow', () => { void loadServerAppointments({ fresh: true }); });
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
-        void loadServerAppointments();
+        void loadServerAppointments({ fresh: true });
     });
 
     // Cursor
