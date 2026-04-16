@@ -13,6 +13,8 @@ test('premium maandelijkse kosten gebruikt dashboard-typografie en verbergt lega
   assert.doesNotMatch(pageSource, /Adobe Creative Cloud/);
   assert.doesNotMatch(pageSource, /Google Workspace/);
   assert.doesNotMatch(pageSource, /Boekhoudpakket/);
+  assert.match(pageSource, /'Totale kosten:'/);
+  assert.doesNotMatch(pageSource, /'Hosting & Domeinen':/);
 
   assert.match(pageSource, /family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700/);
   assert.doesNotMatch(pageSource, /Barlow/);
