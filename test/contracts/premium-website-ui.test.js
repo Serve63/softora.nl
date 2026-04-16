@@ -118,7 +118,8 @@ test('premium website whatsapp-widget gebruikt een verfijnde stijl en opent het 
   assert.doesNotMatch(source, /\.whatsapp-widget-btn::before\s*\{/);
   assert.match(
     source,
-    /href="https:\/\/wa\.me\/31629917185\?text=Hoi%20Softora%2C%20ik%20wil%20graag%20meer%20informatie\."/
+    /href="https:\/\/wa\.me\/31629917185"/
   );
+  assert.doesNotMatch(source, /wa\.me\/31629917185\?text=/);
   assert.match(source, /aria-label="Open WhatsApp chat met Softora op 06 29 91 71 85"/);
 });
