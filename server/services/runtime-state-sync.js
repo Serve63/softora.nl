@@ -1161,93 +1161,181 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
   // in-memory dismissed-sets. De Supabase row is 1 rij voor de hele dismissed-state.
   // Een naïeve "overwrite whole row" causeert last-writer-wins: instance B kan
   // dismisses van instance A overschrijven door simpelweg zijn oudere set te
-  // persisteren. Daarom doen we hier altijd een READ-MODIFY-WRITE:
+  // persisteren. Daarom doen we hier altijd een READ-MODIFY-WRITE met
+  // READ-AFTER-WRITE-VERIFICATIE en RETRY:
   //   1. Lees de huidige remote state (bron van waarheid).
   //   2. Merge remote + lokaal (additief voor sets, max() voor timestamps).
   //   3. Schrijf de gemergde set terug én update ook onze lokale in-memory
   //      kopie zodat we niet meteen de volgende persist met een stale copy doen.
-  // Gevolg: een dismiss gaat nooit verloren door een concurrent request op een
-  // andere instance. Hooguit kunnen twee dismisses tegelijk plaatsvinden in
-  // het korte venster tussen read en write — in dat geval wint de laatste die
-  // schrijft, maar beide waren al in de dedicated row aanwezig via elkaars
-  // preceding read-modify-write.
+  //   4. Lees opnieuw en verifieer dat onze lokale dismisses ALLEMAAL aanwezig
+  //      zijn in de remote row. Als een concurrent write tussendoor ze heeft
+  //      overschreven (race tussen read en write) → retry.
+  // Gevolg: een dismiss gaat nooit verloren — niet door multi-instance state
+  // drift, niet door last-writer-wins, en niet door een concurrent write
+  // race tussen onze read en write.
   async function persistDismissedLeadsToSupabase(reason = 'dismissed_leads_persist') {
     if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return false;
 
-    const remoteState = await readRemoteDismissedLeadsState();
-    const remoteCallIds = remoteState?.callIds instanceof Set ? remoteState.callIds : new Set();
-    const remoteLeadKeys = remoteState?.leadKeys instanceof Set ? remoteState.leadKeys : new Set();
-    const remoteLeadKeyUpdatedAtMs =
-      remoteState?.leadKeyUpdatedAtMsByKey instanceof Map
-        ? remoteState.leadKeyUpdatedAtMsByKey
-        : new Map();
+    const maxAttempts = 3;
+    let lastResultOk = false;
+    let attempt = 0;
 
-    const mergedCallIds = new Set();
-    dismissedInterestedLeadCallIds.forEach((id) => {
-      const value = normalizeString(id);
-      if (value) mergedCallIds.add(value);
-    });
-    remoteCallIds.forEach((id) => {
-      const value = normalizeString(id);
-      if (value) mergedCallIds.add(value);
-    });
+    while (attempt < maxAttempts) {
+      attempt += 1;
 
-    const mergedLeadKeys = new Set();
-    dismissedInterestedLeadKeys.forEach((key) => {
-      const value = normalizeString(key);
-      if (value) mergedLeadKeys.add(value);
-    });
-    remoteLeadKeys.forEach((key) => {
-      const value = normalizeString(key);
-      if (value) mergedLeadKeys.add(value);
-    });
+      const remoteState = await readRemoteDismissedLeadsState();
+      const remoteCallIds = remoteState?.callIds instanceof Set ? remoteState.callIds : new Set();
+      const remoteLeadKeys = remoteState?.leadKeys instanceof Set ? remoteState.leadKeys : new Set();
+      const remoteLeadKeyUpdatedAtMs =
+        remoteState?.leadKeyUpdatedAtMsByKey instanceof Map
+          ? remoteState.leadKeyUpdatedAtMsByKey
+          : new Map();
 
-    const mergedLeadKeyUpdatedAtMs = new Map();
-    mergedLeadKeys.forEach((key) => {
-      const localMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
-      const remoteMs = Number(remoteLeadKeyUpdatedAtMs.get(key) || 0);
-      const best = Math.max(
-        Number.isFinite(localMs) && localMs > 0 ? localMs : 0,
-        Number.isFinite(remoteMs) && remoteMs > 0 ? remoteMs : 0
-      );
-      if (best > 0) mergedLeadKeyUpdatedAtMs.set(key, Math.round(best));
-    });
-
-    // Sync de gemergde remote-waarden terug naar onze in-memory kopie. Zo ziet
-    // deze instance vanaf nu ook dismisses die elders zijn gezet.
-    mergedCallIds.forEach((id) => dismissedInterestedLeadCallIds.add(id));
-    mergedLeadKeys.forEach((key) => dismissedInterestedLeadKeys.add(key));
-    mergedLeadKeyUpdatedAtMs.forEach((ms, key) => {
-      const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
-      if (ms > currentMs) {
-        dismissedInterestedLeadKeyUpdatedAtMsByKey.set(key, ms);
-      }
-    });
-
-    const callIds = Array.from(mergedCallIds).slice(0, 1000);
-    const leadKeys = Array.from(mergedLeadKeys).slice(0, 2000);
-    const leadKeyUpdatedAtMsByKey = Object.fromEntries(
-      leadKeys
-        .map((leadKey) => [leadKey, Number(mergedLeadKeyUpdatedAtMs.get(leadKey) || 0)])
-        .filter(([, ms]) => Number.isFinite(ms) && ms > 0)
-    );
-    if (!callIds.length && !leadKeys.length) return true;
-
-    try {
-      const updatedAt = new Date().toISOString();
-      const result = await upsertSupabaseRowViaRest({
-        state_key: supabaseDismissedLeadsStateKey,
-        payload: { callIds, leadKeys, leadKeyUpdatedAtMsByKey, updatedAt, reason },
-        updated_at: updatedAt,
+      const mergedCallIds = new Set();
+      dismissedInterestedLeadCallIds.forEach((id) => {
+        const value = normalizeString(id);
+        if (value) mergedCallIds.add(value);
       });
-      if (result?.ok) {
-        runtimeState.dismissedLeadsLastHydrateAtMs = Date.now();
+      remoteCallIds.forEach((id) => {
+        const value = normalizeString(id);
+        if (value) mergedCallIds.add(value);
+      });
+
+      const mergedLeadKeys = new Set();
+      dismissedInterestedLeadKeys.forEach((key) => {
+        const value = normalizeString(key);
+        if (value) mergedLeadKeys.add(value);
+      });
+      remoteLeadKeys.forEach((key) => {
+        const value = normalizeString(key);
+        if (value) mergedLeadKeys.add(value);
+      });
+
+      const mergedLeadKeyUpdatedAtMs = new Map();
+      mergedLeadKeys.forEach((key) => {
+        const localMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
+        const remoteMs = Number(remoteLeadKeyUpdatedAtMs.get(key) || 0);
+        const best = Math.max(
+          Number.isFinite(localMs) && localMs > 0 ? localMs : 0,
+          Number.isFinite(remoteMs) && remoteMs > 0 ? remoteMs : 0
+        );
+        if (best > 0) mergedLeadKeyUpdatedAtMs.set(key, Math.round(best));
+      });
+
+      // Sync de gemergde remote-waarden terug naar onze in-memory kopie. Zo
+      // ziet deze instance vanaf nu ook dismisses die elders zijn gezet, en
+      // pakt de volgende retry de complete set mee.
+      mergedCallIds.forEach((id) => dismissedInterestedLeadCallIds.add(id));
+      mergedLeadKeys.forEach((key) => dismissedInterestedLeadKeys.add(key));
+      mergedLeadKeyUpdatedAtMs.forEach((ms, key) => {
+        const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
+        if (ms > currentMs) {
+          dismissedInterestedLeadKeyUpdatedAtMsByKey.set(key, ms);
+        }
+      });
+
+      const callIds = Array.from(mergedCallIds).slice(0, 1000);
+      const leadKeys = Array.from(mergedLeadKeys).slice(0, 2000);
+      const leadKeyUpdatedAtMsByKey = Object.fromEntries(
+        leadKeys
+          .map((leadKey) => [leadKey, Number(mergedLeadKeyUpdatedAtMs.get(leadKey) || 0)])
+          .filter(([, ms]) => Number.isFinite(ms) && ms > 0)
+      );
+      if (!callIds.length && !leadKeys.length) return true;
+
+      let writeOk = false;
+      try {
+        const updatedAt = new Date().toISOString();
+        const result = await upsertSupabaseRowViaRest({
+          state_key: supabaseDismissedLeadsStateKey,
+          payload: {
+            callIds,
+            leadKeys,
+            leadKeyUpdatedAtMsByKey,
+            updatedAt,
+            reason,
+            attempt,
+          },
+          updated_at: updatedAt,
+        });
+        writeOk = Boolean(result?.ok);
+        lastResultOk = writeOk;
+      } catch (error) {
+        logError('[Supabase][DismissedLeadsPersistError]', error?.message || error);
+        writeOk = false;
+        lastResultOk = false;
       }
-      return Boolean(result?.ok);
-    } catch (error) {
-      logError('[Supabase][DismissedLeadsPersistError]', error?.message || error);
-      return false;
+
+      if (!writeOk) {
+        // Geen succesvolle write — wacht kort en retry.
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+          continue;
+        }
+        return false;
+      }
+
+      // READ-AFTER-WRITE: verifieer dat ALLE lokaal-bekende dismisses (incl. de
+      // remote die we net hebben gemerged) in de Supabase row staan. Een
+      // concurrent write op een andere instance kan ze tussen onze read en
+      // write hebben overschreven — in dat geval moeten we opnieuw mergen en
+      // schrijven.
+      const verification = await readRemoteDismissedLeadsState();
+      if (!verification) {
+        // Verify-fetch faalde; we kunnen het niet bevestigen. Toch markeren als
+        // succes (write was ok) — TTL hydrate van andere routes herstelt later.
+        runtimeState.dismissedLeadsLastHydrateAtMs = Date.now();
+        return true;
+      }
+
+      const verifyCallIds = verification.callIds;
+      const verifyLeadKeys = verification.leadKeys;
+
+      let allCallIdsPresent = true;
+      for (const id of dismissedInterestedLeadCallIds) {
+        if (!verifyCallIds.has(id)) {
+          allCallIdsPresent = false;
+          break;
+        }
+      }
+      let allLeadKeysPresent = true;
+      if (allCallIdsPresent) {
+        for (const key of dismissedInterestedLeadKeys) {
+          if (!verifyLeadKeys.has(key)) {
+            allLeadKeysPresent = false;
+            break;
+          }
+        }
+      }
+
+      if (allCallIdsPresent && allLeadKeysPresent) {
+        runtimeState.dismissedLeadsLastHydrateAtMs = Date.now();
+        return true;
+      }
+
+      // Race gedetecteerd: een andere instance heeft tussen onze read en write
+      // de row overschreven en daarbij sommige van onze (lokale) dismisses
+      // verloren. We mergen nu opnieuw — de verification-state heeft
+      // eventueel hun nieuwere dismisses, en wij hebben nog steeds onze
+      // lokale set. De volgende iteratie van de loop schrijft de UNION van
+      // allebei.
+      logError(
+        '[Supabase][DismissedLeadsRaceDetected]',
+        `attempt ${attempt}/${maxAttempts}, retry merge & write`
+      );
+      verifyCallIds.forEach((id) => dismissedInterestedLeadCallIds.add(id));
+      verifyLeadKeys.forEach((key) => dismissedInterestedLeadKeys.add(key));
+      verification.leadKeyUpdatedAtMsByKey.forEach((ms, key) => {
+        const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
+        if (ms > currentMs) {
+          dismissedInterestedLeadKeyUpdatedAtMsByKey.set(key, ms);
+        }
+      });
+      // korte backoff voor retry
+      await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
     }
+
+    return lastResultOk;
   }
 
   async function readRemoteDismissedLeadsState() {

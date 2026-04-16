@@ -445,6 +445,36 @@ test('agenda interested leads coordinator forceert remote dismissed-leads hydrat
     'dismiss-route moet de TTL omzeilen via force=true zodat we niet stale persisten');
 });
 
+test('agenda interested leads coordinator forceert remote dismissed-leads hydrate ook bij set-in-agenda (óók een dismiss)', async () => {
+  // Set-in-agenda is qua dismissed-state een dismiss: de lead verdwijnt uit
+  // de interested-lijst zodra hij is ingepland. We moeten daarom óók hier de
+  // verse remote dismissed-leads ophalen vóór we persisten, zodat we nooit
+  // dismisses van andere instances overschrijven.
+  const { coordinator, dismissedFreshCalls } = createFixture({
+    supabaseConfigured: true,
+    supabaseHydrated: true,
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.setInterestedLeadInAgendaResponse(
+    {
+      body: {
+        callId: 'call-1',
+        appointmentDate: '2026-04-10',
+        appointmentTime: '14:30',
+        location: 'Amsterdam',
+        actor: 'Serve',
+      },
+    },
+    res
+  );
+
+  assert.ok(
+    dismissedFreshCalls.some((options) => options?.force === true),
+    'set-in-agenda-route moet de TTL omzeilen via force=true vóór de dismiss wordt gepersisteerd'
+  );
+});
+
 test('agenda interested leads coordinator keeps dismiss unsafe when the same lead stays visible under another call id', async () => {
   const { applySnapshotCalls, coordinator, dismissCalls, persistWaitCalls } = createFixture({
     supabaseConfigured: true,

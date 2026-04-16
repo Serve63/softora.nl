@@ -798,6 +798,21 @@ test('persistDismissedLeadsToSupabase is read-modify-write zodat een instance me
     ['lead-instance-b-only', Date.parse('2026-04-16T10:05:00.000Z')],
   ]);
 
+  // Realistische Supabase-mock: de "row" reflecteert wat er het laatst is
+  // geüpsert. Zo simuleren we echte Supabase-semantiek en kan de
+  // read-after-write-verificatie na de eerste succesvolle write direct
+  // slagen (geen race).
+  let remoteRow = {
+    payload: {
+      callIds: ['call-from-instance-a-1', 'call-from-instance-a-2'],
+      leadKeys: ['lead-from-instance-a-1'],
+      leadKeyUpdatedAtMsByKey: {
+        'lead-from-instance-a-1': Date.parse('2026-04-16T10:00:00.000Z'),
+      },
+      updatedAt: '2026-04-16T10:00:00.000Z',
+    },
+  };
+
   const fixture = createFixture({
     dismissedInterestedLeadCallIds,
     dismissedInterestedLeadKeys,
@@ -805,19 +820,11 @@ test('persistDismissedLeadsToSupabase is read-modify-write zodat een instance me
     fetchSupabaseRowByKeyViaRest: async () => ({
       ok: true,
       status: 200,
-      body: [{
-        payload: {
-          callIds: ['call-from-instance-a-1', 'call-from-instance-a-2'],
-          leadKeys: ['lead-from-instance-a-1'],
-          leadKeyUpdatedAtMsByKey: {
-            'lead-from-instance-a-1': Date.parse('2026-04-16T10:00:00.000Z'),
-          },
-          updatedAt: '2026-04-16T10:00:00.000Z',
-        },
-      }],
+      body: [remoteRow],
     }),
     upsertSupabaseRowViaRest: async (row) => {
       persistedRows.push(row);
+      remoteRow = { payload: { ...row.payload } };
       return { ok: true, status: 200 };
     },
   });
@@ -825,7 +832,7 @@ test('persistDismissedLeadsToSupabase is read-modify-write zodat een instance me
   const ok = await fixture.coordinator.persistDismissedLeadsToSupabase('instance_b_dismiss');
 
   assert.equal(ok, true, 'Persist hoort succesvol te zijn');
-  assert.equal(persistedRows.length, 1, 'Er moet exact één upsert plaatsvinden');
+  assert.equal(persistedRows.length, 1, 'Zonder race mag er maar één upsert plaatsvinden');
   assert.deepStrictEqual(
     persistedRows[0].payload.callIds.slice().sort(),
     ['call-from-instance-a-1', 'call-from-instance-a-2', 'call-instance-b-only'],
@@ -855,6 +862,93 @@ test('persistDismissedLeadsToSupabase is read-modify-write zodat een instance me
     'Lokale set moet remote dismiss A2 hebben overgenomen na persist');
   assert.equal(dismissedInterestedLeadKeys.has('lead-from-instance-a-1'), true,
     'Lokale leadKeys-set moet remote leadKey hebben overgenomen na persist');
+});
+
+test('persistDismissedLeadsToSupabase retryet als een concurrent instance tussen onze read en write de row overschrijft (read-after-write verify + retry)', async () => {
+  // Simuleer een REAL race tussen Vercel-instances B en C:
+  //   1. B leest remote → [A1]
+  //   2. B schrijft [A1, B1]
+  //   3. Tussen B's write en B's verify-read: C overschrijft remote met
+  //      zijn eigen merge [A1, C1], waardoor B's dismiss B1 verdwenen is.
+  //   4. B's read-after-write detecteert het ontbreken en retryet met een
+  //      verse merge van [A1, C1, B1]. Dat schrijven wint → eind-state.
+  // Dit dicht het laatste race-window dat read-modify-write alleen niet kan
+  // verhelpen zonder een tweede round-trip + retry.
+  const persistedRows = [];
+  const fetchCalls = [];
+  let upsertCallCount = 0;
+  let fetchCallCount = 0;
+
+  const dismissedInterestedLeadCallIds = new Set(['B1']);
+  const dismissedInterestedLeadKeys = new Set();
+
+  const fixture = createFixture({
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+    fetchSupabaseRowByKeyViaRest: async () => {
+      fetchCallCount += 1;
+      fetchCalls.push(fetchCallCount);
+      // Eerste read (merge-fase van attempt 1): remote = [A1]
+      if (fetchCallCount === 1) {
+        return {
+          ok: true,
+          status: 200,
+          body: [{ payload: { callIds: ['A1'], leadKeys: [], leadKeyUpdatedAtMsByKey: {} } }],
+        };
+      }
+      // Tweede read (verify-fase na attempt 1): remote = [A1, C1]
+      //   → B's B1 is overschreven door instance C. Race!
+      if (fetchCallCount === 2) {
+        return {
+          ok: true,
+          status: 200,
+          body: [{ payload: { callIds: ['A1', 'C1'], leadKeys: [], leadKeyUpdatedAtMsByKey: {} } }],
+        };
+      }
+      // Derde read (merge-fase van attempt 2): remote nog steeds [A1, C1]
+      if (fetchCallCount === 3) {
+        return {
+          ok: true,
+          status: 200,
+          body: [{ payload: { callIds: ['A1', 'C1'], leadKeys: [], leadKeyUpdatedAtMsByKey: {} } }],
+        };
+      }
+      // Vierde read (verify-fase na attempt 2): nu reflecteert remote onze
+      // eigen schrijf = [A1, B1, C1] → verify slaagt.
+      return {
+        ok: true,
+        status: 200,
+        body: [{
+          payload: {
+            callIds: persistedRows[persistedRows.length - 1]?.payload?.callIds || [],
+            leadKeys: [],
+            leadKeyUpdatedAtMsByKey: {},
+          },
+        }],
+      };
+    },
+    upsertSupabaseRowViaRest: async (row) => {
+      upsertCallCount += 1;
+      persistedRows.push(row);
+      return { ok: true, status: 200 };
+    },
+  });
+
+  const ok = await fixture.coordinator.persistDismissedLeadsToSupabase('instance_b_race');
+
+  assert.equal(ok, true, 'Na retry hoort de persist alsnog succesvol te zijn');
+  assert.ok(upsertCallCount >= 2, 'Bij een race moeten er minimaal 2 upserts plaatsvinden (retry)');
+  // Laatste write moet de UNION bevatten: A1 (uit remote attempt 1), C1
+  // (uit remote attempt 2 = concurrent winnaar), en B1 (onze eigen dismiss).
+  const finalPayload = persistedRows[persistedRows.length - 1].payload;
+  const finalCallIds = new Set(finalPayload.callIds || []);
+  assert.equal(finalCallIds.has('A1'), true, 'Eindschrijf moet A1 bevatten');
+  assert.equal(finalCallIds.has('B1'), true, 'Eindschrijf MOET onze B1-dismiss bevatten (anti-flap)');
+  assert.equal(finalCallIds.has('C1'), true, 'Eindschrijf moet ook C1 (concurrent) bevatten');
+  // Lokale in-memory state moet ook alles weten.
+  assert.equal(dismissedInterestedLeadCallIds.has('A1'), true);
+  assert.equal(dismissedInterestedLeadCallIds.has('B1'), true);
+  assert.equal(dismissedInterestedLeadCallIds.has('C1'), true);
 });
 
 test('ensureDismissedLeadsFreshFromSupabase respecteert TTL maar dwingt fetch af bij force=true', async () => {

@@ -403,6 +403,14 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
       await forceHydrateRuntimeStateWithRetries(3);
     }
+    // Lead in agenda zetten is óók een dismiss (de lead verdwijnt uit de
+    // interested-lijst). Ook hier willen we eerst de laatste remote dismissed-
+    // state ophalen, zodat onze daaropvolgende persist de volledige union
+    // terugschrijft in plaats van per ongeluk dismisses van andere instances
+    // te vergeten.
+    if (isSupabaseConfigured()) {
+      await ensureDismissedLeadsFreshFromSupabase({ force: true }).catch(() => false);
+    }
     backfillInsightsAndAppointmentsFromRecentCallUpdates();
 
     const callId = normalizeString(req.body?.callId || req.query?.callId || '');
