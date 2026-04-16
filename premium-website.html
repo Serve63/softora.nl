@@ -1627,6 +1627,30 @@
             .diensten-intro-mobile {
                 display: inline;
             }
+
+            /* Centreer alle sectietitels en eyebrows op mobiel */
+            .section-header,
+            .section-header h2,
+            .section-header p,
+            .werkwijze-copy,
+            .werkwijze-copy .eyebrow,
+            .werkwijze-copy h2,
+            .werkwijze-copy p,
+            .content-side.about-panel,
+            .content-side.about-panel .eyebrow,
+            .content-side.about-panel h2,
+            .content-side.about-panel p {
+                text-align: center !important;
+            }
+
+            .section-header h2::after {
+                left: 50%;
+                transform: translateX(-50%);
+            }
+
+            .werkwijze-copy ul {
+                text-align: left;
+            }
         }
 
         @media (max-width: 768px) {
