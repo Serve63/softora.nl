@@ -6824,6 +6824,7 @@ const agendaInterestedLeadsCoordinator = createAgendaInterestedLeadsCoordinator(
   isSupabaseConfigured,
   getSupabaseStateHydrated: () => supabaseStateHydrated,
   forceHydrateRuntimeStateWithRetries,
+  syncRuntimeStateFromSupabaseIfNewer,
   backfillInsightsAndAppointmentsFromRecentCallUpdates,
   normalizeString,
   normalizeDateYyyyMmDd,

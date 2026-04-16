@@ -60,6 +60,17 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     return snapshot && typeof snapshot === 'object' ? snapshot : null;
   }
 
+  function hasRequestBackedInterestedLeadInput(requestBody = {}) {
+    return Boolean(
+      normalizeString(requestBody.company || '') ||
+        normalizeString(requestBody.contact || '') ||
+        normalizeString(requestBody.phone || '') ||
+        normalizeString(requestBody.summary || '') ||
+        normalizeString(requestBody.contactEmail || '') ||
+        normalizeString(requestBody.branche || '')
+    );
+  }
+
   function resolveGeneratedAgendaAppointmentById(rawId) {
     const id = Number(rawId);
     if (!Number.isFinite(id) || id <= 0) return null;
@@ -199,7 +210,14 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     const callUpdate = getLatestCallUpdateByCallId(normalizedCallId);
     const insight = aiCallInsightsByCallId.get(normalizedCallId) || null;
     const followUpLead = buildGeneratedLeadFollowUpFromCall(callUpdate, insight);
-    const base = existingAppointment || followUpLead || leadRow;
+    // De modal op /premium-leads bevat al een snapshot van de leaddata. Als de
+    // POST vervolgens op een andere warme Vercel-instance landt die deze callId
+    // nog niet uit runtime/call-update sync kent, mag "in agenda zetten" niet
+    // met 404 stranden terwijl de gebruiker een geldige open lead voor zich
+    // heeft. In dat geval materialiseren we de afspraak veilig uit de
+    // request-body snapshot.
+    const requestBackedFallback = hasRequestBackedInterestedLeadInput(requestBody) ? {} : null;
+    const base = existingAppointment || followUpLead || leadRow || requestBackedFallback;
     if (!base) return null;
 
     const normalizedStack = normalizeColdcallingStack(
@@ -402,6 +420,14 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
   async function setInterestedLeadInAgendaResponse(req, res) {
     if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
       await forceHydrateRuntimeStateWithRetries(3);
+    }
+    // Vercel serverless: de lead kan in de UI al zichtbaar zijn via instance A,
+    // terwijl deze POST op instance B landt die de laatste runtime snapshot en
+    // call-update rows nog niet kent. Forceer daarom eerst een verse shared-state
+    // sync, anders kan buildMaterializedInterestedLeadAppointment() onterecht 404
+    // geven op een net-verse call-backed lead.
+    if (isSupabaseConfigured()) {
+      await syncRuntimeStateFromSupabaseIfNewer({ force: true, maxAgeMs: 0 }).catch(() => false);
     }
     // Lead in agenda zetten is óók een dismiss (de lead verdwijnt uit de
     // interested-lijst). Ook hier willen we eerst de laatste remote dismissed-
