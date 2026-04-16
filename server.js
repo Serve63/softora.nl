@@ -62,6 +62,7 @@ const { createAgendaTaskHelpers } = require('./server/services/agenda-task-helpe
 const { createAgendaLeadFollowUpService } = require('./server/services/agenda-lead-follow-up');
 const { createAgendaInterestedLeadReadService } = require('./server/services/agenda-interested-lead-read');
 const { createAgendaInterestedLeadStateService } = require('./server/services/agenda-interested-lead-state');
+const { resolveCallUpdateTimestamp } = require('./server/services/call-update-timestamp');
 const { createAgendaInterestedLeadsCoordinator } = require('./server/services/agenda-interested-leads');
 const { createAgendaPostCallCoordinator, createAgendaPostCallHelpers } = require('./server/services/agenda-post-call');
 const { createAgendaReadCoordinator } = require('./server/services/agenda-read');
@@ -2119,17 +2120,20 @@ function upsertRecentCallUpdate(update, options = {}) {
   const persistRuntimeState = options?.persistRuntimeState !== false;
   const persistCallUpdateRow = options?.persistCallUpdateRow !== false;
   const persistReason = truncateText(normalizeString(options?.persistReason || ''), 80) || 'call_update';
-  const safeUpdatedAt = normalizeString(update?.updatedAt || '') || new Date().toISOString();
-  const safeUpdatedAtMs = Number(update?.updatedAtMs || Date.parse(safeUpdatedAt) || Date.now()) || Date.now();
+
+  const existing = callUpdatesById.get(normalizedCallId);
+  const { updatedAt: resolvedUpdatedAt, updatedAtMs: resolvedUpdatedAtMs } = resolveCallUpdateTimestamp(
+    update,
+    existing
+  );
 
   const normalizedUpdate = {
     ...update,
     callId: normalizedCallId,
-    updatedAt: safeUpdatedAt,
-    updatedAtMs: safeUpdatedAtMs,
+    updatedAt: resolvedUpdatedAt,
+    updatedAtMs: resolvedUpdatedAtMs,
   };
 
-  const existing = callUpdatesById.get(normalizedCallId);
   const merged = existing
     ? {
         ...existing,
@@ -2162,8 +2166,8 @@ function upsertRecentCallUpdate(update, options = {}) {
         stack: normalizedUpdate.stack || existing.stack || '',
         stackLabel: normalizedUpdate.stackLabel || existing.stackLabel || '',
         messageType: normalizedUpdate.messageType || existing.messageType || '',
-        updatedAt: normalizedUpdate.updatedAt,
-        updatedAtMs: normalizedUpdate.updatedAtMs,
+        updatedAt: resolvedUpdatedAt,
+        updatedAtMs: resolvedUpdatedAtMs,
       }
     : normalizedUpdate;
 

@@ -83,7 +83,7 @@ test('agenda interested lead state service dismisses by call id and lead key wit
   assert.deepEqual(persistReasons, ['interested_lead_dismissed_manual']);
 });
 
-test('agenda interested lead state service resolves dismissed state for rows via call id and lead key', () => {
+test('agenda interested lead state service resolves dismissed state for rows via call id and dismissal timestamp per lead key', () => {
   const { service } = createFixture({
     dismissedInterestedLeadCallIds: new Set(['call-2']),
     dismissedInterestedLeadKeys: new Set(['name:softora|serve']),
@@ -109,7 +109,7 @@ test('agenda interested lead state service resolves dismissed state for rows via
   );
 });
 
-test('agenda interested lead state service keeps same-phone rows hidden even when a newer call update arrives after dismiss', () => {
+test('agenda interested lead state service allows truly newer same-phone calls after a prior dismiss', () => {
   const { service } = createFixture({
     dismissedInterestedLeadKeys: new Set(['phone:0612345678']),
     dismissedInterestedLeadKeyUpdatedAtMsByKey: new Map([
@@ -124,12 +124,11 @@ test('agenda interested lead state service keeps same-phone rows hidden even whe
       phone: '0612345678',
       updatedAt: '2026-04-15T15:25:00.000Z',
     }),
-    true,
-    'Dismissed leadKey blijft verborgen, ook als een later call-update een nieuwere timestamp heeft.'
+    false
   );
 });
 
-test('agenda interested lead state service keeps same-phone rows hidden when no row timestamp is available', () => {
+test('agenda interested lead state service hides same-phone rows without a trustworthy timestamp after dismiss', () => {
   const { service } = createFixture({
     dismissedInterestedLeadKeys: new Set(['phone:0612345678']),
     dismissedInterestedLeadKeyUpdatedAtMsByKey: new Map([
@@ -147,27 +146,7 @@ test('agenda interested lead state service keeps same-phone rows hidden when no 
   );
 });
 
-test('agenda interested lead state service keeps dismissed identity hidden even for a brand new call id with future timestamp', () => {
-  const { service } = createFixture({
-    dismissedInterestedLeadKeys: new Set(['phone:0612345678']),
-    dismissedInterestedLeadKeyUpdatedAtMsByKey: new Map([
-      ['phone:0612345678', Date.parse('2026-04-15T15:10:00.000Z')],
-    ]),
-  });
-
-  assert.equal(
-    service.isInterestedLeadDismissedForRow('fresh-call-id', {
-      company: 'Softora',
-      contact: 'Serve',
-      phone: '0612345678',
-      updatedAtMs: Date.now() + 60 * 60 * 1000,
-    }),
-    true,
-    'Na dismiss hoort dezelfde identity definitief verborgen te blijven, ongeacht nieuwe call-ids of insight-updates.'
-  );
-});
-
-test('agenda interested lead state service dismisses multiple related call ids and also hides new call ids for the same identity', () => {
+test('agenda interested lead state service can dismiss multiple related call ids without blocking future call ids', () => {
   const { dismissedInterestedLeadCallIds, dismissedInterestedLeadKeys, persistReasons, service } = createFixture();
   const futureUpdatedAtMs = Date.now() + 60 * 1000;
 
@@ -192,8 +171,7 @@ test('agenda interested lead state service dismisses multiple related call ids a
       phone: '0612345678',
       updatedAtMs: futureUpdatedAtMs,
     }),
-    true,
-    'Ook een nieuwe call-id voor dezelfde identity mag na dismiss niet opnieuw zichtbaar worden.'
+    false
   );
   assert.deepEqual(persistReasons, ['interested_lead_dismissed_manual']);
 });

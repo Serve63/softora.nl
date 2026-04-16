@@ -84,25 +84,41 @@ function createAgendaInterestedLeadStateService(deps = {}) {
     const normalizedCallId = normalizeString(callId);
     const leadKey = buildLeadFollowUpCandidateKey(rowLike || {});
     const dismissedByKey = isInterestedLeadDismissedByKey(leadKey);
-    const dismissedByCallId = normalizedCallId ? isInterestedLeadDismissed(normalizedCallId) : false;
-
-    // Intentioneel strikt: dismiss is definitief. Een lead met een dismissed `leadKey`
-    // (telefoon of bedrijf+contact) blijft verborgen, ook als er later nieuwe call updates of
-    // AI-insights binnenkomen met nieuwere timestamps. Eerdere timestamp-vergelijkingen lieten
-    // verwijderde leads terugkomen bij elke nieuwe sync; dat is precies wat we hier uitsluiten.
-    if (dismissedByCallId || dismissedByKey) {
-      if (!dismissedByCallId && dismissedByKey && normalizedCallId) {
-        logLeadTrace('dismiss-state', 'call-id-hidden-by-dismissed-lead-key', {
+    if (normalizedCallId) {
+      const dismissedByCallId = isInterestedLeadDismissed(normalizedCallId);
+      if (dismissedByCallId) return true;
+      if (dismissedByKey) {
+        // Behoud: een dismissed leadKey wordt pas weer zichtbaar als een echte nieuwe
+        // call (nieuwe callId) een bewezen nieuwere timestamp heeft dan het dismiss-moment.
+        // De timestamp-robuustheid zit in upsertRecentCallUpdate: die laat oude timestamps
+        // onaangeroerd bij passieve re-hydrate/sync, zodat alleen daadwerkelijk nieuwe
+        // gesprekken door deze gate komen.
+        const dismissedAtMs = getInterestedLeadKeyDismissedAtMs(leadKey);
+        const rowTimestampMs = getInterestedLeadRowTimestampMs(rowLike || {});
+        if (dismissedAtMs > 0 && rowTimestampMs <= 0) {
+          logLeadTrace('dismiss-state', 'call-id-hidden-while-key-dismissed-without-row-timestamp', {
+            callId: normalizedCallId,
+            leadKey,
+            dismissedAtMs,
+            rowTimestampMs: 0,
+            row: summarizeLeadRow(rowLike),
+          });
+          return true;
+        }
+        if (dismissedAtMs > 0 && rowTimestampMs > 0 && rowTimestampMs <= dismissedAtMs) {
+          return true;
+        }
+        logLeadTrace('dismiss-state', 'call-id-visible-while-key-dismissed', {
           callId: normalizedCallId,
           leadKey,
-          dismissedAtMs: getInterestedLeadKeyDismissedAtMs(leadKey) || 0,
-          rowTimestampMs: getInterestedLeadRowTimestampMs(rowLike || {}),
+          dismissedAtMs: dismissedAtMs || 0,
+          rowTimestampMs: rowTimestampMs || 0,
           row: summarizeLeadRow(rowLike),
         });
       }
-      return true;
+      return false;
     }
-    return false;
+    return dismissedByKey;
   }
 
   function dismissInterestedLeadCallId(callId, reason = 'interested_lead_dismissed') {
