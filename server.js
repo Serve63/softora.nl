@@ -7000,6 +7000,7 @@ const agendaPageBootstrapService = createAgendaPageBootstrapService({
   isSupabaseConfigured,
   getSupabaseStateHydrated: () => supabaseStateHydrated,
   forceHydrateRuntimeStateWithRetries,
+  syncRuntimeStateFromSupabaseIfNewer,
   getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
   isGeneratedAppointmentVisibleForAgenda,
   compareAgendaAppointments,

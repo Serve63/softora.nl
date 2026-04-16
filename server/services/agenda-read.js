@@ -35,10 +35,18 @@ function createAgendaReadCoordinator(deps) {
     }
   }
 
-  async function prepareAppointmentsOverview() {
+  async function prepareAppointmentsOverview(options = {}) {
+    // Vercel serverless: zonder freshSharedState kan een instance die net een
+    // cooldown heeft gedaan de zojuist door een andere instance ge-upserte
+    // afspraak missen. Bij `freshSharedState` omzeilen we de cooldown en
+    // halen we direct de laatste Supabase-state op (maxAgeMs: 0). Gebruikt
+    // door de agenda-pagina bij eerste load / focus / pageshow.
+    const freshSharedState = Boolean(options.freshSharedState);
     await ensureHydratedIfNeeded();
     if (deps.isSupabaseConfigured()) {
-      await deps.syncRuntimeStateFromSupabaseIfNewer({ maxAgeMs: deps.runtimeSyncCooldownMs });
+      await deps.syncRuntimeStateFromSupabaseIfNewer({
+        maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
+      });
     }
     if (deps.isImapMailConfigured()) {
       await deps.syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
@@ -93,7 +101,7 @@ function createAgendaReadCoordinator(deps) {
 
   async function listAppointments(options = {}) {
     const limit = Math.max(1, Math.min(1000, Number(options.limit) || 200));
-    await prepareAppointmentsOverview();
+    await prepareAppointmentsOverview({ freshSharedState: Boolean(options.freshSharedState) });
     const sorted = deps
       .getGeneratedAgendaAppointments()
       .filter(deps.isGeneratedAppointmentVisibleForAgenda)

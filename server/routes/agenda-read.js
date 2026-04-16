@@ -20,6 +20,7 @@ function registerAgendaReadRoutes(app, deps) {
     withValidation(validateAgendaAppointmentsListRequest, async (req, res) => {
       const payload = await deps.readCoordinator.listAppointments({
         limit: req.query.limit,
+        freshSharedState: parseBooleanQuery(req.query.fresh),
       });
       return res.status(200).json(payload);
     })

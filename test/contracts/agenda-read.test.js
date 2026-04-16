@@ -154,3 +154,48 @@ test('agenda read coordinator hydrate dedicated dismissed-leads bij ELKE lees (V
   assert.equal(dismissedFreshCalls[2]?.maxAgeMs, 0,
     'freshSharedState forceert directe hydrate zonder TTL');
 });
+
+test('agenda read coordinator listAppointments forceert fresh shared-state sync wanneer freshSharedState gevraagd (Vercel multi-instance: direct-zichtbare afspraken)', async () => {
+  // Repro: gebruiker heeft zojuist een afspraak ingepland via /premium-leads
+  // (instance A), navigeert direct naar /premium-personeel-agenda. De GET
+  // /api/agenda/appointments landt op instance B die zijn lokale state nog
+  // niet heeft gesynct. Zonder freshSharedState mist B de zojuist geschreven
+  // appointment tot de cooldown (4s) afloopt. Met fresh=1 omzeilen we de
+  // cooldown (maxAgeMs: 0) en ziet de gebruiker de afspraak direct.
+  const syncCalls = [];
+  const coordinator = createAgendaReadCoordinator({
+    runtimeSyncCooldownMs: 4000,
+    demoConfirmationTaskEnabled: false,
+    isSupabaseConfigured: () => true,
+    getSupabaseStateHydrated: () => true,
+    forceHydrateRuntimeStateWithRetries: async () => {},
+    syncRuntimeStateFromSupabaseIfNewer: async (options = {}) => {
+      syncCalls.push(options);
+      return false;
+    },
+    isImapMailConfigured: () => false,
+    syncInboundConfirmationEmailsFromImap: async () => {},
+    backfillInsightsAndAppointmentsFromRecentCallUpdates: () => {},
+    refreshAgendaAppointmentCallSourcesIfNeeded: async () => {},
+    backfillGeneratedAgendaAppointmentsMetadataIfNeeded: () => {},
+    refreshGeneratedAgendaSummariesIfNeeded: async () => {},
+    getGeneratedAgendaAppointments: () => [{ id: 1, date: '2026-04-16', time: '18:30' }],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+    compareAgendaAppointments: () => 0,
+    mapAppointmentToConfirmationTask: (appointment) => appointment,
+    ensureConfirmationEmailDraftAtIndex: () => {},
+    compareConfirmationTasks,
+    buildAllInterestedLeadRows: () => [],
+    isInterestedLeadDismissedForRow: () => false,
+    normalizeString,
+  });
+
+  await coordinator.listAppointments({ limit: 250 });
+  await coordinator.listAppointments({ limit: 250, freshSharedState: true });
+
+  assert.equal(syncCalls.length, 2);
+  assert.equal(syncCalls[0]?.maxAgeMs, 4000,
+    'Standaardpad (achtergrond-poll) gebruikt de cooldown TTL');
+  assert.equal(syncCalls[1]?.maxAgeMs, 0,
+    'freshSharedState=true (bv. bij focus/pageshow) omzeilt de cooldown');
+});

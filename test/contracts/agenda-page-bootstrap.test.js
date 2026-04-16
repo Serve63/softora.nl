@@ -55,3 +55,32 @@ test('agenda page bootstrap service skips hydration when supabase state is alrea
   assert.equal(payload.appointments.length, 1);
   assert.equal(payload.appointments[0].id, 11);
 });
+
+test('agenda page bootstrap service forceert altijd een verse runtime-state sync vóór de bootstrap (Vercel multi-instance regressietest voor direct-zichtbare afspraken)', async () => {
+  // Repro: instance A heeft zojuist een appointment geschreven, gebruiker
+  // navigeert direct naar /premium-personeel-agenda → bootstrap-request
+  // landt op instance B die nog niet weet van de nieuwe appointment. Zonder
+  // forced sync ziet de gebruiker een lege agenda. Met forced sync (maxAgeMs: 0)
+  // haalt B de laatste Supabase-state op en toont hij de afspraak direct.
+  const syncCalls = [];
+  const service = createAgendaPageBootstrapService({
+    isSupabaseConfigured: () => true,
+    getSupabaseStateHydrated: () => true,
+    forceHydrateRuntimeStateWithRetries: async () => {},
+    syncRuntimeStateFromSupabaseIfNewer: async (options) => {
+      syncCalls.push(options);
+      return true;
+    },
+    getGeneratedAgendaAppointments: () => [{ id: 42, date: '2026-04-16', time: '18:30' }],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+    compareAgendaAppointments: () => 0,
+  });
+
+  const payload = await service.buildAgendaBootstrapPayload();
+
+  assert.equal(syncCalls.length, 1,
+    'bootstrap moet altijd een sync forceren, ook als de instance warm is');
+  assert.equal(syncCalls[0]?.maxAgeMs, 0,
+    'bootstrap moet cooldown omzeilen (maxAgeMs: 0), anders ziet gebruiker stale data');
+  assert.equal(payload.appointments.length, 1);
+});

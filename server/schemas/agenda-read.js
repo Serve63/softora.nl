@@ -19,6 +19,7 @@ function validateAgendaAppointmentsListRequest(req) {
     ok: true,
     query: {
       limit: String(parseLimit(req.query?.limit, 200)),
+      fresh: String(parseBooleanQuery(req.query?.fresh || req.query?.forceSync)),
     },
   };
 }
