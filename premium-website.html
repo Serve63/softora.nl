@@ -1570,6 +1570,40 @@
             .werkwijze-lancering {
                 white-space: normal;
             }
+
+            .werkwijze-stats {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0;
+                border-top: 1px solid var(--border);
+                margin-top: 1.5rem;
+            }
+
+            .stat-item {
+                padding: 1rem 0.75rem;
+                border-left: none;
+                border-top: 2px solid var(--accent);
+                text-align: center;
+            }
+
+            .stat-item:not(:last-child) {
+                border-right: 1px solid var(--border);
+            }
+
+            .stat-number {
+                font-size: 1.6rem !important;
+                margin-bottom: 0.25rem;
+            }
+
+            .stat-label {
+                font-size: 0.65rem !important;
+                letter-spacing: 0.08em;
+                line-height: 1.3;
+            }
+
+            .stat-number span {
+                font-size: 1rem !important;
+            }
         }
 
         @media (max-width: 768px) {
