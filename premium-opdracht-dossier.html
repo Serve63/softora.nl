@@ -1118,6 +1118,12 @@
                     normalized.startsWith('praktische aandachtspunten');
             }
 
+            function normalizeDossierPairLabel(value) {
+                const label = String(value || '').replace(/\s+/g, ' ').trim();
+                if (!label) return '';
+                return label.toLowerCase() === 'geclaimd door' ? 'Aangewezen aan' : label;
+            }
+
             function buildFallbackLayout(baseData) {
                 const narrative = buildFallbackNarrative(baseData);
                 const prompt = buildShortOpusPrompt(baseData);
@@ -1135,7 +1141,7 @@
                                 { label: 'Contactpersoon', value: baseData.contact || '—' },
                                 { label: 'Domein', value: baseData.domainName || '—' },
                                 { label: 'Oplevertijd', value: baseData.deliveryTime || '—' },
-                                { label: 'Geclaimd door', value: baseData.claimedBy || '—' },
+                                { label: 'Aangewezen aan', value: baseData.claimedBy || '—' },
                                 { label: 'Geclaimd op', value: formatDateTime(baseData.claimedAt) },
                             ],
                         },
@@ -1152,7 +1158,7 @@
                 if (!Array.isArray(pairs)) return [];
                 return pairs
                     .map((pair) => ({
-                        label: clipText(String(pair?.label || '').trim(), 80),
+                        label: clipText(normalizeDossierPairLabel(pair?.label || ''), 80),
                         value: clipText(String(pair?.value || '').trim(), 260),
                     }))
                     .filter((pair) => pair.label && pair.value)

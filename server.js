@@ -3081,6 +3081,12 @@ function shouldHideOrderDossierBlockTitle(value) {
     normalized.startsWith('praktische aandachtspunten');
 }
 
+function normalizeOrderDossierPairLabel(value) {
+  const label = normalizeString(value || '').replace(/\s+/g, ' ').trim();
+  if (!label) return '';
+  return label.toLowerCase() === 'geclaimd door' ? 'Aangewezen aan' : label;
+}
+
 function buildOrderDossierFallbackLayout(options = {}) {
   const input = buildOrderDossierInput(options);
   const narrative = buildOrderDossierNarrative(input);
@@ -3099,7 +3105,7 @@ function buildOrderDossierFallbackLayout(options = {}) {
           { label: 'Contactpersoon', value: input.contact || '—' },
           { label: 'Domein', value: input.domainName || '—' },
           { label: 'Oplevertijd', value: input.deliveryTime || '—' },
-          { label: 'Geclaimd door', value: input.claimedBy || '—' },
+          { label: 'Aangewezen aan', value: input.claimedBy || '—' },
           { label: 'Geclaimd op', value: input.claimedAt || '—' },
         ],
       },
@@ -3116,7 +3122,7 @@ function normalizeOrderDossierPairs(pairs) {
   if (!Array.isArray(pairs)) return [];
   return pairs
     .map((pair) => {
-      const label = clipText(normalizeString(pair?.label || ''), 80);
+      const label = clipText(normalizeOrderDossierPairLabel(pair?.label || ''), 80);
       const value = clipText(normalizeString(pair?.value || ''), 250);
       if (!label || !value) return null;
       return { label, value };
