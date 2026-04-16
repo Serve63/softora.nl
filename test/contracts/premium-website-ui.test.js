@@ -39,6 +39,10 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
     source,
     /<div class="card-number">01<\/div>\s*<h3>Website's<\/h3>\s*<p>Je hebt één kans om een eerste indruk te maken\./
   );
+  assert.match(
+    source,
+    /<div class="card-number">02<\/div>\s*<h3>Bedrijfssoftware<\/h3>\s*<p>Excel is geen systeem\. Bedrijfssoftware wel\. Op maat gebouwde software die past bij hoe jouw bedrijf écht werkt\.<\/p>/
+  );
   assert.doesNotMatch(source, /diensten-arrow-wrap/);
 });
 
