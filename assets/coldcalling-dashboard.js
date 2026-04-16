@@ -7272,6 +7272,8 @@
 
   async function bootstrapColdcallingUi() {
     primeStatsFromBootstrap();
+    setStatusPill('idle', '');
+    setStatusMessage('', '');
     activeBusinessMode = await loadSavedStatusPillModeFromSupabase();
     applyStatusPillMode(activeBusinessMode);
     const uiStateLoaded = await loadRemoteUiState();
