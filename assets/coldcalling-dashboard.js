@@ -7089,6 +7089,9 @@
       }
 
       const campaign = collectCampaignFormData();
+      const stackLabel = String(
+        campaign.coldcallingStackLabel || getColdcallingStackLabel(campaign.coldcallingStack) || ''
+      ).trim();
       const leadSelection = await getManualLeadsFromDashboard(campaign.amount);
       const leads = leadSelection.leads;
       campaign.amount = leads.length;
@@ -7129,7 +7132,7 @@
             : campaign.dispatchMode === 'delay'
               ? `${campaign.dispatchDelaySeconds}s tussen calls`
               : '1 voor 1'
-        )}) via ${escapeHtml(stackLabel)}.`
+        )}) via ${escapeHtml(stackLabel || 'onbekende provider')}.`
       );
 
       if (campaign.dispatchMode === 'sequential' && leads.length > 1) {
