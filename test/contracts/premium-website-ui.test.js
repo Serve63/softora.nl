@@ -35,6 +35,10 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
+  assert.match(
+    source,
+    /<div class="card-number">01<\/div>\s*<h3>Website's<\/h3>\s*<p>Je hebt één kans om een eerste indruk te maken\./
+  );
   assert.doesNotMatch(source, /diensten-arrow-wrap/);
 });
 
