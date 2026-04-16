@@ -55,13 +55,21 @@ body {
   margin-left: 280px;
   width: calc(100% - 280px);
   min-height: 100vh;
-  padding: 0;
+  min-width: 0;
+  padding: 0 !important;
+  overflow: hidden;
 }
 .pdf-builder-shell {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
   max-height: 100vh;
+}
+
+.dashboard-layout[data-sidebar-shell="canonical"] > .main-content {
+  padding: 0 !important;
 }
 
 /* -- TOP BAR -- */
@@ -362,19 +370,44 @@ body {
 .toast { position: fixed; bottom: 20px; right: 20px; background: #1a1a2e; color: #fff; padding: 10px 16px; border-radius: 5px; font-size: 12px; opacity: 0; transform: translateY(6px); transition: all .2s; pointer-events: none; z-index: 99; }
 .toast.show { opacity: 1; transform: none; }
 
-@media (max-width: 920px) {
-  .main-content { margin-left: 0; width: 100%; }
-  .pdf-builder-shell { min-height: auto; max-height: none; }
-}
-
 @media (max-width: 1280px) {
   .topbar { padding: 0 20px; gap: 18px; }
   .form-panel { width: clamp(270px, 32vw, 320px); min-width: 270px; padding: 22px 18px 32px; }
   .preview-panel { padding: 18px 14px 22px; }
 }
 
+@media (max-width: 1180px) {
+  .split {
+    flex-direction: column;
+    overflow: auto;
+  }
+  .form-panel {
+    width: 100%;
+    min-width: 0;
+    max-height: 44vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .preview-panel {
+    flex: 1 1 auto;
+    min-height: 420px;
+    padding: 16px 12px 20px;
+  }
+  .preview-stage {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 900px) {
   html, body { overflow: auto; }
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+  }
+  .pdf-builder-shell {
+    min-height: auto;
+    max-height: none;
+  }
   .topbar {
     height: auto;
     min-height: 56px;
