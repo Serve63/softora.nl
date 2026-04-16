@@ -2,6 +2,9 @@ const {
   logLeadTrace,
   summarizeLeadRow,
 } = require('./lead-trace');
+const {
+  resolveStableCallOccurrenceMs,
+} = require('./lead-call-occurrence-timestamp');
 
 function createAgendaInterestedLeadStateService(deps = {}) {
   const {
@@ -18,6 +21,17 @@ function createAgendaInterestedLeadStateService(deps = {}) {
   } = deps;
 
   function getInterestedLeadRowTimestampMs(rowLike = {}) {
+    // STABIELE bron: uitsluitend afgeleid van gespreksmomenten (endedAt/startedAt/
+    // confirmationTaskCreatedAt). Deze wordt NIET beïnvloed door latere
+    // AI-reanalyse (`analyzedAt`) of passieve syncs (`updatedAt`), waardoor een
+    // dismissed lead alleen kan terugkomen bij een échte nieuwe call-gebeurtenis.
+    const stableMs = resolveStableCallOccurrenceMs(rowLike);
+    if (stableMs > 0) return stableMs;
+
+    // Backwards-compat fallback: als er geen stabiele call-tijd bekend is
+    // (bv. hydrate uit oudere opslag), gebruiken we dezelfde volgorde als
+    // voorheen zodat oude snapshots hun semantiek behouden. Nieuwe rijen
+    // zetten altijd `callOccurredAtMs` en komen niet in deze tak.
     const explicitMs = Number(rowLike?.updatedAtMs || 0);
     if (Number.isFinite(explicitMs) && explicitMs > 0) return explicitMs;
 
