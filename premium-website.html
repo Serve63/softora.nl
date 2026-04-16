@@ -1557,6 +1557,21 @@
             }
         }
 
+        @media (max-width: 680px) {
+            #werkwijze {
+                padding: 0.5rem 1.5rem 5rem !important;
+            }
+
+            .werkwijze-title {
+                font-size: clamp(2rem, 9vw, 2.8rem) !important;
+                line-height: 1.05 !important;
+            }
+
+            .werkwijze-lancering {
+                white-space: normal;
+            }
+        }
+
         @media (max-width: 768px) {
             .footer-grid { grid-template-columns: 1fr; gap: 28px; padding-bottom: 34px; }
             footer.footer { padding: 42px 20px 0; }
@@ -1684,7 +1699,7 @@
             <div class="grid-2 werkwijze-grid">
                 <div class="fade-up werkwijze-copy">
                     <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.9rem;">Werkwijze</span>
-                    <h2 style="margin: 1rem 0 2rem; font-size: clamp(3rem, 5vw, 4.4rem); line-height: 0.95;">Van Idee<br><span style="white-space: nowrap;">Naar Lancering</span></h2>
+                    <h2 class="werkwijze-title" style="margin: 1rem 0 2rem; font-size: clamp(3rem, 5vw, 4.4rem); line-height: 0.95;">Van Idee<br><span class="werkwijze-lancering">Naar Lancering</span></h2>
                     <p style="color: var(--text-secondary); font-size: 1.1rem; line-height: 1.9; margin-bottom: 2rem; font-weight: 300;">
                         Een gestructureerd proces dat zorgt voor voorspelbare resultaten. Geen verrassingen, wel een website die presteert.
                     </p>
