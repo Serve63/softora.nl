@@ -879,6 +879,7 @@
             const CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
             const ORDER_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
             const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';
+            const DOSSIER_LAYOUT_SCHEMA_VERSION = '20260416c';
             const root = document.getElementById('dossierRoot');
 
             function esc(value) {
@@ -997,6 +998,7 @@
 
             function buildDossierCacheFingerprint(baseData) {
                 return JSON.stringify({
+                    layoutVersion: DOSSIER_LAYOUT_SCHEMA_VERSION,
                     title: String(baseData?.title || '').trim(),
                     company: String(baseData?.company || '').trim(),
                     contact: String(baseData?.contact || '').trim(),
@@ -1023,9 +1025,10 @@
                 const layoutResponse = entry.layoutResponse;
                 if (!layoutResponse || typeof layoutResponse !== 'object') return null;
 
+                const expectedFingerprint = String(fingerprint || '').trim();
                 const entryFingerprint = String(entry.fingerprint || '').trim();
-                if (entryFingerprint && entryFingerprint === String(fingerprint || '').trim()) {
-                    return layoutResponse;
+                if (!entryFingerprint || !expectedFingerprint || entryFingerprint !== expectedFingerprint) {
+                    return null;
                 }
                 return layoutResponse;
             }
@@ -1116,6 +1119,22 @@
                 return 'Werk deze opdracht in Claude Opus 4.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie.';
             }
 
+            function normalizeDossierBlockTitle(value) {
+                return String(value || '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .toLowerCase();
+            }
+
+            function shouldHideLegacyDossierBlockTitle(value) {
+                const normalized = normalizeDossierBlockTitle(value);
+                if (!normalized) return false;
+                return normalized === 'uitvoerplan' ||
+                    normalized === 'uitvoerfocus' ||
+                    normalized.startsWith('ontbrekende informatie') ||
+                    normalized.startsWith('praktische aandachtspunten');
+            }
+
             function buildFallbackLayout(baseData) {
                 const narrative = buildFallbackNarrative(baseData);
                 const prompt = buildShortOpusPrompt(baseData);
@@ -1141,16 +1160,6 @@
                             kind: 'text',
                             title: 'Klantwensen',
                             text: narrative,
-                        },
-                        {
-                            kind: 'bullets',
-                            title: 'Uitvoerfocus',
-                            items: [
-                                'Start met een concreet stappenplan en prioriteiten.',
-                                'Werk met duidelijke pagina- en sectiestructuur.',
-                                'Schrijf copy direct inzetbaar voor productie.',
-                                'Markeer ontbrekende klantinformatie als gerichte vragen.',
-                            ],
                         },
                     ],
                 };
@@ -1191,6 +1200,7 @@
                     .map((block) => {
                         const kind = String(block?.kind || block?.type || '').trim().toLowerCase();
                         const title = clipText(String(block?.title || '').trim(), 120) || 'Sectie';
+                        if (shouldHideLegacyDossierBlockTitle(title)) return null;
 
                         if (kind === 'meta') {
                             const pairs = normalizePairs(block?.pairs || block?.items || []);

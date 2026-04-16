@@ -3061,38 +3061,35 @@ function buildOrderDossierNarrative(input) {
   return 'Nog geen uitgebreide klantwensen vastgelegd. Neem direct contact op met de klant om ontbrekende details te verzamelen.';
 }
 
+function buildShortOrderDossierOpusPrompt(options = {}) {
+  return 'Werk deze opdracht in Claude Opus 4.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie.';
+}
+
+function normalizeOrderDossierBlockTitle(value) {
+  return normalizeString(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function shouldHideOrderDossierBlockTitle(value) {
+  const normalized = normalizeOrderDossierBlockTitle(value);
+  if (!normalized) return false;
+  return normalized === 'uitvoerplan' ||
+    normalized === 'uitvoerfocus' ||
+    normalized.startsWith('ontbrekende informatie') ||
+    normalized.startsWith('praktische aandachtspunten');
+}
+
 function buildOrderDossierFallbackLayout(options = {}) {
   const input = buildOrderDossierInput(options);
   const narrative = buildOrderDossierNarrative(input);
-  const promptLines = [
-    'Je bent senior webbouwer bij Softora. Werk deze opdracht uit in Claude Opus 4.6.',
-    '',
-    'Projectgegevens:',
-    `- Bedrijf: ${input.company || 'Onbekend'}`,
-    `- Contactpersoon: ${input.contact || 'Onbekend'}`,
-    `- Opdracht: ${input.title || 'Opdracht'}`,
-    `- Domein: ${input.domainName || 'Nog niet bekend'}`,
-    `- Gewenste oplevertijd: ${input.deliveryTime || 'Niet opgegeven'}`,
-    input.sourceAppointmentLabel ? `- Bronafspraak: ${input.sourceAppointmentLabel}` : '',
-    '',
-    'Klantwensen (bron):',
-    narrative,
-    '',
-    'Lever op:',
-    '1) Concreet uitvoerplan in stappen (volgorde + prioriteit).',
-    '2) Volledige pagina-/sectiestructuur met doel per sectie.',
-    '3) Direct bruikbare Nederlandse copy per sectie.',
-    '4) Korte lijst met ontbrekende klantinformatie als vragen.',
-    '',
-    'Werk praktisch en concreet, zonder vage algemeenheden.',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const promptText = buildShortOrderDossierOpusPrompt(input);
 
   return {
     documentTitle: input.title || (input.orderId ? `Opdracht #${input.orderId}` : 'Opdracht'),
     subtitle: 'Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie en klantwensen.',
-    opusPrompt: clipText(promptLines, 20000),
+    opusPrompt: clipText(promptText, 20000),
     blocks: [
       {
         kind: 'meta',
@@ -3110,16 +3107,6 @@ function buildOrderDossierFallbackLayout(options = {}) {
         kind: 'text',
         title: 'Klantwensen',
         text: narrative,
-      },
-      {
-        kind: 'bullets',
-        title: 'Uitvoerfocus',
-        items: [
-          'Start met een concreet stappenplan en prioriteiten.',
-          'Werk met duidelijke pagina- en sectiestructuur.',
-          'Schrijf copy direct inzetbaar voor productie.',
-          'Markeer ontbrekende klantinformatie als gerichte vragen.',
-        ],
       },
     ],
   };
@@ -3158,16 +3145,14 @@ function normalizeOrderDossierLayout(rawLayout, fallbackOptions = {}) {
     normalizeString(rawLayout.subtitle || rawLayout.lead || fallback.subtitle),
     320
   ) || fallback.subtitle;
-  const opusPrompt = clipText(
-    normalizeString(rawLayout.opusPrompt || rawLayout.prompt || fallback.opusPrompt),
-    22000
-  ) || fallback.opusPrompt;
+  const opusPrompt = buildShortOrderDossierOpusPrompt(fallbackOptions);
 
   const sourceBlocks = Array.isArray(rawLayout.blocks) ? rawLayout.blocks : [];
   const blocks = sourceBlocks
     .map((block) => {
       const kind = normalizeString(block?.kind || block?.type || '').toLowerCase();
       const title = clipText(normalizeString(block?.title || ''), 120) || 'Sectie';
+      if (shouldHideOrderDossierBlockTitle(title)) return null;
 
       if (kind === 'meta') {
         const pairs = normalizeOrderDossierPairs(block?.pairs || block?.items || []);
@@ -3212,8 +3197,10 @@ function buildAnthropicOrderDossierPrompts(options = {}) {
     'Belangrijk:',
     '- Schrijf in helder Nederlands.',
     '- Verzin geen feiten die niet in de input staan.',
+    '- Gebruik alleen content die direct uit de input volgt; voeg geen generieke projectfasen of teamrichtlijnen toe.',
     '- Gebruik een indeling die past bij de hoeveelheid inhoud (dynamisch, niet template-achtig).',
-    '- Lever een direct copy-paste prompt voor Claude Opus 4.6.',
+    '- Gebruik geen bloktitels zoals "Uitvoerplan", "Ontbrekende informatie" of "Praktische aandachtspunten".',
+    '- Lever een direct copy-paste prompt voor Claude Opus 4.6 die exact 1 zin lang is.',
     '- Gebruik NOOIT ellipsis zoals "...".',
     '- Geef ALLEEN geldig JSON terug, zonder markdown of extra tekst.',
     '',
@@ -3256,8 +3243,9 @@ function buildAnthropicOrderDossierPrompts(options = {}) {
     '<required_output>',
     '- Maak een dynamische sectie-indeling op basis van de beschikbare content.',
     '- Zorg dat er altijd minimaal 1 meta-block en 1 inhoudsblock aanwezig is.',
-    '- opusPrompt moet direct bruikbaar zijn voor Claude Opus 4.6.',
-    '- Zorg dat de prompt praktisch uitvoerbaar is voor een personeelslid.',
+    '- Gebruik alleen dossierblokken die direct op de invoer zijn gebaseerd.',
+    '- Laat blokken met algemene projectplanning, ontbrekende-informatie-lijsten en praktische teamnotities weg.',
+    '- opusPrompt moet direct bruikbaar zijn voor Claude Opus 4.6 en exact 1 zin lang zijn.',
     '</required_output>',
     '<fallback_reference>',
     JSON.stringify(fallback),
