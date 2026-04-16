@@ -16,6 +16,10 @@ test('premium website over-ons paneel gebruikt dezelfde accentrand-taal als wat 
   );
   assert.match(source, /\.content-side\s*\{[\s\S]*--content-panel-padding-x:\s*4\.25rem;/s);
   assert.doesNotMatch(source, /\.content-side::before\s*\{/);
+  assert.match(
+    source,
+    /@media \(max-width: 680px\) \{[\s\S]*\.content-side\.about-panel \{[\s\S]*width:\s*100%;[\s\S]*margin-left:\s*0;[\s\S]*clip-path:\s*none;/s
+  );
 });
 
 test('premium website werkwijze stats gebruiken een vaste paarse lijn zonder hover-effect', () => {

@@ -1505,6 +1505,58 @@
             }
         }
 
+        /* ── Over ons — mobiel ───────────────────────────────────────── */
+        @media (max-width: 680px) {
+            .image-text-section {
+                padding: 0 0 2rem !important;
+            }
+
+            .image-text-frame {
+                display: flex;
+                flex-direction: column;
+                min-height: unset;
+            }
+
+            .image-side {
+                clip-path: none;
+                height: 240px;
+                width: 100%;
+                flex-shrink: 0;
+            }
+
+            .content-side.about-panel {
+                width: 100%;
+                margin-left: 0;
+                padding: 2rem 1.5rem 2.5rem;
+                padding-left: 1.5rem;
+                border: none;
+                border-top: 3px solid var(--accent);
+                box-shadow: none;
+                clip-path: none;
+            }
+
+            .content-side.about-panel h2 {
+                font-size: clamp(2rem, 8vw, 2.8rem) !important;
+                line-height: 1.05 !important;
+                margin-bottom: 1.2rem !important;
+            }
+
+            .content-side.about-panel p {
+                font-size: 0.97rem !important;
+                line-height: 1.72 !important;
+                margin-bottom: 1.1rem !important;
+            }
+
+            .content-side.about-panel a {
+                display: block;
+                text-align: center;
+                width: 100%;
+                box-sizing: border-box;
+                padding: 0.85rem 1.2rem !important;
+                font-size: 0.88rem !important;
+            }
+        }
+
         @media (max-width: 768px) {
             .footer-grid { grid-template-columns: 1fr; gap: 28px; padding-bottom: 34px; }
             footer.footer { padding: 42px 20px 0; }
