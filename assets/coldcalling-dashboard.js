@@ -5062,40 +5062,40 @@
 
           #leadDatabaseModalShell .lead-db-table-summary {
             display: flex;
-            align-items: stretch;
+            align-items: center;
             justify-content: flex-end;
-            gap: 12px;
+            gap: 8px;
             flex-wrap: wrap;
-            padding: 16px 20px;
+            padding: 12px 20px;
             border-top: 1px solid var(--lead-db-border);
-            background: linear-gradient(90deg, rgba(155, 35, 85, 0.06), rgba(155, 35, 85, 0.015));
+            background: rgba(155, 35, 85, 0.03);
           }
 
           #leadDatabaseModalShell .lead-db-table-summary-item {
-            min-width: 190px;
-            padding: 10px 14px;
+            min-width: 156px;
+            padding: 8px 12px;
             border: 1px solid var(--lead-db-border);
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.72);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.58);
           }
 
           #leadDatabaseModalShell .lead-db-table-summary-label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
             color: var(--lead-db-text-light);
-            font-size: 9px;
+            font-size: 8px;
             font-weight: 700;
-            letter-spacing: 1.5px;
+            letter-spacing: 1.3px;
             text-transform: uppercase;
           }
 
           #leadDatabaseModalShell .lead-db-table-summary-value {
             display: block;
             color: var(--lead-db-text-dark);
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 26px;
+            font-family: 'Barlow', sans-serif;
+            font-size: 20px;
             font-weight: 700;
-            line-height: 1;
+            line-height: 1.1;
           }
 
           #leadDatabaseModalShell .lead-db-status-pill {
@@ -5331,14 +5331,6 @@
               <div id="leadDatabaseRefreshInfo" class="lead-db-refresh-info">Nog niet ververst</div>
             </div>
             <div class="lead-db-toolbar-right">
-              <button type="button" id="leadDatabaseTemplateBtn" class="lead-db-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Template download
-              </button>
               <button type="button" id="leadDatabaseAddManualBtn" class="lead-db-btn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -6024,7 +6016,6 @@
       const refreshInfo = byId('leadDatabaseRefreshInfo');
       const importBtn = byId('leadDatabaseImportBtn');
       const addManualBtn = byId('leadDatabaseAddManualBtn');
-      const templateBtn = byId('leadDatabaseTemplateBtn');
       const closeBtn = byId('leadDatabaseCancelBtn');
       if (!tableWrap || !summaryCards || !statusBar) return;
 
@@ -6045,9 +6036,6 @@
       }
       if (addManualBtn) {
         addManualBtn.disabled = busy;
-      }
-      if (templateBtn) {
-        templateBtn.disabled = state.loading;
       }
       if (closeBtn) {
         closeBtn.disabled = false;
@@ -6260,24 +6248,6 @@
       });
     }
 
-    function downloadLeadDatabaseTemplate() {
-      const lines = [
-        'bedrijf;telefoonnummer;regio;contactpersoon;branche;provincie;adres;website',
-        'Voorbeeld BV;0612345678;Utrecht;Jan Jansen;Installatie;Utrecht;Voorbeeldstraat 12 Utrecht;voorbeeld.nl',
-      ];
-      const csv = `\uFEFF${lines.join('\n')}`;
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = 'bedrijvenregister_template.csv';
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
-    }
-
     async function importLeadDocumentFile(file) {
       if (!file) return;
       const fileName = String(file.name || 'document').trim();
@@ -6452,9 +6422,6 @@
         state.importing = false;
         render();
       }
-    });
-    byId('leadDatabaseTemplateBtn')?.addEventListener('click', () => {
-      downloadLeadDatabaseTemplate();
     });
     byId('leadDatabaseImportInput')?.addEventListener('change', async (event) => {
       const input = event.target;

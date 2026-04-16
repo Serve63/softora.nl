@@ -11,7 +11,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260416a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260416b" defer><\/script>/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
   assert.match(pageSource, /id="statBooked"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_BOOKED --><\/div>/);
   assert.match(pageSource, /id="statInterested"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_INTERESTED --><\/div>/);
@@ -152,13 +152,32 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   );
   assert.doesNotMatch(dashboardSource, /return 'Samenvatting wordt opgesteld op basis van de transcriptie\.';/);
   assert.match(dashboardSource, /family=Barlow\+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600/);
-  assert.match(dashboardSource, /<div class="lead-db-toolbar">[\s\S]*leadDatabaseRefreshInfo[\s\S]*leadDatabaseTemplateBtn[\s\S]*leadDatabaseAddManualBtn[\s\S]*leadDatabaseImportBtn/);
+  assert.match(dashboardSource, /<div class="lead-db-toolbar">[\s\S]*leadDatabaseRefreshInfo[\s\S]*leadDatabaseAddManualBtn[\s\S]*leadDatabaseImportBtn/);
   assert.match(dashboardSource, /<div id="leadDatabaseSummaryCards" class="lead-db-stats"><\/div>/);
   assert.match(dashboardSource, /class="lead-db-table-card"/);
   assert.match(dashboardSource, /lead-db-table-summary[\s\S]*Unieke mensen gebeld[\s\S]*Totale beltijd/);
+  assert.match(
+    dashboardSource,
+    /\.lead-db-table-summary\s*\{[\s\S]*align-items:\s*center;[\s\S]*gap:\s*8px;[\s\S]*padding:\s*12px 20px;[\s\S]*background:\s*rgba\(155, 35, 85, 0\.03\);/
+  );
+  assert.match(
+    dashboardSource,
+    /\.lead-db-table-summary-item\s*\{[\s\S]*min-width:\s*156px;[\s\S]*padding:\s*8px 12px;[\s\S]*border-radius:\s*8px;[\s\S]*background:\s*rgba\(255, 255, 255, 0\.58\);/
+  );
+  assert.match(
+    dashboardSource,
+    /\.lead-db-table-summary-label\s*\{[\s\S]*margin-bottom:\s*3px;[\s\S]*font-size:\s*8px;[\s\S]*letter-spacing:\s*1\.3px;/
+  );
+  assert.match(
+    dashboardSource,
+    /\.lead-db-table-summary-value\s*\{[\s\S]*font-family:\s*'Barlow', sans-serif;[\s\S]*font-size:\s*20px;[\s\S]*line-height:\s*1\.1;/
+  );
   assert.match(dashboardSource, /<button type="button" id="leadDatabaseCancelBtn" class="lead-db-close-btn" aria-label="Sluiten" title="Sluiten">×<\/button>/);
   assert.doesNotMatch(dashboardSource, /<div class="lead-db-logo">Softora\.nl<\/div>/);
   assert.doesNotMatch(dashboardSource, /<div class="lead-db-footer">Softora\.nl<\/div>/);
+  assert.doesNotMatch(dashboardSource, /leadDatabaseTemplateBtn/);
+  assert.doesNotMatch(dashboardSource, /Template download/);
+  assert.doesNotMatch(dashboardSource, /downloadLeadDatabaseTemplate/);
   assert.doesNotMatch(dashboardSource, /id="leadDatabaseRefreshBtn"/);
   assert.doesNotMatch(dashboardSource, /id="leadDatabaseFilterPills"/);
   assert.doesNotMatch(dashboardSource, /<button type="button" id="leadDatabaseCancelBtn" class="lead-db-btn">Sluiten<\/button>/);
