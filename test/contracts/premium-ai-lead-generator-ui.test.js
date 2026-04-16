@@ -27,6 +27,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<option value="websites" data-dot-color="accent" selected>Website's<\/option>/);
   assert.match(pageSource, /<option value="voice_software" data-dot-color="green" disabled>🔒 Voicesoftware<\/option>/);
   assert.match(pageSource, /<option value="business_software" data-dot-color="blue" disabled>🔒 Bedrijfssoftware<\/option>/);
+  assert.match(pageSource, /<option value="ai_chatbots" data-dot-color="accent" disabled>🔒 AI Chatbots<\/option>/);
   assert.match(pageSource, /<option value="unlimited" selected>Geen limiet<\/option>/);
   assert.doesNotMatch(pageSource, /<option value="custom">Aangepast<\/option>/);
   assert.match(
