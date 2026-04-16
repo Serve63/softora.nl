@@ -86,6 +86,9 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
   if (!('supabaseCallUpdatesLastSyncCheckMs' in runtimeState)) {
     runtimeState.supabaseCallUpdatesLastSyncCheckMs = 0;
   }
+  if (!('dismissedLeadsLastHydrateAtMs' in runtimeState)) {
+    runtimeState.dismissedLeadsLastHydrateAtMs = 0;
+  }
   if (!('nextLeadOwnerRotationIndex' in runtimeState)) {
     runtimeState.nextLeadOwnerRotationIndex = 0;
   }
@@ -1154,19 +1157,82 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     runtimeState.supabaseCallUpdatesLastSyncCheckMs = 0;
   }
 
+  // CRITIEK op Vercel serverless: meerdere warme instances hebben ieder eigen
+  // in-memory dismissed-sets. De Supabase row is 1 rij voor de hele dismissed-state.
+  // Een naïeve "overwrite whole row" causeert last-writer-wins: instance B kan
+  // dismisses van instance A overschrijven door simpelweg zijn oudere set te
+  // persisteren. Daarom doen we hier altijd een READ-MODIFY-WRITE:
+  //   1. Lees de huidige remote state (bron van waarheid).
+  //   2. Merge remote + lokaal (additief voor sets, max() voor timestamps).
+  //   3. Schrijf de gemergde set terug én update ook onze lokale in-memory
+  //      kopie zodat we niet meteen de volgende persist met een stale copy doen.
+  // Gevolg: een dismiss gaat nooit verloren door een concurrent request op een
+  // andere instance. Hooguit kunnen twee dismisses tegelijk plaatsvinden in
+  // het korte venster tussen read en write — in dat geval wint de laatste die
+  // schrijft, maar beide waren al in de dedicated row aanwezig via elkaars
+  // preceding read-modify-write.
   async function persistDismissedLeadsToSupabase(reason = 'dismissed_leads_persist') {
     if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return false;
-    const callIds = Array.from(dismissedInterestedLeadCallIds).filter(Boolean).slice(0, 1000);
-    const leadKeys = Array.from(dismissedInterestedLeadKeys).filter(Boolean).slice(0, 2000);
+
+    const remoteState = await readRemoteDismissedLeadsState();
+    const remoteCallIds = remoteState?.callIds instanceof Set ? remoteState.callIds : new Set();
+    const remoteLeadKeys = remoteState?.leadKeys instanceof Set ? remoteState.leadKeys : new Set();
+    const remoteLeadKeyUpdatedAtMs =
+      remoteState?.leadKeyUpdatedAtMsByKey instanceof Map
+        ? remoteState.leadKeyUpdatedAtMsByKey
+        : new Map();
+
+    const mergedCallIds = new Set();
+    dismissedInterestedLeadCallIds.forEach((id) => {
+      const value = normalizeString(id);
+      if (value) mergedCallIds.add(value);
+    });
+    remoteCallIds.forEach((id) => {
+      const value = normalizeString(id);
+      if (value) mergedCallIds.add(value);
+    });
+
+    const mergedLeadKeys = new Set();
+    dismissedInterestedLeadKeys.forEach((key) => {
+      const value = normalizeString(key);
+      if (value) mergedLeadKeys.add(value);
+    });
+    remoteLeadKeys.forEach((key) => {
+      const value = normalizeString(key);
+      if (value) mergedLeadKeys.add(value);
+    });
+
+    const mergedLeadKeyUpdatedAtMs = new Map();
+    mergedLeadKeys.forEach((key) => {
+      const localMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
+      const remoteMs = Number(remoteLeadKeyUpdatedAtMs.get(key) || 0);
+      const best = Math.max(
+        Number.isFinite(localMs) && localMs > 0 ? localMs : 0,
+        Number.isFinite(remoteMs) && remoteMs > 0 ? remoteMs : 0
+      );
+      if (best > 0) mergedLeadKeyUpdatedAtMs.set(key, Math.round(best));
+    });
+
+    // Sync de gemergde remote-waarden terug naar onze in-memory kopie. Zo ziet
+    // deze instance vanaf nu ook dismisses die elders zijn gezet.
+    mergedCallIds.forEach((id) => dismissedInterestedLeadCallIds.add(id));
+    mergedLeadKeys.forEach((key) => dismissedInterestedLeadKeys.add(key));
+    mergedLeadKeyUpdatedAtMs.forEach((ms, key) => {
+      const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
+      if (ms > currentMs) {
+        dismissedInterestedLeadKeyUpdatedAtMsByKey.set(key, ms);
+      }
+    });
+
+    const callIds = Array.from(mergedCallIds).slice(0, 1000);
+    const leadKeys = Array.from(mergedLeadKeys).slice(0, 2000);
     const leadKeyUpdatedAtMsByKey = Object.fromEntries(
       leadKeys
-        .map((leadKey) => {
-          const updatedAtMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(leadKey) || 0);
-          return [leadKey, Number.isFinite(updatedAtMs) && updatedAtMs > 0 ? Math.round(updatedAtMs) : 0];
-        })
-        .filter(([, updatedAtMs]) => Number.isFinite(updatedAtMs) && updatedAtMs > 0)
+        .map((leadKey) => [leadKey, Number(mergedLeadKeyUpdatedAtMs.get(leadKey) || 0)])
+        .filter(([, ms]) => Number.isFinite(ms) && ms > 0)
     );
     if (!callIds.length && !leadKeys.length) return true;
+
     try {
       const updatedAt = new Date().toISOString();
       const result = await upsertSupabaseRowViaRest({
@@ -1174,6 +1240,9 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
         payload: { callIds, leadKeys, leadKeyUpdatedAtMsByKey, updatedAt, reason },
         updated_at: updatedAt,
       });
+      if (result?.ok) {
+        runtimeState.dismissedLeadsLastHydrateAtMs = Date.now();
+      }
       return Boolean(result?.ok);
     } catch (error) {
       logError('[Supabase][DismissedLeadsPersistError]', error?.message || error);
@@ -1181,46 +1250,89 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     }
   }
 
-  async function hydrateDismissedLeadsFromSupabase() {
-    if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return false;
+  async function readRemoteDismissedLeadsState() {
+    if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return null;
     try {
       const result = await fetchSupabaseRowByKeyViaRest(supabaseDismissedLeadsStateKey, 'payload');
-      if (!result?.ok) return false;
+      if (!result?.ok) return null;
       const row = Array.isArray(result.body) ? result.body[0] || null : result.body;
-      if (!row?.payload || typeof row.payload !== 'object') return false;
-      const callIds = Array.isArray(row.payload.callIds) ? row.payload.callIds : [];
-      const leadKeys = Array.isArray(row.payload.leadKeys) ? row.payload.leadKeys : [];
+      if (!row?.payload || typeof row.payload !== 'object') return null;
+
+      const callIds = new Set();
+      (Array.isArray(row.payload.callIds) ? row.payload.callIds : []).forEach((item) => {
+        const value = normalizeString(item);
+        if (value) callIds.add(value);
+      });
+
+      const leadKeys = new Set();
+      (Array.isArray(row.payload.leadKeys) ? row.payload.leadKeys : []).forEach((item) => {
+        const value = normalizeString(item);
+        if (value) leadKeys.add(value);
+      });
+
       const fallbackUpdatedAtMs =
         Date.parse(normalizeString(row?.payload?.updatedAt || row?.updated_at || row?.updatedAt || '')) || 0;
-      const leadKeyUpdatedAtMsByKey =
+      const rawMap =
         row.payload.leadKeyUpdatedAtMsByKey && typeof row.payload.leadKeyUpdatedAtMsByKey === 'object'
           ? row.payload.leadKeyUpdatedAtMsByKey
           : {};
-      callIds.forEach((item) => {
-        const callId = normalizeString(item);
-        if (callId) dismissedInterestedLeadCallIds.add(callId);
-      });
-      leadKeys.forEach((item) => {
-        const leadKey = normalizeString(item);
-        if (leadKey) dismissedInterestedLeadKeys.add(leadKey);
-        const updatedAtMs = Number(leadKeyUpdatedAtMsByKey?.[leadKey] || fallbackUpdatedAtMs || 0);
-        if (leadKey && Number.isFinite(updatedAtMs) && updatedAtMs > 0) {
-          const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(leadKey) || 0);
-          if (updatedAtMs >= currentMs) {
-            dismissedInterestedLeadKeyUpdatedAtMsByKey.set(leadKey, Math.round(updatedAtMs));
-          }
+      const leadKeyUpdatedAtMsByKey = new Map();
+      leadKeys.forEach((leadKey) => {
+        const raw = Number(rawMap?.[leadKey] || fallbackUpdatedAtMs || 0);
+        if (Number.isFinite(raw) && raw > 0) {
+          leadKeyUpdatedAtMsByKey.set(leadKey, Math.round(raw));
         }
       });
-      return true;
+
+      return { callIds, leadKeys, leadKeyUpdatedAtMsByKey };
     } catch (error) {
-      logError('[Supabase][DismissedLeadsHydrateError]', error?.message || error);
+      logError('[Supabase][DismissedLeadsReadError]', error?.message || error);
+      return null;
+    }
+  }
+
+  async function hydrateDismissedLeadsFromSupabase() {
+    const remoteState = await readRemoteDismissedLeadsState();
+    if (!remoteState) return false;
+
+    remoteState.callIds.forEach((callId) => {
+      dismissedInterestedLeadCallIds.add(callId);
+    });
+    remoteState.leadKeys.forEach((leadKey) => {
+      dismissedInterestedLeadKeys.add(leadKey);
+    });
+    remoteState.leadKeyUpdatedAtMsByKey.forEach((updatedAtMs, leadKey) => {
+      const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(leadKey) || 0);
+      if (updatedAtMs >= currentMs) {
+        dismissedInterestedLeadKeyUpdatedAtMsByKey.set(leadKey, Math.round(updatedAtMs));
+      }
+    });
+    runtimeState.dismissedLeadsLastHydrateAtMs = Date.now();
+    return true;
+  }
+
+  // Lichte wrapper om herhaalde hydrate-calls samen te voegen binnen een TTL.
+  // Lees-routes op warme Vercel-instances mogen hier goedkoop doorheen: als een
+  // andere request binnen `maxAgeMs` al hydrate heeft gedraaid, skippen we.
+  async function ensureDismissedLeadsFreshFromSupabase(options = {}) {
+    if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return false;
+    const force = Boolean(options?.force);
+    const maxAgeMs = Math.max(
+      0,
+      Number.isFinite(Number(options?.maxAgeMs)) ? Number(options.maxAgeMs) : 2000
+    );
+    const lastMs = Number(runtimeState.dismissedLeadsLastHydrateAtMs || 0);
+    const nowMs = Date.now();
+    if (!force && lastMs > 0 && nowMs - lastMs < maxAgeMs) {
       return false;
     }
+    return hydrateDismissedLeadsFromSupabase();
   }
 
   return {
     applyRuntimeStateSnapshotPayload,
     buildCallUpdateRowPersistMeta,
+    ensureDismissedLeadsFreshFromSupabase,
     ensureRuntimeStateHydratedFromSupabase,
     forceHydrateRuntimeStateWithRetries,
     hydrateDismissedLeadsFromSupabase,

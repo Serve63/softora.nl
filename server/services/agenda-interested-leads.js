@@ -45,6 +45,7 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
     setGeneratedAgendaAppointmentAtIndex = () => null,
     dismissInterestedLeadIdentity = () => {},
     persistDismissedLeadsToSupabase = async () => false,
+    ensureDismissedLeadsFreshFromSupabase = async () => false,
     appendDashboardActivity = () => {},
     cancelOpenLeadFollowUpTasksByIdentity = () => [],
     buildRuntimeStateSnapshotPayload = () => null,
@@ -528,6 +529,13 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
   async function dismissInterestedLeadResponse(req, res) {
     if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
       await forceHydrateRuntimeStateWithRetries(3);
+    }
+    // Vercel serverless: deze instance kan sinds zijn cold start nooit meer
+    // remote dismisses hebben gezien. Refresh altijd de dedicated dismissed-row
+    // zodat we ná de dismiss met de volledige union persisten (en we niet per
+    // ongeluk dismisses van andere instances "vergeten").
+    if (isSupabaseConfigured()) {
+      await ensureDismissedLeadsFreshFromSupabase({ force: true }).catch(() => false);
     }
     backfillInsightsAndAppointmentsFromRecentCallUpdates();
 
