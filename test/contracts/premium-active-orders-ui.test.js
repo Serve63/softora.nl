@@ -114,6 +114,7 @@ test('premium opdrachtdossier toont de pdf-knop rechtsboven en laat de pagina vo
   const filePath = path.join(__dirname, '../../premium-opdracht-dossier.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
+  assert.doesNotMatch(source, /Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie\./);
   assert.match(source, /\.dossier-wrap \{[\s\S]*align-items:\s*stretch;/);
   assert.match(source, /\.page-toolbar \{[\s\S]*justify-content:\s*flex-end;[\s\S]*position:\s*sticky;[\s\S]*top:\s*0;/);
   assert.match(source, /\.toolbar-actions \{[\s\S]*justify-content:\s*flex-end;[\s\S]*margin-left:\s*auto;/);
