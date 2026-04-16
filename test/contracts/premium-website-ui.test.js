@@ -41,6 +41,14 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   assert.doesNotMatch(source, /<h2 style="text-align: center;">Wat We Voor Je Bouwen<\/h2>/);
   assert.match(
     source,
+    /<div class="pricing-grid">[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card fade-up"[\s\S]*id="dienst-premium-website" class="pricing-card featured fade-up"[\s\S]*id="dienst-voicesoftware" class="pricing-card fade-up"/
+  );
+  assert.doesNotMatch(
+    source,
+    /id="dienst-premium-website" class="pricing-card fade-up"[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card featured fade-up"/
+  );
+  assert.match(
+    source,
     /<div class="card-number">01<\/div>\s*<h3>Website's<\/h3>\s*<p>Je hebt één kans om een eerste indruk te maken\./
   );
   assert.match(
