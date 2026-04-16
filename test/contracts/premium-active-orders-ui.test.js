@@ -87,6 +87,8 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.match(source, /if \(shouldHideLegacyDossierBlockTitle\(title\)\) return null;/);
   assert.match(source, /if \(cachedLayoutResponse\) \{[\s\S]*renderDossier\(baseData, cachedLayoutResponse\);/);
   assert.match(source, /void persistDossierCache\(values\?\.\[DOSSIER_CACHE_KEY\], orderId, dossierFingerprint, layoutResponse\);/);
+  assert.doesNotMatch(source, /source-chip/);
+  assert.doesNotMatch(source, /Dynamisch via/);
   assert.doesNotMatch(source, /Klantwensen \(bron\):/);
   assert.doesNotMatch(source, /Werk praktisch en concreet, zonder vage algemeenheden\./);
   assert.doesNotMatch(source, /title: 'Uitvoerfocus'/);

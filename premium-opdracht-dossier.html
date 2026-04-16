@@ -417,20 +417,6 @@
             max-width: 44ch;
         }
 
-        .source-chip {
-            margin-top: 0.65rem;
-            display: inline-flex;
-            align-items: center;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            padding: 0.24rem 0.58rem;
-            font-size: 0.67rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: #7d8499;
-            background: #ffffff;
-        }
-
         .btn {
             appearance: none;
             border: 1px solid var(--line);
@@ -803,9 +789,6 @@
                 font-size: 0.82rem !important;
             }
 
-            .source-chip {
-                display: none !important;
-            }
         }
     </style>
 </head>
@@ -1370,8 +1353,6 @@
                 const orderId = Number(baseData.orderId) || 0;
                 const orderDateLabel = formatDateOnly(baseData.claimedAt || Date.now());
                 const layout = normalizeLayoutPayload(layoutResponse?.layout || layoutResponse || {}, baseData);
-                const source = String(layoutResponse?.source || '').trim();
-                const model = String(layoutResponse?.model || '').trim();
                 const warning = String(layoutResponse?.warning || '').trim();
                 const opusPrompt = String(layout.opusPrompt || '').trim();
                 const blocksHtml = (Array.isArray(layout.blocks) ? layout.blocks : [])
@@ -1407,7 +1388,6 @@
                                             <div class="eyebrow">Uitvoerdossier</div>
                                             <h1 class="title">${esc(layout.documentTitle || `Opdracht #${orderId}`)}</h1>
                                             <p class="subtitle">${esc(layout.subtitle || 'Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie.')}</p>
-                                            ${source ? `<div class="source-chip">Dynamisch via ${esc(model || source)}</div>` : ''}
                                         </div>
                                     </div>
 
