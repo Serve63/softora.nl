@@ -242,6 +242,59 @@ test('agenda interested lead state service triggers dedicated Supabase persist o
   assert.equal(dedicatedPersistReasons[0], 'manual_dismiss');
 });
 
+test('agenda interested lead state service keeps a dismissed lead hidden when only AI analyzedAt moves forward (no new call)', () => {
+  const dismissMoment = Date.parse('2026-04-16T17:35:00.000Z');
+  const { service } = createFixture({
+    dismissedInterestedLeadKeys: new Set(['phone:0612345678']),
+    dismissedInterestedLeadKeyUpdatedAtMsByKey: new Map([
+      ['phone:0612345678', dismissMoment],
+    ]),
+  });
+
+  const staleCallId = 'call-before-dismiss';
+  const staleCallRow = {
+    company: 'Softora',
+    contact: 'Serve',
+    phone: '0612345678',
+    callOccurredAtMs: Date.parse('2026-04-16T17:29:00.000Z'),
+    callOccurredAt: '2026-04-16T17:29:00.000Z',
+    updatedAtMs: Date.parse('2026-04-16T17:55:00.000Z'),
+    updatedAt: '2026-04-16T17:55:00.000Z',
+    analyzedAt: '2026-04-16T17:55:00.000Z',
+  };
+
+  assert.equal(
+    service.isInterestedLeadDismissedForRow(staleCallId, staleCallRow),
+    true,
+    'A later AI analysis or sync must NEVER un-dismiss a lead; only a genuinely newer call-occurrence may.'
+  );
+});
+
+test('agenda interested lead state service shows a truly newer call even if the row also carries an older analyzedAt', () => {
+  const dismissMoment = Date.parse('2026-04-16T17:35:00.000Z');
+  const { service } = createFixture({
+    dismissedInterestedLeadKeys: new Set(['phone:0612345678']),
+    dismissedInterestedLeadKeyUpdatedAtMsByKey: new Map([
+      ['phone:0612345678', dismissMoment],
+    ]),
+  });
+
+  const freshCallRow = {
+    company: 'Softora',
+    contact: 'Serve',
+    phone: '0612345678',
+    callOccurredAtMs: Date.parse('2026-04-16T18:10:00.000Z'),
+    callOccurredAt: '2026-04-16T18:10:00.000Z',
+    updatedAtMs: Date.parse('2026-04-16T18:11:00.000Z'),
+    analyzedAt: '2026-04-16T17:20:00.000Z',
+  };
+
+  assert.equal(
+    service.isInterestedLeadDismissedForRow('call-after-dismiss', freshCallRow),
+    false
+  );
+});
+
 test('agenda interested lead state service does not trigger dedicated persist for duplicate dismiss', () => {
   const { dedicatedPersistReasons, service } = createFixture({
     dismissedInterestedLeadCallIds: new Set(['call-already-dismissed']),

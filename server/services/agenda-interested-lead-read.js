@@ -3,6 +3,10 @@ const {
   normalizeLeadIdentityText,
   normalizeLeadLikePhoneKey,
 } = require('./lead-identity');
+const {
+  resolveStableCallOccurrenceMs,
+  resolveStableCallOccurrenceIso,
+} = require('./lead-call-occurrence-timestamp');
 
 function createAgendaInterestedLeadReadService(deps = {}) {
   const {
@@ -205,6 +209,13 @@ function createAgendaInterestedLeadReadService(deps = {}) {
               ''
           ) || toIsoStringFromTimestamp(occurredAtMs);
 
+        // Stabiele "moment-van-het-gesprek" timestamp voor de dismiss-filter.
+        // Mag NOOIT meebewegen met AI reanalyses of passieve syncs; daarom
+        // leunt resolveStableCallOccurrenceMs alleen op endedAt/startedAt/
+        // confirmationTaskCreatedAt (zie lead-call-occurrence-timestamp.js).
+        const callOccurredAtMs = resolveStableCallOccurrenceMs(task, appointment);
+        const callOccurredAt = resolveStableCallOccurrenceIso(task, appointment);
+
         const ownerFields = buildOwnerFieldsForOccurrence(callId, {
           key: task?.leadOwnerKey || appointment?.leadOwnerKey || '',
           displayName: task?.leadOwnerName || appointment?.leadOwnerName || '',
@@ -253,6 +264,8 @@ function createAgendaInterestedLeadReadService(deps = {}) {
           createdAt: occurredAtIso || new Date().toISOString(),
           confirmationTaskCreatedAt: occurredAtIso || null,
           updatedAtMs: occurredAtMs,
+          callOccurredAtMs: callOccurredAtMs || 0,
+          callOccurredAt: callOccurredAt || '',
           ...ownerFields,
         };
 
@@ -319,6 +332,13 @@ function createAgendaInterestedLeadReadService(deps = {}) {
         const occurredAtIso =
           normalizeString(update?.updatedAt || update?.endedAt || insight?.analyzedAt || '') ||
           toIsoStringFromTimestamp(occurredAtMs);
+
+        // Stabiele gesprekstijd — uitsluitend gebaseerd op endedAt/startedAt
+        // van de call en/of insight. AI-reanalyse (`analyzedAt`) en passieve
+        // syncs (`updatedAt`) mogen deze waarde NIET beïnvloeden, anders
+        // kunnen dismissed leads zonder echte nieuwe call weer verschijnen.
+        const callOccurredAtMs = resolveStableCallOccurrenceMs(update, insight);
+        const callOccurredAt = resolveStableCallOccurrenceIso(update, insight);
         const derivedFollowUp = buildGeneratedLeadFollowUpFromCall(update, insight) || null;
         const hasDerivedFollowUp = Boolean(derivedFollowUp && typeof derivedFollowUp === 'object');
         if (!hasDerivedFollowUp && !isInterestedOccurrence(update, insight)) return null;
@@ -400,6 +420,8 @@ function createAgendaInterestedLeadReadService(deps = {}) {
           createdAt: occurredAtIso || new Date().toISOString(),
           confirmationTaskCreatedAt: occurredAtIso || null,
           updatedAtMs: occurredAtMs,
+          callOccurredAtMs: callOccurredAtMs || 0,
+          callOccurredAt: callOccurredAt || '',
           ...buildOwnerFieldsForOccurrence(callId),
         };
 
