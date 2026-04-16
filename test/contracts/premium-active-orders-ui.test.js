@@ -70,6 +70,9 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.match(source, /const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';/);
   assert.match(source, /function buildDossierCacheFingerprint\(baseData\) \{/);
   assert.match(source, /function getCachedDossierLayoutResponse\(rawValue, orderId, fingerprint\) \{/);
+  assert.match(source, /function buildShortOpusPrompt\(baseData\) \{/);
+  assert.match(source, /return 'Werk deze opdracht in Claude Opus 4\.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie\.';/);
+  assert.match(source, /const prompt = buildShortOpusPrompt\(baseData\);/);
   assert.match(source, /const cacheMap = parseDossierCacheMap\(rawValue\);[\s\S]*const entry = cacheMap\[String\(orderId\)\];/);
   assert.match(source, /if \(entryFingerprint && entryFingerprint === String\(fingerprint \|\| ''\)\.trim\(\)\) \{[\s\S]*return layoutResponse;/);
   assert.doesNotMatch(source, /window\.localStorage/);
@@ -77,8 +80,11 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
   assert.match(source, /async function persistDossierCache\(rawValue, orderId, fingerprint, layoutResponse\) \{/);
   assert.match(source, /await fetchUiStateSetWithFallback\(REMOTE_SCOPE, \{/);
   assert.match(source, /const cachedLayoutResponse = getCachedDossierLayoutResponse\(/);
+  assert.match(source, /const opusPrompt = buildShortOpusPrompt\(baseData\);/);
   assert.match(source, /if \(cachedLayoutResponse\) \{[\s\S]*renderDossier\(baseData, cachedLayoutResponse\);/);
   assert.match(source, /void persistDossierCache\(values\?\.\[DOSSIER_CACHE_KEY\], orderId, dossierFingerprint, layoutResponse\);/);
+  assert.doesNotMatch(source, /Klantwensen \(bron\):/);
+  assert.doesNotMatch(source, /Werk praktisch en concreet, zonder vage algemeenheden\./);
 });
 
 test('premium opdrachtdossier toont de pdf-knop rechtsboven en laat de pagina volledig uitlopen', () => {

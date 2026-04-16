@@ -49,7 +49,9 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /<section class="hero">[\s\S]*<div class="hero-copy">[\s\S]*<div class="hero-side">[\s\S]*<div class="leaderboard-card" id="leaderboardCard">/);
   assert.match(pageSource, /<div class="leaderboard-label">Meeste opdrachten<\/div>/);
   assert.match(pageSource, /<div class="leaderboard-list" id="leaderboardList">[\s\S]*Servé[\s\S]*0 opdrachten[\s\S]*Martijn[\s\S]*0 opdrachten/);
-  assert.match(pageSource, /\.leaderboard-card \{[\s\S]*display: inline-flex;[\s\S]*width: min\(320px, 100%\);[\s\S]*border: 1px solid rgba\(139, 34, 82, 0\.22\);/);
+  assert.match(pageSource, /\.leaderboard-card \{[\s\S]*display: inline-flex;[\s\S]*width: min\(320px, 100%\);[\s\S]*padding: 0;[\s\S]*border: none;[\s\S]*background: transparent;/);
+  assert.doesNotMatch(pageSource, /border: 1px solid rgba\(139, 34, 82, 0\.22\);/);
+  assert.doesNotMatch(pageSource, /background: rgba\(139, 34, 82, 0\.06\);/);
   assert.match(pageSource, /\.leaderboard-list \{[\s\S]*display: grid;[\s\S]*gap: 0\.42rem;/);
   assert.match(pageSource, /\.leaderboard-entry-name \{[\s\S]*font-family: 'Oswald', sans-serif;[\s\S]*text-transform: uppercase;/);
   assert.match(pageSource, /\.leaderboard-icon svg \{[\s\S]*width: 16px;[\s\S]*height: 16px;/);

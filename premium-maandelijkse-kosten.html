@@ -665,11 +665,13 @@ function render() {
     const key = catKey(cat);
     const block = document.createElement('div');
     block.className = 'category';
-    block.innerHTML = `
+    const categoryHeaderMarkup = cat === 'Totale kosten:' ? '' : `
       <div class="category-header">
         <div class="category-title">${escapeHtml(cat)}</div>
         <div class="category-total">${fmtEur(catTotal)}<span style="font-size:11px;font-weight:400;color:var(--text-light);margin-left:4px">/mnd</span></div>
-      </div>
+      </div>`;
+    block.innerHTML = `
+      ${categoryHeaderMarkup}
       <div class="cost-row head">
         <span>Post</span><span>Frequentie</span><span style="text-align:right">Bedrag</span>
       </div>

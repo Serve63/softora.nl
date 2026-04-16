@@ -1112,32 +1112,13 @@
                 return 'Nog geen uitgebreide klantwensen vastgelegd. Neem direct contact op met de klant om ontbrekende details te verzamelen.';
             }
 
+            function buildShortOpusPrompt(baseData) {
+                return 'Werk deze opdracht in Claude Opus 4.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie.';
+            }
+
             function buildFallbackLayout(baseData) {
                 const narrative = buildFallbackNarrative(baseData);
-                const prompt = [
-                    'Je bent senior webbouwer bij Softora. Werk deze opdracht uit in Claude Opus 4.6.',
-                    '',
-                    'Projectgegevens:',
-                    `- Bedrijf: ${baseData.company || 'Onbekend'}`,
-                    `- Contactpersoon: ${baseData.contact || 'Onbekend'}`,
-                    `- Opdracht: ${baseData.title || `Opdracht #${baseData.orderId}`}`,
-                    `- Domein: ${baseData.domainName || 'Nog niet bekend'}`,
-                    `- Gewenste oplevertijd: ${baseData.deliveryTime || 'Niet opgegeven'}`,
-                    baseData.sourceAppointmentLabel ? `- Bronafspraak: ${baseData.sourceAppointmentLabel}` : '',
-                    '',
-                    'Klantwensen (bron):',
-                    narrative,
-                    '',
-                    'Lever op:',
-                    '1) Concreet uitvoerplan in stappen (volgorde + prioriteit).',
-                    '2) Volledige pagina-/sectiestructuur met doel per sectie.',
-                    '3) Direct bruikbare Nederlandse copy per sectie.',
-                    '4) Korte lijst met ontbrekende klantinformatie als vragen.',
-                    '',
-                    'Werk praktisch en concreet, zonder vage algemeenheden.',
-                ]
-                    .filter(Boolean)
-                    .join('\n');
+                const prompt = buildShortOpusPrompt(baseData);
 
                 return {
                     documentTitle: baseData.title || `Opdracht #${baseData.orderId}`,
@@ -1204,9 +1185,7 @@
                 const subtitle =
                     clipText(String(rawLayout.subtitle || rawLayout.lead || fallback.subtitle).trim(), 320) ||
                     fallback.subtitle;
-                const opusPrompt =
-                    clipText(String(rawLayout.opusPrompt || rawLayout.prompt || fallback.opusPrompt).trim(), 22000) ||
-                    fallback.opusPrompt;
+                const opusPrompt = buildShortOpusPrompt(baseData);
 
                 const blocks = (Array.isArray(rawLayout.blocks) ? rawLayout.blocks : [])
                     .map((block) => {
