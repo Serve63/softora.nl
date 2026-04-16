@@ -47,6 +47,8 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
     source,
     /id="dienst-premium-website" class="pricing-card fade-up"[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card featured fade-up"/
   );
+  assert.match(source, /Dit heb ik nodig/);
+  assert.doesNotMatch(source, /Bekijk Pakketten/);
   assert.match(
     source,
     /<div class="card-number">01<\/div>\s*<h3>Website's<\/h3>\s*<p>Je hebt één kans om een eerste indruk te maken\./
