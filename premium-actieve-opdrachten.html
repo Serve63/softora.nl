@@ -1443,7 +1443,17 @@
                         <label class="create-order-label" for="newOrderDeliveryTime">Oplevertijd</label>
                         <input class="create-order-input" id="newOrderDeliveryTime" name="deliveryTime" type="text" placeholder="Bijv. Binnen 3 weken" required>
                     </div>
-                    <div class="create-order-field full">
+                    <div class="create-order-field">
+                        <label class="create-order-label" for="newOrderAssignee">Toegewezen aan</label>
+                        <div class="create-order-select-wrap">
+                            <select class="create-order-select" id="newOrderAssignee" name="assignee" required>
+                                <option value="">Kies medewerker</option>
+                                <option value="Martijn">Martijn</option>
+                                <option value="Servé">Servé</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="create-order-field">
                         <label class="create-order-label" for="newOrderAmount">Bedrag (€)</label>
                         <input class="create-order-input" id="newOrderAmount" name="amount" type="number" min="1" step="100" placeholder="2800" required>
                     </div>
@@ -1621,6 +1631,7 @@
         let agendaLeadOptionsLoadedAt = 0;
         let agendaLeadOptionsPromise = null;
         const AGENDA_LEAD_CACHE_MS = 90000;
+        const ORDER_ASSIGNEE_OPTIONS = Object.freeze(['Martijn', 'Servé']);
 
         const quickBuildSteps = [
             { pct: 5, step: 1, msg: 'Opdracht ontvangen, klantgegevens analyseren...' },
@@ -1888,6 +1899,16 @@
             if (typeof value === 'string' && value.trim() === '') return null;
             const n = Number(value);
             return Number.isFinite(n) ? n : null;
+        }
+
+        function normalizeOrderAssignee(value) {
+            const raw = String(value || '').replace(/\s+/g, ' ').trim();
+            if (!raw) return '';
+            const normalized = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            const words = normalized.split(/[^a-z]+/).filter(Boolean);
+            if (words.includes('serve')) return 'Servé';
+            if (words.includes('martijn')) return 'Martijn';
+            return '';
         }
 
         function escapeHtml(str) {
@@ -3154,6 +3175,7 @@
             const titleInput = document.getElementById('newOrderTitle');
             const descInput = document.getElementById('newOrderDesc');
             const deliveryInput = document.getElementById('newOrderDeliveryTime');
+            const assigneeInput = document.getElementById('newOrderAssignee');
             const amountInput = document.getElementById('newOrderAmount');
 
             if (companyInput) {
@@ -3181,6 +3203,13 @@
                 if (deliveryLabel && (!deliveryInput.value.trim() || deliveryInput.dataset.agendaAutofill === '1')) {
                     deliveryInput.value = `Volgens afspraak op ${deliveryLabel}`;
                     deliveryInput.dataset.agendaAutofill = '1';
+                }
+            }
+            if (assigneeInput) {
+                const suggestedAssignee = normalizeOrderAssignee(lead.leadOwnerName || lead.leadOwnerFullName || '');
+                if (suggestedAssignee && (!assigneeInput.value || assigneeInput.dataset.agendaAutofill === '1')) {
+                    assigneeInput.value = suggestedAssignee;
+                    assigneeInput.dataset.agendaAutofill = '1';
                 }
             }
             if (amountInput) {
@@ -3244,6 +3273,7 @@
                 'newOrderTitle',
                 'newOrderDesc',
                 'newOrderDeliveryTime',
+                'newOrderAssignee',
                 'newOrderAmount'
             ].forEach((fieldId) => {
                 const field = document.getElementById(fieldId);
@@ -3297,12 +3327,18 @@
             const linkedPrompt = String(linkedLead?.postCallPrompt || '').trim();
             const linkedTranscript = String(linkedLead?.postCallNotesTranscript || '').trim();
             const linkedLeadOwnerName = normalizeClaimEmployeeName(linkedLead?.leadOwnerName || linkedLead?.leadOwnerFullName || '');
+            const selectedAssignee = normalizeOrderAssignee(data.get('assignee') || linkedLeadOwnerName);
             const linkedContactPhone = String(linkedLead?.phone || '').trim();
             const linkedContactEmail = String(linkedLead?.contactEmail || linkedLead?.email || '').trim();
             const status = 'wacht';
+            const claimedAtIso = selectedAssignee ? new Date().toISOString() : null;
 
             if (!companyName || !contactPerson || !title || !description || !deliveryTime) {
                 setCreateOrderMessage('Vul alle velden in.', 'error');
+                return;
+            }
+            if (!selectedAssignee || !ORDER_ASSIGNEE_OPTIONS.includes(selectedAssignee)) {
+                setCreateOrderMessage('Kies wie deze opdracht krijgt toegewezen.', 'error');
                 return;
             }
             if (!Number.isFinite(amount) || amount <= 0) {
@@ -3346,8 +3382,8 @@
                 launchDomainStatus: null,
                 launchDomainMessage: null,
                 launchedAt: null,
-                claimedBy: linkedLeadOwnerName || null,
-                claimedAt: null,
+                claimedBy: selectedAssignee || null,
+                claimedAt: claimedAtIso,
                 referenceImages: [],
                 sourceAppointmentId,
                 sourceCallId,
@@ -3485,6 +3521,8 @@
         }
 
         function normalizeClaimEmployeeName(value) {
+            const canonicalAssignee = normalizeOrderAssignee(value);
+            if (canonicalAssignee) return canonicalAssignee;
             return String(value || '')
                 .replace(/\s+/g, ' ')
                 .trim()

@@ -25,7 +25,10 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /window\.addEventListener\('pagehide', \(\) => \{[\s\S]*void flushRemoteUiStateSave\(\);/);
   assert.match(source, /leadOwnerName: String\(item\?\.leadOwnerName \|\| item\?\.leadOwnerFullName \|\| ''\)\.trim\(\),/);
   assert.match(source, /const linkedLeadOwnerName = resolveLinkedLeadOwnerNameForOrder\(customOrder\);[\s\S]*const claimedBy = normalizeClaimEmployeeName\(customOrder\.claimedBy \|\| runtime\.claimedBy \|\| linkedLeadOwnerName \|\| ''\);/);
-  assert.match(source, /claimedBy: linkedLeadOwnerName \|\| null,/);
+  assert.match(source, /const selectedAssignee = normalizeOrderAssignee\(data\.get\('assignee'\) \|\| linkedLeadOwnerName\);/);
+  assert.match(source, /if \(!selectedAssignee \|\| !ORDER_ASSIGNEE_OPTIONS\.includes\(selectedAssignee\)\) \{[\s\S]*Kies wie deze opdracht krijgt toegewezen\./);
+  assert.match(source, /claimedBy: selectedAssignee \|\| null,/);
+  assert.match(source, /claimedAt: claimedAtIso,/);
   assert.match(source, /companyName,\s*contactName: contactPerson,\s*contactPhone: linkedContactPhone,\s*contactEmail: linkedContactEmail,/);
   assert.match(source, /const companyName = String\(item\?\.companyName \|\| ''\)\.trim\(\);/);
   assert.match(source, /const contactName = String\(item\?\.contactName \|\| ''\)\.trim\(\);/);
@@ -44,6 +47,12 @@ test('premium actieve opdrachten tonen create-order modal zonder sample-design e
   const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
+  assert.match(source, /<label class="create-order-label" for="newOrderAssignee">Toegewezen aan<\/label>/);
+  assert.match(source, /<select class="create-order-select" id="newOrderAssignee" name="assignee" required>/);
+  assert.match(source, /<option value="">Kies medewerker<\/option>\s*<option value="Martijn">Martijn<\/option>\s*<option value="Servé">Servé<\/option>/);
+  assert.match(source, /const ORDER_ASSIGNEE_OPTIONS = Object\.freeze\(\['Martijn', 'Servé'\]\);/);
+  assert.match(source, /function normalizeOrderAssignee\(value\) \{[\s\S]*const words = normalized\.split\(\/\[\^a-z\]\+\/\)\.filter\(Boolean\);[\s\S]*if \(words\.includes\('serve'\)\) return 'Servé';[\s\S]*if \(words\.includes\('martijn'\)\) return 'Martijn';/);
+  assert.match(source, /function normalizeClaimEmployeeName\(value\) \{[\s\S]*const canonicalAssignee = normalizeOrderAssignee\(value\);[\s\S]*if \(canonicalAssignee\) return canonicalAssignee;/);
   assert.match(source, /\.modal-btn\.danger \{[\s\S]*color:\s*var\(--accent-light\);/);
   assert.match(source, /\.modal-btn\.danger:hover \{[\s\S]*color:\s*var\(--accent-light\);/);
   assert.doesNotMatch(source, /Voorbeelddesign meenemen als basis/);
