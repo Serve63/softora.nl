@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
@@ -1339,6 +1340,11 @@
             font-size: 13px;
             color: var(--text-secondary);
             line-height: 1.5;
+        }
+
+        .contact-text a[href^="tel"] {
+            color: inherit;
+            text-decoration: none;
         }
 
         .contact-text strong {
