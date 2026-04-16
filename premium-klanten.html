@@ -1087,7 +1087,6 @@
                     <div class="hero-side">
                         <div class="leaderboard-card" id="leaderboardCard">
                             <div class="leaderboard-copy">
-                                <div class="leaderboard-label">Meeste opdrachten</div>
                                 <div class="leaderboard-list" id="leaderboardList">
                                     <div class="leaderboard-entry is-leading">
                                         <span class="leaderboard-entry-name">Servé</span>
@@ -1266,6 +1265,7 @@
 
         const state = {
             klanten: [],
+            orders: [],
             query: "",
             editId: null,
             messageTimer: null
@@ -1851,9 +1851,11 @@
         function updateLeaderboard() {
             if (!nodes.leaderboardCard || !nodes.leaderboardList) return;
 
-            const counts = state.klanten.reduce(function (result, customer) {
-                const responsible = normalizeResponsibleValue(customer && customer.verantwoordelijk);
-                result[responsible] = (result[responsible] || 0) + 1;
+            const counts = state.orders.reduce(function (result, order) {
+                const responsible = normalizeResponsibleValue(order && order.claimedBy);
+                if (responsible === "Serve" || responsible === "Martijn") {
+                    result[responsible] = (result[responsible] || 0) + 1;
+                }
                 return result;
             }, { Serve: 0, Martijn: 0 });
 
@@ -1865,10 +1867,13 @@
                 return a.displayName.localeCompare(b.displayName, "nl");
             });
 
+            const topCount = entries[0].count;
+
             nodes.leaderboardCard.hidden = false;
-            nodes.leaderboardList.innerHTML = entries.map(function (entry, index) {
+            nodes.leaderboardList.innerHTML = entries.map(function (entry) {
                 const assignmentLabel = entry.count === 1 ? "opdracht" : "opdrachten";
-                const rowClassName = index === 0 ? "leaderboard-entry is-leading" : "leaderboard-entry";
+                const isLeading = entry.count > 0 && entry.count === topCount;
+                const rowClassName = isLeading ? "leaderboard-entry is-leading" : "leaderboard-entry";
                 return [
                     "<div class=\"" + rowClassName + "\">",
                         "<span class=\"leaderboard-entry-name\">" + escapeHtml(entry.displayName) + "</span>",
@@ -2149,6 +2154,7 @@
                     try {
                         const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
                         const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
+                        state.orders = Array.isArray(orders) ? orders : [];
                         enrichedCustomers = mergeCustomersWithResponsible(remoteCustomers, orders);
                     } catch (error) {
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
@@ -2175,6 +2181,7 @@
             try {
                 const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
                 const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
+                state.orders = Array.isArray(orders) ? orders : [];
                 const importedCustomers = deriveCustomersFromOrders(orders);
 
                 const shouldRerender = customerListsDiffer(importedCustomers);
