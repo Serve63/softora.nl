@@ -3,6 +3,7 @@
 
   const COST_SUMMARY_ENDPOINT = '/api/coldcalling/cost-summary?scope=month';
   const POLL_INTERVAL_MS = 15000;
+  const COLDCALLING_ESTIMATE_NOTE = 'Geschatte maandkosten, Retell kan hoger uitvallen';
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
 
@@ -208,9 +209,13 @@
     if (!item || !render) return false;
 
     const nextAmount = Math.max(0, Math.round((Number(amountEur) || 0) * 100) / 100);
-    if (Number(item.bedrag || 0) === nextAmount) return false;
+    const nextNote = COLDCALLING_ESTIMATE_NOTE;
+    const amountChanged = Number(item.bedrag || 0) !== nextAmount;
+    const noteChanged = normalizeString(item.note) !== nextNote;
+    if (!amountChanged && !noteChanged) return false;
 
     item.bedrag = nextAmount;
+    item.note = nextNote;
     render();
     return true;
   }

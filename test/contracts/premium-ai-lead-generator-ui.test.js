@@ -236,7 +236,7 @@ test('premium ai lead generator includes a live Retell cost counter', () => {
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const costWidgetSource = fs.readFileSync(costWidgetPath, 'utf8');
 
-  assert.match(pageSource, /<span class="topbar-select-label">Totale kosten coldcalling<\/span>/);
+  assert.match(pageSource, /<span class="topbar-select-label">Geschatte coldcalling kosten<\/span>/);
   assert.match(pageSource, /<div class="topbar-cost-group" data-retell-cost-root>/);
   assert.match(pageSource, /<div class="topbar-cost-value" data-retell-cost-value>€0,00<\/div>/);
   assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260417a" defer><\/script>/);
