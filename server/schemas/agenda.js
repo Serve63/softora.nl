@@ -275,6 +275,7 @@ function validateManualAgendaAppointmentRequest(req) {
         normalizeString(body.availableAgain || body.available_after || ''),
         16
       ),
+      who: truncateText(normalizeString(body.who || body.manualWho || ''), 32),
     },
   };
 }

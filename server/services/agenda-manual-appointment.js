@@ -5,6 +5,13 @@ const { createAgendaConfirmationPersistenceHelpers } = require('./agenda-confirm
 const BUSINESS_START_MIN = 9 * 60;
 const BUSINESS_END_MIN = 17 * 60;
 
+function resolveManualPlannerLabel(body, normalizeString) {
+  const raw = normalizeString(body?.who || body?.manualWho || '').toLowerCase();
+  if (raw === 'serve' || raw === 'servé') return 'Servé';
+  if (raw === 'martijn') return 'Martijn';
+  return '';
+}
+
 function createAgendaManualAppointmentCoordinator(deps = {}) {
   const {
     isSupabaseConfigured,
@@ -73,6 +80,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     const location = sanitizeAppointmentLocation(body.location || '');
     const activity = truncateText(normalizeString(body.activity || ''), 500);
     const availableAgain = normalizeTimeHhMm(body.availableAgain || '');
+    const whoLabel = resolveManualPlannerLabel(body, normalizeString);
     const actor = truncateText(normalizeString(body.actor || body.doneBy || ''), 120);
 
     if (!appointmentDate) {
@@ -93,6 +101,12 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     if (!activity) {
       return res.status(400).json({ ok: false, error: 'Vul een activiteit in.' });
     }
+    if (!whoLabel) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Kies wie de afspraak plant: Servé of Martijn.',
+      });
+    }
     if (!availableAgain) {
       return res.status(400).json({
         ok: false,
@@ -101,7 +115,11 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     }
 
     const callId = `manual_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
-    const summary = [activity, `Weer beschikbaar voor een reis naar prospect: ${availableAgain}`].join('\n\n');
+    const summary = [
+      activity,
+      `Wie: ${whoLabel}`,
+      `Weer beschikbaar voor een reis naar prospect: ${availableAgain}`,
+    ].join('\n\n');
 
     const baseAppointment = {
       callId,
@@ -118,6 +136,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       provider: 'manual',
       providerLabel: 'Handmatig',
       coldcallingStack: 'manual',
+      manualPlannerWho: whoLabel === 'Martijn' ? 'martijn' : 'serve',
       summary,
       summaryFormatVersion: 4,
       branche: '',
@@ -165,7 +184,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       {
         type: 'manual_agenda_appointment',
         title: 'Handmatige afspraak toegevoegd',
-        detail: `${activity} op ${appointmentDate} om ${appointmentTime}${location ? ` (${location})` : ''}.`,
+        detail: `${activity} op ${appointmentDate} om ${appointmentTime}${location ? ` (${location})` : ''}. Door: ${whoLabel}.`,
         company: activity,
         actor: actorLabel,
         taskId: Number(updatedAppointment?.id || 0) || null,

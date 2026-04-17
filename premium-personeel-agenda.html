@@ -260,6 +260,18 @@
             border-left: 2px solid var(--accent);
         }
 
+        .appointment.manual-serve {
+            background: rgba(13, 148, 136, 0.16);
+            color: #5eead4;
+            border-left: 2px solid #0d9488;
+        }
+
+        .appointment.manual-martijn {
+            background: rgba(124, 58, 237, 0.16);
+            color: #c4b5fd;
+            border-left: 2px solid #7c3aed;
+        }
+
         .appointment.completed {
             background: rgba(245, 158, 11, 0.16);
             color: #d97706;
@@ -273,7 +285,7 @@
 
         /* Legend */
         .calendar-legend {
-            display: flex; gap: 1rem; padding: 0.85rem 1.1rem;
+            display: flex; flex-wrap: wrap; gap: 1rem; padding: 0.85rem 1.1rem;
             border-top: 1px solid var(--border);
         }
         .legend-item {
@@ -289,6 +301,8 @@
         .legend-dot.business { background: var(--blue); }
         .legend-dot.voice { background: var(--green); }
         .legend-dot.completed { background: #f59e0b; }
+        .legend-dot.manual-serve { background: #0d9488; }
+        .legend-dot.manual-martijn { background: #7c3aed; }
 
         /* Modal */
         .modal-overlay {
@@ -496,6 +510,26 @@
             font-size: 0.68rem;
             color: var(--text-tertiary);
             line-height: 1.4;
+        }
+
+        .modal-workspace-radio-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem 1.5rem;
+            align-items: center;
+        }
+        .modal-workspace-radio {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+        }
+        .modal-workspace-radio input {
+            accent-color: var(--accent-light);
+            width: 1rem;
+            height: 1rem;
         }
 
         .modal-workspace-status {
@@ -1090,6 +1124,19 @@
             </p>
             <div class="modal-workspace-grid">
                 <div class="modal-workspace-field">
+                    <div class="modal-workspace-label">Wie ben je?</div>
+                    <div class="modal-workspace-radio-group" role="radiogroup" aria-label="Wie ben je?">
+                        <label class="modal-workspace-radio">
+                            <input type="radio" name="manualAppointmentWho" value="serve" checked>
+                            Servé
+                        </label>
+                        <label class="modal-workspace-radio">
+                            <input type="radio" name="manualAppointmentWho" value="martijn">
+                            Martijn
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Tijdstip Activiteit</div>
                     <input type="time" class="modal-workspace-input" id="manualAppointmentTime" min="09:00" max="17:00" step="300" autocomplete="off" required>
                 </div>
@@ -1205,6 +1252,8 @@
                 <div class="legend-item"><div class="legend-dot business"></div> Bedrijfssoftware Meeting</div>
                 <div class="legend-item"><div class="legend-dot voice"></div> Voicesoftware Meeting</div>
                 <div class="legend-item"><div class="legend-dot completed"></div> Afspraak afgerond</div>
+                <div class="legend-item"><div class="legend-dot manual-serve"></div> Activiteit Servé</div>
+                <div class="legend-item"><div class="legend-dot manual-martijn"></div> Activiteit Martijn</div>
             </div>
         </div>
         </div>
@@ -1894,6 +1943,17 @@
         return total >= 9 * 60 && total <= 17 * 60;
     }
 
+    function getManualAppointmentWho() {
+        const el = document.querySelector('input[name="manualAppointmentWho"]:checked');
+        return el ? String(el.value || '').trim().toLowerCase() : '';
+    }
+
+    function resetManualAppointmentWhoRadios() {
+        document.querySelectorAll('input[name="manualAppointmentWho"]').forEach(function (radio) {
+            radio.checked = radio.value === 'serve';
+        });
+    }
+
     function setManualAppointmentStatus(message, variant = '') {
         if (!manualAppointmentStatusEl) return;
         manualAppointmentStatusEl.textContent = message || '';
@@ -1915,6 +1975,7 @@
         }
         if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
         if (manualAppointmentAvailableAgainEl) manualAppointmentAvailableAgainEl.value = '';
+        resetManualAppointmentWhoRadios();
         setManualAppointmentStatus('');
         manualAppointmentOverlay.classList.add('show');
         manualAppointmentOverlay.setAttribute('aria-hidden', 'false');
@@ -1966,6 +2027,11 @@
             setManualAppointmentStatus('Vul een activiteit in.', 'error');
             return;
         }
+        const who = getManualAppointmentWho();
+        if (who !== 'serve' && who !== 'martijn') {
+            setManualAppointmentStatus('Kies Servé of Martijn bij wie ben je.', 'error');
+            return;
+        }
         if (!availableAgain || parseManualTimeToMinutes(availableAgain) === null) {
             setManualAppointmentStatus(
                 'Kies een geldige tijd waarop je weer beschikbaar bent voor een reis naar prospect.',
@@ -1984,6 +2050,7 @@
                 time: timeVal,
                 location,
                 activity,
+                who,
                 availableAgain,
                 actor: 'premium-personeel-agenda',
             });
@@ -2363,6 +2430,19 @@
         if (Number(getLinkedOrderIdForAppointment(apt) || 0) > 0) return true;
         if (String(apt?.activeOrderAddedAt || '').trim()) return true;
         return false;
+    }
+
+    function getCalendarAppointmentClass(apt) {
+        if (isAppointmentCompleted(apt)) return 'appointment completed magnetic';
+        const stack = String(apt?.coldcallingStack || '').toLowerCase();
+        const provider = String(apt?.provider || '').toLowerCase();
+        const isManual = stack === 'manual' || provider === 'manual';
+        if (isManual) {
+            const who = String(apt?.manualPlannerWho || apt?.manualWho || '').toLowerCase();
+            if (who === 'martijn') return 'appointment manual-martijn magnetic';
+            return 'appointment manual-serve magnetic';
+        }
+        return 'appointment meeting magnetic';
     }
 
     async function confirmNoDealForAppointment(apt) {
@@ -2811,9 +2891,7 @@
             }
 
             dayAppointments.forEach((apt) => {
-                const appointmentClass = isAppointmentCompleted(apt)
-                    ? 'appointment completed magnetic'
-                    : 'appointment meeting magnetic';
+                const appointmentClass = getCalendarAppointmentClass(apt);
                 html += `<div class="${appointmentClass}" onclick="event.stopPropagation(); void openAppointment(${apt.id})">
                     <span class="apt-time">${apt.time}</span> ${apt.company}
                 </div>`;

@@ -87,6 +87,11 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /id="manualAppointmentOverlay"/);
+  assert.match(pageSource, /name="manualAppointmentWho"/);
+  assert.match(pageSource, /value="serve"/);
+  assert.match(pageSource, /Servé/);
+  assert.match(pageSource, /value="martijn"/);
+  assert.match(pageSource, /Martijn/);
   assert.match(pageSource, /type="time"[^>]*id="manualAppointmentAvailableAgain"/);
   assert.match(pageSource, /\/api\/agenda\/appointments\/manual/);
   assert.match(pageSource, /data-calendar-date=/);
@@ -95,6 +100,10 @@ test('premium agenda offers manual add flow on day click with business-hour noti
     pageSource,
     /Afspraken die geen effect hebben op de werktijden[\s\S]*09:00[\s\S]*17:00[\s\S]*maandag[\s\S]*vrijdag[\s\S]*hier niet gemeld/i
   );
+  assert.match(pageSource, /legend-dot manual-serve/);
+  assert.match(pageSource, /Activiteit Servé/);
+  assert.match(pageSource, /legend-dot manual-martijn/);
+  assert.match(pageSource, /Activiteit Martijn/);
 });
 
 test('premium agenda handmatige locatie kan Google Places autocomplete gebruiken', () => {
@@ -120,8 +129,9 @@ test('premium agenda keeps appointment color in sync with existing dossiers', ()
     pageSource,
     /function isAppointmentCompleted\(apt\) \{[\s\S]*if \(Number\(getLinkedOrderIdForAppointment\(apt\) \|\| 0\) > 0\) return true;[\s\S]*\}/s
   );
+  assert.match(pageSource, /function getCalendarAppointmentClass\(apt\)/);
   assert.match(
     pageSource,
-    /const appointmentClass = isAppointmentCompleted\(apt\)\s*\? 'appointment completed magnetic'\s*: 'appointment meeting magnetic';/
+    /const appointmentClass = getCalendarAppointmentClass\(apt\);/
   );
 });
