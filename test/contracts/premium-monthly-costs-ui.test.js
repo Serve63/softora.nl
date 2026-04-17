@@ -28,11 +28,19 @@ test('premium maandelijkse kosten gebruikt dashboard-typografie en verbergt lega
   assert.match(pageSource, /<div id="last-updated"><\/div>/);
   assert.match(pageSource, /#last-updated\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*font-size:\s*0\.72rem;/);
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*padding:\s*3rem 3rem 1\.8rem;/);
+  assert.match(pageSource, /\.page-shell\s*\{[\s\S]*position:\s*relative;/);
+  assert.match(pageSource, /id="monthly-costs-boot-loader"/);
+  assert.match(pageSource, /\.monthly-costs-spinner\s*\{[\s\S]*animation:\s*monthly-costs-spin/);
+  assert.match(pageSource, /@keyframes monthly-costs-spin/);
   assert.match(
     pageSource,
     /<div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">/
   );
   assert.match(pageSource, /<div class="monthly-costs-stage" id="monthly-costs-stage">/);
+  assert.match(
+    pageSource,
+    /getElementById\('monthly-costs-boot-loader'\)[\s\S]*classList\.toggle\('is-hidden', !isBooting\)/
+  );
   assert.match(pageSource, /\.totaal-amount\s*\{[\s\S]*font-size:\s*2\.62rem;/);
   assert.match(pageSource, /\.category-title\s*\{[\s\S]*font-size:\s*0\.92rem;/);
   assert.match(pageSource, /\.cost-name\s*\{\s*font-size:\s*0\.92rem;/);

@@ -64,8 +64,36 @@ body {
   padding: 3rem 3rem 1.8rem;
 }
 .page-shell {
+  position: relative;
   width: min(1260px, 100%);
   margin: 0 auto;
+}
+.monthly-costs-boot-loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
+}
+.monthly-costs-boot-loader.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+.monthly-costs-spinner {
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(139, 34, 82, 0.14);
+  border-top-color: var(--crimson);
+  border-radius: 50%;
+  animation: monthly-costs-spin 0.65s linear infinite;
+}
+@keyframes monthly-costs-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .monthly-costs-boot-shell {
   transition: opacity 0.16s ease;
@@ -536,6 +564,9 @@ body {
   </aside>
   <main class="main-content">
     <div class="page-shell">
+      <div class="monthly-costs-boot-loader" id="monthly-costs-boot-loader" aria-hidden="true">
+        <div class="monthly-costs-spinner"></div>
+      </div>
       <div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">
         <div class="header">
           <div>
@@ -783,9 +814,14 @@ function setTotalsLoading() {
 
 function setMonthlyCostsStageBooting(isBooting) {
   const shell = document.getElementById('monthly-costs-boot-shell');
-  if (!shell) return;
-  shell.classList.toggle('is-booting', Boolean(isBooting));
-  shell.setAttribute('aria-busy', isBooting ? 'true' : 'false');
+  const loader = document.getElementById('monthly-costs-boot-loader');
+  if (shell) {
+    shell.classList.toggle('is-booting', Boolean(isBooting));
+    shell.setAttribute('aria-busy', isBooting ? 'true' : 'false');
+  }
+  if (loader) {
+    loader.classList.toggle('is-hidden', !isBooting);
+  }
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
