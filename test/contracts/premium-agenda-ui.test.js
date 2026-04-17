@@ -87,6 +87,7 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /id="manualAppointmentOverlay"/);
+  assert.match(pageSource, /type="time"[^>]*id="manualAppointmentAvailableAgain"/);
   assert.match(pageSource, /\/api\/agenda\/appointments\/manual/);
   assert.match(pageSource, /data-calendar-date=/);
   assert.match(pageSource, /isManualAppointmentTimeAllowed/);

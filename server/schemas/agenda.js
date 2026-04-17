@@ -273,7 +273,7 @@ function validateManualAgendaAppointmentRequest(req) {
       activity: truncateText(normalizeString(body.activity || body.company || ''), 500),
       availableAgain: truncateText(
         normalizeString(body.availableAgain || body.available_after || ''),
-        800
+        16
       ),
     },
   };

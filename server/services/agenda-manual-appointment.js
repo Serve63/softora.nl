@@ -72,7 +72,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     const appointmentTime = normalizeTimeHhMm(body.time || '');
     const location = sanitizeAppointmentLocation(body.location || '');
     const activity = truncateText(normalizeString(body.activity || ''), 500);
-    const availableAgain = truncateText(normalizeString(body.availableAgain || ''), 800);
+    const availableAgain = normalizeTimeHhMm(body.availableAgain || '');
     const actor = truncateText(normalizeString(body.actor || body.doneBy || ''), 120);
 
     if (!appointmentDate) {
@@ -96,7 +96,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     if (!availableAgain) {
       return res.status(400).json({
         ok: false,
-        error: 'Vul in wanneer je weer beschikbaar bent voor een reis naar prospect.',
+        error: 'Kies een geldige tijd (HH:MM) voor wanneer je weer beschikbaar bent.',
       });
     }
 

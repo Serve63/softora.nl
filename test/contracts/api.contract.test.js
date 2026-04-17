@@ -442,7 +442,7 @@ test('agenda manual appointment route rejects times outside 09:00–17:00 when v
     time: '18:00',
     location: 'Amsterdam',
     activity: 'Demo',
-    availableAgain: 'Thuis om 19:00',
+    availableAgain: '19:00',
   });
   if (!configured) {
     assert.equal(late.response.status, 503);
