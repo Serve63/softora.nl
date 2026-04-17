@@ -66,6 +66,17 @@
     return document.getElementById(id);
   }
 
+  function setLeadSliderReadyState(isReady) {
+    const sliderStage = byId('leadSliderStage');
+    if (!sliderStage) return;
+    sliderStage.dataset.sliderReady = isReady ? '1' : '0';
+    if (isReady) {
+      sliderStage.removeAttribute('aria-hidden');
+      return;
+    }
+    sliderStage.setAttribute('aria-hidden', 'true');
+  }
+
   function readColdcallingDashboardBootstrapPayload() {
     const element = document.getElementById('softoraColdcallingDashboardBootstrap');
     if (!element) return null;
@@ -1561,6 +1572,7 @@
     saveStatusPillMode(nextMode);
     resetRemoteUiStateForModeSwitch();
     lastCallUpdateSeenMs = 0;
+    setLeadSliderReadyState(false);
 
     await loadRemoteUiState();
 
@@ -1573,6 +1585,7 @@
     renderLeadAmountDisplay();
     updateLeadListHint();
     updateAiNotebookHint();
+    setLeadSliderReadyState(true);
     applyStatusPillMode(nextMode);
     applyBusinessModeUi();
     void refreshDashboardStatsFromSupabase({ force: true, silent: true });
@@ -7249,6 +7262,7 @@
     const uiStateLoaded = await loadRemoteUiState();
     setupStatsResetButton();
     ensureLeadListPanel();
+    setLeadSliderReadyState(true);
     setupStatusPillModeToggle();
     applyBusinessModeUi();
     startCallUpdatePolling();

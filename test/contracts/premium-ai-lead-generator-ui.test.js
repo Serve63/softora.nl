@@ -11,7 +11,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260416c" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260417b" defer><\/script>/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
   assert.match(pageSource, /id="statBooked"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_BOOKED --><\/div>/);
   assert.match(pageSource, /id="statInterested"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_INTERESTED --><\/div>/);
@@ -34,7 +34,9 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     pageSource,
     /<div class="slider-labels">\s*<span data-slider-label-value="1">1<\/span>\s*<span data-slider-label-value="50">50<\/span>\s*<span data-slider-label-value="100">100<\/span>\s*<span data-slider-label-value="150">150<\/span>\s*<span data-slider-label-value="200">200<\/span>\s*<span class="slider-label-infinity" data-slider-label-value="250">&infin;<\/span>\s*<\/div>/
   );
+  assert.match(pageSource, /<div class="slider-container" id="leadSliderStage" data-slider-ready="0" aria-hidden="true">/);
   assert.match(pageSource, /window\.openSiteInputDialog = openSiteInputDialog;/);
+  assert.match(pageSource, /\.slider-container\[data-slider-ready="0"\]\s*\{[\s\S]*visibility:\s*hidden;[\s\S]*pointer-events:\s*none;/);
   assert.match(pageSource, /\.slider-labels\s*\{[\s\S]*position:\s*relative;[\s\S]*height:\s*1\.4rem;/);
   assert.match(pageSource, /\.slider-labels span\s*\{[\s\S]*position:\s*absolute;[\s\S]*left:\s*var\(--slider-label-position, 0%\);[\s\S]*transform:\s*translateX\(-50%\);/);
   assert.match(pageSource, /\.slider-labels span:last-child\s*\{[\s\S]*left:\s*100%;[\s\S]*transform:\s*translateX\(-100%\);/);
@@ -51,6 +53,10 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /function primeStatsFromBootstrap\(\) \{/);
   assert.match(dashboardSource, /if \(statsResetBaseline\) \{\s*setStatsResetBaselineState\(statsResetBaseline\);\s*\}/);
   assert.match(dashboardSource, /primeStatsFromBootstrap\(\);\s*setStatusPill\('idle', ''\);\s*setStatusMessage\('', ''\);\s*activeBusinessMode = await loadSavedStatusPillModeFromSupabase\(\);/);
+  assert.match(dashboardSource, /function setLeadSliderReadyState\(isReady\) \{[\s\S]*sliderStage\.dataset\.sliderReady = isReady \? '1' : '0';/);
+  assert.match(dashboardSource, /const uiStateLoaded = await loadRemoteUiState\(\);[\s\S]*ensureLeadListPanel\(\);\s*setLeadSliderReadyState\(true\);/);
+  assert.match(dashboardSource, /resetRemoteUiStateForModeSwitch\(\);[\s\S]*setLeadSliderReadyState\(false\);[\s\S]*await loadRemoteUiState\(\);/);
+  assert.match(dashboardSource, /restoreCampaignFormStateFromStorage\(\);\s*renderLeadAmountDisplay\(\);\s*updateLeadListHint\(\);\s*updateAiNotebookHint\(\);\s*setLeadSliderReadyState\(true\);/);
   assert.match(
     dashboardSource,
     /<span>Bedrijf<\/span>[\s\S]*<span>Adres<\/span>[\s\S]*<span>Telefoonnummer<\/span>[\s\S]*<span>Website<\/span>/
