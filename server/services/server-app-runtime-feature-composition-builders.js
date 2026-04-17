@@ -164,6 +164,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         triggerPostCallAutomation: coldcallingServiceRuntime.triggerPostCallAutomation,
         parseDateToIso: platformRuntime.parseDateToIso,
         hasRetellApiKey: () => Boolean(shared.normalizeString(env.RETELL_API_KEY)),
+        fetchRetellCallsByIds: platformRuntime.fetchRetellCallsByIds,
         fetchRetellCallStatusById: platformRuntime.fetchRetellCallStatusById,
         extractCallUpdateFromRetellCallStatusResponse:
           platformRuntime.extractCallUpdateFromRetellCallStatusResponse,

@@ -95,6 +95,8 @@ function createRuntimeBackupCoordinator(deps = {}) {
 
   function compactRuntimeSnapshotCallUpdate(item) {
     const durationSeconds = Number(item?.durationSeconds);
+    const costUsd = parseNumberSafe(item?.costUsd ?? item?.cost_usd, null);
+    const costUsdMilli = parseNumberSafe(item?.costUsdMilli ?? item?.cost_usd_milli, null);
     const updatedAtMs = Number(item?.updatedAtMs || 0);
     return {
       callId: compactRuntimeSnapshotText(item?.callId, 140),
@@ -115,6 +117,14 @@ function createRuntimeBackupCoordinator(deps = {}) {
       endedAt: normalizeString(item?.endedAt || ''),
       durationSeconds:
         Number.isFinite(durationSeconds) && durationSeconds > 0 ? Math.round(durationSeconds) : null,
+      costUsd:
+        Number.isFinite(costUsd) && costUsd >= 0 ? Math.round(costUsd * 1000) / 1000 : null,
+      costUsdMilli:
+        Number.isFinite(costUsdMilli) && costUsdMilli >= 0
+          ? Math.round(costUsdMilli)
+          : Number.isFinite(costUsd) && costUsd >= 0
+            ? Math.round(costUsd * 1000)
+            : null,
       recordingUrl: compactRuntimeSnapshotText(item?.recordingUrl, 1200),
       recordingSid: compactRuntimeSnapshotText(item?.recordingSid, 120),
       recordingUrlProxy: compactRuntimeSnapshotText(item?.recordingUrlProxy, 260),

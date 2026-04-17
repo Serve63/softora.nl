@@ -139,6 +139,34 @@ test('call provider helpers execute outbound and status api calls with provider-
   assert.match(calls[3].auth, /^Basic /);
 });
 
+test('call provider helpers fetch batched Retell calls for cost backfill', async () => {
+  let capturedCall = null;
+  const helpers = createHelpers({
+    fetchJsonWithTimeout: async (url, options) => {
+      capturedCall = {
+        url: url.toString(),
+        method: options?.method || 'GET',
+        auth: options?.headers?.Authorization || '',
+        body: JSON.parse(options?.body || '{}'),
+      };
+      return {
+        response: { ok: true, status: 200 },
+        data: [{ call_id: 'call_123' }],
+      };
+    },
+  });
+
+  const result = await helpers.fetchRetellCallsByIds(['call_123', 'call_456', 'call_123']);
+
+  assert.equal(capturedCall.url, 'https://retell.example/v2/v2/list-calls');
+  assert.equal(capturedCall.method, 'POST');
+  assert.equal(capturedCall.auth, 'Bearer retell-token');
+  assert.deepEqual(capturedCall.body.filter_criteria.call_id, ['call_123', 'call_456']);
+  assert.equal(capturedCall.body.limit, 2);
+  assert.equal(capturedCall.body.sort_order, 'descending');
+  assert.deepEqual(result.data, [{ call_id: 'call_123' }]);
+});
+
 test('call provider helpers normalize recording references and choose preferred recordings', () => {
   const helpers = createHelpers();
 
@@ -224,6 +252,9 @@ test('call provider helpers extract stable retell and twilio call updates', () =
       end_timestamp: 1_700_000_045,
       disconnection_reason: 'completed',
       transcript: 'Klant wil graag een demo ontvangen.',
+      call_cost: {
+        combined_cost: 498,
+      },
       metadata: {
         leadCompany: 'Softora',
         leadName: 'Serve',
@@ -235,6 +266,8 @@ test('call provider helpers extract stable retell and twilio call updates', () =
   assert.equal(retellUpdate.callId, 'call_123');
   assert.equal(retellUpdate.provider, 'retell');
   assert.equal(retellUpdate.durationSeconds, 45);
+  assert.equal(retellUpdate.costUsdMilli, 498);
+  assert.equal(retellUpdate.costUsd, 0.498);
   assert.match(retellUpdate.transcriptSnippet, /Klant wil graag/);
 
   const twilioUpdate = helpers.extractCallUpdateFromTwilioPayload(

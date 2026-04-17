@@ -371,6 +371,84 @@ function createCallProviderHelpers(options = {}) {
     return { endpoint, data };
   }
 
+  async function fetchRetellCallsByIds(callIds) {
+    const normalizedCallIds = Array.from(
+      new Set(
+        (Array.isArray(callIds) ? callIds : [])
+          .map((value) => normalizeString(value))
+          .filter(Boolean)
+      )
+    ).slice(0, 1000);
+
+    if (normalizedCallIds.length === 0) {
+      return {
+        endpoint: '/v2/list-calls',
+        data: [],
+      };
+    }
+
+    const endpoint = '/v2/list-calls';
+    const { response, data } = await fetchJsonWithTimeout(
+      buildRetellApiUrl(endpoint),
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.RETELL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filter_criteria: {
+            call_id: normalizedCallIds,
+          },
+          sort_order: 'descending',
+          limit: normalizedCallIds.length,
+        }),
+      },
+      15000
+    );
+
+    if (!response.ok) {
+      const statusError = new Error(
+        data?.message ||
+          data?.error ||
+          data?.detail ||
+          data?.raw ||
+          `Retell list calls fout (${response.status})`
+      );
+      statusError.status = response.status;
+      statusError.endpoint = endpoint;
+      statusError.data = data;
+      throw statusError;
+    }
+
+    return { endpoint, data };
+  }
+
+  function resolveRetellCallCostFields(call) {
+    const combinedCostMilli = parseNumberSafe(call?.call_cost?.combined_cost, null);
+    if (Number.isFinite(combinedCostMilli) && combinedCostMilli >= 0) {
+      const normalizedMilli = Math.max(0, Math.round(combinedCostMilli));
+      return {
+        costUsdMilli: normalizedMilli,
+        costUsd: normalizedMilli / 1000,
+      };
+    }
+
+    const directCostUsd = parseNumberSafe(call?.cost_usd ?? call?.cost, null);
+    if (Number.isFinite(directCostUsd) && directCostUsd >= 0) {
+      const normalizedMilli = Math.max(0, Math.round(directCostUsd * 1000));
+      return {
+        costUsdMilli: normalizedMilli,
+        costUsd: normalizedMilli / 1000,
+      };
+    }
+
+    return {
+      costUsdMilli: null,
+      costUsd: null,
+    };
+  }
+
   async function createTwilioOutboundCall(payload) {
     const accountSid = normalizeString(env.TWILIO_ACCOUNT_SID);
     const endpoint = `/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Calls.json`;
@@ -511,6 +589,7 @@ function createCallProviderHelpers(options = {}) {
       normalizeString(call?.recording_multi_channel_url) ||
       normalizeString(call?.scrubbed_recording_url) ||
       normalizeString(call?.scrubbed_recording_multi_channel_url);
+    const { costUsd, costUsdMilli } = resolveRetellCallCostFields(call);
     const terminal = isTerminalColdcallingStatus(status, endedReason);
     const updatedAtMs = terminal
       ? Number(call?.end_timestamp || call?.start_timestamp || Date.now())
@@ -538,6 +617,8 @@ function createCallProviderHelpers(options = {}) {
       startedAt,
       endedAt,
       durationSeconds,
+      costUsd,
+      costUsdMilli,
       recordingUrl,
       updatedAt: new Date(updatedAtMs).toISOString(),
       updatedAtMs,
@@ -743,6 +824,7 @@ function createCallProviderHelpers(options = {}) {
     extractCallUpdateFromTwilioCallStatusResponse,
     extractCallUpdateFromTwilioPayload,
     extractTwilioRecordingSidFromUrl,
+    fetchRetellCallsByIds,
     fetchRetellCallStatusById,
     fetchTwilioCallStatusById,
     fetchTwilioRecordingsByCallId,

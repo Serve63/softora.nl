@@ -63,6 +63,9 @@ test('premium maandelijkse kosten toont coldcalling en coldmailing bovenaan met 
 
   assert.match(pageSource, /naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
   assert.match(pageSource, /naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
+  assert.match(pageSource, /window\.softoraMonthlyCostsData = data;/);
+  assert.match(pageSource, /window\.softoraMonthlyCostsRender = render;/);
+  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260417a" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(pageSource, /const categoryHeaderMarkup = cat === 'Totale kosten:' \? '' : `[\s\S]*class="category-header"[\s\S]*category-title[\s\S]*category-total/);
   assert.match(pageSource, /block\.innerHTML = `[\s\S]*\$\{categoryHeaderMarkup\}[\s\S]*<div class="cost-row head">/);
@@ -72,4 +75,20 @@ test('premium maandelijkse kosten toont coldcalling en coldmailing bovenaan met 
   assert.match(pageSource, /const amountWrapClassName = item\.highlighted \? 'cost-amount-wrap is-static' : 'cost-amount-wrap';/);
   assert.match(pageSource, /const rowActionsMarkup = item\.highlighted \? '' : `[\s\S]*class="row-actions"[\s\S]*data-action="edit"[\s\S]*data-action="delete"/);
   assert.match(pageSource, /<div class="\$\{amountWrapClassName\}">[\s\S]*<div class="cost-amount">\$\{fmtEur\(item\.bedrag\)\}<\/div>[\s\S]*\$\{rowActionsMarkup\}/);
+});
+
+test('premium maandelijkse kosten laadt dynamische coldcalling kosten van deze maand', () => {
+  const scriptPath = path.join(__dirname, '../../assets/premium-monthly-costs-dynamic.js');
+  const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+
+  assert.match(scriptSource, /const CALL_UPDATES_ENDPOINT = '\/api\/coldcalling\/call-updates\?limit=500';/);
+  assert.match(scriptSource, /function isCurrentMonthCall\(item\)/);
+  assert.match(scriptSource, /function buildCurrentMonthRetellCostEur\(updates\)/);
+  assert.match(scriptSource, /function applyColdcallingCost\(amountEur\)/);
+  assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'coldcalling'/);
+  assert.match(scriptSource, /window\.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;/);
+  assert.match(
+    scriptSource,
+    /window\.setInterval\(function \(\) \{\s*void refreshMonthlyColdcallingCosts\(\);\s*\}, POLL_INTERVAL_MS\);/
+  );
 });

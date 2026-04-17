@@ -1,5 +1,20 @@
 const express = require('express');
 
+function hasKnownRetellCost(update) {
+  const costUsdMilli = Number(update?.costUsdMilli ?? update?.cost_usd_milli);
+  if (Number.isFinite(costUsdMilli) && costUsdMilli >= 0) return true;
+
+  const costUsd = Number(update?.costUsd ?? update?.cost_usd);
+  return Number.isFinite(costUsd) && costUsd >= 0;
+}
+
+function extractRetellCallsFromListResponse(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.calls)) return data.calls;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
+}
+
 function createSendColdcallingStatusResponse(deps) {
   return async function sendColdcallingStatusResponse(res, callId) {
     const cached = deps.callUpdatesById.get(callId) || null;
@@ -431,10 +446,62 @@ function registerColdcallingRoutes(app, deps) {
       await deps.waitForQueuedRuntimeStatePersist();
     }
 
-    const filtered = deps.recentCallUpdates.filter((item) => {
+    let filtered = deps.recentCallUpdates.filter((item) => {
       if (!Number.isFinite(sinceMs)) return true;
       return Number(item.updatedAtMs || 0) > Number(sinceMs);
     });
+
+    const retellCostBackfillCallIds =
+      typeof deps.fetchRetellCallsByIds === 'function'
+        ? Array.from(
+            new Set(
+              filtered
+                .filter((item) => {
+                  const callId = deps.normalizeString(item?.callId || '');
+                  if (!callId || callId.startsWith('demo-')) return false;
+
+                  const provider = deps.inferCallProvider(
+                    callId,
+                    deps.normalizeString(item?.provider || 'retell').toLowerCase() || 'retell'
+                  );
+                  return provider === 'retell' && !hasKnownRetellCost(item);
+                })
+                .map((item) => deps.normalizeString(item?.callId || ''))
+                .filter(Boolean)
+            )
+          ).slice(0, 200)
+        : [];
+
+    if (retellCostBackfillCallIds.length > 0) {
+      try {
+        const { data } = await deps.fetchRetellCallsByIds(retellCostBackfillCallIds);
+        const calls = extractRetellCallsFromListResponse(data);
+        let touched = 0;
+
+        calls.forEach((call) => {
+          const callId = deps.normalizeString(call?.call_id || call?.callId || '');
+          if (!callId) return;
+
+          const update = deps.extractCallUpdateFromRetellCallStatusResponse(callId, call);
+          if (!update) return;
+
+          const saved = deps.upsertRecentCallUpdate(update, {
+            persistReason: 'retell_call_cost_backfill',
+          });
+          if (saved) touched += 1;
+        });
+
+        if (touched > 0) {
+          await deps.waitForQueuedRuntimeStatePersist();
+          filtered = deps.recentCallUpdates.filter((item) => {
+            if (!Number.isFinite(sinceMs)) return true;
+            return Number(item.updatedAtMs || 0) > Number(sinceMs);
+          });
+        }
+      } catch (_) {
+        // Laat de route slagen, ook als de cost-backfill tijdelijk faalt.
+      }
+    }
 
     return res.status(200).json({
       ok: true,
