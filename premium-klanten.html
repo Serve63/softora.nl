@@ -413,15 +413,6 @@
             width: 100%;
         }
 
-        .leaderboard-label {
-            color: var(--text-tertiary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.62rem;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            line-height: 1.1;
-        }
-
         .leaderboard-list {
             display: grid;
             gap: 0.42rem;
@@ -1077,7 +1068,11 @@
           </div>
         </aside>
 
-        <main class="page-shell">
+        <main class="page-shell is-premium-boot-host">
+            <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
+                <div class="premium-boot-spinner"></div>
+            </div>
+            <div class="premium-boot-shell is-booting" aria-busy="true">
             <div class="page-content">
                 <section class="hero">
                     <div class="hero-copy">
@@ -1087,7 +1082,6 @@
                     <div class="hero-side">
                         <div class="leaderboard-card" id="leaderboardCard">
                             <div class="leaderboard-copy">
-                                <div class="leaderboard-label">Meeste opdrachten</div>
                                 <div class="leaderboard-list" id="leaderboardList">
                                     <div class="leaderboard-entry is-leading">
                                         <span class="leaderboard-entry-name">Servé</span>
@@ -1147,6 +1141,7 @@
 
                     <div class="empty-state" id="emptyState" hidden>Geen klanten gevonden.</div>
                 </section>
+            </div>
             </div>
         </main>
     </div>
@@ -2291,7 +2286,15 @@
             }
         });
 
-        void bootstrapCustomers();
+        void (async function () {
+            try {
+                await bootstrapCustomers();
+            } finally {
+                if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+                    window.SoftoraPremiumBoot.setShellBooting(false);
+                }
+            }
+        })();
     </script>
 </body>
 </html>

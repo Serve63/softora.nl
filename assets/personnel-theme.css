@@ -1076,7 +1076,7 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
 }
 
 /* Premium shell: inhoud pas tonen na bootstrap (zelfde patroon als maandelijkse kosten) */
-main.main-content.is-premium-boot-host {
+main.is-premium-boot-host {
     position: relative;
     min-height: 100vh;
     box-sizing: border-box;

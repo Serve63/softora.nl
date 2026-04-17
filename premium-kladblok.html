@@ -205,7 +205,11 @@
             </div>
           </div>
         </aside>
-        <main class="main-content">
+        <main class="main-content is-premium-boot-host">
+            <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
+                <div class="premium-boot-spinner"></div>
+            </div>
+            <div class="premium-boot-shell is-booting" aria-busy="true">
             <section class="notepad-shell">
                 <header>
                     <h1 class="page-title">Kladblok</h1>
@@ -226,6 +230,7 @@
                     ></div>
                 </article>
             </section>
+            </div>
         </main>
     </div>
 
@@ -319,7 +324,15 @@
                 void save();
             });
 
-            void loadInitialValue();
+            void (async function () {
+                try {
+                    await loadInitialValue();
+                } finally {
+                    if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+                        window.SoftoraPremiumBoot.setShellBooting(false);
+                    }
+                }
+            })();
         })();
     </script>
 </body>

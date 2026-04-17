@@ -9,6 +9,13 @@ const pages = [
   'premium-personeel-agenda.html',
   'premium-ai-coldmailing.html',
   'premium-ai-lead-generator.html',
+  'premium-klanten.html',
+  'premium-mailbox.html',
+  'premium-pakketten.html',
+  'premium-pdfs.html',
+  'premium-boekhouding.html',
+  'premium-kladblok.html',
+  'premium-instellingen.html',
 ];
 
 test('premium personeel pagina’s met boot-shell delen personnel-theme loader en hook', () => {
@@ -20,12 +27,12 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
   const jsPath = path.join(__dirname, '../../assets/personnel-theme.js');
   const jsSource = fs.readFileSync(jsPath, 'utf8');
   assert.match(jsSource, /SoftoraPremiumBoot\.setShellBooting/);
-  assert.match(jsSource, /main\.main-content\.is-premium-boot-host/);
+  assert.match(jsSource, /main\.is-premium-boot-host/);
 
   for (const file of pages) {
     const pagePath = path.join(__dirname, '../../', file);
     const source = fs.readFileSync(pagePath, 'utf8');
-    assert.match(source, /main class="main-content is-premium-boot-host"/, file);
+    assert.match(source, /<main[^>]*\bis-premium-boot-host\b/, file);
     assert.match(source, /class="premium-boot-loader"/, file);
     assert.match(source, /class="premium-boot-shell is-booting"/, file);
     assert.match(source, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);

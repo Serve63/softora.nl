@@ -599,7 +599,11 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
     </div>
   </aside>
 
-  <main class="main-content pdf-main">
+  <main class="main-content pdf-main is-premium-boot-host">
+    <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
+      <div class="premium-boot-spinner"></div>
+    </div>
+    <div class="premium-boot-shell is-booting" aria-busy="true">
     <div class="pdf-builder-shell">
 
     <!-- TOPBAR -->
@@ -649,6 +653,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
         </div>
       </div>
 
+    </div>
     </div>
     </div>
   </main>
@@ -1088,6 +1093,17 @@ function showToast(msg) {
 buildForm();
 setupPreviewAutoFit();
 fitPreviewToViewport();
+
+function finishPremiumShellBoot() {
+  if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+    window.SoftoraPremiumBoot.setShellBooting(false);
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', finishPremiumShellBoot, { once: true });
+} else {
+  finishPremiumShellBoot();
+}
 </script>
 </body>
 </html>

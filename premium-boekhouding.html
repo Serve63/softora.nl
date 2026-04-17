@@ -225,7 +225,11 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
     </div>
   </div>
 </aside>
-<main class="main-content">
+<main class="main-content is-premium-boot-host">
+<div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
+  <div class="premium-boot-spinner"></div>
+</div>
+<div class="premium-boot-shell is-booting" aria-busy="true">
 
 <!-- SCHERM 1: OVERZICHT -->
 <div class="screen active" id="screen-overzicht">
@@ -273,6 +277,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 
 <div class="toast" id="toast"></div>
 
+</div>
 </main>
 </div>
 
@@ -539,6 +544,17 @@ function showToast(msg) {
 }
 
 renderList();
+
+function finishPremiumShellBoot() {
+  if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+    window.SoftoraPremiumBoot.setShellBooting(false);
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', finishPremiumShellBoot, { once: true });
+} else {
+  finishPremiumShellBoot();
+}
 </script>
 </body>
 </html>

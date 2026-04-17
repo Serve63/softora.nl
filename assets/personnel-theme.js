@@ -90,7 +90,7 @@
 
     window.SoftoraPremiumBoot = window.SoftoraPremiumBoot || {};
     window.SoftoraPremiumBoot.setShellBooting = function setShellBooting(isBooting) {
-        var main = document.querySelector("main.main-content.is-premium-boot-host");
+        var main = document.querySelector("main.is-premium-boot-host");
         if (!main) {
             return;
         }

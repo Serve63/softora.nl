@@ -47,8 +47,11 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /aria-label=\\"Klant bewerken\\"/);
   assert.match(pageSource, /<svg viewBox=\\"0 0 24 24\\" fill=\\"none\\" stroke=\\"currentColor\\" stroke-width=\\"1\.8\\"><path d=\\"M12 20h9\\"\/><path d=\\"M16\.5 3\.5a2\.12 2\.12 0 113 3L7 19l-4 1 1-4 12\.5-12\.5z\\"\/><\/svg>/);
   assert.match(pageSource, /<section class="hero">[\s\S]*<div class="hero-copy">[\s\S]*<div class="hero-side">[\s\S]*<div class="leaderboard-card" id="leaderboardCard">/);
-  assert.match(pageSource, /<div class="leaderboard-label">Meeste opdrachten<\/div>/);
-  assert.match(pageSource, /<div class="leaderboard-list" id="leaderboardList">[\s\S]*Servé[\s\S]*0 opdrachten[\s\S]*Martijn[\s\S]*0 opdrachten/);
+  assert.doesNotMatch(pageSource, /Meeste opdrachten/);
+  assert.match(
+    pageSource,
+    /<div class="leaderboard-copy">\s*<div class="leaderboard-list" id="leaderboardList">[\s\S]*Servé[\s\S]*0 opdrachten[\s\S]*Martijn[\s\S]*0 opdrachten/
+  );
   assert.match(pageSource, /\.leaderboard-card \{[\s\S]*display: inline-flex;[\s\S]*width: min\(320px, 100%\);[\s\S]*padding: 0;[\s\S]*border: none;[\s\S]*background: transparent;/);
   assert.doesNotMatch(pageSource, /border: 1px solid rgba\(139, 34, 82, 0\.22\);/);
   assert.doesNotMatch(pageSource, /background: rgba\(139, 34, 82, 0\.06\);/);
