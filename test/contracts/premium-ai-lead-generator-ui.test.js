@@ -239,14 +239,21 @@ test('premium ai lead generator includes a live Retell cost counter', () => {
   assert.match(pageSource, /<span class="topbar-select-label">Totale kosten coldcalling<\/span>/);
   assert.match(pageSource, /<div class="topbar-cost-group" data-retell-cost-root>/);
   assert.match(pageSource, /<div class="topbar-cost-value" data-retell-cost-value>€0,00<\/div>/);
-  assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260415b" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260417a" defer><\/script>/);
   assert.doesNotMatch(pageSource, /topbar-cost-dot/);
   assert.doesNotMatch(pageSource, /data-retell-cost-meta/);
   assert.match(costWidgetSource, /const CALL_UPDATES_ENDPOINT = '\/api\/coldcalling\/call-updates\?limit=500';/);
   assert.match(costWidgetSource, /const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0\.07;/);
   assert.match(costWidgetSource, /const DEFAULT_USD_TO_EUR_RATE = 0\.92;/);
+  assert.match(costWidgetSource, /function resolveKnownRetellCostUsd\(item\)/);
+  assert.match(costWidgetSource, /function resolveEstimatedRetellCostUsd\(item\)/);
   assert.match(costWidgetSource, /function convertUsdToEur\(amountUsd\)/);
   assert.match(costWidgetSource, /function buildRetellCostSummary\(updates\)/);
+  assert.match(costWidgetSource, /const costUsd = resolveKnownRetellCostUsd\(item\);/);
+  assert.match(
+    costWidgetSource,
+    /totalCostUsd \+= costUsd !== null \? costUsd : resolveEstimatedRetellCostUsd\(item\);/
+  );
   assert.match(costWidgetSource, /function formatEurCost\(amount\)/);
   assert.match(costWidgetSource, /return `€\$\{safeAmount\.toLocaleString\('nl-NL'/);
   assert.match(costWidgetSource, /window\.refreshRetellCostSummary = refreshRetellCostSummary;/);

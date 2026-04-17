@@ -14,6 +14,28 @@ function createCallUpdateStore(deps = {}) {
     queueCallUpdateRowPersist = () => null,
   } = deps;
 
+  function resolveMergedNonNegativeNumber(nextValue, previousValue, decimals = null) {
+    const next = Number(nextValue);
+    if (Number.isFinite(next) && next >= 0) {
+      if (Number.isFinite(decimals) && decimals >= 0) {
+        const factor = 10 ** decimals;
+        return Math.round(next * factor) / factor;
+      }
+      return next;
+    }
+
+    const previous = Number(previousValue);
+    if (Number.isFinite(previous) && previous >= 0) {
+      if (Number.isFinite(decimals) && decimals >= 0) {
+        const factor = 10 ** decimals;
+        return Math.round(previous * factor) / factor;
+      }
+      return previous;
+    }
+
+    return null;
+  }
+
   function upsertRecentCallUpdate(update, options = {}) {
     if (!update) return null;
 
@@ -69,6 +91,11 @@ function createCallUpdateStore(deps = {}) {
           stack: normalizedUpdate.stack || existing.stack || '',
           stackLabel: normalizedUpdate.stackLabel || existing.stackLabel || '',
           messageType: normalizedUpdate.messageType || existing.messageType || '',
+          costUsd: resolveMergedNonNegativeNumber(normalizedUpdate.costUsd, existing.costUsd, 3),
+          costUsdMilli: resolveMergedNonNegativeNumber(
+            normalizedUpdate.costUsdMilli,
+            existing.costUsdMilli
+          ),
           updatedAt: resolvedUpdatedAt,
           updatedAtMs: resolvedUpdatedAtMs,
         }

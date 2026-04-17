@@ -1,7 +1,6 @@
 (function () {
   'use strict';
 
-  const ROOT_SELECTOR = '[data-retell-cost-root]';
   const CALL_UPDATES_ENDPOINT = '/api/coldcalling/call-updates?limit=500';
   const POLL_INTERVAL_MS = 15000;
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
@@ -9,7 +8,6 @@
 
   let refreshPromise = null;
   let pollTimer = null;
-  let lastSummary = null;
 
   function normalizeString(value) {
     return String(value || '').trim();
@@ -44,26 +42,6 @@
     return Math.max(0, Number(amountUsd) || 0) * getUsdToEurRate();
   }
 
-  function resolveKnownRetellCostUsd(item) {
-    const costUsdMilli = Number(item && (item.costUsdMilli ?? item.cost_usd_milli));
-    if (Number.isFinite(costUsdMilli) && costUsdMilli >= 0) {
-      return Math.max(0, Math.round(costUsdMilli)) / 1000;
-    }
-
-    const costUsd = Number(item && (item.costUsd ?? item.cost_usd));
-    if (Number.isFinite(costUsd) && costUsd >= 0) {
-      return Math.max(0, Math.round(costUsd * 1000)) / 1000;
-    }
-
-    return null;
-  }
-
-  function resolveEstimatedRetellCostUsd(item) {
-    const durationSeconds = Math.max(0, Math.round(parsePositiveNumber(item && item.durationSeconds)));
-    if (durationSeconds <= 0) return 0;
-    return (durationSeconds / 60) * getRetellEstimatedCostPerMinuteUsd();
-  }
-
   function getOccurredAtMs(item) {
     const updatedAtMs = Number(item && item.updatedAtMs);
     if (Number.isFinite(updatedAtMs) && updatedAtMs > 0) return updatedAtMs;
@@ -80,6 +58,18 @@
     }
 
     return 0;
+  }
+
+  function getMonthKeyFromMs(value) {
+    const date = new Date(Number(value) || 0);
+    if (!Number.isFinite(date.getTime()) || date.getTime() <= 0) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function isCurrentMonthCall(item) {
+    const occurredAtMs = getOccurredAtMs(item);
+    if (!Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return false;
+    return getMonthKeyFromMs(occurredAtMs) === getMonthKeyFromMs(Date.now());
   }
 
   function inferProvider(item) {
@@ -119,7 +109,7 @@
   function mergeCallUpdates(updates) {
     const byCallId = new Map();
 
-    (Array.isArray(updates) ? updates : []).forEach((item, index) => {
+    (Array.isArray(updates) ? updates : []).forEach(function (item, index) {
       if (!item || typeof item !== 'object') return;
 
       const callId = normalizeString(item.callId || item.call_id || `call-${index}`);
@@ -151,90 +141,78 @@
     });
   }
 
-  function buildRetellCostSummary(updates) {
+  function resolveKnownRetellCostUsd(item) {
+    const costUsdMilli = Number(item && (item.costUsdMilli ?? item.cost_usd_milli));
+    if (Number.isFinite(costUsdMilli) && costUsdMilli >= 0) {
+      return Math.max(0, Math.round(costUsdMilli)) / 1000;
+    }
+
+    const costUsd = Number(item && (item.costUsd ?? item.cost_usd));
+    if (Number.isFinite(costUsd) && costUsd >= 0) {
+      return Math.max(0, Math.round(costUsd * 1000)) / 1000;
+    }
+
+    return null;
+  }
+
+  function resolveEstimatedRetellCostUsd(item) {
+    const durationSeconds = Math.max(0, Math.round(parsePositiveNumber(item && item.durationSeconds)));
+    if (durationSeconds <= 0) return 0;
+    return (durationSeconds / 60) * getRetellEstimatedCostPerMinuteUsd();
+  }
+
+  function buildCurrentMonthRetellCostEur(updates) {
     const merged = mergeCallUpdates(updates).filter(function (item) {
       return (
         inferProvider(item) === 'retell' &&
         isOutboundCallLike(item) &&
-        isQualifiedCallLike(item)
+        isQualifiedCallLike(item) &&
+        isCurrentMonthCall(item)
       );
     });
 
-    let callCount = 0;
-    let totalDurationSeconds = 0;
     let totalCostUsd = 0;
-
     merged.forEach(function (item) {
-      callCount += 1;
-      totalDurationSeconds += Math.max(0, Math.round(parsePositiveNumber(item.durationSeconds)));
-      const costUsd = resolveKnownRetellCostUsd(item);
-      totalCostUsd += costUsd !== null ? costUsd : resolveEstimatedRetellCostUsd(item);
+      const exactCostUsd = resolveKnownRetellCostUsd(item);
+      totalCostUsd += exactCostUsd !== null ? exactCostUsd : resolveEstimatedRetellCostUsd(item);
     });
 
-    return {
-      callCount,
-      totalDurationSeconds,
-      costEur: convertUsdToEur(totalCostUsd),
-    };
+    return Math.round(convertUsdToEur(totalCostUsd) * 100) / 100;
   }
 
-  function formatEurCost(amount) {
-    const safeAmount = Number.isFinite(Number(amount)) ? Number(amount) : 0;
-    return `€${safeAmount.toLocaleString('nl-NL', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+  function getMonthlyCostsData() {
+    return window.softoraMonthlyCostsData && typeof window.softoraMonthlyCostsData === 'object'
+      ? window.softoraMonthlyCostsData
+      : null;
   }
 
-  function formatDuration(totalSeconds) {
-    const safeSeconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
-    if (safeSeconds <= 0) return '0m';
-
-    const hours = Math.floor(safeSeconds / 3600);
-    const minutes = Math.floor((safeSeconds % 3600) / 60);
-    const seconds = safeSeconds % 60;
-
-    if (hours > 0) {
-      return minutes > 0 ? `${hours}u ${minutes}m` : `${hours}u`;
-    }
-    if (minutes > 0) {
-      return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-    }
-    return `${seconds}s`;
+  function getMonthlyCostsRender() {
+    return typeof window.softoraMonthlyCostsRender === 'function'
+      ? window.softoraMonthlyCostsRender
+      : null;
   }
 
-  function formatMetaText(summary, fallbackText) {
-    if (!summary || typeof summary !== 'object') {
-      return normalizeString(fallbackText) || 'Niet beschikbaar';
-    }
-
-    if (Number(summary.callCount || 0) <= 0) {
-      return 'Nog geen gesprekken';
-    }
-
-    const callLabel = Number(summary.callCount || 0) === 1 ? '1 gesprek' : `${Number(summary.callCount || 0)} gesprekken`;
-    return `${callLabel} · ${formatDuration(summary.totalDurationSeconds)}`;
+  function resolveColdcallingCostItem() {
+    const state = getMonthlyCostsData();
+    const items = Array.isArray(state && state['Totale kosten:']) ? state['Totale kosten:'] : [];
+    return (
+      items.find(function (item) {
+        return normalizeSearchText(item && item.naam) === 'coldcalling';
+      }) || null
+    );
   }
 
-  function renderSummary(summary, state, fallbackText) {
-    const roots = Array.from(document.querySelectorAll(ROOT_SELECTOR));
-    if (!roots.length) return;
+  function applyColdcallingCost(amountEur) {
+    const item = resolveColdcallingCostItem();
+    const render = getMonthlyCostsRender();
+    if (!item || !render) return false;
 
-    roots.forEach(function (root) {
-      const card = root.querySelector('.topbar-cost-card');
-      const valueEl = root.querySelector('[data-retell-cost-value]');
-      const metaEl = root.querySelector('[data-retell-cost-meta]');
+    const nextAmount = Math.max(0, Math.round((Number(amountEur) || 0) * 100) / 100);
+    if (Number(item.bedrag || 0) === nextAmount) return false;
 
-      if (card) {
-        card.dataset.state = normalizeString(state) || 'ready';
-      }
-      if (valueEl) {
-        valueEl.textContent = formatEurCost(summary && summary.costEur);
-      }
-      if (metaEl) {
-        metaEl.textContent = formatMetaText(summary, fallbackText);
-      }
-    });
+    item.bedrag = nextAmount;
+    render();
+    return true;
   }
 
   async function fetchCallUpdates() {
@@ -251,34 +229,18 @@
     return data.updates;
   }
 
-  async function refreshRetellCostSummary(options) {
-    const opts = options && typeof options === 'object' ? options : {};
-    const silent = Boolean(opts.silent);
-
+  async function refreshMonthlyColdcallingCosts() {
     if (refreshPromise) return refreshPromise;
-    if (!document.querySelector(ROOT_SELECTOR)) {
-      return { ok: true, summary: null };
-    }
-
-    if (!silent && !lastSummary) {
-      renderSummary({ costEur: 0, callCount: 0, totalDurationSeconds: 0 }, 'loading', 'Ophalen...');
+    if (!resolveColdcallingCostItem() || !getMonthlyCostsRender()) {
+      return { ok: true, updated: false };
     }
 
     refreshPromise = (async function () {
       try {
         const updates = await fetchCallUpdates();
-        const summary = buildRetellCostSummary(updates);
-        lastSummary = summary;
-        renderSummary(summary, 'ready', '');
-        return { ok: true, summary: summary };
+        const amountEur = buildCurrentMonthRetellCostEur(updates);
+        return { ok: true, updated: applyColdcallingCost(amountEur), amountEur };
       } catch (error) {
-        if (!lastSummary) {
-          renderSummary(
-            { costEur: 0, callCount: 0, totalDurationSeconds: 0 },
-            'error',
-            normalizeString(error && error.message) || 'Niet beschikbaar'
-          );
-        }
         return {
           ok: false,
           error: normalizeString(error && error.message) || 'Coldcalling-kosten konden niet geladen worden.',
@@ -291,32 +253,32 @@
     return refreshPromise;
   }
 
-  function startRetellCostWidget() {
-    if (!document.querySelector(ROOT_SELECTOR)) return;
+  function startDynamicMonthlyCostsSync() {
+    if (!resolveColdcallingCostItem() || !getMonthlyCostsRender()) return;
 
-    void refreshRetellCostSummary();
+    void refreshMonthlyColdcallingCosts();
     if (!pollTimer) {
       pollTimer = window.setInterval(function () {
-        void refreshRetellCostSummary({ silent: true });
+        void refreshMonthlyColdcallingCosts();
       }, POLL_INTERVAL_MS);
     }
 
     window.addEventListener('focus', function () {
-      void refreshRetellCostSummary({ silent: true });
+      void refreshMonthlyColdcallingCosts();
     });
 
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) {
-        void refreshRetellCostSummary({ silent: true });
+        void refreshMonthlyColdcallingCosts();
       }
     });
   }
 
-  window.refreshRetellCostSummary = refreshRetellCostSummary;
+  window.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startRetellCostWidget, { once: true });
+    document.addEventListener('DOMContentLoaded', startDynamicMonthlyCostsSync, { once: true });
   } else {
-    startRetellCostWidget();
+    startDynamicMonthlyCostsSync();
   }
 })();

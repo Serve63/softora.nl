@@ -156,6 +156,8 @@ test('runtime backup coordinator builds and extracts compact supabase call updat
     {
       callId: 'call-42',
       company: 'Softora',
+      costUsd: 0.498,
+      costUsdMilli: 498,
       updatedAt: '2026-04-07T12:00:00.000Z',
     },
     'manual_test'
@@ -175,4 +177,6 @@ test('runtime backup coordinator builds and extracts compact supabase call updat
   assert.equal(payload.reason, 'manual_test');
   assert.equal(restored.callId, 'call-42');
   assert.equal(restored.company, 'Softora');
+  assert.equal(restored.costUsd, 0.498);
+  assert.equal(restored.costUsdMilli, 498);
 });
