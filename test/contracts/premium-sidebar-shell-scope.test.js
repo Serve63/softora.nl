@@ -56,8 +56,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords", "settings"\]\);/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
-  assert.match(themeSource, /:root\[data-personnel-loading="true"\] \.sidebar-link\[data-sidebar-key="passwords"\],/);
-  assert.match(themeSource, /:root\[data-personnel-loading="true"\] \.sidebar-link\[data-sidebar-key="settings"\] \{/);
+  assert.match(themeJsSource, /premiumInitialSessionFetched/);
+  assert.match(themeJsSource, /persistPremiumSidebarSessionSnapshot/);
 });
 
 test('canonical premium pages opt into the shared sidebar shell', () => {

@@ -1472,7 +1472,7 @@
                     return;
                 }
 
-                renderLoading('Uitvoerdossier laden', 'Opdrachtgegevens worden opgehaald.');
+                renderLoading('Uitvoerdossier laden');
                 const values = await fetchUiStateValues(REMOTE_SCOPE);
                 const customOrders = safeJsonParse(values?.[CUSTOM_ORDERS_KEY], []);
                 const runtimeMap = safeJsonParse(values?.[ORDER_RUNTIME_KEY], {});

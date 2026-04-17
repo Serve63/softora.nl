@@ -8,6 +8,7 @@
     const publicFallbackStorageKey = "softora_public_theme_mode";
     const sidebarCountCacheKey = "softora_sidebar_count_cache_v1";
     const sidebarCountPersistCookieKey = "softora_sidebar_counts_v1";
+    const PREMIUM_SIDEBAR_SESSION_STORAGE_KEY = "softora_premium_sidebar_session_v1";
     const leadSuppressionCookieKey = "softora_hidden_leads_v1";
     const manualLeadSuppressionTtlMs = 1000 * 60 * 2;
     const completedLeadSuppressionTtlMs = 1000 * 60 * 60 * 24 * 30;
@@ -24,11 +25,26 @@
     const themeButtons = document.querySelectorAll(".theme-switch-btn[data-theme-value]");
     let premiumSessionSnapshot = null;
     let premiumSessionPromise = null;
+    let premiumInitialSessionFetched = false;
     let premiumProfileModalRef = null;
     let premiumSidebarProfileResolved = !isPremiumPersonnelContext;
     let sidebarLeadsRefreshRequestId = 0;
     let sidebarLeadsZeroSnapshotStreak = 0;
     window[sidebarCountCacheKey] = sidebarCountCacheState;
+
+    try {
+        if (isPremiumPersonnelContext) {
+            const raw = sessionStorage.getItem(PREMIUM_SIDEBAR_SESSION_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === "object" && parsed.authenticated) {
+                    premiumSessionSnapshot = parsed;
+                }
+            }
+        }
+    } catch (_) {
+        /* ignore corrupt storage */
+    }
 
     window.SoftoraAI = window.SoftoraAI || {};
 
@@ -676,6 +692,10 @@
 
     function syncPremiumSidebarAdminLinks(sidebar, session, activeKey) {
         if (!sidebar) return;
+        if (!premiumInitialSessionFetched && session == null) {
+            syncStaticSidebarActiveState(sidebar, activeKey);
+            return;
+        }
         const allowAdminOnlyLinks = isPremiumAdminSession(session);
         const adminExtraLinks = getPremiumSidebarAdminExtraLinks();
         adminExtraLinks.forEach(function (link) {
@@ -940,26 +960,38 @@
         return payload;
     }
 
+    function persistPremiumSidebarSessionSnapshot(session) {
+        try {
+            if (session && session.authenticated) {
+                sessionStorage.setItem(PREMIUM_SIDEBAR_SESSION_STORAGE_KEY, JSON.stringify(session));
+            } else {
+                sessionStorage.removeItem(PREMIUM_SIDEBAR_SESSION_STORAGE_KEY);
+            }
+        } catch (_) {
+            /* ignore quota / private mode */
+        }
+    }
+
     async function loadPremiumSession(options) {
         if (!isPremiumPersonnelContext) return null;
         const force = Boolean(options && options.force);
-        if (premiumSessionSnapshot && !force) {
-            applyPremiumSidebarProfile(premiumSessionSnapshot);
-            return premiumSessionSnapshot;
-        }
         if (premiumSessionPromise && !force) return premiumSessionPromise;
         premiumSessionPromise = (async function () {
-            const payload = await fetchJsonNoStore("/api/auth/session");
-            premiumSessionSnapshot = payload && payload.authenticated ? payload : null;
-            applyPremiumSidebarProfile(premiumSessionSnapshot);
-            return premiumSessionSnapshot;
-        })().catch(function () {
-            premiumSessionSnapshot = null;
-            applyPremiumSidebarProfile(null);
-            return null;
-        }).finally(function () {
-            premiumSessionPromise = null;
-        });
+            try {
+                const payload = await fetchJsonNoStore("/api/auth/session");
+                premiumInitialSessionFetched = true;
+                premiumSessionSnapshot = payload && payload.authenticated ? payload : null;
+                persistPremiumSidebarSessionSnapshot(premiumSessionSnapshot);
+                applyPremiumSidebarProfile(premiumSessionSnapshot);
+                return premiumSessionSnapshot;
+            } catch (error) {
+                premiumInitialSessionFetched = true;
+                applyPremiumSidebarProfile(premiumSessionSnapshot);
+                return premiumSessionSnapshot;
+            } finally {
+                premiumSessionPromise = null;
+            }
+        })();
         return premiumSessionPromise;
     }
 
@@ -1196,6 +1228,7 @@
                     }),
                 });
                 premiumSessionSnapshot = payload && payload.session ? payload.session : premiumSessionSnapshot;
+                persistPremiumSidebarSessionSnapshot(premiumSessionSnapshot);
                 applyPremiumSidebarProfile(premiumSessionSnapshot);
                 closePremiumProfileModal();
             } catch (error) {
@@ -1977,6 +2010,9 @@
     initSoftoraDialogs();
     applyUnifiedPremiumSidebar();
     neutralizeSidebarAnchors();
+    if (isPremiumPersonnelContext && premiumSessionSnapshot) {
+        applyPremiumSidebarProfile(premiumSessionSnapshot);
+    }
     initPremiumSidebarProfile();
     initSidebarNotificationCounts();
     forceLightTheme();

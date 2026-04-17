@@ -31,8 +31,6 @@ test('premium profielmodal heeft een werkende annuleerknop en subtielere stijl',
   assert.match(jsSource, /if \(!premiumSidebarProfileResolved\) return;/);
   assert.match(jsSource, /paintSidebarAvatar\(avatarEl, resolvedSession\);\s*markPremiumSidebarProfileResolved\(\);/s);
   assert.match(jsSource, /if \(!triggerEl\) \{\s*markPremiumSidebarProfileResolved\(\);\s*return;\s*\}/s);
-  assert.match(
-    cssSource,
-    /:root\[data-personnel-loading="true"\] \[data-sidebar-profile-trigger\] \{[\s\S]*opacity:\s*0 !important;[\s\S]*pointer-events:\s*none !important;/s
-  );
+  assert.match(jsSource, /PREMIUM_SIDEBAR_SESSION_STORAGE_KEY/);
+  assert.match(jsSource, /persistPremiumSidebarSessionSnapshot/);
 });
