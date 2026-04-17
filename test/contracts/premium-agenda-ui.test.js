@@ -64,7 +64,7 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   );
   assert.match(
     pageSource,
-    /modalPrimaryBtn\.textContent = workspacePendingCustomerCheck \? 'Dossier aanmaken' : 'Open dossier';/
+    /modalPrimaryBtn\.textContent = 'Open dossier';/
   );
   assert.match(pageSource, /modalPrimaryBtn\.disabled = workspaceBusy \|\| workspacePendingCustomerCheck;/);
   assert.match(pageSource, /function closeModal\(\) \{\s*if \(isWorkspaceExitLocked\(\)\) return;/);

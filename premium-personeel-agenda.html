@@ -1907,7 +1907,7 @@
         modalSecondaryBtn.textContent = 'Terug';
 
         if (linkedOrderId) {
-            modalPrimaryBtn.textContent = workspacePendingCustomerCheck ? 'Dossier aanmaken' : 'Open dossier';
+            modalPrimaryBtn.textContent = 'Open dossier';
             modalPrimaryBtn.disabled = workspaceBusy || workspacePendingCustomerCheck;
             syncWorkspaceExitControls();
             return;
