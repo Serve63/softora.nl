@@ -67,6 +67,15 @@ body {
   width: min(1260px, 100%);
   margin: 0 auto;
 }
+.monthly-costs-stage {
+  min-height: 420px;
+  transition: opacity .16s ease;
+}
+.monthly-costs-stage.is-booting {
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+}
 
 .header {
   display: flex;
@@ -534,22 +543,24 @@ body {
         <div id="last-updated"></div>
       </div>
 
-      <div class="totals-row">
-        <div class="totaal-card accent">
-          <div class="totaal-label">Totaal per maand</div>
-          <div class="totaal-amount red" id="totaal-maand">...</div>
+      <div class="monthly-costs-stage is-booting" id="monthly-costs-stage" aria-busy="true">
+        <div class="totals-row">
+          <div class="totaal-card accent">
+            <div class="totaal-label">Totaal per maand</div>
+            <div class="totaal-amount red" id="totaal-maand">...</div>
+          </div>
+          <div class="totaal-card">
+            <div class="totaal-label">Per jaar</div>
+            <div class="totaal-amount" id="totaal-jaar">...</div>
+          </div>
+          <div class="totaal-card">
+            <div class="totaal-label">Aantal posten</div>
+            <div class="totaal-amount" id="totaal-posten">...</div>
+          </div>
         </div>
-        <div class="totaal-card">
-          <div class="totaal-label">Per jaar</div>
-          <div class="totaal-amount" id="totaal-jaar">...</div>
-        </div>
-        <div class="totaal-card">
-          <div class="totaal-label">Aantal posten</div>
-          <div class="totaal-amount" id="totaal-posten">...</div>
-        </div>
-      </div>
 
-      <div id="categories-wrap"></div>
+        <div id="categories-wrap"></div>
+      </div>
     </div>
   </main>
 </div>
@@ -764,6 +775,13 @@ function setTotalsLoading() {
   document.getElementById('totaal-maand').textContent = '...';
   document.getElementById('totaal-jaar').textContent = '...';
   document.getElementById('totaal-posten').textContent = '...';
+}
+
+function setMonthlyCostsStageBooting(isBooting) {
+  const stage = document.getElementById('monthly-costs-stage');
+  if (!stage) return;
+  stage.classList.toggle('is-booting', Boolean(isBooting));
+  stage.setAttribute('aria-busy', isBooting ? 'true' : 'false');
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
@@ -998,15 +1016,25 @@ async function bootstrapMonthlyCostsPage() {
   if (monthlyCostsBootstrapPromise) return monthlyCostsBootstrapPromise;
 
   monthlyCostsBootstrapPromise = (async () => {
-    setTotalsLoading();
-    render();
-    await ensureMonthlyCostEntriesLoaded();
-    if (typeof window.refreshMonthlyColdcallingCosts === 'function') {
-      await window.refreshMonthlyColdcallingCosts();
+    try {
+      setMonthlyCostsStageBooting(true);
+      setTotalsLoading();
+      render();
+      await ensureMonthlyCostEntriesLoaded();
+      if (typeof window.refreshMonthlyColdcallingCosts === 'function') {
+        await window.refreshMonthlyColdcallingCosts();
+      }
+      monthlyCostsBootstrapDone = true;
+      render();
+      return true;
+    } catch (error) {
+      console.error('Maandelijkse kosten bootstrap mislukt:', error);
+      monthlyCostsBootstrapDone = true;
+      render();
+      return false;
+    } finally {
+      setMonthlyCostsStageBooting(false);
     }
-    monthlyCostsBootstrapDone = true;
-    render();
-    return true;
   })();
 
   return monthlyCostsBootstrapPromise;
@@ -1193,6 +1221,7 @@ window.softoraMonthlyCostsData = data;
 window.softoraMonthlyCostsRender = render;
 
 syncNextId();
+setMonthlyCostsStageBooting(true);
 setTotalsLoading();
 render();
 if (document.readyState === 'loading') {
