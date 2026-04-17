@@ -29,6 +29,10 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.doesNotMatch(pageSource, /H0st!nger24|Tr@nsIP2026!|G00gl3Work!|Insta\$oft24|Link3dIn!26/);
   assert.doesNotMatch(pageSource, /beheer@softora\.nl|admin@softora\.nl|info@softora\.nl/);
   assert.match(pageSource, /openEditModal\(/);
+  assert.match(pageSource, /openCreateModal\(/);
+  assert.match(pageSource, /class="add-entry-btn"/);
+  assert.match(pageSource, /entryModalMode === 'create'/);
+  assert.match(pageSource, /persistPasswordEntries\('create'\)/);
   assert.match(pageSource, /saveEntryFromModal/);
   assert.match(pageSource, /id="entry-modal"/);
   assert.match(pageSource, /id="entry-user"/);

@@ -296,9 +296,50 @@ body {
 .lock-btn:hover { border-color: var(--crimson); color: var(--crimson); }
 .lock-btn svg { width: 12px; height: 12px; }
 
+.add-entry-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--crimson);
+  border: 1px solid var(--crimson);
+  border-radius: 5px;
+  padding: 0 18px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.add-entry-btn:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-light);
+  color: #fff;
+}
+.add-entry-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+}
+
+.search-toolbar {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.search-toolbar .search-row {
+  flex: 1;
+  min-width: 0;
+}
 .search-row {
   position: relative;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 .search-row input {
   width: 100%;
@@ -594,6 +635,12 @@ body {
     flex-direction: column;
     gap: 14px;
   }
+  .search-toolbar {
+    flex-direction: column;
+  }
+  .add-entry-btn {
+    min-height: 44px;
+  }
   .t-head,
   .t-row {
     grid-template-columns: 1.4fr 1fr 1.2fr 84px;
@@ -701,9 +748,15 @@ body {
 
         <div class="register-status" id="register-status"></div>
 
-        <div class="search-row">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="search" placeholder="Zoeken op naam, website of gebruikersnaam…" oninput="render()">
+        <div class="search-toolbar">
+          <div class="search-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search" placeholder="Zoeken op naam, website of gebruikersnaam…" oninput="render()">
+          </div>
+          <button type="button" class="add-entry-btn" onclick="openCreateModal()" title="Nieuwe inlog toevoegen" aria-label="Nieuwe inlog toevoegen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Nieuwe inlog
+          </button>
         </div>
 
         <div class="table-wrap">
@@ -722,8 +775,8 @@ body {
 <div class="entry-modal" id="entry-modal" hidden>
   <div class="entry-modal-header">
     <div>
-      <div class="entry-modal-title">Inloggegevens wijzigen</div>
-      <div class="entry-modal-sub">Pas naam, website, gebruikersnaam en wachtwoord aan.</div>
+      <div class="entry-modal-title" id="entry-modal-title">Inloggegevens wijzigen</div>
+      <div class="entry-modal-sub" id="entry-modal-sub">Pas naam, website, gebruikersnaam en wachtwoord aan.</div>
     </div>
     <button type="button" class="entry-modal-close" id="entry-modal-close" aria-label="Sluiten">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -861,6 +914,8 @@ let entries = [];
 const visible = {};
 let passwordEntriesLoaded = false;
 let passwordEntriesLoadPromise = null;
+/** @type {'closed' | 'edit' | 'create'} */
+let entryModalMode = 'closed';
 let currentEditEntryId = null;
 
 const registerStatusEl = document.getElementById('register-status');
@@ -874,6 +929,8 @@ const entryNameEl = document.getElementById('entry-name');
 const entryUrlEl = document.getElementById('entry-url');
 const entryUserEl = document.getElementById('entry-user');
 const entryPasswordEl = document.getElementById('entry-password');
+const entryModalTitleEl = document.getElementById('entry-modal-title');
+const entryModalSubEl = document.getElementById('entry-modal-sub');
 
 function normalizeString(value) {
   return String(value == null ? '' : value).trim();
@@ -1133,11 +1190,29 @@ function toggleVis(id) {
   render();
 }
 
+function openCreateModal() {
+  entryModalMode = 'create';
+  currentEditEntryId = null;
+  entryFormEl.reset();
+  if (entryModalTitleEl) entryModalTitleEl.textContent = 'Nieuwe inlog';
+  if (entryModalSubEl) {
+    entryModalSubEl.textContent = 'Vul naam, website, gebruikersnaam en wachtwoord in.';
+  }
+  entryModalBackdrop.hidden = false;
+  entryModalEl.hidden = false;
+  entryNameEl.focus();
+}
+
 function openEditModal(id) {
   const entry = getEntryById(id);
   if (!entry) return;
 
+  entryModalMode = 'edit';
   currentEditEntryId = entry.id;
+  if (entryModalTitleEl) entryModalTitleEl.textContent = 'Inloggegevens wijzigen';
+  if (entryModalSubEl) {
+    entryModalSubEl.textContent = 'Pas naam, website, gebruikersnaam en wachtwoord aan.';
+  }
   entryNameEl.value = entry.naam;
   entryUrlEl.value = entry.url;
   entryUserEl.value = entry.user;
@@ -1148,6 +1223,7 @@ function openEditModal(id) {
 }
 
 function closeEditModal() {
+  entryModalMode = 'closed';
   currentEditEntryId = null;
   entryModalBackdrop.hidden = true;
   entryModalEl.hidden = true;
@@ -1156,7 +1232,36 @@ function closeEditModal() {
 
 async function saveEntryFromModal(event) {
   event.preventDefault();
-  if (!currentEditEntryId) return;
+
+  if (entryModalMode === 'create') {
+    const newEntry = sanitizePasswordEntry(
+      {
+        id: getNextPasswordEntryId(),
+        naam: entryNameEl.value,
+        url: entryUrlEl.value,
+        user: entryUserEl.value,
+        pw: entryPasswordEl.value,
+        cat: 'Overig',
+      },
+      entries.length
+    );
+    const previousEntries = entries.slice();
+    entries = [...entries, newEntry];
+    try {
+      await persistPasswordEntries('create');
+      closeEditModal();
+      render();
+      toast('\u2713 Nieuwe inlog opgeslagen');
+    } catch (_) {
+      entries = previousEntries;
+      render();
+      toast('Opslaan mislukt');
+      setRegisterStatus('Opslaan in Supabase mislukt. Probeer het opnieuw.', 'warning');
+    }
+    return;
+  }
+
+  if (entryModalMode !== 'edit' || !currentEditEntryId) return;
 
   const existingEntry = getEntryById(currentEditEntryId);
   if (!existingEntry) {
