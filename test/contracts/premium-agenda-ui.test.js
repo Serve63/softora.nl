@@ -92,7 +92,7 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   assert.match(pageSource, /isManualAppointmentTimeAllowed/);
   assert.match(
     pageSource,
-    /Afspraken die geen effect hebben op de tijden[\s\S]*09:00[\s\S]*17:00[\s\S]*maandag[\s\S]*vrijdag/i
+    /Afspraken die geen effect hebben op de werktijden[\s\S]*09:00[\s\S]*17:00[\s\S]*maandag[\s\S]*vrijdag[\s\S]*hier niet gemeld/i
   );
 });
 
