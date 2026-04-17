@@ -14,6 +14,7 @@ function createAgendaRetellCoordinator(deps = {}) {
     normalizeString = (value) => String(value || '').trim(),
     normalizeDateYyyyMmDd = (value) => String(value || '').trim(),
     normalizeTimeHhMm = (value) => String(value || '').trim(),
+    retellFreshStateMaxAgeMs = 0,
   } = deps;
 
   function getHeader(req, name) {
@@ -121,8 +122,12 @@ function createAgendaRetellCoordinator(deps = {}) {
     }
     if (isSupabaseConfigured()) {
       await syncRuntimeStateFromSupabaseIfNewer({
-        force: Boolean(forceFresh),
-        maxAgeMs: forceFresh ? 0 : 1000,
+        // Voor de telefoon willen we wél verse data, maar niet blokkeren op een
+        // trage persist-keten van een andere actie. We lezen daarom "fresh when possible"
+        // zonder lokale nieuwere in-memory afspraken weg te drukken.
+        force: false,
+        maxAgeMs: forceFresh ? Math.max(0, Number(retellFreshStateMaxAgeMs) || 0) : 1000,
+        skipPendingPersistWait: true,
       }).catch(() => false);
     }
     backfillInsightsAndAppointmentsFromRecentCallUpdates();
@@ -234,6 +239,15 @@ function createAgendaRetellCoordinator(deps = {}) {
     };
   }
 
+  function isBusinessWeekday(dateYmd) {
+    const normalizedDate = normalizeDateYyyyMmDd(dateYmd);
+    if (!normalizedDate) return false;
+    const [yearRaw, monthRaw, dayRaw] = normalizedDate.split('-');
+    const date = new Date(Date.UTC(toInt(yearRaw, 0), toInt(monthRaw, 1) - 1, toInt(dayRaw, 1), 12));
+    const day = date.getUTCDay();
+    return day >= 1 && day <= 5;
+  }
+
   function buildCandidateTimes(slotMinutes, businessHoursStart, businessHoursEnd) {
     const safeSlotMinutes = clamp(slotMinutes, 15, 240, 60);
     const startMinutes = hhMmToMinutes(businessHoursStart, 9 * 60);
@@ -268,10 +282,38 @@ function createAgendaRetellCoordinator(deps = {}) {
     return occupied;
   }
 
-  function isSlotAvailable(dateYmd, timeHm, options = {}) {
+  function explainRequestedSlotAvailability(dateYmd, timeHm, options = {}) {
     const normalizedDate = normalizeDateYyyyMmDd(dateYmd);
     const normalizedTime = normalizeTimeHhMm(timeHm);
-    if (!normalizedDate || !normalizedTime) return false;
+    if (!normalizedDate || !normalizedTime) {
+      return {
+        available: false,
+        reason: 'invalid',
+      };
+    }
+
+    const occupiedTimes = collectOccupiedTimesForDate(normalizedDate, options);
+    if (occupiedTimes.has(normalizedTime)) {
+      return {
+        available: false,
+        reason: 'occupied',
+      };
+    }
+
+    if (isSlotInPast(normalizedDate, normalizedTime, options.timeZone)) {
+      return {
+        available: false,
+        reason: 'past',
+      };
+    }
+
+    if (!isBusinessWeekday(normalizedDate)) {
+      return {
+        available: false,
+        reason: 'outside_business_days',
+      };
+    }
+
     if (
       !isTimeWithinBusinessHours(
         normalizedTime,
@@ -280,12 +322,20 @@ function createAgendaRetellCoordinator(deps = {}) {
         options.businessHoursEnd
       )
     ) {
-      return false;
+      return {
+        available: false,
+        reason: 'outside_business_hours',
+      };
     }
-    if (isSlotInPast(normalizedDate, normalizedTime, options.timeZone)) return false;
 
-    const occupiedTimes = collectOccupiedTimesForDate(normalizedDate, options);
-    return !occupiedTimes.has(normalizedTime);
+    return {
+      available: true,
+      reason: 'available',
+    };
+  }
+
+  function isSlotAvailable(dateYmd, timeHm, options = {}) {
+    return explainRequestedSlotAvailability(dateYmd, timeHm, options).available;
   }
 
   function collectNextAvailableSlots(options = {}) {
@@ -303,6 +353,7 @@ function createAgendaRetellCoordinator(deps = {}) {
 
     for (let dayOffset = 0; dayOffset < windowDays; dayOffset += 1) {
       const currentDate = addDaysToDate(startDate, dayOffset);
+      if (!isBusinessWeekday(currentDate)) continue;
       const occupiedTimes = collectOccupiedTimesForDate(currentDate, options);
 
       for (const time of candidateTimes) {
@@ -323,26 +374,74 @@ function createAgendaRetellCoordinator(deps = {}) {
     const requestedTime = normalizeTimeHhMm(payload.requestedTime || '');
     const available = Boolean(payload.available);
     const slots = Array.isArray(payload.availableSlots) ? payload.availableSlots : [];
+    const occupiedSlotsOnRequestedDate = Array.isArray(payload.occupiedSlotsOnRequestedDate)
+      ? payload.occupiedSlotsOnRequestedDate.filter(Boolean).map((time) => normalizeTimeHhMm(time)).filter(Boolean)
+      : [];
     const timeZone = normalizeString(payload.timeZone || 'Europe/Amsterdam') || 'Europe/Amsterdam';
+    const businessHoursStart = normalizeTimeHhMm(payload.businessHoursStart || '') || '09:00';
+    const businessHoursEnd = normalizeTimeHhMm(payload.businessHoursEnd || '') || '17:00';
+    const availabilityReason = normalizeString(payload.availabilityReason || '');
+    const suggestionText =
+      slots.length > 0
+        ? ` Eerstvolgende opties: ${slots.map((slot) => slot.label).join(', ')}.`
+        : ' Ik zie nu geen alternatief binnen het ingestelde zoekvenster.';
 
     if (requestedDate && requestedTime && available) {
       return `${buildSlotLabel(requestedDate, requestedTime, timeZone)} is nog vrij in de agenda.`;
     }
 
     if (requestedDate && requestedTime && !available) {
-      if (slots.length > 0) {
+      if (availabilityReason === 'occupied') {
         return `${buildSlotLabel(
           requestedDate,
           requestedTime,
           timeZone
-        )} is niet beschikbaar. Eerstvolgende opties: ${slots
-          .map((slot) => slot.label)
-          .join(', ')}.`;
+        )} is niet beschikbaar; om ${requestedTime} staat al een afspraak in de agenda.${suggestionText}`;
       }
-      return `${buildSlotLabel(requestedDate, requestedTime, timeZone)} is niet beschikbaar en ik zie nu geen alternatief binnen het ingestelde zoekvenster.`;
+      if (availabilityReason === 'outside_business_days') {
+        return `${buildSlotLabel(
+          requestedDate,
+          requestedTime,
+          timeZone
+        )} valt buiten de planning. We plannen alleen afspraken van maandag t/m vrijdag tussen ${businessHoursStart} en ${businessHoursEnd}.${suggestionText}`;
+      }
+      if (availabilityReason === 'outside_business_hours') {
+        return `${buildSlotLabel(
+          requestedDate,
+          requestedTime,
+          timeZone
+        )} valt buiten de planning. We plannen alleen tussen ${businessHoursStart} en ${businessHoursEnd}.${suggestionText}`;
+      }
+      if (availabilityReason === 'past') {
+        return `${buildSlotLabel(
+          requestedDate,
+          requestedTime,
+          timeZone
+        )} ligt in het verleden.${suggestionText}`;
+      }
+      return `${buildSlotLabel(requestedDate, requestedTime, timeZone)} is niet beschikbaar.${suggestionText}`;
     }
 
     if (requestedDate && slots.length > 0) {
+      const requestedDateSlots = slots.filter((slot) => slot?.date === requestedDate);
+      if (requestedDateSlots.length > 0) {
+        const occupiedText = occupiedSlotsOnRequestedDate.length
+          ? ` Op ${buildDateLabel(requestedDate, timeZone)} staan al afspraken om ${occupiedSlotsOnRequestedDate.join(
+              ', '
+            )}.`
+          : '';
+        return `${occupiedText} Vrije momenten zijn ${requestedDateSlots
+          .map((slot) => slot.time)
+          .join(', ')}.`;
+      }
+      if (!isBusinessWeekday(requestedDate)) {
+        return `${buildDateLabel(
+          requestedDate,
+          timeZone
+        )} valt buiten de planning. We plannen alleen van maandag t/m vrijdag tussen ${businessHoursStart} en ${businessHoursEnd}. Eerstvolgende vrije momenten: ${slots
+          .map((slot) => slot.label)
+          .join(', ')}.`;
+      }
       return `Beschikbare momenten op ${buildDateLabel(requestedDate, timeZone)}: ${slots
         .map((slot) => slot.time)
         .join(', ')}.`;
@@ -372,14 +471,17 @@ function createAgendaRetellCoordinator(deps = {}) {
     let available = false;
     let availableSlots = [];
     let occupiedSlotsOnRequestedDate = [];
+    let availabilityReason = '';
 
     if (requestedDate && requestedTime) {
-      available = isSlotAvailable(requestedDate, requestedTime, {
+      const availabilityDecision = explainRequestedSlotAvailability(requestedDate, requestedTime, {
         timeZone,
         slotMinutes,
         businessHoursStart,
         businessHoursEnd,
       });
+      available = availabilityDecision.available;
+      availabilityReason = availabilityDecision.reason;
       availableSlots = available
         ? [buildSlotObject(requestedDate, requestedTime, timeZone)]
         : collectNextAvailableSlots({
@@ -391,19 +493,20 @@ function createAgendaRetellCoordinator(deps = {}) {
             maxSuggestions,
             businessHoursStart,
             businessHoursEnd,
-          });
+      });
       occupiedSlotsOnRequestedDate = Array.from(collectOccupiedTimesForDate(requestedDate)).sort();
     } else if (requestedDate) {
       availableSlots = collectNextAvailableSlots({
         startDate: requestedDate,
         timeZone,
         slotMinutes,
-        windowDays: 1,
+        windowDays: isBusinessWeekday(requestedDate) ? 1 : windowDays,
         maxSuggestions,
         businessHoursStart,
         businessHoursEnd,
       });
       available = availableSlots.length > 0;
+      availabilityReason = isBusinessWeekday(requestedDate) ? 'available' : 'outside_business_days';
       occupiedSlotsOnRequestedDate = Array.from(collectOccupiedTimesForDate(requestedDate)).sort();
     } else {
       availableSlots = collectNextAvailableSlots({
@@ -421,6 +524,7 @@ function createAgendaRetellCoordinator(deps = {}) {
       ok: true,
       functionName: normalizeString(req.body?.retellFunctionName || '') || 'agenda_availability',
       available,
+      availabilityReason,
       requestedSlot:
         requestedDate || requestedTime
           ? {
@@ -432,12 +536,22 @@ function createAgendaRetellCoordinator(deps = {}) {
           : null,
       occupiedSlotsOnRequestedDate,
       availableSlots,
+      constraints: {
+        businessDays: ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag'],
+        businessHoursStart,
+        businessHoursEnd,
+        timezone: timeZone,
+      },
       message: buildAvailabilityMessage({
         requestedDate,
         requestedTime,
         available,
+        availabilityReason,
         availableSlots,
+        occupiedSlotsOnRequestedDate,
         timeZone,
+        businessHoursStart,
+        businessHoursEnd,
       }),
     });
   }

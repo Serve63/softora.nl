@@ -622,6 +622,7 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     if (!isSupabaseConfigured()) return false;
 
     const force = Boolean(options?.force);
+    const skipPendingPersistWait = Boolean(options?.skipPendingPersistWait);
     const maxAgeMs = Math.max(
       0,
       parseNumberSafe(options?.maxAgeMs, runtimeStateSupabaseSyncCooldownMs) ||
@@ -649,7 +650,12 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       return false;
     }
 
-    await waitForQueuedRuntimeStatePersist();
+    // Leespaden zoals de Retell-agenda-check moeten snel kunnen reageren.
+    // Als we lokale mutaties al in memory hebben, is wachten op de persist-keten
+    // hier niet nodig en kan het tientallen seconden vertraging geven.
+    if (!skipPendingPersistWait) {
+      await waitForQueuedRuntimeStatePersist();
+    }
     runtimeState.runtimeStateLastSupabaseSyncCheckMs = Date.now();
 
     const snapshot = await fetchSupabaseStateRowViaRest('payload,updated_at');

@@ -97,10 +97,145 @@ test('agenda retell coordinator returns next free agenda slots after an occupied
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.available, false);
+  assert.equal(res.body.availabilityReason, 'occupied');
   assert.deepEqual(res.body.occupiedSlotsOnRequestedDate, ['10:00', '11:00']);
   assert.deepEqual(
     res.body.availableSlots.map((slot) => slot.time),
     ['12:00']
   );
-  assert.match(res.body.message, /niet beschikbaar/i);
+  assert.match(res.body.message, /om 10:00 staat al een afspraak/i);
+});
+
+test('agenda retell coordinator keeps suggestions within monday to friday office hours', async () => {
+  const { coordinator } = createFixture();
+
+  const rawBody = JSON.stringify({
+    args: {
+      date: '2099-04-20',
+      time: '18:15',
+      slotMinutes: 60,
+      businessHoursStart: '09:00',
+      businessHoursEnd: '17:00',
+      maxSuggestions: 2,
+      windowDays: 5,
+    },
+  });
+  const req = {
+    rawBody,
+    body: {
+      retellFunctionName: 'check_softora_agenda',
+      preferredDate: '2099-04-20',
+      preferredTime: '18:15',
+      slotMinutes: 60,
+      businessHoursStart: '09:00',
+      businessHoursEnd: '17:00',
+      maxSuggestions: 2,
+      windowDays: 5,
+    },
+    get: createHeaderReader({
+      'x-retell-signature': signRetellBody(rawBody),
+    }),
+  };
+  const res = createResponseRecorder();
+
+  await coordinator.sendRetellAgendaAvailabilityResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.available, false);
+  assert.equal(res.body.availabilityReason, 'outside_business_hours');
+  assert.deepEqual(res.body.constraints.businessDays, [
+    'maandag',
+    'dinsdag',
+    'woensdag',
+    'donderdag',
+    'vrijdag',
+  ]);
+  assert.ok(res.body.availableSlots.every((slot) => ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'].includes(slot.time)));
+  assert.ok(res.body.availableSlots.every((slot) => !/zaterdag|zondag/i.test(slot.label)));
+  assert.match(res.body.message, /alleen tussen 09:00 en 17:00/i);
+});
+
+test('agenda retell coordinator explains weekend dates with weekday alternatives', async () => {
+  const { coordinator } = createFixture();
+
+  const rawBody = JSON.stringify({
+    args: {
+      date: '2099-04-18',
+      slotMinutes: 60,
+      businessHoursStart: '09:00',
+      businessHoursEnd: '17:00',
+      maxSuggestions: 2,
+      windowDays: 5,
+    },
+  });
+  const req = {
+    rawBody,
+    body: {
+      retellFunctionName: 'check_softora_agenda',
+      preferredDate: '2099-04-18',
+      slotMinutes: 60,
+      businessHoursStart: '09:00',
+      businessHoursEnd: '17:00',
+      maxSuggestions: 2,
+      windowDays: 5,
+    },
+    get: createHeaderReader({
+      'x-retell-signature': signRetellBody(rawBody),
+    }),
+  };
+  const res = createResponseRecorder();
+
+  await coordinator.sendRetellAgendaAvailabilityResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.available, true);
+  assert.equal(res.body.availabilityReason, 'outside_business_days');
+  assert.ok(res.body.availableSlots.length > 0);
+  assert.ok(res.body.availableSlots.every((slot) => !/zaterdag|zondag/i.test(slot.label)));
+  assert.match(res.body.message, /alleen van maandag t\/m vrijdag/i);
+});
+
+test('agenda retell coordinator refreshes shared state without waiting on persist queue', async () => {
+  const syncCalls = [];
+  const { coordinator } = createFixture({
+    coordinatorOverrides: {
+      isSupabaseConfigured: () => true,
+      getSupabaseStateHydrated: () => true,
+      syncRuntimeStateFromSupabaseIfNewer: async (options = {}) => {
+        syncCalls.push(options);
+        return false;
+      },
+    },
+  });
+
+  const rawBody = JSON.stringify({
+    args: {
+      date: '2099-04-20',
+      time: '10:00',
+    },
+  });
+  const req = {
+    rawBody,
+    body: {
+      retellFunctionName: 'check_softora_agenda',
+      preferredDate: '2099-04-20',
+      preferredTime: '10:00',
+    },
+    get: createHeaderReader({
+      'x-retell-signature': signRetellBody(rawBody),
+    }),
+  };
+  const res = createResponseRecorder();
+
+  await coordinator.sendRetellAgendaAvailabilityResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(syncCalls.length, 1);
+  assert.deepEqual(syncCalls[0], {
+    force: false,
+    maxAgeMs: 0,
+    skipPendingPersistWait: true,
+  });
 });
