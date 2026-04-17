@@ -445,24 +445,35 @@ function createCallProviderHelpers(options = {}) {
     });
   }
 
+  function normalizeRetellCostToUsdMilli(rawValue) {
+    if (rawValue === '' || rawValue === null || rawValue === undefined) return null;
+
+    const numericValue = parseNumberSafe(rawValue, null);
+    if (!Number.isFinite(numericValue) || numericValue < 0) return null;
+
+    const rawText = typeof rawValue === 'string' ? rawValue.trim() : '';
+    const looksIntegerLike =
+      Number.isInteger(numericValue) && (!rawText || !/[.eE]/.test(rawText));
+
+    return looksIntegerLike
+      ? Math.max(0, Math.round(numericValue))
+      : Math.max(0, Math.round(numericValue * 1000));
+  }
+
   function resolveRetellCallCostFields(call) {
-    const combinedCostRaw = parseNumberSafe(call?.call_cost?.combined_cost, null);
-    if (Number.isFinite(combinedCostRaw) && combinedCostRaw >= 0) {
-      const normalizedMilli = Number.isInteger(combinedCostRaw)
-        ? Math.max(0, Math.round(combinedCostRaw))
-        : Math.max(0, Math.round(combinedCostRaw * 1000));
+    const combinedCostMilli = normalizeRetellCostToUsdMilli(call?.call_cost?.combined_cost);
+    if (Number.isFinite(combinedCostMilli)) {
       return {
-        costUsdMilli: normalizedMilli,
-        costUsd: normalizedMilli / 1000,
+        costUsdMilli: combinedCostMilli,
+        costUsd: combinedCostMilli / 1000,
       };
     }
 
-    const directCostUsd = parseNumberSafe(call?.cost_usd ?? call?.cost, null);
-    if (Number.isFinite(directCostUsd) && directCostUsd >= 0) {
-      const normalizedMilli = Math.max(0, Math.round(directCostUsd * 1000));
+    const directCostMilli = normalizeRetellCostToUsdMilli(call?.cost_usd ?? call?.cost);
+    if (Number.isFinite(directCostMilli)) {
       return {
-        costUsdMilli: normalizedMilli,
-        costUsd: normalizedMilli / 1000,
+        costUsdMilli: directCostMilli,
+        costUsd: directCostMilli / 1000,
       };
     }
 

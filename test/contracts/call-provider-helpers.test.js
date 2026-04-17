@@ -323,6 +323,21 @@ test('call provider helpers extract stable retell and twilio call updates', () =
   assert.equal(retellFloatCostUpdate.costUsdMilli, 498);
   assert.equal(retellFloatCostUpdate.costUsd, 0.498);
 
+  const retellDirectIntegerCostUpdate = helpers.extractCallUpdateFromRetellPayload({
+    event: 'call_ended',
+    call: {
+      call_id: 'call_direct_integer_cost',
+      call_status: 'ended',
+      duration_ms: 60000,
+      start_timestamp: 1_700_000_000,
+      end_timestamp: 1_700_000_060,
+      cost: 498,
+    },
+  });
+
+  assert.equal(retellDirectIntegerCostUpdate.costUsdMilli, 498);
+  assert.equal(retellDirectIntegerCostUpdate.costUsd, 0.498);
+
   const twilioUpdate = helpers.extractCallUpdateFromTwilioPayload(
     {
       CallSid: 'CA1234567890abcdef1234567890abcdef',
