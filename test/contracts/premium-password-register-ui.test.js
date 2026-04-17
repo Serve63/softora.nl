@@ -31,6 +31,11 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /openEditModal\(/);
   assert.match(pageSource, /openCreateModal\(/);
   assert.match(pageSource, /class="add-entry-btn"/);
+  assert.match(pageSource, /class="btn-edit"/);
+  assert.match(pageSource, /class="btn-del"/);
+  assert.match(pageSource, /openDeleteEntryModal\(/);
+  assert.match(pageSource, /confirmDeletePasswordEntry/);
+  assert.match(pageSource, /a2\.12 2\.12 0 113 3L7 19l-4 1 1-4 12\.5-12\.5z/);
   assert.match(pageSource, /entryModalMode === 'create'/);
   assert.match(pageSource, /persistPasswordEntries\('create'\)/);
   assert.match(pageSource, /saveEntryFromModal/);

@@ -373,7 +373,7 @@ body {
 }
 .t-head {
   display: grid;
-  grid-template-columns: 2fr 2fr 2.5fr 96px;
+  grid-template-columns: 2fr 2fr 2.5fr 120px;
   gap: 0;
   padding: 8px 20px;
   background: var(--tag);
@@ -389,7 +389,7 @@ body {
 }
 .t-row {
   display: grid;
-  grid-template-columns: 2fr 2fr 2.5fr 96px;
+  grid-template-columns: 2fr 2fr 2.5fr 120px;
   gap: 0;
   align-items: center;
   padding: 13px 20px;
@@ -430,7 +430,116 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Zelfde lijn-icoonstijl als premium-maandelijkse-kosten (btn-edit / btn-del) */
+.btn-edit {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.btn-edit:hover {
+  color: var(--crimson);
+}
+.btn-edit svg {
+  width: 13px;
+  height: 13px;
+}
+
+.btn-del {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.btn-del:hover {
+  color: #a12d21;
+}
+.btn-del svg {
+  width: 13px;
+  height: 13px;
+}
+
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 28, 0.48);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1700;
+}
+.confirm-modal-overlay.open {
+  display: flex;
+}
+.confirm-modal {
+  width: min(420px, 100%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  padding: 18px;
+}
+.confirm-modal-text {
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--text-mid);
+}
+.pw-confirm-modal-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.pw-modal-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
   gap: 8px;
+}
+.btn-modal {
+  padding: 7px 12px;
+  border-radius: 4px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.btn-modal-cancel {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mid);
+}
+.btn-modal-save {
+  border: none;
+  background: var(--crimson);
+  color: #fff;
+}
+.btn-modal-save:hover {
+  background: var(--accent-light);
 }
 
 .entry-modal-backdrop {
@@ -643,7 +752,7 @@ body {
   }
   .t-head,
   .t-row {
-    grid-template-columns: 1.4fr 1fr 1.2fr 84px;
+    grid-template-columns: 1.4fr 1fr 1.2fr 100px;
     padding-inline: 14px;
   }
 }
@@ -810,6 +919,17 @@ body {
   </form>
 </div>
 
+<div class="confirm-modal-overlay" id="pw-delete-modal-overlay" aria-hidden="true">
+  <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="pw-delete-modal-title">
+    <div class="pw-confirm-modal-title" id="pw-delete-modal-title">Inlog verwijderen</div>
+    <div class="confirm-modal-text" id="pw-delete-modal-text">Weet je zeker dat je deze inlog wilt verwijderen?</div>
+    <div class="pw-modal-actions">
+      <button class="btn-modal btn-modal-cancel" id="pw-delete-modal-cancel" type="button">Annuleren</button>
+      <button class="btn-modal btn-modal-save" id="pw-delete-modal-confirm" type="button">Verwijderen</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const PIN = '123456';
 let input = '', attempts = 0, blocked = false;
@@ -893,6 +1013,7 @@ document.addEventListener('keydown', (e) => {
 
 function lock() {
   closeEditModal();
+  closeDeleteEntryModal();
   document.getElementById('screen-register').style.display = 'none';
   document.getElementById('screen-pin').style.display = 'flex';
   input = '';
@@ -917,6 +1038,7 @@ let passwordEntriesLoadPromise = null;
 /** @type {'closed' | 'edit' | 'create'} */
 let entryModalMode = 'closed';
 let currentEditEntryId = null;
+let pendingDeleteEntryId = null;
 
 const registerStatusEl = document.getElementById('register-status');
 const searchInputEl = document.getElementById('search');
@@ -931,6 +1053,10 @@ const entryUserEl = document.getElementById('entry-user');
 const entryPasswordEl = document.getElementById('entry-password');
 const entryModalTitleEl = document.getElementById('entry-modal-title');
 const entryModalSubEl = document.getElementById('entry-modal-sub');
+const pwDeleteModalOverlay = document.getElementById('pw-delete-modal-overlay');
+const pwDeleteModalTextEl = document.getElementById('pw-delete-modal-text');
+const pwDeleteModalCancelEl = document.getElementById('pw-delete-modal-cancel');
+const pwDeleteModalConfirmEl = document.getElementById('pw-delete-modal-confirm');
 
 function normalizeString(value) {
   return String(value == null ? '' : value).trim();
@@ -1177,8 +1303,11 @@ function render() {
         </button>
       </div>
       <div class="row-actions">
-        <button class="btn-icon" type="button" onclick="openEditModal(${entry.id})" title="Bewerken" aria-label="Inloggegevens bewerken">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>
+        <button class="btn-edit" type="button" onclick="openEditModal(${entry.id})" title="Bewerken" aria-label="Inloggegevens bewerken">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        </button>
+        <button class="btn-del" type="button" onclick="openDeleteEntryModal(${entry.id})" title="Verwijderen" aria-label="Inloggegevens verwijderen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
         </button>
       </div>
     </div>`;
@@ -1188,6 +1317,52 @@ function render() {
 function toggleVis(id) {
   visible[id] = !visible[id];
   render();
+}
+
+function openDeleteEntryModal(id) {
+  const entry = getEntryById(id);
+  if (!entry) return;
+  pendingDeleteEntryId = entry.id;
+  if (pwDeleteModalTextEl) {
+    pwDeleteModalTextEl.textContent = `Weet je zeker dat je "${entry.naam}" wilt verwijderen?`;
+  }
+  if (pwDeleteModalOverlay) {
+    pwDeleteModalOverlay.classList.add('open');
+    pwDeleteModalOverlay.setAttribute('aria-hidden', 'false');
+  }
+  if (pwDeleteModalConfirmEl) pwDeleteModalConfirmEl.focus();
+}
+
+function closeDeleteEntryModal() {
+  pendingDeleteEntryId = null;
+  if (pwDeleteModalOverlay) {
+    pwDeleteModalOverlay.classList.remove('open');
+    pwDeleteModalOverlay.setAttribute('aria-hidden', 'true');
+  }
+}
+
+async function confirmDeletePasswordEntry() {
+  if (pendingDeleteEntryId == null) return;
+  const id = pendingDeleteEntryId;
+  const entry = getEntryById(id);
+  if (!entry) {
+    closeDeleteEntryModal();
+    return;
+  }
+  const snapshot = entries.slice();
+  entries = entries.filter((e) => Number(e && e.id) !== Number(id));
+  delete visible[id];
+  closeDeleteEntryModal();
+  render();
+  try {
+    await persistPasswordEntries('delete');
+    toast('\u2713 Inlog verwijderd');
+  } catch (_) {
+    entries = snapshot;
+    render();
+    toast('Opslaan mislukt');
+    setRegisterStatus('Opslaan in Supabase mislukt. Probeer het opnieuw.', 'warning');
+  }
 }
 
 function openCreateModal() {
@@ -1297,7 +1472,12 @@ async function saveEntryFromModal(event) {
 }
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !entryModalEl.hidden) {
+  if (event.key !== 'Escape') return;
+  if (pwDeleteModalOverlay && pwDeleteModalOverlay.classList.contains('open')) {
+    closeDeleteEntryModal();
+    return;
+  }
+  if (!entryModalEl.hidden) {
     closeEditModal();
   }
 });
@@ -1306,6 +1486,20 @@ entryModalBackdrop.addEventListener('click', closeEditModal);
 entryModalCloseEl.addEventListener('click', closeEditModal);
 entryCancelEl.addEventListener('click', closeEditModal);
 entryFormEl.addEventListener('submit', saveEntryFromModal);
+
+if (pwDeleteModalOverlay) {
+  pwDeleteModalOverlay.addEventListener('click', (event) => {
+    if (event.target === pwDeleteModalOverlay) closeDeleteEntryModal();
+  });
+}
+if (pwDeleteModalCancelEl) {
+  pwDeleteModalCancelEl.addEventListener('click', closeDeleteEntryModal);
+}
+if (pwDeleteModalConfirmEl) {
+  pwDeleteModalConfirmEl.addEventListener('click', () => {
+    confirmDeletePasswordEntry();
+  });
+}
 
 async function unlockRegister() {
   document.getElementById('screen-pin').style.display = 'none';
