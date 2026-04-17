@@ -67,14 +67,16 @@ body {
   width: min(1260px, 100%);
   margin: 0 auto;
 }
-.monthly-costs-stage {
-  min-height: 420px;
-  transition: opacity .16s ease;
+.monthly-costs-boot-shell {
+  transition: opacity 0.16s ease;
 }
-.monthly-costs-stage.is-booting {
+.monthly-costs-boot-shell.is-booting {
   opacity: 0;
   pointer-events: none;
   user-select: none;
+}
+.monthly-costs-stage {
+  min-height: 420px;
 }
 
 .header {
@@ -534,32 +536,34 @@ body {
   </aside>
   <main class="main-content">
     <div class="page-shell">
-      <div class="header">
-        <div>
-          <div class="logo">SOFTORA.NL</div>
-          <div class="page-title">Maandelijkse Kosten</div>
-          <div class="page-sub">Overzicht van alle vaste lasten</div>
-        </div>
-        <div id="last-updated"></div>
-      </div>
-
-      <div class="monthly-costs-stage is-booting" id="monthly-costs-stage" aria-busy="true">
-        <div class="totals-row">
-          <div class="totaal-card accent">
-            <div class="totaal-label">Totaal per maand</div>
-            <div class="totaal-amount red" id="totaal-maand">...</div>
+      <div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">
+        <div class="header">
+          <div>
+            <div class="logo">SOFTORA.NL</div>
+            <div class="page-title">Maandelijkse Kosten</div>
+            <div class="page-sub">Overzicht van alle vaste lasten</div>
           </div>
-          <div class="totaal-card">
-            <div class="totaal-label">Per jaar</div>
-            <div class="totaal-amount" id="totaal-jaar">...</div>
-          </div>
-          <div class="totaal-card">
-            <div class="totaal-label">Aantal posten</div>
-            <div class="totaal-amount" id="totaal-posten">...</div>
-          </div>
+          <div id="last-updated"></div>
         </div>
 
-        <div id="categories-wrap"></div>
+        <div class="monthly-costs-stage" id="monthly-costs-stage">
+          <div class="totals-row">
+            <div class="totaal-card accent">
+              <div class="totaal-label">Totaal per maand</div>
+              <div class="totaal-amount red" id="totaal-maand">...</div>
+            </div>
+            <div class="totaal-card">
+              <div class="totaal-label">Per jaar</div>
+              <div class="totaal-amount" id="totaal-jaar">...</div>
+            </div>
+            <div class="totaal-card">
+              <div class="totaal-label">Aantal posten</div>
+              <div class="totaal-amount" id="totaal-posten">...</div>
+            </div>
+          </div>
+
+          <div id="categories-wrap"></div>
+        </div>
       </div>
     </div>
   </main>
@@ -778,10 +782,10 @@ function setTotalsLoading() {
 }
 
 function setMonthlyCostsStageBooting(isBooting) {
-  const stage = document.getElementById('monthly-costs-stage');
-  if (!stage) return;
-  stage.classList.toggle('is-booting', Boolean(isBooting));
-  stage.setAttribute('aria-busy', isBooting ? 'true' : 'false');
+  const shell = document.getElementById('monthly-costs-boot-shell');
+  if (!shell) return;
+  shell.classList.toggle('is-booting', Boolean(isBooting));
+  shell.setAttribute('aria-busy', isBooting ? 'true' : 'false');
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
