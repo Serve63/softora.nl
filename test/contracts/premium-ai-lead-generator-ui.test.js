@@ -52,6 +52,10 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /function readColdcallingDashboardBootstrapPayload\(\) \{[\s\S]*softoraColdcallingDashboardBootstrap/);
   assert.match(dashboardSource, /function primeStatsFromBootstrap\(\) \{/);
   assert.match(dashboardSource, /if \(statsResetBaseline\) \{\s*setStatsResetBaselineState\(statsResetBaseline\);\s*\}/);
+  assert.match(
+    dashboardSource,
+    /SoftoraDialogs\.confirm\(message, \{\s*title:\s*'Statistieken resetten'/
+  );
   assert.match(dashboardSource, /primeStatsFromBootstrap\(\);\s*setStatusPill\('idle', ''\);\s*setStatusMessage\('', ''\);\s*activeBusinessMode = await loadSavedStatusPillModeFromSupabase\(\);/);
   assert.match(dashboardSource, /function setLeadSliderReadyState\(isReady\) \{[\s\S]*sliderStage\.dataset\.sliderReady = isReady \? '1' : '0';/);
   assert.match(dashboardSource, /const uiStateLoaded = await loadRemoteUiState\(\);[\s\S]*ensureLeadListPanel\(\);\s*setLeadSliderReadyState\(true\);/);

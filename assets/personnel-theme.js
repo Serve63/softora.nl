@@ -441,7 +441,11 @@
         if (p.indexOf("/premium-wachtwoordenregister") === 0) return "passwords";
         if (p.indexOf("/premium-instellingen") === 0) return "settings";
         if (p.indexOf("/premium-kladblok") === 0) return "notepad";
-        if (p.indexOf("/premium-financiele-kosten") === 0 || p.indexOf("/premium-maandelijkse-kosten") === 0) {
+        if (
+            p.indexOf("/premium-financiele-kosten") === 0 ||
+            p.indexOf("/premium-maandelijkse-kosten") === 0 ||
+            p.indexOf("/premium-vaste-lasten") === 0
+        ) {
             return "monthly_costs";
         }
         if (p.indexOf("/premium-boekhouding") === 0) return "bookkeeping";
@@ -581,9 +585,9 @@
         const extraLinks = filterPremiumSidebarLinksForSession([
             {
                 key: "monthly_costs",
-                href: "/premium-maandelijkse-kosten",
+                href: "/premium-vaste-lasten",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg>',
-                label: "Maandelijkse kosten",
+                label: "Vaste lasten",
             },
             {
                 key: "bookkeeping",

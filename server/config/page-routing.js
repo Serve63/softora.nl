@@ -10,6 +10,7 @@ const defaultLegacyPrettyPageRedirectEntries = Object.freeze([
   ['ai-lead-generator', 'premium-ai-lead-generator'],
   ['seo-crm-system', 'premium-seo-crm-system'],
   ['opdracht-preview', 'premium-opdracht-preview'],
+  ['premium-maandelijkse-kosten', 'premium-vaste-lasten'],
 ]);
 
 const legacyPrettyPageRedirects = new Map(defaultLegacyPrettyPageRedirectEntries);

@@ -29,7 +29,7 @@ const customLayoutPages = [
   'premium-instellingen-personeel.html',
   'premium-klanten.html',
   'premium-mailbox.html',
-  'premium-maandelijkse-kosten.html',
+  'premium-vaste-lasten.html',
   'premium-opdracht-dossier.html',
   'premium-websitegenerator.html',
   'premium-websitepreview.html',

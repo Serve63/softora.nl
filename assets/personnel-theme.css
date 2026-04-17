@@ -1064,7 +1064,7 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
     }
 }
 
-/* Premium shell: inhoud pas tonen na bootstrap (zelfde patroon als maandelijkse kosten) */
+/* Premium shell: inhoud pas tonen na bootstrap (zelfde patroon als vaste lasten) */
 main.is-premium-boot-host {
     position: relative;
     min-height: 100vh;
@@ -1128,6 +1128,13 @@ main.is-premium-boot-host {
 
 .premium-boot-shell {
     transition: opacity 0.16s ease;
+}
+
+/* main met display:flex (o.a. kladblok): anders krimpt deze wrapper tot contentbreedte en blijft ~25% wit. */
+main.is-premium-boot-host > .premium-boot-shell {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
 }
 
 .premium-boot-shell.is-booting {

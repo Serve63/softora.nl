@@ -1731,6 +1731,21 @@
       event.preventDefault();
       event.stopPropagation();
       if (button.disabled) return;
+
+      const message =
+        'Weet je zeker dat je de statistieken wilt resetten? De tellers (zoals Totaal gebeld) worden op nul gezet en dit wordt opgeslagen.';
+      let confirmed = false;
+      if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function') {
+        confirmed = await window.SoftoraDialogs.confirm(message, {
+          title: 'Statistieken resetten',
+          confirmText: 'Resetten',
+          cancelText: 'Annuleren',
+        });
+      } else {
+        confirmed = window.confirm(message);
+      }
+      if (!confirmed) return;
+
       button.disabled = true;
       button.style.opacity = '0.7';
       button.style.cursor = 'progress';
