@@ -96,6 +96,17 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   );
 });
 
+test('premium agenda handmatige locatie kan Google Places autocomplete gebruiken', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /id="manualAppointmentLocationPlacesHint"/);
+  assert.match(pageSource, /function getAgendaGoogleMapsKey\(\)/);
+  assert.match(pageSource, /function ensureAgendaPlacesReady\(\)/);
+  assert.match(pageSource, /googleMapsPlacesKey/);
+  assert.match(pageSource, /\.pac-container\s*\{\s*z-index:\s*10050/);
+});
+
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');

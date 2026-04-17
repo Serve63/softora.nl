@@ -7,6 +7,8 @@ function createAgendaPageBootstrapService(deps = {}) {
     getGeneratedAgendaAppointments = () => [],
     isGeneratedAppointmentVisibleForAgenda = () => true,
     compareAgendaAppointments = () => 0,
+    getGoogleMapsPlacesBrowserKey = () =>
+      String(process.env.GOOGLE_MAPS_PLACES_BROWSER_KEY || process.env.GOOGLE_MAPS_API_KEY || '').trim(),
   } = deps;
 
   async function buildAgendaBootstrapPayload(options = {}) {
@@ -32,10 +34,13 @@ function createAgendaPageBootstrapService(deps = {}) {
       .sort(compareAgendaAppointments)
       .slice(0, limit);
 
+    const googleMapsPlacesKey = getGoogleMapsPlacesBrowserKey();
+
     return {
       ok: true,
       loadedAt: new Date().toISOString(),
       appointments,
+      ...(googleMapsPlacesKey ? { googleMapsPlacesKey } : {}),
     };
   }
 

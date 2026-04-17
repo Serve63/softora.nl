@@ -35,6 +35,23 @@ test('agenda page bootstrap service returns visible sorted appointments and hydr
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
 });
 
+test('agenda page bootstrap voegt googleMapsPlacesKey toe wanneer geconfigureerd', async () => {
+  const service = createAgendaPageBootstrapService({
+    isSupabaseConfigured: () => false,
+    getSupabaseStateHydrated: () => true,
+    forceHydrateRuntimeStateWithRetries: async () => {},
+    syncRuntimeStateFromSupabaseIfNewer: async () => false,
+    getGeneratedAgendaAppointments: () => [],
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+    compareAgendaAppointments: () => 0,
+    getGoogleMapsPlacesBrowserKey: () => 'test-browser-key',
+  });
+
+  const payload = await service.buildAgendaBootstrapPayload({ limit: 5 });
+
+  assert.equal(payload.googleMapsPlacesKey, 'test-browser-key');
+});
+
 test('agenda page bootstrap service skips hydration when supabase state is already warm', async () => {
   let hydrated = false;
 

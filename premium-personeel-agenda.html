@@ -312,6 +312,9 @@
         }
         .modal-overlay.show .modal { transform: translateY(0); }
 
+        /* Google Places suggesties boven handmatige afspraak-modal (z-index modal = 5000) */
+        .pac-container { z-index: 10050 !important; }
+
         .modal-top {
             padding: 1.35rem 1.5rem 0;
             display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
@@ -1094,6 +1097,7 @@
                 <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Locatie</div>
                     <input type="text" class="modal-workspace-input" id="manualAppointmentLocation" placeholder="Adres of locatie bij de prospect" maxlength="220" autocomplete="off">
+                    <div class="modal-workspace-hint" id="manualAppointmentLocationPlacesHint" hidden>Typ en kies een adres uit de Google-suggesties. Alleen zo weet je zeker dat de locatie bestaat.</div>
                 </div>
                 <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Activiteit</div>
@@ -1233,6 +1237,10 @@
     const agendaBootstrapPayload = readAgendaBootstrapPayload();
     const appointments = [];
 
+    function getAgendaGoogleMapsKey() {
+        return String(agendaBootstrapPayload && agendaBootstrapPayload.googleMapsPlacesKey || '').trim();
+    }
+
     // State
     let currentDate = new Date();
     const today = new Date();
@@ -1256,9 +1264,14 @@
     const manualAppointmentCloseBtn = document.getElementById('manualAppointmentCloseBtn');
     const manualAppointmentCancelBtn = document.getElementById('manualAppointmentCancelBtn');
     const manualAppointmentSubmitBtn = document.getElementById('manualAppointmentSubmitBtn');
+    const manualAppointmentLocationPlacesHint = document.getElementById('manualAppointmentLocationPlacesHint');
     const calendarGridEl = document.getElementById('calendarGrid');
     let manualAppointmentSelectedDate = '';
     let manualAppointmentSaving = false;
+    let manualAppointmentLocationPlaceConfirmed = false;
+    let agendaPlacesAutocompleteBound = false;
+    let agendaPlacesLoadAborted = false;
+    let programmaticManualLocationUpdate = false;
     const modalAudioBlock = document.getElementById('modalAudioBlock');
     const modalAudioPlayer = document.getElementById('modalAudioPlayer');
     const modalAudioEmpty = document.getElementById('modalAudioEmpty');
@@ -1766,6 +1779,116 @@
         return h * 60 + mins;
     }
 
+    function loadGoogleMapsPlaces(apiKey) {
+        return new Promise(function (resolve, reject) {
+            if (window.google && window.google.maps && window.google.maps.places) {
+                resolve(window.google.maps);
+                return;
+            }
+            var existing = document.getElementById('softoraGoogleMapsPlacesScript');
+            if (existing) {
+                var deadline = Date.now() + 15000;
+                (function wait() {
+                    if (window.google && window.google.maps && window.google.maps.places) {
+                        resolve(window.google.maps);
+                    } else if (Date.now() > deadline) {
+                        reject(new Error('Google Maps time-out'));
+                    } else {
+                        setTimeout(wait, 50);
+                    }
+                })();
+                return;
+            }
+            var cbName = 'softoraAgendaPlacesCb_' + String(Date.now());
+            window[cbName] = function () {
+                try {
+                    delete window[cbName];
+                } catch (_) { /* ignore */ }
+                if (window.google && window.google.maps && window.google.maps.places) {
+                    resolve(window.google.maps);
+                } else {
+                    reject(new Error('Google Maps niet geladen'));
+                }
+            };
+            var script = document.createElement('script');
+            script.id = 'softoraGoogleMapsPlacesScript';
+            script.async = true;
+            script.defer = true;
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(apiKey) + '&libraries=places&callback=' + cbName;
+            script.onerror = function () {
+                try {
+                    delete window[cbName];
+                } catch (_) { /* ignore */ }
+                try {
+                    script.remove();
+                } catch (_) { /* ignore */ }
+                reject(new Error('Google Maps script geweigerd'));
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    function ensureAgendaPlacesReady() {
+        return new Promise(function (resolve) {
+            var key = getAgendaGoogleMapsKey();
+            if (!key || !manualAppointmentLocationEl || agendaPlacesLoadAborted) {
+                resolve();
+                return;
+            }
+            if (agendaPlacesAutocompleteBound) {
+                resolve();
+                return;
+            }
+            loadGoogleMapsPlaces(key)
+                .then(function () {
+                    if (!manualAppointmentLocationEl || agendaPlacesAutocompleteBound) {
+                        resolve();
+                        return;
+                    }
+                    var AutocompleteCtor = window.google.maps.places.Autocomplete;
+                    if (typeof AutocompleteCtor !== 'function') {
+                        resolve();
+                        return;
+                    }
+                    var autocomplete = new AutocompleteCtor(manualAppointmentLocationEl, {
+                        fields: ['formatted_address', 'place_id', 'geometry', 'name'],
+                    });
+                    autocomplete.addListener('place_changed', function () {
+                        var place = autocomplete.getPlace();
+                        if (!place || !place.geometry || !manualAppointmentLocationEl) {
+                            manualAppointmentLocationPlaceConfirmed = false;
+                            return;
+                        }
+                        var label = String(place.formatted_address || place.name || '').trim();
+                        if (!label) {
+                            manualAppointmentLocationPlaceConfirmed = false;
+                            return;
+                        }
+                        programmaticManualLocationUpdate = true;
+                        manualAppointmentLocationEl.value = label.slice(0, 220);
+                        manualAppointmentLocationEl.dataset.placeId = String(place.place_id || '').trim();
+                        manualAppointmentLocationPlaceConfirmed = true;
+                        window.requestAnimationFrame(function () {
+                            programmaticManualLocationUpdate = false;
+                        });
+                    });
+                    manualAppointmentLocationEl.addEventListener('input', function () {
+                        if (programmaticManualLocationUpdate) return;
+                        manualAppointmentLocationPlaceConfirmed = false;
+                        manualAppointmentLocationEl.dataset.placeId = '';
+                    });
+                    agendaPlacesAutocompleteBound = true;
+                    resolve();
+                })
+                .catch(function () {
+                    agendaPlacesLoadAborted = true;
+                    manualAppointmentLocationPlaceConfirmed = true;
+                    if (manualAppointmentLocationPlacesHint) manualAppointmentLocationPlacesHint.hidden = true;
+                    resolve();
+                });
+        });
+    }
+
     function isManualAppointmentTimeAllowed(timeStr) {
         const total = parseManualTimeToMinutes(timeStr);
         if (total === null) return false;
@@ -1783,12 +1906,22 @@
         manualAppointmentSelectedDate = String(dateYmd || '').trim();
         manualAppointmentDateLine.textContent = formatAgendaDateLongNl(manualAppointmentSelectedDate);
         if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '10:00';
-        if (manualAppointmentLocationEl) manualAppointmentLocationEl.value = '';
+        if (manualAppointmentLocationEl) {
+            manualAppointmentLocationEl.value = '';
+            manualAppointmentLocationEl.dataset.placeId = '';
+        }
+        manualAppointmentLocationPlaceConfirmed = !getAgendaGoogleMapsKey();
+        if (manualAppointmentLocationPlacesHint) {
+            manualAppointmentLocationPlacesHint.hidden = !getAgendaGoogleMapsKey();
+        }
         if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
         if (manualAppointmentAvailableAgainEl) manualAppointmentAvailableAgainEl.value = '';
         setManualAppointmentStatus('');
         manualAppointmentOverlay.classList.add('show');
         manualAppointmentOverlay.setAttribute('aria-hidden', 'false');
+        window.setTimeout(function () {
+            void ensureAgendaPlacesReady();
+        }, 0);
         window.setTimeout(() => {
             if (manualAppointmentTimeEl) manualAppointmentTimeEl.focus();
         }, 30);
@@ -1821,6 +1954,13 @@
         }
         if (!location) {
             setManualAppointmentStatus('Vul een locatie in.', 'error');
+            return;
+        }
+        if (getAgendaGoogleMapsKey() && !manualAppointmentLocationPlaceConfirmed) {
+            setManualAppointmentStatus(
+                'Kies een bestaand adres uit de Google-suggesties (klik een voorstel aan).',
+                'error'
+            );
             return;
         }
         if (!activity) {
