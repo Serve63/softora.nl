@@ -325,12 +325,29 @@
                 void save();
             });
 
+            function finishPremiumBootShell() {
+                if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+                    window.SoftoraPremiumBoot.setShellBooting(false);
+                    return;
+                }
+                var main = document.querySelector('main.is-premium-boot-host');
+                if (!main) return;
+                var shell = main.querySelector('.premium-boot-shell');
+                var loader = main.querySelector('.premium-boot-loader');
+                if (shell) {
+                    shell.classList.remove('is-booting');
+                    shell.setAttribute('aria-busy', 'false');
+                }
+                if (loader) loader.classList.add('is-hidden');
+            }
+
             void (async function () {
                 try {
                     await loadInitialValue();
                 } finally {
-                    if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-                        window.SoftoraPremiumBoot.setShellBooting(false);
+                    finishPremiumBootShell();
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', finishPremiumBootShell, { once: true });
                     }
                 }
             })();
