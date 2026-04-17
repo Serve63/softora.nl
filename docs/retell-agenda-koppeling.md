@@ -1,19 +1,14 @@
 # Retell AI Agenda Koppeling
 
-Deze koppeling laat een Retell-agent:
+Deze koppeling laat een Retell-agent vrije plekken in de Softora-agenda controleren. **Inplannen via Retell gebeurt niet meer:** afspraken vastleggen doe je in het dashboard of via je bestaande workflow buiten deze HTTP-functie.
 
-1. vrije plekken in de Softora-agenda controleren
-2. een afspraak direct in de agenda zetten
-
-De backend-routes zijn:
+De backend-route is:
 
 - `POST /api/retell/functions/agenda/availability`
-- `POST /api/retell/functions/agenda/book`
 
 Gebruik altijd je publieke basis-URL ervoor, bijvoorbeeld:
 
 - `https://jouwdomein.nl/api/retell/functions/agenda/availability`
-- `https://jouwdomein.nl/api/retell/functions/agenda/book`
 
 ## Belangrijk in Retell
 
@@ -22,7 +17,7 @@ Gebruik altijd je publieke basis-URL ervoor, bijvoorbeeld:
 - Laat Retell de standaard `X-Retell-Signature` meesturen.
 - Als je handmatig wilt testen, kun je ook `Authorization: Bearer <WEBHOOK_SECRET>` gebruiken als `WEBHOOK_SECRET` op de server staat.
 
-## Functie 1: Agenda Beschikbaarheid
+## Custom function: agenda beschikbaarheid
 
 Maak in Retell een custom function aan:
 
@@ -75,75 +70,6 @@ Retell krijgt terug:
 - `availableSlots`
 - `message`
 
-## Functie 2: Afspraak Inboeken
-
-Maak in Retell een tweede custom function aan:
-
-- Naam: `book_softora_appointment`
-- Methode: `POST`
-- URL: `https://jouwdomein.nl/api/retell/functions/agenda/book`
-
-Parameter schema:
-
-```json
-{
-  "type": "object",
-  "required": ["date", "time", "location"],
-  "properties": {
-    "date": {
-      "type": "string",
-      "description": "Afspraakdatum in YYYY-MM-DD formaat"
-    },
-    "time": {
-      "type": "string",
-      "description": "Afspraaktijd in HH:MM formaat"
-    },
-    "location": {
-      "type": "string",
-      "description": "Adres of locatie van de afspraak"
-    },
-    "company": {
-      "type": "string",
-      "description": "Bedrijfsnaam van de prospect"
-    },
-    "contact": {
-      "type": "string",
-      "description": "Naam van de contactpersoon"
-    },
-    "phone": {
-      "type": "string",
-      "description": "Telefoonnummer van de prospect"
-    },
-    "contactEmail": {
-      "type": "string",
-      "description": "E-mailadres van de prospect"
-    },
-    "branche": {
-      "type": "string",
-      "description": "Branche of sector"
-    },
-    "summary": {
-      "type": "string",
-      "description": "Korte samenvatting van de afspraak"
-    },
-    "whatsappInfo": {
-      "type": "string",
-      "description": "Extra notities voor route of bevestiging"
-    },
-    "whatsappConfirmed": {
-      "type": "boolean",
-      "description": "Of WhatsApp-bevestiging al besproken is"
-    },
-    "timezone": {
-      "type": "string",
-      "description": "Tijdzone van de afspraak, standaard Europe/Amsterdam"
-    }
-  }
-}
-```
-
-De route gebruikt automatisch de `call.call_id` van Retell om de afspraak aan de juiste call te koppelen.
-
 ## Prompt-aanvulling voor je agent
 
 Zet iets in deze richting in je agent-instructie:
@@ -151,12 +77,12 @@ Zet iets in deze richting in je agent-instructie:
 ```text
 Als de prospect een datum of tijd noemt, controleer eerst de agenda met `check_softora_agenda`.
 
-Boek een afspraak pas als je datum, tijd en locatie expliciet hebt bevestigd.
-
 Als het gekozen moment bezet is, geef maximaal 2 concrete alternatieven uit de functie terug.
 
-Gebruik daarna `book_softora_appointment` om de afspraak definitief in te plannen.
+Leg de afspraak vast in Softora zoals jullie dat normaal doen (dashboard of interne flow); deze server-endpoint boekt niet automatisch in.
 ```
+
+Verwijder in Retell eventuele oude custom function `book_softora_appointment` en bijbehorende URL’s; die route bestaat niet meer.
 
 ## Handige standaard voor de eerste versie
 
@@ -169,12 +95,12 @@ Gebruik daarna `book_softora_appointment` om de afspraak definitief in te planne
 Wel:
 
 - bestaande agenda-afspraken controleren
-- conflicten op exact dezelfde datum en tijd blokkeren
+- conflicten op exact dezelfde datum en tijd signaleren
 - alternatieve slots teruggeven
-- afspraak direct in Softora opslaan
 
 Nog niet:
 
+- afspraken via Retell wegschrijven naar de agenda
 - reistijd tussen afspraken berekenen
 - verschillende afspraakduren per type afspraak
 - meerdere agenda's of medewerkers apart plannen

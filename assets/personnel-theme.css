@@ -1064,7 +1064,7 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
     }
 }
 
-/* Premium shell: inhoud pas tonen na bootstrap (zelfde patroon als vaste lasten) */
+/* Premium shell: inhoud pas tonen na bootstrap (zelfde patroon als terugkerende kosten) */
 main.is-premium-boot-host {
     position: relative;
     min-height: 100vh;

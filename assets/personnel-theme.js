@@ -587,7 +587,7 @@
                 key: "monthly_costs",
                 href: "/premium-vaste-lasten",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg>',
-                label: "Vaste lasten",
+                label: "Terugkerende kosten",
             },
             {
                 key: "bookkeeping",

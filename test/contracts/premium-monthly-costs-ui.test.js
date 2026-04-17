@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-test('premium vaste lasten gebruikt dashboard-typografie en verbergt legacy kostenblokken', () => {
+test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt legacy kostenblokken', () => {
   const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -49,7 +49,7 @@ test('premium vaste lasten gebruikt dashboard-typografie en verbergt legacy kost
   assert.match(pageSource, /\.add-inputs input, \.add-inputs select\s*\{[\s\S]*font-size:\s*0\.86rem;/);
 });
 
-test('premium vaste lasten gebruikt modals en delegated acties voor bewerken en verwijderen', () => {
+test('premium terugkerende kosten gebruikt modals en delegated acties voor bewerken en verwijderen', () => {
   const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -74,7 +74,7 @@ test('premium vaste lasten gebruikt modals en delegated acties voor bewerken en 
   assert.match(pageSource, /function editItem\(cat, id\) \{[\s\S]*edit-modal-overlay[\s\S]*document\.getElementById\('edit-naam'\)\.focus\(\);/s);
 });
 
-test('premium vaste lasten toont coldcalling en coldmailing bovenaan met paarse stippelrand', () => {
+test('premium terugkerende kosten toont coldcalling en coldmailing bovenaan met paarse stippelrand', () => {
   const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -100,7 +100,7 @@ test('premium vaste lasten toont coldcalling en coldmailing bovenaan met paarse 
   assert.match(pageSource, /<div class="\$\{amountWrapClassName\}">[\s\S]*<div class="cost-amount">\$\{fmtEur\(item\.bedrag\)\}<\/div>[\s\S]*\$\{rowActionsMarkup\}/);
 });
 
-test('premium vaste lasten bewaart bewerkbare posten via supabase ui-state', () => {
+test('premium terugkerende kosten bewaart bewerkbare posten via supabase ui-state', () => {
   const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -127,7 +127,7 @@ test('premium vaste lasten bewaart bewerkbare posten via supabase ui-state', () 
   assert.match(pageSource, /void bootstrapMonthlyCostsPage\(\);/);
 });
 
-test('premium vaste lasten laadt dynamische coldcalling kosten van deze maand', () => {
+test('premium terugkerende kosten laadt dynamische coldcalling kosten van deze maand', () => {
   const scriptPath = path.join(__dirname, '../../assets/premium-monthly-costs-dynamic.js');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
 

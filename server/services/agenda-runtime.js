@@ -440,31 +440,9 @@ function createAgendaRuntime(deps = {}) {
     getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
     isGeneratedAppointmentVisibleForAgenda,
     compareAgendaAppointments,
-    getGeneratedAppointmentIndexById,
-    setGeneratedAgendaAppointmentAtIndex,
-    upsertGeneratedAgendaAppointment,
-    buildLeadToAgendaSummary,
-    getLatestCallUpdateByCallId,
-    aiCallInsightsByCallId,
     normalizeString,
     normalizeDateYyyyMmDd,
     normalizeTimeHhMm,
-    sanitizeAppointmentLocation,
-    sanitizeAppointmentWhatsappInfo,
-    normalizeEmailAddress,
-    toBooleanSafe,
-    normalizeColdcallingStack,
-    getColdcallingStackLabel,
-    buildLeadOwnerFields,
-    resolveAppointmentLocation,
-    resolveCallDurationSeconds,
-    resolvePreferredRecordingUrl,
-    formatEuroLabel,
-    appendDashboardActivity,
-    buildRuntimeStateSnapshotPayload,
-    applyRuntimeStateSnapshotPayload,
-    waitForQueuedRuntimeSnapshotPersist,
-    invalidateSupabaseSyncTimestamp,
   });
 
   async function buildRuntimeHtmlPageBootstrapData(_req, fileName) {
@@ -519,8 +497,6 @@ function createAgendaRuntime(deps = {}) {
         agendaRetellCoordinator.ensureRetellAgendaRequestAuthorized,
       sendRetellAgendaAvailabilityResponse:
         agendaRetellCoordinator.sendRetellAgendaAvailabilityResponse,
-      bookRetellAgendaAppointmentResponse:
-        agendaRetellCoordinator.bookRetellAgendaAppointmentResponse,
     },
     readRouteDeps: {
       readCoordinator: agendaReadCoordinator,

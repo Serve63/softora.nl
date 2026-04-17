@@ -11,10 +11,8 @@ const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/twilio/status',
   '/api/retell/webhook',
   '/api/retell/functions/agenda/availability',
-  '/api/retell/functions/agenda/book',
   '/retell/webhook',
   '/retell/functions/agenda/availability',
-  '/retell/functions/agenda/book',
 ]);
 const PREMIUM_PUBLIC_API_PREFIXES = Object.freeze([
   '/api/retell/functions/agenda/',

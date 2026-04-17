@@ -8,10 +8,8 @@ const SAME_ORIGIN_PROTECTION_EXEMPT_PATHS = new Set([
   '/api/twilio/status',
   '/api/retell/webhook',
   '/api/retell/functions/agenda/availability',
-  '/api/retell/functions/agenda/book',
   '/retell/webhook',
   '/retell/functions/agenda/availability',
-  '/retell/functions/agenda/book',
 ]);
 const SAME_ORIGIN_PROTECTION_EXEMPT_PREFIXES = Object.freeze([
   '/api/retell/functions/agenda/',

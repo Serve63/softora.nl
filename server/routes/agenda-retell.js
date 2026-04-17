@@ -1,7 +1,4 @@
-const {
-  validateRetellAgendaAvailabilityRequest,
-  validateRetellAgendaBookingRequest,
-} = require('../schemas/agenda-retell');
+const { validateRetellAgendaAvailabilityRequest } = require('../schemas/agenda-retell');
 const { applyValidation } = require('./validation');
 
 function withRetellAuthAndValidation(deps, validator, handler) {
@@ -28,12 +25,6 @@ function registerAgendaRetellRoutes(app, deps) {
     )
   );
 
-  app.post(
-    '/api/retell/functions/agenda/book',
-    withRetellAuthAndValidation(deps, validateRetellAgendaBookingRequest, (req, res) =>
-      deps.bookRetellAgendaAppointmentResponse(req, res)
-    )
-  );
 }
 
 module.exports = {
