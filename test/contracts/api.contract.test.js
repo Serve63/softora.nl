@@ -440,6 +440,17 @@ test('coldcalling endpoints keep their contract boundaries', async () => {
     assert.ok(Array.isArray(updatesResult.body.updates));
   }
 
+  const costSummaryResult = await getJson('/api/coldcalling/cost-summary?scope=all_time');
+  assert.ok([200, 401, 503].includes(costSummaryResult.response.status));
+  if (costSummaryResult.response.status === 200) {
+    assert.equal(costSummaryResult.body.ok, true);
+    assert.equal(costSummaryResult.body.scope, 'all_time');
+    assert.equal(typeof costSummaryResult.body.summary, 'object');
+    assert.equal(typeof costSummaryResult.body.summary.costEur, 'number');
+  } else {
+    assert.equal(costSummaryResult.body.ok, false);
+  }
+
   const missingCallIdResult = await getJson('/api/coldcalling/call-detail');
   assert.ok([400, 401, 503].includes(missingCallIdResult.response.status));
   assert.equal(missingCallIdResult.body.ok, false);

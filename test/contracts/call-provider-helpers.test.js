@@ -167,6 +167,42 @@ test('call provider helpers fetch batched Retell calls for cost backfill', async
   assert.deepEqual(result.data, [{ call_id: 'call_123' }]);
 });
 
+test('call provider helpers list Retell calls with filter and pagination', async () => {
+  let capturedCall = null;
+  const helpers = createHelpers({
+    fetchJsonWithTimeout: async (url, options) => {
+      capturedCall = {
+        url: url.toString(),
+        method: options?.method || 'GET',
+        auth: options?.headers?.Authorization || '',
+        body: JSON.parse(options?.body || '{}'),
+      };
+      return {
+        response: { ok: true, status: 200 },
+        data: [{ call_id: 'call_999' }],
+      };
+    },
+  });
+
+  const result = await helpers.listRetellCalls({
+    filterCriteria: {
+      direction: ['outbound'],
+    },
+    sortOrder: 'ascending',
+    limit: 1200,
+    paginationKey: 'call_prev',
+  });
+
+  assert.equal(capturedCall.url, 'https://retell.example/v2/v2/list-calls');
+  assert.equal(capturedCall.method, 'POST');
+  assert.equal(capturedCall.auth, 'Bearer retell-token');
+  assert.deepEqual(capturedCall.body.filter_criteria, { direction: ['outbound'] });
+  assert.equal(capturedCall.body.sort_order, 'ascending');
+  assert.equal(capturedCall.body.limit, 1000);
+  assert.equal(capturedCall.body.pagination_key, 'call_prev');
+  assert.deepEqual(result.data, [{ call_id: 'call_999' }]);
+});
+
 test('call provider helpers normalize recording references and choose preferred recordings', () => {
   const helpers = createHelpers();
 
@@ -269,6 +305,23 @@ test('call provider helpers extract stable retell and twilio call updates', () =
   assert.equal(retellUpdate.costUsdMilli, 498);
   assert.equal(retellUpdate.costUsd, 0.498);
   assert.match(retellUpdate.transcriptSnippet, /Klant wil graag/);
+
+  const retellFloatCostUpdate = helpers.extractCallUpdateFromRetellPayload({
+    event: 'call_ended',
+    call: {
+      call_id: 'call_float',
+      call_status: 'ended',
+      duration_ms: 60000,
+      start_timestamp: 1_700_000_000,
+      end_timestamp: 1_700_000_060,
+      call_cost: {
+        combined_cost: 0.498,
+      },
+    },
+  });
+
+  assert.equal(retellFloatCostUpdate.costUsdMilli, 498);
+  assert.equal(retellFloatCostUpdate.costUsd, 0.498);
 
   const twilioUpdate = helpers.extractCallUpdateFromTwilioPayload(
     {

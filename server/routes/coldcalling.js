@@ -1,5 +1,10 @@
 const express = require('express');
 
+const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
+const DEFAULT_USD_TO_EUR_RATE = 0.92;
+const RETELL_COST_SUMMARY_CACHE_MS = 12000;
+const retellCostSummaryCacheByScope = new Map();
+
 function hasKnownRetellCost(update) {
   const costUsdMilli = Number(update?.costUsdMilli ?? update?.cost_usd_milli);
   if (Number.isFinite(costUsdMilli) && costUsdMilli >= 0) return true;
@@ -13,6 +18,124 @@ function extractRetellCallsFromListResponse(data) {
   if (Array.isArray(data?.calls)) return data.calls;
   if (Array.isArray(data?.items)) return data.items;
   return [];
+}
+
+function normalizeRetellCostSummaryScope(value) {
+  return String(value || '').trim().toLowerCase() === 'month' ? 'month' : 'all_time';
+}
+
+function getRetellCostSummaryMonthStartMs(nowMs = Date.now()) {
+  const now = new Date(Number(nowMs) || Date.now());
+  return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+}
+
+function convertUsdToEur(amountUsd) {
+  return Math.max(0, Number(amountUsd) || 0) * DEFAULT_USD_TO_EUR_RATE;
+}
+
+function getRetellEstimatedCostUsdFromDurationSeconds(durationSeconds) {
+  const safeDurationSeconds = Math.max(0, Math.round(Number(durationSeconds) || 0));
+  if (safeDurationSeconds <= 0) return 0;
+  return (safeDurationSeconds / 60) * DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD;
+}
+
+async function buildRetellCostSummary(deps, scope, options = {}) {
+  const normalizedScope = normalizeRetellCostSummaryScope(scope);
+  const nowMs = Math.max(0, Number(options?.nowMs) || Date.now());
+  const force = Boolean(options?.force);
+  const cached = retellCostSummaryCacheByScope.get(normalizedScope);
+  if (
+    !force &&
+    cached &&
+    Number.isFinite(Number(cached.cachedAtMs)) &&
+    nowMs - Number(cached.cachedAtMs) < RETELL_COST_SUMMARY_CACHE_MS
+  ) {
+    return cached.summary;
+  }
+
+  const lowerThresholdMs =
+    normalizedScope === 'month' ? getRetellCostSummaryMonthStartMs(nowMs) : null;
+  const filterCriteria = {
+    call_type: ['phone_call'],
+    direction: ['outbound'],
+    call_status: ['ended', 'not_connected', 'error'],
+  };
+  if (Number.isFinite(lowerThresholdMs) && lowerThresholdMs > 0) {
+    filterCriteria.start_timestamp = {
+      lower_threshold: lowerThresholdMs,
+    };
+  }
+
+  let paginationKey = '';
+  let totalCostUsd = 0;
+  let totalDurationSeconds = 0;
+  let callCount = 0;
+  let exactCostCount = 0;
+  let estimatedCostCount = 0;
+
+  for (let pageIndex = 0; pageIndex < 25; pageIndex += 1) {
+    const { data } = await deps.listRetellCalls({
+      filterCriteria,
+      sortOrder: 'descending',
+      limit: 1000,
+      paginationKey,
+    });
+    const calls = extractRetellCallsFromListResponse(data);
+    if (!calls.length) break;
+
+    calls.forEach((call) => {
+      if (!call || typeof call !== 'object') return;
+
+      const status = deps.normalizeString(call?.call_status || call?.status || '').toLowerCase();
+      if (!status || status === 'registered' || status === 'ongoing') return;
+
+      const durationSeconds =
+        Number.isFinite(Number(call?.duration_ms)) && Number(call.duration_ms) > 0
+          ? Math.max(1, Math.round(Number(call.duration_ms) / 1000))
+          : 0;
+      const resolvedCost =
+        typeof deps.resolveRetellCallCostFields === 'function'
+          ? deps.resolveRetellCallCostFields(call)
+          : { costUsd: null, costUsdMilli: null };
+      const exactCostUsd = Number(resolvedCost?.costUsd);
+
+      callCount += 1;
+      totalDurationSeconds += durationSeconds;
+
+      if (Number.isFinite(exactCostUsd) && exactCostUsd >= 0) {
+        totalCostUsd += exactCostUsd;
+        exactCostCount += 1;
+        return;
+      }
+
+      totalCostUsd += getRetellEstimatedCostUsdFromDurationSeconds(durationSeconds);
+      estimatedCostCount += 1;
+    });
+
+    const nextPaginationKey = deps.normalizeString(
+      calls[calls.length - 1]?.call_id || calls[calls.length - 1]?.callId || ''
+    );
+    if (calls.length < 1000 || !nextPaginationKey) break;
+    paginationKey = nextPaginationKey;
+  }
+
+  const summary = {
+    scope: normalizedScope,
+    callCount,
+    totalDurationSeconds,
+    exactCostCount,
+    estimatedCostCount,
+    costUsd: Math.round(totalCostUsd * 1000) / 1000,
+    costUsdMilli: Math.max(0, Math.round(totalCostUsd * 1000)),
+    costEur: Math.round(convertUsdToEur(totalCostUsd) * 100) / 100,
+  };
+
+  retellCostSummaryCacheByScope.set(normalizedScope, {
+    cachedAtMs: nowMs,
+    summary,
+  });
+
+  return summary;
 }
 
 function createSendColdcallingStatusResponse(deps) {
@@ -508,6 +631,40 @@ function registerColdcallingRoutes(app, deps) {
       count: Math.min(limit, filtered.length),
       updates: filtered.slice(0, limit),
     });
+  });
+
+  app.get('/api/coldcalling/cost-summary', async (req, res) => {
+    const scope = normalizeRetellCostSummaryScope(req.query?.scope);
+    if (!deps.hasRetellApiKey()) {
+      return res.status(503).json({
+        ok: false,
+        error: 'RETELL_API_KEY ontbreekt op server.',
+      });
+    }
+
+    if (typeof deps.listRetellCalls !== 'function') {
+      return res.status(503).json({
+        ok: false,
+        error: 'Retell cost summary helper is niet beschikbaar.',
+      });
+    }
+
+    try {
+      const summary = await buildRetellCostSummary(deps, scope);
+      return res.status(200).json({
+        ok: true,
+        scope,
+        source: 'retell',
+        summary,
+      });
+    } catch (error) {
+      return res.status(Number(error?.status || 502)).json({
+        ok: false,
+        error: error?.message || 'Retell cost summary ophalen mislukt.',
+        endpoint: error?.endpoint || null,
+        details: error?.data || null,
+      });
+    }
   });
 
   app.get('/api/coldcalling/call-detail', async (req, res) => {

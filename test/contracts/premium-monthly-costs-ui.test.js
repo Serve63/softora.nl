@@ -81,11 +81,12 @@ test('premium maandelijkse kosten laadt dynamische coldcalling kosten van deze m
   const scriptPath = path.join(__dirname, '../../assets/premium-monthly-costs-dynamic.js');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
 
-  assert.match(scriptSource, /const CALL_UPDATES_ENDPOINT = '\/api\/coldcalling\/call-updates\?limit=500';/);
-  assert.match(scriptSource, /function isCurrentMonthCall\(item\)/);
-  assert.match(scriptSource, /function buildCurrentMonthRetellCostEur\(updates\)/);
+  assert.match(scriptSource, /const COST_SUMMARY_ENDPOINT = '\/api\/coldcalling\/cost-summary\?scope=month';/);
+  assert.match(scriptSource, /async function fetchMonthlyCostSummary\(\)/);
   assert.match(scriptSource, /function applyColdcallingCost\(amountEur\)/);
   assert.match(scriptSource, /normalizeSearchText\(item && item\.naam\) === 'coldcalling'/);
+  assert.match(scriptSource, /const summary = await fetchMonthlyCostSummary\(\);/);
+  assert.match(scriptSource, /const amountEur = Number\(summary\.costEur \|\| 0\) \|\| 0;/);
   assert.match(scriptSource, /window\.refreshMonthlyColdcallingCosts = refreshMonthlyColdcallingCosts;/);
   assert.match(
     scriptSource,

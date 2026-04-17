@@ -371,23 +371,25 @@ function createCallProviderHelpers(options = {}) {
     return { endpoint, data };
   }
 
-  async function fetchRetellCallsByIds(callIds) {
-    const normalizedCallIds = Array.from(
-      new Set(
-        (Array.isArray(callIds) ? callIds : [])
-          .map((value) => normalizeString(value))
-          .filter(Boolean)
-      )
-    ).slice(0, 1000);
-
-    if (normalizedCallIds.length === 0) {
-      return {
-        endpoint: '/v2/list-calls',
-        data: [],
-      };
-    }
+  async function listRetellCalls(options = {}) {
+    const filterCriteria =
+      options?.filterCriteria && typeof options.filterCriteria === 'object'
+        ? options.filterCriteria
+        : {};
+    const sortOrder = normalizeString(options?.sortOrder || 'descending').toLowerCase() || 'descending';
+    const limit = Math.max(1, Math.min(1000, parseIntSafe(options?.limit, 50) || 50));
+    const paginationKey = normalizeString(options?.paginationKey || '');
 
     const endpoint = '/v2/list-calls';
+    const requestBody = {
+      filter_criteria: filterCriteria,
+      sort_order: sortOrder === 'ascending' ? 'ascending' : 'descending',
+      limit,
+    };
+    if (paginationKey) {
+      requestBody.pagination_key = paginationKey;
+    }
+
     const { response, data } = await fetchJsonWithTimeout(
       buildRetellApiUrl(endpoint),
       {
@@ -396,13 +398,7 @@ function createCallProviderHelpers(options = {}) {
           Authorization: `Bearer ${env.RETELL_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          filter_criteria: {
-            call_id: normalizedCallIds,
-          },
-          sort_order: 'descending',
-          limit: normalizedCallIds.length,
-        }),
+        body: JSON.stringify(requestBody),
       },
       15000
     );
@@ -424,10 +420,37 @@ function createCallProviderHelpers(options = {}) {
     return { endpoint, data };
   }
 
+  async function fetchRetellCallsByIds(callIds) {
+    const normalizedCallIds = Array.from(
+      new Set(
+        (Array.isArray(callIds) ? callIds : [])
+          .map((value) => normalizeString(value))
+          .filter(Boolean)
+      )
+    ).slice(0, 1000);
+
+    if (normalizedCallIds.length === 0) {
+      return {
+        endpoint: '/v2/list-calls',
+        data: [],
+      };
+    }
+
+    return listRetellCalls({
+      filterCriteria: {
+        call_id: normalizedCallIds,
+      },
+      sortOrder: 'descending',
+      limit: normalizedCallIds.length,
+    });
+  }
+
   function resolveRetellCallCostFields(call) {
-    const combinedCostMilli = parseNumberSafe(call?.call_cost?.combined_cost, null);
-    if (Number.isFinite(combinedCostMilli) && combinedCostMilli >= 0) {
-      const normalizedMilli = Math.max(0, Math.round(combinedCostMilli));
+    const combinedCostRaw = parseNumberSafe(call?.call_cost?.combined_cost, null);
+    if (Number.isFinite(combinedCostRaw) && combinedCostRaw >= 0) {
+      const normalizedMilli = Number.isInteger(combinedCostRaw)
+        ? Math.max(0, Math.round(combinedCostRaw))
+        : Math.max(0, Math.round(combinedCostRaw * 1000));
       return {
         costUsdMilli: normalizedMilli,
         costUsd: normalizedMilli / 1000,
@@ -824,6 +847,7 @@ function createCallProviderHelpers(options = {}) {
     extractCallUpdateFromTwilioCallStatusResponse,
     extractCallUpdateFromTwilioPayload,
     extractTwilioRecordingSidFromUrl,
+    listRetellCalls,
     fetchRetellCallsByIds,
     fetchRetellCallStatusById,
     fetchTwilioCallStatusById,
@@ -837,6 +861,7 @@ function createCallProviderHelpers(options = {}) {
     parseDateToIso,
     parseTwilioRecordingDurationSeconds,
     parseTwilioRecordingUpdatedAtMs,
+    resolveRetellCallCostFields,
     resolvePreferredRecordingUrl,
     toIsoFromUnixMilliseconds,
   };

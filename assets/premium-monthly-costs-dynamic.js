@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const CALL_UPDATES_ENDPOINT = '/api/coldcalling/call-updates?limit=500';
+  const COST_SUMMARY_ENDPOINT = '/api/coldcalling/cost-summary?scope=month';
   const POLL_INTERVAL_MS = 15000;
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
@@ -215,18 +215,18 @@
     return true;
   }
 
-  async function fetchCallUpdates() {
-    const response = await fetch(CALL_UPDATES_ENDPOINT, {
+  async function fetchMonthlyCostSummary() {
+    const response = await fetch(COST_SUMMARY_ENDPOINT, {
       method: 'GET',
       cache: 'no-store',
     });
     const data = await response.json().catch(function () {
       return {};
     });
-    if (!response.ok || !data || data.ok !== true || !Array.isArray(data.updates)) {
+    if (!response.ok || !data || data.ok !== true || !data.summary || typeof data.summary !== 'object') {
       throw new Error(String((data && (data.error || data.detail)) || 'Coldcalling-kosten konden niet geladen worden.'));
     }
-    return data.updates;
+    return data.summary;
   }
 
   async function refreshMonthlyColdcallingCosts() {
@@ -237,8 +237,8 @@
 
     refreshPromise = (async function () {
       try {
-        const updates = await fetchCallUpdates();
-        const amountEur = buildCurrentMonthRetellCostEur(updates);
+        const summary = await fetchMonthlyCostSummary();
+        const amountEur = Number(summary.costEur || 0) || 0;
         return { ok: true, updated: applyColdcallingCost(amountEur), amountEur };
       } catch (error) {
         return {

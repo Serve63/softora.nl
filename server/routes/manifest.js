@@ -27,6 +27,7 @@ const contractTargets = Object.freeze([
   { path: '/api/auth/session', method: 'GET' },
   { path: '/api/agenda/appointments?limit=3', method: 'GET' },
   { path: '/api/coldcalling/call-updates?limit=3', method: 'GET' },
+  { path: '/api/coldcalling/cost-summary?scope=all_time', method: 'GET' },
   { path: '/api/coldcalling/call-detail', method: 'GET', expectsMissingCallId: true },
 ]);
 

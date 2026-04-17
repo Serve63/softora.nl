@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_SELECTOR = '[data-retell-cost-root]';
-  const CALL_UPDATES_ENDPOINT = '/api/coldcalling/call-updates?limit=500';
+  const COST_SUMMARY_ENDPOINT = '/api/coldcalling/cost-summary?scope=all_time';
   const POLL_INTERVAL_MS = 15000;
   const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
   const DEFAULT_USD_TO_EUR_RATE = 0.92;
@@ -237,18 +237,18 @@
     });
   }
 
-  async function fetchCallUpdates() {
-    const response = await fetch(CALL_UPDATES_ENDPOINT, {
+  async function fetchRetellCostSummary() {
+    const response = await fetch(COST_SUMMARY_ENDPOINT, {
       method: 'GET',
       cache: 'no-store',
     });
     const data = await response.json().catch(function () {
       return {};
     });
-    if (!response.ok || !data || data.ok !== true || !Array.isArray(data.updates)) {
+    if (!response.ok || !data || data.ok !== true || !data.summary || typeof data.summary !== 'object') {
       throw new Error(String((data && (data.error || data.detail)) || 'Coldcalling-kosten konden niet geladen worden.'));
     }
-    return data.updates;
+    return data.summary;
   }
 
   async function refreshRetellCostSummary(options) {
@@ -266,8 +266,7 @@
 
     refreshPromise = (async function () {
       try {
-        const updates = await fetchCallUpdates();
-        const summary = buildRetellCostSummary(updates);
+        const summary = await fetchRetellCostSummary();
         lastSummary = summary;
         renderSummary(summary, 'ready', '');
         return { ok: true, summary: summary };

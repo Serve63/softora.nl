@@ -242,18 +242,9 @@ test('premium ai lead generator includes a live Retell cost counter', () => {
   assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260417a" defer><\/script>/);
   assert.doesNotMatch(pageSource, /topbar-cost-dot/);
   assert.doesNotMatch(pageSource, /data-retell-cost-meta/);
-  assert.match(costWidgetSource, /const CALL_UPDATES_ENDPOINT = '\/api\/coldcalling\/call-updates\?limit=500';/);
-  assert.match(costWidgetSource, /const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0\.07;/);
-  assert.match(costWidgetSource, /const DEFAULT_USD_TO_EUR_RATE = 0\.92;/);
-  assert.match(costWidgetSource, /function resolveKnownRetellCostUsd\(item\)/);
-  assert.match(costWidgetSource, /function resolveEstimatedRetellCostUsd\(item\)/);
-  assert.match(costWidgetSource, /function convertUsdToEur\(amountUsd\)/);
-  assert.match(costWidgetSource, /function buildRetellCostSummary\(updates\)/);
-  assert.match(costWidgetSource, /const costUsd = resolveKnownRetellCostUsd\(item\);/);
-  assert.match(
-    costWidgetSource,
-    /totalCostUsd \+= costUsd !== null \? costUsd : resolveEstimatedRetellCostUsd\(item\);/
-  );
+  assert.match(costWidgetSource, /const COST_SUMMARY_ENDPOINT = '\/api\/coldcalling\/cost-summary\?scope=all_time';/);
+  assert.match(costWidgetSource, /async function fetchRetellCostSummary\(\)/);
+  assert.match(costWidgetSource, /const summary = await fetchRetellCostSummary\(\);/);
   assert.match(costWidgetSource, /function formatEurCost\(amount\)/);
   assert.match(costWidgetSource, /return `€\$\{safeAmount\.toLocaleString\('nl-NL'/);
   assert.match(costWidgetSource, /window\.refreshRetellCostSummary = refreshRetellCostSummary;/);
