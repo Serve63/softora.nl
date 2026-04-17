@@ -172,7 +172,7 @@
     text-decoration: none !important;
     font-size: 0.78rem !important;
     font-weight: 400 !important;
-    transition: all 0.2s !important;
+    transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease !important;
 }
 
 .sidebar-link .sidebar-link-text {
@@ -736,6 +736,7 @@ button,
 .sidebar a.sidebar-link,
 .sidebar-footer a.logout-btn {
     pointer-events: none;
+    transform: none !important;
 }
 
 body[data-sidebar-nav-ready="1"] .sidebar a.sidebar-logo,

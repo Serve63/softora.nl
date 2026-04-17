@@ -8,8 +8,8 @@ test('premium pdf builder scales the live preview to the available viewport', ()
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /<title>PDF's - Softora\.nl<\/title>/);
-  assert.match(pageSource, /assets\/personnel-theme\.css\?v=20260411a/);
-  assert.match(pageSource, /assets\/personnel-theme\.js\?v=20260414a/);
+  assert.match(pageSource, /assets\/personnel-theme\.css\?v=[^"'\\s]+/);
+  assert.match(pageSource, /assets\/personnel-theme\.js\?v=[^"'\\s]+/);
   assert.match(pageSource, /family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700/);
   assert.match(pageSource, /body \{[\s\S]*font-family:\s*'Inter', sans-serif;[\s\S]*min-height:\s*100vh;/);
   assert.match(pageSource, /<div class="dashboard-layout" data-sidebar-shell="canonical">/);

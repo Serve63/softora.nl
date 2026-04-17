@@ -36,6 +36,16 @@ const customLayoutPages = [
   'premium-websitepreview.html',
 ];
 
+const staticSidebarPages = [
+  ...canonicalPages,
+  'premium-analytics.html',
+  'premium-instellingen-personeel.html',
+  'premium-klanten.html',
+  'premium-mailbox.html',
+  'premium-opdracht-dossier.html',
+  'premium-vaste-lasten.html',
+];
+
 test('personnel theme canonical shell is explicitly opt-in', () => {
   const themeSource = readRepoFile('assets/personnel-theme.css');
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
@@ -54,11 +64,16 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /document\.body\.setAttribute\("data-sidebar-nav-ready", "1"\);/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
   assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
+  assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*transform:\s*none !important;/);
   assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords", "settings"\]\);/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
   assert.match(themeJsSource, /persistPremiumSidebarSessionSnapshot/);
+  assert.doesNotMatch(
+    themeJsSource,
+    /if \(sidebar\.dataset\.staticSidebar === "1"\) \{[\s\S]*ensureStaticSidebarLink\(sidebar, "beheer", getWebsitePreviewSidebarLink\(\), \["seo", "packages", "pdfs"\]\);/s
+  );
 });
 
 test('canonical premium pages opt into the shared sidebar shell', () => {
@@ -79,6 +94,17 @@ test('custom premium layouts stay outside the shared sidebar shell', () => {
       pageSource,
       /<div class="dashboard-layout" data-sidebar-shell="canonical">/,
       `${relativePath} hoort niet door de canonical shell overgenomen te worden`
+    );
+  }
+});
+
+test('static premium sidebars ship the websitegenerator link in html', () => {
+  for (const relativePath of staticSidebarPages) {
+    const pageSource = readRepoFile(relativePath);
+    assert.match(
+      pageSource,
+      /data-sidebar-key="websitegenerator"/,
+      `${relativePath} hoort Websitegenerator direct in de sidebar html te hebben`
     );
   }
 });

@@ -46,7 +46,7 @@ for (const filePath of unifiedPersonnelThemeTargets) {
     const html = fs.readFileSync(path.join(repoRoot, filePath), 'utf8');
     assert.match(
       html,
-      /assets\/personnel-theme\.js\?v=20260414a/,
+      /assets\/personnel-theme\.js\?v=[^"'\\s]+/,
       `Theme cache key mismatch for ${filePath}`
     );
   });

@@ -731,7 +731,6 @@
         if (!sidebar) return;
         const activeKey = getSidebarActiveKey(pathname);
         if (sidebar.dataset.staticSidebar === "1") {
-            ensureStaticSidebarLink(sidebar, "beheer", getWebsitePreviewSidebarLink(), ["seo", "packages", "pdfs"]);
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
             neutralizeSidebarAnchors();
