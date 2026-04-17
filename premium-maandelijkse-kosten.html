@@ -537,15 +537,15 @@ body {
       <div class="totals-row">
         <div class="totaal-card accent">
           <div class="totaal-label">Totaal per maand</div>
-          <div class="totaal-amount red" id="totaal-maand">€0,00</div>
+          <div class="totaal-amount red" id="totaal-maand">...</div>
         </div>
         <div class="totaal-card">
           <div class="totaal-label">Per jaar</div>
-          <div class="totaal-amount" id="totaal-jaar">€0,00</div>
+          <div class="totaal-amount" id="totaal-jaar">...</div>
         </div>
         <div class="totaal-card">
           <div class="totaal-label">Aantal posten</div>
-          <div class="totaal-amount" id="totaal-posten">0</div>
+          <div class="totaal-amount" id="totaal-posten">...</div>
         </div>
       </div>
 
@@ -615,6 +615,8 @@ let editingContext = null;
 let deletingContext = null;
 let monthlyCostsLoaded = false;
 let monthlyCostsLoadPromise = null;
+let monthlyCostsBootstrapDone = false;
+let monthlyCostsBootstrapPromise = null;
 
 const freqLabel = { maandelijks:'Maandelijks', jaarlijks:'Jaarlijks', kwartaal:'Per kwartaal' };
 
@@ -758,6 +760,12 @@ function fmtEur(n) {
   return '€' + n.toLocaleString('nl-NL', { minimumFractionDigits:2, maximumFractionDigits:2 });
 }
 
+function setTotalsLoading() {
+  document.getElementById('totaal-maand').textContent = '...';
+  document.getElementById('totaal-jaar').textContent = '...';
+  document.getElementById('totaal-posten').textContent = '...';
+}
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -882,9 +890,6 @@ async function ensureMonthlyCostEntriesLoaded() {
       return data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [];
     } finally {
       monthlyCostsLoadPromise = null;
-      if (typeof window.refreshMonthlyColdcallingCosts === 'function') {
-        void window.refreshMonthlyColdcallingCosts();
-      }
     }
   })();
 
@@ -892,6 +897,10 @@ async function ensureMonthlyCostEntriesLoaded() {
 }
 
 function updateTotals() {
+  if (!monthlyCostsBootstrapDone) {
+    setTotalsLoading();
+    return;
+  }
   let total = 0;
   let count = 0;
   Object.values(data).flat().forEach((item) => {
@@ -908,7 +917,8 @@ function render() {
   wrap.innerHTML = '';
 
   Object.entries(data).forEach(([cat, items]) => {
-    const catTotal = items.reduce((s, i) => s + toMonthly(i), 0);
+    const visibleItems = monthlyCostsBootstrapDone ? items : [];
+    const catTotal = visibleItems.reduce((s, i) => s + toMonthly(i), 0);
     const key = catKey(cat);
     const block = document.createElement('div');
     block.className = 'category';
@@ -917,18 +927,18 @@ function render() {
         <div class="category-title">${escapeHtml(cat)}</div>
         <div class="category-total">${fmtEur(catTotal)}<span style="font-size:11px;font-weight:400;color:var(--text-light);margin-left:4px">/mnd</span></div>
       </div>`;
-    const loadingRowsMarkup = !monthlyCostsLoaded ? `
+    const loadingRowsMarkup = !monthlyCostsBootstrapDone ? `
       <div class="cost-row">
         <div>
           <div class="cost-name">Kosten laden...</div>
-          <div class="cost-note">Je opgeslagen databasegegevens worden opgehaald</div>
+          <div class="cost-note">Je opgeslagen databasegegevens en actuele coldcalling-kosten worden opgehaald</div>
         </div>
         <div class="cost-freq">...</div>
         <div class="cost-amount-wrap is-static">
           <div class="cost-amount">...</div>
         </div>
       </div>` : '';
-    const addRowMarkup = monthlyCostsLoaded ? `
+    const addRowMarkup = monthlyCostsBootstrapDone ? `
       <div class="add-row">
         <div class="add-inputs">
           <input type="text" placeholder="Naam" id="new-naam-${key}">
@@ -948,7 +958,7 @@ function render() {
       </div>
       <div id="rows-${key}">
         ${loadingRowsMarkup}
-        ${items.map((item) => {
+        ${visibleItems.map((item) => {
               const rowClassName = item.highlighted ? 'cost-row cost-row-accent' : 'cost-row';
               const displayFreqLabel = item.highlighted && item.freq === 'maandelijks'
                 ? 'Deze maand'
@@ -982,6 +992,24 @@ function render() {
   });
 
   updateTotals();
+}
+
+async function bootstrapMonthlyCostsPage() {
+  if (monthlyCostsBootstrapPromise) return monthlyCostsBootstrapPromise;
+
+  monthlyCostsBootstrapPromise = (async () => {
+    setTotalsLoading();
+    render();
+    await ensureMonthlyCostEntriesLoaded();
+    if (typeof window.refreshMonthlyColdcallingCosts === 'function') {
+      await window.refreshMonthlyColdcallingCosts();
+    }
+    monthlyCostsBootstrapDone = true;
+    render();
+    return true;
+  })();
+
+  return monthlyCostsBootstrapPromise;
 }
 
 function addItem(cat) {
@@ -1165,8 +1193,15 @@ window.softoraMonthlyCostsData = data;
 window.softoraMonthlyCostsRender = render;
 
 syncNextId();
+setTotalsLoading();
 render();
-void ensureMonthlyCostEntriesLoaded();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    void bootstrapMonthlyCostsPage();
+  }, { once: true });
+} else {
+  void bootstrapMonthlyCostsPage();
+}
 </script>
 <script src="assets/premium-monthly-costs-dynamic.js?v=20260417a" defer></script>
 </body>

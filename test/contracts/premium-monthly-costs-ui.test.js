@@ -25,6 +25,9 @@ test('premium maandelijkse kosten gebruikt dashboard-typografie en verbergt lega
   assert.match(pageSource, /<div id="last-updated"><\/div>/);
   assert.match(pageSource, /#last-updated\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*font-size:\s*0\.72rem;/);
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*padding:\s*3rem 3rem 1\.8rem;/);
+  assert.match(pageSource, /id="totaal-maand">\.\.\.</);
+  assert.match(pageSource, /id="totaal-jaar">\.\.\.</);
+  assert.match(pageSource, /id="totaal-posten">\.\.\.</);
   assert.match(pageSource, /\.totaal-amount\s*\{[\s\S]*font-size:\s*2\.62rem;/);
   assert.match(pageSource, /\.category-title\s*\{[\s\S]*font-size:\s*0\.92rem;/);
   assert.match(pageSource, /\.cost-name\s*\{\s*font-size:\s*0\.92rem;/);
@@ -72,8 +75,9 @@ test('premium maandelijkse kosten toont coldcalling en coldmailing bovenaan met 
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(pageSource, /const categoryHeaderMarkup = cat === 'Totale kosten:' \? '' : `[\s\S]*class="category-header"[\s\S]*category-title[\s\S]*category-total/);
   assert.match(pageSource, /block\.innerHTML = `[\s\S]*\$\{categoryHeaderMarkup\}[\s\S]*<div class="cost-row head">/);
-  assert.match(pageSource, /const loadingRowsMarkup = !monthlyCostsLoaded \? `[\s\S]*Kosten laden\.\.\.[\s\S]*databasegegevens worden opgehaald/);
-  assert.match(pageSource, /const addRowMarkup = monthlyCostsLoaded \? `[\s\S]*\+ Toevoegen/);
+  assert.match(pageSource, /const visibleItems = monthlyCostsBootstrapDone \? items : \[\];/);
+  assert.match(pageSource, /const loadingRowsMarkup = !monthlyCostsBootstrapDone \? `[\s\S]*Kosten laden\.\.\.[\s\S]*actuele coldcalling-kosten worden opgehaald/);
+  assert.match(pageSource, /const addRowMarkup = monthlyCostsBootstrapDone \? `[\s\S]*\+ Toevoegen/);
   assert.match(pageSource, /\.cost-amount-wrap\.is-static\s*\{[\s\S]*justify-content:\s*flex-end;/);
   assert.match(pageSource, /const rowClassName = item\.highlighted \? 'cost-row cost-row-accent' : 'cost-row';/);
   assert.match(pageSource, /const displayFreqLabel = item\.highlighted && item\.freq === 'maandelijks'[\s\S]*'Deze maand'[\s\S]*freqLabel\[item\.freq\] \|\| item\.freq \|\| '-';/);
@@ -92,13 +96,18 @@ test('premium maandelijkse kosten bewaart bewerkbare posten via supabase ui-stat
   assert.match(pageSource, /async function fetchUiStateSetWithFallback\(scope, body\) \{/);
   assert.match(pageSource, /async function persistMonthlyCostEntries\(actor = 'browser'\) \{/);
   assert.match(pageSource, /async function ensureMonthlyCostEntriesLoaded\(\) \{/);
+  assert.match(pageSource, /async function bootstrapMonthlyCostsPage\(\) \{/);
+  assert.match(pageSource, /let monthlyCostsBootstrapDone = false;/);
+  assert.match(pageSource, /function setTotalsLoading\(\) \{/);
+  assert.match(pageSource, /if \(!monthlyCostsBootstrapDone\) \{\s*setTotalsLoading\(\);/);
   assert.match(pageSource, /\[MONTHLY_COSTS_REMOTE_KEY\]: JSON\.stringify\(editableItems\),/);
-  assert.match(pageSource, /const result = await fetchUiStateGetWithFallback\(MONTHLY_COSTS_REMOTE_SCOPE\);/);
+  assert.match(pageSource, /await ensureMonthlyCostEntriesLoaded\(\);/);
+  assert.match(pageSource, /await window\.refreshMonthlyColdcallingCosts\(\);/);
   assert.match(pageSource, /const parsedEntries = JSON\.parse\(serializedEntries\);/);
   assert.match(pageSource, /return persistMonthlyCostEntries\('browser_add'\)/);
   assert.match(pageSource, /await persistMonthlyCostEntries\('browser_delete'\);/);
   assert.match(pageSource, /await persistMonthlyCostEntries\('browser_edit'\);/);
-  assert.match(pageSource, /void ensureMonthlyCostEntriesLoaded\(\);/);
+  assert.match(pageSource, /void bootstrapMonthlyCostsPage\(\);/);
 });
 
 test('premium maandelijkse kosten laadt dynamische coldcalling kosten van deze maand', () => {
