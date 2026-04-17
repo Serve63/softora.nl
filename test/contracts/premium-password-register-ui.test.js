@@ -23,6 +23,11 @@ test('premium wachtwoordenregister gebruikt dashboard-typografie en persistente 
   assert.match(pageSource, /fetchUiStateGetWithFallback\(PASSWORD_REGISTER_SCOPE\)/);
   assert.match(pageSource, /fetchUiStateSetWithFallback\(PASSWORD_REGISTER_SCOPE, payload\)/);
   assert.match(pageSource, /\[PASSWORD_REGISTER_ENTRIES_KEY\]: JSON\.stringify\(sanitized\)/);
+  assert.match(pageSource, /hosting@example\.test/);
+  assert.match(pageSource, /Voorbeeldgegevens geladen\. Vervang deze en sla daarna op om echte gegevens veilig te bewaren\./);
+  assert.doesNotMatch(pageSource, /persistPasswordEntries\('bootstrap'\)/);
+  assert.doesNotMatch(pageSource, /H0st!nger24|Tr@nsIP2026!|G00gl3Work!|Insta\$oft24|Link3dIn!26/);
+  assert.doesNotMatch(pageSource, /beheer@softora\.nl|admin@softora\.nl|info@softora\.nl/);
   assert.match(pageSource, /openEditModal\(/);
   assert.match(pageSource, /saveEntryFromModal/);
   assert.match(pageSource, /id="entry-modal"/);

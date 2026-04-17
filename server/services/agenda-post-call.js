@@ -113,9 +113,11 @@ function createAgendaPostCallHelpers(deps = {}) {
   }
 
   function buildActiveOrderRecordFromAppointment(appointment, input = {}, nextId = 1) {
+    const resolvedContactPhone =
+      appointment?.phone || appointment?.telefoon || appointment?.contactPhone || '';
     const company = truncateText(normalizeString(appointment?.company || ''), 160) || 'Nieuwe lead';
     const contact = truncateText(normalizeString(appointment?.contact || ''), 160);
-    const contactPhone = truncateText(normalizeString(appointment?.phone || ''), 80);
+    const contactPhone = truncateText(normalizeString(resolvedContactPhone), 80);
     const contactEmail = truncateText(
       normalizeString(appointment?.contactEmail || appointment?.email || ''),
       160
@@ -344,7 +346,13 @@ function createAgendaPostCallCoordinator(deps = {}) {
           160
         ),
         contactPhone: truncateText(
-          normalizeString(existingOrder?.contactPhone || appointment?.phone || ''),
+          normalizeString(
+            existingOrder?.contactPhone ||
+              appointment?.phone ||
+              appointment?.telefoon ||
+              appointment?.contactPhone ||
+              ''
+          ),
           80
         ),
         contactEmail: truncateText(

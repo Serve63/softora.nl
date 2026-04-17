@@ -50,6 +50,11 @@
     pointer-events: none !important;
 }
 
+:root[data-personnel-loading="true"] .sidebar-link[data-sidebar-key="passwords"],
+:root[data-personnel-loading="true"] .sidebar-link[data-sidebar-key="settings"] {
+    display: none !important;
+}
+
 
 .sidebar-theme {
     display: none !important;

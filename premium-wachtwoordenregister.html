@@ -850,11 +850,11 @@ function lock() {
 const PASSWORD_REGISTER_SCOPE = 'premium_password_register';
 const PASSWORD_REGISTER_ENTRIES_KEY = 'entries_json';
 const DEFAULT_PASSWORD_ENTRIES = [
-  { id: 1, naam: 'Hostinger', url: 'hostinger.com', user: 'beheer@softora.nl', pw: 'H0st!nger24', cat: 'Hosting' },
-  { id: 2, naam: 'TransIP', url: 'transip.nl', user: 'admin@softora.nl', pw: 'Tr@nsIP2026!', cat: 'Hosting' },
-  { id: 3, naam: 'Google Workspace', url: 'workspace.google.com', user: 'info@softora.nl', pw: 'G00gl3Work!', cat: 'Tools' },
-  { id: 4, naam: 'Instagram', url: 'instagram.com', user: '@softora.nl', pw: 'Insta$oft24', cat: 'Socials' },
-  { id: 5, naam: 'LinkedIn', url: 'linkedin.com', user: 'info@softora.nl', pw: 'Link3dIn!26', cat: 'Socials' },
+  { id: 1, naam: 'Hostinger', url: 'hostinger.com', user: 'hosting@example.test', pw: 'voorbeeld-hosting', cat: 'Hosting' },
+  { id: 2, naam: 'TransIP', url: 'transip.nl', user: 'dns@example.test', pw: 'voorbeeld-domein', cat: 'Hosting' },
+  { id: 3, naam: 'Google Workspace', url: 'workspace.google.com', user: 'workspace@example.test', pw: 'voorbeeld-tools', cat: 'Tools' },
+  { id: 4, naam: 'Instagram', url: 'instagram.com', user: 'socials@example.test', pw: 'voorbeeld-socials', cat: 'Socials' },
+  { id: 5, naam: 'LinkedIn', url: 'linkedin.com', user: 'sales@example.test', pw: 'voorbeeld-linkedin', cat: 'Socials' },
 ];
 
 let entries = [];
@@ -1047,15 +1047,17 @@ async function ensurePasswordEntriesLoaded() {
         }
       } else {
         entries = sanitizePasswordEntries(DEFAULT_PASSWORD_ENTRIES);
-        try {
-          await persistPasswordEntries('bootstrap');
-        } catch (_) {
-          setRegisterStatus('Standaardgegevens geladen. Opslaan in Supabase is nog niet bevestigd.', 'warning');
-        }
+        setRegisterStatus(
+          'Voorbeeldgegevens geladen. Vervang deze en sla daarna op om echte gegevens veilig te bewaren.',
+          'warning'
+        );
       }
     } catch (_) {
       entries = sanitizePasswordEntries(DEFAULT_PASSWORD_ENTRIES);
-      setRegisterStatus('Kon Supabase niet laden, tijdelijke fallback actief.', 'warning');
+      setRegisterStatus(
+        'Kon Supabase niet laden. Veilige voorbeeldgegevens zijn lokaal geladen totdat je later opslaat.',
+        'warning'
+      );
     }
 
     passwordEntriesLoaded = true;

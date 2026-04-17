@@ -97,13 +97,13 @@ test('premium opdrachtdossier laadt eerst een bestaand cache-item voordat opus o
 });
 
 test('server opdrachtdossier filtert legacy planningsblokken en houdt de opus prompt kort', () => {
-  const filePath = path.join(__dirname, '../../server.js');
+  const filePath = path.join(__dirname, '../../server/services/order-dossier.js');
   const source = fs.readFileSync(filePath, 'utf8');
 
   assert.match(source, /function buildShortOrderDossierOpusPrompt\(options = \{\}\) \{/);
   assert.match(source, /return 'Werk deze opdracht in Claude Opus 4\.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie\.';/);
   assert.match(source, /function shouldHideOrderDossierBlockTitle\(value\) \{[\s\S]*normalized === 'uitvoerplan'[\s\S]*normalized === 'uitvoerfocus'[\s\S]*normalized\.startsWith\('ontbrekende informatie'\)[\s\S]*normalized\.startsWith\('praktische aandachtspunten'\)/);
-  assert.match(source, /function normalizeOrderDossierPairLabel\(value\) \{[\s\S]*normalized === 'accounthouder softora' \|\| normalized === 'softora contactpersoon'[\s\S]*return ''[\s\S]*normalized === 'geclaimd door' \? 'Aangewezen aan' : label;/);
+  assert.match(source, /function normalizeOrderDossierPairLabel\(value\) \{[\s\S]*normalized === 'accounthouder softora'[\s\S]*normalized === 'softora contactpersoon'[\s\S]*return ''[\s\S]*normalized === 'geclaimd door' \? 'Aangewezen aan' : label;/);
   assert.match(source, /const promptText = buildShortOrderDossierOpusPrompt\(input\);/);
   assert.match(source, /const opusPrompt = buildShortOrderDossierOpusPrompt\(fallbackOptions\);/);
   assert.match(source, /if \(shouldHideOrderDossierBlockTitle\(title\)\) return null;/);

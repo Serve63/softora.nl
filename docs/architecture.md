@@ -3,7 +3,7 @@
 ## Huidige richting
 - Bestaande routes en schermen blijven compatibel.
 - De codebase wordt gefaseerd opgesplitst zonder full rewrite.
-- `server.js` blijft tijdelijk legacy entrypoint, maar nieuwe structuur landt onder `server/`.
+- `server.js` blijft een klein entrypoint, terwijl de app-compositie landt onder `server/services/server-app-runtime*.js`.
 
 ## Doelstructuur
 - `server/routes/` voor route-registratie
@@ -18,7 +18,8 @@ Zie [server/routes/manifest.js](../server/routes/manifest.js).
 
 ## Navigatie
 - Start oriëntatie in [docs/repo-map.md](repo-map.md).
-- Runtime entrypoint blijft voorlopig [server.js](../server.js).
+- Lees voor nieuwe wijzigingen ook [docs/quality-protocol.md](quality-protocol.md).
+- Runtime entrypoint blijft [server.js](../server.js).
 - Vercel gebruikt [api/_app-handler.js](../api/_app-handler.js) als bootstrap naar dezelfde Express app.
 
 ## Werkvolgorde

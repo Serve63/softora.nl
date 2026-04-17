@@ -34,6 +34,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .sidebar { width: 280px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; display: flex; flex-direction: column; }
 .main-content { margin-left: 280px; width: calc(100% - 280px); min-width: 0; padding: 40px 48px; }
 .page-shell { width: min(1380px, 100%); }
+.workspace { display: block; }
 
 /* Coming soon lock: alleen over content rechts, sidebar blijft zichtbaar */
 .content-lock-overlay {
@@ -254,7 +255,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
     </div>
   </div>
 
-  <div id="scan-output">
+  <div id="scan-output" class="workspace">
     <div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
       <p>Voer een URL in en klik op "AI Genereren" om een visuele homepage preview te genereren</p>
@@ -294,11 +295,13 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 </html>"></textarea>
 
       <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
-        <button class="btn" onclick="openLiveLink()">
+        <button class="btn" id="website-link-create-btn" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          Openen in nieuw tabblad
+          Websitelink aanmaken
         </button>
+        <button class="btn outline" id="website-link-copy" type="button" hidden>Kopieer websitelink</button>
       </div>
+      <div id="website-link-status" style="margin-top:12px;font-size:12px;color:var(--text-mid);"></div>
     </div>
   </div>
 </div>
@@ -438,20 +441,77 @@ function addToHistory(url, hostname) {
 
 function reScan(url) { document.getElementById('scan-url').value = url; startScan(); }
 
-function openLiveLink() {
-  const code = document.getElementById('html-code').value.trim();
-  if (!code) { showToast('Plak eerst HTML code in'); return; }
-  const blob = new Blob([code], { type: 'text/html' });
-  window.open(URL.createObjectURL(blob), '_blank');
-  showToast('Pagina geopend in nieuw tabblad');
-}
-
 const delay = ms => new Promise(r => setTimeout(r, ms));
 
 function showToast(msg) {
   const t = document.getElementById('toast'); t.textContent = msg;
   t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2800);
 }
+
+(function () {
+  const urlInput = document.getElementById('scan-url');
+  const htmlInput = document.getElementById('html-code');
+  const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
+  const websiteLinkStatusEl = document.getElementById('website-link-status');
+  const websiteLinkCopyEl = document.getElementById('website-link-copy');
+  if (!urlInput || !htmlInput || !websiteLinkCreateEl || !websiteLinkStatusEl || !websiteLinkCopyEl) { return; }
+
+  let latestWebsiteLinkUrl = '';
+
+  function setWebsiteLinkStatus(message, isError = false) {
+    websiteLinkStatusEl.textContent = String(message || '');
+    websiteLinkStatusEl.style.color = isError ? '#c0392b' : 'var(--text-mid)';
+  }
+
+  websiteLinkCopyEl.addEventListener('click', async function () {
+    if (!latestWebsiteLinkUrl) return;
+    try {
+      await navigator.clipboard.writeText(latestWebsiteLinkUrl);
+      showToast('Websitelink gekopieerd');
+    } catch (_) {
+      showToast('Kopieren mislukt');
+    }
+  });
+
+  websiteLinkCreateEl.addEventListener('click', async function () {
+    const html = String(htmlInput.value || '').trim();
+    if (!html) {
+      setWebsiteLinkStatus('Plak eerst HTML code in.', true);
+      htmlInput.focus();
+      return;
+    }
+
+    websiteLinkCreateEl.disabled = true;
+    websiteLinkCopyEl.hidden = true;
+    latestWebsiteLinkUrl = '';
+    setWebsiteLinkStatus('Websitelink wordt aangemaakt...');
+
+    try {
+      const response = await fetch('/api/website-links/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          html,
+          title: String(urlInput.value || '').trim()
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload || payload.ok === false) {
+        throw new Error(String(payload?.detail || payload?.error || 'Websitelink aanmaken mislukt'));
+      }
+      latestWebsiteLinkUrl = String(payload.url || '').trim();
+      websiteLinkCopyEl.hidden = !latestWebsiteLinkUrl;
+      setWebsiteLinkStatus(latestWebsiteLinkUrl || 'Websitelink aangemaakt.');
+      if (latestWebsiteLinkUrl) {
+        window.open(latestWebsiteLinkUrl, '_blank', 'noopener');
+      }
+    } catch (error) {
+      setWebsiteLinkStatus(String(error?.message || 'Websitelink aanmaken mislukt'), true);
+    } finally {
+      websiteLinkCreateEl.disabled = false;
+    }
+  });
+})();
 
 const CONTENT_LOCK_CODE = 'Andre2Fritz2!';
 const CONTENT_LOCK_STORAGE_KEY = 'cs-auth-premium-websitegenerator';

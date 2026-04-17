@@ -435,6 +435,42 @@
         };
     }
 
+    const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set(["passwords", "settings"]);
+
+    function getPremiumSidebarAdminExtraLinks() {
+        return [
+            {
+                key: "passwords",
+                href: "/premium-wachtwoordenregister",
+                label: "Wachtwoordenregister",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg>',
+            },
+            {
+                key: "settings",
+                href: "/premium-instellingen",
+                label: "Instellingen",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg>',
+            },
+        ];
+    }
+
+    function isPremiumAdminSession(session) {
+        return Boolean(
+            session &&
+            session.authenticated &&
+            String(session.role || "").trim().toLowerCase() === "admin"
+        );
+    }
+
+    function filterPremiumSidebarLinksForSession(links, session) {
+        const allowAdminOnlyLinks = isPremiumAdminSession(session);
+        return (Array.isArray(links) ? links : []).filter(function (link) {
+            const key = String(link && link.key || "").trim();
+            if (!PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS.has(key)) return true;
+            return allowAdminOnlyLinks;
+        });
+    }
+
     function buildUnifiedPremiumSidebarHtml(activeKey) {
         const overviewLinks = [
             {
@@ -509,13 +545,7 @@
             },
         ];
 
-        const extraLinks = [
-            {
-                key: "passwords",
-                href: "/premium-wachtwoordenregister",
-                label: "Wachtwoordenregister",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg>',
-            },
+        const extraLinks = filterPremiumSidebarLinksForSession([
             {
                 key: "monthly_costs",
                 href: "/premium-maandelijkse-kosten",
@@ -534,13 +564,7 @@
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg>',
                 label: "Kladblok",
             },
-            {
-                key: "settings",
-                href: "/premium-instellingen",
-                label: "Instellingen",
-                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg>',
-            },
-        ];
+        ].concat(getPremiumSidebarAdminExtraLinks()), premiumSessionSnapshot);
 
         return [
             '<a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>',
@@ -616,12 +640,41 @@
         return nextLink;
     }
 
+    function removeSidebarLinkByKey(sidebar, key) {
+        if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
+        sidebar.querySelectorAll(`[data-sidebar-key="${String(key || "").trim()}"]`).forEach(function (link) {
+            if (link && link.parentNode) {
+                link.parentNode.removeChild(link);
+            }
+        });
+    }
+
     function syncStaticSidebarActiveState(sidebar, activeKey) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         sidebar.querySelectorAll(".sidebar-link[data-sidebar-key]").forEach(function (link) {
             const key = String(link.getAttribute("data-sidebar-key") || "").trim();
             link.classList.toggle("active", key === activeKey);
         });
+    }
+
+    function syncPremiumSidebarAdminLinks(sidebar, session, activeKey) {
+        if (!sidebar) return;
+        const allowAdminOnlyLinks = isPremiumAdminSession(session);
+        const adminExtraLinks = getPremiumSidebarAdminExtraLinks();
+        adminExtraLinks.forEach(function (link) {
+            if (!link || !link.key) return;
+            if (!allowAdminOnlyLinks) {
+                removeSidebarLinkByKey(sidebar, link.key);
+                return;
+            }
+            ensureStaticSidebarLink(
+                sidebar,
+                "extra",
+                link,
+                link.key === "passwords" ? ["monthly_costs", "bookkeeping", "notepad", "settings"] : null
+            );
+        });
+        syncStaticSidebarActiveState(sidebar, activeKey);
     }
 
     function applyUnifiedPremiumSidebar() {
@@ -631,7 +684,7 @@
         const activeKey = getSidebarActiveKey(pathname);
         if (sidebar.dataset.staticSidebar === "1") {
             ensureStaticSidebarLink(sidebar, "beheer", getWebsitePreviewSidebarLink(), ["seo", "packages", "pdfs"]);
-            syncStaticSidebarActiveState(sidebar, activeKey);
+            syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
             neutralizeSidebarAnchors();
             sidebar.dataset.sidebarReady = "true";
@@ -640,6 +693,7 @@
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
         // Alleen legacy/lege sidebars nog opbouwen; statische sidebars blijven onaangeroerd.
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
+        syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
         pruneDeprecatedSidebarLinks(sidebar);
         neutralizeSidebarAnchors();
         sidebar.dataset.sidebarReady = "true";
@@ -815,6 +869,17 @@
         const roleEl = document.querySelector("[data-sidebar-user-role]");
         const avatarEl = document.querySelector("[data-sidebar-avatar]");
         const triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
+        const sidebar = document.querySelector(".sidebar");
+        const activeKey = getSidebarActiveKey(pathname);
+
+        if (sidebar) {
+            syncPremiumSidebarAdminLinks(
+                sidebar,
+                session && session.authenticated ? session : null,
+                activeKey
+            );
+            neutralizeSidebarAnchors();
+        }
 
         if (!nameEl || !roleEl || !avatarEl || !triggerEl) {
             markPremiumSidebarProfileResolved();

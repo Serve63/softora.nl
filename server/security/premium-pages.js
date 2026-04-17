@@ -1,6 +1,9 @@
+const { createPremiumAdminOnlyHtmlFilesSet } = require('../config/premium-admin-html-files');
+
 function createPremiumHtmlPageAccessController(options = {}) {
   const {
     premiumPublicHtmlFiles = new Set(),
+    premiumAdminOnlyHtmlFiles = createPremiumAdminOnlyHtmlFilesSet(),
     noindexHeaderValue = 'noindex',
     getResolvedPremiumAuthState = async () => ({
       configured: false,
@@ -32,10 +35,17 @@ function createPremiumHtmlPageAccessController(options = {}) {
     return /^premium-/i.test(fileName) && !premiumPublicHtmlFiles.has(fileName);
   }
 
+  function isPremiumAdminOnlyHtmlFile(fileNameRaw) {
+    const fileName = normalizeFileName(fileNameRaw);
+    if (!fileName) return false;
+    return premiumAdminOnlyHtmlFiles.has(fileName);
+  }
+
   async function resolvePremiumHtmlPageAccess(req, res, fileNameRaw) {
     const fileName = normalizeFileName(fileNameRaw);
     const isLoginPage = fileName === 'premium-personeel-login.html';
     const isProtectedPremiumPage = isPremiumProtectedHtmlFile(fileName);
+    const isAdminOnlyPremiumPage = isProtectedPremiumPage && isPremiumAdminOnlyHtmlFile(fileName);
     const authState = isLoginPage || isProtectedPremiumPage ? await getResolvedPremiumAuthState(req) : null;
     const logoutRequested = isLoginPage && /^(1|true|yes)$/i.test(String(req.query?.logout || ''));
     const requestedPath = getSafePremiumRedirectPath(req.originalUrl || req.url || req.path || '/');
@@ -72,6 +82,7 @@ function createPremiumHtmlPageAccessController(options = {}) {
           fileName,
           isLoginPage,
           isProtectedPremiumPage,
+          isAdminOnlyPremiumPage,
         };
       }
 
@@ -86,6 +97,7 @@ function createPremiumHtmlPageAccessController(options = {}) {
           fileName,
           isLoginPage,
           isProtectedPremiumPage,
+          isAdminOnlyPremiumPage,
         };
       }
 
@@ -112,6 +124,33 @@ function createPremiumHtmlPageAccessController(options = {}) {
           fileName,
           isLoginPage,
           isProtectedPremiumPage,
+          isAdminOnlyPremiumPage,
+        };
+      }
+
+      if (isAdminOnlyPremiumPage && !authState.isAdmin) {
+        appendSecurityAuditEvent(
+          {
+            type: 'premium_admin_page_required',
+            severity: 'warning',
+            success: false,
+            email: authState.email || '',
+            ip: getClientIpFromRequest(req),
+            path: requestedPath,
+            origin: getRequestOriginFromHeaders(req),
+            userAgent: getRequestUserAgent(req),
+            detail: 'Admin-only premium pagina geweigerd voor niet-admin account.',
+          },
+          'security_premium_admin_page_required'
+        );
+        res.redirect(302, '/premium-personeel-dashboard?forbidden=1');
+        return {
+          handled: true,
+          authState,
+          fileName,
+          isLoginPage,
+          isProtectedPremiumPage,
+          isAdminOnlyPremiumPage,
         };
       }
     }
@@ -122,10 +161,12 @@ function createPremiumHtmlPageAccessController(options = {}) {
       fileName,
       isLoginPage,
       isProtectedPremiumPage,
+      isAdminOnlyPremiumPage,
     };
   }
 
   return {
+    isPremiumAdminOnlyHtmlFile,
     isPremiumProtectedHtmlFile,
     resolvePremiumHtmlPageAccess,
   };

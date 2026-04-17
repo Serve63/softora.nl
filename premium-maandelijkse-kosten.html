@@ -87,7 +87,7 @@ body {
 }
 .page-title {
   font-family: 'Oswald', sans-serif;
-  font-size: 1.58rem;
+  font-size: 1.8rem;
   font-weight: 600;
   letter-spacing: 0.015em;
   text-transform: uppercase;
@@ -136,7 +136,7 @@ body {
 }
 .totaal-amount {
   font-family: 'Oswald', sans-serif;
-  font-size: 2.2rem;
+  font-size: 2.62rem;
   font-weight: 600;
   color: var(--text-dark);
   line-height: 1;
@@ -220,7 +220,7 @@ body {
 .cost-freq { font-size: 0.82rem; color: var(--text-tertiary); }
 .cost-amount {
   font-family: 'Oswald', sans-serif;
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-dark);
   line-height: 1;
@@ -677,11 +677,11 @@ function render() {
       </div>
       <div id="rows-${key}">
         ${items.map((item) => {
-          const rowClassName = item.highlighted ? 'cost-row cost-row-accent' : 'cost-row';
-          const displayFreqLabel = item.highlighted && item.freq === 'maandelijks'
-            ? 'Deze maand'
-            : (freqLabel[item.freq] || item.freq || '-');
-          const amountWrapClassName = item.highlighted ? 'cost-amount-wrap is-static' : 'cost-amount-wrap';
+              const rowClassName = item.highlighted ? 'cost-row cost-row-accent' : 'cost-row';
+              const displayFreqLabel = item.highlighted && item.freq === 'maandelijks'
+                ? 'Deze maand'
+                : freqLabel[item.freq] || item.freq || '-';
+              const amountWrapClassName = item.highlighted ? 'cost-amount-wrap is-static' : 'cost-amount-wrap';
           const rowActionsMarkup = item.highlighted ? '' : `
               <div class="row-actions">
                 <button class="btn-edit" type="button" data-action="edit" data-cat-key="${escapeHtml(key)}" data-item-id="${item.id}" title="Bewerken">

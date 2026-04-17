@@ -3,6 +3,7 @@
 Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplitst. Werk daarom volgens deze regels:
 
 ## Altijd eerst
+- Lees bij grotere refactors ook [docs/quality-protocol.md](docs/quality-protocol.md).
 - Draai `npm run verify:critical` voor je afrondt.
 - Draai bij wijzigingen in `server.js`, `server/routes`, `server/security`, `agenda`, `auth`, `leads` of `coldcalling` eerst `npm run backup:runtime`.
 - Gebruik [server/routes/manifest.js](server/routes/manifest.js) als lijst van kritieke flows.
@@ -19,6 +20,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 - Voeg nieuwe logica bij voorkeur toe via `server/routes`, `server/services`, `server/repositories`, `server/security`, `server/schemas`.
 - Nieuwe frontendlogica hoort uiteindelijk in losse bestanden, niet in grote inline scripts.
 - Nieuwe businesshelpers horen niet meer in [server.js](server.js); houd dat bestand zoveel mogelijk wiring-only.
+- Houd [server/services/server-app-runtime.js](server/services/server-app-runtime.js) en `server/services/server-app-runtime-*.js` compositie-only; nieuwe domeinlogica hoort daar niet thuis.
 - Nieuwe servercode hoort niet in nieuwe ad-hoc mappen onder `server/`; gebruik de bestaande architectuurmappen.
 - Productiecodewijzigingen horen samen te gaan met contract- of smoke-testupdates.
 

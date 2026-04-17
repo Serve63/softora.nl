@@ -20,6 +20,7 @@ function createResponseRecorder() {
 
 function createFixture(overrides = {}) {
   const dashboardActivityCalls = [];
+  const securityAuditCalls = [];
   const coordinator = createRuntimeOpsCoordinator({
     parseIntSafe: (value, fallback = 0) => {
       const parsed = Number.parseInt(value, 10);
@@ -65,11 +66,17 @@ function createFixture(overrides = {}) {
         source: meta.source,
         updatedAt: '2026-04-07T12:30:00.000Z',
       })),
+    adminOnlyUiStateScopes: overrides.adminOnlyUiStateScopes || new Set(['premium_password_register']),
+    appendSecurityAuditEvent: overrides.appendSecurityAuditEvent || ((payload, reason) => {
+      securityAuditCalls.push({ payload, reason });
+      return payload;
+    }),
   });
 
   return {
     coordinator,
     dashboardActivityCalls,
+    securityAuditCalls,
   };
 }
 
@@ -164,6 +171,65 @@ test('runtime ops coordinator merges patches for ui-state writes', async () => {
       actor: 'serve',
     },
   });
+});
+
+test('runtime ops coordinator blocks admin-only ui-state scopes for non-admin users', async () => {
+  const { coordinator, securityAuditCalls } = createFixture();
+  const getRes = createResponseRecorder();
+  const setRes = createResponseRecorder();
+
+  await coordinator.sendUiStateGetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: false, email: 'medewerker@softora.nl' },
+      originalUrl: '/api/ui-state-get?scope=premium_password_register',
+      headers: { origin: 'https://app.softora.nl' },
+      get: () => 'agent',
+      ip: '203.0.113.9',
+    },
+    getRes,
+    'premium_password_register'
+  );
+  await coordinator.sendUiStateSetResponse(
+    {
+      premiumAuth: { authenticated: true, isAdmin: false, email: 'medewerker@softora.nl' },
+      originalUrl: '/api/ui-state-set?scope=premium_password_register',
+      headers: { origin: 'https://app.softora.nl' },
+      get: () => 'agent',
+      ip: '203.0.113.9',
+      body: { values: { entries_json: '[]' } },
+    },
+    setRes,
+    'premium_password_register'
+  );
+
+  assert.equal(getRes.statusCode, 403);
+  assert.match(getRes.body.error, /Alleen Full Acces-accounts/i);
+  assert.equal(setRes.statusCode, 403);
+  assert.match(setRes.body.error, /Alleen Full Acces-accounts/i);
+  assert.equal(securityAuditCalls.length, 2);
+  assert.equal(securityAuditCalls[0].reason, 'security_admin_ui_state_scope_denied');
+  assert.equal(securityAuditCalls[0].payload.type, 'admin_ui_state_scope_denied');
+  assert.match(securityAuditCalls[0].payload.detail, /premium_password_register/);
+});
+
+test('runtime ops coordinator allows admin users on admin-only ui-state scopes', async () => {
+  const { coordinator } = createFixture({
+    getUiStateValues: async () => ({
+      values: { entries_json: '[]' },
+      source: 'supabase',
+      updatedAt: '2026-04-07T12:00:00.000Z',
+    }),
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.sendUiStateGetResponse(
+    { premiumAuth: { authenticated: true, isAdmin: true } },
+    res,
+    'premium_password_register'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.scope, 'premium_password_register');
 });
 
 test('runtime ops coordinator creates manual dashboard activities with normalized defaults', () => {

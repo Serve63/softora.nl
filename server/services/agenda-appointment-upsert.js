@@ -72,6 +72,12 @@ function createAgendaAppointmentUpsertService(deps = {}) {
     return Number.isFinite(parsedMs) && parsedMs > 0 ? Math.round(parsedMs) : 0;
   }
 
+  function getCurrentTimestampIso() {
+    const nowMsRaw = Number(getCurrentTimestampMs());
+    const nowMs = Number.isFinite(nowMsRaw) && nowMsRaw > 0 ? Math.round(nowMsRaw) : Date.now();
+    return new Date(nowMs).toISOString();
+  }
+
   function upsertGeneratedAgendaAppointment(appointment, callId) {
     if (!appointment || !callId) return null;
 
@@ -121,7 +127,7 @@ function createAgendaAppointmentUpsertService(deps = {}) {
           confirmationTaskCreatedAt:
             normalizeString(existing?.confirmationTaskCreatedAt || '') ||
             normalizeString(existing?.createdAt || '') ||
-            new Date().toISOString(),
+            getCurrentTimestampIso(),
           postCallStatus:
             normalizeString(existing?.postCallStatus || appointment?.postCallStatus || '') || null,
           postCallNotesTranscript:
@@ -137,7 +143,7 @@ function createAgendaAppointmentUpsertService(deps = {}) {
         };
         const stabilized = ensureConfirmationDraft(
           applyPreservedAgendaScheduleFields(existing, updated),
-          new Date().toISOString()
+          getCurrentTimestampIso()
         );
         return setGeneratedAgendaAppointmentAtIndex(idx, stabilized, 'agenda_appointment_upsert');
       }
@@ -152,7 +158,8 @@ function createAgendaAppointmentUpsertService(deps = {}) {
         ...appointment,
         id: existingIdForReuse,
         callId,
-        createdAt: normalizeString(appointment?.createdAt || existing?.createdAt || '') || new Date().toISOString(),
+        createdAt:
+          normalizeString(appointment?.createdAt || existing?.createdAt || '') || getCurrentTimestampIso(),
         needsConfirmationEmail: toBooleanSafe(
           existing?.needsConfirmationEmail,
           toBooleanSafe(appointment?.aiGenerated, false)
@@ -191,7 +198,7 @@ function createAgendaAppointmentUpsertService(deps = {}) {
           normalizeString(appointment?.createdAt || appointment?.updatedAt || '') ||
           normalizeString(existing?.confirmationTaskCreatedAt || '') ||
           normalizeString(existing?.createdAt || '') ||
-          new Date().toISOString(),
+          getCurrentTimestampIso(),
         postCallStatus:
           normalizeString(existing?.postCallStatus || appointment?.postCallStatus || '') || null,
         postCallNotesTranscript:
@@ -207,13 +214,13 @@ function createAgendaAppointmentUpsertService(deps = {}) {
       };
       const stabilized = ensureConfirmationDraft(
         applyPreservedAgendaScheduleFields(existing, updated),
-        new Date().toISOString()
+        getCurrentTimestampIso()
       );
       return setGeneratedAgendaAppointmentAtIndex(reusableIdx, stabilized, 'agenda_appointment_reuse_upsert');
     }
 
     const appointments = getGeneratedAgendaAppointments();
-    const createdAtIso = normalizeString(appointment?.createdAt) || new Date().toISOString();
+    const createdAtIso = normalizeString(appointment?.createdAt) || getCurrentTimestampIso();
     const hintedUpdatedAtMs = Math.max(
       Number(appointment?.updatedAtMs || 0) || 0,
       parseTimestampMs(appointment?.updatedAt || ''),

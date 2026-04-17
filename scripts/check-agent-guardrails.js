@@ -113,10 +113,20 @@ function getNewestRuntimeBackupAgeMs() {
   return Math.max(0, Date.now() - newestMtimeMs);
 }
 
-function readServerJsLineCount() {
-  const serverPath = path.join(repoRoot, 'server.js');
-  if (!fs.existsSync(serverPath)) return 0;
-  return fs.readFileSync(serverPath, 'utf8').split('\n').length;
+function readRepoFileLineCount(relativePath) {
+  const filePath = path.join(repoRoot, relativePath);
+  if (!fs.existsSync(filePath)) return 0;
+  return fs.readFileSync(filePath, 'utf8').split('\n').length;
+}
+
+function getMissingRequiredRepoFiles() {
+  return [
+    'AGENTS.md',
+    'docs/repo-map.md',
+    'docs/architecture.md',
+    'docs/quality-protocol.md',
+    'server/routes/manifest.js',
+  ].filter((relativePath) => !fs.existsSync(path.join(repoRoot, relativePath)));
 }
 
 function toBooleanEnv(name) {
@@ -153,8 +163,11 @@ const violations = buildGuardrailViolations({
   newestBackupAgeMs: getNewestRuntimeBackupAgeMs(),
   maxLocalBackupAgeMs: Number(process.env.GUARDRAILS_MAX_BACKUP_AGE_MS || 12 * 60 * 60 * 1000),
   isCi: toBooleanEnv('CI'),
-  serverJsLineCount: readServerJsLineCount(),
+  missingRequiredRepoFiles: getMissingRequiredRepoFiles(),
+  serverJsLineCount: readRepoFileLineCount('server.js'),
   maxServerJsLines: Number(process.env.GUARDRAILS_MAX_SERVER_JS_LINES || 7500),
+  serverAppRuntimeLineCount: readRepoFileLineCount('server/services/server-app-runtime.js'),
+  maxServerAppRuntimeLines: Number(process.env.GUARDRAILS_MAX_SERVER_APP_RUNTIME_LINES || 1200),
   serverJsNetGrowth: Math.max(0, serverJsCounts.additions - serverJsCounts.deletions),
   maxServerJsNetGrowth: Number(process.env.GUARDRAILS_MAX_SERVER_JS_NET_GROWTH || 25),
   addedServerJsFunctions: countAddedServerJsFunctions(serverJsDiffText),

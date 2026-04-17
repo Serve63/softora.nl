@@ -64,6 +64,7 @@ function createFixture(overrides = {}) {
         id: 42,
         company: 'Softora',
         contact: 'Serve Creusen',
+        phone: '0612345678',
         callId: 'call-42',
         leadOwnerName: 'Servé Creusen',
         summary: 'Lead wil een website en vroeg om een vervolgstap.',

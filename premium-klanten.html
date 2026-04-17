@@ -200,7 +200,7 @@
 
         .sidebar-link.active {
             color: var(--text-primary);
-            background: rgba(139, 34, 82, 0.06);
+            background: var(--accent-soft);
         }
 
         .sidebar-link svg {
@@ -1087,6 +1087,7 @@
                     <div class="hero-side">
                         <div class="leaderboard-card" id="leaderboardCard">
                             <div class="leaderboard-copy">
+                                <div class="leaderboard-label">Meeste opdrachten</div>
                                 <div class="leaderboard-list" id="leaderboardList">
                                     <div class="leaderboard-entry is-leading">
                                         <span class="leaderboard-entry-name">Servé</span>
@@ -1851,8 +1852,8 @@
         function updateLeaderboard() {
             if (!nodes.leaderboardCard || !nodes.leaderboardList) return;
 
-            const counts = state.orders.reduce(function (result, order) {
-                const responsible = normalizeResponsibleValue(order && order.claimedBy);
+            const counts = state.klanten.reduce(function (result, customer) {
+                const responsible = normalizeResponsibleValue(customer && customer.verantwoordelijk);
                 if (responsible === "Serve" || responsible === "Martijn") {
                     result[responsible] = (result[responsible] || 0) + 1;
                 }
@@ -1867,13 +1868,10 @@
                 return a.displayName.localeCompare(b.displayName, "nl");
             });
 
-            const topCount = entries[0].count;
-
             nodes.leaderboardCard.hidden = false;
-            nodes.leaderboardList.innerHTML = entries.map(function (entry) {
+            nodes.leaderboardList.innerHTML = entries.map(function (entry, index) {
                 const assignmentLabel = entry.count === 1 ? "opdracht" : "opdrachten";
-                const isLeading = entry.count > 0 && entry.count === topCount;
-                const rowClassName = isLeading ? "leaderboard-entry is-leading" : "leaderboard-entry";
+                const rowClassName = index === 0 ? "leaderboard-entry is-leading" : "leaderboard-entry";
                 return [
                     "<div class=\"" + rowClassName + "\">",
                         "<span class=\"leaderboard-entry-name\">" + escapeHtml(entry.displayName) + "</span>",

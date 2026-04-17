@@ -3,9 +3,13 @@
 ## Doel
 Snelle oriëntatie voor mensen en AI-agents, zodat nieuwe wijzigingen op de juiste plek landen zonder kritieke flows te breken.
 
+## Kwaliteitsprotocol
+- [docs/quality-protocol.md](quality-protocol.md): vaste kwaliteits-, security- en onderhoudsregels voor mensen en AI.
+
 ## Runtime entrypoints
-- [server.js](../server.js): huidige Express runtime en legacy hoofd-entrypoint.
+- [server.js](../server.js): klein Express entrypoint en export-layer.
 - [server/app.js](../server/app.js): kleine loader voor dezelfde Express app.
+- [server/services/server-app-runtime.js](../server/services/server-app-runtime.js): centrale app-compositie en wiringlaag.
 - [api/_app-handler.js](../api/_app-handler.js): Vercel bootstrap naar de bestaande Express app.
 - [twilio-media-bridge/server.js](../twilio-media-bridge/server.js): losse subservice voor Twilio media streams.
 
@@ -17,6 +21,7 @@ Snelle oriëntatie voor mensen en AI-agents, zodat nieuwe wijzigingen op de juis
 
 Gebruik voor deze domeinen altijd eerst:
 - [AGENTS.md](../AGENTS.md)
+- [docs/quality-protocol.md](quality-protocol.md)
 - [server/routes/manifest.js](../server/routes/manifest.js)
 - [docs/rollback-playbook.md](rollback-playbook.md)
 
@@ -48,6 +53,7 @@ Gebruik voor deze domeinen altijd eerst:
 - Verander bestaande response-shapes niet stilletjes.
 - Voeg geen nieuwe bron van waarheid toe naast database of formele repositories.
 - Nieuwe backendlogica niet verder ophopen in `server.js` als het ook in `server/` kan.
+- Houd `server/services/server-app-runtime.js` en `server/services/server-app-runtime-*.js` wiring-only.
 - Nieuwe frontendlogica niet inline in HTML als een los assetbestand redelijk is.
 - High-risk wijzigingen eerst backuppen en daarna pas verifiëren.
 

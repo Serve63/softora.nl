@@ -37,6 +37,17 @@ function createCustomersPageBootstrapService(deps = {}) {
     return parseResponsibleValue(value) || 'Serve';
   }
 
+  function setExplicitResponsibleMetadata(target, value) {
+    if (!target || typeof target !== 'object') return target;
+    Object.defineProperty(target, '__explicitResponsible', {
+      value: parseResponsibleValue(value),
+      enumerable: false,
+      configurable: true,
+      writable: false,
+    });
+    return target;
+  }
+
   function getResponsibleSourceValue(raw) {
     if (!raw || typeof raw !== 'object') return '';
     return normalizeString(
@@ -117,7 +128,12 @@ function createCustomersPageBootstrapService(deps = {}) {
       const parsed = JSON.parse(String(raw || '[]'));
       if (!Array.isArray(parsed)) return [];
       return sortCustomers(
-        parsed.map((item, index) => normalizeCustomer(item, `klant-import-${index}`))
+        parsed.map((item, index) =>
+          setExplicitResponsibleMetadata(
+            normalizeCustomer(item, `klant-import-${index}`),
+            getResponsibleSourceValue(item)
+          )
+        )
       );
     } catch (_) {
       return [];
@@ -257,9 +273,10 @@ function createCustomersPageBootstrapService(deps = {}) {
 
     return sortCustomers(
       customers.map((customer, index) => {
+        const explicitResponsible =
+          typeof customer?.__explicitResponsible === 'string' ? customer.__explicitResponsible : '';
         const normalizedCustomer = normalizeCustomer(customer, `klant-responsible-${index}`);
         const key = buildCustomerIdentityKey(normalizedCustomer);
-        const explicitResponsible = parseResponsibleValue(getResponsibleSourceValue(customer));
         const matchedResponsible =
           explicitResponsible || responsibleByCustomerKey.get(key) || normalizedCustomer.verantwoordelijk;
         if (matchedResponsible === normalizedCustomer.verantwoordelijk) {

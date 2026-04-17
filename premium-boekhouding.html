@@ -26,14 +26,14 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: var(--bg-primary);
+  --bg: #f0ede8;
   --card: var(--bg-secondary);
   --tag: rgba(139, 34, 82, 0.06);
   --border: var(--border);
-  --crimson: var(--accent);
+  --crimson: #9b2355;
   --clight: var(--accent-light);
   --dark: var(--text-primary);
-  --text-dark: var(--text-primary);
+  --text-dark: #1a1a2e;
   --mid: var(--text-secondary);
   --light: var(--text-tertiary);
   --green: #16733c;
@@ -246,7 +246,8 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
   <div class="map-body">
     <div class="files-header">
       <div class="files-header-copy">
-        <div class="files-title">Bestanden</div>
+        <div class="files-title" id="map-title">Bestanden</div>
+        <div class="files-count" id="map-period"></div>
         <div class="files-count" id="files-count"></div>
       </div>
       <div class="files-tools">
@@ -436,6 +437,8 @@ function openMap(id) {
   const a = ALL_AANGIFTES.find(x => x.id === id); if (!a) return;
   const e = entry(id);
 
+  document.getElementById('map-title').textContent = a.naam;
+  document.getElementById('map-period').textContent = a.period || '';
   document.getElementById('notes-ta').value = e.notes || '';
   renderFiles();
 

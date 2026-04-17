@@ -6894,9 +6894,9 @@
         status: String(data.status || '').trim(),
         endedReason: String(data.endedReason || '').trim(),
         startedAt: String(data.startedAt || '').trim(),
+        messageType: 'direct.call.status',
         endedAt: String(data.endedAt || '').trim(),
         durationSeconds: Number(data.durationSeconds || 0) || 0,
-        messageType: 'direct.call.status',
         updatedAtMs: Date.now(),
       };
 

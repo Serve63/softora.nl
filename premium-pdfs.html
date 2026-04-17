@@ -44,23 +44,45 @@
 }
 
 html, body { height: 100%; overflow: hidden; }
-body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
 /* ── LAYOUT ─────────────────────────────────────────────── */
 .dashboard-layout { display: flex; min-height: 100vh; }
 
+.main-content,
 .pdf-main {
   flex: 1;
   margin-left: 280px;
   width: calc(100% - 280px);
   min-width: 0;
+  padding: 0 !important;
   height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
+.dashboard-layout[data-sidebar-shell="canonical"] > .main-content {
+  padding: 0 !important;
+}
+
+.main-content {
+  margin-left: 280px;
+  width: calc(100% - 280px);
+  min-width: 0;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.pdf-builder-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
 /* ── TOPBAR ──────────────────────────────────────────────── */
+.topbar,
 .pdf-topbar {
   height: 58px;
   background: var(--surface);
@@ -72,6 +94,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   flex-shrink: 0;
 }
 
+.topbar-logo,
 .pdf-topbar-title {
   font-family: 'Oswald', sans-serif;
   font-size: 13px;
@@ -81,6 +104,15 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   color: var(--crimson);
   margin-right: 24px;
   flex-shrink: 0;
+}
+
+.topbar-logo {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--crimson);
 }
 
 .pdf-tabs {
@@ -113,6 +145,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 }
 .pdf-tab.active svg { opacity: 1; }
 
+.btn-dl,
 .btn-download {
   display: flex;
   align-items: center;
@@ -131,20 +164,29 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   transition: opacity .15s;
   flex-shrink: 0;
 }
+
+.btn-dl {
+  font-family: 'Oswald', sans-serif;
+}
 .btn-download:hover { opacity: .88; }
 .btn-download svg { width: 14px; height: 14px; }
 
 /* ── SPLIT ───────────────────────────────────────────────── */
+.split,
 .pdf-split {
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-width: 0;
   min-height: 0;
 }
 
+.split { display: flex; flex: 1; overflow: hidden; min-width: 0; min-height: 0; }
+
 /* ── FORM PANEL ──────────────────────────────────────────── */
+.form-panel,
 .pdf-form-panel {
-  width: 320px;
+  width: clamp(280px, 30vw, 340px);
   min-width: 280px;
   flex-shrink: 0;
   background: var(--surface);
@@ -152,6 +194,11 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+.form-panel {
+  width: clamp(280px, 30vw, 340px);
+  min-width: 280px;
 }
 
 .pdf-form-inner {
@@ -330,6 +377,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 }
 
 /* ── PREVIEW PANEL ───────────────────────────────────────── */
+.preview-panel,
 .pdf-preview-panel {
   flex: 1;
   min-width: 0;
@@ -338,7 +386,12 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   flex-direction: column;
   align-items: stretch;
   overflow: hidden;
+  padding: 0;
 }
+
+.preview-panel { padding: 0; }
+
+.preview-hint { display: none; }
 
 .preview-header {
   height: 40px;
@@ -376,11 +429,19 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   justify-content: center;
 }
 
+.a4-scale-shell,
 .a4-shell {
   width: calc(var(--a4-width) * var(--preview-scale));
   height: calc(var(--a4-height) * var(--preview-scale));
   flex-shrink: 0;
   position: relative;
+  margin: 0 auto;
+}
+
+.a4-scale-shell {
+  width: calc(var(--a4-width) * var(--preview-scale));
+  height: calc(var(--a4-height) * var(--preview-scale));
+  margin: 0 auto;
 }
 
 /* ── A4 DOCUMENT ─────────────────────────────────────────── */
@@ -393,7 +454,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   flex-direction: column;
   font-family: 'Barlow', sans-serif;
   transform: scale(var(--preview-scale));
-  transform-origin: top left;
+  transform-origin: top center;
   border-radius: 2px;
   overflow: hidden;
 }
@@ -460,17 +521,34 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .toast.show { opacity: 1; transform: translateY(0); }
 
 /* ── RESPONSIVE ──────────────────────────────────────────── */
-@media (max-width: 1100px) {
-  .pdf-form-panel { width: 280px; }
+@media (max-width: 1180px) {
+  .split, .pdf-split { flex-direction: column; overflow: auto; }
+  .form-panel, .pdf-form-panel { width: 100%; max-height: 44vh; }
+  .split { flex-direction: column; overflow: auto; }
+  .form-panel { width: 100%; max-height: 44vh; }
 }
 
 @media (max-width: 900px) {
-  .pdf-main { margin-left: 0; width: 100%; }
-  .pdf-split { flex-direction: column; overflow: auto; }
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+  }
+  .pdf-builder-shell {
+    min-height: auto;
+    max-height: none;
+  }
+  .split {
+    flex-direction: column;
+  }
+  .main-content, .pdf-main { margin-left: 0; width: 100%; }
+  .split, .pdf-split { flex-direction: column; }
   html, body { overflow: auto; }
-  .pdf-main { height: auto; overflow: visible; }
-  .pdf-form-panel { width: 100%; min-width: 0; border-right: none; border-bottom: 1px solid var(--border); max-height: none; overflow: visible; }
+  .pdf-builder-shell { min-height: auto; max-height: none; }
+  .main-content, .pdf-main { height: auto; overflow: visible; }
+  .form-panel, .pdf-form-panel { width: 100%; min-width: 0; border-right: none; border-bottom: 1px solid var(--border); max-height: none; overflow: visible; }
   .pdf-preview-panel { min-height: 500px; }
+  .main-content { margin-left: 0; width: 100%; }
+  .split { flex-direction: column; }
 }
 </style>
 </head>
@@ -521,11 +599,12 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
     </div>
   </aside>
 
-  <main class="pdf-main">
+  <main class="main-content pdf-main">
+    <div class="pdf-builder-shell">
 
     <!-- TOPBAR -->
-    <div class="pdf-topbar">
-      <div class="pdf-topbar-title">PDF's</div>
+    <div class="topbar">
+      <div class="topbar-logo">PDF's</div>
       <div class="pdf-tabs">
         <button class="pdf-tab active" onclick="setDoc('offerte',this)" data-doc="offerte">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h4M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg>
@@ -540,35 +619,37 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
           Betalingsherinnering
         </button>
       </div>
-      <button class="btn-download" onclick="downloadPDF()">
+      <button class="btn-dl btn-download" onclick="downloadPDF()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         PDF Downloaden
       </button>
     </div>
 
     <!-- SPLIT -->
-    <div class="pdf-split">
+    <div class="split pdf-split">
 
       <!-- FORMULIER -->
-      <div class="pdf-form-panel">
+      <div class="form-panel">
         <div class="pdf-form-inner" id="form-panel">
           <!-- filled by JS -->
         </div>
       </div>
 
       <!-- PREVIEW -->
-      <div class="pdf-preview-panel">
+      <div class="preview-panel" id="previewPanel">
         <div class="preview-header">
           <div class="preview-header-dot"></div>
           <div class="preview-header-label">Live preview</div>
         </div>
+        <div class="preview-hint">Live preview</div>
         <div class="preview-stage" id="previewStage">
-          <div class="a4-shell" id="a4Shell">
+          <div class="a4-scale-shell" id="a4ScaleShell">
             <div class="a4" id="a4"><!-- filled by JS --></div>
           </div>
         </div>
       </div>
 
+    </div>
     </div>
   </main>
 </div>
@@ -580,42 +661,39 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 let docType = 'offerte';
 let regels = [{ id:1, omschrijving:'', aantal:1, prijs:0 }];
 let rc = 2;
-const A4W = 595, A4H = 842;
+const A4_PREVIEW_WIDTH = 595;
+const A4_PREVIEW_HEIGHT = 842;
 let resizeObs = null;
 
 const fields = {};
 const v = id => (fields[id] && fields[id].value) || '';
-const fmtEur = n => '€\u00a0' + (isNaN(n) ? '0,00' : n.toLocaleString('nl-NL', { minimumFractionDigits:2, maximumFractionDigits:2 }));
+function fmtEur(n) { return '€\u00a0' + (isNaN(n) ? '0,00' : n.toLocaleString('nl-NL', { minimumFractionDigits:2, maximumFractionDigits:2 })); }
 const fmtDate = s => { if(!s) return '-'; const[y,m,d]=s.split('-'); return `${d}-${m}-${y}`; };
 const today = () => new Date().toISOString().split('T')[0];
 const addDays = n => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; };
 
 // ── SCALE ──────────────────────────────────────────────────
-function fitPreview() {
+function fitPreviewToViewport() {
   const stage = document.getElementById('previewStage');
-  const shell = document.getElementById('a4Shell');
+  const shell = document.getElementById('a4ScaleShell');
   if (!stage || !shell) return;
-  const aw = stage.clientWidth - 48;
-  const ah = stage.clientHeight - 56;
-  const scaleW = Math.min(1, aw / A4W);
-  const scaleH = Math.min(1, ah / A4H);
-  const scale = Math.min(scaleW, scaleH, 1);
-  shell.style.width = (A4W * scale) + 'px';
-  shell.style.height = (A4H * scale) + 'px';
+  const availableWidth = Math.max(240, stage.clientWidth);
+  const scale = Math.min(1, availableWidth / A4_PREVIEW_WIDTH);
+  shell.style.width = (A4_PREVIEW_WIDTH * scale) + 'px';
+  shell.style.height = (A4_PREVIEW_HEIGHT * scale) + 'px';
   shell.style.setProperty('--preview-scale', String(scale));
   document.getElementById('a4').style.transform = `scale(${scale})`;
-  document.getElementById('a4').style.transformOrigin = 'top left';
+  document.getElementById('a4').style.transformOrigin = 'top center';
 }
 
-function setupFit() {
+function setupPreviewAutoFit() {
   const stage = document.getElementById('previewStage');
   if (!stage) return;
   if (!resizeObs && typeof ResizeObserver === 'function') {
-    resizeObs = new ResizeObserver(fitPreview);
+    resizeObs = new ResizeObserver(() => fitPreviewToViewport());
     resizeObs.observe(stage);
   }
-  window.addEventListener('resize', fitPreview, { passive:true });
-  fitPreview();
+  window.addEventListener('resize', fitPreviewToViewport, { passive:true });
 }
 
 // ── DOC SWITCH ─────────────────────────────────────────────
@@ -627,7 +705,7 @@ function setDoc(type, el) {
   rc = 2;
   buildForm();
   update();
-  fitPreview();
+  fitPreviewToViewport();
 }
 
 // ── BUILD FORM ─────────────────────────────────────────────
@@ -1008,7 +1086,8 @@ function showToast(msg) {
 
 // ── INIT ───────────────────────────────────────────────────
 buildForm();
-setupFit();
+setupPreviewAutoFit();
+fitPreviewToViewport();
 </script>
 </body>
 </html>

@@ -53,6 +53,11 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /document\.body\.setAttribute\("data-sidebar-nav-ready", "1"\);/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
   assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
+  assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords", "settings"\]\);/);
+  assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
+  assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
+  assert.match(themeSource, /:root\[data-personnel-loading="true"\] \.sidebar-link\[data-sidebar-key="passwords"\],/);
+  assert.match(themeSource, /:root\[data-personnel-loading="true"\] \.sidebar-link\[data-sidebar-key="settings"\] \{/);
 });
 
 test('canonical premium pages opt into the shared sidebar shell', () => {

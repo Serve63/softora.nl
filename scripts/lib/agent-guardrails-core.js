@@ -3,6 +3,7 @@ const HIGH_RISK_PATH_PATTERNS = Object.freeze([
   /^api\//,
   /^server\/routes\//,
   /^server\/security\//,
+  /^server\/services\/.+-runtime(?:-[^/]+)?\.js$/,
   /^server\/services\/agenda-/,
   /^server\/services\/premium-/,
   /^server\/services\/confirmation-/,
@@ -138,8 +139,11 @@ function buildGuardrailViolations(options = {}) {
     maxLocalBackupAgeMs = 12 * 60 * 60 * 1000,
     isCi = false,
     behaviorFiles = [],
+    missingRequiredRepoFiles = [],
     serverJsLineCount = 0,
     maxServerJsLines = 7500,
+    serverAppRuntimeLineCount = 0,
+    maxServerAppRuntimeLines = 1200,
     serverJsNetGrowth = 0,
     maxServerJsNetGrowth = 25,
     addedServerJsFunctions = 0,
@@ -155,9 +159,21 @@ function buildGuardrailViolations(options = {}) {
   const violations = [];
   const normalizedAddedFiles = addedFiles.map(normalizeRepoPath);
 
+  if (missingRequiredRepoFiles.length > 0) {
+    violations.push(
+      `[guardrails] Verplichte repo-protocolfiles ontbreken: ${missingRequiredRepoFiles.join(', ')}. Herstel de architectuur- en kwaliteitsdocs voordat je afrondt.`
+    );
+  }
+
   if (serverJsLineCount > maxServerJsLines) {
     violations.push(
       `[guardrails] server.js telt nu ${serverJsLineCount} regels; limiet is ${maxServerJsLines}. Trek nieuwe logica uit naar server/services of server/routes.`
+    );
+  }
+
+  if (serverAppRuntimeLineCount > maxServerAppRuntimeLines) {
+    violations.push(
+      `[guardrails] server/services/server-app-runtime.js telt nu ${serverAppRuntimeLineCount} regels; limiet is ${maxServerAppRuntimeLines}. Houd de runtime-compositie opgesplitst over kleinere modules.`
     );
   }
 

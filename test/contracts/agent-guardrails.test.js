@@ -51,6 +51,8 @@ test('agent guardrails detect server.js growth and new helper functions', () => 
     isCi: false,
     serverJsLineCount: 7601,
     maxServerJsLines: 7500,
+    serverAppRuntimeLineCount: 1190,
+    maxServerAppRuntimeLines: 1200,
     serverJsNetGrowth: 41,
     maxServerJsNetGrowth: 25,
     addedServerJsFunctions: countAddedServerJsFunctions(diffText),
@@ -60,6 +62,27 @@ test('agent guardrails detect server.js growth and new helper functions', () => 
   assert.match(violations[0], /server\.js telt nu 7601 regels/i);
   assert.match(violations[1], /groeide netto met 41 regels/i);
   assert.match(violations[2], /Nieuwe function-declaraties in server\.js/i);
+});
+
+test('agent guardrails protect runtime composition size and required protocol docs', () => {
+  const violations = buildGuardrailViolations({
+    changedFiles: ['server/services/server-app-runtime.js', 'test/contracts/example.test.js'],
+    addedFiles: [],
+    changedTests: ['test/contracts/example.test.js'],
+    highRiskFiles: ['server/services/server-app-runtime.js'],
+    behaviorFiles: ['server/services/server-app-runtime.js'],
+    newestBackupAgeMs: 10 * 60 * 1000,
+    isCi: false,
+    missingRequiredRepoFiles: ['docs/quality-protocol.md'],
+    serverJsLineCount: 25,
+    serverAppRuntimeLineCount: 1211,
+    maxServerAppRuntimeLines: 1200,
+    serverJsNetGrowth: 0,
+  });
+
+  assert.equal(violations.length, 2);
+  assert.match(violations[0], /Verplichte repo-protocolfiles ontbreken/i);
+  assert.match(violations[1], /server\/services\/server-app-runtime\.js telt nu 1211 regels/i);
 });
 
 test('agent guardrails block nonstandard new server files and new root js files', () => {
@@ -114,5 +137,6 @@ test('agent guardrails helpers recognize approved and high-risk paths', () => {
   assert.equal(isFrontendProductionPath('assets/coldcalling-dashboard.js'), true);
   assert.equal(isFrontendProductionPath('server/services/ui-state.js'), false);
   assert.equal(isHighRiskPath('server/services/agenda-metadata.js'), true);
+  assert.equal(isHighRiskPath('server/services/server-app-runtime.js'), true);
   assert.equal(isHighRiskPath('docs/repo-map.md'), false);
 });

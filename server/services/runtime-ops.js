@@ -1,3 +1,5 @@
+const { createAdminOnlyUiStateScopesSet } = require('../config/admin-ui-state-scopes');
+
 function createRuntimeOpsCoordinator(deps = {}) {
   const {
     parseIntSafe = (value, fallback = 0) => {
@@ -12,6 +14,8 @@ function createRuntimeOpsCoordinator(deps = {}) {
     getUiStateValues = async () => null,
     sanitizeUiStateValues = (value) => value || {},
     setUiStateValues = async () => null,
+    adminOnlyUiStateScopes = createAdminOnlyUiStateScopesSet(),
+    appendSecurityAuditEvent = () => {},
   } = deps;
 
   function normalizeListLimit(value, fallback = 100) {
@@ -36,10 +40,44 @@ function createRuntimeOpsCoordinator(deps = {}) {
     });
   }
 
+  function requiresAdminUiStateAccess(scope) {
+    return adminOnlyUiStateScopes.has(scope);
+  }
+
+  function hasAdminUiStateAccess(req, scope) {
+    if (!requiresAdminUiStateAccess(scope)) return true;
+    return Boolean(req?.premiumAuth?.authenticated && req?.premiumAuth?.isAdmin);
+  }
+
+  function appendAdminScopeDeniedAuditEvent(req, scope) {
+    appendSecurityAuditEvent(
+      {
+        type: 'admin_ui_state_scope_denied',
+        severity: 'warning',
+        success: false,
+        email: String(req?.premiumAuth?.email || '').trim(),
+        ip: String(req?.ip || req?.headers?.['x-forwarded-for'] || '').trim(),
+        path: String(req?.originalUrl || req?.url || '').trim(),
+        origin: String(req?.headers?.origin || '').trim(),
+        userAgent: typeof req?.get === 'function' ? req.get('user-agent') : '',
+        detail: `Admin-only UI state scope geweigerd: ${scope}`,
+      },
+      'security_admin_ui_state_scope_denied'
+    );
+  }
+
   async function sendUiStateGetResponse(req, res, scopeRaw) {
     const scope = normalizeUiStateScope(scopeRaw);
     if (!scope) {
       return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
+    }
+
+    if (!hasAdminUiStateAccess(req, scope)) {
+      appendAdminScopeDeniedAuditEvent(req, scope);
+      return res.status(403).json({
+        ok: false,
+        error: 'Alleen Full Acces-accounts hebben toegang tot deze UI state scope.',
+      });
     }
 
     const state = await getUiStateValues(scope);
@@ -63,6 +101,14 @@ function createRuntimeOpsCoordinator(deps = {}) {
     const scope = normalizeUiStateScope(scopeRaw);
     if (!scope) {
       return res.status(400).json({ ok: false, error: 'Ongeldige UI state scope' });
+    }
+
+    if (!hasAdminUiStateAccess(req, scope)) {
+      appendAdminScopeDeniedAuditEvent(req, scope);
+      return res.status(403).json({
+        ok: false,
+        error: 'Alleen Full Acces-accounts hebben toegang tot deze UI state scope.',
+      });
     }
 
     const patchProvided =
@@ -125,6 +171,8 @@ function createRuntimeOpsCoordinator(deps = {}) {
   }
 
   return {
+    hasAdminUiStateAccess,
+    requiresAdminUiStateAccess,
     sendDashboardActivityCreateResponse,
     sendDashboardActivityResponse,
     sendSecurityAuditLogResponse,
