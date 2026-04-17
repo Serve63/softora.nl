@@ -49,6 +49,7 @@ const staticSidebarPages = [
 test('personnel theme canonical shell is explicitly opt-in', () => {
   const themeSource = readRepoFile('assets/personnel-theme.css');
   const themeJsSource = readRepoFile('assets/personnel-theme.js');
+  const prefillSource = readRepoFile('assets/premium-sidebar-profile-prefill.js');
 
   assert.match(
     themeSource,
@@ -70,6 +71,12 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
   assert.match(themeJsSource, /persistPremiumSidebarSessionSnapshot/);
+  assert.match(themeJsSource, /buildSidebarProfileRenderKey/);
+  assert.match(themeJsSource, /sidebar\.dataset\.sidebarProfileRenderKey === renderKey/);
+  assert.match(themeSource, /\.sidebar-link \.sidebar-link-text[\s\S]*white-space:\s*nowrap !important;/);
+  assert.match(themeSource, /\.sidebar-user-name[\s\S]*text-overflow:\s*ellipsis !important;/);
+  assert.match(prefillSource, /data-sidebar-profile-render-key/);
+  assert.match(prefillSource, /getAttribute\("data-sidebar-profile-render-key"\)/);
   assert.doesNotMatch(
     themeJsSource,
     /if \(sidebar\.dataset\.staticSidebar === "1"\) \{[\s\S]*ensureStaticSidebarLink\(sidebar, "beheer", getWebsitePreviewSidebarLink\(\), \["seo", "packages", "pdfs"\]\);/s

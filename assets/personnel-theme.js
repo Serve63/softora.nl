@@ -896,6 +896,13 @@
         return (compact.slice(0, 2) || "SP").toUpperCase();
     }
 
+    function buildSidebarProfileRenderKey(session) {
+        const displayName = String((session && session.displayName) || "Softora Premium").trim() || "Softora Premium";
+        const role = String((session && session.role) || "admin").trim().toLowerCase() || "admin";
+        const avatarDataUrl = String((session && session.avatarDataUrl) || "").trim();
+        return [displayName, role, avatarDataUrl].join("\u0001");
+    }
+
     function paintSidebarAvatar(avatarEl, session) {
         if (!avatarEl) return;
         const avatarDataUrl = String((session && session.avatarDataUrl) || "").trim();
@@ -941,6 +948,11 @@
                 avatarDataUrl: "",
                 email: "",
             };
+        const renderKey = buildSidebarProfileRenderKey(resolvedSession);
+        if (sidebar && sidebar.dataset.sidebarProfileRenderKey === renderKey) {
+            markPremiumSidebarProfileResolved();
+            return;
+        }
 
         nameEl.textContent = String(resolvedSession.displayName || "Softora Premium");
         roleEl.textContent = buildSidebarRoleLabel(resolvedSession.role);
@@ -949,6 +961,9 @@
             `Profiel bewerken van ${String(resolvedSession.displayName || "Softora Premium")}`
         );
         paintSidebarAvatar(avatarEl, resolvedSession);
+        if (sidebar) {
+            sidebar.dataset.sidebarProfileRenderKey = renderKey;
+        }
         markPremiumSidebarProfileResolved();
     }
 

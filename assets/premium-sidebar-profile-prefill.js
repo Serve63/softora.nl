@@ -20,6 +20,13 @@
         return (compact.slice(0, 2) || "SP").toUpperCase();
     }
 
+    function buildProfileRenderKey(session) {
+        var displayName = String((session && session.displayName) || "Softora Premium").trim() || "Softora Premium";
+        var role = String((session && session.role) || "admin").trim().toLowerCase() || "admin";
+        var avatarDataUrl = String((session && session.avatarDataUrl) || "").trim();
+        return [displayName, role, avatarDataUrl].join("\u0001");
+    }
+
     try {
         var raw = sessionStorage.getItem(STORAGE_KEY);
         if (!raw) return;
@@ -30,6 +37,9 @@
         var roleEl = document.querySelector("[data-sidebar-user-role]");
         var avatarEl = document.querySelector("[data-sidebar-avatar]");
         var triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
+        var sidebarEl = document.querySelector(".sidebar");
+        if (sidebarEl && String(sidebarEl.getAttribute("data-sidebar-profile-render-key") || "").trim()) return;
+        var renderKey = buildProfileRenderKey(s);
 
         var displayName = String(s.displayName || "Softora Premium");
         if (nameEl) nameEl.textContent = displayName;
@@ -49,6 +59,9 @@
             } else {
                 avatarEl.textContent = initialsFromSession(s);
             }
+        }
+        if (sidebarEl) {
+            sidebarEl.setAttribute("data-sidebar-profile-render-key", renderKey);
         }
     } catch (_) {
         /* ignore */

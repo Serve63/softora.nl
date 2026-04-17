@@ -28,6 +28,40 @@ function createHtmlPageCoordinator(options = {}) {
     applySeoOverridesToHtml = (_fileName, html) => String(html || ''),
     getPageBootstrapData = async () => null,
   } = options;
+  let premiumSidebarProfilePrefillInlineTag = null;
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function buildPremiumSidebarRoleLabel(role) {
+    return String(role || '').trim().toLowerCase() === 'admin' ? 'Full Acces' : 'Medewerker';
+  }
+
+  function buildPremiumSidebarInitials(authState) {
+    const displayName = String(
+      (authState && (authState.displayName || authState.firstName || authState.email)) || ''
+    ).trim();
+    if (!displayName) return 'SP';
+    const parts = displayName.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+    }
+    const compact = displayName.replace(/[^a-z0-9]+/gi, '');
+    return (compact.slice(0, 2) || 'SP').toUpperCase();
+  }
+
+  function buildPremiumSidebarProfileRenderKey(authState) {
+    const displayName = String((authState && authState.displayName) || 'Softora Premium').trim() || 'Softora Premium';
+    const role = String((authState && authState.role) || 'admin').trim().toLowerCase() || 'admin';
+    const avatarDataUrl = String((authState && authState.avatarDataUrl) || '').trim();
+    return [displayName, role, avatarDataUrl].join('\u0001');
+  }
 
   function escapeJsonForInlineHtml(value) {
     return JSON.stringify(value === undefined ? null : value)
@@ -97,7 +131,69 @@ function createHtmlPageCoordinator(options = {}) {
     return `${snippet}\n${sourceHtml}`;
   }
 
-  function optimizeHtmlDelivery(html, fileName) {
+  function inlinePremiumSidebarProfilePrefill(html) {
+    const sourceHtml = String(html || '');
+    const scriptPattern =
+      /<script[^>]+src=["']\/?assets\/premium-sidebar-profile-prefill\.js(?:\?[^"']*)?["'][^>]*><\/script>/i;
+    if (!scriptPattern.test(sourceHtml)) return sourceHtml;
+    if (premiumSidebarProfilePrefillInlineTag === null) {
+      try {
+        const assetPath = path.join(pagesDir, 'assets', 'premium-sidebar-profile-prefill.js');
+        const assetSource = fs.readFileSync(assetPath, 'utf8');
+        premiumSidebarProfilePrefillInlineTag = `<script>${assetSource}</script>`;
+      } catch (error) {
+        logger.error('[HTML][InlineSidebarPrefillError]', error?.message || error);
+        premiumSidebarProfilePrefillInlineTag = '';
+      }
+    }
+    if (!premiumSidebarProfilePrefillInlineTag) return sourceHtml;
+    return sourceHtml.replace(scriptPattern, premiumSidebarProfilePrefillInlineTag);
+  }
+
+  function injectPremiumSidebarProfileHtml(html, authState) {
+    let renderedHtml = String(html || '');
+    if (!authState || !authState.authenticated) return renderedHtml;
+    if (!/data-sidebar-user-name/i.test(renderedHtml)) return renderedHtml;
+
+    const displayNameRaw =
+      String(authState.displayName || authState.firstName || authState.email || 'Softora Premium').trim() ||
+      'Softora Premium';
+    const roleLabelRaw = buildPremiumSidebarRoleLabel(authState.role);
+    const renderKey = escapeHtml(buildPremiumSidebarProfileRenderKey(authState));
+    const ariaLabel = escapeHtml(`Profiel bewerken van ${displayNameRaw}`);
+    const avatarDataUrl = String(authState.avatarDataUrl || '').trim();
+    const avatarHtml = avatarDataUrl
+      ? `<img src="${escapeHtml(avatarDataUrl)}" alt="${escapeHtml(displayNameRaw || 'Profielfoto')}" decoding="async">`
+      : escapeHtml(buildPremiumSidebarInitials(authState));
+
+    renderedHtml = renderedHtml.replace(
+      /<aside([^>]*\bclass="sidebar\b[^"]*"[^>]*)>/i,
+      (match, attrs) => {
+        const normalizedAttrs = String(attrs || '').replace(/\sdata-sidebar-profile-render-key="[^"]*"/i, '');
+        return `<aside${normalizedAttrs} data-sidebar-profile-render-key="${renderKey}">`;
+      }
+    );
+    renderedHtml = renderedHtml.replace(
+      /(<button[^>]*data-sidebar-profile-trigger="1"[^>]*aria-label=")[^"]*(")/i,
+      `$1${ariaLabel}$2`
+    );
+    renderedHtml = renderedHtml.replace(
+      /(<div class="sidebar-avatar"[^>]*data-sidebar-avatar[^>]*>)([\s\S]*?)(<\/div>)/i,
+      `$1${avatarHtml}$3`
+    );
+    renderedHtml = renderedHtml.replace(
+      /(<div class="sidebar-user-name"[^>]*data-sidebar-user-name[^>]*>)([\s\S]*?)(<\/div>)/i,
+      `$1${escapeHtml(displayNameRaw)}$3`
+    );
+    renderedHtml = renderedHtml.replace(
+      /(<div class="sidebar-user-role"[^>]*data-sidebar-user-role[^>]*>)([\s\S]*?)(<\/div>)/i,
+      `$1${escapeHtml(roleLabelRaw)}$3`
+    );
+
+    return renderedHtml;
+  }
+
+  function optimizeHtmlDelivery(html, fileName, authState) {
     let renderedHtml = String(html || '')
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.googleapis\.com"[^>]*>\s*/gim, '')
       .replace(/^[ \t]*<link[^>]+href="https:\/\/fonts\.gstatic\.com"[^>]*>\s*/gim, '');
@@ -114,6 +210,9 @@ function createHtmlPageCoordinator(options = {}) {
     if (fileName === 'premium-website.html') {
       renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, HOMEPAGE_HERO_IMAGE_PRELOAD);
     }
+
+    renderedHtml = injectPremiumSidebarProfileHtml(renderedHtml, authState);
+    renderedHtml = inlinePremiumSidebarProfilePrefill(renderedHtml);
 
     return renderedHtml;
   }
@@ -160,7 +259,7 @@ function createHtmlPageCoordinator(options = {}) {
       } catch (error) {
         logger.error('[HTML][BootstrapError]', fileName, error?.message || error);
       }
-      rendered = optimizeHtmlDelivery(rendered, fileName);
+      rendered = optimizeHtmlDelivery(rendered, fileName, premiumPageAccess?.authState || null);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader(
         'Cache-Control',
