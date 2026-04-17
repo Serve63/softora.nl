@@ -54,71 +54,6 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
 .page-title { font-family: 'Oswald', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 .page-sub { font-size: 13px; color: var(--light); margin-top: 3px; margin-bottom: 32px; }
 
-.deadlines-legal-note {
-  margin-bottom: 24px;
-  padding: 14px 16px;
-  background: var(--tag);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--mid);
-}
-.deadlines-legal-note strong { color: var(--dark); }
-.deadlines-legal-note__fineprint { margin-top: 10px; font-size: 11px; color: var(--light); }
-.deadlines-legal-note a { color: var(--crimson); font-weight: 600; text-decoration: none; }
-.deadlines-legal-note a:hover { text-decoration: underline; }
-
-.deadlines-reference {
-  margin-top: 28px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--card);
-}
-.deadlines-reference summary {
-  cursor: pointer;
-  padding: 12px 16px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--light);
-  list-style: none;
-}
-.deadlines-reference summary::-webkit-details-marker { display: none; }
-.deadlines-reference__body {
-  padding: 0 16px 16px;
-  border-top: 1px solid var(--border);
-}
-.deadlines-reference__body h3 {
-  font-family: 'Oswald', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  margin: 14px 0 8px;
-  color: var(--dark);
-  letter-spacing: 0.02em;
-}
-.deadlines-reference__body pre {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 240px;
-  overflow: auto;
-  padding: 10px 12px;
-  background: rgba(0,0,0,.04);
-  border-radius: 4px;
-  margin-bottom: 10px;
-  color: var(--dark);
-}
-.deadlines-reference__body p.note {
-  font-size: 11px;
-  color: var(--light);
-  line-height: 1.5;
-  margin: 0 0 8px;
-}
-
 .year-nav { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
 .year-label { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 1px; }
 .btn-yr { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--mid); transition: all .15s; }
@@ -301,12 +236,6 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
   <div class="page-title">Boekhouding</div>
   <div class="page-sub">Fiscale verplichtingen en aangiftekalender voor je VOF</div>
 
-  <aside class="deadlines-legal-note" aria-label="Toelichting fiscale deadlines">
-    <p><strong>Omzetbelasting (BTW).</strong> Het overzicht toont 35 eerstvolgende kwartaaltermijnen vanaf Q1&nbsp;2026 (tot en met Q3&nbsp;2034), met de gebruikelijke uiterste indieningsdata per kwartaal volgens de regeling van de Belastingdienst.</p>
-    <p><strong>Inkomstenbelasting (IB).</strong> 35 opeenvolgende belastingjaren vanaf 2025; de uiterste datum is steeds <strong>1&nbsp;mei</strong> van het jaar na het belastingjaar.</p>
-    <p class="deadlines-legal-note__fineprint">Dit is een praktisch hulpmiddel, geen juridisch advies. Controleer je eigen situatie en actuele termijnen op <a href="https://www.belastingdienst.nl" target="_blank" rel="noopener noreferrer">belastingdienst.nl</a>.</p>
-  </aside>
-
   <div class="year-nav">
     <button class="btn-yr" onclick="changeYear(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg></button>
     <div class="year-label" id="year-label">2026</div>
@@ -314,85 +243,6 @@ body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: v
   </div>
 
   <div id="list-wrap"></div>
-
-  <details class="deadlines-reference">
-    <summary>Referentie — exacte deadlinelijsten (tekst)</summary>
-    <div class="deadlines-reference__body">
-      <h3>Omzetbelasting – eerstvolgende 35 deadlines</h3>
-      <pre>Q1 2026 — 30 april 2026
-Q2 2026 — 31 juli 2026
-Q3 2026 — 31 oktober 2026
-Q4 2026 — 31 januari 2027
-Q1 2027 — 30 april 2027
-Q2 2027 — 31 juli 2027
-Q3 2027 — 31 oktober 2027
-Q4 2027 — 31 januari 2028
-Q1 2028 — 30 april 2028
-Q2 2028 — 31 juli 2028
-Q3 2028 — 31 oktober 2028
-Q4 2028 — 31 januari 2029
-Q1 2029 — 30 april 2029
-Q2 2029 — 31 juli 2029
-Q3 2029 — 31 oktober 2029
-Q4 2029 — 31 januari 2030
-Q1 2030 — 30 april 2030
-Q2 2030 — 31 juli 2030
-Q3 2030 — 31 oktober 2030
-Q4 2030 — 31 januari 2031
-Q1 2031 — 30 april 2031
-Q2 2031 — 31 juli 2031
-Q3 2031 — 31 oktober 2031
-Q4 2031 — 31 januari 2032
-Q1 2032 — 30 april 2032
-Q2 2032 — 31 juli 2032
-Q3 2032 — 31 oktober 2032
-Q4 2032 — 31 januari 2033
-Q1 2033 — 30 april 2033
-Q2 2033 — 31 juli 2033
-Q3 2033 — 31 oktober 2033
-Q4 2033 — 31 januari 2034
-Q1 2034 — 30 april 2034
-Q2 2034 — 31 juli 2034
-Q3 2034 — 31 oktober 2034</pre>
-      <p class="note">Deze reeks is rechtstreeks opgebouwd vanuit de officiële kwartaalregel van de Belastingdienst. De datums in het jaaroverzicht hierboven worden op dezelfde manier berekend.</p>
-      <h3>Inkomstenbelasting – eerstvolgende 35 deadlines</h3>
-      <pre>Belastingjaar 2025 — 1 mei 2026
-Belastingjaar 2026 — 1 mei 2027
-Belastingjaar 2027 — 1 mei 2028
-Belastingjaar 2028 — 1 mei 2029
-Belastingjaar 2029 — 1 mei 2030
-Belastingjaar 2030 — 1 mei 2031
-Belastingjaar 2031 — 1 mei 2032
-Belastingjaar 2032 — 1 mei 2033
-Belastingjaar 2033 — 1 mei 2034
-Belastingjaar 2034 — 1 mei 2035
-Belastingjaar 2035 — 1 mei 2036
-Belastingjaar 2036 — 1 mei 2037
-Belastingjaar 2037 — 1 mei 2038
-Belastingjaar 2038 — 1 mei 2039
-Belastingjaar 2039 — 1 mei 2040
-Belastingjaar 2040 — 1 mei 2041
-Belastingjaar 2041 — 1 mei 2042
-Belastingjaar 2042 — 1 mei 2043
-Belastingjaar 2043 — 1 mei 2044
-Belastingjaar 2044 — 1 mei 2045
-Belastingjaar 2045 — 1 mei 2046
-Belastingjaar 2046 — 1 mei 2047
-Belastingjaar 2047 — 1 mei 2048
-Belastingjaar 2048 — 1 mei 2049
-Belastingjaar 2049 — 1 mei 2050
-Belastingjaar 2050 — 1 mei 2051
-Belastingjaar 2051 — 1 mei 2052
-Belastingjaar 2052 — 1 mei 2053
-Belastingjaar 2053 — 1 mei 2054
-Belastingjaar 2054 — 1 mei 2055
-Belastingjaar 2055 — 1 mei 2056
-Belastingjaar 2056 — 1 mei 2057
-Belastingjaar 2057 — 1 mei 2058
-Belastingjaar 2058 — 1 mei 2059
-Belastingjaar 2059 — 1 mei 2060</pre>
-    </div>
-  </details>
 </div>
 
 <!-- SCHERM 2: MAP -->
