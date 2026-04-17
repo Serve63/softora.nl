@@ -1,3 +1,13 @@
+const {
+  createRuntimeStateSnapshotHelpers,
+} = require('./runtime-state-sync-snapshot');
+const {
+  createRuntimeStateSyncCallUpdateHelpers,
+} = require('./runtime-state-sync-call-updates');
+const {
+  createRuntimeStateSyncDismissedLeadHelpers,
+} = require('./runtime-state-sync-dismissed-leads');
+
 function createRuntimeStateSyncCoordinator(deps = {}) {
   const {
     isSupabaseConfigured = () => false,
@@ -108,6 +118,21 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     }
   }
 
+  const {
+    getRuntimeSnapshotItemTimestampMs,
+    mergeRuntimeSnapshotPayloads,
+    resolveRuntimeStateVersionMs,
+  } = createRuntimeStateSnapshotHelpers({
+    normalizeString,
+    normalizeLeadOwnerRecord,
+    compactRuntimeSnapshotWebhookEvent,
+    compactRuntimeSnapshotCallUpdate,
+    compactRuntimeSnapshotAiInsight,
+    compactRuntimeSnapshotDashboardActivity,
+    compactRuntimeSnapshotSecurityAuditEvent,
+    compactRuntimeSnapshotGeneratedAgendaAppointment,
+  });
+
   async function awaitWithTimeout(promise, timeoutMs, errorMessage) {
     const safeTimeoutMs = Math.max(1000, Math.min(120000, Number(timeoutMs) || 12000));
     let timeoutId = null;
@@ -123,311 +148,6 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
-  }
-
-  function getRuntimeSnapshotItemTimestampMs(item) {
-    const explicitMs = Number(item?.updatedAtMs || 0);
-    if (Number.isFinite(explicitMs) && explicitMs > 0) return explicitMs;
-
-    const candidateFields = [
-      item?.updatedAt,
-      item?.analyzedAt,
-      item?.receivedAt,
-      item?.endedAt,
-      item?.startedAt,
-      item?.confirmationEmailSentAt,
-      item?.confirmationResponseReceivedAt,
-      item?.confirmationAppointmentCancelledAt,
-      item?.postCallUpdatedAt,
-      item?.createdAt,
-    ];
-
-    for (const candidate of candidateFields) {
-      const parsedMs = Date.parse(normalizeString(candidate || ''));
-      if (Number.isFinite(parsedMs) && parsedMs > 0) return parsedMs;
-    }
-
-    return 0;
-  }
-
-  function chooseRuntimeSnapshotValue(primaryValue, fallbackValue) {
-    if (primaryValue === undefined || primaryValue === null) return fallbackValue;
-    if (typeof primaryValue === 'string') {
-      return primaryValue.trim() ? primaryValue : fallbackValue;
-    }
-    if (Array.isArray(primaryValue)) {
-      return primaryValue.length > 0
-        ? primaryValue.slice()
-        : Array.isArray(fallbackValue)
-          ? fallbackValue.slice()
-          : primaryValue.slice();
-    }
-    return primaryValue;
-  }
-
-  function mergeRuntimeSnapshotObjects(primary, fallback) {
-    const safePrimary = primary && typeof primary === 'object' ? primary : {};
-    const safeFallback = fallback && typeof fallback === 'object' ? fallback : {};
-    const merged = { ...safeFallback };
-    const keys = new Set([...Object.keys(safeFallback), ...Object.keys(safePrimary)]);
-    keys.forEach((key) => {
-      merged[key] = chooseRuntimeSnapshotValue(safePrimary[key], safeFallback[key]);
-    });
-    return merged;
-  }
-
-  function mergeRuntimeSnapshotArraysByKey(localItems, remoteItems, keyFn, limit = 500) {
-    const mergedByKey = new Map();
-    const append = (items) => {
-      (Array.isArray(items) ? items : []).forEach((item) => {
-        if (!item || typeof item !== 'object') return;
-        const key = normalizeString(keyFn(item) || '');
-        if (!key) return;
-        const existing = mergedByKey.get(key) || null;
-        if (!existing) {
-          mergedByKey.set(key, item);
-          return;
-        }
-        const existingTs = getRuntimeSnapshotItemTimestampMs(existing);
-        const incomingTs = getRuntimeSnapshotItemTimestampMs(item);
-        const primary = incomingTs >= existingTs ? item : existing;
-        const fallback = incomingTs >= existingTs ? existing : item;
-        mergedByKey.set(key, mergeRuntimeSnapshotObjects(primary, fallback));
-      });
-    };
-
-    append(remoteItems);
-    append(localItems);
-
-    return Array.from(mergedByKey.values())
-      .sort((a, b) => getRuntimeSnapshotItemTimestampMs(b) - getRuntimeSnapshotItemTimestampMs(a))
-      .slice(0, limit);
-  }
-
-  function mergeRuntimeSnapshotPayloads(localPayload, remotePayload) {
-    const safeLocal = localPayload && typeof localPayload === 'object' ? localPayload : {};
-    const safeRemote = remotePayload && typeof remotePayload === 'object' ? remotePayload : {};
-    const localLeadOwnerAssignments = (
-      Array.isArray(safeLocal.leadOwnerAssignments) ? safeLocal.leadOwnerAssignments : []
-    )
-      .map((item) => ({
-        callId: normalizeString(item?.callId || ''),
-        owner: normalizeLeadOwnerRecord(item?.owner || {}),
-      }))
-      .filter((item) => item.callId && item.owner);
-    const remoteLeadOwnerAssignments = (
-      Array.isArray(safeRemote.leadOwnerAssignments) ? safeRemote.leadOwnerAssignments : []
-    )
-      .map((item) => ({
-        callId: normalizeString(item?.callId || ''),
-        owner: normalizeLeadOwnerRecord(item?.owner || {}),
-      }))
-      .filter((item) => item.callId && item.owner);
-    const localGeneratedAgendaAppointments = (
-      Array.isArray(safeLocal.generatedAgendaAppointments) ? safeLocal.generatedAgendaAppointments : []
-    )
-      .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
-      .filter(Boolean);
-    const remoteGeneratedAgendaAppointments = (
-      Array.isArray(safeRemote.generatedAgendaAppointments) ? safeRemote.generatedAgendaAppointments : []
-    )
-      .map(compactRuntimeSnapshotGeneratedAgendaAppointment)
-      .filter(Boolean);
-    const localWebhookEvents = (
-      Array.isArray(safeLocal.recentWebhookEvents) ? safeLocal.recentWebhookEvents : []
-    ).map(compactRuntimeSnapshotWebhookEvent);
-    const remoteWebhookEvents = (
-      Array.isArray(safeRemote.recentWebhookEvents) ? safeRemote.recentWebhookEvents : []
-    ).map(compactRuntimeSnapshotWebhookEvent);
-    const localCallUpdates = (
-      Array.isArray(safeLocal.recentCallUpdates) ? safeLocal.recentCallUpdates : []
-    )
-      .map(compactRuntimeSnapshotCallUpdate)
-      .filter((item) => normalizeString(item?.callId || ''));
-    const remoteCallUpdates = (
-      Array.isArray(safeRemote.recentCallUpdates) ? safeRemote.recentCallUpdates : []
-    )
-      .map(compactRuntimeSnapshotCallUpdate)
-      .filter((item) => normalizeString(item?.callId || ''));
-    const localAiCallInsights = (
-      Array.isArray(safeLocal.recentAiCallInsights) ? safeLocal.recentAiCallInsights : []
-    )
-      .map(compactRuntimeSnapshotAiInsight)
-      .filter((item) => normalizeString(item?.callId || ''));
-    const remoteAiCallInsights = (
-      Array.isArray(safeRemote.recentAiCallInsights) ? safeRemote.recentAiCallInsights : []
-    )
-      .map(compactRuntimeSnapshotAiInsight)
-      .filter((item) => normalizeString(item?.callId || ''));
-    const localDashboardActivities = (
-      Array.isArray(safeLocal.recentDashboardActivities) ? safeLocal.recentDashboardActivities : []
-    )
-      .map(compactRuntimeSnapshotDashboardActivity)
-      .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
-    const remoteDashboardActivities = (
-      Array.isArray(safeRemote.recentDashboardActivities) ? safeRemote.recentDashboardActivities : []
-    )
-      .map(compactRuntimeSnapshotDashboardActivity)
-      .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
-    const localSecurityAuditEvents = (
-      Array.isArray(safeLocal.recentSecurityAuditEvents) ? safeLocal.recentSecurityAuditEvents : []
-    )
-      .map(compactRuntimeSnapshotSecurityAuditEvent)
-      .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
-    const remoteSecurityAuditEvents = (
-      Array.isArray(safeRemote.recentSecurityAuditEvents) ? safeRemote.recentSecurityAuditEvents : []
-    )
-      .map(compactRuntimeSnapshotSecurityAuditEvent)
-      .filter((item) => normalizeString(item?.id || item?.type || item?.createdAt || ''));
-    const remoteDismissedCallIds = (
-      Array.isArray(safeRemote.dismissedInterestedLeadCallIds)
-        ? safeRemote.dismissedInterestedLeadCallIds
-        : []
-    )
-      .map((item) => normalizeString(item))
-      .filter(Boolean);
-    const localDismissedCallIds = (
-      Array.isArray(safeLocal.dismissedInterestedLeadCallIds)
-        ? safeLocal.dismissedInterestedLeadCallIds
-        : []
-    )
-      .map((item) => normalizeString(item))
-      .filter(Boolean);
-    const remoteDismissedLeadKeys = (
-      Array.isArray(safeRemote.dismissedInterestedLeadKeys)
-        ? safeRemote.dismissedInterestedLeadKeys
-        : []
-    )
-      .map((item) => normalizeString(item))
-      .filter(Boolean);
-    const localDismissedLeadKeys = (
-      Array.isArray(safeLocal.dismissedInterestedLeadKeys)
-        ? safeLocal.dismissedInterestedLeadKeys
-        : []
-    )
-      .map((item) => normalizeString(item))
-      .filter(Boolean);
-    const localDismissedLeadKeyUpdatedAtMsByKey =
-      safeLocal.dismissedInterestedLeadKeyUpdatedAtMsByKey &&
-      typeof safeLocal.dismissedInterestedLeadKeyUpdatedAtMsByKey === 'object'
-        ? safeLocal.dismissedInterestedLeadKeyUpdatedAtMsByKey
-        : safeLocal.dismissedLeadKeyUpdatedAtMsByKey && typeof safeLocal.dismissedLeadKeyUpdatedAtMsByKey === 'object'
-          ? safeLocal.dismissedLeadKeyUpdatedAtMsByKey
-          : {};
-    const remoteDismissedLeadKeyUpdatedAtMsByKey =
-      safeRemote.dismissedInterestedLeadKeyUpdatedAtMsByKey &&
-      typeof safeRemote.dismissedInterestedLeadKeyUpdatedAtMsByKey === 'object'
-        ? safeRemote.dismissedInterestedLeadKeyUpdatedAtMsByKey
-        : safeRemote.dismissedLeadKeyUpdatedAtMsByKey &&
-            typeof safeRemote.dismissedLeadKeyUpdatedAtMsByKey === 'object'
-          ? safeRemote.dismissedLeadKeyUpdatedAtMsByKey
-          : {};
-
-    const leadOwnerAssignments = mergeRuntimeSnapshotArraysByKey(
-      localLeadOwnerAssignments,
-      remoteLeadOwnerAssignments,
-      (item) => item?.callId || '',
-      5000
-    );
-
-    const mergedAppointments = mergeRuntimeSnapshotArraysByKey(
-      localGeneratedAgendaAppointments,
-      remoteGeneratedAgendaAppointments,
-      (item) => String(item?.id || item?.callId || ''),
-      5000
-    );
-
-    const mergedWebhookEvents = mergeRuntimeSnapshotArraysByKey(
-      localWebhookEvents,
-      remoteWebhookEvents,
-      (item) =>
-        `${normalizeString(item?.receivedAt || '')}|${normalizeString(item?.messageType || '')}|${normalizeString(item?.callId || '')}`,
-      80
-    );
-
-    const mergedCallUpdates = mergeRuntimeSnapshotArraysByKey(
-      localCallUpdates,
-      remoteCallUpdates,
-      (item) => item?.callId || '',
-      500
-    );
-
-    const mergedAiCallInsights = mergeRuntimeSnapshotArraysByKey(
-      localAiCallInsights,
-      remoteAiCallInsights,
-      (item) => item?.callId || '',
-      500
-    );
-
-    const mergedDashboardActivities = mergeRuntimeSnapshotArraysByKey(
-      localDashboardActivities,
-      remoteDashboardActivities,
-      (item) => item?.id || '',
-      500
-    );
-
-    const mergedSecurityAuditEvents = mergeRuntimeSnapshotArraysByKey(
-      localSecurityAuditEvents,
-      remoteSecurityAuditEvents,
-      (item) => item?.id || '',
-      500
-    );
-
-    const mergedDismissedCallIds = Array.from(
-      new Set([...remoteDismissedCallIds, ...localDismissedCallIds].filter(Boolean))
-    ).slice(0, 1000);
-    const mergedDismissedLeadKeys = Array.from(
-      new Set([...remoteDismissedLeadKeys, ...localDismissedLeadKeys].filter(Boolean))
-    ).slice(0, 2000);
-    const mergedDismissedLeadKeyUpdatedAtMsByKey = Object.fromEntries(
-      mergedDismissedLeadKeys
-        .map((leadKey) => {
-          const localMs = Number(localDismissedLeadKeyUpdatedAtMsByKey?.[leadKey] || 0);
-          const remoteMs = Number(remoteDismissedLeadKeyUpdatedAtMsByKey?.[leadKey] || 0);
-          const nextMs = Math.max(localMs, remoteMs);
-          return [leadKey, Number.isFinite(nextMs) && nextMs > 0 ? Math.round(nextMs) : 0];
-        })
-        .filter(([, updatedAtMs]) => Number.isFinite(updatedAtMs) && updatedAtMs > 0)
-    );
-
-    return {
-      version: Math.max(Number(safeLocal.version || 0), Number(safeRemote.version || 0), 5),
-      savedAt: new Date().toISOString(),
-      recentWebhookEvents: mergedWebhookEvents,
-      recentCallUpdates: mergedCallUpdates,
-      recentAiCallInsights: mergedAiCallInsights,
-      recentDashboardActivities: mergedDashboardActivities,
-      recentSecurityAuditEvents: mergedSecurityAuditEvents,
-      generatedAgendaAppointments: mergedAppointments,
-      dismissedInterestedLeadCallIds: mergedDismissedCallIds,
-      dismissedInterestedLeadKeys: mergedDismissedLeadKeys,
-      dismissedInterestedLeadKeyUpdatedAtMsByKey: mergedDismissedLeadKeyUpdatedAtMsByKey,
-      leadOwnerAssignments,
-      nextLeadOwnerRotationIndex: Math.max(
-        0,
-        Number(safeLocal.nextLeadOwnerRotationIndex || 0),
-        Number(safeRemote.nextLeadOwnerRotationIndex || 0)
-      ),
-      nextGeneratedAgendaAppointmentId: Math.max(
-        100000,
-        Number(safeLocal.nextGeneratedAgendaAppointmentId || 0),
-        Number(safeRemote.nextGeneratedAgendaAppointmentId || 0),
-        ...mergedAppointments
-          .map((item) => Number(item?.id || 0) + 1)
-          .filter((value) => Number.isFinite(value) && value > 0)
-      ),
-    };
-  }
-
-  function resolveRuntimeStateVersionMs(updatedAt = '', payload = null) {
-    const candidates = [normalizeString(updatedAt), normalizeString(payload?.savedAt || '')];
-    for (const candidate of candidates) {
-      const parsedMs = Date.parse(candidate);
-      if (Number.isFinite(parsedMs) && parsedMs > 0) {
-        return parsedMs;
-      }
-    }
-    return 0;
   }
 
   function markRuntimeStateObserved(atMs = Date.now()) {
@@ -576,46 +296,6 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
     markRuntimeStateSynced(resolveRuntimeStateVersionMs(options?.updatedAt || '', payload));
 
     return true;
-  }
-
-  async function fetchSupabaseCallUpdateRows(limit = supabaseCallUpdateRowsFetchLimit) {
-    if (!isSupabaseConfigured()) {
-      return { ok: false, status: null, rows: [], error: 'Supabase niet geconfigureerd.' };
-    }
-
-    const safeLimit = Math.max(
-      1,
-      Math.min(2000, Number(limit) || supabaseCallUpdateRowsFetchLimit)
-    );
-    const client = getSupabaseClient();
-    if (client) {
-      try {
-        const { data, error } = await client
-          .from(supabaseStateTable)
-          .select('state_key,payload,updated_at')
-          .like('state_key', `${supabaseCallUpdateStateKeyPrefix}%`)
-          .order('updated_at', { ascending: false })
-          .limit(safeLimit);
-        if (!error) {
-          return {
-            ok: true,
-            status: 200,
-            rows: Array.isArray(data) ? data : [],
-            error: null,
-          };
-        }
-      } catch {
-        // Val terug op REST wanneer client query faalt.
-      }
-    }
-
-    const fallback = await fetchSupabaseCallUpdateRowsViaRest(safeLimit);
-    return {
-      ok: Boolean(fallback.ok),
-      status: fallback.status,
-      rows: Array.isArray(fallback.body) ? fallback.body : [],
-      error: fallback.error || null,
-    };
   }
 
   async function ensureRuntimeStateHydratedFromSupabase(options = {}) {
@@ -905,179 +585,38 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
       return false;
     }
   }
-
-  function buildCallUpdateRowPersistMeta(callUpdate, reason = 'call_update_row') {
-    return {
-      reason: truncateText(normalizeString(reason || ''), 80) || 'call_update_row',
-      callId: truncateText(normalizeString(callUpdate?.callId || ''), 140),
-      status: truncateText(normalizeString(callUpdate?.status || ''), 80),
-      provider: truncateText(normalizeString(callUpdate?.provider || ''), 40),
-      updatedAt: normalizeString(callUpdate?.updatedAt || '') || new Date().toISOString(),
-    };
-  }
-
-  async function persistSingleCallUpdateRowToSupabase(callUpdate, reason = 'call_update_row') {
-    if (!isSupabaseConfigured()) return false;
-    const compact = compactRuntimeSnapshotCallUpdate(callUpdate || {});
-    const callId = normalizeString(compact?.callId || '');
-    if (!callId || callId.startsWith('demo-')) return false;
-
-    const stateKey = buildSupabaseCallUpdateStateKey(callId);
-    if (!stateKey) return false;
-
-    const payload = buildSupabaseCallUpdatePayload(compact, reason);
-    if (!payload) return false;
-
-    const updatedAt = normalizeString(compact?.updatedAt || '') || new Date().toISOString();
-    const row = {
-      state_key: stateKey,
-      payload,
-      updated_at: updatedAt,
-      meta: buildCallUpdateRowPersistMeta(compact, reason),
-    };
-
-    const client = getSupabaseClient();
-    if (client) {
-      try {
-        const result = await awaitWithTimeout(
-          client.from(supabaseStateTable).upsert(row, {
-            onConflict: 'state_key',
-          }),
-          supabaseClientPersistTimeoutMs,
-          `Supabase call-update persist timeout na ${Math.round(Math.max(1000, Math.min(60000, Number(supabaseClientPersistTimeoutMs) || 12000)) / 1000)}s`
-        );
-        const error = result?.error || null;
-        if (!error) {
-          runtimeState.supabaseLastCallUpdatePersistError = '';
-          return true;
-        }
-        const fallback = await upsertSupabaseRowViaRest(row);
-        if (fallback.ok) {
-          runtimeState.supabaseLastCallUpdatePersistError = '';
-          return true;
-        }
-        const fallbackMsg = fallback.error
-          ? ` | REST fallback: ${fallback.error}`
-          : fallback.status
-            ? ` | REST fallback status: ${fallback.status}`
-            : '';
-        runtimeState.supabaseLastCallUpdatePersistError = truncateText(
-          `${error.message || String(error)}${fallbackMsg}`,
-          500
-        );
-        return false;
-      } catch (error) {
-        const fallback = await upsertSupabaseRowViaRest(row);
-        if (fallback.ok) {
-          runtimeState.supabaseLastCallUpdatePersistError = '';
-          return true;
-        }
-        const fallbackMsg = fallback.error
-          ? ` | REST fallback: ${fallback.error}`
-          : fallback.status
-            ? ` | REST fallback status: ${fallback.status}`
-            : '';
-        runtimeState.supabaseLastCallUpdatePersistError = truncateText(
-          `${error?.message || String(error)}${fallbackMsg}`,
-          500
-        );
-        return false;
-      }
-    }
-
-    const fallback = await upsertSupabaseRowViaRest(row);
-    if (fallback.ok) {
-      runtimeState.supabaseLastCallUpdatePersistError = '';
-      return true;
-    }
-    runtimeState.supabaseLastCallUpdatePersistError = truncateText(
-      fallback.error || `REST fallback status: ${fallback.status || 'onbekend'}`,
-      500
-    );
-    return false;
-  }
-
-  function queueCallUpdateRowPersist(callUpdate, reason = 'call_update_row') {
-    if (!isSupabaseConfigured()) return Promise.resolve(false);
-    const callId = normalizeString(callUpdate?.callId || '');
-    if (!callId || callId.startsWith('demo-')) return Promise.resolve(false);
-
-    runtimeState.supabaseCallUpdatePersistChain = runtimeState.supabaseCallUpdatePersistChain
-      .catch(() => null)
-      .then(() => persistSingleCallUpdateRowToSupabase(callUpdate, reason))
-      .catch((error) => {
-        runtimeState.supabaseLastCallUpdatePersistError = truncateText(
-          error?.message || String(error),
-          500
-        );
-        return false;
-      });
-
-    return runtimeState.supabaseCallUpdatePersistChain;
-  }
-
-  async function waitForQueuedCallUpdateRowPersist() {
-    if (!isSupabaseConfigured()) return false;
-    try {
-      return Boolean(await runtimeState.supabaseCallUpdatePersistChain);
-    } catch (error) {
-      logError('[Supabase][CallUpdatePersistAwaitError]', error?.message || error);
-      return false;
-    }
-  }
-
-  function mergeCallUpdatesFromSupabaseRows(rows = []) {
-    let touched = 0;
-    (Array.isArray(rows) ? rows : []).forEach((row) => {
-      const callUpdate = extractSupabaseCallUpdateFromRow(row);
-      if (!callUpdate) return;
-      const before = callUpdatesById.get(callUpdate.callId) || null;
-      const after = upsertRecentCallUpdate(callUpdate, {
-        persistRuntimeState: false,
-        persistCallUpdateRow: false,
-      });
-      if (!after) return;
-      const beforeMs = getRuntimeSnapshotItemTimestampMs(before || {});
-      const afterMs = getRuntimeSnapshotItemTimestampMs(after || {});
-      if (!before || afterMs > beforeMs) {
-        touched += 1;
-      }
-    });
-    return touched;
-  }
-
-  async function syncCallUpdatesFromSupabaseRows(options = {}) {
-    if (!isSupabaseConfigured()) return false;
-
-    const force = Boolean(options?.force);
-    const maxAgeMs = Math.max(
-      0,
-      parseNumberSafe(options?.maxAgeMs, runtimeStateSupabaseSyncCooldownMs) ||
-        runtimeStateSupabaseSyncCooldownMs
-    );
-    const nowMs = Date.now();
-
-    if (
-      !force &&
-      runtimeState.supabaseCallUpdatesLastSyncCheckMs > 0 &&
-      nowMs - runtimeState.supabaseCallUpdatesLastSyncCheckMs < maxAgeMs
-    ) {
-      return false;
-    }
-
-    await waitForQueuedCallUpdateRowPersist();
-    const rowsResult = await fetchSupabaseCallUpdateRows(supabaseCallUpdateRowsFetchLimit);
-    runtimeState.supabaseCallUpdatesLastSyncCheckMs = Date.now();
-    if (!rowsResult.ok) {
-      if (rowsResult.error) {
-        runtimeState.supabaseLastHydrateError = truncateText(rowsResult.error, 500);
-      }
-      return false;
-    }
-
-    const touched = mergeCallUpdatesFromSupabaseRows(rowsResult.rows || []);
-    return touched > 0;
-  }
+  const {
+    buildCallUpdateRowPersistMeta,
+    mergeCallUpdatesFromSupabaseRows,
+    persistSingleCallUpdateRowToSupabase,
+    queueCallUpdateRowPersist,
+    syncCallUpdatesFromSupabaseRows,
+    waitForQueuedCallUpdateRowPersist,
+  } = createRuntimeStateSyncCallUpdateHelpers({
+    isSupabaseConfigured,
+    getSupabaseClient,
+    fetchSupabaseCallUpdateRowsViaRest,
+    upsertSupabaseRowViaRest,
+    supabaseStateTable,
+    supabaseCallUpdateStateKeyPrefix,
+    supabaseCallUpdateRowsFetchLimit,
+    supabaseClientPersistTimeoutMs,
+    runtimeStateSupabaseSyncCooldownMs,
+    normalizeString,
+    truncateText,
+    parseNumberSafe,
+    buildSupabaseCallUpdateStateKey,
+    extractSupabaseCallUpdateFromRow,
+    buildSupabaseCallUpdatePayload,
+    compactRuntimeSnapshotCallUpdate,
+    upsertRecentCallUpdate,
+    getRuntimeSnapshotItemTimestampMs,
+    awaitWithTimeout,
+    logError,
+    recentCallUpdates,
+    callUpdatesById,
+    runtimeState,
+  });
 
   async function syncRuntimeStateFromSupabaseIfNewer(options = {}) {
     if (!isSupabaseConfigured()) return false;
@@ -1173,249 +712,22 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
   // Gevolg: een dismiss gaat nooit verloren — niet door multi-instance state
   // drift, niet door last-writer-wins, en niet door een concurrent write
   // race tussen onze read en write.
-  async function persistDismissedLeadsToSupabase(reason = 'dismissed_leads_persist') {
-    if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return false;
-
-    const maxAttempts = 3;
-    let lastResultOk = false;
-    let attempt = 0;
-
-    while (attempt < maxAttempts) {
-      attempt += 1;
-
-      const remoteState = await readRemoteDismissedLeadsState();
-      const remoteCallIds = remoteState?.callIds instanceof Set ? remoteState.callIds : new Set();
-      const remoteLeadKeys = remoteState?.leadKeys instanceof Set ? remoteState.leadKeys : new Set();
-      const remoteLeadKeyUpdatedAtMs =
-        remoteState?.leadKeyUpdatedAtMsByKey instanceof Map
-          ? remoteState.leadKeyUpdatedAtMsByKey
-          : new Map();
-
-      const mergedCallIds = new Set();
-      dismissedInterestedLeadCallIds.forEach((id) => {
-        const value = normalizeString(id);
-        if (value) mergedCallIds.add(value);
-      });
-      remoteCallIds.forEach((id) => {
-        const value = normalizeString(id);
-        if (value) mergedCallIds.add(value);
-      });
-
-      const mergedLeadKeys = new Set();
-      dismissedInterestedLeadKeys.forEach((key) => {
-        const value = normalizeString(key);
-        if (value) mergedLeadKeys.add(value);
-      });
-      remoteLeadKeys.forEach((key) => {
-        const value = normalizeString(key);
-        if (value) mergedLeadKeys.add(value);
-      });
-
-      const mergedLeadKeyUpdatedAtMs = new Map();
-      mergedLeadKeys.forEach((key) => {
-        const localMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
-        const remoteMs = Number(remoteLeadKeyUpdatedAtMs.get(key) || 0);
-        const best = Math.max(
-          Number.isFinite(localMs) && localMs > 0 ? localMs : 0,
-          Number.isFinite(remoteMs) && remoteMs > 0 ? remoteMs : 0
-        );
-        if (best > 0) mergedLeadKeyUpdatedAtMs.set(key, Math.round(best));
-      });
-
-      // Sync de gemergde remote-waarden terug naar onze in-memory kopie. Zo
-      // ziet deze instance vanaf nu ook dismisses die elders zijn gezet, en
-      // pakt de volgende retry de complete set mee.
-      mergedCallIds.forEach((id) => dismissedInterestedLeadCallIds.add(id));
-      mergedLeadKeys.forEach((key) => dismissedInterestedLeadKeys.add(key));
-      mergedLeadKeyUpdatedAtMs.forEach((ms, key) => {
-        const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
-        if (ms > currentMs) {
-          dismissedInterestedLeadKeyUpdatedAtMsByKey.set(key, ms);
-        }
-      });
-
-      const callIds = Array.from(mergedCallIds).slice(0, 1000);
-      const leadKeys = Array.from(mergedLeadKeys).slice(0, 2000);
-      const leadKeyUpdatedAtMsByKey = Object.fromEntries(
-        leadKeys
-          .map((leadKey) => [leadKey, Number(mergedLeadKeyUpdatedAtMs.get(leadKey) || 0)])
-          .filter(([, ms]) => Number.isFinite(ms) && ms > 0)
-      );
-      if (!callIds.length && !leadKeys.length) return true;
-
-      let writeOk = false;
-      try {
-        const updatedAt = new Date().toISOString();
-        const result = await upsertSupabaseRowViaRest({
-          state_key: supabaseDismissedLeadsStateKey,
-          payload: {
-            callIds,
-            leadKeys,
-            leadKeyUpdatedAtMsByKey,
-            updatedAt,
-            reason,
-            attempt,
-          },
-          updated_at: updatedAt,
-        });
-        writeOk = Boolean(result?.ok);
-        lastResultOk = writeOk;
-      } catch (error) {
-        logError('[Supabase][DismissedLeadsPersistError]', error?.message || error);
-        writeOk = false;
-        lastResultOk = false;
-      }
-
-      if (!writeOk) {
-        // Geen succesvolle write — wacht kort en retry.
-        if (attempt < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
-          continue;
-        }
-        return false;
-      }
-
-      // READ-AFTER-WRITE: verifieer dat ALLE lokaal-bekende dismisses (incl. de
-      // remote die we net hebben gemerged) in de Supabase row staan. Een
-      // concurrent write op een andere instance kan ze tussen onze read en
-      // write hebben overschreven — in dat geval moeten we opnieuw mergen en
-      // schrijven.
-      const verification = await readRemoteDismissedLeadsState();
-      if (!verification) {
-        // Verify-fetch faalde; we kunnen het niet bevestigen. Toch markeren als
-        // succes (write was ok) — TTL hydrate van andere routes herstelt later.
-        runtimeState.dismissedLeadsLastHydrateAtMs = Date.now();
-        return true;
-      }
-
-      const verifyCallIds = verification.callIds;
-      const verifyLeadKeys = verification.leadKeys;
-
-      let allCallIdsPresent = true;
-      for (const id of dismissedInterestedLeadCallIds) {
-        if (!verifyCallIds.has(id)) {
-          allCallIdsPresent = false;
-          break;
-        }
-      }
-      let allLeadKeysPresent = true;
-      if (allCallIdsPresent) {
-        for (const key of dismissedInterestedLeadKeys) {
-          if (!verifyLeadKeys.has(key)) {
-            allLeadKeysPresent = false;
-            break;
-          }
-        }
-      }
-
-      if (allCallIdsPresent && allLeadKeysPresent) {
-        runtimeState.dismissedLeadsLastHydrateAtMs = Date.now();
-        return true;
-      }
-
-      // Race gedetecteerd: een andere instance heeft tussen onze read en write
-      // de row overschreven en daarbij sommige van onze (lokale) dismisses
-      // verloren. We mergen nu opnieuw — de verification-state heeft
-      // eventueel hun nieuwere dismisses, en wij hebben nog steeds onze
-      // lokale set. De volgende iteratie van de loop schrijft de UNION van
-      // allebei.
-      logError(
-        '[Supabase][DismissedLeadsRaceDetected]',
-        `attempt ${attempt}/${maxAttempts}, retry merge & write`
-      );
-      verifyCallIds.forEach((id) => dismissedInterestedLeadCallIds.add(id));
-      verifyLeadKeys.forEach((key) => dismissedInterestedLeadKeys.add(key));
-      verification.leadKeyUpdatedAtMsByKey.forEach((ms, key) => {
-        const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(key) || 0);
-        if (ms > currentMs) {
-          dismissedInterestedLeadKeyUpdatedAtMsByKey.set(key, ms);
-        }
-      });
-      // korte backoff voor retry
-      await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
-    }
-
-    return lastResultOk;
-  }
-
-  async function readRemoteDismissedLeadsState() {
-    if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return null;
-    try {
-      const result = await fetchSupabaseRowByKeyViaRest(supabaseDismissedLeadsStateKey, 'payload');
-      if (!result?.ok) return null;
-      const row = Array.isArray(result.body) ? result.body[0] || null : result.body;
-      if (!row?.payload || typeof row.payload !== 'object') return null;
-
-      const callIds = new Set();
-      (Array.isArray(row.payload.callIds) ? row.payload.callIds : []).forEach((item) => {
-        const value = normalizeString(item);
-        if (value) callIds.add(value);
-      });
-
-      const leadKeys = new Set();
-      (Array.isArray(row.payload.leadKeys) ? row.payload.leadKeys : []).forEach((item) => {
-        const value = normalizeString(item);
-        if (value) leadKeys.add(value);
-      });
-
-      const fallbackUpdatedAtMs =
-        Date.parse(normalizeString(row?.payload?.updatedAt || row?.updated_at || row?.updatedAt || '')) || 0;
-      const rawMap =
-        row.payload.leadKeyUpdatedAtMsByKey && typeof row.payload.leadKeyUpdatedAtMsByKey === 'object'
-          ? row.payload.leadKeyUpdatedAtMsByKey
-          : {};
-      const leadKeyUpdatedAtMsByKey = new Map();
-      leadKeys.forEach((leadKey) => {
-        const raw = Number(rawMap?.[leadKey] || fallbackUpdatedAtMs || 0);
-        if (Number.isFinite(raw) && raw > 0) {
-          leadKeyUpdatedAtMsByKey.set(leadKey, Math.round(raw));
-        }
-      });
-
-      return { callIds, leadKeys, leadKeyUpdatedAtMsByKey };
-    } catch (error) {
-      logError('[Supabase][DismissedLeadsReadError]', error?.message || error);
-      return null;
-    }
-  }
-
-  async function hydrateDismissedLeadsFromSupabase() {
-    const remoteState = await readRemoteDismissedLeadsState();
-    if (!remoteState) return false;
-
-    remoteState.callIds.forEach((callId) => {
-      dismissedInterestedLeadCallIds.add(callId);
-    });
-    remoteState.leadKeys.forEach((leadKey) => {
-      dismissedInterestedLeadKeys.add(leadKey);
-    });
-    remoteState.leadKeyUpdatedAtMsByKey.forEach((updatedAtMs, leadKey) => {
-      const currentMs = Number(dismissedInterestedLeadKeyUpdatedAtMsByKey.get(leadKey) || 0);
-      if (updatedAtMs >= currentMs) {
-        dismissedInterestedLeadKeyUpdatedAtMsByKey.set(leadKey, Math.round(updatedAtMs));
-      }
-    });
-    runtimeState.dismissedLeadsLastHydrateAtMs = Date.now();
-    return true;
-  }
-
-  // Lichte wrapper om herhaalde hydrate-calls samen te voegen binnen een TTL.
-  // Lees-routes op warme Vercel-instances mogen hier goedkoop doorheen: als een
-  // andere request binnen `maxAgeMs` al hydrate heeft gedraaid, skippen we.
-  async function ensureDismissedLeadsFreshFromSupabase(options = {}) {
-    if (!isSupabaseConfigured() || !supabaseDismissedLeadsStateKey) return false;
-    const force = Boolean(options?.force);
-    const maxAgeMs = Math.max(
-      0,
-      Number.isFinite(Number(options?.maxAgeMs)) ? Number(options.maxAgeMs) : 2000
-    );
-    const lastMs = Number(runtimeState.dismissedLeadsLastHydrateAtMs || 0);
-    const nowMs = Date.now();
-    if (!force && lastMs > 0 && nowMs - lastMs < maxAgeMs) {
-      return false;
-    }
-    return hydrateDismissedLeadsFromSupabase();
-  }
+  const {
+    ensureDismissedLeadsFreshFromSupabase,
+    hydrateDismissedLeadsFromSupabase,
+    persistDismissedLeadsToSupabase,
+  } = createRuntimeStateSyncDismissedLeadHelpers({
+    isSupabaseConfigured,
+    supabaseDismissedLeadsStateKey,
+    fetchSupabaseRowByKeyViaRest,
+    upsertSupabaseRowViaRest,
+    normalizeString,
+    logError,
+    dismissedInterestedLeadCallIds,
+    dismissedInterestedLeadKeys,
+    dismissedInterestedLeadKeyUpdatedAtMsByKey,
+    runtimeState,
+  });
 
   return {
     applyRuntimeStateSnapshotPayload,
