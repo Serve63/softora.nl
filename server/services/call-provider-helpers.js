@@ -451,13 +451,17 @@ function createCallProviderHelpers(options = {}) {
     const numericValue = parseNumberSafe(rawValue, null);
     if (!Number.isFinite(numericValue) || numericValue < 0) return null;
 
-    const rawText = typeof rawValue === 'string' ? rawValue.trim() : '';
-    const looksIntegerLike =
-      Number.isInteger(numericValue) && (!rawText || !/[.eE]/.test(rawText));
+    if (numericValue === 0) return 0;
 
-    return looksIntegerLike
-      ? Math.max(0, Math.round(numericValue))
-      : Math.max(0, Math.round(numericValue * 1000));
+    if (numericValue < 1) {
+      return Math.max(0, Math.round(numericValue * 1000));
+    }
+
+    if (numericValue >= 100) {
+      return Math.max(0, Math.round(numericValue));
+    }
+
+    return Math.max(0, Math.round(numericValue * 10));
   }
 
   function resolveRetellCallCostFields(call) {

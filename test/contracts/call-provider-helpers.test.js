@@ -323,6 +323,40 @@ test('call provider helpers extract stable retell and twilio call updates', () =
   assert.equal(retellFloatCostUpdate.costUsdMilli, 498);
   assert.equal(retellFloatCostUpdate.costUsd, 0.498);
 
+  const retellCentsCostUpdate = helpers.extractCallUpdateFromRetellPayload({
+    event: 'call_ended',
+    call: {
+      call_id: 'call_cents_cost',
+      call_status: 'ended',
+      duration_ms: 60000,
+      start_timestamp: 1_700_000_000,
+      end_timestamp: 1_700_000_060,
+      call_cost: {
+        combined_cost: 49.8,
+      },
+    },
+  });
+
+  assert.equal(retellCentsCostUpdate.costUsdMilli, 498);
+  assert.equal(retellCentsCostUpdate.costUsd, 0.498);
+
+  const retellDecimalWrappedMilliCostUpdate = helpers.extractCallUpdateFromRetellPayload({
+    event: 'call_ended',
+    call: {
+      call_id: 'call_decimal_wrapped_milli_cost',
+      call_status: 'ended',
+      duration_ms: 60000,
+      start_timestamp: 1_700_000_000,
+      end_timestamp: 1_700_000_060,
+      call_cost: {
+        combined_cost: '498.0',
+      },
+    },
+  });
+
+  assert.equal(retellDecimalWrappedMilliCostUpdate.costUsdMilli, 498);
+  assert.equal(retellDecimalWrappedMilliCostUpdate.costUsd, 0.498);
+
   const retellDirectIntegerCostUpdate = helpers.extractCallUpdateFromRetellPayload({
     event: 'call_ended',
     call: {
@@ -337,6 +371,21 @@ test('call provider helpers extract stable retell and twilio call updates', () =
 
   assert.equal(retellDirectIntegerCostUpdate.costUsdMilli, 498);
   assert.equal(retellDirectIntegerCostUpdate.costUsd, 0.498);
+
+  const retellDirectCentsCostUpdate = helpers.extractCallUpdateFromRetellPayload({
+    event: 'call_ended',
+    call: {
+      call_id: 'call_direct_cents_cost',
+      call_status: 'ended',
+      duration_ms: 60000,
+      start_timestamp: 1_700_000_000,
+      end_timestamp: 1_700_000_060,
+      cost: 49.8,
+    },
+  });
+
+  assert.equal(retellDirectCentsCostUpdate.costUsdMilli, 498);
+  assert.equal(retellDirectCentsCostUpdate.costUsd, 0.498);
 
   const twilioUpdate = helpers.extractCallUpdateFromTwilioPayload(
     {
