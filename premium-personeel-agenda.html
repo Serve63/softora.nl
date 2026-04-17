@@ -1083,12 +1083,11 @@
         </div>
         <div class="modal-body">
             <p class="modal-workspace-help" style="margin-top:0;">
-                Afspraken in de agenda staan tussen <strong>09:00</strong> en <strong>17:00</strong>.
-                Tijden daarbuiten worden niet opgeslagen.
+                Afspraken die geen effect hebben op de tijden <strong>09:00</strong> - <strong>17:00</strong> hoeven niet gemeld te worden.
             </p>
             <div class="modal-workspace-grid">
                 <div class="modal-workspace-field">
-                    <div class="modal-workspace-label">Tijdstip</div>
+                    <div class="modal-workspace-label">Tijdstip Activiteit</div>
                     <input type="time" class="modal-workspace-input" id="manualAppointmentTime" min="09:00" max="17:00" step="300" autocomplete="off" required>
                     <div class="modal-workspace-hint">Starttijd binnen kantooruren (stappen van 5 minuten).</div>
                 </div>
@@ -1101,9 +1100,8 @@
                     <input type="text" class="modal-workspace-input" id="manualAppointmentActivity" placeholder="Korte omschrijving van de afspraak" maxlength="500" autocomplete="off">
                 </div>
                 <div class="modal-workspace-field">
-                    <div class="modal-workspace-label">Weer beschikbaar / thuis</div>
+                    <div class="modal-workspace-label">Weer beschikbaar voor een reis naar prospect</div>
                     <textarea id="manualAppointmentAvailableAgain" placeholder="Bv. weer bereikbaar vanaf 16:30, of thuis rond 18:00 na reis." maxlength="800"></textarea>
-                    <div class="modal-workspace-hint">Na reizen naar een prospect: wanneer ben je weer inzetbaar of thuis?</div>
                 </div>
             </div>
             <div class="modal-workspace-status" id="manualAppointmentStatus"></div>
@@ -1830,7 +1828,7 @@
             return;
         }
         if (!availableAgain) {
-            setManualAppointmentStatus('Vul in wanneer je weer beschikbaar of thuis bent na reizen.', 'error');
+            setManualAppointmentStatus('Vul in wanneer je weer beschikbaar bent voor een reis naar prospect.', 'error');
             return;
         }
 

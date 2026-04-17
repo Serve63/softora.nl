@@ -96,12 +96,12 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     if (!availableAgain) {
       return res.status(400).json({
         ok: false,
-        error: 'Vul in wanneer je weer beschikbaar of thuis bent na reizen.',
+        error: 'Vul in wanneer je weer beschikbaar bent voor een reis naar prospect.',
       });
     }
 
     const callId = `manual_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
-    const summary = [activity, `Weer beschikbaar / thuis: ${availableAgain}`].join('\n\n');
+    const summary = [activity, `Weer beschikbaar voor een reis naar prospect: ${availableAgain}`].join('\n\n');
 
     const baseAppointment = {
       callId,
