@@ -602,21 +602,15 @@ let data = {
   'Totale kosten:': [
     { id:1, naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
     { id:2, naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
-    { id:3, naam:'Hostinger VPS', note:'Webhosting server', freq:'maandelijks', bedrag:9.99, status:'active' },
-    { id:4, naam:'softora.nl domein', note:'Jaarlijkse verlenging', freq:'jaarlijks', bedrag:1.25, status:'yearly' },
-    { id:5, naam:'TransIP backup', note:'Extra opslag', freq:'maandelijks', bedrag:3.00, status:'active' },
   ],
 };
 const MONTHLY_COSTS_REMOTE_SCOPE = 'premium_monthly_costs';
 const MONTHLY_COSTS_REMOTE_KEY = 'monthly_cost_entries_v1';
 const DEFAULT_MONTHLY_COSTS_CATEGORY = 'Totale kosten:';
-const DEFAULT_MONTHLY_COSTS_EDITABLE_ITEMS = (data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [])
-  .filter((item) => !item.highlighted)
-  .map((item) => ({ ...item }));
 const DEFAULT_MONTHLY_COSTS_HIGHLIGHTED_ITEMS = (data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [])
   .filter((item) => item.highlighted)
   .map((item) => ({ ...item }));
-let nextId = 6;
+let nextId = 3;
 let editingContext = null;
 let deletingContext = null;
 let monthlyCostsLoaded = false;
@@ -670,43 +664,33 @@ function getHighlightedCostItems(cat = DEFAULT_MONTHLY_COSTS_CATEGORY) {
 }
 
 function sanitizeStoredCostItem(item, index) {
-  const fallback = DEFAULT_MONTHLY_COSTS_EDITABLE_ITEMS[index] || {};
-  const naam = normalizeString(item && item.naam).slice(0, 120) || normalizeString(fallback.naam).slice(0, 120);
+  const naam = normalizeString(item && item.naam).slice(0, 120);
   if (!naam) return null;
 
   const rawId = Math.round(Number(item && item.id));
-  const fallbackId = Math.round(Number(fallback.id));
   const freq = freqLabel[item && item.freq]
     ? item.freq
-    : freqLabel[fallback.freq]
-      ? fallback.freq
-      : 'maandelijks';
+    : 'maandelijks';
   const amountRaw = Number(item && item.bedrag);
-  const fallbackAmount = Number(fallback.bedrag);
   const bedrag = Math.round(
     (
-      (Number.isFinite(amountRaw) && amountRaw >= 0
-        ? amountRaw
-        : Number.isFinite(fallbackAmount) && fallbackAmount >= 0
-          ? fallbackAmount
-          : 0
-      ) * 100
+      (Number.isFinite(amountRaw) && amountRaw >= 0 ? amountRaw : 0) * 100
     )
   ) / 100;
 
   return {
-    id: Math.max(1, Number.isFinite(rawId) && rawId > 0 ? rawId : Number.isFinite(fallbackId) && fallbackId > 0 ? fallbackId : index + 1),
+    id: Math.max(1, Number.isFinite(rawId) && rawId > 0 ? rawId : index + 1),
     naam,
-    note: normalizeString(item && item.note).slice(0, 200) || normalizeString(fallback.note).slice(0, 200),
+    note: normalizeString(item && item.note).slice(0, 200),
     freq,
     bedrag,
-    status: normalizeString(item && item.status) || normalizeString(fallback.status) || 'active',
+    status: normalizeString(item && item.status) || 'active',
   };
 }
 
 function sanitizeStoredCostItems(rawEntries) {
   if (!Array.isArray(rawEntries)) {
-    return DEFAULT_MONTHLY_COSTS_EDITABLE_ITEMS.map(cloneCostItem);
+    return [];
   }
   if (rawEntries.length === 0) {
     return [];
@@ -734,7 +718,7 @@ function sanitizeStoredCostItems(rawEntries) {
     });
   });
 
-  return sanitized.length ? sanitized : DEFAULT_MONTHLY_COSTS_EDITABLE_ITEMS.map(cloneCostItem);
+  return sanitized;
 }
 
 function applyStoredMonthlyCostItems(rawEntries) {
@@ -933,12 +917,37 @@ function render() {
         <div class="category-title">${escapeHtml(cat)}</div>
         <div class="category-total">${fmtEur(catTotal)}<span style="font-size:11px;font-weight:400;color:var(--text-light);margin-left:4px">/mnd</span></div>
       </div>`;
+    const loadingRowsMarkup = !monthlyCostsLoaded ? `
+      <div class="cost-row">
+        <div>
+          <div class="cost-name">Kosten laden...</div>
+          <div class="cost-note">Je opgeslagen databasegegevens worden opgehaald</div>
+        </div>
+        <div class="cost-freq">...</div>
+        <div class="cost-amount-wrap is-static">
+          <div class="cost-amount">...</div>
+        </div>
+      </div>` : '';
+    const addRowMarkup = monthlyCostsLoaded ? `
+      <div class="add-row">
+        <div class="add-inputs">
+          <input type="text" placeholder="Naam" id="new-naam-${key}">
+          <select id="new-freq-${key}">
+            <option value="maandelijks">Maandelijks</option>
+            <option value="jaarlijks">Jaarlijks</option>
+            <option value="kwartaal">Per kwartaal</option>
+          </select>
+          <input type="number" placeholder="Bedrag" step="0.01" min="0" id="new-bedrag-${key}">
+        </div>
+        <button class="btn-add" type="button" data-action="add" data-cat-key="${escapeHtml(key)}">+ Toevoegen</button>
+      </div>` : '';
     block.innerHTML = `
       ${categoryHeaderMarkup}
       <div class="cost-row head">
         <span>Post</span><span>Frequentie</span><span style="text-align:right">Bedrag</span>
       </div>
       <div id="rows-${key}">
+        ${loadingRowsMarkup}
         ${items.map((item) => {
               const rowClassName = item.highlighted ? 'cost-row cost-row-accent' : 'cost-row';
               const displayFreqLabel = item.highlighted && item.freq === 'maandelijks'
@@ -968,18 +977,7 @@ function render() {
           </div>`;
         }).join('')}
       </div>
-      <div class="add-row">
-        <div class="add-inputs">
-          <input type="text" placeholder="Naam" id="new-naam-${key}">
-          <select id="new-freq-${key}">
-            <option value="maandelijks">Maandelijks</option>
-            <option value="jaarlijks">Jaarlijks</option>
-            <option value="kwartaal">Per kwartaal</option>
-          </select>
-          <input type="number" placeholder="Bedrag" step="0.01" min="0" id="new-bedrag-${key}">
-        </div>
-        <button class="btn-add" type="button" data-action="add" data-cat-key="${escapeHtml(key)}">+ Toevoegen</button>
-      </div>`;
+      ${addRowMarkup}`;
     wrap.appendChild(block);
   });
 

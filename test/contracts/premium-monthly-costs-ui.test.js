@@ -63,12 +63,17 @@ test('premium maandelijkse kosten toont coldcalling en coldmailing bovenaan met 
 
   assert.match(pageSource, /naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
   assert.match(pageSource, /naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
+  assert.doesNotMatch(pageSource, /naam:'Hostinger VPS'/);
+  assert.doesNotMatch(pageSource, /naam:'softora\.nl domein'/);
+  assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);
   assert.match(pageSource, /window\.softoraMonthlyCostsData = data;/);
   assert.match(pageSource, /window\.softoraMonthlyCostsRender = render;/);
   assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260417a" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(pageSource, /const categoryHeaderMarkup = cat === 'Totale kosten:' \? '' : `[\s\S]*class="category-header"[\s\S]*category-title[\s\S]*category-total/);
   assert.match(pageSource, /block\.innerHTML = `[\s\S]*\$\{categoryHeaderMarkup\}[\s\S]*<div class="cost-row head">/);
+  assert.match(pageSource, /const loadingRowsMarkup = !monthlyCostsLoaded \? `[\s\S]*Kosten laden\.\.\.[\s\S]*databasegegevens worden opgehaald/);
+  assert.match(pageSource, /const addRowMarkup = monthlyCostsLoaded \? `[\s\S]*\+ Toevoegen/);
   assert.match(pageSource, /\.cost-amount-wrap\.is-static\s*\{[\s\S]*justify-content:\s*flex-end;/);
   assert.match(pageSource, /const rowClassName = item\.highlighted \? 'cost-row cost-row-accent' : 'cost-row';/);
   assert.match(pageSource, /const displayFreqLabel = item\.highlighted && item\.freq === 'maandelijks'[\s\S]*'Deze maand'[\s\S]*freqLabel\[item\.freq\] \|\| item\.freq \|\| '-';/);
