@@ -607,11 +607,141 @@ let data = {
     { id:5, naam:'TransIP backup', note:'Extra opslag', freq:'maandelijks', bedrag:3.00, status:'active' },
   ],
 };
+const MONTHLY_COSTS_REMOTE_SCOPE = 'premium_monthly_costs';
+const MONTHLY_COSTS_REMOTE_KEY = 'monthly_cost_entries_v1';
+const DEFAULT_MONTHLY_COSTS_CATEGORY = 'Totale kosten:';
+const DEFAULT_MONTHLY_COSTS_EDITABLE_ITEMS = (data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [])
+  .filter((item) => !item.highlighted)
+  .map((item) => ({ ...item }));
+const DEFAULT_MONTHLY_COSTS_HIGHLIGHTED_ITEMS = (data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [])
+  .filter((item) => item.highlighted)
+  .map((item) => ({ ...item }));
 let nextId = 6;
 let editingContext = null;
 let deletingContext = null;
+let monthlyCostsLoaded = false;
+let monthlyCostsLoadPromise = null;
 
 const freqLabel = { maandelijks:'Maandelijks', jaarlijks:'Jaarlijks', kwartaal:'Per kwartaal' };
+
+function normalizeString(value) {
+  return String(value ?? '').trim();
+}
+
+function cloneCostItem(item) {
+  return { ...(item || {}) };
+}
+
+function cloneDataState() {
+  const snapshot = {};
+  Object.entries(data).forEach(([cat, items]) => {
+    snapshot[cat] = Array.isArray(items) ? items.map(cloneCostItem) : [];
+  });
+  return snapshot;
+}
+
+function replaceDataState(snapshot) {
+  Object.keys(data).forEach((key) => {
+    delete data[key];
+  });
+  Object.entries(snapshot || {}).forEach(([cat, items]) => {
+    data[cat] = Array.isArray(items) ? items.map(cloneCostItem) : [];
+  });
+  syncNextId();
+}
+
+function syncNextId() {
+  nextId = Object.values(data)
+    .flat()
+    .reduce((maxId, item) => Math.max(maxId, Number(item && item.id) || 0), 0) + 1;
+}
+
+function getEditableCostItems(cat = DEFAULT_MONTHLY_COSTS_CATEGORY) {
+  return Array.isArray(data[cat]) ? data[cat].filter((item) => !item.highlighted).map(cloneCostItem) : [];
+}
+
+function getHighlightedCostItems(cat = DEFAULT_MONTHLY_COSTS_CATEGORY) {
+  const highlightedItems = Array.isArray(data[cat])
+    ? data[cat].filter((item) => item.highlighted).map(cloneCostItem)
+    : [];
+  return highlightedItems.length
+    ? highlightedItems
+    : DEFAULT_MONTHLY_COSTS_HIGHLIGHTED_ITEMS.map(cloneCostItem);
+}
+
+function sanitizeStoredCostItem(item, index) {
+  const fallback = DEFAULT_MONTHLY_COSTS_EDITABLE_ITEMS[index] || {};
+  const naam = normalizeString(item && item.naam).slice(0, 120) || normalizeString(fallback.naam).slice(0, 120);
+  if (!naam) return null;
+
+  const rawId = Math.round(Number(item && item.id));
+  const fallbackId = Math.round(Number(fallback.id));
+  const freq = freqLabel[item && item.freq]
+    ? item.freq
+    : freqLabel[fallback.freq]
+      ? fallback.freq
+      : 'maandelijks';
+  const amountRaw = Number(item && item.bedrag);
+  const fallbackAmount = Number(fallback.bedrag);
+  const bedrag = Math.round(
+    (
+      (Number.isFinite(amountRaw) && amountRaw >= 0
+        ? amountRaw
+        : Number.isFinite(fallbackAmount) && fallbackAmount >= 0
+          ? fallbackAmount
+          : 0
+      ) * 100
+    )
+  ) / 100;
+
+  return {
+    id: Math.max(1, Number.isFinite(rawId) && rawId > 0 ? rawId : Number.isFinite(fallbackId) && fallbackId > 0 ? fallbackId : index + 1),
+    naam,
+    note: normalizeString(item && item.note).slice(0, 200) || normalizeString(fallback.note).slice(0, 200),
+    freq,
+    bedrag,
+    status: normalizeString(item && item.status) || normalizeString(fallback.status) || 'active',
+  };
+}
+
+function sanitizeStoredCostItems(rawEntries) {
+  if (!Array.isArray(rawEntries)) {
+    return DEFAULT_MONTHLY_COSTS_EDITABLE_ITEMS.map(cloneCostItem);
+  }
+  if (rawEntries.length === 0) {
+    return [];
+  }
+
+  const takenIds = new Set(
+    getHighlightedCostItems(DEFAULT_MONTHLY_COSTS_CATEGORY)
+      .map((item) => Math.round(Number(item && item.id)))
+      .filter((id) => Number.isFinite(id) && id > 0)
+  );
+  const sanitized = [];
+
+  rawEntries.forEach((item, index) => {
+    const normalizedItem = sanitizeStoredCostItem(item, index);
+    if (!normalizedItem) return;
+
+    let safeId = Math.max(1, Math.round(Number(normalizedItem.id) || 0));
+    while (takenIds.has(safeId)) {
+      safeId += 1;
+    }
+    takenIds.add(safeId);
+    sanitized.push({
+      ...normalizedItem,
+      id: safeId,
+    });
+  });
+
+  return sanitized.length ? sanitized : DEFAULT_MONTHLY_COSTS_EDITABLE_ITEMS.map(cloneCostItem);
+}
+
+function applyStoredMonthlyCostItems(rawEntries) {
+  data[DEFAULT_MONTHLY_COSTS_CATEGORY] = getHighlightedCostItems(DEFAULT_MONTHLY_COSTS_CATEGORY)
+    .concat(sanitizeStoredCostItems(rawEntries));
+  syncNextId();
+}
 
 function catKey(cat) {
   return String(cat).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -642,6 +772,139 @@ function toMonthly(item) {
 
 function fmtEur(n) {
   return '€' + n.toLocaleString('nl-NL', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+async function fetchUiStateGetWithFallback(scope) {
+  const encodedScope = encodeURIComponent(String(scope || ''));
+  const urls = [`/api/ui-state-get?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(
+        url,
+        {
+          method: 'GET',
+          cache: 'no-store',
+        },
+        12000
+      );
+      if (!response.ok) {
+        throw new Error(`UI state GET mislukt (${response.status})`);
+      }
+      return await response.json().catch(() => ({}));
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('UI state GET mislukt');
+}
+
+async function fetchUiStateSetWithFallback(scope, body) {
+  const encodedScope = encodeURIComponent(String(scope || ''));
+  const urls = [`/api/ui-state-set?scope=${encodedScope}`, `/api/ui-state/${encodedScope}`];
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body || {}),
+        },
+        12000
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(normalizeString(result && result.error) || `UI state POST mislukt (${response.status})`);
+      }
+      return result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('UI state POST mislukt');
+}
+
+async function persistMonthlyCostEntries(actor = 'browser') {
+  const editableItems = getEditableCostItems(DEFAULT_MONTHLY_COSTS_CATEGORY).map((item) => ({
+    ...item,
+    highlighted: false,
+  }));
+  const result = await fetchUiStateSetWithFallback(MONTHLY_COSTS_REMOTE_SCOPE, {
+    patch: {
+      [MONTHLY_COSTS_REMOTE_KEY]: JSON.stringify(editableItems),
+      updated_at: new Date().toISOString(),
+      updated_by: normalizeString(actor || 'browser'),
+    },
+    source: 'premium-maandelijkse-kosten',
+    actor: normalizeString(actor || 'browser'),
+  });
+  if (normalizeString(result && result.source) !== 'supabase') {
+    throw new Error('Maandelijkse kosten zijn nog niet bevestigd in de database.');
+  }
+  return result;
+}
+
+async function ensureMonthlyCostEntriesLoaded() {
+  if (monthlyCostsLoaded) return data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [];
+  if (monthlyCostsLoadPromise) return monthlyCostsLoadPromise;
+
+  monthlyCostsLoadPromise = (async () => {
+    try {
+      const result = await fetchUiStateGetWithFallback(MONTHLY_COSTS_REMOTE_SCOPE);
+      const serializedEntries = normalizeString(
+        result && result.values && result.values[MONTHLY_COSTS_REMOTE_KEY]
+      );
+
+      if (serializedEntries) {
+        let remoteEntries = null;
+        try {
+          const parsedEntries = JSON.parse(serializedEntries);
+          if (Array.isArray(parsedEntries)) {
+            remoteEntries = parsedEntries;
+          }
+        } catch (_) {
+          remoteEntries = null;
+        }
+
+        if (remoteEntries) {
+          applyStoredMonthlyCostItems(remoteEntries);
+          render();
+        }
+      }
+
+      monthlyCostsLoaded = true;
+      return data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [];
+    } catch (error) {
+      console.error('Maandelijkse kosten laden via Supabase mislukt:', error);
+      monthlyCostsLoaded = true;
+      return data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [];
+    } finally {
+      monthlyCostsLoadPromise = null;
+      if (typeof window.refreshMonthlyColdcallingCosts === 'function') {
+        void window.refreshMonthlyColdcallingCosts();
+      }
+    }
+  })();
+
+  return monthlyCostsLoadPromise;
 }
 
 function updateTotals() {
@@ -729,9 +992,18 @@ function addItem(cat) {
   const freq = document.getElementById(`new-freq-${key}`).value;
   const bedrag = parseFloat(document.getElementById(`new-bedrag-${key}`).value);
   if (!naam || isNaN(bedrag) || bedrag <= 0) return showToast('Vul naam en bedrag in');
-  data[cat].push({ id: nextId++, naam, note: '', freq, bedrag, status: 'active' });
+  const snapshot = cloneDataState();
+  data[cat].push({ id: nextId++, naam, note: '', freq, bedrag: Math.round(bedrag * 100) / 100, status: 'active' });
   render();
-  showToast('✓ ' + naam + ' toegevoegd');
+  return persistMonthlyCostEntries('browser_add')
+    .then(() => {
+      showToast('✓ ' + naam + ' toegevoegd');
+    })
+    .catch((error) => {
+      replaceDataState(snapshot);
+      render();
+      showToast(normalizeString(error && error.message) || 'Opslaan mislukt; wijziging is teruggedraaid');
+    });
 }
 
 function deleteItem(cat, id) {
@@ -753,15 +1025,23 @@ function closeDeleteModal() {
   overlay.setAttribute('aria-hidden', 'true');
 }
 
-function confirmDeleteModal() {
+async function confirmDeleteModal() {
   if (!deletingContext) return;
   const { cat, id } = deletingContext;
   const item = getCostItem(cat, id);
   if (!item) return closeDeleteModal();
+  const snapshot = cloneDataState();
   data[cat] = data[cat].filter((i) => i.id !== id);
   closeDeleteModal();
   render();
-  showToast('✓ Post verwijderd');
+  try {
+    await persistMonthlyCostEntries('browser_delete');
+    showToast('✓ Post verwijderd');
+  } catch (error) {
+    replaceDataState(snapshot);
+    render();
+    showToast(normalizeString(error && error.message) || 'Opslaan mislukt; wijziging is teruggedraaid');
+  }
 }
 
 function editItem(cat, id) {
@@ -785,7 +1065,7 @@ function closeEditModal() {
   overlay.setAttribute('aria-hidden', 'true');
 }
 
-function saveEditModal() {
+async function saveEditModal() {
   if (!editingContext) return;
   const { cat, id } = editingContext;
   const item = getCostItem(cat, id);
@@ -800,13 +1080,21 @@ function saveEditModal() {
   if (!freqLabel[nieuweFreq]) return showToast('Kies een geldige frequentie');
   if (!Number.isFinite(nieuweBedrag) || nieuweBedrag <= 0) return showToast('Vul een geldig bedrag in');
 
+  const snapshot = cloneDataState();
   item.naam = nieuweNaam;
   item.note = nieuweNote;
   item.freq = nieuweFreq;
   item.bedrag = Math.round(nieuweBedrag * 100) / 100;
   closeEditModal();
   render();
-  showToast('✓ Post bijgewerkt');
+  try {
+    await persistMonthlyCostEntries('browser_edit');
+    showToast('✓ Post bijgewerkt');
+  } catch (error) {
+    replaceDataState(snapshot);
+    render();
+    showToast(normalizeString(error && error.message) || 'Opslaan mislukt; wijziging is teruggedraaid');
+  }
 }
 
 function showToast(msg) {
@@ -829,9 +1117,13 @@ document.getElementById('delete-modal-overlay').addEventListener('click', (event
 });
 
 document.getElementById('edit-modal-cancel').addEventListener('click', closeEditModal);
-document.getElementById('edit-modal-save').addEventListener('click', saveEditModal);
+document.getElementById('edit-modal-save').addEventListener('click', () => {
+  void saveEditModal();
+});
 document.getElementById('delete-modal-cancel').addEventListener('click', closeDeleteModal);
-document.getElementById('delete-modal-confirm').addEventListener('click', confirmDeleteModal);
+document.getElementById('delete-modal-confirm').addEventListener('click', () => {
+  void confirmDeleteModal();
+});
 
 document.getElementById('categories-wrap').addEventListener('click', (event) => {
   const button = event.target.closest('[data-action]');
@@ -841,7 +1133,7 @@ document.getElementById('categories-wrap').addEventListener('click', (event) => 
   const id = Number(button.dataset.itemId || 0) || 0;
   if (!cat) return;
   if (action === 'add') {
-    addItem(cat);
+    void addItem(cat);
     return;
   }
   if (action === 'edit' && id > 0) {
@@ -849,7 +1141,7 @@ document.getElementById('categories-wrap').addEventListener('click', (event) => 
     return;
   }
   if (action === 'delete' && id > 0) {
-    deleteItem(cat, id);
+    void deleteItem(cat, id);
   }
 });
 
@@ -863,18 +1155,20 @@ document.addEventListener('keydown', (event) => {
   }
   if (event.key !== 'Enter') return;
   if (deleteOverlay.classList.contains('open')) {
-    confirmDeleteModal();
+    void confirmDeleteModal();
     return;
   }
   if (editOverlay.classList.contains('open')) {
-    saveEditModal();
+    void saveEditModal();
   }
 });
 
 window.softoraMonthlyCostsData = data;
 window.softoraMonthlyCostsRender = render;
 
+syncNextId();
 render();
+void ensureMonthlyCostEntriesLoaded();
 </script>
 <script src="assets/premium-monthly-costs-dynamic.js?v=20260417a" defer></script>
 </body>

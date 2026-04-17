@@ -53,7 +53,7 @@ test('premium maandelijkse kosten gebruikt modals en delegated acties voor bewer
   assert.match(pageSource, /if \(action === 'edit' && id > 0\) \{/);
   assert.match(pageSource, /if \(action === 'delete' && id > 0\) \{/);
   assert.match(pageSource, /function deleteItem\(cat, id\) \{[\s\S]*delete-modal-overlay[\s\S]*delete-modal-confirm/s);
-  assert.match(pageSource, /function confirmDeleteModal\(\) \{[\s\S]*showToast\('✓ Post verwijderd'\);/s);
+  assert.match(pageSource, /async function confirmDeleteModal\(\) \{[\s\S]*showToast\('✓ Post verwijderd'\);/s);
   assert.match(pageSource, /function editItem\(cat, id\) \{[\s\S]*edit-modal-overlay[\s\S]*document\.getElementById\('edit-naam'\)\.focus\(\);/s);
 });
 
@@ -75,6 +75,25 @@ test('premium maandelijkse kosten toont coldcalling en coldmailing bovenaan met 
   assert.match(pageSource, /const amountWrapClassName = item\.highlighted \? 'cost-amount-wrap is-static' : 'cost-amount-wrap';/);
   assert.match(pageSource, /const rowActionsMarkup = item\.highlighted \? '' : `[\s\S]*class="row-actions"[\s\S]*data-action="edit"[\s\S]*data-action="delete"/);
   assert.match(pageSource, /<div class="\$\{amountWrapClassName\}">[\s\S]*<div class="cost-amount">\$\{fmtEur\(item\.bedrag\)\}<\/div>[\s\S]*\$\{rowActionsMarkup\}/);
+});
+
+test('premium maandelijkse kosten bewaart bewerkbare posten via supabase ui-state', () => {
+  const pagePath = path.join(__dirname, '../../premium-maandelijkse-kosten.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /const MONTHLY_COSTS_REMOTE_SCOPE = 'premium_monthly_costs';/);
+  assert.match(pageSource, /const MONTHLY_COSTS_REMOTE_KEY = 'monthly_cost_entries_v1';/);
+  assert.match(pageSource, /async function fetchUiStateGetWithFallback\(scope\) \{/);
+  assert.match(pageSource, /async function fetchUiStateSetWithFallback\(scope, body\) \{/);
+  assert.match(pageSource, /async function persistMonthlyCostEntries\(actor = 'browser'\) \{/);
+  assert.match(pageSource, /async function ensureMonthlyCostEntriesLoaded\(\) \{/);
+  assert.match(pageSource, /\[MONTHLY_COSTS_REMOTE_KEY\]: JSON\.stringify\(editableItems\),/);
+  assert.match(pageSource, /const result = await fetchUiStateGetWithFallback\(MONTHLY_COSTS_REMOTE_SCOPE\);/);
+  assert.match(pageSource, /const parsedEntries = JSON\.parse\(serializedEntries\);/);
+  assert.match(pageSource, /return persistMonthlyCostEntries\('browser_add'\)/);
+  assert.match(pageSource, /await persistMonthlyCostEntries\('browser_delete'\);/);
+  assert.match(pageSource, /await persistMonthlyCostEntries\('browser_edit'\);/);
+  assert.match(pageSource, /void ensureMonthlyCostEntriesLoaded\(\);/);
 });
 
 test('premium maandelijkse kosten laadt dynamische coldcalling kosten van deze maand', () => {
