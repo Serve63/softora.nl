@@ -10,7 +10,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260417c">
     <script>
         (function () {
             document.documentElement.setAttribute('data-personnel-loading', 'true');
@@ -23,7 +23,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260414a" defer></script>
+    <script src="assets/personnel-theme.js?v=20260417c" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -1005,7 +1005,11 @@
           </div>
         </aside>
 
-        <main class="main-content">
+        <main class="main-content is-premium-boot-host">
+            <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
+                <div class="premium-boot-spinner"></div>
+            </div>
+            <div class="premium-boot-shell is-booting" aria-busy="true">
             <div class="topbar">
                 <div>
                     <h1>Leads</h1>
@@ -1024,6 +1028,7 @@
                 <div class="lead-status" id="leadStatus"><!-- SOFTORA_LEADS_STATUS --></div>
                 <div class="lead-list" id="leadList" style="visibility:hidden;"><!-- SOFTORA_LEADS_LIST --></div>
             </section>
+            </div>
         </main>
 
         <div class="lead-modal-overlay" id="leadModalOverlay" aria-hidden="true">
@@ -4146,7 +4151,15 @@
                 setStatus('Leads laden...', '');
             }
 
-            loadLeads({ silent: cachedLeads.leads.length > 0 });
+            void (async () => {
+                try {
+                    await loadLeads({ silent: cachedLeads.leads.length > 0 });
+                } finally {
+                    if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+                        window.SoftoraPremiumBoot.setShellBooting(false);
+                    }
+                }
+            })();
 
             function refreshLeadSurfaces() {
                 loadLeads({ silent: true });

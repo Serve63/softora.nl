@@ -88,6 +88,23 @@
 
     window.addEventListener("load", scheduleLoadingStateRelease, { once: true });
 
+    window.SoftoraPremiumBoot = window.SoftoraPremiumBoot || {};
+    window.SoftoraPremiumBoot.setShellBooting = function setShellBooting(isBooting) {
+        var main = document.querySelector("main.main-content.is-premium-boot-host");
+        if (!main) {
+            return;
+        }
+        var loader = main.querySelector(".premium-boot-loader");
+        var shell = main.querySelector(".premium-boot-shell");
+        if (shell) {
+            shell.classList.toggle("is-booting", Boolean(isBooting));
+            shell.setAttribute("aria-busy", isBooting ? "true" : "false");
+        }
+        if (loader) {
+            loader.classList.toggle("is-hidden", !isBooting);
+        }
+    };
+
     function initSoftoraDialogs() {
         if (window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === "function") {
             return;

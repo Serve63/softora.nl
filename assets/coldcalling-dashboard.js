@@ -7254,48 +7254,57 @@
   };
 
   async function bootstrapColdcallingUi() {
-    primeStatsFromBootstrap();
-    setStatusPill('idle', '');
-    setStatusMessage('', '');
-    activeBusinessMode = await loadSavedStatusPillModeFromSupabase();
-    applyStatusPillMode(activeBusinessMode);
-    const uiStateLoaded = await loadRemoteUiState();
-    setupStatsResetButton();
-    ensureLeadListPanel();
-    setLeadSliderReadyState(true);
-    setupStatusPillModeToggle();
-    applyBusinessModeUi();
-    startCallUpdatePolling();
-    if (!uiStateLoaded || remoteUiStateLastSource !== 'supabase') {
-      setStatusPill('error', 'Supabase vereist');
-      setStatusMessage(
-        'error',
-        remoteUiStateLastError || 'Dashboardconfiguratie kon niet uit Supabase geladen worden.'
-      );
-      // Automatisch opnieuw proberen na 5 seconden
-      window.setTimeout(async () => {
-        remoteUiStateLoaded = false;
-        const retried = await loadRemoteUiState();
-        if (retried && remoteUiStateLastSource === 'supabase') {
-          setStatusPill('idle', '');
-          setStatusMessage('', '');
-          void refreshDashboardStatsFromSupabase({ force: true, silent: true });
-          const leadDatabaseModal = ensureLeadDatabaseModal();
-          if (leadDatabaseModal && typeof leadDatabaseModal.prewarmLeadDatabase === 'function') {
-            void leadDatabaseModal.prewarmLeadDatabase();
+    try {
+      primeStatsFromBootstrap();
+      setStatusPill('idle', '');
+      setStatusMessage('', '');
+      activeBusinessMode = await loadSavedStatusPillModeFromSupabase();
+      applyStatusPillMode(activeBusinessMode);
+      const uiStateLoaded = await loadRemoteUiState();
+      setupStatsResetButton();
+      ensureLeadListPanel();
+      setLeadSliderReadyState(true);
+      setupStatusPillModeToggle();
+      applyBusinessModeUi();
+      startCallUpdatePolling();
+      if (!uiStateLoaded || remoteUiStateLastSource !== 'supabase') {
+        setStatusPill('error', 'Supabase vereist');
+        setStatusMessage(
+          'error',
+          remoteUiStateLastError || 'Dashboardconfiguratie kon niet uit Supabase geladen worden.'
+        );
+        // Automatisch opnieuw proberen na 5 seconden
+        window.setTimeout(async () => {
+          remoteUiStateLoaded = false;
+          const retried = await loadRemoteUiState();
+          if (retried && remoteUiStateLastSource === 'supabase') {
+            setStatusPill('idle', '');
+            setStatusMessage('', '');
+            void refreshDashboardStatsFromSupabase({ force: true, silent: true });
+            const leadDatabaseModal = ensureLeadDatabaseModal();
+            if (leadDatabaseModal && typeof leadDatabaseModal.prewarmLeadDatabase === 'function') {
+              void leadDatabaseModal.prewarmLeadDatabase();
+            }
           }
+        }, 5000);
+      } else {
+        void refreshDashboardStatsFromSupabase({ force: true, silent: true });
+        const leadDatabaseModal = ensureLeadDatabaseModal();
+        if (leadDatabaseModal && typeof leadDatabaseModal.prewarmLeadDatabase === 'function') {
+          void leadDatabaseModal.prewarmLeadDatabase();
         }
-      }, 5000);
-    } else {
-      void refreshDashboardStatsFromSupabase({ force: true, silent: true });
-      const leadDatabaseModal = ensureLeadDatabaseModal();
-      if (leadDatabaseModal && typeof leadDatabaseModal.prewarmLeadDatabase === 'function') {
-        void leadDatabaseModal.prewarmLeadDatabase();
+      }
+
+      // Zorg dat het loglabel direct "calls" toont in plaats van "mails".
+      updateLogCountLabel();
+    } finally {
+      if (
+        window.SoftoraPremiumBoot &&
+        typeof window.SoftoraPremiumBoot.setShellBooting === 'function'
+      ) {
+        window.SoftoraPremiumBoot.setShellBooting(false);
       }
     }
-
-    // Zorg dat het loglabel direct "calls" toont in plaats van "mails".
-    updateLogCountLabel();
   }
 
   bindLeadDatabaseOpenControl();

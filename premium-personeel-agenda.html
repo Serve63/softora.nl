@@ -10,7 +10,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260411a">
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260417c">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -26,7 +26,7 @@
             }
         })();
     </script>
-    <script src="assets/personnel-theme.js?v=20260414a" defer></script>
+    <script src="assets/personnel-theme.js?v=20260417c" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -1103,8 +1103,11 @@
         </aside>
 
     <!-- Main -->
-    <main class="main-content">
-
+    <main class="main-content is-premium-boot-host">
+        <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
+            <div class="premium-boot-spinner"></div>
+        </div>
+        <div class="premium-boot-shell is-booting" aria-busy="true">
         <div class="topbar">
             <div class="topbar-left">
                 <h1>Agenda</h1>
@@ -1139,6 +1142,7 @@
                 <div class="legend-item"><div class="legend-dot voice"></div> Voicesoftware Meeting</div>
                 <div class="legend-item"><div class="legend-dot completed"></div> Afspraak afgerond</div>
             </div>
+        </div>
         </div>
 
     </main>
@@ -2606,12 +2610,20 @@
     applyInitialAgendaBootstrap();
     renderCalendar();
     renderWorkspaceReferenceImages();
-    void refreshKnownActiveOrdersIndex();
-    // Eerste load + elke user-getriggerde refresh forceert fresh, zodat
-    // afspraken die zojuist via een andere instance (of een andere tab)
-    // zijn ingepland direct in de agenda verschijnen. De achtergrond-poll
-    // van 10s blijft cached om server-load te besparen.
-    void loadServerAppointments({ fresh: true });
+    void (async () => {
+        try {
+            await refreshKnownActiveOrdersIndex();
+            // Eerste load + elke user-getriggerde refresh forceert fresh, zodat
+            // afspraken die zojuist via een andere instance (of een andere tab)
+            // zijn ingepland direct in de agenda verschijnen. De achtergrond-poll
+            // van 10s blijft cached om server-load te besparen.
+            await loadServerAppointments({ fresh: true });
+        } finally {
+            if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+                window.SoftoraPremiumBoot.setShellBooting(false);
+            }
+        }
+    })();
     window.setInterval(() => { void loadServerAppointments(); }, 10000);
     window.addEventListener('focus', () => { void loadServerAppointments({ fresh: true }); });
     window.addEventListener('pageshow', () => { void loadServerAppointments({ fresh: true }); });

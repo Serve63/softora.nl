@@ -1074,3 +1074,64 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
         width: 100% !important;
     }
 }
+
+/* Premium shell: inhoud pas tonen na bootstrap (zelfde patroon als maandelijkse kosten) */
+main.main-content.is-premium-boot-host {
+    position: relative;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+.premium-boot-loader {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    pointer-events: none;
+    transition: opacity 0.22s ease, visibility 0.22s ease;
+}
+
+.premium-boot-loader.is-hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.premium-boot-spinner {
+    width: 44px;
+    height: 44px;
+    border: 3px solid rgba(139, 34, 82, 0.12);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: premium-boot-spin 0.72s linear infinite;
+    box-sizing: border-box;
+}
+
+@keyframes premium-boot-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+:root[data-personnel-loading="true"] .premium-boot-spinner {
+    animation-duration: 0.72s !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .premium-boot-spinner {
+        animation-duration: 1.4s !important;
+    }
+}
+
+.premium-boot-shell {
+    transition: opacity 0.16s ease;
+}
+
+.premium-boot-shell.is-booting {
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+}
