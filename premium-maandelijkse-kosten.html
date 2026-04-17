@@ -58,16 +58,17 @@ body {
   z-index: 100;
 }
 .main-content {
+  position: relative;
   margin-left: 280px;
   width: calc(100% - 280px);
   min-height: 100vh;
   padding: 3rem 3rem 1.8rem;
 }
 .page-shell {
-  position: relative;
   width: min(1260px, 100%);
   margin: 0 auto;
 }
+/* Loader vult het hele hoofdvlak (main), niet alleen de page-shell-hoogte */
 .monthly-costs-boot-loader {
   position: absolute;
   inset: 0;
@@ -83,12 +84,13 @@ body {
   visibility: hidden;
 }
 .monthly-costs-spinner {
-  width: 26px;
-  height: 26px;
-  border: 2px solid rgba(139, 34, 82, 0.14);
+  width: 44px;
+  height: 44px;
+  border: 3px solid rgba(139, 34, 82, 0.12);
   border-top-color: var(--crimson);
   border-radius: 50%;
-  animation: monthly-costs-spin 0.65s linear infinite;
+  animation: monthly-costs-spin 0.72s linear infinite;
+  box-sizing: border-box;
 }
 @keyframes monthly-costs-spin {
   to {
@@ -563,10 +565,10 @@ body {
     </div>
   </aside>
   <main class="main-content">
+    <div class="monthly-costs-boot-loader" id="monthly-costs-boot-loader" aria-hidden="true">
+      <div class="monthly-costs-spinner"></div>
+    </div>
     <div class="page-shell">
-      <div class="monthly-costs-boot-loader" id="monthly-costs-boot-loader" aria-hidden="true">
-        <div class="monthly-costs-spinner"></div>
-      </div>
       <div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">
         <div class="header">
           <div>

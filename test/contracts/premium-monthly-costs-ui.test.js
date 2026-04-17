@@ -28,9 +28,10 @@ test('premium maandelijkse kosten gebruikt dashboard-typografie en verbergt lega
   assert.match(pageSource, /<div id="last-updated"><\/div>/);
   assert.match(pageSource, /#last-updated\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;[\s\S]*font-size:\s*0\.72rem;/);
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*padding:\s*3rem 3rem 1\.8rem;/);
-  assert.match(pageSource, /\.page-shell\s*\{[\s\S]*position:\s*relative;/);
+  assert.match(pageSource, /\.main-content\s*\{[\s\S]*position:\s*relative;/);
+  assert.match(pageSource, /<main class="main-content">[\s\S]*id="monthly-costs-boot-loader"/);
   assert.match(pageSource, /id="monthly-costs-boot-loader"/);
-  assert.match(pageSource, /\.monthly-costs-spinner\s*\{[\s\S]*animation:\s*monthly-costs-spin/);
+  assert.match(pageSource, /\.monthly-costs-spinner\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;[\s\S]*animation:\s*monthly-costs-spin/);
   assert.match(pageSource, /@keyframes monthly-costs-spin/);
   assert.match(
     pageSource,
