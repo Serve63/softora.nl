@@ -15,6 +15,7 @@ const pages = [
   'premium-pdfs.html',
   'premium-boekhouding.html',
   'premium-kladblok.html',
+  'premium-word.html',
   'premium-instellingen.html',
 ];
 

@@ -15,6 +15,7 @@ const canonicalPages = [
   'premium-boekhouding.html',
   'premium-instellingen.html',
   'premium-kladblok.html',
+  'premium-word.html',
   'premium-pakketten.html',
   'premium-pdfs.html',
   'premium-personeel-agenda.html',

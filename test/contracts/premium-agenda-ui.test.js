@@ -82,6 +82,20 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   );
 });
 
+test('premium agenda offers manual add flow on day click with business-hour notice', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /id="manualAppointmentOverlay"/);
+  assert.match(pageSource, /\/api\/agenda\/appointments\/manual/);
+  assert.match(pageSource, /data-calendar-date=/);
+  assert.match(pageSource, /isManualAppointmentTimeAllowed/);
+  assert.match(
+    pageSource,
+    /Afspraken in de agenda staan tussen[\s\S]*09:00[\s\S]*17:00/i
+  );
+});
+
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');

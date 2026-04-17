@@ -3,6 +3,7 @@ const { createAgendaInterestedLeadReadService } = require('./agenda-interested-l
 const { createAgendaLeadFollowUpService } = require('./agenda-lead-follow-up');
 const { createAgendaAppointmentUpsertService } = require('./agenda-appointment-upsert');
 const { createAgendaInterestedLeadsCoordinator } = require('./agenda-interested-leads');
+const { createAgendaManualAppointmentCoordinator } = require('./agenda-manual-appointment');
 const { createAgendaPostCallCoordinator } = require('./agenda-post-call');
 const { createAgendaConfirmationCoordinator } = require('./agenda-confirmation');
 const { createAgendaReadCoordinator } = require('./agenda-read');
@@ -235,6 +236,28 @@ function createAgendaRuntime(deps = {}) {
   });
 
   const { upsertGeneratedAgendaAppointment } = agendaAppointmentUpsertService;
+
+  const agendaManualAppointmentCoordinator = createAgendaManualAppointmentCoordinator({
+    isSupabaseConfigured,
+    getSupabaseStateHydrated: () => runtimeStateSyncState.supabaseStateHydrated,
+    forceHydrateRuntimeStateWithRetries,
+    syncRuntimeStateFromSupabaseIfNewer,
+    backfillInsightsAndAppointmentsFromRecentCallUpdates,
+    getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
+    getGeneratedAppointmentIndexById,
+    setGeneratedAgendaAppointmentAtIndex,
+    upsertGeneratedAgendaAppointment,
+    appendDashboardActivity,
+    buildRuntimeStateSnapshotPayload,
+    applyRuntimeStateSnapshotPayload,
+    waitForQueuedRuntimeSnapshotPersist,
+    invalidateSupabaseSyncTimestamp,
+    normalizeString,
+    normalizeDateYyyyMmDd,
+    normalizeTimeHhMm,
+    sanitizeAppointmentLocation,
+    truncateText,
+  });
 
   const agendaInterestedLeadsCoordinator = createAgendaInterestedLeadsCoordinator({
     isSupabaseConfigured,
@@ -504,6 +527,8 @@ function createAgendaRuntime(deps = {}) {
         agendaConfirmationCoordinator.sendConfirmationTaskDetailResponse,
     },
     mutationRouteDeps: {
+      createManualAgendaAppointmentResponse:
+        agendaManualAppointmentCoordinator.createManualAgendaAppointmentResponse,
       updateAgendaAppointmentPostCallDataById:
         agendaPostCallCoordinator.updateAgendaAppointmentPostCallDataById,
       addAgendaAppointmentToPremiumActiveOrders:

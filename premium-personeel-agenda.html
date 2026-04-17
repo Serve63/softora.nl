@@ -223,9 +223,23 @@
         }
         .calendar-day:nth-child(7n) { border-right: none; }
         .calendar-day:hover { background: rgba(255,255,255,0.01); }
-        .calendar-day.other-month { opacity: 0.25; }
+        .calendar-day.other-month { opacity: 0.25; pointer-events: none; }
+        .calendar-day.calendar-day-selectable { cursor: pointer; }
+        .calendar-day.calendar-day-selectable:hover { background: rgba(139, 34, 82, 0.06); }
         .calendar-day.today { background: rgba(139,34,82,0.04); }
         .calendar-day.today .day-number { color: var(--accent-light); font-weight: 700; }
+
+        .manual-appointment-modal {
+            width: min(92vw, 480px) !important;
+            max-width: none;
+            grid-template-rows: auto auto auto;
+        }
+        .manual-appointment-modal .modal-body {
+            padding: 1rem 1.35rem 1.15rem;
+        }
+        .manual-appointment-modal .modal-footer {
+            padding: 0.5rem 1.35rem 1.15rem;
+        }
 
         .day-number {
             font-family: 'Oswald', sans-serif; font-size: 0.78rem; font-weight: 500;
@@ -1054,6 +1068,53 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="manualAppointmentOverlay" aria-hidden="true">
+    <div class="modal manual-appointment-modal" role="dialog" aria-modal="true" aria-labelledby="manualAppointmentTitle">
+        <div class="modal-top">
+            <div>
+                <div class="modal-type-badge meeting" id="manualAppointmentTitle">Afspraak toevoegen</div>
+                <div class="modal-company" id="manualAppointmentDateLine" style="font-size:1rem;">—</div>
+            </div>
+            <div class="modal-top-actions">
+                <button class="modal-close magnetic" id="manualAppointmentCloseBtn" type="button" aria-label="Sluiten">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="modal-body">
+            <p class="modal-workspace-help" style="margin-top:0;">
+                Afspraken in de agenda staan tussen <strong>09:00</strong> en <strong>17:00</strong>.
+                Tijden daarbuiten worden niet opgeslagen.
+            </p>
+            <div class="modal-workspace-grid">
+                <div class="modal-workspace-field">
+                    <div class="modal-workspace-label">Tijdstip</div>
+                    <input type="time" class="modal-workspace-input" id="manualAppointmentTime" min="09:00" max="17:00" step="300" autocomplete="off" required>
+                    <div class="modal-workspace-hint">Starttijd binnen kantooruren (stappen van 5 minuten).</div>
+                </div>
+                <div class="modal-workspace-field">
+                    <div class="modal-workspace-label">Locatie</div>
+                    <input type="text" class="modal-workspace-input" id="manualAppointmentLocation" placeholder="Adres of locatie bij de prospect" maxlength="220" autocomplete="off">
+                </div>
+                <div class="modal-workspace-field">
+                    <div class="modal-workspace-label">Activiteit</div>
+                    <input type="text" class="modal-workspace-input" id="manualAppointmentActivity" placeholder="Korte omschrijving van de afspraak" maxlength="500" autocomplete="off">
+                </div>
+                <div class="modal-workspace-field">
+                    <div class="modal-workspace-label">Weer beschikbaar / thuis</div>
+                    <textarea id="manualAppointmentAvailableAgain" placeholder="Bv. weer bereikbaar vanaf 16:30, of thuis rond 18:00 na reis." maxlength="800"></textarea>
+                    <div class="modal-workspace-hint">Na reizen naar een prospect: wanneer ben je weer inzetbaar of thuis?</div>
+                </div>
+            </div>
+            <div class="modal-workspace-status" id="manualAppointmentStatus"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn secondary magnetic" id="manualAppointmentCancelBtn" type="button">Annuleren</button>
+            <button class="modal-btn primary magnetic" id="manualAppointmentSubmitBtn" type="button">Toevoegen</button>
+        </div>
+    </div>
+</div>
+
     <div class="dashboard-layout" data-sidebar-shell="canonical">
 
     <!-- Sidebar -->
@@ -1083,6 +1144,7 @@
 	              <a href="/premium-vaste-lasten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Terugkerende kosten</span></a>
 	              <a href="/premium-boekhouding" class="sidebar-link magnetic" data-sidebar-key="bookkeeping"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg><span class="sidebar-link-text">Boekhouding</span></a>
 	              <a href="/premium-kladblok" class="sidebar-link magnetic" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
+	              <a href="/premium-word" class="sidebar-link magnetic" data-sidebar-key="word"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 12.75h2.25m1.12 0h2.25m-5.62 3.75h6m-6 3h4.5"></path></svg><span class="sidebar-link-text">Word</span></a>
 	              <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
             </div>
           </nav>
@@ -1186,6 +1248,19 @@
     const modalNoDealBtn = document.getElementById('modalNoDealBtn');
     const modalSecondaryBtn = document.getElementById('modalSecondaryBtn');
     const modalCloseBtn = document.getElementById('modalCloseBtn');
+    const manualAppointmentOverlay = document.getElementById('manualAppointmentOverlay');
+    const manualAppointmentDateLine = document.getElementById('manualAppointmentDateLine');
+    const manualAppointmentTimeEl = document.getElementById('manualAppointmentTime');
+    const manualAppointmentLocationEl = document.getElementById('manualAppointmentLocation');
+    const manualAppointmentActivityEl = document.getElementById('manualAppointmentActivity');
+    const manualAppointmentAvailableAgainEl = document.getElementById('manualAppointmentAvailableAgain');
+    const manualAppointmentStatusEl = document.getElementById('manualAppointmentStatus');
+    const manualAppointmentCloseBtn = document.getElementById('manualAppointmentCloseBtn');
+    const manualAppointmentCancelBtn = document.getElementById('manualAppointmentCancelBtn');
+    const manualAppointmentSubmitBtn = document.getElementById('manualAppointmentSubmitBtn');
+    const calendarGridEl = document.getElementById('calendarGrid');
+    let manualAppointmentSelectedDate = '';
+    let manualAppointmentSaving = false;
     const modalAudioBlock = document.getElementById('modalAudioBlock');
     const modalAudioPlayer = document.getElementById('modalAudioPlayer');
     const modalAudioEmpty = document.getElementById('modalAudioEmpty');
@@ -1459,6 +1534,7 @@
 
     function resolveAppointmentRecordingUrl(item) {
         const callId = String(item?.callId || '').trim();
+        if (callId.startsWith('manual_')) return '';
         const raw = String(
             item?.recordingUrl ||
             item?.recording_url ||
@@ -1662,6 +1738,128 @@
         }
 
         return changed;
+    }
+
+    function formatAgendaDateLongNl(dateYmd) {
+        const raw = String(dateYmd || '').trim();
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+        if (!m) return raw;
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        if (Number.isNaN(d.getTime())) return raw;
+        try {
+            return d.toLocaleDateString('nl-NL', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+            });
+        } catch (_) {
+            return raw;
+        }
+    }
+
+    function parseManualTimeToMinutes(timeStr) {
+        const t = String(timeStr || '').trim();
+        const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+        if (!m) return null;
+        const h = Number(m[1]);
+        const mins = Number(m[2]);
+        if (!Number.isFinite(h) || !Number.isFinite(mins) || mins < 0 || mins > 59) return null;
+        return h * 60 + mins;
+    }
+
+    function isManualAppointmentTimeAllowed(timeStr) {
+        const total = parseManualTimeToMinutes(timeStr);
+        if (total === null) return false;
+        return total >= 9 * 60 && total <= 17 * 60;
+    }
+
+    function setManualAppointmentStatus(message, variant = '') {
+        if (!manualAppointmentStatusEl) return;
+        manualAppointmentStatusEl.textContent = message || '';
+        manualAppointmentStatusEl.className = `modal-workspace-status${variant ? ` ${variant}` : ''}`;
+    }
+
+    function openManualAppointmentModal(dateYmd) {
+        if (!manualAppointmentOverlay || !manualAppointmentDateLine) return;
+        manualAppointmentSelectedDate = String(dateYmd || '').trim();
+        manualAppointmentDateLine.textContent = formatAgendaDateLongNl(manualAppointmentSelectedDate);
+        if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '10:00';
+        if (manualAppointmentLocationEl) manualAppointmentLocationEl.value = '';
+        if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
+        if (manualAppointmentAvailableAgainEl) manualAppointmentAvailableAgainEl.value = '';
+        setManualAppointmentStatus('');
+        manualAppointmentOverlay.classList.add('show');
+        manualAppointmentOverlay.setAttribute('aria-hidden', 'false');
+        window.setTimeout(() => {
+            if (manualAppointmentTimeEl) manualAppointmentTimeEl.focus();
+        }, 30);
+    }
+
+    function closeManualAppointmentModal() {
+        if (!manualAppointmentOverlay) return;
+        if (manualAppointmentSaving) return;
+        manualAppointmentOverlay.classList.remove('show');
+        manualAppointmentOverlay.setAttribute('aria-hidden', 'true');
+        manualAppointmentSelectedDate = '';
+        setManualAppointmentStatus('');
+    }
+
+    async function submitManualAppointment() {
+        if (!manualAppointmentSelectedDate || manualAppointmentSaving) return;
+        const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
+        const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
+        const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
+        const availableAgain = manualAppointmentAvailableAgainEl
+            ? String(manualAppointmentAvailableAgainEl.value || '').trim()
+            : '';
+
+        if (!isManualAppointmentTimeAllowed(timeVal)) {
+            setManualAppointmentStatus(
+                'Kies een tijd tussen 09:00 en 17:00. Andere tijden worden niet in de agenda gezet.',
+                'error'
+            );
+            return;
+        }
+        if (!location) {
+            setManualAppointmentStatus('Vul een locatie in.', 'error');
+            return;
+        }
+        if (!activity) {
+            setManualAppointmentStatus('Vul een activiteit in.', 'error');
+            return;
+        }
+        if (!availableAgain) {
+            setManualAppointmentStatus('Vul in wanneer je weer beschikbaar of thuis bent na reizen.', 'error');
+            return;
+        }
+
+        manualAppointmentSaving = true;
+        if (manualAppointmentSubmitBtn) manualAppointmentSubmitBtn.disabled = true;
+        setManualAppointmentStatus('Opslaan...', '');
+
+        try {
+            const result = await postJsonWithFallback('/api/agenda/appointments/manual', {
+                date: manualAppointmentSelectedDate,
+                time: timeVal,
+                location,
+                activity,
+                availableAgain,
+                actor: 'premium-personeel-agenda',
+            });
+            const created = result?.appointment;
+            if (created && mergeServerAppointments([created])) {
+                renderCalendar();
+            }
+            await loadServerAppointments({ fresh: true });
+            renderCalendar();
+            closeManualAppointmentModal();
+        } catch (error) {
+            setManualAppointmentStatus(String(error?.message || 'Opslaan mislukt.'), 'error');
+        } finally {
+            manualAppointmentSaving = false;
+            if (manualAppointmentSubmitBtn) manualAppointmentSubmitBtn.disabled = false;
+        }
     }
 
     function applyInitialAgendaBootstrap() {
@@ -2461,9 +2659,13 @@
                 : [];
 
             let classes = 'calendar-day';
+            if (isOtherMonth) classes += ' other-month';
             if (isToday) classes += ' today';
+            if (!isOtherMonth) classes += ' calendar-day-selectable';
 
-            html += `<div class="${classes}">`;
+            const dayDataAttr =
+                !isOtherMonth && dateStr ? ` data-calendar-date="${dateStr}"` : '';
+            html += `<div class="${classes}"${dayDataAttr}>`;
             if (!isOtherMonth) {
                 html += `<div class="day-number">${day}</div>`;
             }
@@ -2472,7 +2674,7 @@
                 const appointmentClass = isAppointmentCompleted(apt)
                     ? 'appointment completed magnetic'
                     : 'appointment meeting magnetic';
-                html += `<div class="${appointmentClass}" onclick="openAppointment(${apt.id})">
+                html += `<div class="${appointmentClass}" onclick="event.stopPropagation(); void openAppointment(${apt.id})">
                     <span class="apt-time">${apt.time}</span> ${apt.company}
                 </div>`;
             });
@@ -2606,6 +2808,44 @@
         });
     }
     workspaceTranscriptEl.addEventListener('input', refreshWorkspacePrimaryButtonLabel);
+
+    if (calendarGridEl) {
+        calendarGridEl.addEventListener('click', (event) => {
+            const cell = event.target.closest('.calendar-day');
+            if (!cell || cell.classList.contains('other-month')) return;
+            if (event.target.closest('.appointment')) return;
+            const dateStr = cell.getAttribute('data-calendar-date');
+            if (!dateStr) return;
+            openManualAppointmentModal(dateStr);
+        });
+    }
+    if (manualAppointmentCloseBtn) {
+        manualAppointmentCloseBtn.addEventListener('click', () => closeManualAppointmentModal());
+    }
+    if (manualAppointmentCancelBtn) {
+        manualAppointmentCancelBtn.addEventListener('click', () => closeManualAppointmentModal());
+    }
+    if (manualAppointmentSubmitBtn) {
+        manualAppointmentSubmitBtn.addEventListener('click', () => {
+            void submitManualAppointment();
+        });
+    }
+    if (manualAppointmentOverlay) {
+        manualAppointmentOverlay.addEventListener('click', (event) => {
+            if (event.target === manualAppointmentOverlay) closeManualAppointmentModal();
+        });
+    }
+    window.addEventListener(
+        'keydown',
+        (event) => {
+            if (!manualAppointmentOverlay || !manualAppointmentOverlay.classList.contains('show')) return;
+            if (event.key !== 'Escape') return;
+            if (manualAppointmentSaving) return;
+            event.preventDefault();
+            closeManualAppointmentModal();
+        },
+        true
+    );
 
     // Init
     applyInitialAgendaBootstrap();

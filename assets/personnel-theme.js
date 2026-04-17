@@ -441,6 +441,7 @@
         if (p.indexOf("/premium-wachtwoordenregister") === 0) return "passwords";
         if (p.indexOf("/premium-instellingen") === 0) return "settings";
         if (p.indexOf("/premium-kladblok") === 0) return "notepad";
+        if (p.indexOf("/premium-word") === 0) return "word";
         if (
             p.indexOf("/premium-financiele-kosten") === 0 ||
             p.indexOf("/premium-maandelijkse-kosten") === 0 ||
@@ -601,6 +602,12 @@
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg>',
                 label: "Kladblok",
             },
+            {
+                key: "word",
+                href: "/premium-word",
+                icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 12.75h2.25m1.12 0h2.25m-5.62 3.75h6m-6 3h4.5"></path></svg>',
+                label: "Word",
+            },
         ].concat(getPremiumSidebarAdminExtraLinks()), premiumSessionSnapshot);
 
         return [
@@ -712,7 +719,7 @@
                 sidebar,
                 "extra",
                 link,
-                link.key === "passwords" ? ["monthly_costs", "bookkeeping", "notepad", "settings"] : null
+                link.key === "passwords" ? ["monthly_costs", "bookkeeping", "notepad", "word", "settings"] : null
             );
         });
         syncStaticSidebarActiveState(sidebar, activeKey);

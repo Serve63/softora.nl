@@ -433,6 +433,30 @@ test('agenda interested-lead routes keep their auth boundaries and stable error 
   }
 });
 
+test('agenda manual appointment route rejects times outside 09:00–17:00 when validated', async () => {
+  const authState = await getJson('/api/auth/session');
+  const configured = Boolean(authState.body?.configured);
+
+  const late = await postJson('/api/agenda/appointments/manual', {
+    date: '2026-04-20',
+    time: '18:00',
+    location: 'Amsterdam',
+    activity: 'Demo',
+    availableAgain: 'Thuis om 19:00',
+  });
+  if (!configured) {
+    assert.equal(late.response.status, 503);
+    assert.equal(late.body.ok, false);
+    return;
+  }
+  if (late.response.status === 400) {
+    assert.equal(late.body.ok, false);
+    assert.match(String(late.body.error || ''), /09:00|17:00|tussen/i);
+    return;
+  }
+  assert.equal(late.response.status, 401);
+});
+
 test('coldcalling endpoints keep their contract boundaries', async () => {
   const updatesResult = await getProtectedApiExpectation('/api/coldcalling/call-updates?limit=3');
   if (updatesResult.response.status === 200) {

@@ -261,6 +261,24 @@ function validateTaskActorRequest(req) {
   };
 }
 
+function validateManualAgendaAppointmentRequest(req) {
+  const body = req.body || {};
+  return {
+    ok: true,
+    body: {
+      ...normalizeActorFields(body),
+      date: truncateText(normalizeString(body.date || body.appointmentDate || ''), 32),
+      time: truncateText(normalizeString(body.time || body.appointmentTime || ''), 16),
+      location: truncateText(normalizeString(body.location || body.appointmentLocation || ''), 220),
+      activity: truncateText(normalizeString(body.activity || body.company || ''), 500),
+      availableAgain: truncateText(
+        normalizeString(body.availableAgain || body.available_after || ''),
+        800
+      ),
+    },
+  };
+}
+
 module.exports = {
   ensureRequiredRef,
   validateAddActiveOrderRequest,
@@ -269,6 +287,7 @@ module.exports = {
   validateDraftEmailRequest,
   validateInterestedLeadDismissRequest,
   validateInterestedLeadSetInAgendaRequest,
+  validateManualAgendaAppointmentRequest,
   validatePostCallRequest,
   validateSendEmailRequest,
   validateTaskActorRequest,

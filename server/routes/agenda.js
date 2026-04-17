@@ -5,6 +5,7 @@ const {
   validateDraftEmailRequest,
   validateInterestedLeadDismissRequest,
   validateInterestedLeadSetInAgendaRequest,
+  validateManualAgendaAppointmentRequest,
   validatePostCallRequest,
   validateSendEmailRequest,
   validateTaskActorRequest,
@@ -12,6 +13,13 @@ const {
 const { withValidation } = require('./validation');
 
 function registerAgendaMutationRoutes(app, deps) {
+  app.post(
+    '/api/agenda/appointments/manual',
+    withValidation(validateManualAgendaAppointmentRequest, (req, res) =>
+      deps.createManualAgendaAppointmentResponse(req, res)
+    )
+  );
+
   app.post(
     '/api/agenda/appointments/:id/post-call',
     withValidation(validatePostCallRequest, (req, res) =>

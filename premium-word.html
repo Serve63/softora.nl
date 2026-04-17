@@ -6,7 +6,7 @@
     <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
         <link rel="stylesheet" href="/assets/iphone-optimizations.css">
-<title>Softora | Kladblok</title>
+<title>Softora | Word</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -64,7 +64,7 @@
             justify-content: flex-start;
         }
 
-        .notepad-shell {
+        .word-shell {
             width: 100%;
             max-width: none;
             margin: 0;
@@ -89,55 +89,156 @@
             color: var(--text-tertiary);
         }
 
-        .editor-sheet {
-            background: #fff;
+        .word-app {
             border: 1px solid var(--border);
             border-radius: 14px;
             box-shadow: 0 14px 40px rgba(20, 18, 34, 0.05);
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             min-height: calc(100vh - 8rem);
-            padding: 1rem 1.1rem 1.2rem;
+            background: #f3f4f6;
         }
 
-        .editor-toolbar {
+        .word-ribbon {
             display: flex;
-            justify-content: space-between;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 0.8rem;
-            padding: 0.25rem 0.25rem 0.85rem;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 0.85rem;
+            gap: 0.35rem 0.75rem;
+            padding: 0.55rem 0.75rem;
+            background: linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%);
+            border-bottom: 1px solid #d1d5db;
         }
 
-        .editor-toolbar h2 {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-tertiary);
+        .ribbon-group {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.25rem;
+            padding-right: 0.75rem;
+            margin-right: 0.25rem;
+            border-right: 1px solid #e5e7eb;
         }
 
-        .notepad-editor {
-            flex: 1;
-            width: 100%;
-            min-height: 540px;
-            padding: 0.45rem;
-            outline: none;
-            border: 0;
-            background: transparent;
+        .ribbon-group:last-child {
+            border-right: 0;
+            margin-right: 0;
+            padding-right: 0;
+        }
+
+        .ribbon-btn {
+            font: inherit;
+            font-size: 0.8rem;
+            min-width: 2rem;
+            height: 2rem;
+            padding: 0 0.45rem;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: #fff;
             color: var(--text-primary);
-            font-size: 1rem;
-            line-height: 1.7;
-            white-space: pre-wrap;
-            word-break: break-word;
-            overflow-wrap: anywhere;
-            cursor: text;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
         }
 
-        .notepad-editor:empty::before {
-            content: attr(data-placeholder);
+        .ribbon-btn:hover {
+            border-color: #c4c9d1;
+            background: #f9fafb;
+        }
+
+        .ribbon-btn:active {
+            background: #e5e7eb;
+        }
+
+        .ribbon-select {
+            font: inherit;
+            font-size: 0.78rem;
+            height: 2rem;
+            padding: 0 0.35rem;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: var(--text-primary);
+        }
+
+        .ribbon-color {
+            width: 2rem;
+            height: 2rem;
+            padding: 0;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            cursor: pointer;
+            background: #fff;
+        }
+
+        .ribbon-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
             color: var(--text-tertiary);
+            margin-right: 0.25rem;
+        }
+
+        .word-page-outer {
+            flex: 1;
+            overflow: auto;
+            padding: 1.5rem 1rem 2.5rem;
+            background: #e5e7eb;
+        }
+
+        .word-page {
+            max-width: 51rem;
+            min-height: 72rem;
+            margin: 0 auto;
+            background: #fff;
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.12);
+            padding: 3rem 3.25rem 4rem;
+            color: #111827;
+        }
+
+        .word-editor {
+            min-height: 64rem;
+            outline: none;
+            font-size: 11pt;
+            line-height: 1.55;
+        }
+
+        .word-editor:empty::before {
+            content: attr(data-placeholder);
+            color: #9ca3af;
+            pointer-events: none;
+        }
+
+        .word-editor h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin: 0.5rem 0 0.75rem;
+        }
+
+        .word-editor h2 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin: 0.5rem 0 0.6rem;
+        }
+
+        .word-editor h3 {
+            font-size: 1.12rem;
+            font-weight: 600;
+            margin: 0.4rem 0 0.5rem;
+        }
+
+        .word-editor p {
+            margin: 0 0 0.65rem;
+        }
+
+        .word-editor ul,
+        .word-editor ol {
+            margin: 0 0 0.65rem;
+            padding-left: 1.75rem;
+        }
+
+        .word-editor a {
+            color: #2563eb;
+            text-decoration: underline;
         }
 
         @media (max-width: 900px) {
@@ -153,8 +254,13 @@
                 padding: 1rem;
             }
 
-            .editor-sheet {
+            .word-app {
                 min-height: 76vh;
+            }
+
+            .word-page {
+                min-height:50rem;
+                padding: 1.5rem 1.25rem 2rem;
             }
         }
     </style>
@@ -186,8 +292,8 @@
               <a href="/premium-wachtwoordenregister" class="sidebar-link magnetic" data-sidebar-key="passwords"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg><span class="sidebar-link-text">Wachtwoordenregister</span></a>
               <a href="/premium-vaste-lasten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Terugkerende kosten</span></a>
               <a href="/premium-boekhouding" class="sidebar-link magnetic" data-sidebar-key="bookkeeping"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg><span class="sidebar-link-text">Boekhouding</span></a>
-              <a href="/premium-kladblok" class="sidebar-link magnetic active" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
-              <a href="/premium-word" class="sidebar-link magnetic" data-sidebar-key="word"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 12.75h2.25m1.12 0h2.25m-5.62 3.75h6m-6 3h4.5"></path></svg><span class="sidebar-link-text">Word</span></a>
+              <a href="/premium-kladblok" class="sidebar-link magnetic" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
+              <a href="/premium-word" class="sidebar-link magnetic active" data-sidebar-key="word"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 12.75h2.25m1.12 0h2.25m-5.62 3.75h6m-6 3h4.5"></path></svg><span class="sidebar-link-text">Word</span></a>
               <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
             </div>
           </nav>
@@ -212,25 +318,74 @@
                 <div class="premium-boot-spinner"></div>
             </div>
             <div class="premium-boot-shell is-booting" aria-busy="true">
-            <section class="notepad-shell">
+            <section class="word-shell">
                 <header>
-                    <h1 class="page-title">Kladblok</h1>
-                    <p class="page-subtitle">Typ hier je losse notities.</p>
+                    <h1 class="page-title">Word</h1>
+                    <p class="page-subtitle">Rijke tekstopmaak op een documentpagina. Automatisch opgeslagen.</p>
                 </header>
 
-                <article class="editor-sheet">
-                    <div class="editor-toolbar">
-                        <h2>Notities</h2>
+                <div class="word-app">
+                    <div class="word-ribbon" id="wordRibbon" role="toolbar" aria-label="Document opmaak">
+                        <div class="ribbon-group">
+                            <button type="button" class="ribbon-btn" data-cmd="undo" title="Ongedaan maken">Ongedaan</button>
+                            <button type="button" class="ribbon-btn" data-cmd="redo" title="Opnieuw">Opnieuw</button>
+                        </div>
+                        <div class="ribbon-group">
+                            <button type="button" class="ribbon-btn" data-cmd="bold" title="Vet"><strong>B</strong></button>
+                            <button type="button" class="ribbon-btn" data-cmd="italic" title="Cursief"><em>I</em></button>
+                            <button type="button" class="ribbon-btn" data-cmd="underline" title="Onderstrepen"><span style="text-decoration:underline">U</span></button>
+                            <button type="button" class="ribbon-btn" data-cmd="strikeThrough" title="Doorhalen"><span style="text-decoration:line-through">S</span></button>
+                        </div>
+                        <div class="ribbon-group">
+                            <button type="button" class="ribbon-btn" data-cmd="formatBlock" data-val="p" title="Normaal">Normaal</button>
+                            <button type="button" class="ribbon-btn" data-cmd="formatBlock" data-val="h1" title="Kop 1">H1</button>
+                            <button type="button" class="ribbon-btn" data-cmd="formatBlock" data-val="h2" title="Kop 2">H2</button>
+                            <button type="button" class="ribbon-btn" data-cmd="formatBlock" data-val="h3" title="Kop 3">H3</button>
+                        </div>
+                        <div class="ribbon-group">
+                            <button type="button" class="ribbon-btn" data-cmd="insertUnorderedList" title="Lijst">• Lijst</button>
+                            <button type="button" class="ribbon-btn" data-cmd="insertOrderedList" title="Genummerd">1. Lijst</button>
+                        </div>
+                        <div class="ribbon-group">
+                            <button type="button" class="ribbon-btn" data-cmd="justifyLeft" title="Links uitlijnen">Links</button>
+                            <button type="button" class="ribbon-btn" data-cmd="justifyCenter" title="Centreren">Midden</button>
+                            <button type="button" class="ribbon-btn" data-cmd="justifyRight" title="Rechts uitlijnen">Rechts</button>
+                        </div>
+                        <div class="ribbon-group">
+                            <span class="ribbon-label">Tekst</span>
+                            <input type="color" class="ribbon-color" id="wordForeColor" value="#111827" title="Tekstkleur" aria-label="Tekstkleur">
+                            <span class="ribbon-label">Markeer</span>
+                            <input type="color" class="ribbon-color" id="wordHiliteColor" value="#fef08a" title="Markeren" aria-label="Markeerkleur">
+                        </div>
+                        <div class="ribbon-group">
+                            <button type="button" class="ribbon-btn" data-cmd="createLink" title="Hyperlink">Link</button>
+                            <button type="button" class="ribbon-btn" data-cmd="removeFormat" title="Opmaak wissen">Wis opmaak</button>
+                        </div>
+                        <div class="ribbon-group">
+                            <span class="ribbon-label">Grootte</span>
+                            <select class="ribbon-select" id="wordFontSize" aria-label="Lettergrootte">
+                                <option value="2">Klein</option>
+                                <option value="3" selected>Standaard</option>
+                                <option value="4">Groter</option>
+                                <option value="5">Groot</option>
+                                <option value="6">Extra</option>
+                                <option value="7">Max</option>
+                            </select>
+                        </div>
                     </div>
-                    <div
-                        id="notepadEditor"
-                        class="notepad-editor"
-                        contenteditable="true"
-                        spellcheck="true"
-                        data-placeholder="Typ hier je notities..."
-                        aria-label="Kladblok notities"
-                    ></div>
-                </article>
+                    <div class="word-page-outer">
+                        <div class="word-page">
+                            <div
+                                id="wordEditor"
+                                class="word-editor"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-placeholder="Begin met typen. Gebruik de werkbalk voor vet, koppen, lijsten en meer."
+                                aria-label="Word document"
+                            ></div>
+                        </div>
+                    </div>
+                </div>
             </section>
             </div>
         </main>
@@ -238,54 +393,101 @@
 
     <script>
         (function () {
-            const REMOTE_SCOPE = 'premium_notepad';
-            const REMOTE_KEY = 'softora_premium_notepad_html_v1';
-            const editor = document.getElementById('notepadEditor');
-            if (!editor) return;
+            const REMOTE_SCOPE = 'premium_word';
+            const REMOTE_KEY = 'softora_premium_word_html_v1';
+            const editor = document.getElementById('wordEditor');
+            const ribbon = document.getElementById('wordRibbon');
+            const forePick = document.getElementById('wordForeColor');
+            const hilitePick = document.getElementById('wordHiliteColor');
+            const fontSizeSelect = document.getElementById('wordFontSize');
+            if (!editor || !ribbon) return;
+
+            function exec(cmd, value) {
+                editor.focus();
+                try {
+                    document.execCommand(cmd, false, value === undefined ? null : value);
+                } catch (err) {
+                    /* ignore */
+                }
+            }
+
+            ribbon.addEventListener('mousedown', function (e) {
+                if (e.target.closest('.ribbon-btn')) e.preventDefault();
+            });
+
+            ribbon.addEventListener('click', function (e) {
+                const btn = e.target.closest('.ribbon-btn');
+                if (!btn) return;
+                e.preventDefault();
+                const cmd = btn.getAttribute('data-cmd');
+                const val = btn.getAttribute('data-val');
+                if (cmd === 'createLink') {
+                    var url = window.prompt('Voer een URL in (https://…)', 'https://');
+                    if (url) exec('createLink', url);
+                    return;
+                }
+                if (cmd === 'formatBlock' && val) {
+                    exec('formatBlock', val);
+                    return;
+                }
+                if (cmd) exec(cmd, null);
+            });
+
+            if (forePick) {
+                forePick.addEventListener('input', function () {
+                    exec('foreColor', forePick.value);
+                });
+            }
+            if (hilitePick) {
+                hilitePick.addEventListener('input', function () {
+                    exec('hiliteColor', hilitePick.value);
+                });
+            }
+            if (fontSizeSelect) {
+                fontSizeSelect.addEventListener('change', function () {
+                    exec('fontSize', fontSizeSelect.value);
+                });
+            }
 
             async function fetchUiStateGet(scope) {
                 const encodedScope = encodeURIComponent(String(scope || ''));
                 const urls = [
-                    `/api/ui-state-get?scope=${encodedScope}`,
-                    `/api/ui-state/${encodedScope}`
+                    '/api/ui-state-get?scope=' + encodedScope,
+                    '/api/ui-state/' + encodedScope
                 ];
-                let lastError = null;
-
-                for (const url of urls) {
+                var lastError = null;
+                for (var i = 0; i < urls.length; i++) {
                     try {
-                        const res = await fetch(url, { method: 'GET', cache: 'no-store' });
-                        if (!res.ok) throw new Error(`UI-state GET mislukt (${res.status})`);
+                        var res = await fetch(urls[i], { method: 'GET', cache: 'no-store' });
+                        if (!res.ok) throw new Error('UI-state GET mislukt (' + res.status + ')');
                         return await res.json().catch(function () { return {}; });
                     } catch (error) {
                         lastError = error;
                     }
                 }
-
                 throw lastError || new Error('UI-state GET mislukt');
             }
 
             async function fetchUiStateSet(scope, body) {
                 const encodedScope = encodeURIComponent(String(scope || ''));
                 const urls = [
-                    `/api/ui-state-set?scope=${encodedScope}`,
-                    `/api/ui-state/${encodedScope}`
+                    '/api/ui-state-set?scope=' + encodedScope,
+                    '/api/ui-state/' + encodedScope
                 ];
-                let lastError = null;
-
-                for (const url of urls) {
+                var lastError = null;
+                for (var j = 0; j < urls.length; j++) {
                     try {
-                        const res = await fetch(url, {
+                        var res2 = await fetch(urls[j], {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(body || {})
                         });
-                        if (!res.ok) throw new Error(`UI-state POST mislukt (${res.status})`);
-                        return await res.json().catch(function () { return {}; });
-                    } catch (error) {
-                        lastError = error;
+                        if (!res2.ok) throw new Error('UI-state POST mislukt (' + res2.status + ')');
+                        return await res2.json().catch(function () { return {}; });
+                    } catch (error2) {
+                        lastError = error2;
                     }
                 }
-
                 throw lastError || new Error('UI-state POST mislukt');
             }
 
@@ -295,30 +497,32 @@
                     const html = String(state && state.values && state.values[REMOTE_KEY] || '');
                     if (html) editor.innerHTML = html;
                 } catch (error) {
-                    console.error('Kladblok laden via Supabase mislukt:', error);
+                    console.error('Word-document laden mislukt:', error);
                 }
             }
 
             async function save() {
                 try {
                     await fetchUiStateSet(REMOTE_SCOPE, {
-                        patch: {
-                            [REMOTE_KEY]: editor.innerHTML
-                        },
-                        source: 'premium-kladblok',
+                        patch: (function () {
+                            var p = {};
+                            p[REMOTE_KEY] = editor.innerHTML;
+                            return p;
+                        })(),
+                        source: 'premium-word',
                         actor: 'browser'
                     });
                 } catch (error) {
-                    console.error('Kladblok opslaan via Supabase mislukt:', error);
+                    console.error('Word-document opslaan mislukt:', error);
                 }
             }
 
-            let saveTimer = 0;
+            var saveTimer = 0;
             editor.addEventListener('input', function () {
                 window.clearTimeout(saveTimer);
                 saveTimer = window.setTimeout(function () {
                     void save();
-                }, 240);
+                }, 280);
             });
 
             window.addEventListener('beforeunload', function () {
