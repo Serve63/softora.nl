@@ -7,6 +7,15 @@ const SAME_ORIGIN_PROTECTION_EXEMPT_PATHS = new Set([
   '/api/twilio/voice',
   '/api/twilio/status',
   '/api/retell/webhook',
+  '/api/retell/functions/agenda/availability',
+  '/api/retell/functions/agenda/book',
+  '/retell/webhook',
+  '/retell/functions/agenda/availability',
+  '/retell/functions/agenda/book',
+]);
+const SAME_ORIGIN_PROTECTION_EXEMPT_PREFIXES = Object.freeze([
+  '/api/retell/functions/agenda/',
+  '/retell/functions/agenda/',
 ]);
 
 const JSON_LIKE_CONTENT_TYPE_PATTERN = /^application\/([a-z0-9.+-]+\+)?json$/i;
@@ -25,6 +34,27 @@ function getRequestPathname(req) {
   const rawUrl = normalizeString(req?.originalUrl || req?.url || req?.path || '/');
   const questionMarkIndex = rawUrl.indexOf('?');
   return questionMarkIndex >= 0 ? rawUrl.slice(0, questionMarkIndex) : rawUrl;
+}
+
+function normalizeRequestPathname(value) {
+  const raw = normalizeString(value || '/');
+  if (!raw) return '/';
+  const withLeadingSlash = raw.startsWith('/') ? raw : `/${raw}`;
+  if (withLeadingSlash === '/') return '/';
+  return withLeadingSlash.replace(/\/+$/, '') || '/';
+}
+
+function getRequestPathVariants(req) {
+  const normalizedPath = normalizeRequestPathname(getRequestPathname(req));
+  const variants = new Set([normalizedPath]);
+
+  if (normalizedPath.startsWith('/api/')) {
+    variants.add(normalizedPath.slice(4) || '/');
+  } else if (normalizedPath !== '/api') {
+    variants.add(`/api${normalizedPath}`);
+  }
+
+  return variants;
 }
 
 function normalizeIpAddress(value) {
@@ -138,8 +168,16 @@ function createRequestSecurityContext(options = {}) {
   }
 
   function isSameOriginProtectionExemptRequest(req) {
-    const requestPath = normalizeString(getRequestPathname(req) || '');
-    return SAME_ORIGIN_PROTECTION_EXEMPT_PATHS.has(requestPath);
+    const requestPathVariants = getRequestPathVariants(req);
+    for (const requestPath of requestPathVariants) {
+      if (SAME_ORIGIN_PROTECTION_EXEMPT_PATHS.has(requestPath)) return true;
+      if (
+        SAME_ORIGIN_PROTECTION_EXEMPT_PREFIXES.some((prefix) => requestPath.startsWith(prefix))
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   function getStateChangingApiProtectionDecision(req) {
@@ -235,6 +273,8 @@ module.exports = {
   isJsonLikeContentType,
   isSafeHttpMethod,
   isSecureHttpRequest,
+  getRequestPathVariants,
   normalizeIpAddress,
   normalizeOrigin,
+  normalizeRequestPathname,
 };

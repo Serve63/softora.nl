@@ -120,13 +120,17 @@ function createFixture(overrides = {}) {
   const coordinator = createAgendaInterestedLeadsCoordinator({
     isSupabaseConfigured: () => Boolean(overrides.supabaseConfigured),
     getSupabaseStateHydrated: () => !overrides.supabaseConfigured || Boolean(overrides.supabaseHydrated),
-    forceHydrateRuntimeStateWithRetries: async (times) => {
-      hydrateCalls.push(times);
-    },
-    syncRuntimeStateFromSupabaseIfNewer: async (options) => {
-      syncRuntimeCalls.push(options);
-      return overrides.syncRuntimeResult !== undefined ? Boolean(overrides.syncRuntimeResult) : false;
-    },
+    forceHydrateRuntimeStateWithRetries:
+      overrides.forceHydrateRuntimeStateWithRetries ||
+      (async (times) => {
+        hydrateCalls.push(times);
+      }),
+    syncRuntimeStateFromSupabaseIfNewer:
+      overrides.syncRuntimeStateFromSupabaseIfNewer ||
+      (async (options) => {
+        syncRuntimeCalls.push(options);
+        return overrides.syncRuntimeResult !== undefined ? Boolean(overrides.syncRuntimeResult) : false;
+      }),
     backfillInsightsAndAppointmentsFromRecentCallUpdates: () => {},
     normalizeString,
     normalizeDateYyyyMmDd,
@@ -211,12 +215,14 @@ function createFixture(overrides = {}) {
         ? Boolean(overrides.persistDismissedLeadsResult)
         : false;
     },
-    ensureDismissedLeadsFreshFromSupabase: async (options) => {
-      dismissedFreshCalls.push(options);
-      return overrides.ensureDismissedLeadsFreshResult !== undefined
-        ? Boolean(overrides.ensureDismissedLeadsFreshResult)
-        : true;
-    },
+    ensureDismissedLeadsFreshFromSupabase:
+      overrides.ensureDismissedLeadsFreshFromSupabase ||
+      (async (options) => {
+        dismissedFreshCalls.push(options);
+        return overrides.ensureDismissedLeadsFreshResult !== undefined
+          ? Boolean(overrides.ensureDismissedLeadsFreshResult)
+          : true;
+      }),
     appendDashboardActivity: (payload, reason) => {
       activityCalls.push({ payload, reason });
     },
@@ -445,51 +451,82 @@ test('agenda interested leads coordinator forceert remote dismissed-leads hydrat
     'dismiss-route moet de TTL omzeilen via force=true zodat we niet stale persisten');
 });
 
-test('agenda interested leads coordinator forceert remote dismissed-leads hydrate ook bij set-in-agenda (óók een dismiss)', async () => {
-  // Set-in-agenda is qua dismissed-state een dismiss: de lead verdwijnt uit
-  // de interested-lijst zodra hij is ingepland. We moeten daarom óók hier de
-  // verse remote dismissed-leads ophalen vóór we persisten, zodat we nooit
-  // dismisses van andere instances overschrijven.
-  const { coordinator, dismissedFreshCalls } = createFixture({
+test('agenda interested leads coordinator gebruikt request-body snapshot voor set-in-agenda zonder trage shared-state warmup', async () => {
+  const { coordinator } = createFixture({
     supabaseConfigured: true,
-    supabaseHydrated: true,
+    supabaseHydrated: false,
+    findInterestedLeadRowByCallId: () => null,
+    getLatestCallUpdateByCallId: () => null,
+    buildGeneratedLeadFollowUpFromCall: () => null,
+    aiCallInsightsByCallId: [],
+    forceHydrateRuntimeStateWithRetries: async () => {
+      throw new Error('forceHydrateRuntimeStateWithRetries mag hier niet nodig zijn');
+    },
+    syncRuntimeStateFromSupabaseIfNewer: async () => {
+      throw new Error('syncRuntimeStateFromSupabaseIfNewer mag hier niet nodig zijn');
+    },
+    ensureDismissedLeadsFreshFromSupabase: async () => {
+      throw new Error('ensureDismissedLeadsFreshFromSupabase mag hier niet nodig zijn');
+    },
   });
   const res = createResponseRecorder();
 
   await coordinator.setInterestedLeadInAgendaResponse(
     {
       body: {
-        callId: 'call-1',
+        callId: 'call-snapshot',
         appointmentDate: '2026-04-10',
         appointmentTime: '14:30',
         location: 'Amsterdam',
+        whatsappConfirmed: true,
         actor: 'Serve',
+        company: 'Softora',
+        contact: 'Serve Creusen',
+        phone: '0612345678',
+        summary: 'Lead wil graag een afspraak inplannen.',
       },
     },
     res
   );
 
-  assert.ok(
-    dismissedFreshCalls.some((options) => options?.force === true),
-    'set-in-agenda-route moet de TTL omzeilen via force=true vóór de dismiss wordt gepersisteerd'
-  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.taskCompleted, true);
 });
 
-test('agenda interested leads coordinator forceert óók runtime-state sync vóór set-in-agenda zodat een andere warme Vercel-instance een verse call-backed lead direct kent', async () => {
-  // Repro: de lead is al zichtbaar in de browser (instance A), maar de POST
-  // /set-in-agenda landt op instance B die deze callId nog niet heeft
-  // gehydrateerd. Zonder forced shared-state sync krijgt de gebruiker 404:
-  // "Lead of call niet gevonden."
-  const { coordinator, syncRuntimeCalls } = createFixture({
+test('agenda interested leads coordinator forceert runtime-state sync pas als lokale en request-body bronnen ontbreken', async () => {
+  let syncedLead = null;
+  const hydrateCalls = [];
+  const syncRuntimeCalls = [];
+  const { coordinator } = createFixture({
     supabaseConfigured: true,
-    supabaseHydrated: true,
+    supabaseHydrated: false,
+    findInterestedLeadRowByCallId: () => syncedLead,
+    getLatestCallUpdateByCallId: () => null,
+    buildGeneratedLeadFollowUpFromCall: () => null,
+    aiCallInsightsByCallId: [],
+    forceHydrateRuntimeStateWithRetries: async (times) => {
+      hydrateCalls.push(times);
+    },
+    syncRuntimeStateFromSupabaseIfNewer: async (options) => {
+      syncRuntimeCalls.push(options);
+      syncedLead = {
+        callId: 'call-remote-only',
+        company: 'Softora',
+        contact: 'Serve Creusen',
+        phone: '0612345678',
+        source: 'AI Cold Calling',
+        summary: 'Lead kwam via gedeelde state binnen.',
+      };
+      return true;
+    },
   });
   const res = createResponseRecorder();
 
   await coordinator.setInterestedLeadInAgendaResponse(
     {
       body: {
-        callId: 'call-1',
+        callId: 'call-remote-only',
         appointmentDate: '2026-04-10',
         appointmentTime: '14:30',
         location: 'Amsterdam',
@@ -500,10 +537,9 @@ test('agenda interested leads coordinator forceert óók runtime-state sync vó�
   );
 
   assert.equal(res.statusCode, 200);
-  assert.ok(
-    syncRuntimeCalls.some((options) => options?.force === true && options?.maxAgeMs === 0),
-    'set-in-agenda-route moet vóór materialisatie eerst de runtime-state + call updates vers ophalen'
-  );
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(hydrateCalls, [3]);
+  assert.deepEqual(syncRuntimeCalls, [{ force: true, maxAgeMs: 0 }]);
 });
 
 test('agenda interested leads coordinator kan set-in-agenda materialiseren uit de request-body snapshot als de lead intussen uit lokale runtime is verdwenen', async () => {
@@ -511,7 +547,7 @@ test('agenda interested leads coordinator kan set-in-agenda materialiseren uit d
   // waarop de POST landt kent de callId lokaal niet (nog) of niet meer. In dat
   // geval mag "in agenda zetten" niet met 404 stranden zolang de modal een
   // geldige snapshot meestuurt.
-  const { appointments, coordinator, upsertCalls } = createFixture({
+  const { appointments, coordinator, dismissedFreshCalls, hydrateCalls, syncRuntimeCalls, upsertCalls } = createFixture({
     findInterestedLeadRowByCallId: () => null,
     getLatestCallUpdateByCallId: () => null,
     buildGeneratedLeadFollowUpFromCall: () => null,
@@ -543,6 +579,9 @@ test('agenda interested leads coordinator kan set-in-agenda materialiseren uit d
   assert.equal(res.body.ok, true);
   assert.equal(upsertCalls.length, 1);
   assert.equal(upsertCalls[0].callId, 'call-missing-locally');
+  assert.equal(hydrateCalls.length, 0);
+  assert.equal(syncRuntimeCalls.length, 0);
+  assert.equal(dismissedFreshCalls.length, 0);
   assert.equal(appointments[0].company, 'Servé Creusen');
   assert.equal(appointments[0].contact, 'Servé Creusen');
   assert.equal(appointments[0].phone, '0629917185');

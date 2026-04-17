@@ -6,6 +6,7 @@ const { createAgendaInterestedLeadsCoordinator } = require('./agenda-interested-
 const { createAgendaPostCallCoordinator } = require('./agenda-post-call');
 const { createAgendaConfirmationCoordinator } = require('./agenda-confirmation');
 const { createAgendaReadCoordinator } = require('./agenda-read');
+const { createAgendaRetellCoordinator } = require('./agenda-retell');
 const { createAgendaPageBootstrapService } = require('./agenda-page-bootstrap');
 const { createCustomersPageBootstrapService } = require('./customers-page-bootstrap');
 const { createLeadsPageBootstrapService } = require('./leads-page-bootstrap');
@@ -430,6 +431,42 @@ function createAgendaRuntime(deps = {}) {
     normalizeString,
   });
 
+  const agendaRetellCoordinator = createAgendaRetellCoordinator({
+    isSupabaseConfigured,
+    getSupabaseStateHydrated: () => runtimeStateSyncState.supabaseStateHydrated,
+    forceHydrateRuntimeStateWithRetries,
+    syncRuntimeStateFromSupabaseIfNewer,
+    backfillInsightsAndAppointmentsFromRecentCallUpdates,
+    getGeneratedAgendaAppointments: () => generatedAgendaAppointments,
+    isGeneratedAppointmentVisibleForAgenda,
+    compareAgendaAppointments,
+    getGeneratedAppointmentIndexById,
+    setGeneratedAgendaAppointmentAtIndex,
+    upsertGeneratedAgendaAppointment,
+    buildLeadToAgendaSummary,
+    getLatestCallUpdateByCallId,
+    aiCallInsightsByCallId,
+    normalizeString,
+    normalizeDateYyyyMmDd,
+    normalizeTimeHhMm,
+    sanitizeAppointmentLocation,
+    sanitizeAppointmentWhatsappInfo,
+    normalizeEmailAddress,
+    toBooleanSafe,
+    normalizeColdcallingStack,
+    getColdcallingStackLabel,
+    buildLeadOwnerFields,
+    resolveAppointmentLocation,
+    resolveCallDurationSeconds,
+    resolvePreferredRecordingUrl,
+    formatEuroLabel,
+    appendDashboardActivity,
+    buildRuntimeStateSnapshotPayload,
+    applyRuntimeStateSnapshotPayload,
+    waitForQueuedRuntimeSnapshotPersist,
+    invalidateSupabaseSyncTimestamp,
+  });
+
   async function buildRuntimeHtmlPageBootstrapData(_req, fileName) {
     if (fileName === 'premium-personeel-agenda.html') {
       return {
@@ -477,6 +514,14 @@ function createAgendaRuntime(deps = {}) {
     backfillOpenLeadFollowUpAppointmentsFromLatestCalls,
     upsertGeneratedAgendaAppointment,
     buildRuntimeHtmlPageBootstrapData,
+    retellRouteDeps: {
+      ensureRetellAgendaRequestAuthorized:
+        agendaRetellCoordinator.ensureRetellAgendaRequestAuthorized,
+      sendRetellAgendaAvailabilityResponse:
+        agendaRetellCoordinator.sendRetellAgendaAvailabilityResponse,
+      bookRetellAgendaAppointmentResponse:
+        agendaRetellCoordinator.bookRetellAgendaAppointmentResponse,
+    },
     readRouteDeps: {
       readCoordinator: agendaReadCoordinator,
       sendConfirmationTaskDetailResponse:

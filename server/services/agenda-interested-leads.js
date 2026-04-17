@@ -418,37 +418,17 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
   }
 
   async function setInterestedLeadInAgendaResponse(req, res) {
-    if (isSupabaseConfigured() && !getSupabaseStateHydrated()) {
-      await forceHydrateRuntimeStateWithRetries(3);
-    }
-    // Vercel serverless: de lead kan in de UI al zichtbaar zijn via instance A,
-    // terwijl deze POST op instance B landt die de laatste runtime snapshot en
-    // call-update rows nog niet kent. Forceer daarom eerst een verse shared-state
-    // sync, anders kan buildMaterializedInterestedLeadAppointment() onterecht 404
-    // geven op een net-verse call-backed lead.
-    if (isSupabaseConfigured()) {
-      await syncRuntimeStateFromSupabaseIfNewer({ force: true, maxAgeMs: 0 }).catch(() => false);
-    }
-    // Lead in agenda zetten is óók een dismiss (de lead verdwijnt uit de
-    // interested-lijst). Ook hier willen we eerst de laatste remote dismissed-
-    // state ophalen, zodat onze daaropvolgende persist de volledige union
-    // terugschrijft in plaats van per ongeluk dismisses van andere instances
-    // te vergeten.
-    if (isSupabaseConfigured()) {
-      await ensureDismissedLeadsFreshFromSupabase({ force: true }).catch(() => false);
-    }
-    backfillInsightsAndAppointmentsFromRecentCallUpdates();
-
     const callId = normalizeString(req.body?.callId || req.query?.callId || '');
     if (!callId) {
       return res.status(400).json({ ok: false, error: 'callId ontbreekt.' });
     }
 
-    const appointmentDate = normalizeDateYyyyMmDd(req.body?.appointmentDate || req.body?.date || '');
-    const appointmentTime = normalizeTimeHhMm(req.body?.appointmentTime || req.body?.time || '');
-    const rawLocation = sanitizeAppointmentLocation(req.body?.location || req.body?.appointmentLocation || '');
-    const whatsappInfo = sanitizeAppointmentWhatsappInfo(req.body?.whatsappInfo || '');
-    const actor = normalizeString(req.body?.actor || req.body?.doneBy || '');
+    const requestBody = req.body && typeof req.body === 'object' ? req.body : {};
+    const appointmentDate = normalizeDateYyyyMmDd(requestBody?.appointmentDate || requestBody?.date || '');
+    const appointmentTime = normalizeTimeHhMm(requestBody?.appointmentTime || requestBody?.time || '');
+    const rawLocation = sanitizeAppointmentLocation(requestBody?.location || requestBody?.appointmentLocation || '');
+    const whatsappInfo = sanitizeAppointmentWhatsappInfo(requestBody?.whatsappInfo || '');
+    const actor = normalizeString(requestBody?.actor || requestBody?.doneBy || '');
 
     if (!appointmentDate) {
       return res.status(400).json({ ok: false, error: 'Vul een geldige datum in (YYYY-MM-DD).' });
@@ -457,12 +437,25 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
       return res.status(400).json({ ok: false, error: 'Vul een geldige tijd in (HH:MM).' });
     }
 
-    const baseAppointment = buildMaterializedInterestedLeadAppointment(callId, req.body || {});
+    // Probeer eerst direct uit de huidige instance en request-body snapshot te
+    // materialiseren. De lead-modal stuurt al voldoende context mee; een
+    // verplichte shared-state refresh hier veroorzaakte juist false timeouts
+    // terwijl de afspraak later alsnog werd aangemaakt.
+    backfillInsightsAndAppointmentsFromRecentCallUpdates();
+    let baseAppointment = buildMaterializedInterestedLeadAppointment(callId, requestBody);
+    if (!baseAppointment && isSupabaseConfigured()) {
+      if (!getSupabaseStateHydrated()) {
+        await forceHydrateRuntimeStateWithRetries(3);
+      }
+      await syncRuntimeStateFromSupabaseIfNewer({ force: true, maxAgeMs: 0 }).catch(() => false);
+      backfillInsightsAndAppointmentsFromRecentCallUpdates();
+      baseAppointment = buildMaterializedInterestedLeadAppointment(callId, requestBody);
+    }
     if (!baseAppointment) {
       return res.status(404).json({ ok: false, error: 'Lead of call niet gevonden.' });
     }
     const whatsappConfirmed = toBooleanSafe(
-      req.body?.whatsappConfirmed,
+      requestBody?.whatsappConfirmed,
       toBooleanSafe(baseAppointment?.whatsappConfirmed, false)
     );
 
@@ -484,7 +477,7 @@ function createAgendaInterestedLeadsCoordinator(deps = {}) {
 
     const nowIso = new Date().toISOString();
     const mergedSummary = await buildLeadToAgendaSummary(
-      req.body?.summary || baseAppointment.summary,
+      requestBody?.summary || baseAppointment.summary,
       location,
       whatsappInfo,
       { whatsappConfirmed }

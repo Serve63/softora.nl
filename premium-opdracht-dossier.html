@@ -862,7 +862,7 @@
             const CUSTOM_ORDERS_KEY = 'softora_custom_orders_premium_v1';
             const ORDER_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
             const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';
-            const DOSSIER_LAYOUT_SCHEMA_VERSION = '20260416c';
+            const DOSSIER_LAYOUT_SCHEMA_VERSION = '20260417a';
             const root = document.getElementById('dossierRoot');
 
             function esc(value) {
@@ -1098,8 +1098,48 @@
                 return 'Nog geen uitgebreide klantwensen vastgelegd. Neem direct contact op met de klant om ontbrekende details te verzamelen.';
             }
 
+            function extractWebsiteStyleHintFromBaseData(baseData) {
+                const blob = [
+                    String(baseData?.description || '').trim(),
+                    String(baseData?.transcript || '').trim(),
+                    String(baseData?.title || '').trim(),
+                ]
+                    .filter(Boolean)
+                    .join('\n')
+                    .toLowerCase();
+
+                const hasBlue = /\bblauw(e|we)?\b/.test(blob) || /\bblue\b/.test(blob);
+                const hasWhite = /\bwit(te)?\b/.test(blob) || /\bwhite\b/.test(blob);
+                if (hasBlue && hasWhite) {
+                    return ' in een strak blauw-wit kleurenschema';
+                }
+                if (hasBlue) {
+                    return ' met blauw als hoofdkleur in een rustig, premium palet';
+                }
+                if (hasWhite) {
+                    return ' met een lichte, frisse witte basis en premium uitstraling';
+                }
+                return ' met hoogwaardige typografie en een strak, professioneel premium design';
+            }
+
+            function baseDataHasUsableDomain(baseData) {
+                const raw = String(baseData?.domainName || '').trim();
+                if (!raw) return false;
+                if (/^[\u2014\-–—]+$/u.test(raw)) return false;
+                const compact = raw.replace(/\s+/g, ' ').trim().toLowerCase();
+                const noise = new Set(['—', '-', 'n/a', 'na', 'nog niet opgegeven', 'onbekend', 'tbd', 'todo']);
+                if (noise.has(compact)) return false;
+                return true;
+            }
+
             function buildShortOpusPrompt(baseData) {
-                return 'Werk deze opdracht in Claude Opus 4.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie.';
+                const company = String(baseData?.company || '').trim();
+                const label = company && company !== 'Onbekend' ? company : 'de klant';
+                const domainPart = baseDataHasUsableDomain(baseData)
+                    ? ` voor ${String(baseData.domainName).trim()}`
+                    : '';
+                const styleHint = extractWebsiteStyleHintFromBaseData(baseData);
+                return `Bouw een premium, moderne en volledig responsieve website voor ${label}${domainPart}${styleHint}; gebruik dit dossier voor inhoud, structuur en contact en zet ontbrekende onderdelen netjes als placeholder.`;
             }
 
             function normalizeDossierBlockTitle(value) {
@@ -1189,7 +1229,8 @@
                 const subtitle =
                     clipText(String(rawLayout.subtitle || rawLayout.lead || fallback.subtitle).trim(), 320) ||
                     fallback.subtitle;
-                const opusPrompt = buildShortOpusPrompt(baseData);
+                const opusFromLayout = clipText(String(rawLayout.opusPrompt || '').trim(), 22000);
+                const opusPrompt = opusFromLayout || buildShortOpusPrompt(baseData);
 
                 const blocks = (Array.isArray(rawLayout.blocks) ? rawLayout.blocks : [])
                     .map((block) => {
@@ -1405,7 +1446,7 @@
                                     ${blocksHtml}
 
                                     <section class="layout-block">
-                                        <div class="layout-block-head"><h2 class="section-title">Prompt voor Claude Opus 4.6</h2></div>
+                                        <div class="layout-block-head"><h2 class="section-title">Website-bouwprompt</h2></div>
                                         <pre class="prompt-box" id="opusPromptDisplay">${esc(opusPrompt)}</pre>
                                     </section>
                                 </div>

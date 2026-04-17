@@ -456,6 +456,24 @@ test('coldcalling endpoints keep their contract boundaries', async () => {
   assert.equal(missingCallIdResult.body.ok, false);
 });
 
+test('retell agenda function routes stay public but require Retell verification', async () => {
+  const availabilityResult = await postJson('/api/retell/functions/agenda/availability', {
+    date: '2099-04-20',
+    time: '10:00',
+  });
+  assert.ok([401, 503].includes(availabilityResult.response.status));
+  assert.equal(availabilityResult.body.ok, false);
+
+  const bookingResult = await postJson('/api/retell/functions/agenda/book', {
+    date: '2099-04-20',
+    time: '10:00',
+    location: 'Amsterdam',
+    callId: 'call_123',
+  });
+  assert.ok([401, 503].includes(bookingResult.response.status));
+  assert.equal(bookingResult.body.ok, false);
+});
+
 test('runtime backup route is available in non-production verification mode', async () => {
   const authState = await getJson('/api/auth/session');
   const { response, body } = await getJson('/api/runtime-backup');

@@ -74,9 +74,56 @@ function createOrderDossierHelpers(deps = {}) {
     return 'Nog geen uitgebreide klantwensen vastgelegd. Neem direct contact op met de klant om ontbrekende details te verzamelen.';
   }
 
+  function extractWebsiteStyleHintFromOrderInput(input) {
+    const blob = [
+      normalizeString(input?.description || ''),
+      normalizeString(input?.transcript || ''),
+      normalizeString(input?.title || ''),
+    ]
+      .filter(Boolean)
+      .join('\n')
+      .toLowerCase();
+
+    const hasBlue = /\bblauw(e|we)?\b/.test(blob) || /\bblue\b/.test(blob);
+    const hasWhite = /\bwit(te)?\b/.test(blob) || /\bwhite\b/.test(blob);
+    if (hasBlue && hasWhite) {
+      return ' in een strak blauw-wit kleurenschema';
+    }
+    if (hasBlue) {
+      return ' met blauw als hoofdkleur in een rustig, premium palet';
+    }
+    if (hasWhite) {
+      return ' met een lichte, frisse witte basis en premium uitstraling';
+    }
+    return ' met hoogwaardige typografie en een strak, professioneel premium design';
+  }
+
+  function orderInputHasUsableDomain(input) {
+    const raw = normalizeString(input?.domainName || '');
+    if (!raw) return false;
+    const compact = raw.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (/^[\u2014\-–—]+$/u.test(raw.trim())) return false;
+    const noise = new Set([
+      '—',
+      '-',
+      'n/a',
+      'na',
+      'nog niet opgegeven',
+      'onbekend',
+      'tbd',
+      'todo',
+    ]);
+    if (noise.has(compact)) return false;
+    return true;
+  }
+
   function buildShortOrderDossierOpusPrompt(options = {}) {
-    void options;
-    return 'Werk deze opdracht in Claude Opus 4.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie.';
+    const input = buildOrderDossierInput(options);
+    const company = normalizeString(input.company);
+    const label = company && company !== 'Onbekend' ? company : 'de klant';
+    const domainPart = orderInputHasUsableDomain(input) ? ` voor ${normalizeString(input.domainName)}` : '';
+    const styleHint = extractWebsiteStyleHintFromOrderInput(input);
+    return `Bouw een premium, moderne en volledig responsieve website voor ${label}${domainPart}${styleHint}; gebruik dit dossier voor inhoud, structuur en contact en zet ontbrekende onderdelen netjes als placeholder.`;
   }
 
   function normalizeOrderDossierBlockTitle(value) {
@@ -177,7 +224,8 @@ function createOrderDossierHelpers(deps = {}) {
     const subtitle =
       clipText(normalizeString(rawLayout.subtitle || rawLayout.lead || fallback.subtitle), 320) ||
       fallback.subtitle;
-    const opusPrompt = buildShortOrderDossierOpusPrompt(fallbackOptions);
+    const opusFromLayout = clipText(normalizeString(rawLayout.opusPrompt || ''), 20000);
+    const opusPrompt = opusFromLayout || fallback.opusPrompt;
 
     const sourceBlocks = Array.isArray(rawLayout.blocks) ? rawLayout.blocks : [];
     const blocks = sourceBlocks
@@ -233,7 +281,10 @@ function createOrderDossierHelpers(deps = {}) {
       '- Gebruik een indeling die past bij de hoeveelheid inhoud (dynamisch, niet template-achtig).',
       '- Gebruik geen bloktitels zoals "Uitvoerplan", "Ontbrekende informatie" of "Praktische aandachtspunten".',
       '- Voeg geen interne velden toe zoals "Accounthouder Softora" of "Softora-contactpersoon".',
-      '- Lever een direct copy-paste prompt voor Claude Opus 4.6 die exact 1 zin lang is.',
+      '- Lever een korte, direct copy-paste bouwprompt in het Nederlands voor een AI die de website ontwerpt en bouwt.',
+      '- De prompt is concrete uitvoerinstructie (premium responsive site, stijl, sfeer) en bevat alleen wat uit de input volgt; geen verzonnen features of huisstijl.',
+      '- Gebruik geen meta-regels over modellen, Softora, dossiers of gekoppelde informatie.',
+      '- Houd de prompt bondig (liefst één zin, maximaal twee korte zinnen), zonder opsommingen.',
       '- Gebruik NOOIT ellipsis zoals "...".',
       '- Geef ALLEEN geldig JSON terug, zonder markdown of extra tekst.',
       '',
@@ -279,7 +330,7 @@ function createOrderDossierHelpers(deps = {}) {
       '- Gebruik alleen dossierblokken die direct op de invoer zijn gebaseerd.',
       '- Laat blokken met algemene projectplanning, ontbrekende-informatie-lijsten en praktische teamnotities weg.',
       '- Laat interne Softora-contactvelden zoals account- of contactpersoonlabels weg.',
-      '- opusPrompt moet direct bruikbaar zijn voor Claude Opus 4.6 en exact 1 zin lang zijn.',
+      '- opusPrompt moet een echte bouwprompt zijn (geen verwijzing naar het dossierbestand of naar een specifiek model).',
       '</required_output>',
       '<fallback_reference>',
       JSON.stringify(fallback),

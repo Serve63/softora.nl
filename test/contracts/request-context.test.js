@@ -51,6 +51,11 @@ test('getRequestPathname strips the query string', () => {
   assert.equal(getRequestPathname(req), '/api/test');
 });
 
+test('getRequestPathname falls back to mounted route urls without losing the api prefix match', () => {
+  const req = createRequest({ originalUrl: '', path: '/retell/functions/agenda/book/' });
+  assert.equal(getRequestPathname(req), '/retell/functions/agenda/book/');
+});
+
 test('getClientIpFromRequest prefers forwarded-for and normalizes values', () => {
   const req = createRequest({
     headers: { 'x-forwarded-for': '::ffff:203.0.113.10, 10.0.0.1' },
@@ -129,9 +134,24 @@ test('request security context exempts safe methods and webhook paths', () => {
 
   const getReq = createRequest({ method: 'GET', originalUrl: '/api/custom-action' });
   const webhookReq = createRequest({ method: 'POST', originalUrl: '/api/retell/webhook' });
+  const retellFunctionReq = createRequest({
+    method: 'POST',
+    originalUrl: '/api/retell/functions/agenda/availability',
+  });
+  const mountedRetellBookReq = createRequest({
+    method: 'POST',
+    originalUrl: '/retell/functions/agenda/book/',
+  });
+  const namespacedRetellAvailabilityReq = createRequest({
+    method: 'POST',
+    originalUrl: '/api/retell/functions/agenda/availability/run',
+  });
 
   assert.equal(context.isSameOriginApiRequest(getReq), true);
   assert.equal(context.isSameOriginApiRequest(webhookReq), true);
+  assert.equal(context.isSameOriginApiRequest(retellFunctionReq), true);
+  assert.equal(context.isSameOriginApiRequest(mountedRetellBookReq), true);
+  assert.equal(context.isSameOriginApiRequest(namespacedRetellAvailabilityReq), true);
 });
 
 test('request security context blocks cross-site fetch metadata before same-origin checks', () => {

@@ -43,7 +43,11 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   );
   assert.match(
     pageSource,
-    /function syncWorkspaceExitControls\(\) \{[\s\S]*modalElement\.classList\.toggle\('dismiss-locked', shouldLockExit\);[\s\S]*modalCloseBtn\.hidden = shouldLockExit;[\s\S]*modalCloseBtn\.style\.display = shouldLockExit \? 'none' : '';[\s\S]*modalCloseBtn\.setAttribute\('aria-hidden', shouldLockExit \? 'true' : 'false'\);[\s\S]*modalSecondaryBtn\.disabled = shouldLockExit;/
+    /function shouldHideWorkspaceDismissControls\(\) \{\s*return modalWorkspaceMode && hasWorkspaceLinkedOrder\(\);\s*\}/
+  );
+  assert.match(
+    pageSource,
+    /function syncWorkspaceExitControls\(\) \{[\s\S]*const shouldHideDismissControls = shouldHideWorkspaceDismissControls\(\);[\s\S]*const hideClose = shouldLockExit \|\| shouldHideDismissControls;[\s\S]*modalCloseBtn\.hidden = hideClose;[\s\S]*modalCloseBtn\.style\.display = hideClose \? 'none' : '';[\s\S]*modalCloseBtn\.setAttribute\('aria-hidden', hideClose \? 'true' : 'false'\);[\s\S]*modalSecondaryBtn\.hidden = shouldHideDismissControls;[\s\S]*modalSecondaryBtn\.disabled = shouldLockExit \|\| shouldHideDismissControls;/
   );
   assert.match(
     pageSource,
@@ -64,9 +68,8 @@ test('premium agenda workspace locks modal exit while dossier flow is still mand
   );
   assert.match(
     pageSource,
-    /modalPrimaryBtn\.textContent = workspacePendingCustomerCheck \? 'Dossier aanmaken' : 'Open dossier';/
+    /modalSecondaryBtn\.textContent = 'Terug';[\s\S]*if \(linkedOrderId\) \{[\s\S]*modalPrimaryBtn\.textContent = 'Open dossier';[\s\S]*modalPrimaryBtn\.disabled = workspaceBusy;[\s\S]*syncWorkspaceExitControls\(\);[\s\S]*return;/
   );
-  assert.match(pageSource, /modalPrimaryBtn\.disabled = workspaceBusy \|\| workspacePendingCustomerCheck;/);
   assert.match(pageSource, /function closeModal\(\) \{\s*if \(isWorkspaceExitLocked\(\)\) return;/);
   assert.match(pageSource, /function handleModalSecondaryAction\(\) \{\s*if \(isWorkspaceExitLocked\(\)\) return;/);
   assert.match(

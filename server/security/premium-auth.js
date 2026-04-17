@@ -1,3 +1,5 @@
+const { normalizeRequestPathname } = require('./request-context');
+
 const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/healthz',
   '/api/health/baseline',
@@ -8,7 +10,29 @@ const PREMIUM_PUBLIC_API_EXACT_MATCHES = new Set([
   '/api/twilio/voice',
   '/api/twilio/status',
   '/api/retell/webhook',
+  '/api/retell/functions/agenda/availability',
+  '/api/retell/functions/agenda/book',
+  '/retell/webhook',
+  '/retell/functions/agenda/availability',
+  '/retell/functions/agenda/book',
 ]);
+const PREMIUM_PUBLIC_API_PREFIXES = Object.freeze([
+  '/api/retell/functions/agenda/',
+  '/retell/functions/agenda/',
+]);
+
+function getPublicApiPathVariants(requestPath) {
+  const normalizedPath = normalizeRequestPathname(requestPath || '/');
+  const variants = new Set([normalizedPath]);
+
+  if (normalizedPath.startsWith('/api/')) {
+    variants.add(normalizedPath.slice(4) || '/');
+  } else if (normalizedPath !== '/api') {
+    variants.add(`/api${normalizedPath}`);
+  }
+
+  return variants;
+}
 
 function createPremiumAuthStateManager(options = {}) {
   const {
@@ -156,11 +180,21 @@ function createPremiumAuthStateManager(options = {}) {
 
   function isPremiumPublicApiRequest(req) {
     const method = normalizeString(req?.method || 'GET').toUpperCase();
-    const requestPath = normalizeString(getRequestPathname(req) || '');
-    if (!requestPath.startsWith('/')) return false;
+    const requestPathVariants = getPublicApiPathVariants(getRequestPathname(req));
+    if (requestPathVariants.size === 0) return false;
 
-    if (PREMIUM_PUBLIC_API_EXACT_MATCHES.has(requestPath)) return true;
-    if (requestPath === '/api/twilio/voice' && (method === 'GET' || method === 'POST')) return true;
+    for (const requestPath of requestPathVariants) {
+      if (PREMIUM_PUBLIC_API_EXACT_MATCHES.has(requestPath)) return true;
+      if (PREMIUM_PUBLIC_API_PREFIXES.some((prefix) => requestPath.startsWith(prefix))) {
+        return true;
+      }
+      if (
+        requestPath === '/api/twilio/voice' &&
+        (method === 'GET' || method === 'POST')
+      ) {
+        return true;
+      }
+    }
     return false;
   }
 

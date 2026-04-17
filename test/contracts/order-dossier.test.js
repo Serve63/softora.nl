@@ -19,20 +19,50 @@ const helpers = createOrderDossierHelpers({
       .replace(/'/g, '&#39;'),
 });
 
-test('order dossier helpers keep the opus prompt short and preserve assigned-owner labels', () => {
+test('order dossier helpers build a concrete website prompt and preserve assigned-owner labels', () => {
   const fallback = helpers.buildOrderDossierFallbackLayout({
     orderId: '7',
     company: 'Softora',
     claimedBy: 'Servé',
   });
 
-  assert.equal(
-    helpers.buildShortOrderDossierOpusPrompt(),
-    'Werk deze opdracht in Claude Opus 4.6 uit op basis van uitsluitend de gekoppelde lead- en dossierinformatie.'
-  );
+  const genericPrompt = helpers.buildShortOrderDossierOpusPrompt({ company: 'Softora' });
+  assert.match(genericPrompt, /premium/i);
+  assert.match(genericPrompt, /Softora/);
+  assert.match(genericPrompt, /responsieve website/i);
+
+  const styledPrompt = helpers.buildShortOrderDossierOpusPrompt({
+    company: 'ACME',
+    description: 'De website moet een blauw-wit kleurenschema krijgen.',
+  });
+  assert.match(styledPrompt, /blauw-wit/i);
+
   assert.equal(fallback.documentTitle, 'Opdracht #7');
   assert.equal(fallback.blocks[0].pairs[4].label, 'Aangewezen aan');
   assert.equal(fallback.blocks[0].pairs[4].value, 'Servé');
+});
+
+test('order dossier helpers preserve opusPrompt from AI layout when present', () => {
+  const layout = helpers.normalizeOrderDossierLayout(
+    {
+      opusPrompt: 'Bouw een luxe one-pager voor ACME in donkergroen en goud.',
+      blocks: [
+        {
+          kind: 'meta',
+          title: 'Projectkern',
+          pairs: [{ label: 'Bedrijf', value: 'ACME' }],
+        },
+        {
+          kind: 'text',
+          title: 'Klantwensen',
+          text: 'Nieuwe website met intake.',
+        },
+      ],
+    },
+    { title: 'Fallback dossier', company: 'Anders' }
+  );
+
+  assert.equal(layout.opusPrompt, 'Bouw een luxe one-pager voor ACME in donkergroen en goud.');
 });
 
 test('order dossier helpers strip legacy block titles and internal pair labels', () => {

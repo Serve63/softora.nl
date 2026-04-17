@@ -1233,8 +1233,13 @@
         return modalWorkspaceMode && (workspaceBusy || workspacePendingCustomerCheck || isWorkspaceLoadingVisible());
     }
 
+    function shouldHideWorkspaceDismissControls() {
+        return modalWorkspaceMode && hasWorkspaceLinkedOrder();
+    }
+
     function syncWorkspaceExitControls() {
         const shouldLockExit = isWorkspaceExitLocked();
+        const shouldHideDismissControls = shouldHideWorkspaceDismissControls();
         if (modalElement) {
             modalElement.classList.toggle('dismiss-locked', shouldLockExit);
             modalElement.dataset.dismissLocked = shouldLockExit ? '1' : '0';
@@ -1244,18 +1249,20 @@
             modalCardElement.dataset.dismissLocked = shouldLockExit ? '1' : '0';
         }
         if (modalCloseBtn) {
-            modalCloseBtn.hidden = shouldLockExit;
-            modalCloseBtn.disabled = shouldLockExit;
-            modalCloseBtn.style.display = shouldLockExit ? 'none' : '';
-            modalCloseBtn.setAttribute('aria-hidden', shouldLockExit ? 'true' : 'false');
-            if (shouldLockExit) {
+            const hideClose = shouldLockExit || shouldHideDismissControls;
+            modalCloseBtn.hidden = hideClose;
+            modalCloseBtn.disabled = hideClose;
+            modalCloseBtn.style.display = hideClose ? 'none' : '';
+            modalCloseBtn.setAttribute('aria-hidden', hideClose ? 'true' : 'false');
+            if (hideClose) {
                 modalCloseBtn.setAttribute('tabindex', '-1');
             } else {
                 modalCloseBtn.removeAttribute('tabindex');
             }
         }
         if (modalSecondaryBtn) {
-            modalSecondaryBtn.disabled = shouldLockExit;
+            modalSecondaryBtn.hidden = shouldHideDismissControls;
+            modalSecondaryBtn.disabled = shouldLockExit || shouldHideDismissControls;
         }
     }
 
@@ -1907,8 +1914,8 @@
         modalSecondaryBtn.textContent = 'Terug';
 
         if (linkedOrderId) {
-            modalPrimaryBtn.textContent = workspacePendingCustomerCheck ? 'Dossier aanmaken' : 'Open dossier';
-            modalPrimaryBtn.disabled = workspaceBusy || workspacePendingCustomerCheck;
+            modalPrimaryBtn.textContent = 'Open dossier';
+            modalPrimaryBtn.disabled = workspaceBusy;
             syncWorkspaceExitControls();
             return;
         }
