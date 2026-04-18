@@ -135,6 +135,49 @@ const wss = new WebSocket.Server({
   noServer: true,
   perMessageDeflate: false,
 });
+const RECENT_SESSION_LIMIT = 20;
+const recentSessions = [];
+
+function recordRecentSession(session) {
+  if (!session || typeof session !== 'object') return;
+  recentSessions.unshift(session);
+  if (recentSessions.length > RECENT_SESSION_LIMIT) recentSessions.length = RECENT_SESSION_LIMIT;
+}
+
+function summarizeGeminiMessage(msg) {
+  const summary = {
+    keys: Object.keys(msg || {}).slice(0, 8),
+  };
+  const serverContent = msg?.serverContent || msg?.server_content || null;
+  if (serverContent && typeof serverContent === 'object') {
+    const modelTurn = serverContent.modelTurn || serverContent.model_turn || {};
+    const parts = Array.isArray(modelTurn.parts) ? modelTurn.parts : [];
+    summary.serverContent = {
+      interrupted: Boolean(serverContent.interrupted),
+      turnComplete: Boolean(serverContent.turnComplete || serverContent.turn_complete),
+      generationComplete: Boolean(
+        serverContent.generationComplete || serverContent.generation_complete
+      ),
+      inputTranscription: Boolean(serverContent.inputTranscription || serverContent.input_transcription),
+      outputTranscription: Boolean(
+        serverContent.outputTranscription || serverContent.output_transcription
+      ),
+      modelTurnParts: parts.map((part) => {
+        if (!part || typeof part !== 'object') return 'unknown';
+        if (part.inlineData || part.inline_data) return 'inlineData';
+        if (part.text) return 'text';
+        return Object.keys(part)[0] || 'unknown';
+      }),
+    };
+  }
+  if (msg?.error) {
+    summary.error = {
+      message: String(msg.error?.message || ''),
+      code: String(msg.error?.code || ''),
+    };
+  }
+  return summary;
+}
 
 function isDebugRequestAuthorized(req) {
   if (!BRIDGE_DEBUG_TOKEN) return true;
@@ -264,6 +307,17 @@ app.get('/debug/gemini-setup', async (req, res) => {
   });
 });
 
+app.get('/debug/recent-sessions', (req, res) => {
+  if (!isDebugRequestAuthorized(req)) {
+    return res.status(403).json({ ok: false, error: 'Forbidden' });
+  }
+  return res.status(200).json({
+    ok: true,
+    sessions: recentSessions,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 server.on('upgrade', (request, socket, head) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
   if (url.pathname !== '/twilio-media') {
@@ -280,6 +334,17 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (twilioWs, _request, url) => {
+  const sessionSummary = {
+    connectedAt: new Date().toISOString(),
+    stack: String(url.searchParams.get('stack') || '').trim() || 'gemini_flash_3_1_live',
+    streamSid: '',
+    autoStart: GEMINI_AUTO_START,
+    geminiReady: false,
+    twilioMediaInCount: 0,
+    geminiAudioOutCount: 0,
+    geminiMessages: [],
+    close: null,
+  };
   let streamSid = '';
   let closed = false;
   let geminiReady = false;
@@ -302,7 +367,7 @@ wss.on('connection', (twilioWs, _request, url) => {
     console.warn('[Bridge] Prompt override hints in query gedetecteerd en genegeerd (prompt lock actief).');
   }
 
-  const stack = String(url.searchParams.get('stack') || '').trim() || 'gemini_flash_3_1_live';
+  const stack = sessionSummary.stack;
   const geminiWs = new WebSocket(buildGeminiWsUrl(), {
     perMessageDeflate: false,
     handshakeTimeout: GEMINI_WS_HANDSHAKE_TIMEOUT_MS,
@@ -331,6 +396,7 @@ wss.on('connection', (twilioWs, _request, url) => {
         })
       );
       geminiAudioOutCount += 1;
+      sessionSummary.geminiAudioOutCount = geminiAudioOutCount;
     }
   }
 
@@ -345,6 +411,7 @@ wss.on('connection', (twilioWs, _request, url) => {
         })
       );
       geminiAudioOutCount += 1;
+      sessionSummary.geminiAudioOutCount = geminiAudioOutCount;
       return;
     }
     if (twilioWs.readyState !== WebSocket.OPEN) return;
@@ -360,6 +427,20 @@ wss.on('connection', (twilioWs, _request, url) => {
   function closeBoth(reason = 'unknown') {
     if (closed) return;
     closed = true;
+    sessionSummary.close = sessionSummary.close || {
+      reason,
+      at: new Date().toISOString(),
+      twilioMediaInCount,
+      geminiAudioOutCount,
+      streamSid: streamSid || '',
+    };
+    recordRecentSession({
+      ...sessionSummary,
+      geminiReady,
+      twilioMediaInCount,
+      geminiAudioOutCount,
+      streamSid: streamSid || '',
+    });
     try {
       if (twilioWs.readyState === WebSocket.OPEN) twilioWs.close(1000, reason);
     } catch {}
@@ -383,6 +464,7 @@ wss.on('connection', (twilioWs, _request, url) => {
 
     if (msg.setupComplete) {
       geminiReady = true;
+      sessionSummary.geminiReady = true;
       if (BRIDGE_VERBOSE_LOGS) {
         console.log(`[Bridge] setupComplete stack=${stack}`);
       }
@@ -401,8 +483,12 @@ wss.on('connection', (twilioWs, _request, url) => {
 
     if (msg.error) {
       console.error('[Bridge] Gemini server error:', JSON.stringify(msg.error));
-      return;
     }
+
+    sessionSummary.geminiMessages.push(summarizeGeminiMessage(msg));
+    if (sessionSummary.geminiMessages.length > 12) sessionSummary.geminiMessages.shift();
+
+    if (msg.error) return;
 
     const audioParts = extractInlineAudioParts(msg);
     if (!audioParts.length || twilioWs.readyState !== WebSocket.OPEN) return;
@@ -452,6 +538,7 @@ wss.on('connection', (twilioWs, _request, url) => {
           msg.StreamSid ||
           ''
       ).trim();
+      sessionSummary.streamSid = streamSid;
       if (BRIDGE_VERBOSE_LOGS) {
         console.log(`[Bridge] Twilio start streamSid=${streamSid || '(leeg)'}`);
       }
@@ -468,6 +555,7 @@ wss.on('connection', (twilioWs, _request, url) => {
     const payload = String(msg.media?.payload || '');
     if (!payload) return;
     twilioMediaInCount += 1;
+    sessionSummary.twilioMediaInCount = twilioMediaInCount;
 
     try {
       const ulaw = Uint8Array.from(Buffer.from(payload, 'base64'));
