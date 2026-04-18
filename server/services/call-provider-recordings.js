@@ -158,13 +158,25 @@ function createCallProviderRecordingHelpers(options = {}) {
     return ['RETELL_AI', 'RETELL'];
   }
 
+  function normalizeTwilioMediaWsUrl(value) {
+    const raw = normalizeString(value);
+    if (!raw) return '';
+    const compatOrigin = normalizeString(
+      env.TWILIO_MEDIA_BRIDGE_COMPAT_ORIGIN || 'wss://twilio-media-bridge-ln3f.onrender.com'
+    ).replace(/\/+$/, '');
+    return raw.replace(
+      /wss?:\/\/twilio-media-bridge-pjzd\.onrender\.com(?=\/|$)/i,
+      compatOrigin
+    );
+  }
+
   function getTwilioMediaWsUrlForStack(stack) {
     const suffixes = getTwilioStackEnvSuffixes(stack);
     for (const suffix of suffixes) {
       const candidate = normalizeString(env[`TWILIO_MEDIA_WS_URL_${suffix}`]);
-      if (candidate) return candidate;
+      if (candidate) return normalizeTwilioMediaWsUrl(candidate);
     }
-    return normalizeString(env.TWILIO_MEDIA_WS_URL || defaultTwilioMediaWsUrl);
+    return normalizeTwilioMediaWsUrl(env.TWILIO_MEDIA_WS_URL || defaultTwilioMediaWsUrl);
   }
 
   function getTwilioFromNumberForStack(stack) {

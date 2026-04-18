@@ -281,9 +281,16 @@ function createCallProviderHelpers(options = {}) {
     const stack = normalizeColdcallingStack(campaign?.coldcallingStack);
     const twimlUrl = buildTwilioOutboundTwimlUrl(stack, campaign);
     const statusCallbackUrl = buildTwilioStatusCallbackUrl(stack, campaign);
+    const mediaWsUrl = getTwilioMediaWsUrlForStack(stack);
     const fromNumber = getTwilioFromNumberForStack(stack);
     if (!fromNumber) {
       throw new Error('TWILIO_FROM_NUMBER ontbreekt voor geselecteerde stack.');
+    }
+    if (!/^wss?:\/\//i.test(mediaWsUrl)) {
+      const envHints = [...getTwilioStackEnvSuffixes(stack).map((suffix) => `TWILIO_MEDIA_WS_URL_${suffix}`), 'TWILIO_MEDIA_WS_URL'];
+      throw new Error(
+        `${envHints.join(' of ')} ontbreekt of is ongeldig voor geselecteerde stack.`
+      );
     }
 
     return {
@@ -487,7 +494,102 @@ function createCallProviderHelpers(options = {}) {
     };
   }
 
-  async function createTwilioOutboundCall(payload) {
+  function buildTwilioBridgeHttpUrl(mediaWsUrl, pathname) {
+    const raw = normalizeString(mediaWsUrl);
+    const normalizedPathname = normalizeString(pathname);
+    if (!raw || !normalizedPathname) return '';
+    try {
+      const parsed = new URL(raw);
+      parsed.protocol = parsed.protocol === 'wss:' ? 'https:' : 'http:';
+      parsed.pathname = normalizedPathname;
+      parsed.search = '';
+      parsed.hash = '';
+      return parsed.toString();
+    } catch {
+      return '';
+    }
+  }
+
+  async function warmTwilioRealtimeBridge(mediaWsUrl, options = {}) {
+    const normalizedMediaWsUrl = normalizeString(mediaWsUrl);
+    if (!normalizedMediaWsUrl) return null;
+
+    const stack = normalizeColdcallingStack(options?.stack);
+    const warmupTimeoutMs = Math.max(
+      3000,
+      Math.min(20000, parseIntSafe(env.TWILIO_MEDIA_BRIDGE_WARMUP_TIMEOUT_MS, 12000) || 12000)
+    );
+    const healthzUrl = buildTwilioBridgeHttpUrl(normalizedMediaWsUrl, '/healthz');
+    if (!healthzUrl) return null;
+
+    const { response: healthResponse, data: healthData } = await fetchJsonWithTimeout(
+      healthzUrl,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      },
+      warmupTimeoutMs
+    );
+    if (!healthResponse.ok || healthData?.ok === false) {
+      throw new Error(
+        `Twilio media bridge warmup mislukt (${healthResponse.status || 'network'})`
+      );
+    }
+
+    if (stack !== 'gemini_flash_3_1_live') {
+      return { ok: true, stage: 'healthz' };
+    }
+
+    const geminiSetupUrl = buildTwilioBridgeHttpUrl(
+      normalizedMediaWsUrl,
+      '/debug/gemini-setup'
+    );
+    if (!geminiSetupUrl) {
+      return { ok: true, stage: 'healthz' };
+    }
+
+    const parsedGeminiSetupUrl = new URL(geminiSetupUrl);
+    parsedGeminiSetupUrl.searchParams.set(
+      'timeoutMs',
+      String(Math.max(3000, warmupTimeoutMs - 1000))
+    );
+    const bridgeDebugToken = normalizeString(
+      env.TWILIO_MEDIA_BRIDGE_DEBUG_TOKEN || env.BRIDGE_DEBUG_TOKEN
+    );
+    const geminiSetupHeaders = {
+      Accept: 'application/json',
+    };
+    if (bridgeDebugToken) {
+      geminiSetupHeaders['x-bridge-debug-token'] = bridgeDebugToken;
+    }
+
+    const { response: geminiSetupResponse, data: geminiSetupData } = await fetchJsonWithTimeout(
+      parsedGeminiSetupUrl,
+      {
+        method: 'GET',
+        headers: geminiSetupHeaders,
+      },
+      warmupTimeoutMs
+    );
+
+    if (geminiSetupResponse.status === 403) {
+      return { ok: true, stage: 'healthz-only' };
+    }
+    if (!geminiSetupResponse.ok || geminiSetupData?.ok === false) {
+      throw new Error(
+        `Gemini bridge setup-check mislukt (${geminiSetupResponse.status || 'network'})`
+      );
+    }
+
+    return {
+      ok: true,
+      stage: 'gemini-setup',
+    };
+  }
+
+  async function createTwilioOutboundCall(payload, options = {}) {
     const accountSid = normalizeString(env.TWILIO_ACCOUNT_SID);
     const endpoint = `/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Calls.json`;
     const form = new URLSearchParams();
@@ -505,6 +607,8 @@ function createCallProviderHelpers(options = {}) {
       if (!normalizedValue) return;
       form.set(key, normalizedValue);
     });
+
+    await warmTwilioRealtimeBridge(options?.mediaWsUrl, { stack: options?.stack });
 
     const { response, data } = await fetchJsonWithTimeout(
       buildTwilioApiUrl(endpoint),

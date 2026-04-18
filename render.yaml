@@ -28,7 +28,7 @@ services:
       - key: SUPABASE_STATE_KEY
         value: core
       - key: TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE
-        value: wss://twilio-media-bridge-pjzd.onrender.com/twilio-media
+        value: wss://twilio-media-bridge-ln3f.onrender.com/twilio-media
   - type: web
     name: twilio-media-bridge-pjzd
     runtime: node

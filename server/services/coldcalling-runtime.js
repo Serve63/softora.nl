@@ -28,6 +28,7 @@ function createColdcallingRuntime(deps = {}) {
     sleep = async () => {},
     buildTwilioOutboundPayload = () => ({}),
     createTwilioOutboundCall = async () => ({ endpoint: '', data: null }),
+    getTwilioMediaWsUrlForStack = () => '',
     classifyTwilioFailure = () => ({ cause: 'unknown', explanation: '' }),
     parseDateToIso = () => '',
     handleSequentialDispatchQueueWebhookProgress = () => {},
@@ -186,7 +187,11 @@ function createColdcallingRuntime(deps = {}) {
     try {
       const payload = buildTwilioOutboundPayload(lead, campaign);
       const normalizedPhone = normalizeString(payload.To);
-      const { endpoint, data } = await createTwilioOutboundCall(payload);
+      const stack = normalizeColdcallingStack(campaign?.coldcallingStack);
+      const { endpoint, data } = await createTwilioOutboundCall(payload, {
+        stack,
+        mediaWsUrl: getTwilioMediaWsUrlForStack(stack),
+      });
       const callId = normalizeString(data?.sid || data?.call_sid || data?.callSid || '');
       const callStatus = normalizeString(data?.status || 'queued').toLowerCase();
       const startedAt =

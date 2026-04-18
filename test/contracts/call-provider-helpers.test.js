@@ -27,6 +27,12 @@ function normalizeAbsoluteHttpUrl(value) {
 }
 
 function createHelpers(overrides = {}) {
+  const defaultTwilioMediaWsUrl = Object.prototype.hasOwnProperty.call(
+    overrides,
+    'defaultTwilioMediaWsUrl'
+  )
+    ? overrides.defaultTwilioMediaWsUrl
+    : 'wss://default.example/media';
   return createCallProviderHelpers({
     env: {
       RETELL_API_BASE_URL: 'https://retell.example/v2',
@@ -47,7 +53,7 @@ function createHelpers(overrides = {}) {
     },
     retellApiBaseUrl: 'https://retell.example/v2',
     twilioApiBaseUrl: 'https://twilio.example',
-    defaultTwilioMediaWsUrl: 'wss://default.example/media',
+    defaultTwilioMediaWsUrl,
     fetchJsonWithTimeout: overrides.fetchJsonWithTimeout || (async () => ({
       response: { ok: true, status: 200 },
       data: { recordings: [] },
@@ -137,6 +143,49 @@ test('call provider helpers execute outbound and status api calls with provider-
   assert.equal(calls[3].url, 'https://twilio.example/2010-04-01/Accounts/AC123/Calls/CA999.json');
   assert.equal(calls[3].method, 'GET');
   assert.match(calls[3].auth, /^Basic /);
+});
+
+test('call provider helpers warm Gemini bridge before starting a Twilio realtime call', async () => {
+  const calls = [];
+  const helpers = createHelpers({
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({
+        url: url.toString(),
+        method: options?.method || 'GET',
+      });
+      if (/\/healthz$/.test(url.toString())) {
+        return {
+          response: { ok: true, status: 200 },
+          data: { ok: true },
+        };
+      }
+      if (/\/debug\/gemini-setup\?/.test(url.toString())) {
+        return {
+          response: { ok: true, status: 200 },
+          data: { ok: true },
+        };
+      }
+      return {
+        response: { ok: true, status: 200 },
+        data: { ok: true, sid: 'CA123' },
+      };
+    },
+  });
+
+  await helpers.createTwilioOutboundCall(
+    { To: '+31612345678', StatusCallbackEvent: ['answered'] },
+    {
+      stack: 'gemini_flash_3_1_live',
+      mediaWsUrl: 'wss://twilio-media-bridge-ln3f.onrender.com/twilio-media',
+    }
+  );
+
+  assert.equal(calls[0].url, 'https://twilio-media-bridge-ln3f.onrender.com/healthz');
+  assert.match(
+    calls[1].url,
+    /^https:\/\/twilio-media-bridge-ln3f\.onrender\.com\/debug\/gemini-setup\?/
+  );
+  assert.equal(calls[2].url, 'https://twilio.example/2010-04-01/Accounts/AC123/Calls.json');
 });
 
 test('call provider helpers fetch batched Retell calls for cost backfill', async () => {
@@ -272,6 +321,39 @@ test('call provider helpers build outbound payloads and stack-specific urls', ()
   assert.equal(twilioPayload.From, '+31611111111');
   assert.match(twilioPayload.Url, /stack=openai_realtime_1_5/);
   assert.equal(twilioPayload.Timeout, '45');
+});
+
+test('call provider helpers fail early when realtime stacks miss a media websocket url', () => {
+  const helpers = createHelpers({
+    env: {
+      TWILIO_MEDIA_WS_URL: '',
+      TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE: '',
+    },
+    defaultTwilioMediaWsUrl: '',
+  });
+
+  assert.throws(
+    () =>
+      helpers.buildTwilioOutboundPayload(
+        { phone: '06 12 34 56 78' },
+        { coldcallingStack: 'gemini_flash_3_1_live', publicBaseUrl: 'https://demo.softora.test' }
+      ),
+    /TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE.*TWILIO_MEDIA_WS_URL/
+  );
+});
+
+test('call provider helpers rewrite the legacy dead Gemini bridge host to the live compat host', () => {
+  const helpers = createHelpers({
+    env: {
+      TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE:
+        'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media',
+    },
+  });
+
+  assert.equal(
+    helpers.getTwilioMediaWsUrlForStack('gemini_flash_3_1_live'),
+    'wss://twilio-media-bridge-ln3f.onrender.com/twilio-media'
+  );
 });
 
 test('call provider helpers extract stable retell and twilio call updates', () => {

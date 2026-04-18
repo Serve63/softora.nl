@@ -83,6 +83,7 @@ function createColdcallingServiceRuntime(deps = {}) {
     sleep,
     buildTwilioOutboundPayload,
     createTwilioOutboundCall,
+    getTwilioMediaWsUrlForStack,
     classifyTwilioFailure,
     parseDateToIso,
     handleSequentialDispatchQueueWebhookProgress,
