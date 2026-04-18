@@ -62,5 +62,13 @@ services:
         sync: false
       - key: GEMINI_SYSTEM_PROMPT_LOCKED
         value: true
+      - key: AMBIENT_ENABLED
+        value: true
+      - key: AMBIENT_NOISE_LEVEL
+        value: 0.10
+      - key: AMBIENT_DUCK_LEVEL
+        value: 0.05
+      - key: NOISE_GATE_RMS
+        value: 400
       - key: BRIDGE_DEBUG_TOKEN
         sync: false
