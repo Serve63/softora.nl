@@ -98,9 +98,13 @@ const AMBIENT_DUCK_LEVEL = Math.max(
   0,
   Math.min(1, Number(process.env.AMBIENT_DUCK_LEVEL || 0.1) || 0.1)
 );
+const INPUT_AUDIO_FLUSH_DELAY_MS = Math.max(
+  250,
+  Math.min(2500, Number(process.env.INPUT_AUDIO_FLUSH_DELAY_MS || 900) || 900)
+);
 const NOISE_GATE_RMS = Math.max(
   1,
-  Math.min(12000, Number(process.env.NOISE_GATE_RMS || 250) || 250)
+  Math.min(12000, Number(process.env.NOISE_GATE_RMS || 120) || 120)
 );
 const DEFAULT_SYSTEM_PROMPT = 'Je bent een vriendelijke Nederlandse sales assistent. Praat kort, helder en natuurlijk.';
 const CUSTOM_SYSTEM_PROMPT = String(process.env.GEMINI_SYSTEM_PROMPT || '').replace(/\r/g, '').trim();
@@ -373,6 +377,7 @@ app.get('/healthz', (_req, res) => {
     latencyTuning: {
       wsPerMessageDeflate: false,
       geminiHandshakeTimeoutMs: GEMINI_WS_HANDSHAKE_TIMEOUT_MS,
+      inputAudioFlushDelayMs: INPUT_AUDIO_FLUSH_DELAY_MS,
     },
     prompt: {
       source: SYSTEM_PROMPT_SOURCE,
@@ -398,6 +403,7 @@ app.get('/healthz', (_req, res) => {
       noiseLevel: AMBIENT_NOISE_LEVEL,
       duckLevel: AMBIENT_DUCK_LEVEL,
       noiseGateRms: NOISE_GATE_RMS,
+      forwardGateEndSilenceMs: 420,
     },
     timestamp: new Date().toISOString(),
   });
@@ -480,6 +486,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   let lastGeminiAudioSentAtMs = 0;
   let nextPlaybackMarkId = 1;
   let outboundFrameLoop = null;
+  let inputFlushTimer = null;
   const pendingPlaybackMarks = new Set();
   const pendingVoiceFramesOut = [];
   const ambientState = {
@@ -494,7 +501,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   const geminiForwardGateState = createSpeechTurnState({
     rmsThreshold: NOISE_GATE_RMS,
     startFrames: 1,
-    endSilenceMs: 180,
+    endSilenceMs: 420,
   });
 
   if (!AMBIENT_ONLY_MODE && !GEMINI_API_KEY) {
@@ -604,6 +611,26 @@ wss.on('connection', (twilioWs, _request, url) => {
     outboundFrameLoop = null;
   }
 
+  function clearInputFlushTimer() {
+    if (!inputFlushTimer) return;
+    clearTimeout(inputFlushTimer);
+    inputFlushTimer = null;
+  }
+
+  function scheduleInputAudioFlush() {
+    clearInputFlushTimer();
+    inputFlushTimer = setTimeout(() => {
+      inputFlushTimer = null;
+      if (!geminiReady || !geminiWs || geminiWs.readyState !== WebSocket.OPEN) return;
+      geminiWs.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
+      sessionSummary.audioStreamEndCount += 1;
+      if (BRIDGE_VERBOSE_LOGS) {
+        console.log('[Bridge] audioStreamEnd naar Gemini verstuurd');
+      }
+    }, INPUT_AUDIO_FLUSH_DELAY_MS);
+    if (typeof inputFlushTimer.unref === 'function') inputFlushTimer.unref();
+  }
+
   function pumpOutboundFrame() {
     if (!streamSid || twilioWs.readyState !== WebSocket.OPEN) return;
 
@@ -634,6 +661,7 @@ wss.on('connection', (twilioWs, _request, url) => {
     if (closed) return;
     closed = true;
     stopOutboundFrameLoop();
+    clearInputFlushTimer();
     callerSpeechState.reset();
     geminiForwardGateState.reset();
     sessionSummary.close = sessionSummary.close || {
@@ -803,7 +831,11 @@ wss.on('connection', (twilioWs, _request, url) => {
         suppressGeminiAudioUntilMs = nowMs + CALLER_BARGE_IN_SUPPRESSION_MS;
         clearTwilioBufferedAudio('caller-speech-start');
       }
-      if (!forwardGateState.speechActive && !forwardGateState.hasSpeech && !shouldForwardToGeminiPcmFrame(pcm16, NOISE_GATE_RMS)) {
+      if (
+        !forwardGateState.speechActive &&
+        !forwardGateState.hasSpeech &&
+        !shouldForwardToGeminiPcmFrame(pcm16, NOISE_GATE_RMS)
+      ) {
         sessionSummary.noiseGateDroppedFrameCount += 1;
         return;
       }
@@ -826,9 +858,10 @@ wss.on('connection', (twilioWs, _request, url) => {
                 mimeType: 'audio/pcm;rate=8000',
                 data: b64,
               },
-            },
-          };
+          },
+        };
       geminiWs.send(JSON.stringify(realtimePayload));
+      scheduleInputAudioFlush();
     } catch (error) {
       if (!sentConfigError) {
         sentConfigError = true;
