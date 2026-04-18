@@ -58,6 +58,8 @@ services:
         value: Puck
       - key: GEMINI_REQUIRE_CUSTOM_PROMPT
         value: false
+      - key: GEMINI_AUTO_START
+        value: true
       - key: GEMINI_SYSTEM_PROMPT
         sync: false
       - key: GEMINI_SYSTEM_PROMPT_LOCKED
@@ -65,10 +67,10 @@ services:
       - key: AMBIENT_ENABLED
         value: true
       - key: AMBIENT_NOISE_LEVEL
-        value: 0.10
+        value: 0.22
       - key: AMBIENT_DUCK_LEVEL
-        value: 0.05
+        value: 0.10
       - key: NOISE_GATE_RMS
-        value: 400
+        value: 250
       - key: BRIDGE_DEBUG_TOKEN
         sync: false

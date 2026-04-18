@@ -65,9 +65,9 @@ TWILIO_API_EDGE=dublin
 
 # Office ambience onder Gemini phone calls
 AMBIENT_ENABLED=true
-AMBIENT_NOISE_LEVEL=0.10
-AMBIENT_DUCK_LEVEL=0.05
-NOISE_GATE_RMS=400
+AMBIENT_NOISE_LEVEL=0.22
+AMBIENT_DUCK_LEVEL=0.10
+NOISE_GATE_RMS=250
 # Testmodus: alleen ambience, geen Gemini
 # AMBIENT_ONLY_MODE=false
 # Eigen raw 8k mono PCM loopbestand voor de bridge

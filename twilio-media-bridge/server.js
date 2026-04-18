@@ -52,7 +52,7 @@ const GEMINI_SYSTEM_PROMPT_LOCKED = !/^(0|false|no)$/i.test(
 const GEMINI_REQUIRE_CUSTOM_PROMPT = /^(1|true|yes)$/i.test(
   String(process.env.GEMINI_REQUIRE_CUSTOM_PROMPT || 'false')
 );
-const GEMINI_AUTO_START = /^(1|true|yes)$/i.test(String(process.env.GEMINI_AUTO_START || 'false'));
+const GEMINI_AUTO_START = !/^(0|false|no)$/i.test(String(process.env.GEMINI_AUTO_START || 'true'));
 const GEMINI_VAD_START_SENSITIVITY = String(
   process.env.GEMINI_VAD_START_SENSITIVITY || 'START_SENSITIVITY_LOW'
 ).trim();
@@ -92,15 +92,15 @@ const AMBIENT_ONLY_MODE = /^(1|true|yes)$/i.test(String(process.env.AMBIENT_ONLY
 const AMBIENT_ASSET_PATH = String(process.env.AMBIENT_ASSET_PATH || '').trim();
 const AMBIENT_NOISE_LEVEL = Math.max(
   0,
-  Math.min(1, Number(process.env.AMBIENT_NOISE_LEVEL || 0.1) || 0.1)
+  Math.min(1, Number(process.env.AMBIENT_NOISE_LEVEL || 0.22) || 0.22)
 );
 const AMBIENT_DUCK_LEVEL = Math.max(
   0,
-  Math.min(1, Number(process.env.AMBIENT_DUCK_LEVEL || 0.05) || 0.05)
+  Math.min(1, Number(process.env.AMBIENT_DUCK_LEVEL || 0.1) || 0.1)
 );
 const NOISE_GATE_RMS = Math.max(
   1,
-  Math.min(12000, Number(process.env.NOISE_GATE_RMS || 400) || 400)
+  Math.min(12000, Number(process.env.NOISE_GATE_RMS || 250) || 250)
 );
 const DEFAULT_SYSTEM_PROMPT = 'Je bent een vriendelijke Nederlandse sales assistent. Praat kort, helder en natuurlijk.';
 const CUSTOM_SYSTEM_PROMPT = String(process.env.GEMINI_SYSTEM_PROMPT || '').replace(/\r/g, '').trim();
@@ -111,7 +111,8 @@ const SYSTEM_PROMPT_FINGERPRINT = crypto
   .update(SYSTEM_PROMPT)
   .digest('hex')
   .slice(0, 16);
-const DEFAULT_INITIAL_MESSAGE = '';
+const DEFAULT_INITIAL_MESSAGE =
+  'Open het gesprek nu in natuurlijk Nederlands. Noem geen naam, bedrijf of branche tenzij die expliciet bekend is.';
 const CUSTOM_INITIAL_MESSAGE = String(process.env.GEMINI_INITIAL_MESSAGE || '').replace(/\r/g, '').trim();
 const INITIAL_MESSAGE = (CUSTOM_INITIAL_MESSAGE || DEFAULT_INITIAL_MESSAGE).trim();
 const INITIAL_MESSAGE_FINGERPRINT = crypto

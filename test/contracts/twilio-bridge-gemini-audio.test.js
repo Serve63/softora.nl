@@ -193,7 +193,7 @@ test('twilio media bridge defaults target the current Gemini Live model without 
 
   assert.match(source, /DEFAULT_GEMINI_MODEL = 'gemini-3\.1-flash-live-preview'/);
   assert.match(source, /GEMINI_REQUIRE_CUSTOM_PROMPT \|\| 'false'/);
-  assert.match(source, /GEMINI_AUTO_START \|\| 'false'/);
+  assert.match(source, /GEMINI_AUTO_START \|\| 'true'/);
   assert.match(source, /GEMINI_VAD_START_SENSITIVITY \|\| 'START_SENSITIVITY_LOW'/);
   assert.match(source, /activityHandling: 'START_OF_ACTIVITY_INTERRUPTS'/);
   assert.match(source, /CALLER_SPEECH_RMS_THRESHOLD \|\| 1200/);
@@ -207,9 +207,9 @@ test('twilio media bridge defaults target the current Gemini Live model without 
   assert.match(source, /event: 'clear'/);
   assert.match(source, /serverInterruptedCount/);
   assert.match(source, /AMBIENT_ENABLED \|\| 'true'/);
-  assert.match(source, /AMBIENT_NOISE_LEVEL \|\| 0\.1/);
-  assert.match(source, /AMBIENT_DUCK_LEVEL \|\| 0\.05/);
-  assert.match(source, /NOISE_GATE_RMS \|\| 400/);
-  assert.match(source, /DEFAULT_INITIAL_MESSAGE = ''/);
+  assert.match(source, /AMBIENT_NOISE_LEVEL \|\| 0\.22/);
+  assert.match(source, /AMBIENT_DUCK_LEVEL \|\| 0\.1/);
+  assert.match(source, /NOISE_GATE_RMS \|\| 250/);
+  assert.match(source, /DEFAULT_INITIAL_MESSAGE =/);
   assert.match(source, /gemini-live-2\.5-flash-preview', DEFAULT_GEMINI_MODEL/);
 });

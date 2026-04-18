@@ -97,7 +97,7 @@ let peak = 0;
 for (const sample of samples) {
   peak = Math.max(peak, Math.abs(sample));
 }
-const targetPeak = 2400;
+const targetPeak = 16000;
 const scale = peak > 0 ? targetPeak / peak : 1;
 
 const out = Buffer.alloc(TOTAL_SAMPLES * 2);
