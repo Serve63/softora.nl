@@ -27,3 +27,32 @@ services:
         value: softora_runtime_state
       - key: SUPABASE_STATE_KEY
         value: core
+      - key: TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE
+        value: wss://twilio-media-bridge-pjzd.onrender.com/twilio-media
+  - type: web
+    name: twilio-media-bridge-pjzd
+    runtime: node
+    rootDir: twilio-media-bridge
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.1-flash-live-preview
+      - key: GEMINI_VOICE
+        value: Puck
+      - key: GEMINI_REQUIRE_CUSTOM_PROMPT
+        value: false
+      - key: GEMINI_SYSTEM_PROMPT
+        sync: false
+      - key: GEMINI_SYSTEM_PROMPT_LOCKED
+        value: true
+      - key: BRIDGE_DEBUG_TOKEN
+        sync: false

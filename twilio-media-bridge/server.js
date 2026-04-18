@@ -5,10 +5,17 @@ const http = require('http');
 const express = require('express');
 const WebSocket = require('ws');
 const { mulaw } = require('alawmulaw');
+const { extractInlineAudioParts, parsePcmRateFromMime } = require('./gemini-payload');
 
 const PORT = Number(process.env.PORT || 3000);
 const GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
-const GEMINI_MODEL_RAW = String(process.env.GEMINI_MODEL || 'gemini-live-2.5-flash-preview').trim();
+const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-live-preview';
+const LEGACY_GEMINI_MODEL_ALIASES = new Map([
+  ['gemini-live-2.5-flash-preview', DEFAULT_GEMINI_MODEL],
+]);
+const GEMINI_MODEL_REQUESTED_RAW = String(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL).trim();
+const GEMINI_MODEL_RAW =
+  LEGACY_GEMINI_MODEL_ALIASES.get(GEMINI_MODEL_REQUESTED_RAW) || GEMINI_MODEL_REQUESTED_RAW;
 const GEMINI_MODEL = GEMINI_MODEL_RAW.startsWith('models/')
   ? GEMINI_MODEL_RAW
   : `models/${GEMINI_MODEL_RAW}`;
@@ -19,11 +26,18 @@ const GEMINI_WS_HANDSHAKE_TIMEOUT_MS = Math.max(
   3000,
   Math.min(20000, Number(process.env.GEMINI_WS_HANDSHAKE_TIMEOUT_MS || 10000) || 10000)
 );
+const MAX_PENDING_TWILIO_MEDIA_OUT = Math.max(
+  50,
+  Math.min(2000, Number(process.env.MAX_PENDING_TWILIO_MEDIA_OUT || 600) || 600)
+);
+const GEMINI_USE_MEDIA_CHUNKS_FOR_MIC = /^(1|true|yes)$/i.test(
+  String(process.env.GEMINI_USE_MEDIA_CHUNKS_FOR_MIC || '')
+);
 const GEMINI_SYSTEM_PROMPT_LOCKED = !/^(0|false|no)$/i.test(
   String(process.env.GEMINI_SYSTEM_PROMPT_LOCKED || 'true')
 );
 const GEMINI_REQUIRE_CUSTOM_PROMPT = /^(1|true|yes)$/i.test(
-  String(process.env.GEMINI_REQUIRE_CUSTOM_PROMPT || 'true')
+  String(process.env.GEMINI_REQUIRE_CUSTOM_PROMPT || 'false')
 );
 const DEFAULT_SYSTEM_PROMPT = 'Je bent een vriendelijke Nederlandse sales assistent. Praat kort, helder en natuurlijk.';
 const CUSTOM_SYSTEM_PROMPT = String(process.env.GEMINI_SYSTEM_PROMPT || '').replace(/\r/g, '').trim();
@@ -78,14 +92,6 @@ function downsampleInt16(input, fromRate, toRate) {
   return out;
 }
 
-function parsePcmRateFromMime(mimeType) {
-  const raw = String(mimeType || '').toLowerCase();
-  const match = raw.match(/rate=(\d{3,6})/);
-  if (!match) return 24000;
-  const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? parsed : 24000;
-}
-
 function buildGeminiWsUrl() {
   return `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(
     GEMINI_API_KEY
@@ -113,22 +119,6 @@ function buildGeminiSetupPayload() {
         : undefined,
     },
   };
-}
-
-function extractInlineAudioParts(payload) {
-  const out = [];
-  const root = payload && typeof payload === 'object' ? payload : {};
-  const serverContent = root.serverContent || {};
-  const modelTurn = serverContent.modelTurn || {};
-  const parts = Array.isArray(modelTurn.parts) ? modelTurn.parts : [];
-  parts.forEach((part) => {
-    if (part && part.inlineData && typeof part.inlineData === 'object') {
-      const data = String(part.inlineData.data || '');
-      const mimeType = String(part.inlineData.mimeType || '');
-      if (data) out.push({ data, mimeType });
-    }
-  });
-  return out;
 }
 
 function safeJsonParse(text) {
@@ -230,7 +220,12 @@ app.get('/healthz', (_req, res) => {
     ok: true,
     service: 'twilio-media-bridge',
     geminiConfigured: Boolean(GEMINI_API_KEY),
+    requestedModel: GEMINI_MODEL_REQUESTED_RAW,
     model: GEMINI_MODEL,
+    modelAliasApplied:
+      GEMINI_MODEL_REQUESTED_RAW !== GEMINI_MODEL_RAW
+        ? `${GEMINI_MODEL_REQUESTED_RAW} -> ${GEMINI_MODEL_RAW}`
+        : '',
     voice: GEMINI_VOICE,
     latencyTuning: {
       wsPerMessageDeflate: false,
@@ -313,6 +308,49 @@ wss.on('connection', (twilioWs, _request, url) => {
     }
   } catch {}
 
+  const pendingUlawB64Out = [];
+
+  function flushPendingUlawOut() {
+    while (
+      pendingUlawB64Out.length > 0 &&
+      streamSid &&
+      twilioWs.readyState === WebSocket.OPEN
+    ) {
+      const payload = pendingUlawB64Out.shift();
+      twilioWs.send(
+        JSON.stringify({
+          event: 'media',
+          streamSid,
+          media: { payload },
+        })
+      );
+      geminiAudioOutCount += 1;
+    }
+  }
+
+  function enqueueGeminiAudioToTwilio(ulawB64) {
+    if (!ulawB64) return;
+    if (streamSid && twilioWs.readyState === WebSocket.OPEN) {
+      twilioWs.send(
+        JSON.stringify({
+          event: 'media',
+          streamSid,
+          media: { payload: ulawB64 },
+        })
+      );
+      geminiAudioOutCount += 1;
+      return;
+    }
+    if (twilioWs.readyState !== WebSocket.OPEN) return;
+    if (pendingUlawB64Out.length >= MAX_PENDING_TWILIO_MEDIA_OUT) {
+      pendingUlawB64Out.shift();
+      if (BRIDGE_VERBOSE_LOGS) {
+        console.warn('[Bridge] pending Twilio media uit buffer vol; oudste chunk gedropt');
+      }
+    }
+    pendingUlawB64Out.push(ulawB64);
+  }
+
   function closeBoth(reason = 'unknown') {
     if (closed) return;
     closed = true;
@@ -351,7 +389,7 @@ wss.on('connection', (twilioWs, _request, url) => {
     }
 
     const audioParts = extractInlineAudioParts(msg);
-    if (!audioParts.length || !streamSid || twilioWs.readyState !== WebSocket.OPEN) return;
+    if (!audioParts.length || twilioWs.readyState !== WebSocket.OPEN) return;
 
     audioParts.forEach((audio) => {
       try {
@@ -362,14 +400,7 @@ wss.on('connection', (twilioWs, _request, url) => {
         const downsampled = downsampleInt16(pcm16, sampleRate, 8000);
         const ulaw = mulaw.encode(downsampled);
         const payload = Buffer.from(ulaw).toString('base64');
-        twilioWs.send(
-          JSON.stringify({
-            event: 'media',
-            streamSid,
-            media: { payload },
-          })
-        );
-        geminiAudioOutCount += 1;
+        enqueueGeminiAudioToTwilio(payload);
       } catch (error) {
         console.error('[Bridge] Audio render fout:', error?.message || error);
       }
@@ -398,7 +429,17 @@ wss.on('connection', (twilioWs, _request, url) => {
       console.log(`[Bridge] Twilio event=${event}`);
     }
     if (event === 'start') {
-      streamSid = String(msg.start?.streamSid || '');
+      streamSid = String(
+        msg.start?.streamSid ||
+          msg.start?.StreamSid ||
+          msg.streamSid ||
+          msg.StreamSid ||
+          ''
+      ).trim();
+      if (BRIDGE_VERBOSE_LOGS) {
+        console.log(`[Bridge] Twilio start streamSid=${streamSid || '(leeg)'}`);
+      }
+      flushPendingUlawOut();
       return;
     }
     if (event === 'stop') {
@@ -416,14 +457,26 @@ wss.on('connection', (twilioWs, _request, url) => {
       const ulaw = Uint8Array.from(Buffer.from(payload, 'base64'));
       const pcm16 = mulaw.decode(ulaw);
       const pcmBuffer = int16ArrayToBuffer(pcm16);
-      const realtimePayload = {
-        realtimeInput: {
-          audio: {
-            mimeType: 'audio/pcm;rate=8000',
-            data: pcmBuffer.toString('base64'),
-          },
-        },
-      };
+      const b64 = pcmBuffer.toString('base64');
+      const realtimePayload = GEMINI_USE_MEDIA_CHUNKS_FOR_MIC
+        ? {
+            realtimeInput: {
+              mediaChunks: [
+                {
+                  mimeType: 'audio/pcm;rate=8000',
+                  data: b64,
+                },
+              ],
+            },
+          }
+        : {
+            realtimeInput: {
+              audio: {
+                mimeType: 'audio/pcm;rate=8000',
+                data: b64,
+              },
+            },
+          };
       geminiWs.send(JSON.stringify(realtimePayload));
     } catch (error) {
       if (!sentConfigError) {
@@ -453,6 +506,11 @@ wss.on('connection', (twilioWs, _request, url) => {
 
 server.listen(PORT, () => {
   console.log(`[Bridge] listening on :${PORT}`);
+  if (GEMINI_MODEL_REQUESTED_RAW !== GEMINI_MODEL_RAW) {
+    console.warn(
+      `[Bridge] legacy model alias toegepast: ${GEMINI_MODEL_REQUESTED_RAW} -> ${GEMINI_MODEL_RAW}`
+    );
+  }
   console.log(`[Bridge] model=${GEMINI_MODEL}`);
   console.log(`[Bridge] geminiConfigured=${Boolean(GEMINI_API_KEY)}`);
 });
