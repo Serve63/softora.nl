@@ -87,7 +87,7 @@ const GEMINI_PLAYBACK_ACTIVE_WINDOW_MS = Math.max(
   100,
   Math.min(3000, Number(process.env.GEMINI_PLAYBACK_ACTIVE_WINDOW_MS || 900) || 900)
 );
-const AMBIENT_ENABLED = !/^(0|false|no)$/i.test(String(process.env.AMBIENT_ENABLED || 'true'));
+const AMBIENT_ENABLED = /^(1|true|yes)$/i.test(String(process.env.AMBIENT_ENABLED || 'false'));
 const AMBIENT_ONLY_MODE = /^(1|true|yes)$/i.test(String(process.env.AMBIENT_ONLY_MODE || 'false'));
 const AMBIENT_ASSET_PATH = String(process.env.AMBIENT_ASSET_PATH || '').trim();
 const AMBIENT_NOISE_LEVEL = Math.max(
@@ -404,6 +404,7 @@ app.get('/healthz', (_req, res) => {
       duckLevel: AMBIENT_DUCK_LEVEL,
       noiseGateRms: NOISE_GATE_RMS,
       forwardGateEndSilenceMs: 420,
+      gateOnlyDuringPlayback: true,
     },
     timestamp: new Date().toISOString(),
   });
@@ -826,12 +827,14 @@ wss.on('connection', (twilioWs, _request, url) => {
       const nowMs = Date.now();
       const speechState = callerSpeechState.processPcmFrame(pcm16, nowMs);
       const forwardGateState = geminiForwardGateState.processPcmFrame(pcm16, nowMs);
+      const applyNoiseGate = isGeminiPlaybackLikelyActive(nowMs);
       if (speechState.speechStarted && isGeminiPlaybackLikelyActive(nowMs)) {
         sessionSummary.bargeInCount += 1;
         suppressGeminiAudioUntilMs = nowMs + CALLER_BARGE_IN_SUPPRESSION_MS;
         clearTwilioBufferedAudio('caller-speech-start');
       }
       if (
+        applyNoiseGate &&
         !forwardGateState.speechActive &&
         !forwardGateState.hasSpeech &&
         !shouldForwardToGeminiPcmFrame(pcm16, NOISE_GATE_RMS)
