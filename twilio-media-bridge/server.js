@@ -5,6 +5,7 @@ const http = require('http');
 const express = require('express');
 const WebSocket = require('ws');
 const { mulaw } = require('alawmulaw');
+const { createSpeechTurnState } = require('./audio-turn-state');
 const {
   buildGeminiInitialRealtimeInputPayload,
   buildGeminiSetupPayload: buildGeminiSetupEnvelope,
@@ -45,6 +46,36 @@ const GEMINI_REQUIRE_CUSTOM_PROMPT = /^(1|true|yes)$/i.test(
   String(process.env.GEMINI_REQUIRE_CUSTOM_PROMPT || 'false')
 );
 const GEMINI_AUTO_START = !/^(0|false|no)$/i.test(String(process.env.GEMINI_AUTO_START || 'true'));
+const GEMINI_VAD_START_SENSITIVITY = String(
+  process.env.GEMINI_VAD_START_SENSITIVITY || 'START_SENSITIVITY_HIGH'
+).trim();
+const GEMINI_VAD_END_SENSITIVITY = String(
+  process.env.GEMINI_VAD_END_SENSITIVITY || 'END_SENSITIVITY_LOW'
+).trim();
+const GEMINI_VAD_PREFIX_PADDING_MS = Math.max(
+  0,
+  Math.min(500, Number(process.env.GEMINI_VAD_PREFIX_PADDING_MS || 120) || 120)
+);
+const GEMINI_VAD_SILENCE_DURATION_MS = Math.max(
+  100,
+  Math.min(2000, Number(process.env.GEMINI_VAD_SILENCE_DURATION_MS || 250) || 250)
+);
+const CALLER_SPEECH_RMS_THRESHOLD = Math.max(
+  50,
+  Math.min(12000, Number(process.env.CALLER_SPEECH_RMS_THRESHOLD || 900) || 900)
+);
+const CALLER_SPEECH_START_FRAMES = Math.max(
+  1,
+  Math.min(20, Number(process.env.CALLER_SPEECH_START_FRAMES || 3) || 3)
+);
+const CALLER_SPEECH_END_SILENCE_MS = Math.max(
+  100,
+  Math.min(5000, Number(process.env.CALLER_SPEECH_END_SILENCE_MS || 700) || 700)
+);
+const CALLER_BARGE_IN_SUPPRESSION_MS = Math.max(
+  0,
+  Math.min(3000, Number(process.env.CALLER_BARGE_IN_SUPPRESSION_MS || 450) || 450)
+);
 const DEFAULT_SYSTEM_PROMPT = 'Je bent een vriendelijke Nederlandse sales assistent. Praat kort, helder en natuurlijk.';
 const CUSTOM_SYSTEM_PROMPT = String(process.env.GEMINI_SYSTEM_PROMPT || '').replace(/\r/g, '').trim();
 const SYSTEM_PROMPT = (CUSTOM_SYSTEM_PROMPT || DEFAULT_SYSTEM_PROMPT).trim();
@@ -118,6 +149,16 @@ function buildGeminiSetupPayload() {
     voiceName: GEMINI_VOICE,
     systemPrompt: SYSTEM_PROMPT,
     seedInitialHistory: false,
+    realtimeInputConfig: {
+      automaticActivityDetection: {
+        disabled: false,
+        startOfSpeechSensitivity: GEMINI_VAD_START_SENSITIVITY,
+        endOfSpeechSensitivity: GEMINI_VAD_END_SENSITIVITY,
+        prefixPaddingMs: GEMINI_VAD_PREFIX_PADDING_MS,
+        silenceDurationMs: GEMINI_VAD_SILENCE_DURATION_MS,
+      },
+      activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
+    },
   });
 }
 
@@ -343,6 +384,9 @@ wss.on('connection', (twilioWs, _request, url) => {
     twilioMediaInCount: 0,
     geminiAudioOutCount: 0,
     audioStreamEndCount: 0,
+    twilioClearCount: 0,
+    bargeInCount: 0,
+    droppedGeminiAudioChunkCount: 0,
     geminiMessages: [],
     close: null,
   };
@@ -353,7 +397,13 @@ wss.on('connection', (twilioWs, _request, url) => {
   let sentConfigError = false;
   let twilioMediaInCount = 0;
   let geminiAudioOutCount = 0;
-  let inputFlushTimer = null;
+  let callerSpeechActive = false;
+  let suppressGeminiAudioUntilMs = 0;
+  const callerSpeechState = createSpeechTurnState({
+    rmsThreshold: CALLER_SPEECH_RMS_THRESHOLD,
+    startFrames: CALLER_SPEECH_START_FRAMES,
+    endSilenceMs: CALLER_SPEECH_END_SILENCE_MS,
+  });
 
   if (!GEMINI_API_KEY) {
     console.error('[Bridge] GEMINI_API_KEY/GOOGLE_API_KEY ontbreekt');
@@ -383,25 +433,6 @@ wss.on('connection', (twilioWs, _request, url) => {
 
   const pendingUlawB64Out = [];
 
-  function clearInputFlushTimer() {
-    if (!inputFlushTimer) return;
-    clearTimeout(inputFlushTimer);
-    inputFlushTimer = null;
-  }
-
-  function scheduleInputAudioFlush() {
-    clearInputFlushTimer();
-    inputFlushTimer = setTimeout(() => {
-      inputFlushTimer = null;
-      if (!geminiReady || geminiWs.readyState !== WebSocket.OPEN) return;
-      geminiWs.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
-      sessionSummary.audioStreamEndCount += 1;
-      if (BRIDGE_VERBOSE_LOGS) {
-        console.log('[Bridge] audioStreamEnd naar Gemini verstuurd');
-      }
-    }, 1200);
-  }
-
   function flushPendingUlawOut() {
     while (
       pendingUlawB64Out.length > 0 &&
@@ -421,8 +452,28 @@ wss.on('connection', (twilioWs, _request, url) => {
     }
   }
 
+  function clearTwilioBufferedAudio(reason = 'unknown') {
+    pendingUlawB64Out.length = 0;
+    if (!streamSid || twilioWs.readyState !== WebSocket.OPEN) return;
+    twilioWs.send(
+      JSON.stringify({
+        event: 'clear',
+        streamSid,
+      })
+    );
+    sessionSummary.twilioClearCount += 1;
+    if (BRIDGE_VERBOSE_LOGS) {
+      console.log(`[Bridge] clear naar Twilio verstuurd (${reason})`);
+    }
+  }
+
   function enqueueGeminiAudioToTwilio(ulawB64) {
     if (!ulawB64) return;
+    const nowMs = Date.now();
+    if (callerSpeechActive || nowMs < suppressGeminiAudioUntilMs) {
+      sessionSummary.droppedGeminiAudioChunkCount += 1;
+      return;
+    }
     if (streamSid && twilioWs.readyState === WebSocket.OPEN) {
       twilioWs.send(
         JSON.stringify({
@@ -448,7 +499,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   function closeBoth(reason = 'unknown') {
     if (closed) return;
     closed = true;
-    clearInputFlushTimer();
+    callerSpeechState.reset();
     sessionSummary.close = sessionSummary.close || {
       reason,
       at: new Date().toISOString(),
@@ -511,6 +562,15 @@ wss.on('connection', (twilioWs, _request, url) => {
     if (sessionSummary.geminiMessages.length > 12) sessionSummary.geminiMessages.shift();
 
     if (msg.error) return;
+
+    const serverContent = msg.serverContent || msg.server_content || null;
+    if (
+      serverContent &&
+      (serverContent.interrupted || serverContent.interrupted === true)
+    ) {
+      suppressGeminiAudioUntilMs = Date.now() + CALLER_BARGE_IN_SUPPRESSION_MS;
+      clearTwilioBufferedAudio('gemini-interrupted');
+    }
 
     const audioParts = extractInlineAudioParts(msg);
     if (!audioParts.length || twilioWs.readyState !== WebSocket.OPEN) return;
@@ -582,6 +642,13 @@ wss.on('connection', (twilioWs, _request, url) => {
     try {
       const ulaw = Uint8Array.from(Buffer.from(payload, 'base64'));
       const pcm16 = mulaw.decode(ulaw);
+      const speechState = callerSpeechState.processPcmFrame(pcm16, Date.now());
+      callerSpeechActive = speechState.speechActive;
+      if (speechState.speechStarted) {
+        sessionSummary.bargeInCount += 1;
+        suppressGeminiAudioUntilMs = Date.now() + CALLER_BARGE_IN_SUPPRESSION_MS;
+        clearTwilioBufferedAudio('caller-speech-start');
+      }
       const pcmBuffer = int16ArrayToBuffer(pcm16);
       const b64 = pcmBuffer.toString('base64');
       const realtimePayload = GEMINI_USE_MEDIA_CHUNKS_FOR_MIC
@@ -604,7 +671,6 @@ wss.on('connection', (twilioWs, _request, url) => {
             },
           };
       geminiWs.send(JSON.stringify(realtimePayload));
-      scheduleInputAudioFlush();
     } catch (error) {
       if (!sentConfigError) {
         sentConfigError = true;

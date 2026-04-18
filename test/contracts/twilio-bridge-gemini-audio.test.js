@@ -4,6 +4,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
+  computeInt16Rms,
+  createSpeechTurnState,
+} = require('../../twilio-media-bridge/audio-turn-state');
+const {
   buildGeminiInitialClientContentPayload,
   buildGeminiInitialRealtimeInputPayload,
   buildGeminiSetupPayload,
@@ -15,6 +19,37 @@ test('parsePcmRateFromMime reads rate= from mime string', () => {
   assert.equal(parsePcmRateFromMime('audio/pcm;rate=16000'), 16000);
   assert.equal(parsePcmRateFromMime('audio/L16; rate=8000'), 8000);
   assert.equal(parsePcmRateFromMime('audio/pcm'), 24000);
+});
+
+test('computeInt16Rms distinguishes silence from voiced audio', () => {
+  assert.equal(computeInt16Rms(new Int16Array([0, 0, 0, 0])), 0);
+  assert.ok(computeInt16Rms(new Int16Array([2500, -2500, 2500, -2500])) > 1000);
+});
+
+test('speech turn state detects speech start and end from PCM frames', () => {
+  const turns = createSpeechTurnState({
+    rmsThreshold: 800,
+    startFrames: 2,
+    endSilenceMs: 300,
+  });
+  const voiced = new Int16Array([2200, -2200, 2200, -2200]);
+  const silent = new Int16Array([0, 0, 0, 0]);
+
+  const frame1 = turns.processPcmFrame(voiced, 0);
+  assert.equal(frame1.speechStarted, false);
+  assert.equal(frame1.speechActive, false);
+
+  const frame2 = turns.processPcmFrame(voiced, 20);
+  assert.equal(frame2.speechStarted, true);
+  assert.equal(frame2.speechActive, true);
+
+  const frame3 = turns.processPcmFrame(silent, 200);
+  assert.equal(frame3.speechEnded, false);
+  assert.equal(frame3.speechActive, true);
+
+  const frame4 = turns.processPcmFrame(silent, 360);
+  assert.equal(frame4.speechEnded, true);
+  assert.equal(frame4.speechActive, false);
 });
 
 test('extractInlineAudioParts supports camelCase server JSON', () => {
@@ -49,6 +84,15 @@ test('buildGeminiSetupPayload can seed initial client history for an auto-start 
     voiceName: 'Iapetus',
     systemPrompt: 'Bel prospects kort en natuurlijk.',
     seedInitialHistory: true,
+    realtimeInputConfig: {
+      automaticActivityDetection: {
+        disabled: false,
+        startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
+        endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
+        silenceDurationMs: 250,
+      },
+      activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
+    },
   });
 
   assert.equal(payload.setup.model, 'models/gemini-3.1-flash-live-preview');
@@ -58,6 +102,15 @@ test('buildGeminiSetupPayload can seed initial client history for an auto-start 
   });
   assert.deepEqual(payload.setup.historyConfig, {
     initialHistoryInClientContent: true,
+  });
+  assert.deepEqual(payload.setup.realtimeInputConfig, {
+    automaticActivityDetection: {
+      disabled: false,
+      startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
+      endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
+      silenceDurationMs: 250,
+    },
+    activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
   });
 });
 
@@ -89,6 +142,8 @@ test('twilio media bridge defaults target the current Gemini Live model without 
   assert.match(source, /DEFAULT_GEMINI_MODEL = 'gemini-3\.1-flash-live-preview'/);
   assert.match(source, /GEMINI_REQUIRE_CUSTOM_PROMPT \|\| 'false'/);
   assert.match(source, /GEMINI_AUTO_START \|\| 'true'/);
+  assert.match(source, /activityHandling: 'START_OF_ACTIVITY_INTERRUPTS'/);
+  assert.match(source, /event: 'clear'/);
   assert.match(source, /DEFAULT_INITIAL_MESSAGE = 'De call is nu verbonden\. Begin direct met het gesprek\.'/);
   assert.match(source, /gemini-live-2\.5-flash-preview', DEFAULT_GEMINI_MODEL/);
 });

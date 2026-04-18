@@ -6,36 +6,53 @@ function parsePcmRateFromMime(mimeType) {
   return Number.isFinite(parsed) ? parsed : 24000;
 }
 
-function buildGeminiSetupPayload({ model = '', voiceName = '', systemPrompt = '', seedInitialHistory = false } = {}) {
+function buildGeminiSetupPayload({
+  model = '',
+  voiceName = '',
+  systemPrompt = '',
+  seedInitialHistory = false,
+  realtimeInputConfig = null,
+  inputAudioTranscription = false,
+  outputAudioTranscription = false,
+} = {}) {
   const normalizedModel = String(model || '').trim();
   const normalizedVoiceName = String(voiceName || '').trim();
   const normalizedSystemPrompt = String(systemPrompt || '').replace(/\r/g, '').trim();
 
-  return {
-    setup: {
-      model: normalizedModel,
-      generationConfig: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: normalizedVoiceName,
-            },
+  const setup = {
+    model: normalizedModel,
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: {
+            voiceName: normalizedVoiceName,
           },
         },
       },
-      systemInstruction: normalizedSystemPrompt
-        ? {
-            parts: [{ text: normalizedSystemPrompt }],
-          }
-        : undefined,
-      historyConfig: seedInitialHistory
-        ? {
-            initialHistoryInClientContent: true,
-          }
-        : undefined,
     },
+    systemInstruction: normalizedSystemPrompt
+      ? {
+          parts: [{ text: normalizedSystemPrompt }],
+        }
+      : undefined,
+    historyConfig: seedInitialHistory
+      ? {
+          initialHistoryInClientContent: true,
+        }
+      : undefined,
   };
+  if (realtimeInputConfig && typeof realtimeInputConfig === 'object') {
+    setup.realtimeInputConfig = realtimeInputConfig;
+  }
+  if (inputAudioTranscription) {
+    setup.inputAudioTranscription = {};
+  }
+  if (outputAudioTranscription) {
+    setup.outputAudioTranscription = {};
+  }
+
+  return { setup };
 }
 
 function buildGeminiInitialClientContentPayload(text) {
