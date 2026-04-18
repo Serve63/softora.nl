@@ -45,7 +45,7 @@ const GEMINI_SYSTEM_PROMPT_LOCKED = !/^(0|false|no)$/i.test(
 const GEMINI_REQUIRE_CUSTOM_PROMPT = /^(1|true|yes)$/i.test(
   String(process.env.GEMINI_REQUIRE_CUSTOM_PROMPT || 'false')
 );
-const GEMINI_AUTO_START = !/^(0|false|no)$/i.test(String(process.env.GEMINI_AUTO_START || 'true'));
+const GEMINI_AUTO_START = /^(1|true|yes)$/i.test(String(process.env.GEMINI_AUTO_START || 'false'));
 const GEMINI_VAD_START_SENSITIVITY = String(
   process.env.GEMINI_VAD_START_SENSITIVITY || 'START_SENSITIVITY_LOW'
 ).trim();
@@ -89,7 +89,7 @@ const SYSTEM_PROMPT_FINGERPRINT = crypto
   .update(SYSTEM_PROMPT)
   .digest('hex')
   .slice(0, 16);
-const DEFAULT_INITIAL_MESSAGE = 'De call is nu verbonden. Begin direct met het gesprek.';
+const DEFAULT_INITIAL_MESSAGE = '';
 const CUSTOM_INITIAL_MESSAGE = String(process.env.GEMINI_INITIAL_MESSAGE || '').replace(/\r/g, '').trim();
 const INITIAL_MESSAGE = (CUSTOM_INITIAL_MESSAGE || DEFAULT_INITIAL_MESSAGE).trim();
 const INITIAL_MESSAGE_FINGERPRINT = crypto
