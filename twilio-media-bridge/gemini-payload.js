@@ -6,6 +6,49 @@ function parsePcmRateFromMime(mimeType) {
   return Number.isFinite(parsed) ? parsed : 24000;
 }
 
+function buildGeminiSetupPayload({ model = '', voiceName = '', systemPrompt = '', seedInitialHistory = false } = {}) {
+  const normalizedModel = String(model || '').trim();
+  const normalizedVoiceName = String(voiceName || '').trim();
+  const normalizedSystemPrompt = String(systemPrompt || '').replace(/\r/g, '').trim();
+
+  return {
+    setup: {
+      model: normalizedModel,
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: normalizedVoiceName,
+            },
+          },
+        },
+      },
+      systemInstruction: normalizedSystemPrompt
+        ? {
+            parts: [{ text: normalizedSystemPrompt }],
+          }
+        : undefined,
+      historyConfig: seedInitialHistory
+        ? {
+            initialHistoryInClientContent: true,
+          }
+        : undefined,
+    },
+  };
+}
+
+function buildGeminiInitialClientContentPayload(text) {
+  const normalizedText = String(text || '').replace(/\r/g, '').trim();
+  if (!normalizedText) return null;
+  return {
+    clientContent: {
+      turns: [{ role: 'user', parts: [{ text: normalizedText }] }],
+      turnComplete: true,
+    },
+  };
+}
+
 function extractInlineAudioParts(payload) {
   const out = [];
   const root = payload && typeof payload === 'object' ? payload : {};
@@ -25,6 +68,8 @@ function extractInlineAudioParts(payload) {
 }
 
 module.exports = {
+  buildGeminiInitialClientContentPayload,
+  buildGeminiSetupPayload,
   extractInlineAudioParts,
   parsePcmRateFromMime,
 };

@@ -5,7 +5,12 @@ const http = require('http');
 const express = require('express');
 const WebSocket = require('ws');
 const { mulaw } = require('alawmulaw');
-const { extractInlineAudioParts, parsePcmRateFromMime } = require('./gemini-payload');
+const {
+  buildGeminiInitialClientContentPayload,
+  buildGeminiSetupPayload: buildGeminiSetupEnvelope,
+  extractInlineAudioParts,
+  parsePcmRateFromMime,
+} = require('./gemini-payload');
 
 const PORT = Number(process.env.PORT || 3000);
 const GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
@@ -39,6 +44,7 @@ const GEMINI_SYSTEM_PROMPT_LOCKED = !/^(0|false|no)$/i.test(
 const GEMINI_REQUIRE_CUSTOM_PROMPT = /^(1|true|yes)$/i.test(
   String(process.env.GEMINI_REQUIRE_CUSTOM_PROMPT || 'false')
 );
+const GEMINI_AUTO_START = !/^(0|false|no)$/i.test(String(process.env.GEMINI_AUTO_START || 'true'));
 const DEFAULT_SYSTEM_PROMPT = 'Je bent een vriendelijke Nederlandse sales assistent. Praat kort, helder en natuurlijk.';
 const CUSTOM_SYSTEM_PROMPT = String(process.env.GEMINI_SYSTEM_PROMPT || '').replace(/\r/g, '').trim();
 const SYSTEM_PROMPT = (CUSTOM_SYSTEM_PROMPT || DEFAULT_SYSTEM_PROMPT).trim();
@@ -46,6 +52,14 @@ const SYSTEM_PROMPT_SOURCE = CUSTOM_SYSTEM_PROMPT ? 'env:GEMINI_SYSTEM_PROMPT' :
 const SYSTEM_PROMPT_FINGERPRINT = crypto
   .createHash('sha256')
   .update(SYSTEM_PROMPT)
+  .digest('hex')
+  .slice(0, 16);
+const DEFAULT_INITIAL_MESSAGE = 'De call is nu verbonden. Begin direct met het gesprek.';
+const CUSTOM_INITIAL_MESSAGE = String(process.env.GEMINI_INITIAL_MESSAGE || '').replace(/\r/g, '').trim();
+const INITIAL_MESSAGE = (CUSTOM_INITIAL_MESSAGE || DEFAULT_INITIAL_MESSAGE).trim();
+const INITIAL_MESSAGE_FINGERPRINT = crypto
+  .createHash('sha256')
+  .update(INITIAL_MESSAGE)
   .digest('hex')
   .slice(0, 16);
 
@@ -99,26 +113,12 @@ function buildGeminiWsUrl() {
 }
 
 function buildGeminiSetupPayload() {
-  return {
-    setup: {
-      model: GEMINI_MODEL,
-      generationConfig: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: GEMINI_VOICE,
-            },
-          },
-        },
-      },
-      systemInstruction: SYSTEM_PROMPT
-        ? {
-            parts: [{ text: SYSTEM_PROMPT }],
-          }
-        : undefined,
-    },
-  };
+  return buildGeminiSetupEnvelope({
+    model: GEMINI_MODEL,
+    voiceName: GEMINI_VOICE,
+    systemPrompt: SYSTEM_PROMPT,
+    seedInitialHistory: GEMINI_AUTO_START && Boolean(INITIAL_MESSAGE),
+  });
 }
 
 function safeJsonParse(text) {
@@ -239,6 +239,11 @@ app.get('/healthz', (_req, res) => {
       length: SYSTEM_PROMPT.length,
       fingerprint: SYSTEM_PROMPT_FINGERPRINT,
     },
+    autoStart: {
+      enabled: GEMINI_AUTO_START,
+      length: INITIAL_MESSAGE.length,
+      fingerprint: INITIAL_MESSAGE_FINGERPRINT,
+    },
     timestamp: new Date().toISOString(),
   });
 });
@@ -278,6 +283,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   let streamSid = '';
   let closed = false;
   let geminiReady = false;
+  let autoStartSent = false;
   let sentConfigError = false;
   let twilioMediaInCount = 0;
   let geminiAudioOutCount = 0;
@@ -379,6 +385,16 @@ wss.on('connection', (twilioWs, _request, url) => {
       geminiReady = true;
       if (BRIDGE_VERBOSE_LOGS) {
         console.log(`[Bridge] setupComplete stack=${stack}`);
+      }
+      if (GEMINI_AUTO_START && INITIAL_MESSAGE && !autoStartSent) {
+        const initialPayload = buildGeminiInitialClientContentPayload(INITIAL_MESSAGE);
+        if (initialPayload) {
+          geminiWs.send(JSON.stringify(initialPayload));
+          autoStartSent = true;
+          if (BRIDGE_VERBOSE_LOGS) {
+            console.log('[Bridge] auto-start bericht naar Gemini verstuurd');
+          }
+        }
       }
       return;
     }
