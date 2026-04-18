@@ -148,6 +148,10 @@ test('twilio media bridge defaults target the current Gemini Live model without 
   assert.match(source, /CALLER_SPEECH_START_FRAMES \|\| 4/);
   assert.match(source, /CALLER_BARGE_IN_SUPPRESSION_MS \|\| 220/);
   assert.match(source, /GEMINI_PLAYBACK_ACTIVE_WINDOW_MS \|\| 900/);
+  assert.match(source, /function resampleInt16/);
+  assert.match(source, /event: 'mark'/);
+  assert.match(source, /twilioMarkSentCount/);
+  assert.match(source, /twilioMarkAckCount/);
   assert.match(source, /event: 'clear'/);
   assert.match(source, /serverInterruptedCount/);
   assert.match(source, /DEFAULT_INITIAL_MESSAGE = ''/);

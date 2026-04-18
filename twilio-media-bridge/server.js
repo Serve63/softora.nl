@@ -129,15 +129,43 @@ function bufferToInt16Array(buffer) {
   return out;
 }
 
-function downsampleInt16(input, fromRate, toRate) {
-  if (toRate >= fromRate || input.length === 0) return input;
-  const ratio = fromRate / toRate;
-  const outLen = Math.max(1, Math.floor(input.length / ratio));
-  const out = new Int16Array(outLen);
-  for (let i = 0; i < outLen; i += 1) {
-    const srcIndex = Math.min(input.length - 1, Math.floor(i * ratio));
-    out[i] = input[srcIndex];
+function resampleInt16(input, fromRate, toRate) {
+  if (input.length === 0 || !Number.isFinite(fromRate) || !Number.isFinite(toRate) || fromRate <= 0 || toRate <= 0) {
+    return input;
   }
+  if (fromRate === toRate) return input;
+
+  const ratio = fromRate / toRate;
+  const outLen = Math.max(1, Math.round(input.length / ratio));
+  const out = new Int16Array(outLen);
+
+  for (let i = 0; i < outLen; i += 1) {
+    const start = i * ratio;
+    const end = Math.min(input.length, (i + 1) * ratio);
+    let sum = 0;
+    let weight = 0;
+    const left = Math.floor(start);
+    const right = Math.ceil(end);
+
+    for (let sourceIndex = left; sourceIndex < right; sourceIndex += 1) {
+      const clippedIndex = Math.min(input.length - 1, Math.max(0, sourceIndex));
+      const overlapStart = Math.max(start, sourceIndex);
+      const overlapEnd = Math.min(end, sourceIndex + 1);
+      const overlap = Math.max(0, overlapEnd - overlapStart);
+      if (overlap <= 0) continue;
+      sum += input[clippedIndex] * overlap;
+      weight += overlap;
+    }
+
+    if (weight > 0) {
+      out[i] = Math.max(-32768, Math.min(32767, Math.round(sum / weight)));
+      continue;
+    }
+
+    const fallbackIndex = Math.min(input.length - 1, Math.max(0, Math.round(start)));
+    out[i] = input[fallbackIndex];
+  }
+
   return out;
 }
 
@@ -389,6 +417,8 @@ wss.on('connection', (twilioWs, _request, url) => {
     geminiAudioOutCount: 0,
     audioStreamEndCount: 0,
     twilioClearCount: 0,
+    twilioMarkSentCount: 0,
+    twilioMarkAckCount: 0,
     bargeInCount: 0,
     serverInterruptedCount: 0,
     droppedGeminiAudioChunkCount: 0,
@@ -404,6 +434,8 @@ wss.on('connection', (twilioWs, _request, url) => {
   let geminiAudioOutCount = 0;
   let suppressGeminiAudioUntilMs = 0;
   let lastGeminiAudioSentAtMs = 0;
+  let nextPlaybackMarkId = 1;
+  const pendingPlaybackMarks = new Set();
   const callerSpeechState = createSpeechTurnState({
     rmsThreshold: CALLER_SPEECH_RMS_THRESHOLD,
     startFrames: CALLER_SPEECH_START_FRAMES,
@@ -452,13 +484,26 @@ wss.on('connection', (twilioWs, _request, url) => {
           media: { payload },
         })
       );
+      lastGeminiAudioSentAtMs = Date.now();
       geminiAudioOutCount += 1;
       sessionSummary.geminiAudioOutCount = geminiAudioOutCount;
+      const markName = `gemini-${nextPlaybackMarkId}`;
+      nextPlaybackMarkId += 1;
+      pendingPlaybackMarks.add(markName);
+      twilioWs.send(
+        JSON.stringify({
+          event: 'mark',
+          streamSid,
+          mark: { name: markName },
+        })
+      );
+      sessionSummary.twilioMarkSentCount += 1;
     }
   }
 
   function clearTwilioBufferedAudio(reason = 'unknown') {
     pendingUlawB64Out.length = 0;
+    pendingPlaybackMarks.clear();
     if (!streamSid || twilioWs.readyState !== WebSocket.OPEN) return;
     twilioWs.send(
       JSON.stringify({
@@ -474,6 +519,7 @@ wss.on('connection', (twilioWs, _request, url) => {
 
   function isGeminiPlaybackLikelyActive(nowMs = Date.now()) {
     return (
+      pendingPlaybackMarks.size > 0 ||
       pendingUlawB64Out.length > 0 ||
       (lastGeminiAudioSentAtMs > 0 && nowMs - lastGeminiAudioSentAtMs <= GEMINI_PLAYBACK_ACTIVE_WINDOW_MS)
     );
@@ -497,6 +543,17 @@ wss.on('connection', (twilioWs, _request, url) => {
       lastGeminiAudioSentAtMs = nowMs;
       geminiAudioOutCount += 1;
       sessionSummary.geminiAudioOutCount = geminiAudioOutCount;
+      const markName = `gemini-${nextPlaybackMarkId}`;
+      nextPlaybackMarkId += 1;
+      pendingPlaybackMarks.add(markName);
+      twilioWs.send(
+        JSON.stringify({
+          event: 'mark',
+          streamSid,
+          mark: { name: markName },
+        })
+      );
+      sessionSummary.twilioMarkSentCount += 1;
       return;
     }
     if (twilioWs.readyState !== WebSocket.OPEN) return;
@@ -597,8 +654,8 @@ wss.on('connection', (twilioWs, _request, url) => {
         if (!pcmBuffer.length) return;
         const sampleRate = parsePcmRateFromMime(audio.mimeType);
         const pcm16 = bufferToInt16Array(pcmBuffer);
-        const downsampled = downsampleInt16(pcm16, sampleRate, 8000);
-        const ulaw = mulaw.encode(downsampled);
+        const resampled = resampleInt16(pcm16, sampleRate, 8000);
+        const ulaw = mulaw.encode(resampled);
         const payload = Buffer.from(ulaw).toString('base64');
         enqueueGeminiAudioToTwilio(payload);
       } catch (error) {
@@ -641,6 +698,13 @@ wss.on('connection', (twilioWs, _request, url) => {
         console.log(`[Bridge] Twilio start streamSid=${streamSid || '(leeg)'}`);
       }
       flushPendingUlawOut();
+      return;
+    }
+    if (event === 'mark') {
+      const markName = String(msg.mark?.name || '').trim();
+      if (markName && pendingPlaybackMarks.delete(markName)) {
+        sessionSummary.twilioMarkAckCount += 1;
+      }
       return;
     }
     if (event === 'stop') {
