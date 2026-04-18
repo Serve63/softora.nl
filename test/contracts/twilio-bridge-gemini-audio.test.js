@@ -207,8 +207,8 @@ test('twilio media bridge defaults target the current Gemini Live model without 
   assert.match(source, /event: 'clear'/);
   assert.match(source, /serverInterruptedCount/);
   assert.match(source, /AMBIENT_ENABLED \|\| 'true'/);
-  assert.match(source, /AMBIENT_NOISE_LEVEL \|\| 0\.22/);
-  assert.match(source, /AMBIENT_DUCK_LEVEL \|\| 0\.1/);
+  assert.match(source, /AMBIENT_NOISE_LEVEL \|\| 0\.6/);
+  assert.match(source, /AMBIENT_DUCK_LEVEL \|\| 0\.24/);
   assert.match(source, /INPUT_AUDIO_FLUSH_DELAY_MS \|\| 900/);
   assert.match(source, /NOISE_GATE_RMS \|\| 120/);
   assert.match(source, /audioStreamEnd: true/);

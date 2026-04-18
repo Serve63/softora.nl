@@ -92,11 +92,11 @@ const AMBIENT_ONLY_MODE = /^(1|true|yes)$/i.test(String(process.env.AMBIENT_ONLY
 const AMBIENT_ASSET_PATH = String(process.env.AMBIENT_ASSET_PATH || '').trim();
 const AMBIENT_NOISE_LEVEL = Math.max(
   0,
-  Math.min(1, Number(process.env.AMBIENT_NOISE_LEVEL || 0.22) || 0.22)
+  Math.min(1, Number(process.env.AMBIENT_NOISE_LEVEL || 0.6) || 0.6)
 );
 const AMBIENT_DUCK_LEVEL = Math.max(
   0,
-  Math.min(1, Number(process.env.AMBIENT_DUCK_LEVEL || 0.1) || 0.1)
+  Math.min(1, Number(process.env.AMBIENT_DUCK_LEVEL || 0.24) || 0.24)
 );
 const INPUT_AUDIO_FLUSH_DELAY_MS = Math.max(
   250,

@@ -42,7 +42,10 @@ const murmurLp = { value: 0 };
 const murmurHp = { input: 0, output: 0 };
 const hissLp = { value: 0 };
 let clickEnergy = 0;
+let rustleEnergy = 0;
+let deskTonePhase = 0;
 let nextClickAt = Math.floor(SAMPLE_RATE * (0.2 + rand() * 0.8));
+let nextRustleAt = Math.floor(SAMPLE_RATE * (1.0 + rand() * 2.5));
 
 for (let i = 0; i < TOTAL_SAMPLES; i += 1) {
   const t = i / SAMPLE_RATE;
@@ -59,23 +62,33 @@ for (let i = 0; i < TOTAL_SAMPLES; i += 1) {
     0.04 * Math.sin((2 * Math.PI * t) / 4.1 + 2.2);
 
   if (i >= nextClickAt) {
-    clickEnergy = 0.05 + rand() * 0.08;
-    nextClickAt = i + Math.floor(SAMPLE_RATE * (0.18 + rand() * 1.1));
+    clickEnergy = 0.12 + rand() * 0.18;
+    nextClickAt = i + Math.floor(SAMPLE_RATE * (0.12 + rand() * 0.9));
   }
 
-  const keyboardClick = clickEnergy * (0.55 + 0.45 * rand()) * (rand() > 0.4 ? 1 : -1);
-  clickEnergy *= 0.91;
+  if (i >= nextRustleAt) {
+    rustleEnergy = 0.07 + rand() * 0.11;
+    nextRustleAt = i + Math.floor(SAMPLE_RATE * (1.1 + rand() * 3.4));
+  }
+
+  const keyboardClick = clickEnergy * (0.8 + 0.2 * rand()) * (rand() > 0.35 ? 1 : -1);
+  clickEnergy *= 0.84;
+  rustleEnergy *= 0.992;
+  deskTonePhase += 2 * Math.PI * (680 + rand() * 190) / SAMPLE_RATE;
+  if (deskTonePhase > 2 * Math.PI) deskTonePhase -= 2 * Math.PI;
+  const deskBeep = rustleEnergy * Math.sin(deskTonePhase);
+  const paperRustle = rustleEnergy * chatterBand * 0.9;
 
   const hvacHum =
-    0.018 * Math.sin(2 * Math.PI * 120 * t) +
-    0.008 * Math.sin(2 * Math.PI * 240 * t) +
-    0.004 * Math.sin(2 * Math.PI * 360 * t);
+    0.012 * Math.sin(2 * Math.PI * 180 * t) +
+    0.01 * Math.sin(2 * Math.PI * 360 * t) +
+    0.006 * Math.sin(2 * Math.PI * 720 * t);
 
-  const roomTone = roomNoise * 0.09;
-  const distantMurmur = chatterBand * murmurEnvelope * 0.2;
-  const air = hissNoise * 0.018;
+  const roomTone = roomNoise * 0.12;
+  const distantMurmur = chatterBand * murmurEnvelope * 0.28;
+  const air = hissNoise * 0.024;
 
-  samples[i] = roomTone + distantMurmur + air + hvacHum + keyboardClick;
+  samples[i] = roomTone + distantMurmur + air + hvacHum + keyboardClick + deskBeep + paperRustle;
 }
 
 let mean = 0;
@@ -97,7 +110,7 @@ let peak = 0;
 for (const sample of samples) {
   peak = Math.max(peak, Math.abs(sample));
 }
-const targetPeak = 16000;
+const targetPeak = 22000;
 const scale = peak > 0 ? targetPeak / peak : 1;
 
 const out = Buffer.alloc(TOTAL_SAMPLES * 2);
