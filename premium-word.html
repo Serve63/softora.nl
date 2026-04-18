@@ -328,10 +328,6 @@
                 <div class="word-app">
                     <div class="word-ribbon" id="wordRibbon" role="toolbar" aria-label="Document opmaak">
                         <div class="ribbon-group">
-                            <button type="button" class="ribbon-btn" data-cmd="undo" title="Ongedaan maken">Ongedaan</button>
-                            <button type="button" class="ribbon-btn" data-cmd="redo" title="Opnieuw">Opnieuw</button>
-                        </div>
-                        <div class="ribbon-group">
                             <button type="button" class="ribbon-btn" data-cmd="bold" title="Vet"><strong>B</strong></button>
                             <button type="button" class="ribbon-btn" data-cmd="italic" title="Cursief"><em>I</em></button>
                             <button type="button" class="ribbon-btn" data-cmd="underline" title="Onderstrepen"><span style="text-decoration:underline">U</span></button>
@@ -357,21 +353,6 @@
                             <input type="color" class="ribbon-color" id="wordForeColor" value="#111827" title="Tekstkleur" aria-label="Tekstkleur">
                             <span class="ribbon-label">Markeer</span>
                             <input type="color" class="ribbon-color" id="wordHiliteColor" value="#fef08a" title="Markeren" aria-label="Markeerkleur">
-                        </div>
-                        <div class="ribbon-group">
-                            <button type="button" class="ribbon-btn" data-cmd="createLink" title="Hyperlink">Link</button>
-                            <button type="button" class="ribbon-btn" data-cmd="removeFormat" title="Opmaak wissen">Wis opmaak</button>
-                        </div>
-                        <div class="ribbon-group">
-                            <span class="ribbon-label">Grootte</span>
-                            <select class="ribbon-select" id="wordFontSize" aria-label="Lettergrootte">
-                                <option value="2">Klein</option>
-                                <option value="3" selected>Standaard</option>
-                                <option value="4">Groter</option>
-                                <option value="5">Groot</option>
-                                <option value="6">Extra</option>
-                                <option value="7">Max</option>
-                            </select>
                         </div>
                     </div>
                     <div class="word-page-outer">
@@ -400,7 +381,6 @@
             const ribbon = document.getElementById('wordRibbon');
             const forePick = document.getElementById('wordForeColor');
             const hilitePick = document.getElementById('wordHiliteColor');
-            const fontSizeSelect = document.getElementById('wordFontSize');
             if (!editor || !ribbon) return;
 
             function exec(cmd, value) {
@@ -422,11 +402,6 @@
                 e.preventDefault();
                 const cmd = btn.getAttribute('data-cmd');
                 const val = btn.getAttribute('data-val');
-                if (cmd === 'createLink') {
-                    var url = window.prompt('Voer een URL in (https://…)', 'https://');
-                    if (url) exec('createLink', url);
-                    return;
-                }
                 if (cmd === 'formatBlock' && val) {
                     exec('formatBlock', val);
                     return;
@@ -444,12 +419,6 @@
                     exec('hiliteColor', hilitePick.value);
                 });
             }
-            if (fontSizeSelect) {
-                fontSizeSelect.addEventListener('change', function () {
-                    exec('fontSize', fontSizeSelect.value);
-                });
-            }
-
             async function fetchUiStateGet(scope) {
                 const encodedScope = encodeURIComponent(String(scope || ''));
                 const urls = [
