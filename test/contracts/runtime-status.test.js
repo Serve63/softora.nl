@@ -81,3 +81,18 @@ test('runtime status service exposes stable dependency and runtime payloads', ()
     realCallUpdates: 1,
   });
 });
+
+test('runtime status marks Twilio configured when regional API keys are present', () => {
+  const service = createRuntimeStatusService({
+    env: {
+      TWILIO_ACCOUNT_SID: 'AC123',
+      TWILIO_API_KEY_SID: 'SK123',
+      TWILIO_API_KEY_SECRET: 'secret',
+    },
+    getColdcallingProvider: () => 'twilio',
+    normalizeString: (value) => String(value || '').trim(),
+    getMissingEnvVars: () => [],
+  });
+
+  assert.equal(service.getAiStatus().twilioConfigured, true);
+});

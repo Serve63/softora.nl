@@ -87,6 +87,23 @@ test('call provider recording helpers expose twilio auth, urls and preferred rec
   assert.equal(helpers.getTwilioFromNumberForStack('openai'), '+31611111111');
 });
 
+test('call provider recording helpers prefer regional Twilio API keys when configured', () => {
+  const helpers = createHelpers({
+    env: {
+      TWILIO_API_KEY_SID: 'SKregional123',
+      TWILIO_API_KEY_SECRET: 'regional-secret',
+      TWILIO_AUTH_TOKEN: '',
+    },
+  });
+
+  const decoded = Buffer.from(
+    helpers.getTwilioBasicAuthorizationHeader().replace(/^Basic\s+/i, ''),
+    'base64'
+  ).toString('utf8');
+
+  assert.equal(decoded, 'SKregional123:regional-secret');
+});
+
 test('call provider recording helpers normalize references and resolve preferred proxy urls', () => {
   const helpers = createHelpers();
 

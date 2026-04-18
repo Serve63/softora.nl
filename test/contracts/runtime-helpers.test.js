@@ -39,6 +39,25 @@ test('runtime helpers resolve coldcalling providers and missing env vars', () =>
   assert.equal(helpers.inferCallProvider('CA1234567890abcdef1234567890abcdef', 'retell'), 'twilio');
 });
 
+test('runtime helpers accept regional Twilio API keys as a valid realtime calling setup', () => {
+  const helpers = createRuntimeHelpers({
+    env: {
+      COLDCALLING_PROVIDER: 'twilio_media',
+      TWILIO_ACCOUNT_SID: 'AC123',
+      TWILIO_API_KEY_SID: 'SK123',
+      TWILIO_API_KEY_SECRET: 'secret',
+      TWILIO_FROM_NUMBER: '+31600000000',
+    },
+    normalizeString,
+    normalizeColdcallingStack: (value) => normalizeString(value).toLowerCase(),
+    parseNumberSafe,
+  });
+
+  assert.equal(helpers.isTwilioColdcallingConfigured(), true);
+  assert.equal(helpers.isTwilioStatusApiConfigured(), true);
+  assert.deepEqual(helpers.getMissingEnvVars('twilio'), []);
+});
+
 test('runtime helpers normalize booleans, dates, times and currency labels', () => {
   const helpers = createRuntimeHelpers({
     normalizeString,

@@ -23,6 +23,27 @@ function readBoundedNumberEnv(value, fallback, min, max) {
   return Math.max(min, Math.min(max, parsed));
 }
 
+function getDefaultTwilioEdgeForRegion(region) {
+  const normalizedRegion = normalizeString(region).toLowerCase();
+  if (normalizedRegion === 'ie1') return 'dublin';
+  if (normalizedRegion === 'au1') return 'sydney';
+  if (normalizedRegion === 'us1') return 'ashburn';
+  return '';
+}
+
+function buildTwilioApiBaseUrl(env) {
+  const explicitBaseUrl = normalizeString(env.TWILIO_API_BASE_URL || '');
+  if (explicitBaseUrl) return explicitBaseUrl;
+
+  const region = normalizeString(env.TWILIO_API_REGION || '').toLowerCase();
+  if (!region) return 'https://api.twilio.com';
+
+  const edge = normalizeString(env.TWILIO_API_EDGE || getDefaultTwilioEdgeForRegion(region)).toLowerCase();
+  if (!edge) return 'https://api.twilio.com';
+
+  return `https://api.${edge}.${region}.twilio.com`;
+}
+
 function loadRuntimeEnv(env = process.env) {
   const safeEnv = env && typeof env === 'object' ? env : {};
   const mailSmtpHostSource =
@@ -49,7 +70,7 @@ function loadRuntimeEnv(env = process.env) {
     },
     ai: {
       retellApiBaseUrl: safeEnv.RETELL_API_BASE_URL || 'https://api.retellai.com',
-      twilioApiBaseUrl: safeEnv.TWILIO_API_BASE_URL || 'https://api.twilio.com',
+      twilioApiBaseUrl: buildTwilioApiBaseUrl(safeEnv),
       openaiApiBaseUrl: safeEnv.OPENAI_API_BASE_URL || 'https://api.openai.com/v1',
       openaiModel: safeEnv.OPENAI_MODEL || 'gpt-4o-mini',
       openaiImageModel:
@@ -66,7 +87,7 @@ function loadRuntimeEnv(env = process.env) {
         safeEnv.CLAUDE_DOSSIER_MODEL ||
         'claude-opus-4-6',
       verboseCallWebhookLogs: readBooleanEnvFlag(safeEnv.VERBOSE_CALL_WEBHOOK_LOGS),
-      defaultTwilioMediaWsUrl: 'wss://twilio-media-bridge-pjzd.onrender.com/twilio-media',
+      defaultTwilioMediaWsUrl: 'wss://twilio-media-bridge-ln3f.onrender.com/twilio-media',
     },
     websiteGeneration: {
       provider: normalizeString(

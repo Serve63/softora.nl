@@ -166,7 +166,8 @@ function createCallProviderHelpers(options = {}) {
     ) {
       return {
         cause: 'wrong twilio credentials',
-        explanation: 'TWILIO_ACCOUNT_SID of TWILIO_AUTH_TOKEN lijkt ongeldig.',
+        explanation:
+          'Twilio credentials lijken ongeldig. Controleer TWILIO_ACCOUNT_SID plus TWILIO_AUTH_TOKEN of de regionale TWILIO_API_KEY_SID/TWILIO_API_KEY_SECRET.',
       };
     }
 

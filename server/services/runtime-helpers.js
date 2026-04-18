@@ -26,14 +26,35 @@ function createRuntimeHelpers(options = {}) {
     return getRequiredRetellEnv().every((key) => normalizeString(env[key]));
   };
 
-  const getRequiredTwilioEnv = () => ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM_NUMBER'];
+  const hasTwilioRegionalApiKeyPair = () => {
+    return Boolean(
+      normalizeString(env.TWILIO_API_KEY_SID) && normalizeString(env.TWILIO_API_KEY_SECRET)
+    );
+  };
+
+  const hasTwilioLegacyAuth = () => {
+    return Boolean(normalizeString(env.TWILIO_ACCOUNT_SID) && normalizeString(env.TWILIO_AUTH_TOKEN));
+  };
+
+  const getRequiredTwilioEnv = () => [
+    'TWILIO_ACCOUNT_SID',
+    'TWILIO_FROM_NUMBER',
+    'TWILIO_AUTH_TOKEN of TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET',
+  ];
 
   const isTwilioColdcallingConfigured = () => {
-    return getRequiredTwilioEnv().every((key) => normalizeString(env[key]));
+    return Boolean(
+      normalizeString(env.TWILIO_ACCOUNT_SID) &&
+        normalizeString(env.TWILIO_FROM_NUMBER) &&
+        (hasTwilioLegacyAuth() || hasTwilioRegionalApiKeyPair())
+    );
   };
 
   const isTwilioStatusApiConfigured = () => {
-    return Boolean(normalizeString(env.TWILIO_ACCOUNT_SID) && normalizeString(env.TWILIO_AUTH_TOKEN));
+    return Boolean(
+      normalizeString(env.TWILIO_ACCOUNT_SID) &&
+        (hasTwilioLegacyAuth() || hasTwilioRegionalApiKeyPair())
+    );
   };
 
   const getColdcallingProvider = () => {
@@ -53,7 +74,13 @@ function createRuntimeHelpers(options = {}) {
 
   const getMissingEnvVars = (provider = getColdcallingProvider()) => {
     if (provider === 'twilio') {
-      return getRequiredTwilioEnv().filter((key) => !normalizeString(env[key]));
+      const missing = [];
+      if (!normalizeString(env.TWILIO_ACCOUNT_SID)) missing.push('TWILIO_ACCOUNT_SID');
+      if (!normalizeString(env.TWILIO_FROM_NUMBER)) missing.push('TWILIO_FROM_NUMBER');
+      if (!hasTwilioLegacyAuth() && !hasTwilioRegionalApiKeyPair()) {
+        missing.push('TWILIO_AUTH_TOKEN of TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET');
+      }
+      return missing;
     }
     if (provider === 'retell') {
       return getRequiredRetellEnv().filter((key) => !normalizeString(env[key]));

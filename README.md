@@ -51,9 +51,17 @@ VERBOSE_CALL_WEBHOOK_LOGS=true
 TWILIO_OUTBOUND_TWIML_URL=https://jouwdomein.nl/api/twilio/voice
 TWILIO_STATUS_CALLBACK_URL=https://jouwdomein.nl/api/twilio/status
 TWILIO_WEBHOOK_SECRET=your_twilio_webhook_secret
-TWILIO_MEDIA_WS_URL=wss://twilio-media-bridge-pjzd.onrender.com/twilio-media
+TWILIO_MEDIA_WS_URL=wss://twilio-media-bridge-ln3f.onrender.com/twilio-media
 TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE=wss://example.com/twilio-media
 TWILIO_FROM_NUMBER_GEMINI_FLASH_3_1_LIVE=+31xxxxxxxxx
+
+# Voor Twilio Regions/IE1 (aanbevolen voor NL + Frankfurt)
+TWILIO_API_KEY_SID=SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_API_KEY_SECRET=your_twilio_api_key_secret
+TWILIO_API_REGION=ie1
+TWILIO_API_EDGE=dublin
+# alternatief:
+# TWILIO_API_BASE_URL=https://api.dublin.ie1.twilio.com
 ```
 
 ### Extra env vars voor `Voer opdracht uit` automation (Actieve Opdrachten)

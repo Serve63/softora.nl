@@ -30,10 +30,20 @@ function createCallProviderRecordingHelpers(options = {}) {
     return new URL(String(relativePath || '').replace(/^\/+/, ''), normalizedBase);
   }
 
+  function hasTwilioRegionalApiKeyPair() {
+    return Boolean(
+      normalizeString(env.TWILIO_API_KEY_SID) && normalizeString(env.TWILIO_API_KEY_SECRET)
+    );
+  }
+
   function getTwilioBasicAuthorizationHeader() {
-    const accountSid = normalizeString(env.TWILIO_ACCOUNT_SID);
-    const authToken = normalizeString(env.TWILIO_AUTH_TOKEN);
-    const basic = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const username = hasTwilioRegionalApiKeyPair()
+      ? normalizeString(env.TWILIO_API_KEY_SID)
+      : normalizeString(env.TWILIO_ACCOUNT_SID);
+    const password = hasTwilioRegionalApiKeyPair()
+      ? normalizeString(env.TWILIO_API_KEY_SECRET)
+      : normalizeString(env.TWILIO_AUTH_TOKEN);
+    const basic = Buffer.from(`${username}:${password}`).toString('base64');
     return `Basic ${basic}`;
   }
 

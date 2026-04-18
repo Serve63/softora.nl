@@ -164,7 +164,11 @@ function createSendColdcallingStatusResponse(deps) {
         if (cached) return sendCached('twilio');
         return res
           .status(500)
-          .json({ ok: false, error: 'TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN ontbreken op server.' });
+          .json({
+            ok: false,
+            error:
+              'Twilio credentials ontbreken op server. Verwacht TWILIO_ACCOUNT_SID plus TWILIO_AUTH_TOKEN of TWILIO_API_KEY_SID/TWILIO_API_KEY_SECRET.',
+          });
       }
 
       try {
@@ -391,7 +395,11 @@ function registerColdcallingRoutes(app, deps) {
     if (!deps.isTwilioStatusApiConfigured()) {
       return res
         .status(500)
-        .json({ ok: false, error: 'TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN ontbreken op server.' });
+        .json({
+          ok: false,
+          error:
+            'Twilio credentials ontbreken op server. Verwacht TWILIO_ACCOUNT_SID plus TWILIO_AUTH_TOKEN of TWILIO_API_KEY_SID/TWILIO_API_KEY_SECRET.',
+        });
     }
 
     const callId = deps.normalizeString(req.query?.callId || '');

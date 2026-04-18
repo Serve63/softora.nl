@@ -65,3 +65,16 @@ test('loadRuntimeEnv preserves legacy boolean and numeric fallback rules', () =>
   assert.equal(runtimeEnv.mail.imapPollCooldownMs, 5_000);
   assert.equal(runtimeEnv.demoConfirmationTaskEnabled, true);
 });
+
+test('loadRuntimeEnv derives the Twilio IE1 API host from region and edge env vars', () => {
+  const runtimeEnv = loadRuntimeEnv({
+    TWILIO_API_REGION: 'ie1',
+    TWILIO_API_EDGE: 'dublin',
+  });
+
+  assert.equal(runtimeEnv.ai.twilioApiBaseUrl, 'https://api.dublin.ie1.twilio.com');
+  assert.equal(
+    runtimeEnv.ai.defaultTwilioMediaWsUrl,
+    'wss://twilio-media-bridge-ln3f.onrender.com/twilio-media'
+  );
+});

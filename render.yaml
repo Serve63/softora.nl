@@ -29,6 +29,14 @@ services:
         value: core
       - key: TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE
         value: wss://twilio-media-bridge-ln3f.onrender.com/twilio-media
+      - key: TWILIO_API_KEY_SID
+        sync: false
+      - key: TWILIO_API_KEY_SECRET
+        sync: false
+      - key: TWILIO_API_REGION
+        value: ie1
+      - key: TWILIO_API_EDGE
+        value: dublin
   - type: web
     name: twilio-media-bridge-pjzd
     runtime: node

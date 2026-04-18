@@ -23,6 +23,16 @@ function createRuntimeStatusService(deps = {}) {
     generatedAgendaAppointments = [],
   } = deps;
 
+  function hasTwilioRegionalApiKeyPair() {
+    return Boolean(
+      normalizeString(env.TWILIO_API_KEY_SID) && normalizeString(env.TWILIO_API_KEY_SECRET)
+    );
+  }
+
+  function hasTwilioLegacyAuth() {
+    return Boolean(normalizeString(env.TWILIO_ACCOUNT_SID) && normalizeString(env.TWILIO_AUTH_TOKEN));
+  }
+
   function getSupabaseStatus() {
     return {
       enabled: isSupabaseConfigured(),
@@ -53,7 +63,8 @@ function createRuntimeStatusService(deps = {}) {
       anthropicConfigured: Boolean(normalizeString(env.ANTHROPIC_API_KEY || env.CLAUDE_API_KEY)),
       retellConfigured: Boolean(normalizeString(env.RETELL_API_KEY)),
       twilioConfigured: Boolean(
-        normalizeString(env.TWILIO_ACCOUNT_SID) && normalizeString(env.TWILIO_AUTH_TOKEN)
+        normalizeString(env.TWILIO_ACCOUNT_SID) &&
+          (hasTwilioLegacyAuth() || hasTwilioRegionalApiKeyPair())
       ),
       missingProviderEnv: getMissingEnvVars(getColdcallingProvider()),
     };
