@@ -86,6 +86,20 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
 });
 
+test('premium website houdt footer-links direct klikbaar door footer buiten content-visibility defer te houden', () => {
+  const filePath = path.join(__dirname, '../../premium-website.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(
+    source,
+    /@supports \(content-visibility: auto\) \{[\s\S]*section:not\(\.hero\) \{[\s\S]*content-visibility:\s*auto;[\s\S]*contain-intrinsic-size:\s*1000px;[\s\S]*\}[\s\S]*\}/s
+  );
+  assert.doesNotMatch(
+    source,
+    /@supports \(content-visibility: auto\) \{[\s\S]*footer \{[\s\S]*content-visibility:\s*auto;/s
+  );
+});
+
 test('premium website hero is full-bleed workspace-foto met donkere overlay en leesbare tekst', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
