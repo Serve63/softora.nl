@@ -47,7 +47,7 @@ const GEMINI_REQUIRE_CUSTOM_PROMPT = /^(1|true|yes)$/i.test(
 );
 const GEMINI_AUTO_START = !/^(0|false|no)$/i.test(String(process.env.GEMINI_AUTO_START || 'true'));
 const GEMINI_VAD_START_SENSITIVITY = String(
-  process.env.GEMINI_VAD_START_SENSITIVITY || 'START_SENSITIVITY_HIGH'
+  process.env.GEMINI_VAD_START_SENSITIVITY || 'START_SENSITIVITY_LOW'
 ).trim();
 const GEMINI_VAD_END_SENSITIVITY = String(
   process.env.GEMINI_VAD_END_SENSITIVITY || 'END_SENSITIVITY_LOW'
@@ -62,11 +62,11 @@ const GEMINI_VAD_SILENCE_DURATION_MS = Math.max(
 );
 const CALLER_SPEECH_RMS_THRESHOLD = Math.max(
   50,
-  Math.min(12000, Number(process.env.CALLER_SPEECH_RMS_THRESHOLD || 900) || 900)
+  Math.min(12000, Number(process.env.CALLER_SPEECH_RMS_THRESHOLD || 1200) || 1200)
 );
 const CALLER_SPEECH_START_FRAMES = Math.max(
   1,
-  Math.min(20, Number(process.env.CALLER_SPEECH_START_FRAMES || 3) || 3)
+  Math.min(20, Number(process.env.CALLER_SPEECH_START_FRAMES || 4) || 4)
 );
 const CALLER_SPEECH_END_SILENCE_MS = Math.max(
   100,
@@ -74,7 +74,11 @@ const CALLER_SPEECH_END_SILENCE_MS = Math.max(
 );
 const CALLER_BARGE_IN_SUPPRESSION_MS = Math.max(
   0,
-  Math.min(3000, Number(process.env.CALLER_BARGE_IN_SUPPRESSION_MS || 450) || 450)
+  Math.min(3000, Number(process.env.CALLER_BARGE_IN_SUPPRESSION_MS || 220) || 220)
+);
+const GEMINI_PLAYBACK_ACTIVE_WINDOW_MS = Math.max(
+  100,
+  Math.min(3000, Number(process.env.GEMINI_PLAYBACK_ACTIVE_WINDOW_MS || 900) || 900)
 );
 const DEFAULT_SYSTEM_PROMPT = 'Je bent een vriendelijke Nederlandse sales assistent. Praat kort, helder en natuurlijk.';
 const CUSTOM_SYSTEM_PROMPT = String(process.env.GEMINI_SYSTEM_PROMPT || '').replace(/\r/g, '').trim();
@@ -386,6 +390,7 @@ wss.on('connection', (twilioWs, _request, url) => {
     audioStreamEndCount: 0,
     twilioClearCount: 0,
     bargeInCount: 0,
+    serverInterruptedCount: 0,
     droppedGeminiAudioChunkCount: 0,
     geminiMessages: [],
     close: null,
@@ -397,8 +402,8 @@ wss.on('connection', (twilioWs, _request, url) => {
   let sentConfigError = false;
   let twilioMediaInCount = 0;
   let geminiAudioOutCount = 0;
-  let callerSpeechActive = false;
   let suppressGeminiAudioUntilMs = 0;
+  let lastGeminiAudioSentAtMs = 0;
   const callerSpeechState = createSpeechTurnState({
     rmsThreshold: CALLER_SPEECH_RMS_THRESHOLD,
     startFrames: CALLER_SPEECH_START_FRAMES,
@@ -467,10 +472,17 @@ wss.on('connection', (twilioWs, _request, url) => {
     }
   }
 
+  function isGeminiPlaybackLikelyActive(nowMs = Date.now()) {
+    return (
+      pendingUlawB64Out.length > 0 ||
+      (lastGeminiAudioSentAtMs > 0 && nowMs - lastGeminiAudioSentAtMs <= GEMINI_PLAYBACK_ACTIVE_WINDOW_MS)
+    );
+  }
+
   function enqueueGeminiAudioToTwilio(ulawB64) {
     if (!ulawB64) return;
     const nowMs = Date.now();
-    if (callerSpeechActive || nowMs < suppressGeminiAudioUntilMs) {
+    if (nowMs < suppressGeminiAudioUntilMs) {
       sessionSummary.droppedGeminiAudioChunkCount += 1;
       return;
     }
@@ -482,6 +494,7 @@ wss.on('connection', (twilioWs, _request, url) => {
           media: { payload: ulawB64 },
         })
       );
+      lastGeminiAudioSentAtMs = nowMs;
       geminiAudioOutCount += 1;
       sessionSummary.geminiAudioOutCount = geminiAudioOutCount;
       return;
@@ -568,8 +581,11 @@ wss.on('connection', (twilioWs, _request, url) => {
       serverContent &&
       (serverContent.interrupted || serverContent.interrupted === true)
     ) {
+      sessionSummary.serverInterruptedCount += 1;
       suppressGeminiAudioUntilMs = Date.now() + CALLER_BARGE_IN_SUPPRESSION_MS;
-      clearTwilioBufferedAudio('gemini-interrupted');
+      if (isGeminiPlaybackLikelyActive()) {
+        clearTwilioBufferedAudio('gemini-interrupted');
+      }
     }
 
     const audioParts = extractInlineAudioParts(msg);
@@ -643,8 +659,7 @@ wss.on('connection', (twilioWs, _request, url) => {
       const ulaw = Uint8Array.from(Buffer.from(payload, 'base64'));
       const pcm16 = mulaw.decode(ulaw);
       const speechState = callerSpeechState.processPcmFrame(pcm16, Date.now());
-      callerSpeechActive = speechState.speechActive;
-      if (speechState.speechStarted) {
+      if (speechState.speechStarted && isGeminiPlaybackLikelyActive()) {
         sessionSummary.bargeInCount += 1;
         suppressGeminiAudioUntilMs = Date.now() + CALLER_BARGE_IN_SUPPRESSION_MS;
         clearTwilioBufferedAudio('caller-speech-start');

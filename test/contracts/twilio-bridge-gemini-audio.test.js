@@ -142,8 +142,14 @@ test('twilio media bridge defaults target the current Gemini Live model without 
   assert.match(source, /DEFAULT_GEMINI_MODEL = 'gemini-3\.1-flash-live-preview'/);
   assert.match(source, /GEMINI_REQUIRE_CUSTOM_PROMPT \|\| 'false'/);
   assert.match(source, /GEMINI_AUTO_START \|\| 'true'/);
+  assert.match(source, /GEMINI_VAD_START_SENSITIVITY \|\| 'START_SENSITIVITY_LOW'/);
   assert.match(source, /activityHandling: 'START_OF_ACTIVITY_INTERRUPTS'/);
+  assert.match(source, /CALLER_SPEECH_RMS_THRESHOLD \|\| 1200/);
+  assert.match(source, /CALLER_SPEECH_START_FRAMES \|\| 4/);
+  assert.match(source, /CALLER_BARGE_IN_SUPPRESSION_MS \|\| 220/);
+  assert.match(source, /GEMINI_PLAYBACK_ACTIVE_WINDOW_MS \|\| 900/);
   assert.match(source, /event: 'clear'/);
+  assert.match(source, /serverInterruptedCount/);
   assert.match(source, /DEFAULT_INITIAL_MESSAGE = 'De call is nu verbonden\. Begin direct met het gesprek\.'/);
   assert.match(source, /gemini-live-2\.5-flash-preview', DEFAULT_GEMINI_MODEL/);
 });
