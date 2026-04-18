@@ -49,6 +49,16 @@ function buildGeminiInitialClientContentPayload(text) {
   };
 }
 
+function buildGeminiInitialRealtimeInputPayload(text) {
+  const normalizedText = String(text || '').replace(/\r/g, '').trim();
+  if (!normalizedText) return null;
+  return {
+    realtimeInput: {
+      text: normalizedText,
+    },
+  };
+}
+
 function extractInlineAudioParts(payload) {
   const out = [];
   const root = payload && typeof payload === 'object' ? payload : {};
@@ -69,6 +79,7 @@ function extractInlineAudioParts(payload) {
 
 module.exports = {
   buildGeminiInitialClientContentPayload,
+  buildGeminiInitialRealtimeInputPayload,
   buildGeminiSetupPayload,
   extractInlineAudioParts,
   parsePcmRateFromMime,

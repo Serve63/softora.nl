@@ -6,7 +6,7 @@ const express = require('express');
 const WebSocket = require('ws');
 const { mulaw } = require('alawmulaw');
 const {
-  buildGeminiInitialClientContentPayload,
+  buildGeminiInitialRealtimeInputPayload,
   buildGeminiSetupPayload: buildGeminiSetupEnvelope,
   extractInlineAudioParts,
   parsePcmRateFromMime,
@@ -117,7 +117,7 @@ function buildGeminiSetupPayload() {
     model: GEMINI_MODEL,
     voiceName: GEMINI_VOICE,
     systemPrompt: SYSTEM_PROMPT,
-    seedInitialHistory: GEMINI_AUTO_START && Boolean(INITIAL_MESSAGE),
+    seedInitialHistory: false,
   });
 }
 
@@ -342,6 +342,7 @@ wss.on('connection', (twilioWs, _request, url) => {
     geminiReady: false,
     twilioMediaInCount: 0,
     geminiAudioOutCount: 0,
+    audioStreamEndCount: 0,
     geminiMessages: [],
     close: null,
   };
@@ -352,6 +353,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   let sentConfigError = false;
   let twilioMediaInCount = 0;
   let geminiAudioOutCount = 0;
+  let inputFlushTimer = null;
 
   if (!GEMINI_API_KEY) {
     console.error('[Bridge] GEMINI_API_KEY/GOOGLE_API_KEY ontbreekt');
@@ -380,6 +382,25 @@ wss.on('connection', (twilioWs, _request, url) => {
   } catch {}
 
   const pendingUlawB64Out = [];
+
+  function clearInputFlushTimer() {
+    if (!inputFlushTimer) return;
+    clearTimeout(inputFlushTimer);
+    inputFlushTimer = null;
+  }
+
+  function scheduleInputAudioFlush() {
+    clearInputFlushTimer();
+    inputFlushTimer = setTimeout(() => {
+      inputFlushTimer = null;
+      if (!geminiReady || geminiWs.readyState !== WebSocket.OPEN) return;
+      geminiWs.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
+      sessionSummary.audioStreamEndCount += 1;
+      if (BRIDGE_VERBOSE_LOGS) {
+        console.log('[Bridge] audioStreamEnd naar Gemini verstuurd');
+      }
+    }, 1200);
+  }
 
   function flushPendingUlawOut() {
     while (
@@ -427,6 +448,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   function closeBoth(reason = 'unknown') {
     if (closed) return;
     closed = true;
+    clearInputFlushTimer();
     sessionSummary.close = sessionSummary.close || {
       reason,
       at: new Date().toISOString(),
@@ -469,7 +491,7 @@ wss.on('connection', (twilioWs, _request, url) => {
         console.log(`[Bridge] setupComplete stack=${stack}`);
       }
       if (GEMINI_AUTO_START && INITIAL_MESSAGE && !autoStartSent) {
-        const initialPayload = buildGeminiInitialClientContentPayload(INITIAL_MESSAGE);
+        const initialPayload = buildGeminiInitialRealtimeInputPayload(INITIAL_MESSAGE);
         if (initialPayload) {
           geminiWs.send(JSON.stringify(initialPayload));
           autoStartSent = true;
@@ -582,6 +604,7 @@ wss.on('connection', (twilioWs, _request, url) => {
             },
           };
       geminiWs.send(JSON.stringify(realtimePayload));
+      scheduleInputAudioFlush();
     } catch (error) {
       if (!sentConfigError) {
         sentConfigError = true;

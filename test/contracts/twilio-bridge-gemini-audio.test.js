@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const {
   buildGeminiInitialClientContentPayload,
+  buildGeminiInitialRealtimeInputPayload,
   buildGeminiSetupPayload,
   extractInlineAudioParts,
   parsePcmRateFromMime,
@@ -68,6 +69,15 @@ test('buildGeminiInitialClientContentPayload builds a first user turn for auto-s
     },
   });
   assert.equal(buildGeminiInitialClientContentPayload('   '), null);
+});
+
+test('buildGeminiInitialRealtimeInputPayload builds a direct text kick-off for auto-start', () => {
+  assert.deepEqual(buildGeminiInitialRealtimeInputPayload('  Begin nu het gesprek.  '), {
+    realtimeInput: {
+      text: 'Begin nu het gesprek.',
+    },
+  });
+  assert.equal(buildGeminiInitialRealtimeInputPayload('   '), null);
 });
 
 test('twilio media bridge defaults target the current Gemini Live model without requiring a custom prompt', () => {
