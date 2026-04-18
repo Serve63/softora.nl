@@ -2301,7 +2301,7 @@
             if (linkedOrderId) {
                 modalPrimaryBtn.hidden = false;
                 modalPrimaryBtn.textContent = 'Open dossier';
-                modalPrimaryBtn.disabled = workspaceBusy;
+                modalPrimaryBtn.disabled = workspaceBusy || workspacePendingCustomerCheck;
                 modalNoDealBtn.hidden = true;
                 modalNoDealBtn.disabled = true;
                 modalSecondaryBtn.textContent = 'Sluiten';
@@ -2326,7 +2326,7 @@
 
         if (linkedOrderId) {
             modalPrimaryBtn.textContent = 'Open dossier';
-            modalPrimaryBtn.disabled = workspaceBusy;
+            modalPrimaryBtn.disabled = workspaceBusy || workspacePendingCustomerCheck;
             syncWorkspaceExitControls();
             return;
         }
@@ -2968,6 +2968,7 @@
 
         if (!modalWorkspaceMode) {
             if (getLinkedOrderIdForAppointment(apt)) {
+                if (workspacePendingCustomerCheck) return;
                 openLinkedOrderDossierForAppointment(apt);
                 return;
             }
@@ -2978,6 +2979,7 @@
             return;
         }
         if (getLinkedOrderIdForAppointment(apt)) {
+            if (workspacePendingCustomerCheck) return;
             openLinkedOrderDossierForAppointment(apt);
             return;
         }
