@@ -564,6 +564,46 @@
             opacity: 0.92;
         }
 
+        .form-label .form-label-tip.form-label-tip--info {
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            margin-left: 0.4rem;
+            font-size: 0;
+            line-height: 0;
+            opacity: 1;
+        }
+
+        .form-label-info-wrap {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: help;
+            color: var(--text-secondary);
+            line-height: 0;
+        }
+
+        .form-label-info-wrap:hover,
+        .form-label-info-wrap:focus-visible {
+            color: var(--accent-light);
+            outline: none;
+        }
+
+        .form-label-info-wrap:focus-visible {
+            box-shadow: 0 0 0 2px rgba(139, 34, 82, 0.35);
+            border-radius: 999px;
+        }
+
+        .form-label-info-icon {
+            width: 0.95rem;
+            height: 0.95rem;
+            opacity: 0.88;
+        }
+
+        .form-label-info-wrap:hover .form-label-info-icon {
+            opacity: 1;
+        }
+
         .form-checkbox-row {
             display: flex;
             align-items: flex-start;
@@ -689,6 +729,24 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        .site-select-value .site-select-regio-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.32rem;
+            vertical-align: middle;
+        }
+
+        .site-select-value .site-select-regio-count-icon {
+            width: 0.92rem;
+            height: 0.92rem;
+            flex-shrink: 0;
+            opacity: 0.88;
+        }
+
+        .site-select-value .site-select-regio-count-num {
+            font-variant-numeric: tabular-nums;
         }
 
         .site-select-menu {
@@ -1971,7 +2029,7 @@
                     </div>
 
                     <div class="form-group form-group--regio">
-                        <label class="form-label" for="regio">Omstreken Oisterwijk<span class="form-label-tip" id="campaignRegioTip">TIP: Start dichtbij en breid het steeds verder uit.</span></label>
+                        <label class="form-label" for="regio">Omstreken Oisterwijk<span class="form-label-tip form-label-tip--info" id="campaignRegioTip"><span class="form-label-info-wrap" tabindex="0" role="img" aria-label="TIP: Start dichtbij en breid het steeds verder uit." title="TIP: Start dichtbij en breid het steeds verder uit."><svg class="form-label-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9.25"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5V16M12 8.25v.01"></path></svg></span></span></label>
                         <select class="form-select magnetic" id="regio">
                             <option value="unlimited" selected>Geen limiet</option>
                             <option value="auto">Automatisch</option>

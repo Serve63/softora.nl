@@ -3092,9 +3092,17 @@
     const regioEl = byId('regio');
     if (!tipEl || !regioEl) return;
     const isAuto = String(regioEl.value || '').trim() === AUTO_CAMPAIGN_REGIO_VALUE;
-    tipEl.textContent = isAuto
+    const tipText = isAuto
       ? 'Belt automatisch op volgorde van nabijheid.'
       : 'TIP: Start dichtbij en breid het steeds verder uit.';
+    const safeTip = escapeHtml(tipText);
+    tipEl.className = 'form-label-tip form-label-tip--info';
+    tipEl.innerHTML =
+      '<span class="form-label-info-wrap" tabindex="0" role="img" aria-label="' +
+      safeTip +
+      '" title="' +
+      safeTip +
+      '"><svg class="form-label-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9.25"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5V16M12 8.25v.01"></path></svg></span>';
   }
 
   function paintRegioLeadCountOnCustomSelectValue() {
@@ -3109,7 +3117,16 @@
     const radiusKm = resolveCampaignRegioRadiusKmForLeadCount(regioSel);
     const leads = getDialableLeadsForRegioCount();
     const count = countDialableLeadsWithinCampaignRegioRadius(leads, radiusKm);
-    valueEl.textContent = `${baseLabel} · ${count} Bedrijven`;
+    const n = Math.max(0, Math.floor(Number(count) || 0));
+    const safeLabel = escapeHtml(baseLabel);
+    const safeCount = String(n);
+    const buildingSvg =
+      '<svg class="site-select-regio-count-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V8l8-4 8 4v13"></path><path d="M4 21h16"></path><path d="M9 21v-4h6v4"></path><path d="M9 11h.01M12 11h.01M15 11h.01M9 15h.01M12 15h.01M15 15h.01"></path></svg>';
+    valueEl.innerHTML = `${safeLabel} · <span class="site-select-regio-count">${buildingSvg}<span class="site-select-regio-count-num">${safeCount}</span></span> Bedrijven`;
+    const trigger = valueEl.closest('.site-select-trigger');
+    if (trigger) {
+      trigger.setAttribute('aria-label', `Regio: ${baseLabel}, ${n} bedrijven`);
+    }
   }
 
   function hookRegioLeadCountCustomSelectSync() {
