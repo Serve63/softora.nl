@@ -319,10 +319,9 @@
             margin: 0 auto 1.1rem;
             padding: 0;
         }
-        .agenda-routing-bubble {
-            margin: 0;
-            max-width: none;
-            padding: 0;
+        /* Zelfde lopende tekst als Ruben-planning uitleg (onder de kalender) */
+        .agenda-routing-bubble,
+        .agenda-today-planning-body {
             font-family: 'Inter', sans-serif;
             font-size: 0.75rem;
             font-weight: 400;
@@ -334,10 +333,16 @@
             box-shadow: none;
         }
 
+        .agenda-routing-bubble {
+            margin: 0;
+            max-width: none;
+            padding: 0;
+        }
+
         .agenda-today-planning {
             max-width: 1240px;
             margin: 1.15rem auto 0;
-            padding: 0 0.2rem;
+            padding: 0;
         }
         .agenda-today-planning-title {
             font-family: 'Oswald', sans-serif;
@@ -350,16 +355,7 @@
             line-height: 1.2;
         }
         .agenda-today-planning-body {
-            font-family: 'Inter', sans-serif;
-            font-size: 0.875rem;
-            font-weight: 400;
-            line-height: 1.55;
-            color: var(--text-secondary);
-            background: none;
-            border: none;
-            border-radius: 0;
             padding: 0;
-            box-shadow: none;
         }
         .agenda-today-planning-body p {
             margin: 0 0 0.65rem 0;
@@ -1047,11 +1043,9 @@
             .agenda-routing-bubble-wrap {
                 margin-bottom: 0.95rem;
             }
-            .agenda-routing-bubble {
-                font-size: 0.72rem;
-            }
+            .agenda-routing-bubble,
             .agenda-today-planning-body {
-                font-size: 0.82rem;
+                font-size: 0.72rem;
             }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
             .calendar-day { min-height: 64px; }
