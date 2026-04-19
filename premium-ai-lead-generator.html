@@ -552,6 +552,18 @@
             margin-bottom: 0.8rem;
         }
 
+        .form-label .form-label-tip {
+            display: inline;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            text-transform: none;
+            color: var(--text-secondary);
+            margin-left: 0.35rem;
+            opacity: 0.92;
+        }
+
         .form-checkbox-row {
             display: flex;
             align-items: flex-start;
@@ -1908,7 +1920,7 @@
                     </div>
 
                     <div class="form-group form-group--regio">
-                        <label class="form-label">Omstreken Oisterwijk</label>
+                        <label class="form-label" for="regio">Omstreken Oisterwijk<span class="form-label-tip">tip: start van dichtbij naar verder, bereid het steeds verder uit</span></label>
                         <select class="form-select magnetic" id="regio">
                             <option value="unlimited" selected>Geen limiet</option>
                             <option value="10km">10 km</option>

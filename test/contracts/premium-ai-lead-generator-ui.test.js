@@ -23,6 +23,10 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<div class="form-group form-group--dispatch" id="callDispatchControlWrap">/);
   assert.match(pageSource, /<select class="form-select magnetic" id="callDispatchMode">/);
   assert.match(pageSource, /<select class="form-select magnetic" id="regio">/);
+  assert.match(
+    pageSource,
+    /<label class="form-label" for="regio">Omstreken Oisterwijk<span class="form-label-tip">tip: start van dichtbij naar verder, bereid het steeds verder uit<\/span><\/label>/
+  );
   assert.match(pageSource, /<select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">/);
   assert.match(pageSource, /<option value="websites" data-dot-color="accent" selected>Website's<\/option>/);
   assert.match(pageSource, /<option value="voice_software" data-dot-color="green" disabled>🔒 Voicesoftware<\/option>/);
@@ -68,6 +72,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     dashboardSource,
     /const agendaCapGroup = byId\('campaignFillAgendaWorkdays'\)\?\.closest\('\.form-group'\);[\s\S]*agendaCapGroup\.style\.gridRow = '2'/
   );
+  assert.match(dashboardSource, /function paintRegioLeadCountOnCustomSelectValue\(\)/);
+  assert.match(dashboardSource, /function hookRegioLeadCountCustomSelectSync\(\)/);
   assert.match(dashboardSource, /let controlWrap = byId\('leadListControlWrap'\);[\s\S]*if \(!controlWrap\)/);
   assert.match(dashboardSource, /let dispatchWrap = byId\('callDispatchControlWrap'\);[\s\S]*if \(!dispatchWrap\)/);
   assert.match(dashboardSource, /let coldcallingDashboardBootstrapPayload = null;/);
