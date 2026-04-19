@@ -551,12 +551,19 @@
             const link = sidebar.querySelector('[data-sidebar-key="' + key + '"]');
             if (!link) return;
             link.classList.add("sidebar-link--coming-soon");
-            if (link.querySelector(".sidebar-link-lock")) return;
-            const lockWrap = document.createElement("span");
-            lockWrap.className = "sidebar-link-lock";
-            lockWrap.setAttribute("aria-hidden", "true");
-            lockWrap.innerHTML = COMING_SOON_LOCK_SVG;
-            link.insertBefore(lockWrap, link.firstChild);
+            link.setAttribute("aria-disabled", "true");
+            link.setAttribute("tabindex", "-1");
+            const directSvg = link.querySelector(":scope > svg");
+            if (directSvg) {
+                directSvg.remove();
+            }
+            if (!link.querySelector(".sidebar-link-lock")) {
+                const lockWrap = document.createElement("span");
+                lockWrap.className = "sidebar-link-lock";
+                lockWrap.setAttribute("aria-hidden", "true");
+                lockWrap.innerHTML = COMING_SOON_LOCK_SVG;
+                link.insertBefore(lockWrap, link.firstChild);
+            }
         });
     }
 
@@ -854,16 +861,16 @@
         const activeKey = getSidebarActiveKey(path);
         if (sidebar.dataset.staticSidebar === "1") {
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
-            neutralizeSidebarAnchors();
             decorateComingSoonSidebarLinks();
+            neutralizeSidebarAnchors();
             return;
         }
         if (path.indexOf("/premium-advertenties") === 0) {
             sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
-            neutralizeSidebarAnchors();
             decorateComingSoonSidebarLinks();
+            neutralizeSidebarAnchors();
         }
     }
 
@@ -875,9 +882,9 @@
         if (sidebar.dataset.staticSidebar === "1") {
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
+            decorateComingSoonSidebarLinks();
             neutralizeSidebarAnchors();
             sidebar.dataset.sidebarReady = "true";
-            decorateComingSoonSidebarLinks();
             return;
         }
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
@@ -885,9 +892,9 @@
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
         syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
         pruneDeprecatedSidebarLinks(sidebar);
+        decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();
         sidebar.dataset.sidebarReady = "true";
-        decorateComingSoonSidebarLinks();
     }
 
     function mergeSidebarCountState() {
@@ -1001,6 +1008,15 @@
             .querySelectorAll(".sidebar a.sidebar-logo, .sidebar a.sidebar-link, .sidebar-footer a.logout-btn")
             .forEach(function (anchor) {
                 if (!anchor || anchor.dataset.sidebarNavInit === "1") return;
+                const sidebarKey = String(anchor.getAttribute("data-sidebar-key") || "").trim();
+                if (sidebarKey && PREMIUM_SIDEBAR_COMING_SOON_KEYS.has(sidebarKey)) {
+                    anchor.dataset.sidebarNavInit = "1";
+                    anchor.removeAttribute("href");
+                    anchor.setAttribute("role", "link");
+                    anchor.setAttribute("aria-disabled", "true");
+                    anchor.setAttribute("tabindex", "-1");
+                    return;
+                }
                 const href = String(anchor.getAttribute("href") || "").trim();
                 if (!href) return;
                 anchor.dataset.sidebarNavInit = "1";
@@ -1076,8 +1092,8 @@
                 session && session.authenticated ? session : null,
                 activeKey
             );
-            neutralizeSidebarAnchors();
             decorateComingSoonSidebarLinks();
+            neutralizeSidebarAnchors();
         }
 
         if (!nameEl || !roleEl || !avatarEl || !triggerEl) {
