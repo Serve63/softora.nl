@@ -142,4 +142,9 @@ test('premium agenda shows klantwerk label on Saturdays', () => {
   assert.match(pageSource, /const isSaturday = Boolean\(dateStr\) && i % 7 === 5;/);
   assert.match(pageSource, /calendar-day--klantwerk/);
   assert.match(pageSource, /calendar-day-klantwerk-label/);
+  assert.match(pageSource, /function isYmdCalendarSaturday\(/);
+  assert.match(pageSource, /if \(isYmdCalendarSaturday\(item\.date\)\) return null;/);
+  assert.match(pageSource, /const withoutSaturday = appointments\.filter/);
+  assert.match(pageSource, /if \(cell\.classList\.contains\('calendar-day--klantwerk'\)\) return;/);
+  assert.match(pageSource, /if \(isYmdCalendarSaturday\(picked\)\) return;/);
 });

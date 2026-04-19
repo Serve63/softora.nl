@@ -237,6 +237,12 @@
         .calendar-day.today { background: rgba(139,34,82,0.04); }
         .calendar-day.today .day-number { color: var(--accent-light); font-weight: 700; }
 
+        .calendar-day--klantwerk {
+            cursor: default;
+        }
+        .calendar-day--klantwerk:hover {
+            background: transparent;
+        }
         .calendar-day--klantwerk .calendar-day-klantwerk-label {
             position: absolute;
             inset: 0;
@@ -249,8 +255,8 @@
             font-family: 'Oswald', sans-serif;
             font-size: clamp(0.88rem, 2.4vw, 1.12rem);
             font-weight: 600;
-            letter-spacing: 0.06em;
-            text-transform: lowercase;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
             color: var(--text-tertiary);
             padding: 0 0.35rem;
         }
@@ -1860,6 +1866,7 @@
     function normalizeServerAppointment(item) {
         if (!item || typeof item !== 'object') return null;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || ''))) return null;
+        if (isYmdCalendarSaturday(item.date)) return null;
 
         return {
             id: Number(item.id) || Math.floor(Math.random() * 1e9),
@@ -1895,48 +1902,56 @@
     }
 
     function mergeServerAppointments(items) {
-        if (!Array.isArray(items) || !items.length) return false;
-
         let changed = false;
-        const existingFingerprints = new Set(appointments.map(appointmentFingerprint));
-        const indexById = new Map(
-            appointments
-                .map((item, idx) => ({ id: Number(item?.id || 0), idx }))
-                .filter((entry) => Number.isFinite(entry.id) && entry.id > 0)
-                .map((entry) => [entry.id, entry.idx])
-        );
 
-        items.forEach((item) => {
-            const apt = normalizeServerAppointment(item);
-            if (!apt) return;
+        if (Array.isArray(items) && items.length) {
+            const existingFingerprints = new Set(appointments.map(appointmentFingerprint));
+            const indexById = new Map(
+                appointments
+                    .map((item, idx) => ({ id: Number(item?.id || 0), idx }))
+                    .filter((entry) => Number.isFinite(entry.id) && entry.id > 0)
+                    .map((entry) => [entry.id, entry.idx])
+            );
 
-            const aptId = Number(apt.id || 0);
-            if (Number.isFinite(aptId) && aptId > 0 && indexById.has(aptId)) {
-                const existingIndex = indexById.get(aptId);
-                const previous = appointments[existingIndex];
-                const merged = {
-                    ...previous,
-                    ...apt
-                };
-                if (item.manualAllDayUnavailable === undefined) {
-                    merged.manualAllDayUnavailable = previous.manualAllDayUnavailable;
+            items.forEach((item) => {
+                const apt = normalizeServerAppointment(item);
+                if (!apt) return;
+
+                const aptId = Number(apt.id || 0);
+                if (Number.isFinite(aptId) && aptId > 0 && indexById.has(aptId)) {
+                    const existingIndex = indexById.get(aptId);
+                    const previous = appointments[existingIndex];
+                    const merged = {
+                        ...previous,
+                        ...apt
+                    };
+                    if (item.manualAllDayUnavailable === undefined) {
+                        merged.manualAllDayUnavailable = previous.manualAllDayUnavailable;
+                    }
+                    if (JSON.stringify(previous) !== JSON.stringify(merged)) {
+                        appointments[existingIndex] = merged;
+                        changed = true;
+                    }
+                    return;
                 }
-                if (JSON.stringify(previous) !== JSON.stringify(merged)) {
-                    appointments[existingIndex] = merged;
-                    changed = true;
-                }
-                return;
-            }
 
-            const fingerprint = appointmentFingerprint(apt);
-            if (existingFingerprints.has(fingerprint)) return;
-            existingFingerprints.add(fingerprint);
-            appointments.push(apt);
-            changed = true;
-        });
+                const fingerprint = appointmentFingerprint(apt);
+                if (existingFingerprints.has(fingerprint)) return;
+                existingFingerprints.add(fingerprint);
+                appointments.push(apt);
+                changed = true;
+            });
+        }
 
         if (changed) {
             appointments.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+        }
+
+        const withoutSaturday = appointments.filter((a) => !isYmdCalendarSaturday(a.date));
+        if (withoutSaturday.length !== appointments.length) {
+            appointments.length = 0;
+            appointments.push(...withoutSaturday);
+            changed = true;
         }
 
         return changed;
@@ -1979,6 +1994,19 @@
         const raw = String(value || '').trim();
         const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
         return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+    }
+
+    function isYmdCalendarSaturday(value) {
+        const ymd = normalizeAgendaDateYmd(value);
+        if (!ymd) return false;
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+        if (!m) return false;
+        const y = Number(m[1]);
+        const mo = Number(m[2]);
+        const d = Number(m[3]);
+        if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return false;
+        const dt = new Date(y, mo - 1, d);
+        return dt.getDay() === 6;
     }
 
     function isPlaceholderAgendaLocation(loc) {
@@ -2188,7 +2216,9 @@
 
     function openManualAppointmentModal(dateYmd) {
         if (!manualAppointmentOverlay || !manualAppointmentDateLine) return;
-        manualAppointmentSelectedDate = String(dateYmd || '').trim();
+        const picked = String(dateYmd || '').trim();
+        if (isYmdCalendarSaturday(picked)) return;
+        manualAppointmentSelectedDate = picked;
         manualAppointmentDateLine.textContent = formatAgendaDateLongNl(manualAppointmentSelectedDate);
         if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '10:00';
         if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
@@ -2219,6 +2249,10 @@
 
     async function submitManualAppointment() {
         if (!manualAppointmentSelectedDate || manualAppointmentSaving) return;
+        if (isYmdCalendarSaturday(manualAppointmentSelectedDate)) {
+            setManualAppointmentStatus('Op zaterdag staan geen afspraken in de agenda.', 'error');
+            return;
+        }
         const fullDay = Boolean(manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked);
         const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
@@ -3091,20 +3125,20 @@
                 isToday = (day === today.getDate() && month === today.getMonth() && year === today.getFullYear());
             }
 
-            const dayAppointments = dateStr
+            const isSaturday = Boolean(dateStr) && i % 7 === 5;
+            const dayAppointmentsRaw = dateStr
                 ? appointments.filter((a) => normalizeAgendaDateYmd(a.date) === dateStr)
                 : [];
-
-            const isSaturday = Boolean(dateStr) && i % 7 === 5;
+            const dayAppointments = isSaturday ? [] : dayAppointmentsRaw;
 
             let classes = 'calendar-day';
             if (isOtherMonth) classes += ' other-month';
             if (isToday) classes += ' today';
-            if (!isOtherMonth) classes += ' calendar-day-selectable';
+            if (!isOtherMonth && !isSaturday) classes += ' calendar-day-selectable';
             if (isSaturday) classes += ' calendar-day--klantwerk';
 
             const dayDataAttr =
-                !isOtherMonth && dateStr ? ` data-calendar-date="${dateStr}"` : '';
+                !isOtherMonth && dateStr && !isSaturday ? ` data-calendar-date="${dateStr}"` : '';
             html += `<div class="${classes}"${dayDataAttr}>`;
             if (!isOtherMonth) {
                 html += `<div class="day-number">${day}</div>`;
@@ -3258,6 +3292,7 @@
         calendarGridEl.addEventListener('click', (event) => {
             const cell = event.target.closest('.calendar-day');
             if (!cell || cell.classList.contains('other-month')) return;
+            if (cell.classList.contains('calendar-day--klantwerk')) return;
             if (event.target.closest('.appointment')) return;
             const dateStr = cell.getAttribute('data-calendar-date');
             if (!dateStr) return;
