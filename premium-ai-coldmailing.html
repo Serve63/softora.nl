@@ -47,6 +47,7 @@
             --border: rgba(255, 255, 255, 0.06);
             --green: #2ecc71;
             --warn: #f39c12;
+            --lead-chatbot: #f39c12;
         }
 
         body {
@@ -314,6 +315,10 @@
             color: var(--green);
         }
 
+        .legend-item.chatbot {
+            color: var(--lead-chatbot);
+        }
+
         .legend-swatch {
             width: 14px;
             height: 9px;
@@ -431,6 +436,14 @@
             --lead-shadow-color: rgba(46, 204, 113, 0.24);
             --lead-chip-color: var(--green);
             --lead-chip-border-color: rgba(46, 204, 113, 0.56);
+        }
+
+        .lead-item.type-chatbot {
+            --lead-border-color: rgba(243, 156, 18, 0.55);
+            --lead-border-color-focus: rgba(243, 156, 18, 0.78);
+            --lead-shadow-color: rgba(243, 156, 18, 0.22);
+            --lead-chip-color: var(--lead-chatbot);
+            --lead-chip-border-color: rgba(243, 156, 18, 0.62);
         }
 
         .lead-item.clickable {
@@ -1030,6 +1043,7 @@
                         <span class="legend-item website"><span class="legend-swatch" aria-hidden="true"></span>Website</span>
                         <span class="legend-item business"><span class="legend-swatch" aria-hidden="true"></span>Bedrijfssoftware</span>
                         <span class="legend-item voice"><span class="legend-swatch" aria-hidden="true"></span>Voicesoftware</span>
+                        <span class="legend-item chatbot"><span class="legend-swatch" aria-hidden="true"></span>Chatbots</span>
                     </div>
                 </div>
             </div>
@@ -3053,6 +3067,7 @@
             function mapLeadModeToLabel(value) {
                 const raw = normalize(value).replace(/[\s-]+/g, '_');
                 if (!raw) return '';
+                if (raw === 'chatbot' || raw === 'chatbots') return 'Chatbots';
                 if (raw === 'voice_software' || raw === 'voice' || raw === 'voicesoftware') return 'Voicesoftware';
                 if (raw === 'business_software' || raw === 'business' || raw === 'bedrijfssoftware') return 'Bedrijfssoftware';
                 if (raw === 'website' || raw === 'websites' || raw === 'web') return 'Website';
@@ -3062,6 +3077,7 @@
             function inferLeadTypeFromText(value) {
                 const text = normalize(value);
                 if (!text) return '';
+                if (/(chatbot|chatbots|whatsapp\s*bot|widget\s*bot|conversational\s*bot)/.test(text)) return 'Chatbots';
                 if (/(voice\s*software|voice\s*agent|spraaksoftware|belsoftware)/.test(text)) return 'Voicesoftware';
                 if (/(bedrijfssoftware|business\s*software|crm|erp)/.test(text)) return 'Bedrijfssoftware';
                 if (/(website|web\s*site|webshop|webdesign)/.test(text)) return 'Website';
@@ -3096,6 +3112,9 @@
             function leadTypeToClass(typeLabel) {
                 const normalizedType = normalize(typeLabel).replace(/[\s_-]+/g, ' ').trim();
                 if (!normalizedType) return 'type-website';
+                if (normalizedType.includes('chatbot')) {
+                    return 'type-chatbot';
+                }
                 if (normalizedType.includes('voicesoftware') || normalizedType.includes('voice')) {
                     return 'type-voice-software';
                 }

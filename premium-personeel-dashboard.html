@@ -51,6 +51,7 @@
             --border: rgba(255, 255, 255, 0.06);
             --green: #2ecc71;
             --green-glow: rgba(46, 204, 113, 0.15);
+            --service-business-blue: #3498db;
             --red: #e74c3c;
             --yellow: #f39c12;
 
@@ -577,6 +578,30 @@
             font-weight: 700;
             line-height: 1;
             margin-bottom: 0.8rem;
+        }
+
+        .kpi-value--active-orders {
+            display: inline-flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 0;
+        }
+
+        .kpi-active-count-sep {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .kpi-card.highlighted .kpi-active-count-total {
+            color: var(--accent-light);
+        }
+
+        .kpi-active-count-business {
+            color: var(--service-business-blue);
+        }
+
+        .kpi-active-count-voice {
+            color: var(--green);
         }
 
         .kpi-change {
@@ -1535,7 +1560,13 @@
                 </div>
                 <div class="kpi-card highlighted">
                     <div class="kpi-label">Actieve Opdrachten</div>
-                    <div class="kpi-value" id="kpiActiveOrders">0</div>
+                    <div class="kpi-value kpi-value--active-orders" id="kpiActiveOrders" aria-label="Actieve opdrachten: 0, bedrijfssoftware: 0, voicesoftware: 0">
+                        <span class="kpi-active-count-total" data-kpi-active-total>0</span>
+                        <span class="kpi-active-count-sep" aria-hidden="true"> - </span>
+                        <span class="kpi-active-count-business" data-kpi-active-business>0</span>
+                        <span class="kpi-active-count-sep" aria-hidden="true"> - </span>
+                        <span class="kpi-active-count-voice" data-kpi-active-voice>0</span>
+                    </div>
                 </div>
             </div>
 
@@ -1818,6 +1849,50 @@
                     if (paidDelta) return paidDelta;
                     return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
                 });
+        }
+
+        function classifyPremiumDashboardOrderProductLine(order) {
+            const hay = `${String(order?.title || '')} ${String(order?.description || '')}`.toLowerCase();
+            if (!hay.trim()) return 'other';
+            if (
+                /voicesoftware|voice\s*software|voice_software|spraaksoftware|belsoftware|telefon(y|ie)|voice\s*agent|ai\s*voice|spraak\s*agent/.test(
+                    hay
+                )
+            ) {
+                return 'voice';
+            }
+            if (/bedrijfssoftware|business\s*software|business_software|\bcrm\b|\berp\b/.test(hay)) {
+                return 'business';
+            }
+            return 'other';
+        }
+
+        function updateKpiActiveOrdersDisplay(activeOrders) {
+            const root = document.getElementById('kpiActiveOrders');
+            if (!root) return;
+            const list = Array.isArray(activeOrders) ? activeOrders : [];
+            const totalEl = root.querySelector('[data-kpi-active-total]');
+            const businessEl = root.querySelector('[data-kpi-active-business]');
+            const voiceEl = root.querySelector('[data-kpi-active-voice]');
+            let business = 0;
+            let voice = 0;
+            list.forEach((o) => {
+                const line = classifyPremiumDashboardOrderProductLine(o);
+                if (line === 'business') business += 1;
+                else if (line === 'voice') voice += 1;
+            });
+            const total = list.length;
+            if (totalEl && businessEl && voiceEl) {
+                totalEl.textContent = String(total);
+                businessEl.textContent = String(business);
+                voiceEl.textContent = String(voice);
+                root.setAttribute(
+                    'aria-label',
+                    `Actieve opdrachten: ${total}, bedrijfssoftware: ${business}, voicesoftware: ${voice}`
+                );
+            } else {
+                root.textContent = String(total);
+            }
         }
 
         function parsePremiumCustomers(raw) {
@@ -2162,8 +2237,7 @@
             if (maintenanceMonthEl) maintenanceMonthEl.textContent = formatMoneyEUR(selectedRevenue.maintenance);
             const totalClientsEl = document.getElementById('kpiTotalClients');
             if (totalClientsEl) totalClientsEl.textContent = String(hasCustomerDatabase ? customers.length : uniqueClients.size);
-            const activeOrdersEl = document.getElementById('kpiActiveOrders');
-            if (activeOrdersEl) activeOrdersEl.textContent = String(activeOrders.length);
+            updateKpiActiveOrdersDisplay(activeOrders);
 
             const periodPresentation = getDashboardPeriodPresentation(currentYear, currentMonth);
             const revenueTitleEl = document.getElementById('revenuePanelTitle');

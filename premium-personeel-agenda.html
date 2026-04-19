@@ -298,6 +298,24 @@
             border-left: 2px solid var(--accent);
         }
 
+        .appointment.meeting.meeting--business {
+            background: var(--blue-glow);
+            color: #5dade2;
+            border-left-color: var(--blue);
+        }
+
+        .appointment.meeting.meeting--voice {
+            background: var(--green-glow);
+            color: #58d68d;
+            border-left-color: var(--green);
+        }
+
+        .appointment.meeting.meeting--chatbot {
+            background: var(--yellow-glow);
+            color: #f7c566;
+            border-left-color: var(--yellow);
+        }
+
         .appointment.manual-serve {
             background: rgba(13, 148, 136, 0.16);
             color: #5eead4;
@@ -338,6 +356,7 @@
         .legend-dot.website { background: var(--accent); }
         .legend-dot.business { background: var(--blue); }
         .legend-dot.voice { background: var(--green); }
+        .legend-dot.chatbot { background: var(--yellow); }
         .legend-dot.completed { background: #f59e0b; }
         .legend-dot.manual-serve { background: #0d9488; }
         .legend-dot.manual-martijn { background: #7c3aed; }
@@ -1407,6 +1426,7 @@
                 <div class="legend-item"><div class="legend-dot website"></div> Website Meeting</div>
                 <div class="legend-item"><div class="legend-dot business"></div> Bedrijfssoftware Meeting</div>
                 <div class="legend-item"><div class="legend-dot voice"></div> Voicesoftware Meeting</div>
+                <div class="legend-item"><div class="legend-dot chatbot"></div> Chatbots Meeting</div>
                 <div class="legend-item"><div class="legend-dot completed"></div> Activiteit afgerond</div>
                 <div class="legend-item"><div class="legend-dot manual-serve"></div> Activiteit Servé</div>
                 <div class="legend-item"><div class="legend-dot manual-martijn"></div> Activiteit Martijn</div>
@@ -2691,6 +2711,16 @@
         return false;
     }
 
+    function resolveAgendaMeetingProductLine(apt) {
+        const hay = `${String(apt?.branche || '')} ${String(apt?.summary || '')} ${String(apt?.company || '')} ${String(apt?.value || '')}`.toLowerCase();
+        if (/chatbot|chatbots|whatsapp\s*bot|widget\s*bot|conversational\s*bot/.test(hay)) return 'chatbot';
+        if (/voicesoftware|voice\s*software|voice_software|spraaksoftware|belsoftware|telefon(y|ie)|voice\s*agent/.test(hay)) {
+            return 'voice';
+        }
+        if (/bedrijfssoftware|business\s*software|business_software|\bcrm\b|\berp\b/.test(hay)) return 'business';
+        return 'website';
+    }
+
     function getCalendarAppointmentClass(apt) {
         if (isAppointmentCompleted(apt)) return 'appointment completed magnetic';
         const stack = String(apt?.coldcallingStack || '').toLowerCase();
@@ -2701,7 +2731,10 @@
             if (who === 'martijn') return 'appointment manual-martijn magnetic';
             return 'appointment manual-serve magnetic';
         }
-        return 'appointment meeting magnetic';
+        const line = resolveAgendaMeetingProductLine(apt);
+        const lineClass =
+            line === 'business' ? ' meeting--business' : line === 'voice' ? ' meeting--voice' : line === 'chatbot' ? ' meeting--chatbot' : '';
+        return `appointment meeting magnetic${lineClass}`;
     }
 
     async function confirmNoDealForAppointment(apt) {
@@ -3201,7 +3234,16 @@
             // Zonder actieve opdrachten index blijven we op afspraakdata draaien.
         }
 
-        document.getElementById('modalBadge').textContent = 'Website Meeting';
+        const meetingLine = resolveAgendaMeetingProductLine(apt);
+        const badgeLabel =
+            meetingLine === 'business'
+                ? 'Bedrijfssoftware Meeting'
+                : meetingLine === 'voice'
+                    ? 'Voicesoftware Meeting'
+                    : meetingLine === 'chatbot'
+                        ? 'Chatbots Meeting'
+                        : 'Website Meeting';
+        document.getElementById('modalBadge').textContent = badgeLabel;
         document.getElementById('modalBadge').className = 'modal-type-badge meeting';
         document.getElementById('modalCompany').textContent = apt.company;
         document.getElementById('modalContact').textContent = `${apt.contact}  ·  ${apt.phone}`;

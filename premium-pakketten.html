@@ -363,6 +363,10 @@ body {
     --tab-accent: #1f9b5a;
   }
 
+  .tab.theme-chatbot {
+    --tab-accent: #f39c12;
+  }
+
   .section-title {
     font-family: 'Oswald', sans-serif;
     font-size: 13px;
@@ -558,6 +562,12 @@ body {
     --panel-accent: #1f9b5a;
     --panel-accent-light: #26b56c;
     --panel-accent-soft: rgba(31, 155, 90, 0.14);
+  }
+
+  .tab-panel.theme-chatbot {
+    --panel-accent: #f39c12;
+    --panel-accent-light: #f5b041;
+    --panel-accent-soft: rgba(243, 156, 18, 0.16);
   }
 
   .tab-panel .section-title {
@@ -1441,6 +1451,7 @@ body {
     <button class="tab theme-website active" type="button" onclick="switchTab('website', this)">Website</button>
     <button class="tab theme-business" type="button" onclick="switchTab('bedrijfssoftware', this)">Bedrijfssoftware</button>
     <button class="tab theme-voice" type="button" onclick="switchTab('voicesoftware', this)">Voicesoftware</button>
+    <button class="tab theme-chatbot" type="button" onclick="switchTab('chatbots', this)">Chatbots</button>
   </div>
 
   <div id="tab-bouwen" class="tab-panel theme-website active">
@@ -1889,6 +1900,154 @@ body {
     </div>
   </div>
 
+  <div id="tab-chatbots" class="tab-panel theme-chatbot">
+    <div class="section-title">Chatbots Pakketten</div>
+
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-tier">Pakket 01</div>
+        <div class="card-name">Widget</div>
+        <div class="card-desc">Slimme chatwidget voor je website met vaste Q&amp;A en overdracht naar mens.</div>
+        <div class="card-price">
+          <div class="price-amount">€999<span class="price-suffix">eenmalig</span></div>
+          <div class="price-note">Excl. BTW · Oplevering binnen 2 weken</div>
+        </div>
+        <ul class="features-list">
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>1 kennisbank + snelle antwoorden</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Styling in huisstijl</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Handover naar e-mail of WhatsApp</li>
+        </ul>
+        <button class="card-cta outline" type="button">Meer Informatie</button>
+      </div>
+
+      <div class="card featured">
+        <div class="card-badge">Meest gekozen</div>
+        <div class="card-tier">Pakket 02</div>
+        <div class="card-name">Assist</div>
+        <div class="card-desc">Conversational AI met agenda, CRM-notities en opvolgtaken.</div>
+        <div class="card-price">
+          <div class="price-amount">€2.499<span class="price-suffix">eenmalig</span></div>
+          <div class="price-note">Excl. BTW · Oplevering binnen 3 weken</div>
+        </div>
+        <ul class="features-list">
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Widget</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Koppeling met agenda of leads</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Logging + exporteerbare transcripten</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Prompt-tuning op jouw tone-of-voice</li>
+        </ul>
+        <button class="card-cta filled" type="button">Pakket Aanvragen</button>
+      </div>
+
+      <div class="card">
+        <div class="card-tier">Pakket 03</div>
+        <div class="card-name">Studio</div>
+        <div class="card-desc">Multi-kanaal (web + WhatsApp) met geavanceerde routing en policies.</div>
+        <div class="card-price">
+          <div class="price-amount">€4.999<span class="price-suffix">eenmalig</span></div>
+          <div class="price-note">Excl. BTW · Gefaseerde oplevering</div>
+        </div>
+        <ul class="features-list">
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Meerdere bots + fallback flows</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>RBAC en audit trail</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Integraties (CRM, mailbox, webhooks)</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Analytics dashboard</li>
+        </ul>
+        <button class="card-cta outline" type="button">Meer Informatie</button>
+      </div>
+
+      <div class="card">
+        <div class="card-tier">Pakket 04</div>
+        <div class="card-name">Enterprise</div>
+        <div class="card-desc">Chat-automation op schaal met compliance, SSO en dedicated delivery.</div>
+        <div class="card-price">
+          <div class="price-amount">Op<span class="price-suffix"> aanvraag</span></div>
+          <div class="price-note">Excl. BTW · Scope en planning in overleg</div>
+        </div>
+        <ul class="features-list">
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>High-availability setup</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Security review + DPIA-ondersteuning</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Dedicated solution engineer</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Enterprise SLA</li>
+        </ul>
+        <button class="card-cta outline" type="button">Offerte Aanvragen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-chatbots-onderhoud" class="tab-panel theme-chatbot">
+    <div class="section-title">Chatbots Onderhoud Abonnementen</div>
+
+    <div class="onderhoud-grid">
+      <div class="onderhoud-card">
+        <div class="card-tier">Abonnement 01</div>
+        <div class="card-name">Monitor</div>
+        <div class="card-desc">Updates aan kennisbank, kleine prompt-aanpassingen en foutmeldingen.</div>
+        <div class="card-price">
+          <div class="price-amount">€79<span class="price-suffix">/mnd</span></div>
+          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+        </div>
+        <ul class="features-list">
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Maandelijkse content refresh</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Bugfixes &amp; compatibiliteit</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Usage-rapport</li>
+        </ul>
+        <button class="card-cta outline" type="button">Selecteren</button>
+      </div>
+
+      <div class="onderhoud-card featured">
+        <div class="card-badge">Meest gekozen</div>
+        <div class="card-tier">Abonnement 02</div>
+        <div class="card-name">Optimize</div>
+        <div class="card-desc">Actief verbeteren van conversies en intents op basis van data.</div>
+        <div class="card-price">
+          <div class="price-amount">€199<span class="price-suffix">/mnd</span></div>
+          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+        </div>
+        <ul class="features-list">
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Monitor</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Wekelijkse tuning-sprint</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>A/B-tests op openingsflows</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Support op werkdagen</li>
+        </ul>
+        <button class="card-cta filled" type="button">Selecteren</button>
+      </div>
+
+      <div class="onderhoud-card">
+        <div class="card-tier">Abonnement 03</div>
+        <div class="card-name">Scale</div>
+        <div class="card-desc">Voor teams met hoge chatvolumes en strakke KPI&apos;s.</div>
+        <div class="card-price">
+          <div class="price-amount">€449<span class="price-suffix">/mnd</span></div>
+          <div class="price-note">Excl. BTW · Maandelijks opzegbaar</div>
+        </div>
+        <ul class="features-list">
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Alles uit Optimize</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Dagelijkse KPI-review</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Prioriteit support (&lt;2 uur)</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Custom dashboards</li>
+        </ul>
+        <button class="card-cta outline" type="button">Selecteren</button>
+      </div>
+
+      <div class="onderhoud-card">
+        <div class="card-tier">Abonnement 04</div>
+        <div class="card-name">Enterprise</div>
+        <div class="card-desc">24/7 beheer voor mission-critical chat automation.</div>
+        <div class="card-price">
+          <div class="price-amount">Op<span class="price-suffix"> aanvraag</span></div>
+          <div class="price-note">Excl. BTW · Contract op maat</div>
+        </div>
+        <ul class="features-list">
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>24/7 incident response</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Dedicated chatbot engineer</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Compliance reviews</li>
+          <li><span class="check"><svg viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2.5" stroke="#8b2252" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Strategie + roadmap</li>
+        </ul>
+        <button class="card-cta outline" type="button">Contact Opnemen</button>
+      </div>
+    </div>
+  </div>
+
   </div>
 </main>
 
@@ -1901,6 +2060,7 @@ body {
       website: ['bouwen', 'onderhoud'],
       bedrijfssoftware: ['bedrijfssoftware', 'bedrijfssoftware-onderhoud'],
       voicesoftware: ['voice-software', 'voice-software-onderhoud'],
+      chatbots: ['chatbots', 'chatbots-onderhoud'],
     };
 
     const panelIds = Array.isArray(groups[name]) ? groups[name] : [name];

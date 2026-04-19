@@ -285,6 +285,7 @@ function createLeadsPageBootstrapService(deps = {}) {
   function mapLeadModeToLabel(value) {
     const raw = normalize(value).replace(/[\s-]+/g, '_');
     if (!raw) return '';
+    if (raw === 'chatbot' || raw === 'chatbots') return 'Chatbots';
     if (raw === 'voice_software' || raw === 'voice' || raw === 'voicesoftware') return 'Voicesoftware';
     if (raw === 'business_software' || raw === 'business' || raw === 'bedrijfssoftware') return 'Bedrijfssoftware';
     if (raw === 'website' || raw === 'websites' || raw === 'web') return 'Website';
@@ -294,6 +295,7 @@ function createLeadsPageBootstrapService(deps = {}) {
   function inferLeadTypeFromText(value) {
     const text = normalize(value);
     if (!text) return '';
+    if (/(chatbot|chatbots|whatsapp\s*bot|widget\s*bot|conversational\s*bot)/.test(text)) return 'Chatbots';
     if (/(voice\s*software|voice\s*agent|spraaksoftware|belsoftware)/.test(text)) return 'Voicesoftware';
     if (/(bedrijfssoftware|business\s*software|crm|erp)/.test(text)) return 'Bedrijfssoftware';
     if (/(website|web\s*site|webshop|webdesign)/.test(text)) return 'Website';
@@ -328,6 +330,9 @@ function createLeadsPageBootstrapService(deps = {}) {
   function leadTypeToClass(typeLabel) {
     const normalizedType = normalize(typeLabel).replace(/[\s_-]+/g, ' ').trim();
     if (!normalizedType) return 'type-website';
+    if (normalizedType.includes('chatbot')) {
+      return 'type-chatbot';
+    }
     if (normalizedType.includes('voicesoftware') || normalizedType.includes('voice')) {
       return 'type-voice-software';
     }
