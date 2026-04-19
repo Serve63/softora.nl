@@ -11,7 +11,9 @@ test('premium ai lead generator renders campaign controls before dashboard boots
 
   assert.match(pageSource, /<div class="form-group form-group--lead-list" id="leadListControlWrap">/);
   assert.match(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
-  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260417b" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/coldcalling-dashboard\.js\?v=20260417d" defer><\/script>/);
+  assert.match(pageSource, /id="leadAmountQuestionLabel"/);
+  assert.match(pageSource, /Hoeveel mensen wil je bellen\?/);
   assert.match(pageSource, /id="statCalled"><!-- SOFTORA_COLDCALLING_STAT_CALLED --><\/div>/);
   assert.match(pageSource, /id="statBooked"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_BOOKED --><\/div>/);
   assert.match(pageSource, /id="statInterested"[\s\S]*<!-- SOFTORA_COLDCALLING_STAT_INTERESTED --><\/div>/);
@@ -69,6 +71,12 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     dashboardSource,
     /const fillAgendaEl = byId\('campaignFillAgendaWorkdays'\);[\s\S]*readStorage\(CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY\)/
   );
+  assert.match(
+    dashboardSource,
+    /CAMPAIGN_AMOUNT_QUESTION_MODE_STORAGE_KEY = 'softora_campaign_amount_question_mode'/
+  );
+  assert.match(dashboardSource, /function bindLeadAmountQuestionNav\(\) \{/);
+  assert.match(dashboardSource, /function getLeadAmountQuestionLabelText\(\) \{/);
   assert.match(
     dashboardSource,
     /writeStorage\(CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY, fillAgendaEl\.checked \? '1' : '0'\)/

@@ -37,6 +37,9 @@
   const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
   const CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY = 'softora_campaign_coldcalling_stack';
   const CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY = 'softora_campaign_fill_agenda_10_workdays';
+  const CAMPAIGN_AMOUNT_QUESTION_MODE_STORAGE_KEY = 'softora_campaign_amount_question_mode';
+  const CAMOUNT_Q_BELLEN = 'bellen';
+  const CAMOUNT_Q_AFSPRAKEN = 'afspraken';
   const BUSINESS_MODE_STORAGE_KEY = 'softora_business_mode';
   const DEFAULT_CAMPAIGN_REGIO_VALUE = 'unlimited';
   const CUSTOM_CAMPAIGN_REGIO_VALUE = 'custom';
@@ -576,6 +579,27 @@
     return String(leadSlider.dataset?.customValueMode || '').toLowerCase() !== 'sync-slider';
   }
 
+  function getCampaignAmountQuestionMode() {
+    const raw = readStorage(CAMPAIGN_AMOUNT_QUESTION_MODE_STORAGE_KEY).trim().toLowerCase();
+    if (raw === CAMOUNT_Q_AFSPRAKEN) return CAMOUNT_Q_AFSPRAKEN;
+    return CAMOUNT_Q_BELLEN;
+  }
+
+  function setCampaignAmountQuestionMode(mode) {
+    const next = mode === CAMOUNT_Q_AFSPRAKEN ? CAMOUNT_Q_AFSPRAKEN : CAMOUNT_Q_BELLEN;
+    writeStorage(CAMPAIGN_AMOUNT_QUESTION_MODE_STORAGE_KEY, next);
+  }
+
+  function getLeadAmountUnitWord() {
+    return getCampaignAmountQuestionMode() === CAMOUNT_Q_AFSPRAKEN ? 'afspraken' : 'mensen';
+  }
+
+  function getLeadAmountQuestionLabelText() {
+    return getCampaignAmountQuestionMode() === CAMOUNT_Q_AFSPRAKEN
+      ? 'Hoeveel afspraken wil je inplannen?'
+      : 'Hoeveel mensen wil je bellen?';
+  }
+
   function getLeadSliderAmount() {
     const rawValue = Math.max(1, parseNumber(leadSlider.value, 1));
     const customValue = Math.round(parseNumber(leadSlider.dataset?.customValue, NaN));
@@ -605,17 +629,25 @@
   function renderLeadAmountDisplay() {
     const leadValueEl = byId('leadValue');
     if (!leadValueEl) return;
+    const questionText = getLeadAmountQuestionLabelText();
+    const unitWord = getLeadAmountUnitWord();
+    const labelEl = byId('leadAmountQuestionLabel');
+    if (labelEl) labelEl.textContent = questionText;
+
     const amount = getLeadSliderAmount();
     const maxAmount = Math.max(1, Math.round(parseNumber(leadSlider?.max, 1)));
     const displayAmount = amount >= maxAmount ? '&infin;' : String(amount);
     const inlineInput = leadValueEl.querySelector('.slider-value-input');
     if (inlineInput) {
       inlineInput.value = displayAmount === '&infin;' ? '∞' : String(amount);
+      inlineInput.setAttribute('aria-label', questionText);
       const length = Math.max(1, String(inlineInput.value || '').length);
       inlineInput.style.width = `${Math.max(2, length)}ch`;
+      const unitSpan = byId('leadAmountUnitLabel') || leadValueEl.querySelector('span');
+      if (unitSpan) unitSpan.textContent = unitWord;
       return;
     }
-    leadValueEl.innerHTML = `${displayAmount} <span>mensen</span>`;
+    leadValueEl.innerHTML = `${displayAmount} <span id="leadAmountUnitLabel">${unitWord}</span>`;
   }
 
   function positionLeadSliderLabels(sliderEl = leadSlider) {
@@ -818,9 +850,64 @@
     renderLeadAmountDisplay();
   }
 
+  function bindLeadAmountQuestionNav() {
+    const prev = byId('leadAmountQuestionPrev');
+    const next = byId('leadAmountQuestionNext');
+    const row = byId('leadAmountQuestionRow');
+    if (!prev || !next || prev.dataset.leadAmountNavBound === '1') return;
+    prev.dataset.leadAmountNavBound = '1';
+    next.dataset.leadAmountNavBound = '1';
+
+    const applyMode = (mode) => {
+      setCampaignAmountQuestionMode(mode);
+      renderLeadAmountDisplay();
+      positionLeadSliderLabels();
+    };
+
+    prev.addEventListener('click', () => applyMode(CAMOUNT_Q_BELLEN));
+    next.addEventListener('click', () => applyMode(CAMOUNT_Q_AFSPRAKEN));
+
+    const swipeHost = row || prev.closest('.slider-header-question');
+    if (swipeHost && swipeHost.dataset.leadAmountSwipeBound !== '1') {
+      swipeHost.dataset.leadAmountSwipeBound = '1';
+      let touchStartX = null;
+      swipeHost.addEventListener(
+        'touchstart',
+        (event) => {
+          if (event.touches && event.touches.length === 1) {
+            touchStartX = event.touches[0].clientX;
+          }
+        },
+        { passive: true }
+      );
+      swipeHost.addEventListener(
+        'touchend',
+        (event) => {
+          if (touchStartX == null) return;
+          const endX = event.changedTouches && event.changedTouches[0] ? event.changedTouches[0].clientX : null;
+          if (typeof endX !== 'number') {
+            touchStartX = null;
+            return;
+          }
+          const dx = endX - touchStartX;
+          touchStartX = null;
+          if (Math.abs(dx) < 48) return;
+          if (dx < 0) {
+            applyMode(CAMOUNT_Q_AFSPRAKEN);
+          } else {
+            applyMode(CAMOUNT_Q_BELLEN);
+          }
+        },
+        { passive: true }
+      );
+    }
+  }
+
   function bindCampaignFormStatePersistence() {
     if (leadSlider.dataset.campaignPersistenceBound === '1') return;
     leadSlider.dataset.campaignPersistenceBound = '1';
+
+    bindLeadAmountQuestionNav();
 
     const brancheEl = byId('branche');
     const regioEl = byId('regio');
@@ -1536,7 +1623,7 @@
 
   const FIXED_TOPBAR_TITLE = 'Coldcalling';
   const FIXED_TOPBAR_SUBTITLE =
-    'Coldcalling wordt automatisch geblokkeerd zodra de agenda<br>voor de komende 10 werkdagen vol zit.';
+    'Coldcalling wordt automatisch geblokkeerd zodra de agenda<br>voor de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.';
 
   function applyBusinessModeUi() {
     const mode = getCurrentBusinessMode();

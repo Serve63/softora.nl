@@ -477,7 +477,46 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 1rem;
             margin-bottom: 1rem;
+        }
+
+        .slider-header-question {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            max-width: min(28rem, 70vw);
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .slider-question-label {
+            margin-bottom: 0 !important;
+            flex: 1 1 auto;
+            text-align: center;
+            line-height: 1.25;
+        }
+
+        .slider-question-nav {
+            flex: 0 0 auto;
+            appearance: none;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--accent-color);
+            width: 2rem;
+            height: 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.25rem;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .slider-question-nav:hover {
+            opacity: 0.92;
         }
 
         .slider-value {
@@ -924,8 +963,12 @@
                     <div class="form-group">
                         <div class="slider-container">
                             <div class="slider-header">
-                                <label class="form-label" style="margin-bottom: 0;">Hoeveel mensen bellen</label>
-                                <div class="slider-value" id="leadValue">15 <span>mensen</span></div>
+                                <div class="slider-header-question" id="leadAmountQuestionRow">
+                                    <button type="button" class="slider-question-nav" id="leadAmountQuestionPrev" aria-label="Vraag: hoeveel mensen bellen">‹</button>
+                                    <label class="form-label slider-question-label" id="leadAmountQuestionLabel" for="leadSlider">Hoeveel mensen wil je bellen?</label>
+                                    <button type="button" class="slider-question-nav" id="leadAmountQuestionNext" aria-label="Vraag: hoeveel afspraken inplannen">›</button>
+                                </div>
+                                <div class="slider-value" id="leadValue">15 <span id="leadAmountUnitLabel">mensen</span></div>
                             </div>
                             <input type="range" min="5" max="50" value="15" step="5" id="leadSlider" class="magnetic">
                             <div class="slider-labels">
@@ -1044,8 +1087,20 @@
             return slider.value;
         }
 
+        function getLeadValueUnitWord() {
+            const label = document.getElementById('leadAmountQuestionLabel');
+            if (label && /afspraken/i.test(String(label.textContent || ''))) return 'afspraken';
+            return 'mensen';
+        }
+
+        function getLeadAmountPromptQuestion() {
+            const label = document.getElementById('leadAmountQuestionLabel');
+            const text = String(label?.textContent || '').trim();
+            return text || 'Hoeveel mensen wil je bellen?';
+        }
+
         function renderSliderValue() {
-            sliderValue.innerHTML = `${getSliderDisplayAmount()} <span>mensen</span>`;
+            sliderValue.innerHTML = `${getSliderDisplayAmount()} <span id="leadAmountUnitLabel">${getLeadValueUnitWord()}</span>`;
         }
 
         slider.addEventListener('input', () => {
@@ -1058,7 +1113,7 @@
             const input =
                 window.SoftoraDialogs && typeof window.SoftoraDialogs.prompt === 'function'
                     ? await window.SoftoraDialogs.prompt(
-                        'Hoeveel mensen wil je bellen?',
+                        getLeadAmountPromptQuestion(),
                         String(currentAmount),
                         { title: 'Aantal leads', confirmText: 'Opslaan', cancelText: 'Annuleren' }
                     )

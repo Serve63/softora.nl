@@ -942,7 +942,46 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 1rem;
             margin-bottom: 1rem;
+        }
+
+        .slider-header-question {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            max-width: min(28rem, 70vw);
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .slider-question-label {
+            margin-bottom: 0 !important;
+            flex: 1 1 auto;
+            text-align: center;
+            line-height: 1.25;
+        }
+
+        .slider-question-nav {
+            flex: 0 0 auto;
+            appearance: none;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--accent-light);
+            width: 2rem;
+            height: 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.25rem;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .slider-question-nav:hover {
+            opacity: 0.92;
         }
 
         .slider-value {
@@ -1818,7 +1857,7 @@
             <div class="topbar">
                 <div class="topbar-left">
                     <h1>Coldcalling</h1>
-                    <p>Coldcalling wordt automatisch geblokkeerd zodra de agenda<br>voor de komende 10 werkdagen vol zit.</p>
+                    <p>Coldcalling wordt automatisch geblokkeerd zodra de agenda<br>voor de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.</p>
                 </div>
                 <div class="topbar-right">
                     <div class="topbar-select-group">
@@ -1869,8 +1908,12 @@
                     <div class="form-group form-group--slider">
                         <div class="slider-container" id="leadSliderStage" data-slider-ready="0" aria-hidden="true">
                             <div class="slider-header">
-                                <label class="form-label" style="margin-bottom: 0;">Hoeveel mensen bellen</label>
-                                <div class="slider-value" id="leadValue">1 <span>mensen</span></div>
+                                <div class="slider-header-question" id="leadAmountQuestionRow">
+                                    <button type="button" class="slider-question-nav" id="leadAmountQuestionPrev" aria-label="Vraag: hoeveel mensen bellen">‹</button>
+                                    <label class="form-label slider-question-label" id="leadAmountQuestionLabel" for="leadSlider">Hoeveel mensen wil je bellen?</label>
+                                    <button type="button" class="slider-question-nav" id="leadAmountQuestionNext" aria-label="Vraag: hoeveel afspraken inplannen">›</button>
+                                </div>
+                                <div class="slider-value" id="leadValue">1 <span id="leadAmountUnitLabel">mensen</span></div>
                             </div>
                             <input type="range" min="1" max="250" value="1" step="1" id="leadSlider" data-custom-value-mode="sync-slider">
                             <div class="slider-labels">
@@ -2349,9 +2392,10 @@
         sliderValueInput.inputMode = 'numeric';
         sliderValueInput.autocomplete = 'off';
         sliderValueInput.className = 'slider-value-input';
-        sliderValueInput.setAttribute('aria-label', 'Hoeveel mensen bellen');
+        sliderValueInput.setAttribute('aria-label', 'Hoeveel mensen wil je bellen?');
 
         const sliderValueUnit = document.createElement('span');
+        sliderValueUnit.id = 'leadAmountUnitLabel';
         sliderValueUnit.textContent = 'mensen';
 
         sliderValue.innerHTML = '';
