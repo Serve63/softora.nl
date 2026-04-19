@@ -53,6 +53,7 @@
             --yellow: #f39c12;
             --yellow-glow: rgba(243, 156, 18, 0.15);
             --red: #e74c3c;
+            --service-business-blue: #3498db;
 
             --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -408,6 +409,34 @@
 
         .summary-value.accent { color: var(--accent-light); }
         .summary-value.green { color: var(--green); }
+
+        .summary-value--active-breakdown {
+            display: inline-flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 0;
+        }
+
+        .summary-active-sep {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .summary-active-total {
+            color: var(--accent-light);
+        }
+
+        .summary-active-business {
+            color: var(--service-business-blue);
+        }
+
+        .summary-active-voice {
+            color: var(--green);
+        }
+
+        .summary-active-chatbot {
+            color: var(--yellow);
+        }
 
         .summary-icon {
             width: 48px;
@@ -1575,7 +1604,15 @@
                 <div class="summary-card">
                     <div>
                         <div class="summary-label">Actieve Opdrachten</div>
-                        <div class="summary-value accent" id="sumActive">0</div>
+                        <div class="summary-value summary-value--active-breakdown" id="sumActive" aria-label="Actieve opdrachten: 0, bedrijfssoftware: 0, voicesoftware: 0, chatbot: 0">
+                            <span class="summary-active-total" data-sum-active-total>0</span>
+                            <span class="summary-active-sep" aria-hidden="true"> - </span>
+                            <span class="summary-active-business" data-sum-active-business>0</span>
+                            <span class="summary-active-sep" aria-hidden="true"> - </span>
+                            <span class="summary-active-voice" data-sum-active-voice>0</span>
+                            <span class="summary-active-sep" aria-hidden="true"> - </span>
+                            <span class="summary-active-chatbot" data-sum-active-chatbot>0</span>
+                        </div>
                     </div>
                     <div class="summary-icon">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -2405,6 +2442,44 @@
             applyOrderFilter();
         }
 
+        function classifyActiveOrderProductLine(order) {
+            const hay = `${String(order?.title || '')} ${String(order?.description || '')}`.toLowerCase();
+            if (!hay.trim()) return 'other';
+            if (/chatbot|chatbots|whatsapp\s*bot|widget\s*bot|conversational\s*bot/.test(hay)) return 'chatbot';
+            if (
+                /voicesoftware|voice\s*software|voice_software|spraaksoftware|belsoftware|telefon(y|ie)|voice\s*agent|ai\s*voice|spraak\s*agent/.test(
+                    hay
+                )
+            ) {
+                return 'voice';
+            }
+            if (/bedrijfssoftware|business\s*software|business_software|\bcrm\b|\berp\b/.test(hay)) {
+                return 'business';
+            }
+            return 'other';
+        }
+
+        function renderSumActiveBreakdown(total, business, voice, chatbot) {
+            const root = document.getElementById('sumActive');
+            if (!root) return;
+            const totalEl = root.querySelector('[data-sum-active-total]');
+            const businessEl = root.querySelector('[data-sum-active-business]');
+            const voiceEl = root.querySelector('[data-sum-active-voice]');
+            const chatbotEl = root.querySelector('[data-sum-active-chatbot]');
+            if (totalEl && businessEl && voiceEl && chatbotEl) {
+                totalEl.textContent = String(total);
+                businessEl.textContent = String(business);
+                voiceEl.textContent = String(voice);
+                chatbotEl.textContent = String(chatbot);
+                root.setAttribute(
+                    'aria-label',
+                    `Actieve opdrachten: ${total}, bedrijfssoftware: ${business}, voicesoftware: ${voice}, chatbot: ${chatbot}`
+                );
+            } else {
+                root.textContent = String(total);
+            }
+        }
+
         function clearDemoOrdersOnLoad() {
             const grid = document.getElementById('ordersGrid');
             if (!grid) return;
@@ -2420,8 +2495,7 @@
                 delete orders[id];
             });
 
-            const sumActive = document.getElementById('sumActive');
-            if (sumActive) sumActive.textContent = '0';
+            renderSumActiveBreakdown(0, 0, 0, 0);
             const sumTotal = document.getElementById('sumTotal');
             if (sumTotal) sumTotal.textContent = '€0';
             const sumDelivered = document.getElementById('sumDelivered');
@@ -2462,12 +2536,24 @@
 
         function refreshOrderSummaryCards() {
             const cards = Array.from(document.querySelectorAll('#ordersGrid .order-card'));
-            const activeCount = cards.reduce((count, card) => {
+            const activeOrders = cards.reduce((list, card) => {
                 const id = Number(String(card?.id || '').replace('order-', ''));
                 const order = orders[id];
+                if (!order) return list;
                 const ui = resolveOrderUiState(order);
-                return count + (ui.isBuilt ? 0 : 1);
-            }, 0);
+                if (!ui.isBuilt) list.push(order);
+                return list;
+            }, []);
+            let business = 0;
+            let voice = 0;
+            let chatbot = 0;
+            activeOrders.forEach((o) => {
+                const line = classifyActiveOrderProductLine(o);
+                if (line === 'business') business += 1;
+                else if (line === 'voice') voice += 1;
+                else if (line === 'chatbot') chatbot += 1;
+            });
+            renderSumActiveBreakdown(activeOrders.length, business, voice, chatbot);
             const openValue = cards.reduce((sum, card) => {
                 const id = Number(String(card?.id || '').replace('order-', ''));
                 const order = orders[id];
@@ -2482,9 +2568,6 @@
                 const ui = resolveOrderUiState(order);
                 return count + (ui.isBuilt ? 1 : 0);
             }, 0);
-
-            const sumActive = document.getElementById('sumActive');
-            if (sumActive) sumActive.textContent = String(activeCount);
 
             const sumTotal = document.getElementById('sumTotal');
             if (sumTotal) sumTotal.textContent = '€' + openValue.toLocaleString('nl-NL');
