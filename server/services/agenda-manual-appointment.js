@@ -99,7 +99,8 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       activity = 'Gehele dag niet beschikbaar';
     } else {
       appointmentTime = normalizeTimeHhMm(body.time || '');
-      location = sanitizeAppointmentLocation(body.location || '');
+      location =
+        sanitizeAppointmentLocation(body.location || '') || '—';
       activity = truncateText(normalizeString(body.activity || ''), 500);
       availableAgain = normalizeTimeHhMm(body.availableAgain || '');
     }
@@ -122,9 +123,6 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
           ok: false,
           error: 'Afspraken zijn alleen tussen 09:00 en 17:00. Kies een tijd in dat venster.',
         });
-      }
-      if (!location) {
-        return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
       }
       if (!activity) {
         return res.status(400).json({ ok: false, error: 'Vul een activiteit in.' });
@@ -210,7 +208,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
         title: 'Handmatige afspraak toegevoegd',
         detail: allDayUnavailable
           ? `${activity} op ${appointmentDate} (09:00–17:00). Door: ${whoLabel}.`
-          : `${activity} op ${appointmentDate} om ${appointmentTime}${location ? ` (${location})` : ''}. Door: ${whoLabel}.`,
+          : `${activity} op ${appointmentDate} om ${appointmentTime}. Door: ${whoLabel}.`,
         company: activity,
         actor: actorLabel,
         taskId: Number(updatedAppointment?.id || 0) || null,

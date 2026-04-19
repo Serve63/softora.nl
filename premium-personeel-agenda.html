@@ -304,15 +304,42 @@
         .legend-dot.manual-serve { background: #0d9488; }
         .legend-dot.manual-martijn { background: #7c3aed; }
 
-        .agenda-routing-notice {
+        /* Losse spraakballon onder de agenda (niet in .calendar-wrapper) */
+        .agenda-routing-bubble-wrap {
+            max-width: 1240px;
+            margin: 1.5rem auto 0;
+            padding: 0 0.2rem;
+            display: flex;
+            justify-content: flex-start;
+        }
+        .agenda-routing-bubble {
+            position: relative;
             margin: 0;
-            padding: 0.85rem 1.1rem 1.05rem;
-            border-top: 1px solid var(--border);
+            max-width: min(100%, 26.5rem);
+            padding: 0.95rem 1.25rem 1.05rem 1.2rem;
             font-family: 'Inter', sans-serif;
-            font-size: 0.8125rem;
-            font-weight: 400;
-            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 450;
             line-height: 1.5;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border: 1px solid rgba(139, 34, 82, 0.22);
+            border-radius: 18px;
+            box-shadow:
+                0 2px 4px rgba(0, 0, 0, 0.04),
+                0 14px 36px rgba(0, 0, 0, 0.09);
+        }
+        .agenda-routing-bubble::before {
+            content: '';
+            position: absolute;
+            left: 1.85rem;
+            top: -8px;
+            width: 14px;
+            height: 14px;
+            background: var(--bg-secondary);
+            border-left: 1px solid rgba(139, 34, 82, 0.22);
+            border-top: 1px solid rgba(139, 34, 82, 0.22);
+            transform: rotate(45deg);
         }
 
         /* Modal */
@@ -336,9 +363,6 @@
             transform: translateY(20px); transition: transform 0.4s var(--ease-out-expo);
         }
         .modal-overlay.show .modal { transform: translateY(0); }
-
-        /* Google Places suggesties boven handmatige afspraak-modal (z-index modal = 5000) */
-        .pac-container { z-index: 10050 !important; }
 
         .modal-top {
             padding: 1.35rem 1.5rem 0;
@@ -543,23 +567,31 @@
             height: 1rem;
         }
 
+        .modal-workspace-field--checkbox-first {
+            margin-bottom: 0.15rem;
+        }
         .modal-workspace-check {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.55rem;
-            font-size: 0.78rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
             color: var(--text-secondary);
             cursor: pointer;
             font-family: 'Inter', sans-serif;
-            line-height: 1.35;
+            line-height: 1.25;
             max-width: 36rem;
         }
-        .modal-workspace-check input {
-            margin-top: 0.18rem;
+        .modal-workspace-check input[type='checkbox'] {
             flex-shrink: 0;
-            accent-color: var(--accent-light);
             width: 1rem;
             height: 1rem;
+            margin: 0;
+            accent-color: var(--accent-light);
+            vertical-align: middle;
+        }
+        .modal-workspace-check span {
+            line-height: 1.25;
+            padding-top: 0.02em;
         }
 
         .modal-workspace-status {
@@ -968,6 +1000,15 @@
         }
         @media (max-width: 768px) {
             .main-content { padding: 1.5rem; }
+            .agenda-routing-bubble-wrap {
+                margin-top: 1.15rem;
+                padding: 0;
+            }
+            .agenda-routing-bubble {
+                max-width: 100%;
+                font-size: 0.82rem;
+                border-radius: 16px;
+            }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
             .calendar-day { min-height: 64px; }
             .appointment { font-size: 0.6rem; }
@@ -1153,6 +1194,12 @@
                 Afspraken die geen effect hebben op de werktijden <strong>09:00</strong> - <strong>17:00</strong> van maandag tot vrijdag hoeven hier niet gemeld te worden.
             </p>
             <div class="modal-workspace-grid">
+                <div class="modal-workspace-field modal-workspace-field--checkbox-first">
+                    <label class="modal-workspace-check" for="manualAppointmentFullDay">
+                        <input type="checkbox" id="manualAppointmentFullDay" autocomplete="off">
+                        <span>Gehele dag niet beschikbaar</span>
+                    </label>
+                </div>
                 <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Wie ben je?</div>
                     <div class="modal-workspace-radio-group" role="radiogroup" aria-label="Wie ben je?">
@@ -1167,19 +1214,8 @@
                     </div>
                 </div>
                 <div class="modal-workspace-field">
-                    <label class="modal-workspace-check" for="manualAppointmentFullDay">
-                        <input type="checkbox" id="manualAppointmentFullDay" autocomplete="off">
-                        <span>Gehele dag niet beschikbaar</span>
-                    </label>
-                </div>
-                <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Tijdstip Activiteit</div>
                     <input type="time" class="modal-workspace-input" id="manualAppointmentTime" min="09:00" max="17:00" step="300" autocomplete="off" required>
-                </div>
-                <div class="modal-workspace-field">
-                    <div class="modal-workspace-label">Locatie</div>
-                    <input type="text" class="modal-workspace-input" id="manualAppointmentLocation" placeholder="Adres of locatie bij de prospect" maxlength="220" autocomplete="off">
-                    <div class="modal-workspace-hint" id="manualAppointmentLocationPlacesHint" hidden>Typ en kies een adres uit de Google-suggesties. Alleen zo weet je zeker dat de locatie bestaat.</div>
                 </div>
                 <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Activiteit</div>
@@ -1292,7 +1328,10 @@
                 <div class="legend-item"><div class="legend-dot manual-serve"></div> Activiteit Servé</div>
                 <div class="legend-item"><div class="legend-dot manual-martijn"></div> Activiteit Martijn</div>
             </div>
-            <p class="agenda-routing-notice" role="note">
+        </div>
+
+        <div class="agenda-routing-bubble-wrap">
+            <p class="agenda-routing-bubble" role="note">
                 Ruben Nijhuis houdt rekening met het reizen van locatie naar locatie
             </p>
         </div>
@@ -1325,10 +1364,6 @@
     const agendaBootstrapPayload = readAgendaBootstrapPayload();
     const appointments = [];
 
-    function getAgendaGoogleMapsKey() {
-        return String(agendaBootstrapPayload && agendaBootstrapPayload.googleMapsPlacesKey || '').trim();
-    }
-
     // State
     let currentDate = new Date();
     const today = new Date();
@@ -1345,7 +1380,6 @@
     const manualAppointmentOverlay = document.getElementById('manualAppointmentOverlay');
     const manualAppointmentDateLine = document.getElementById('manualAppointmentDateLine');
     const manualAppointmentTimeEl = document.getElementById('manualAppointmentTime');
-    const manualAppointmentLocationEl = document.getElementById('manualAppointmentLocation');
     const manualAppointmentActivityEl = document.getElementById('manualAppointmentActivity');
     const manualAppointmentAvailableAgainEl = document.getElementById('manualAppointmentAvailableAgain');
     const manualAppointmentFullDayEl = document.getElementById('manualAppointmentFullDay');
@@ -1353,14 +1387,9 @@
     const manualAppointmentCloseBtn = document.getElementById('manualAppointmentCloseBtn');
     const manualAppointmentCancelBtn = document.getElementById('manualAppointmentCancelBtn');
     const manualAppointmentSubmitBtn = document.getElementById('manualAppointmentSubmitBtn');
-    const manualAppointmentLocationPlacesHint = document.getElementById('manualAppointmentLocationPlacesHint');
     const calendarGridEl = document.getElementById('calendarGrid');
     let manualAppointmentSelectedDate = '';
     let manualAppointmentSaving = false;
-    let manualAppointmentLocationPlaceConfirmed = false;
-    let agendaPlacesAutocompleteBound = false;
-    let agendaPlacesLoadAborted = false;
-    let programmaticManualLocationUpdate = false;
     const modalAudioBlock = document.getElementById('modalAudioBlock');
     const modalAudioPlayer = document.getElementById('modalAudioPlayer');
     const modalAudioEmpty = document.getElementById('modalAudioEmpty');
@@ -1868,116 +1897,6 @@
         return h * 60 + mins;
     }
 
-    function loadGoogleMapsPlaces(apiKey) {
-        return new Promise(function (resolve, reject) {
-            if (window.google && window.google.maps && window.google.maps.places) {
-                resolve(window.google.maps);
-                return;
-            }
-            var existing = document.getElementById('softoraGoogleMapsPlacesScript');
-            if (existing) {
-                var deadline = Date.now() + 15000;
-                (function wait() {
-                    if (window.google && window.google.maps && window.google.maps.places) {
-                        resolve(window.google.maps);
-                    } else if (Date.now() > deadline) {
-                        reject(new Error('Google Maps time-out'));
-                    } else {
-                        setTimeout(wait, 50);
-                    }
-                })();
-                return;
-            }
-            var cbName = 'softoraAgendaPlacesCb_' + String(Date.now());
-            window[cbName] = function () {
-                try {
-                    delete window[cbName];
-                } catch (_) { /* ignore */ }
-                if (window.google && window.google.maps && window.google.maps.places) {
-                    resolve(window.google.maps);
-                } else {
-                    reject(new Error('Google Maps niet geladen'));
-                }
-            };
-            var script = document.createElement('script');
-            script.id = 'softoraGoogleMapsPlacesScript';
-            script.async = true;
-            script.defer = true;
-            script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(apiKey) + '&libraries=places&callback=' + cbName;
-            script.onerror = function () {
-                try {
-                    delete window[cbName];
-                } catch (_) { /* ignore */ }
-                try {
-                    script.remove();
-                } catch (_) { /* ignore */ }
-                reject(new Error('Google Maps script geweigerd'));
-            };
-            document.head.appendChild(script);
-        });
-    }
-
-    function ensureAgendaPlacesReady() {
-        return new Promise(function (resolve) {
-            var key = getAgendaGoogleMapsKey();
-            if (!key || !manualAppointmentLocationEl || agendaPlacesLoadAborted) {
-                resolve();
-                return;
-            }
-            if (agendaPlacesAutocompleteBound) {
-                resolve();
-                return;
-            }
-            loadGoogleMapsPlaces(key)
-                .then(function () {
-                    if (!manualAppointmentLocationEl || agendaPlacesAutocompleteBound) {
-                        resolve();
-                        return;
-                    }
-                    var AutocompleteCtor = window.google.maps.places.Autocomplete;
-                    if (typeof AutocompleteCtor !== 'function') {
-                        resolve();
-                        return;
-                    }
-                    var autocomplete = new AutocompleteCtor(manualAppointmentLocationEl, {
-                        fields: ['formatted_address', 'place_id', 'geometry', 'name'],
-                    });
-                    autocomplete.addListener('place_changed', function () {
-                        var place = autocomplete.getPlace();
-                        if (!place || !place.geometry || !manualAppointmentLocationEl) {
-                            manualAppointmentLocationPlaceConfirmed = false;
-                            return;
-                        }
-                        var label = String(place.formatted_address || place.name || '').trim();
-                        if (!label) {
-                            manualAppointmentLocationPlaceConfirmed = false;
-                            return;
-                        }
-                        programmaticManualLocationUpdate = true;
-                        manualAppointmentLocationEl.value = label.slice(0, 220);
-                        manualAppointmentLocationEl.dataset.placeId = String(place.place_id || '').trim();
-                        manualAppointmentLocationPlaceConfirmed = true;
-                        window.requestAnimationFrame(function () {
-                            programmaticManualLocationUpdate = false;
-                        });
-                    });
-                    manualAppointmentLocationEl.addEventListener('input', function () {
-                        if (programmaticManualLocationUpdate) return;
-                        manualAppointmentLocationPlaceConfirmed = false;
-                        manualAppointmentLocationEl.dataset.placeId = '';
-                    });
-                    agendaPlacesAutocompleteBound = true;
-                    resolve();
-                })
-                .catch(function () {
-                    agendaPlacesLoadAborted = true;
-                    manualAppointmentLocationPlaceConfirmed = true;
-                    if (manualAppointmentLocationPlacesHint) manualAppointmentLocationPlacesHint.hidden = true;
-                    resolve();
-                });
-        });
-    }
-
     function isManualAppointmentTimeAllowed(timeStr) {
         const total = parseManualTimeToMinutes(timeStr);
         if (total === null) return false;
@@ -1999,7 +1918,6 @@
         const on = Boolean(manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked);
         const toToggle = [
             manualAppointmentTimeEl,
-            manualAppointmentLocationEl,
             manualAppointmentActivityEl,
             manualAppointmentAvailableAgainEl,
         ];
@@ -2024,14 +1942,6 @@
         manualAppointmentSelectedDate = String(dateYmd || '').trim();
         manualAppointmentDateLine.textContent = formatAgendaDateLongNl(manualAppointmentSelectedDate);
         if (manualAppointmentTimeEl) manualAppointmentTimeEl.value = '10:00';
-        if (manualAppointmentLocationEl) {
-            manualAppointmentLocationEl.value = '';
-            manualAppointmentLocationEl.dataset.placeId = '';
-        }
-        manualAppointmentLocationPlaceConfirmed = !getAgendaGoogleMapsKey();
-        if (manualAppointmentLocationPlacesHint) {
-            manualAppointmentLocationPlacesHint.hidden = !getAgendaGoogleMapsKey();
-        }
         if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
         if (manualAppointmentAvailableAgainEl) manualAppointmentAvailableAgainEl.value = '';
         if (manualAppointmentFullDayEl) manualAppointmentFullDayEl.checked = false;
@@ -2040,9 +1950,6 @@
         setManualAppointmentStatus('');
         manualAppointmentOverlay.classList.add('show');
         manualAppointmentOverlay.setAttribute('aria-hidden', 'false');
-        window.setTimeout(function () {
-            void ensureAgendaPlacesReady();
-        }, 0);
         window.setTimeout(() => {
             if (manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked) {
                 manualAppointmentFullDayEl.focus();
@@ -2065,7 +1972,6 @@
         if (!manualAppointmentSelectedDate || manualAppointmentSaving) return;
         const fullDay = Boolean(manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked);
         const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
-        const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
         const availableAgain = manualAppointmentAvailableAgainEl
             ? String(manualAppointmentAvailableAgainEl.value || '').trim()
@@ -2081,17 +1987,6 @@
             if (!isManualAppointmentTimeAllowed(timeVal)) {
                 setManualAppointmentStatus(
                     'Kies een tijd tussen 09:00 en 17:00. Andere tijden worden niet in de agenda gezet.',
-                    'error'
-                );
-                return;
-            }
-            if (!location) {
-                setManualAppointmentStatus('Vul een locatie in.', 'error');
-                return;
-            }
-            if (getAgendaGoogleMapsKey() && !manualAppointmentLocationPlaceConfirmed) {
-                setManualAppointmentStatus(
-                    'Kies een bestaand adres uit de Google-suggesties (klik een voorstel aan).',
                     'error'
                 );
                 return;
@@ -2123,7 +2018,6 @@
                 payload.allDayUnavailable = true;
             } else {
                 payload.time = timeVal;
-                payload.location = location;
                 payload.activity = activity;
                 payload.availableAgain = availableAgain;
             }

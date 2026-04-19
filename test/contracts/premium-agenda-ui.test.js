@@ -106,15 +106,14 @@ test('premium agenda offers manual add flow on day click with business-hour noti
   assert.match(pageSource, /Activiteit Martijn/);
 });
 
-test('premium agenda handmatige locatie kan Google Places autocomplete gebruiken', () => {
+test('premium agenda handmatige afspraak-modal heeft geen locatieveld', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /id="manualAppointmentLocationPlacesHint"/);
-  assert.match(pageSource, /function getAgendaGoogleMapsKey\(\)/);
-  assert.match(pageSource, /function ensureAgendaPlacesReady\(\)/);
-  assert.match(pageSource, /googleMapsPlacesKey/);
-  assert.match(pageSource, /\.pac-container\s*\{\s*z-index:\s*10050/);
+  assert.doesNotMatch(pageSource, /id="manualAppointmentLocation"/);
+  assert.doesNotMatch(pageSource, /ensureAgendaPlacesReady/);
+  assert.match(pageSource, /payload\.activity = activity/);
+  assert.match(pageSource, /payload\.availableAgain = availableAgain/);
 });
 
 test('premium agenda keeps appointment color in sync with existing dossiers', () => {
