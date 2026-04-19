@@ -311,11 +311,15 @@
             padding: 0 0.2rem;
             display: flex;
             justify-content: flex-start;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .agenda-routing-bubble {
             position: relative;
             margin: 0;
-            max-width: min(100%, 26.5rem);
+            width: max-content;
+            max-width: none;
+            white-space: nowrap;
             padding: 0.95rem 1.25rem 1.05rem 1.2rem;
             font-family: 'Inter', sans-serif;
             font-size: 0.875rem;
@@ -1013,7 +1017,6 @@
                 padding: 0;
             }
             .agenda-routing-bubble {
-                max-width: 100%;
                 font-size: 0.82rem;
                 border-radius: 16px;
             }
