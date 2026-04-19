@@ -3109,7 +3109,7 @@
     const radiusKm = resolveCampaignRegioRadiusKmForLeadCount(regioSel);
     const leads = getDialableLeadsForRegioCount();
     const count = countDialableLeadsWithinCampaignRegioRadius(leads, radiusKm);
-    valueEl.textContent = `${baseLabel} · ${count} bedrijven`;
+    valueEl.textContent = `${baseLabel} · ${count} Bedrijven`;
     if (wrapper) {
       wrapper.setAttribute(
         'title',
