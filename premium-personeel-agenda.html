@@ -1975,9 +1975,9 @@
 
         if (!todays.length) {
             host.innerHTML =
-                '<p>Even alsof <strong>Ruben</strong> je dit mondeling vertelt: voor <strong>vandaag</strong> (' +
+                '<p>Even alsof Ruben je dit mondeling vertelt: voor vandaag (' +
                 escapeAgendaPlanningHtml(longDate) +
-                ') zie ik <strong>nog geen afspraken</strong> in de agenda. Zodra er iets ingepland staat, vult dit blok vanzelf bij—met een korte “van hier naar daar” en of het een rustige of <strong>drukke dag</strong> wordt.</p>';
+                ') zie ik nog geen afspraken in de agenda. Zodra er iets ingepland staat, vult dit blok vanzelf bij—met een korte “van hier naar daar” en of het een rustige of drukke dag wordt.</p>';
             return;
         }
 
@@ -1995,24 +1995,24 @@
             const locHtml = escapeAgendaPlanningHtml(locRaw);
             const startHtml = escapeAgendaPlanningHtml(RUBEN_DEFAULT_START_ADDRESS);
             const locPart = hasLoc
-                ? ' De locatie is <strong>' + locHtml + '</strong>.'
-                : ' Er staat <strong>nog geen adres</strong> bij deze afspraak in de agenda.';
+                ? ' De locatie is ' + locHtml + '.'
+                : ' Er staat nog geen adres bij deze afspraak in de agenda.';
             const drivePart = hasLoc
-                ? ' Vanaf <strong>' +
+                ? ' Vanaf ' +
                   startHtml +
-                  '</strong> is dat <strong>een autorit naar die locatie</strong>—reken op <strong>normale reistijd</strong> (en eventuele vertraging) als je vertrek plant.'
-                : ' Je vertrekt vanuit <strong>' +
+                  ' is dat een autorit naar die locatie—reken op normale reistijd (en eventuele vertraging) als je vertrek plant.'
+                : ' Je vertrekt vanuit ' +
                   startHtml +
-                  '</strong>; zodra het adres bekend is, kun je de rit preciezer timen.';
+                  '; zodra het adres bekend is, kun je de rit preciezer timen.';
 
             host.innerHTML =
-                '<p>Zo zou <strong>Ruben</strong> het zeggen: <strong>vandaag</strong> (' +
+                '<p>Zo zou Ruben het zeggen: vandaag (' +
                 escapeAgendaPlanningHtml(longDate) +
-                ') is een <strong>relatief rustige dag</strong> met <strong>één afspraak</strong> om <strong>' +
+                ') is een relatief rustige dag met één afspraak om ' +
                 time +
-                '</strong> (<strong>' +
+                ' (' +
                 label +
-                '</strong>).' +
+                ').' +
                 locPart +
                 drivePart +
                 '</p>';
@@ -2021,11 +2021,11 @@
 
         const parts = [];
         parts.push(
-            '<p>Zo zou <strong>Ruben</strong> je dag kunnen voorlezen: <strong>vandaag</strong> (' +
+            '<p>Zo zou Ruben je dag kunnen voorlezen: vandaag (' +
                 escapeAgendaPlanningHtml(longDate) +
-                '), vertrekkend vanuit <strong>' +
+                '), vertrekkend vanuit ' +
                 escapeAgendaPlanningHtml(RUBEN_DEFAULT_START_ADDRESS) +
-                '</strong>. Dit is hoe de dag eruitziet; er wordt rekening gehouden met <strong>reistijd tussen locaties</strong> zodat een vervolgafspraak aansluit op het adres van de vorige stop.</p>'
+                '. Dit is hoe de dag eruitziet; er wordt rekening gehouden met reistijd tussen locaties zodat een vervolgafspraak aansluit op het adres van de vorige stop.</p>'
         );
 
         const items = [];
@@ -2040,21 +2040,20 @@
 
             if (apt.manualAllDayUnavailable) {
                 items.push(
-                    '<li>Je hebt <strong>de hele (werk)dag geblokkeerd</strong>: <strong>' +
+                    '<li>Je hebt de hele (werk)dag geblokkeerd: ' +
                         label +
-                        '</strong>—er staan dan geen losse tijdsloten tussen.</li>'
+                        '—er staan dan geen losse tijdsloten tussen.</li>'
                 );
                 return;
             }
 
             if (index === 0) {
                 items.push(
-                    '<li>Je start om <strong>' +
+                    '<li>Je start om ' +
                         time +
-                        '</strong> met <strong>' +
+                        ' met ' +
                         label +
-                        '</strong>' +
-                        (hasLoc ? ' op <strong>' + locHtml + '</strong>' : '') +
+                        (hasLoc ? ' op ' + locHtml : '') +
                         '.</li>'
                 );
                 return;
@@ -2068,30 +2067,28 @@
             const prevHas = !isPlaceholderAgendaLocation(prevLocRaw);
             if (prevHas && hasLoc) {
                 items.push(
-                    '<li>Daarna reis je van <strong>' +
+                    '<li>Daarna reis je van ' +
                         escapeAgendaPlanningHtml(prevLocRaw) +
-                        '</strong> naar <strong>' +
+                        ' naar ' +
                         locHtml +
-                        '</strong> voor <strong>' +
+                        ' voor ' +
                         label +
-                        '</strong> om <strong>' +
+                        ' om ' +
                         time +
-                        '</strong>.</li>'
+                        '.</li>'
                 );
             } else if (hasLoc) {
                 items.push(
-                    '<li>Om <strong>' +
+                    '<li>Om ' +
                         time +
-                        '</strong> ben je op <strong>' +
+                        ' ben je op ' +
                         locHtml +
-                        '</strong> voor <strong>' +
+                        ' voor ' +
                         label +
-                        '</strong>.</li>'
+                        '.</li>'
                 );
             } else {
-                items.push(
-                    '<li>Om <strong>' + time + '</strong> volgt <strong>' + label + '</strong>.</li>'
-                );
+                items.push('<li>Om ' + time + ' volgt ' + label + '.</li>');
             }
         });
 
@@ -2100,17 +2097,17 @@
         let closing = '';
         if (n >= 4) {
             closing =
-                '<p><strong>Drukke dag</strong>—vier afspraken of meer; plan ruim buffer tussen ritten en houd rekening met onderweg-zijn.</p>';
+                '<p>Drukke dag—vier afspraken of meer; plan ruim buffer tussen ritten en houd rekening met onderweg-zijn.</p>';
         } else if (n === 3) {
             closing =
-                '<p>Drie afspraken vandaag: <strong>best vol</strong>; tussen elke stop zit logisch gezien ritijd.</p>';
+                '<p>Drie afspraken vandaag: best vol; tussen elke stop zit logisch gezien ritijd.</p>';
         } else if (n === 2) {
             closing =
-                '<p><strong>Twee afspraken</strong>: je reist van de ene locatie naar de andere—houd rekening met een normale rit ertussen.</p>';
+                '<p>Twee afspraken: je reist van de ene locatie naar de andere—houd rekening met een normale rit ertussen.</p>';
         } else if (n <= 1 && nAll === 1 && todays[0] && todays[0].manualAllDayUnavailable) {
             closing = '<p>Verder geen losse tijdstippen vandaag—alles zit in dat ene blok.</p>';
         } else if (n === 1) {
-            closing = '<p><strong>Rustige dag</strong> qua aantal stops—één duidelijk hoofdstuk op de planning.</p>';
+            closing = '<p>Rustige dag qua aantal stops—één duidelijk hoofdstuk op de planning.</p>';
         } else {
             closing = '<p>Dat is je beeld voor vandaag—succes onderweg.</p>';
         }
