@@ -118,7 +118,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
     const summary = [
       activity,
       `Wie: ${whoLabel}`,
-      `Weer beschikbaar voor een reis naar prospect: ${availableAgain}`,
+      `Weer thuis, beschikbaar voor een reis naar prospect: ${availableAgain}`,
     ].join('\n\n');
 
     const baseAppointment = {
