@@ -510,6 +510,14 @@
             gap: 0.75rem;
         }
 
+        /* Kinderen blijven grid-items; bij gehele dag verbergen we het hele blok */
+        .manual-appointment-detail-fields {
+            display: contents;
+        }
+        .manual-appointment-detail-fields.is-hidden-for-fullday {
+            display: none !important;
+        }
+
         .modal-workspace-field textarea {
             width: 100%;
             min-height: 130px;
@@ -1213,6 +1221,7 @@
                         </label>
                     </div>
                 </div>
+                <div class="manual-appointment-detail-fields" id="manualAppointmentDetailFields">
                 <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Tijdstip Activiteit</div>
                     <input type="time" class="modal-workspace-input" id="manualAppointmentTime" min="09:00" max="17:00" step="300" autocomplete="off" required>
@@ -1224,6 +1233,7 @@
                 <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Weer thuis, beschikbaar voor een reis naar prospect</div>
                     <input type="time" class="modal-workspace-input" id="manualAppointmentAvailableAgain" step="300" autocomplete="off" aria-label="Tijd weer beschikbaar na reis naar prospect">
+                </div>
                 </div>
             </div>
             <div class="modal-workspace-status" id="manualAppointmentStatus"></div>
@@ -1916,15 +1926,11 @@
 
     function syncManualAppointmentFullDayFields() {
         const on = Boolean(manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked);
-        const toToggle = [
-            manualAppointmentTimeEl,
-            manualAppointmentActivityEl,
-            manualAppointmentAvailableAgainEl,
-        ];
-        toToggle.forEach(function (el) {
-            if (!el) return;
-            el.disabled = on;
-        });
+        const detailWrap = document.getElementById('manualAppointmentDetailFields');
+        if (detailWrap) {
+            detailWrap.classList.toggle('is-hidden-for-fullday', on);
+            detailWrap.setAttribute('aria-hidden', on ? 'true' : 'false');
+        }
         if (manualAppointmentTimeEl) {
             if (on) manualAppointmentTimeEl.removeAttribute('required');
             else manualAppointmentTimeEl.setAttribute('required', '');
