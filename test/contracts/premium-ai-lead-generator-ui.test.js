@@ -25,15 +25,18 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<div class="form-group form-group--dispatch" id="callDispatchControlWrap">/);
   assert.match(pageSource, /<select class="form-select magnetic" id="callDispatchMode">/);
   assert.match(pageSource, /<select class="form-select magnetic" id="regio">/);
+  assert.match(pageSource, /<label class="form-label form-label--regio" for="regio">/);
   assert.match(
     pageSource,
-    /<label class="form-label" for="regio">Omstreken Oisterwijk<span class="form-label-tip form-label-tip--info" id="campaignRegioTip"><span class="form-label-info-wrap"[\s\S]*?TIP: Start dichtbij en breid het steeds verder uit\.[\s\S]*?<\/span><\/span><\/label>/
+    /id="campaignRegioTip"[\s\S]*?<span class="form-label-regio-heading">Omstreken Oisterwijk<\/span>[\s\S]*?id="campaignRegioLeadCount"/
   );
   assert.match(pageSource, /<select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">/);
   assert.match(pageSource, /<option value="websites" data-dot-color="accent" selected>Website's<\/option>/);
-  assert.match(pageSource, /<option value="voice_software" data-dot-color="green" disabled>🔒 Voicesoftware<\/option>/);
-  assert.match(pageSource, /<option value="business_software" data-dot-color="blue" disabled>🔒 Bedrijfssoftware<\/option>/);
-  assert.match(pageSource, /<option value="ai_chatbots" data-dot-color="accent" disabled>🔒 AI Chatbots<\/option>/);
+  assert.match(pageSource, /<option value="voice_software" data-dot-color="green" disabled>Voicesoftware<\/option>/);
+  assert.match(pageSource, /<option value="business_software" data-dot-color="blue" disabled>Bedrijfssoftware<\/option>/);
+  assert.match(pageSource, /<option value="ai_chatbots" data-dot-color="accent" disabled>AI Chatbots<\/option>/);
+  assert.match(pageSource, /serviceLockOptionValues = new Set\(\['voice_software', 'business_software', 'ai_chatbots'\]\)/);
+  assert.match(pageSource, /class="sidebar-link-lock-icon"/);
   assert.match(pageSource, /<option value="unlimited" selected>Geen limiet<\/option>/);
   assert.match(pageSource, /<option value="auto">Automatisch<\/option>/);
   assert.match(pageSource, /<option value="150km">150 km<\/option>/);
@@ -55,7 +58,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="blue"\] \.site-select-trigger::before \{[\s\S]*background:\s*#2563eb;/);
   assert.match(
     pageSource,
-    /<div class="form-group form-group--agenda-capacity">[\s\S]*<input type="checkbox" id="campaignFillAgendaWorkdays"[\s\S]*Start campagne tot 10 werkdagen vooruit is volgepland\./
+    /<div class="form-group form-group--agenda-capacity">[\s\S]*<input type="checkbox" id="campaignFillAgendaWorkdays"[\s\S]*Start Campagne tot 10 werkdagen vooruit is volgepland\./
   );
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--agenda-capacity\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*grid-row:\s*2;/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--slider\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*grid-row:\s*3;/);
@@ -87,6 +90,8 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     /bindCampaignFormStatePersistence\(\);\s*syncCampaignFillAgendaSliderVisibility\(\);/
   );
   assert.match(dashboardSource, /function paintRegioLeadCountOnCustomSelectValue\(\)/);
+  assert.match(dashboardSource, /const countHost = byId\('campaignRegioLeadCount'\);/);
+  assert.match(dashboardSource, /valueEl\.innerHTML = safeLabel;/);
   assert.match(dashboardSource, /function hookRegioLeadCountCustomSelectSync\(\)/);
   assert.match(dashboardSource, /const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';/);
   assert.match(dashboardSource, /const MAX_CAMPAIGN_REGIO_KM_CHOICE = 250;/);
@@ -291,16 +296,15 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.doesNotMatch(dashboardSource, /window\.sessionStorage/);
 });
 
-test('premium ai lead generator includes a live Retell cost counter', () => {
+test('premium ai lead generator omits topbar Retell cost; widget asset stays for other pages', () => {
   const pagePath = path.join(__dirname, '../../premium-ai-lead-generator.html');
   const costWidgetPath = path.join(__dirname, '../../assets/retell-cost-widget.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const costWidgetSource = fs.readFileSync(costWidgetPath, 'utf8');
 
-  assert.match(pageSource, /<span class="topbar-select-label">Geschatte coldcalling kosten<\/span>/);
-  assert.match(pageSource, /<div class="topbar-cost-group" data-retell-cost-root>/);
-  assert.match(pageSource, /<div class="topbar-cost-value" data-retell-cost-value>€0,00<\/div>/);
-  assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260417a" defer><\/script>/);
+  assert.doesNotMatch(pageSource, /Geschatte coldcalling kosten/);
+  assert.doesNotMatch(pageSource, /data-retell-cost-root/);
+  assert.doesNotMatch(pageSource, /retell-cost-widget\.js/);
   assert.doesNotMatch(pageSource, /topbar-cost-dot/);
   assert.doesNotMatch(pageSource, /data-retell-cost-meta/);
   assert.match(costWidgetSource, /const COST_SUMMARY_ENDPOINT = '\/api\/coldcalling\/cost-summary\?scope=all_time';/);

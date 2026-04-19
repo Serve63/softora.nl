@@ -757,13 +757,13 @@
             "</nav>",
             '<div class="sidebar-footer">',
             '  <div class="sidebar-user">',
-            '    <button type="button" class="sidebar-user-trigger" data-sidebar-profile-trigger="1" aria-label="Profiel bewerken">',
+            '    <div class="sidebar-user-trigger" role="group" aria-label="Gebruikersinfo">',
             '      <div class="sidebar-avatar" data-sidebar-avatar>SP</div>',
             '      <div class="sidebar-user-info">',
             '        <div class="sidebar-user-name" data-sidebar-user-name>Softora Premium</div>',
             '        <div class="sidebar-user-role" data-sidebar-user-role>Full Acces</div>',
             "      </div>",
-            "    </button>",
+            "    </div>",
             '    <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">',
             '      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>',
             "    </a>",
@@ -1083,7 +1083,7 @@
         const nameEl = document.querySelector("[data-sidebar-user-name]");
         const roleEl = document.querySelector("[data-sidebar-user-role]");
         const avatarEl = document.querySelector("[data-sidebar-avatar]");
-        const triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
+        const profileWrapEl = document.querySelector(".sidebar-user .sidebar-user-trigger");
         const sidebar = document.querySelector(".sidebar");
         const activeKey = getSidebarActiveKey(pathname);
 
@@ -1097,7 +1097,7 @@
             neutralizeSidebarAnchors();
         }
 
-        if (!nameEl || !roleEl || !avatarEl || !triggerEl) {
+        if (!nameEl || !roleEl || !avatarEl) {
             markPremiumSidebarProfileResolved();
             return;
         }
@@ -1118,10 +1118,12 @@
 
         nameEl.textContent = String(resolvedSession.displayName || "Softora Premium");
         roleEl.textContent = buildSidebarRoleLabel(resolvedSession.role);
-        triggerEl.setAttribute(
-            "aria-label",
-            `Profiel bewerken van ${String(resolvedSession.displayName || "Softora Premium")}`
-        );
+        if (profileWrapEl) {
+            profileWrapEl.setAttribute(
+                "aria-label",
+                `Ingelogd als ${String(resolvedSession.displayName || "Softora Premium")}`
+            );
+        }
         paintSidebarAvatar(avatarEl, resolvedSession);
         markPremiumSidebarProfileResolved();
         if (sidebar) {
@@ -1455,16 +1457,17 @@
 
     function initPremiumSidebarProfile() {
         if (!isPremiumPersonnelContext) return;
+        if (document.documentElement.dataset.premiumSidebarProfileInit === "1") return;
+        document.documentElement.dataset.premiumSidebarProfileInit = "1";
         const triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
-        if (!triggerEl) {
-            markPremiumSidebarProfileResolved();
-            return;
+        if (triggerEl && String(triggerEl.tagName || "").toLowerCase() === "button") {
+            if (triggerEl.dataset.profileInit !== "1") {
+                triggerEl.dataset.profileInit = "1";
+                triggerEl.addEventListener("click", function () {
+                    openPremiumProfileModal();
+                });
+            }
         }
-        if (triggerEl.dataset.profileInit === "1") return;
-        triggerEl.dataset.profileInit = "1";
-        triggerEl.addEventListener("click", function () {
-            openPremiumProfileModal();
-        });
         loadPremiumSession();
     }
 

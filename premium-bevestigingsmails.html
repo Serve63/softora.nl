@@ -872,6 +872,26 @@
             white-space: nowrap;
         }
 
+        .topbar-right .site-select--pill .site-select-option.site-select-option--locked {
+            display: flex;
+            align-items: center;
+            gap: 0.42rem;
+        }
+
+        .topbar-right .site-select--pill .site-select-option .sidebar-link-lock {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .topbar-right .site-select--pill .site-select-option .sidebar-link-lock-icon {
+            width: 15px;
+            height: 15px;
+            opacity: 0.72;
+            flex-shrink: 0;
+        }
+
         .site-dialog-backdrop {
             position: fixed;
             inset: 0;
@@ -1235,15 +1255,15 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid var(--border);
-            background: var(--bg-primary);
+            padding: 0;
+            border: none;
+            background: transparent;
             color: var(--text-secondary);
             cursor: pointer;
-            transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+            transition: color 0.2s ease, transform 0.2s ease;
         }
 
         .stat-card-reset:hover {
-            border-color: var(--accent-light);
             color: var(--accent-light);
             transform: rotate(-12deg);
         }
@@ -1855,13 +1875,13 @@
           </nav>
           <div class="sidebar-footer">
             <div class="sidebar-user">
-              <button type="button" class="sidebar-user-trigger" data-sidebar-profile-trigger="1" aria-label="Profiel bewerken">
+              <div class="sidebar-user-trigger" role="group" aria-label="Gebruikersinfo">
                 <div class="sidebar-avatar" data-sidebar-avatar>SP</div>
                 <div class="sidebar-user-info">
                   <div class="sidebar-user-name" data-sidebar-user-name>Softora Premium</div>
                   <div class="sidebar-user-role" data-sidebar-user-role>Full Acces</div>
                 </div>
-              </button>
+              </div>
               <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
               </a>
@@ -1882,8 +1902,8 @@
                         <span class="topbar-select-label">Service</span>
                         <select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">
                             <option value="websites" data-dot-color="accent" selected>Website's</option>
-                            <option value="voice_software" data-dot-color="green" disabled>🔒 Voicesoftware</option>
-                            <option value="business_software" data-dot-color="blue" disabled>🔒 Bedrijfssoftware</option>
+                            <option value="voice_software" data-dot-color="green" disabled>Voicesoftware</option>
+                            <option value="business_software" data-dot-color="blue" disabled>Bedrijfssoftware</option>
                         </select>
                     </div>
                     <div class="topbar-select-group">
@@ -2148,11 +2168,30 @@
                 });
             }
 
+            const serviceLockOptionValues = new Set(['voice_software', 'business_software', 'ai_chatbots']);
+            const serviceLockMarkup =
+                '<span class="sidebar-link-lock" aria-hidden="true">' +
+                '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>' +
+                '<rect x="5" y="11" width="14" height="11" rx="2" ry="2"/>' +
+                '</svg></span>';
+
             Array.from(select.options).forEach((option, index) => {
                 const optionButton = document.createElement('button');
                 optionButton.type = 'button';
                 optionButton.className = 'site-select-option';
-                optionButton.textContent = option.textContent;
+                const rawLabel = String(option.textContent || '').trim().replace(/^\uD83D\uDD12\s*/u, '').replace(/^🔒\s*/, '').trim();
+                const useServiceLockSvg =
+                    option.disabled &&
+                    selectVariant === 'pill' &&
+                    serviceLockOptionValues.has(String(option.value || '').trim());
+                if (useServiceLockSvg) {
+                    optionButton.classList.add('site-select-option--locked');
+                    optionButton.innerHTML = `${serviceLockMarkup}<span class="site-select-option-label"></span>`;
+                    optionButton.querySelector('.site-select-option-label').textContent = rawLabel;
+                } else {
+                    optionButton.textContent = String(option.textContent || '').trim();
+                }
                 optionButton.dataset.value = option.value;
                 optionButton.setAttribute('role', 'option');
                 optionButton.disabled = option.disabled;

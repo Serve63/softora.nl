@@ -3172,7 +3172,12 @@
     const safeCount = String(n);
     const buildingSvg =
       '<svg class="site-select-regio-count-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V8l8-4 8 4v13"></path><path d="M4 21h16"></path><path d="M9 21v-4h6v4"></path><path d="M9 11h.01M12 11h.01M15 11h.01M9 15h.01M12 15h.01M15 15h.01"></path></svg>';
-    valueEl.innerHTML = `${safeLabel} · <span class="site-select-regio-count">${buildingSvg}<span class="site-select-regio-count-num">${safeCount}</span></span>`;
+    valueEl.innerHTML = safeLabel;
+    const countHost = byId('campaignRegioLeadCount');
+    if (countHost) {
+      countHost.innerHTML = `<span class="site-select-regio-count">${buildingSvg}<span class="site-select-regio-count-num">${safeCount}</span></span>`;
+      countHost.setAttribute('aria-label', `${n} bedrijven in dit gebied`);
+    }
     const trigger = valueEl.closest('.site-select-trigger');
     if (trigger) {
       trigger.setAttribute('aria-label', `Regio: ${baseLabel}, ${n} bedrijven`);

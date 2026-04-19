@@ -331,59 +331,6 @@
             text-align: center;
         }
 
-        .topbar-cost-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.28rem;
-            min-width: 15.5rem;
-        }
-
-        .topbar-cost-card {
-            width: 15.5rem;
-            min-width: 15.5rem;
-            max-width: 15.5rem;
-            min-height: auto;
-            padding: 0;
-            border: none;
-            background: transparent;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .topbar-cost-stack {
-            display: flex;
-            justify-content: center;
-            min-width: 0;
-            width: 100%;
-        }
-
-        .topbar-cost-copy {
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.12rem;
-            text-align: center;
-        }
-
-        .topbar-cost-value {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.82rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            line-height: 1;
-            color: var(--text-primary);
-            white-space: nowrap;
-        }
-
-        .topbar-cost-group .topbar-select-label {
-            font-size: 0.5rem;
-            letter-spacing: 0.14em;
-        }
-
         .topbar-left h1 {
             font-size: 2rem;
             font-weight: 700;
@@ -574,6 +521,27 @@
             opacity: 1;
         }
 
+        .form-label.form-label--regio {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.35rem 0.5rem;
+        }
+
+        .form-label.form-label--regio .form-label-tip.form-label-tip--info {
+            margin-left: 0;
+        }
+
+        .form-label-regio-heading {
+            letter-spacing: inherit;
+        }
+
+        .form-label-regio-count {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 0.1rem;
+        }
+
         .form-label-info-wrap {
             display: inline-flex;
             align-items: center;
@@ -731,21 +699,24 @@
             text-overflow: ellipsis;
         }
 
-        .site-select-value .site-select-regio-count {
+        .site-select-value .site-select-regio-count,
+        .form-label-regio-count .site-select-regio-count {
             display: inline-flex;
             align-items: center;
             gap: 0.32rem;
             vertical-align: middle;
         }
 
-        .site-select-value .site-select-regio-count-icon {
+        .site-select-value .site-select-regio-count-icon,
+        .form-label-regio-count .site-select-regio-count-icon {
             width: 0.92rem;
             height: 0.92rem;
             flex-shrink: 0;
             opacity: 0.88;
         }
 
-        .site-select-value .site-select-regio-count-num {
+        .site-select-value .site-select-regio-count-num,
+        .form-label-regio-count .site-select-regio-count-num {
             font-variant-numeric: tabular-nums;
         }
 
@@ -881,6 +852,26 @@
             letter-spacing: 0.08em;
             text-transform: uppercase;
             white-space: nowrap;
+        }
+
+        .topbar-right .site-select--pill .site-select-option.site-select-option--locked {
+            display: flex;
+            align-items: center;
+            gap: 0.42rem;
+        }
+
+        .topbar-right .site-select--pill .site-select-option .sidebar-link-lock {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .topbar-right .site-select--pill .site-select-option .sidebar-link-lock-icon {
+            width: 15px;
+            height: 15px;
+            opacity: 0.72;
+            flex-shrink: 0;
         }
 
         .site-dialog-backdrop {
@@ -1290,15 +1281,15 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid var(--border);
-            background: var(--bg-primary);
+            padding: 0;
+            border: none;
+            background: transparent;
             color: var(--text-secondary);
             cursor: pointer;
-            transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+            transition: color 0.2s ease, transform 0.2s ease;
         }
 
         .stat-card-reset:hover {
-            border-color: var(--accent-light);
             color: var(--accent-light);
             transform: rotate(-12deg);
         }
@@ -1900,13 +1891,13 @@
           </nav>
           <div class="sidebar-footer">
             <div class="sidebar-user">
-              <button type="button" class="sidebar-user-trigger" data-sidebar-profile-trigger="1" aria-label="Profiel bewerken">
+              <div class="sidebar-user-trigger" role="group" aria-label="Gebruikersinfo">
                 <div class="sidebar-avatar" data-sidebar-avatar>SP</div>
                 <div class="sidebar-user-info">
                   <div class="sidebar-user-name" data-sidebar-user-name>Softora Premium</div>
                   <div class="sidebar-user-role" data-sidebar-user-role>Full Acces</div>
                 </div>
-              </button>
+              </div>
               <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
               </a>
@@ -1930,9 +1921,9 @@
                         <span class="topbar-select-label">Service</span>
                         <select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">
                             <option value="websites" data-dot-color="accent" selected>Website's</option>
-                            <option value="voice_software" data-dot-color="green" disabled>🔒 Voicesoftware</option>
-                            <option value="business_software" data-dot-color="blue" disabled>🔒 Bedrijfssoftware</option>
-                            <option value="ai_chatbots" data-dot-color="accent" disabled>🔒 AI Chatbots</option>
+                            <option value="voice_software" data-dot-color="green" disabled>Voicesoftware</option>
+                            <option value="business_software" data-dot-color="blue" disabled>Bedrijfssoftware</option>
+                            <option value="ai_chatbots" data-dot-color="accent" disabled>AI Chatbots</option>
                         </select>
                     </div>
                     <div class="topbar-select-group">
@@ -1942,16 +1933,6 @@
                             <option value="gemini_flash_3_1_live">Gemini 3.1 Live</option>
                             <option value="more_coming" disabled>Meer volgt...</option>
                         </select>
-                    </div>
-                    <div class="topbar-cost-group" data-retell-cost-root>
-                        <span class="topbar-select-label">Geschatte coldcalling kosten</span>
-                        <div class="topbar-cost-card" data-state="loading" aria-live="polite">
-                            <div class="topbar-cost-stack">
-                                <div class="topbar-cost-copy">
-                                    <div class="topbar-cost-value" data-retell-cost-value>€0,00</div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1967,7 +1948,7 @@
                     <div class="form-group form-group--agenda-capacity">
                         <label class="form-checkbox-row magnetic" for="campaignFillAgendaWorkdays">
                             <input type="checkbox" id="campaignFillAgendaWorkdays" autocomplete="off">
-                            <span>Start campagne tot 10 werkdagen vooruit is volgepland.</span>
+                            <span>Start Campagne tot 10 werkdagen vooruit is volgepland.</span>
                         </label>
                     </div>
 
@@ -2002,7 +1983,7 @@
                     </div>
 
                     <div class="form-group form-group--branche">
-                        <label class="form-label">Doelgroep / Branche</label>
+                        <label class="form-label">Branche</label>
                         <select class="form-select magnetic" id="branche">
                             <option value="all" selected>Alles</option>
                             <option value="horeca">Horeca & Restaurants</option>
@@ -2029,7 +2010,7 @@
                     </div>
 
                     <div class="form-group form-group--regio">
-                        <label class="form-label" for="regio">Omstreken Oisterwijk<span class="form-label-tip form-label-tip--info" id="campaignRegioTip"><span class="form-label-info-wrap" tabindex="0" role="img" aria-label="TIP: Start dichtbij en breid het steeds verder uit." title="TIP: Start dichtbij en breid het steeds verder uit."><svg class="form-label-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9.25"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5V16M12 8.25v.01"></path></svg></span></span></label>
+                        <label class="form-label form-label--regio" for="regio"><span class="form-label-tip form-label-tip--info" id="campaignRegioTip"><span class="form-label-info-wrap" tabindex="0" role="img" aria-label="TIP: Start dichtbij en breid het steeds verder uit." title="TIP: Start dichtbij en breid het steeds verder uit."><svg class="form-label-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9.25"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5V16M12 8.25v.01"></path></svg></span></span><span class="form-label-regio-heading">Omstreken Oisterwijk</span><span id="campaignRegioLeadCount" class="form-label-regio-count" aria-live="polite"></span></label>
                         <select class="form-select magnetic" id="regio">
                             <option value="unlimited" selected>Geen limiet</option>
                             <option value="auto">Automatisch</option>
@@ -2206,11 +2187,30 @@
                 });
             }
 
+            const serviceLockOptionValues = new Set(['voice_software', 'business_software', 'ai_chatbots']);
+            const serviceLockMarkup =
+                '<span class="sidebar-link-lock" aria-hidden="true">' +
+                '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>' +
+                '<rect x="5" y="11" width="14" height="11" rx="2" ry="2"/>' +
+                '</svg></span>';
+
             Array.from(select.options).forEach((option, index) => {
                 const optionButton = document.createElement('button');
                 optionButton.type = 'button';
                 optionButton.className = 'site-select-option';
-                optionButton.textContent = option.textContent;
+                const rawLabel = String(option.textContent || '').trim().replace(/^\uD83D\uDD12\s*/u, '').replace(/^🔒\s*/, '').trim();
+                const useServiceLockSvg =
+                    option.disabled &&
+                    selectVariant === 'pill' &&
+                    serviceLockOptionValues.has(String(option.value || '').trim());
+                if (useServiceLockSvg) {
+                    optionButton.classList.add('site-select-option--locked');
+                    optionButton.innerHTML = `${serviceLockMarkup}<span class="site-select-option-label"></span>`;
+                    optionButton.querySelector('.site-select-option-label').textContent = rawLabel;
+                } else {
+                    optionButton.textContent = String(option.textContent || '').trim();
+                }
                 optionButton.dataset.value = option.value;
                 optionButton.setAttribute('role', 'option');
                 optionButton.disabled = option.disabled;
@@ -2718,6 +2718,5 @@
     </script>
     <!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->
     <script src="assets/coldcalling-dashboard.js?v=20260417d" defer></script>
-    <script src="assets/retell-cost-widget.js?v=20260417a" defer></script>
 </body>
 </html>

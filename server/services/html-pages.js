@@ -160,7 +160,7 @@ function createHtmlPageCoordinator(options = {}) {
       'Softora Premium';
     const roleLabelRaw = buildPremiumSidebarRoleLabel(authState.role);
     const renderKey = escapeHtml(buildPremiumSidebarProfileRenderKey(authState));
-    const ariaLabel = escapeHtml(`Profiel bewerken van ${displayNameRaw}`);
+    const loggedInAriaLabel = escapeHtml(`Ingelogd als ${displayNameRaw}`);
     const avatarDataUrl = String(authState.avatarDataUrl || '').trim();
     const avatarHtml = avatarDataUrl
       ? `<img src="${escapeHtml(avatarDataUrl)}" alt="${escapeHtml(displayNameRaw || 'Profielfoto')}" decoding="async">`
@@ -175,7 +175,11 @@ function createHtmlPageCoordinator(options = {}) {
     );
     renderedHtml = renderedHtml.replace(
       /(<button[^>]*data-sidebar-profile-trigger="1"[^>]*aria-label=")[^"]*(")/i,
-      `$1${ariaLabel}$2`
+      `$1${loggedInAriaLabel}$2`
+    );
+    renderedHtml = renderedHtml.replace(
+      /(<div[^>]*\bsidebar-user-trigger\b[^>]*aria-label=")[^"]*(")/i,
+      `$1${loggedInAriaLabel}$2`
     );
     renderedHtml = renderedHtml.replace(
       /(<div class="sidebar-avatar"[^>]*data-sidebar-avatar[^>]*>)([\s\S]*?)(<\/div>)/i,

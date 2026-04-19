@@ -307,12 +307,7 @@
     min-width: 0 !important;
     padding: 0 !important;
     text-align: left !important;
-    cursor: pointer !important;
-}
-
-.sidebar-user-trigger:hover .sidebar-user-name,
-.sidebar-user-trigger:hover .sidebar-user-role {
-    color: var(--accent) !important;
+    cursor: default !important;
 }
 
 .sidebar-avatar {

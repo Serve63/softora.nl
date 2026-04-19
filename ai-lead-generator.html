@@ -726,15 +726,15 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid var(--border);
-            background: var(--bg-primary);
+            padding: 0;
+            border: none;
+            background: transparent;
             color: var(--text-secondary);
             cursor: pointer;
-            transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+            transition: color 0.2s ease, transform 0.2s ease;
         }
 
         .stat-card-reset:hover {
-            border-color: var(--accent-color);
             color: var(--accent-color);
             transform: rotate(-12deg);
         }

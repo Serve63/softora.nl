@@ -36,7 +36,7 @@
         var nameEl = document.querySelector("[data-sidebar-user-name]");
         var roleEl = document.querySelector("[data-sidebar-user-role]");
         var avatarEl = document.querySelector("[data-sidebar-avatar]");
-        var triggerEl = document.querySelector("[data-sidebar-profile-trigger]");
+        var profileWrapEl = document.querySelector(".sidebar-user .sidebar-user-trigger");
         var sidebarEl = document.querySelector(".sidebar");
         if (sidebarEl && String(sidebarEl.getAttribute("data-sidebar-profile-render-key") || "").trim()) return;
         var renderKey = buildProfileRenderKey(s);
@@ -44,8 +44,8 @@
         var displayName = String(s.displayName || "Softora Premium");
         if (nameEl) nameEl.textContent = displayName;
         if (roleEl) roleEl.textContent = roleLabel(s.role);
-        if (triggerEl) {
-            triggerEl.setAttribute("aria-label", "Profiel bewerken van " + displayName);
+        if (profileWrapEl) {
+            profileWrapEl.setAttribute("aria-label", "Ingelogd als " + displayName);
         }
         if (avatarEl) {
             var url = String(s.avatarDataUrl || "").trim();
