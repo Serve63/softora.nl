@@ -81,9 +81,10 @@ test('premium ai lead generator renders campaign controls before dashboard boots
     dashboardSource,
     /writeStorage\(CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY, fillAgendaEl\.checked \? '1' : '0'\)/
   );
+  assert.match(dashboardSource, /function syncCampaignFillAgendaSliderVisibility\(\)[\s\S]*agendaCapGroup\.style\.gridRow = '2'/);
   assert.match(
     dashboardSource,
-    /const agendaCapGroup = byId\('campaignFillAgendaWorkdays'\)\?\.closest\('\.form-group'\);[\s\S]*agendaCapGroup\.style\.gridRow = '2'/
+    /bindCampaignFormStatePersistence\(\);\s*syncCampaignFillAgendaSliderVisibility\(\);/
   );
   assert.match(dashboardSource, /function paintRegioLeadCountOnCustomSelectValue\(\)/);
   assert.match(dashboardSource, /function hookRegioLeadCountCustomSelectSync\(\)/);

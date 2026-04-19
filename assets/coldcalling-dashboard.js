@@ -925,6 +925,7 @@
         if (fillAgendaEl.checked) {
           syncRegioToAutoIfFillAgendaWorkdaysEnabled();
         }
+        syncCampaignFillAgendaSliderVisibility();
       });
     }
 
@@ -2686,6 +2687,92 @@
     return modal;
   }
 
+  /** Verbergt de hoeveelheid-slider wanneer de 10-werkdagen-agenda-checkbox aan staat. */
+  function syncCampaignFillAgendaSliderVisibility() {
+    const fillAgendaEl = byId('campaignFillAgendaWorkdays');
+    const sliderStage = byId('leadSliderStage');
+    const sliderGroup =
+      sliderStage?.closest('.form-group') || byId('leadSlider')?.closest('.form-group');
+    const hideSlider = Boolean(fillAgendaEl?.checked);
+
+    if (sliderGroup) {
+      sliderGroup.style.display = hideSlider ? 'none' : '';
+      if (hideSlider) {
+        sliderGroup.setAttribute('aria-hidden', 'true');
+      } else {
+        sliderGroup.removeAttribute('aria-hidden');
+      }
+    }
+    if (sliderStage && !hideSlider) {
+      if (sliderStage.dataset.sliderReady === '1') {
+        sliderStage.removeAttribute('aria-hidden');
+      } else {
+        sliderStage.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    const generatorGrid = document.querySelector('.generator-grid');
+    const isSinglePanelLayout =
+      Boolean(generatorGrid) && generatorGrid.querySelectorAll(':scope > .panel').length === 1;
+    if (!isSinglePanelLayout) return;
+
+    const agendaCapGroup = fillAgendaEl?.closest('.form-group');
+    const controlWrap = byId('leadListControlWrap');
+    const dispatchWrap = byId('callDispatchControlWrap');
+    const brancheGroup = byId('branche')?.closest('.form-group');
+    const resolvedRegioGroup = byId('regio')?.closest('.form-group');
+
+    if (agendaCapGroup) {
+      agendaCapGroup.style.gridColumn = '1 / -1';
+      agendaCapGroup.style.gridRow = '2';
+    }
+
+    if (hideSlider) {
+      if (sliderGroup) {
+        sliderGroup.style.gridColumn = '1 / -1';
+        sliderGroup.style.gridRow = '';
+      }
+      if (controlWrap) {
+        controlWrap.style.gridColumn = '1';
+        controlWrap.style.gridRow = '3';
+      }
+      if (dispatchWrap) {
+        dispatchWrap.style.gridColumn = '1';
+        dispatchWrap.style.gridRow = '4';
+      }
+      if (brancheGroup) {
+        brancheGroup.style.gridColumn = '2';
+        brancheGroup.style.gridRow = '3';
+      }
+      if (resolvedRegioGroup) {
+        resolvedRegioGroup.style.gridColumn = '2';
+        resolvedRegioGroup.style.gridRow = '4';
+      }
+      return;
+    }
+
+    if (sliderGroup) {
+      sliderGroup.style.gridColumn = '1 / -1';
+      sliderGroup.style.gridRow = '3';
+    }
+    if (controlWrap) {
+      controlWrap.style.gridColumn = '1';
+      controlWrap.style.gridRow = '4';
+    }
+    if (dispatchWrap) {
+      dispatchWrap.style.gridColumn = '1';
+      dispatchWrap.style.gridRow = '5';
+    }
+    if (brancheGroup) {
+      brancheGroup.style.gridColumn = '2';
+      brancheGroup.style.gridRow = '4';
+    }
+    if (resolvedRegioGroup) {
+      resolvedRegioGroup.style.gridColumn = '2';
+      resolvedRegioGroup.style.gridRow = '5';
+    }
+  }
+
   function ensureLeadListPanel() {
     const regioSelect = byId('regio');
     const regioGroup = regioSelect ? regioSelect.closest('.form-group') : null;
@@ -2738,44 +2825,6 @@
       }
     }
 
-    // In de single-panel campagne-layout willen we 2 nette rijen:
-    // links: Telefoonlijsten + Belstrategie, rechts: Doelgroep + Regio,
-    // met de slider erboven over de volledige breedte.
-    const generatorGrid = targetParent.closest('.generator-grid');
-    const isSinglePanelLayout =
-      Boolean(generatorGrid) && generatorGrid.querySelectorAll(':scope > .panel').length === 1;
-    if (isSinglePanelLayout) {
-      const agendaCapGroup = byId('campaignFillAgendaWorkdays')?.closest('.form-group');
-      const sliderGroup = byId('leadSlider')?.closest('.form-group');
-      const brancheGroup = byId('branche')?.closest('.form-group');
-      const resolvedRegioGroup = byId('regio')?.closest('.form-group') || regioGroup;
-
-      if (agendaCapGroup) {
-        agendaCapGroup.style.gridColumn = '1 / -1';
-        agendaCapGroup.style.gridRow = '2';
-      }
-      if (sliderGroup) {
-        sliderGroup.style.gridColumn = '1 / -1';
-        sliderGroup.style.gridRow = '3';
-      }
-      if (controlWrap) {
-        controlWrap.style.gridColumn = '1';
-        controlWrap.style.gridRow = '4';
-      }
-      if (dispatchWrap) {
-        dispatchWrap.style.gridColumn = '1';
-        dispatchWrap.style.gridRow = '5';
-      }
-      if (brancheGroup) {
-        brancheGroup.style.gridColumn = '2';
-        brancheGroup.style.gridRow = '4';
-      }
-      if (resolvedRegioGroup) {
-        resolvedRegioGroup.style.gridColumn = '2';
-        resolvedRegioGroup.style.gridRow = '5';
-      }
-    }
-
     const modeEl = byId('callDispatchMode');
     const delayEl = byId('callDispatchDelaySeconds');
     if (modeEl) {
@@ -2802,6 +2851,7 @@
     }
     hookRegioLeadCountCustomSelectSync();
     bindCampaignFormStatePersistence();
+    syncCampaignFillAgendaSliderVisibility();
     leadSlider.addEventListener('input', updateLeadListHint);
     leadSlider.addEventListener('change', updateLeadListHint);
     updateLeadListHint();
