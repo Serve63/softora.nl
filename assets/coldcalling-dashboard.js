@@ -671,6 +671,17 @@
     syncCustomSelectUi(selectEl);
   }
 
+  function syncRegioToAutoIfFillAgendaWorkdaysEnabled() {
+    const fillAgendaEl = byId('campaignFillAgendaWorkdays');
+    const regioEl = byId('regio');
+    if (!fillAgendaEl?.checked || !regioEl) return;
+    if (!getCampaignRegioOption(regioEl, AUTO_CAMPAIGN_REGIO_VALUE)) return;
+    const previousCustomKm = readPositiveIntStorage(CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY, null);
+    writeStorage(CAMPAIGN_REGIO_STORAGE_KEY, AUTO_CAMPAIGN_REGIO_VALUE);
+    applyCampaignRegioSelection(regioEl, AUTO_CAMPAIGN_REGIO_VALUE, previousCustomKm);
+    updateLeadListHint();
+  }
+
   async function promptForCustomCampaignRegioKm(initialValue = '') {
     const normalizedInitialValue = String(initialValue || '').trim();
     const validateCustomKm = (rawValue) => {
@@ -785,6 +796,7 @@
       const raw = readStorage(CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY).trim().toLowerCase();
       fillAgendaEl.checked = raw === '1' || raw === 'true' || raw === 'yes';
     }
+    syncRegioToAutoIfFillAgendaWorkdaysEnabled();
 
     positionLeadSliderLabels();
     renderLeadAmountDisplay();
@@ -822,6 +834,9 @@
       fillAgendaEl.dataset.campaignPersistenceBound = '1';
       fillAgendaEl.addEventListener('change', () => {
         writeStorage(CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY, fillAgendaEl.checked ? '1' : '0');
+        if (fillAgendaEl.checked) {
+          syncRegioToAutoIfFillAgendaWorkdaysEnabled();
+        }
       });
     }
 

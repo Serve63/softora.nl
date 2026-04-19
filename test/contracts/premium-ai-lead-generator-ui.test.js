@@ -80,6 +80,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';/);
   assert.match(dashboardSource, /function resolveAutomaticCampaignRegioKm\(/);
   assert.match(dashboardSource, /function getCampaignRegioLabelForApi\(/);
+  assert.match(dashboardSource, /function syncRegioToAutoIfFillAgendaWorkdaysEnabled\(/);
   assert.match(dashboardSource, /let controlWrap = byId\('leadListControlWrap'\);[\s\S]*if \(!controlWrap\)/);
   assert.match(dashboardSource, /let dispatchWrap = byId\('callDispatchControlWrap'\);[\s\S]*if \(!dispatchWrap\)/);
   assert.match(dashboardSource, /let coldcallingDashboardBootstrapPayload = null;/);
