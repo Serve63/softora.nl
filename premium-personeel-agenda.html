@@ -1959,6 +1959,12 @@
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
+    function normalizeAgendaDateYmd(value) {
+        const raw = String(value || '').trim();
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+        return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+    }
+
     function isPlaceholderAgendaLocation(loc) {
         const t = String(loc || '').trim().toLowerCase();
         return !t || t === '—' || t === '-' || t === 'n.v.t.' || t === 'nvt';
@@ -1971,7 +1977,7 @@
         const ymd = formatTodayYyyyMmDd();
         const longDate = formatAgendaDateLongNl(ymd);
         const todays = appointments
-            .filter((a) => a && a.date === ymd)
+            .filter((a) => a && normalizeAgendaDateYmd(a.date) === ymd)
             .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 
         if (!todays.length) {
@@ -1979,6 +1985,44 @@
                 '<p>Even alsof <strong>Ruben</strong> je dit mondeling vertelt: voor <strong>vandaag</strong> (' +
                 escapeAgendaPlanningHtml(longDate) +
                 ') zie ik <strong>nog geen afspraken</strong> in de agenda. Zodra er iets ingepland staat, vult dit blok vanzelf bij—met een korte “van hier naar daar” en of het een rustige of <strong>drukke dag</strong> wordt.</p>';
+            return;
+        }
+
+        const timedToday = todays.filter((a) => a && !a.manualAllDayUnavailable);
+        const allDayToday = todays.filter((a) => a && a.manualAllDayUnavailable);
+
+        if (timedToday.length === 1 && allDayToday.length === 0 && todays.length === 1) {
+            const apt = timedToday[0];
+            const time = escapeAgendaPlanningHtml(apt.time || '');
+            const label = escapeAgendaPlanningHtml(
+                String(apt.company || 'Afspraak').trim() || 'Afspraak'
+            );
+            const locRaw = String(apt.location || '').trim();
+            const hasLoc = !isPlaceholderAgendaLocation(locRaw);
+            const locHtml = escapeAgendaPlanningHtml(locRaw);
+            const startHtml = escapeAgendaPlanningHtml(RUBEN_DEFAULT_START_ADDRESS);
+            const locPart = hasLoc
+                ? ' De locatie is <strong>' + locHtml + '</strong>.'
+                : ' Er staat <strong>nog geen adres</strong> bij deze afspraak in de agenda.';
+            const drivePart = hasLoc
+                ? ' Vanaf <strong>' +
+                  startHtml +
+                  '</strong> is dat <strong>een autorit naar die locatie</strong>—reken op <strong>normale reistijd</strong> (en eventuele vertraging) als je vertrek plant.'
+                : ' Je vertrekt vanuit <strong>' +
+                  startHtml +
+                  '</strong>; zodra het adres bekend is, kun je de rit preciezer timen.';
+
+            host.innerHTML =
+                '<p>Zo zou <strong>Ruben</strong> het zeggen: <strong>vandaag</strong> (' +
+                escapeAgendaPlanningHtml(longDate) +
+                ') is een <strong>relatief rustige dag</strong> met <strong>één afspraak</strong> om <strong>' +
+                time +
+                '</strong> (<strong>' +
+                label +
+                '</strong>).' +
+                locPart +
+                drivePart +
+                '</p>';
             return;
         }
 
@@ -3035,7 +3079,7 @@
             }
 
             const dayAppointments = dateStr
-                ? appointments.filter((a) => a.date === dateStr)
+                ? appointments.filter((a) => normalizeAgendaDateYmd(a.date) === dateStr)
                 : [];
 
             let classes = 'calendar-day';
