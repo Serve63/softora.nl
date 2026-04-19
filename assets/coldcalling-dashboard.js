@@ -3000,9 +3000,20 @@
     return getSelectedText('regio');
   }
 
+  function refreshCampaignRegioTipLabel() {
+    const tipEl = byId('campaignRegioTip');
+    const regioEl = byId('regio');
+    if (!tipEl || !regioEl) return;
+    const isAuto = String(regioEl.value || '').trim() === AUTO_CAMPAIGN_REGIO_VALUE;
+    tipEl.textContent = isAuto
+      ? 'Belt automatisch van dichtbij naar verweg'
+      : 'tip: start van dichtbij naar verder, bereid het steeds verder uit';
+  }
+
   function paintRegioLeadCountOnCustomSelectValue() {
     const regioSel = byId('regio');
     if (!regioSel) return;
+    refreshCampaignRegioTipLabel();
     const wrapper = regioSel.closest('.site-select');
     const valueEl = wrapper?.querySelector('.site-select-value');
     if (!valueEl) return;
