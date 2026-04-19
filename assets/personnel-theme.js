@@ -541,8 +541,9 @@
         "ads_linkedin",
     ]);
 
+    /* Klassiek hangslot: U-beugel + afgeronde kast (herkenbaar op klein formaat) */
     const COMING_SOON_LOCK_SVG =
-        '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6a3 3 0 1 0-6 0v4.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5a1.5 1.5 0 0 1-1.5 1.5H7.5A1.5 1.5 0 0 1 6 19.5V12a1.5 1.5 0 0 1 1.5-1.5z"/></svg>';
+        '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg>';
 
     function decorateComingSoonSidebarLinks() {
         const sidebar = document.querySelector(".sidebar");
