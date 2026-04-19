@@ -70,8 +70,10 @@ AMBIENT_DUCK_LEVEL=0.10
 NOISE_GATE_RMS=250
 # Testmodus: alleen ambience, geen Gemini
 # AMBIENT_ONLY_MODE=false
-# Eigen raw 8k mono PCM loopbestand voor de bridge
-# AMBIENT_ASSET_PATH=twilio-media-bridge/assets/office-8k.raw
+# Standaard gebruikt deze repo de voorbereide office loop:
+# AMBIENT_ASSET_PATH=assets/office-freesound-community-6322-8k.raw
+# Eigen raw 8k mono PCM loopbestand kan ook:
+# AMBIENT_ASSET_PATH=assets/jouw-office-loop-8k.raw
 ```
 
 ### Extra env vars voor `Voer opdracht uit` automation (Actieve Opdrachten)

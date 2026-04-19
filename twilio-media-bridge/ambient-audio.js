@@ -15,7 +15,31 @@ function clampNumber(value, fallback, min, max) {
 
 function resolveAmbientAssetPath(filePath = '') {
   const normalized = String(filePath || '').trim();
-  if (normalized) return path.resolve(normalized);
+  if (normalized) {
+    if (path.isAbsolute(normalized)) return normalized;
+
+    const projectRoot = path.dirname(__dirname);
+    const prefix = `twilio-media-bridge${path.sep}`;
+    const trimmedPrefixPath = normalized.startsWith(prefix)
+      ? normalized.slice(prefix.length)
+      : normalized;
+    const candidates = [
+      path.resolve(normalized),
+      path.resolve(__dirname, normalized),
+      path.resolve(projectRoot, normalized),
+    ];
+
+    if (trimmedPrefixPath !== normalized) {
+      candidates.push(path.resolve(__dirname, trimmedPrefixPath));
+      candidates.push(path.resolve(projectRoot, trimmedPrefixPath));
+    }
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+
+    return candidates[0];
+  }
   return path.join(__dirname, 'assets', 'office-8k.raw');
 }
 

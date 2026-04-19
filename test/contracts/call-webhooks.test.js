@@ -161,7 +161,11 @@ test('call webhooks handle inbound twilio voice selection and start an inbound c
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Content-Type'], 'text/xml');
-  assert.match(res.textBody, /<Stream url="wss:\/\/media\.softora\.test\/ws\?stack=openai_realtime_1_5/);
+  assert.match(res.textBody, /<Stream url="wss:\/\/media\.softora\.test\/ws"/);
+  assert.match(res.textBody, /<Parameter name="stack" value="openai_realtime_1_5" \/>/);
+  assert.match(res.textBody, /<Parameter name="callSid" value="CA123" \/>/);
+  assert.match(res.textBody, /<Parameter name="to" value="\+31880000000" \/>/);
+  assert.match(res.textBody, /<Parameter name="from" value="\+31612345678" \/>/);
   assert.equal(context.upserts.length, 1);
   assert.equal(context.upserts[0].callId, 'CA123');
   assert.equal(context.upserts[0].stack, 'openai_realtime_1_5');

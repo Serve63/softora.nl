@@ -42,10 +42,32 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /\.slider-labels span:last-child\s*\{[\s\S]*left:\s*100%;[\s\S]*transform:\s*translateX\(-100%\);/);
   assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="accent"\] \.site-select-trigger::before \{[\s\S]*background:\s*var\(--accent-light\);/);
   assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="blue"\] \.site-select-trigger::before \{[\s\S]*background:\s*#2563eb;/);
-  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--lead-list\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*3;/);
-  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--dispatch\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*4;/);
-  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--branche\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*3;/);
-  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--regio\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*4;/);
+  assert.match(
+    pageSource,
+    /<div class="form-group form-group--agenda-capacity">[\s\S]*<input type="checkbox" id="campaignFillAgendaWorkdays"[\s\S]*Start campagne tot Ruben Nijhuis de agenda heeft volgepland voor de aankomende 10 werkdagen/
+  );
+  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--agenda-capacity\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*grid-row:\s*2;/);
+  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--slider\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*grid-row:\s*3;/);
+  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--lead-list\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*4;/);
+  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--dispatch\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*5;/);
+  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--branche\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*4;/);
+  assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--regio\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*5;/);
+  assert.match(
+    dashboardSource,
+    /const CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY = 'softora_campaign_fill_agenda_10_workdays';/
+  );
+  assert.match(
+    dashboardSource,
+    /const fillAgendaEl = byId\('campaignFillAgendaWorkdays'\);[\s\S]*readStorage\(CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY\)/
+  );
+  assert.match(
+    dashboardSource,
+    /writeStorage\(CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY, fillAgendaEl\.checked \? '1' : '0'\)/
+  );
+  assert.match(
+    dashboardSource,
+    /const agendaCapGroup = byId\('campaignFillAgendaWorkdays'\)\?\.closest\('\.form-group'\);[\s\S]*agendaCapGroup\.style\.gridRow = '2'/
+  );
   assert.match(dashboardSource, /let controlWrap = byId\('leadListControlWrap'\);[\s\S]*if \(!controlWrap\)/);
   assert.match(dashboardSource, /let dispatchWrap = byId\('callDispatchControlWrap'\);[\s\S]*if \(!dispatchWrap\)/);
   assert.match(dashboardSource, /let coldcallingDashboardBootstrapPayload = null;/);

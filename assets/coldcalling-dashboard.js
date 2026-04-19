@@ -36,6 +36,7 @@
   const CAMPAIGN_MAX_DISCOUNT_STORAGE_KEY = 'softora_campaign_max_discount';
   const CAMPAIGN_INSTRUCTIONS_STORAGE_KEY = 'softora_campaign_instructions';
   const CAMPAIGN_COLDCALLING_STACK_STORAGE_KEY = 'softora_campaign_coldcalling_stack';
+  const CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY = 'softora_campaign_fill_agenda_10_workdays';
   const BUSINESS_MODE_STORAGE_KEY = 'softora_business_mode';
   const DEFAULT_CAMPAIGN_REGIO_VALUE = 'unlimited';
   const CUSTOM_CAMPAIGN_REGIO_VALUE = 'custom';
@@ -778,6 +779,12 @@
       syncCustomSelectUi(stackEl);
     }
 
+    const fillAgendaEl = byId('campaignFillAgendaWorkdays');
+    if (fillAgendaEl) {
+      const raw = readStorage(CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY).trim().toLowerCase();
+      fillAgendaEl.checked = raw === '1' || raw === 'true' || raw === 'yes';
+    }
+
     positionLeadSliderLabels();
     renderLeadAmountDisplay();
   }
@@ -807,7 +814,15 @@
     const maxDiscountEl = byId('maxDiscount');
     const instructionsEl = byId('instructions');
     const stackEl = byId('coldcallingStack');
+    const fillAgendaEl = byId('campaignFillAgendaWorkdays');
     const leadValueEl = byId('leadValue');
+
+    if (fillAgendaEl && fillAgendaEl.dataset.campaignPersistenceBound !== '1') {
+      fillAgendaEl.dataset.campaignPersistenceBound = '1';
+      fillAgendaEl.addEventListener('change', () => {
+        writeStorage(CAMPAIGN_FILL_AGENDA_10_WORKDAYS_STORAGE_KEY, fillAgendaEl.checked ? '1' : '0');
+      });
+    }
 
     leadSlider.addEventListener('input', () => {
       // De pagina-script verwijdert customValue al op slider beweging; wij persistten daarna de nieuwe state.
@@ -1502,7 +1517,8 @@
   }
 
   const FIXED_TOPBAR_TITLE = 'Coldcalling';
-  const FIXED_TOPBAR_SUBTITLE = 'Start en beheer je AI-campagne voor gerichte zakelijke gesprekken.';
+  const FIXED_TOPBAR_SUBTITLE =
+    'Ruben Nijhuis plant afspraken in tot 10 werkdagen vanaf het moment van bellen en stopt vanzelf wanneer de agenda vol is.';
 
   function applyBusinessModeUi() {
     const mode = getCurrentBusinessMode();
@@ -2624,29 +2640,34 @@
     const isSinglePanelLayout =
       Boolean(generatorGrid) && generatorGrid.querySelectorAll(':scope > .panel').length === 1;
     if (isSinglePanelLayout) {
+      const agendaCapGroup = byId('campaignFillAgendaWorkdays')?.closest('.form-group');
       const sliderGroup = byId('leadSlider')?.closest('.form-group');
       const brancheGroup = byId('branche')?.closest('.form-group');
       const resolvedRegioGroup = byId('regio')?.closest('.form-group') || regioGroup;
 
+      if (agendaCapGroup) {
+        agendaCapGroup.style.gridColumn = '1 / -1';
+        agendaCapGroup.style.gridRow = '2';
+      }
       if (sliderGroup) {
         sliderGroup.style.gridColumn = '1 / -1';
-        sliderGroup.style.gridRow = '2';
+        sliderGroup.style.gridRow = '3';
       }
       if (controlWrap) {
         controlWrap.style.gridColumn = '1';
-        controlWrap.style.gridRow = '3';
+        controlWrap.style.gridRow = '4';
       }
       if (dispatchWrap) {
         dispatchWrap.style.gridColumn = '1';
-        dispatchWrap.style.gridRow = '4';
+        dispatchWrap.style.gridRow = '5';
       }
       if (brancheGroup) {
         brancheGroup.style.gridColumn = '2';
-        brancheGroup.style.gridRow = '3';
+        brancheGroup.style.gridRow = '4';
       }
       if (resolvedRegioGroup) {
         resolvedRegioGroup.style.gridColumn = '2';
-        resolvedRegioGroup.style.gridRow = '4';
+        resolvedRegioGroup.style.gridRow = '5';
       }
     }
 

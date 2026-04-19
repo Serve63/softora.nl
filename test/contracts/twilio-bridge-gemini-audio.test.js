@@ -4,6 +4,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
+  OUTPUT_FRAME_BYTES,
+  loadAmbientLoopBuffer,
+  mixPcmFrame,
+  resolveAmbientAssetPath,
+  shouldForwardToGeminiPcmFrame,
+  splitPcmBufferIntoFrames,
+} = require('../../twilio-media-bridge/ambient-audio');
+const {
   computeInt16Rms,
   createSpeechTurnState,
 } = require('../../twilio-media-bridge/audio-turn-state');
@@ -50,6 +58,65 @@ test('speech turn state detects speech start and end from PCM frames', () => {
   const frame4 = turns.processPcmFrame(silent, 360);
   assert.equal(frame4.speechEnded, true);
   assert.equal(frame4.speechActive, false);
+});
+
+test('ambient helpers split PCM into fixed 20ms frames and zero-pad the tail', () => {
+  const frameAndHalf = Buffer.alloc(OUTPUT_FRAME_BYTES + OUTPUT_FRAME_BYTES / 2, 1);
+  const frames = splitPcmBufferIntoFrames(frameAndHalf);
+
+  assert.equal(frames.length, 2);
+  assert.equal(frames[0].length, OUTPUT_FRAME_BYTES);
+  assert.equal(frames[1].length, OUTPUT_FRAME_BYTES);
+  assert.equal(frames[1].subarray(OUTPUT_FRAME_BYTES / 2).equals(Buffer.alloc(OUTPUT_FRAME_BYTES / 2)), true);
+});
+
+test('ambient helpers keep even byte offsets when looping raw PCM ambience', () => {
+  const ambient = Buffer.alloc(OUTPUT_FRAME_BYTES * 2);
+  for (let i = 0; i < ambient.length; i += 2) ambient.writeInt16LE(i, i);
+  const voice = Buffer.alloc(OUTPUT_FRAME_BYTES);
+  const state = { ambientPosition: 1, geminiIsSpeaking: false };
+
+  const mixed = mixPcmFrame(voice, state, {
+    ambientBuffer: ambient,
+    ambientNoiseLevel: 0.1,
+    ambientDuckLevel: 0.05,
+  });
+
+  assert.equal(mixed.length, OUTPUT_FRAME_BYTES);
+  assert.equal(state.ambientPosition % 2, 0);
+});
+
+test('ambient helpers only forward frames above the configured noise gate threshold', () => {
+  assert.equal(shouldForwardToGeminiPcmFrame(new Int16Array([0, 0, 0, 0]), 400), false);
+  assert.equal(shouldForwardToGeminiPcmFrame(new Int16Array([1200, -1200, 1200, -1200]), 400), true);
+});
+
+test('ambient loader trims odd byte tails and reports metadata', async (t) => {
+  const tempDir = await fs.promises.mkdtemp(path.join(__dirname, 'ambient-'));
+  const rawPath = path.join(tempDir, 'office-8k.raw');
+  await fs.promises.writeFile(rawPath, Buffer.alloc(OUTPUT_FRAME_BYTES + 1, 7));
+  t.after(async () => {
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+  });
+
+  const result = loadAmbientLoopBuffer({ enabled: true, filePath: rawPath });
+  assert.equal(result.enabled, true);
+  assert.equal(result.bytes % 2, 0);
+  assert.equal(result.reason, 'loaded');
+});
+
+test('ambient path resolver supports repo-root paths when the bridge runs from its own rootDir', (t) => {
+  const originalCwd = process.cwd();
+  const bridgeDir = path.join(__dirname, '..', '..', 'twilio-media-bridge');
+  const rawPath = path.join(bridgeDir, 'assets', 'office-8k.raw');
+
+  process.chdir(bridgeDir);
+  t.after(() => {
+    process.chdir(originalCwd);
+  });
+
+  const resolved = resolveAmbientAssetPath('twilio-media-bridge/assets/office-8k.raw');
+  assert.equal(resolved, rawPath);
 });
 
 test('extractInlineAudioParts supports camelCase server JSON', () => {
@@ -144,8 +211,6 @@ test('twilio media bridge defaults target the current Gemini Live model without 
   assert.match(source, /GEMINI_AUTO_START \|\| 'true'/);
   assert.match(source, /GEMINI_VAD_START_SENSITIVITY \|\| 'START_SENSITIVITY_LOW'/);
   assert.match(source, /activityHandling: 'START_OF_ACTIVITY_INTERRUPTS'/);
-  assert.match(source, /INPUT_AUDIO_FLUSH_DELAY_MS \|\| 900/);
-  assert.match(source, /NOISE_GATE_RMS \|\| 120/);
   assert.match(source, /CALLER_SPEECH_RMS_THRESHOLD \|\| 1200/);
   assert.match(source, /CALLER_SPEECH_START_FRAMES \|\| 4/);
   assert.match(source, /CALLER_BARGE_IN_SUPPRESSION_MS \|\| 220/);
@@ -156,10 +221,15 @@ test('twilio media bridge defaults target the current Gemini Live model without 
   assert.match(source, /twilioMarkAckCount/);
   assert.match(source, /event: 'clear'/);
   assert.match(source, /serverInterruptedCount/);
+  assert.match(source, /customParameters/);
+  assert.match(source, /sessionSummary\.stack = requestedStack/);
+  assert.match(source, /AMBIENT_ENABLED \|\| 'true'/);
+  assert.match(source, /AMBIENT_NOISE_LEVEL \|\| 0\.22/);
+  assert.match(source, /AMBIENT_DUCK_LEVEL \|\| 0\.1/);
+  assert.match(source, /INPUT_AUDIO_FLUSH_DELAY_MS \|\| 900/);
+  assert.match(source, /NOISE_GATE_RMS \|\| 120/);
   assert.match(source, /audioStreamEnd: true/);
   assert.match(source, /scheduleInputAudioFlush\(\)/);
-  assert.match(source, /directTwilioOutput: true/);
-  assert.match(source, /gateOnlyDuringPlayback: true/);
   assert.match(source, /DEFAULT_INITIAL_MESSAGE =/);
   assert.match(source, /gemini-live-2\.5-flash-preview', DEFAULT_GEMINI_MODEL/);
 });

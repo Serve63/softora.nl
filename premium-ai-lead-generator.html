@@ -462,34 +462,39 @@
             align-items: end;
         }
 
-        .generator-grid > .panel:only-child .panel-header,
-        .generator-grid > .panel:only-child .form-group:first-of-type {
+        .generator-grid > .panel:only-child .panel-header {
             grid-column: 1 / -1;
+        }
+
+        .generator-grid > .panel:only-child .form-group--agenda-capacity {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            align-self: start;
         }
 
         .generator-grid > .panel:only-child .form-group--slider {
             grid-column: 1 / -1;
-            grid-row: 2;
+            grid-row: 3;
         }
 
         .generator-grid > .panel:only-child .form-group--lead-list {
             grid-column: 1;
-            grid-row: 3;
+            grid-row: 4;
         }
 
         .generator-grid > .panel:only-child .form-group--branche {
             grid-column: 2;
-            grid-row: 3;
+            grid-row: 4;
         }
 
         .generator-grid > .panel:only-child .form-group--dispatch {
             grid-column: 1;
-            grid-row: 4;
+            grid-row: 5;
         }
 
         .generator-grid > .panel:only-child .form-group--regio {
             grid-column: 2;
-            grid-row: 4;
+            grid-row: 5;
         }
 
         .generator-grid > .panel:only-child .panel-header,
@@ -545,6 +550,27 @@
             letter-spacing: 0.15em;
             color: var(--text-tertiary);
             margin-bottom: 0.8rem;
+        }
+
+        .form-checkbox-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.65rem;
+            margin: 0;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.88rem;
+            font-weight: 400;
+            line-height: 1.45;
+            color: var(--text-secondary);
+        }
+        .form-checkbox-row input[type='checkbox'] {
+            width: 1.05rem;
+            height: 1.05rem;
+            margin: 0.15rem 0 0 0;
+            flex-shrink: 0;
+            accent-color: var(--accent-light);
+            cursor: pointer;
         }
 
         .form-input, .form-select, .form-textarea {
@@ -1780,7 +1806,7 @@
             <div class="topbar">
                 <div class="topbar-left">
                     <h1>Coldcalling</h1>
-                    <p>Start en beheer je AI-campagne voor gerichte zakelijke gesprekken.</p>
+                    <p>Ruben Nijhuis plant afspraken in tot 10 werkdagen vanaf het moment van bellen en stopt vanzelf wanneer de agenda vol is.</p>
                 </div>
                 <div class="topbar-right">
                     <div class="topbar-select-group">
@@ -1819,6 +1845,13 @@
                     <div class="panel-header">
                         <span class="panel-title">Campagne Instellingen</span>
                         <span class="panel-badge">Configuratie</span>
+                    </div>
+
+                    <div class="form-group form-group--agenda-capacity">
+                        <label class="form-checkbox-row magnetic" for="campaignFillAgendaWorkdays">
+                            <input type="checkbox" id="campaignFillAgendaWorkdays" autocomplete="off">
+                            <span>Start campagne tot Ruben Nijhuis de agenda heeft volgepland voor de aankomende 10 werkdagen</span>
+                        </label>
                     </div>
 
                     <div class="form-group form-group--slider">

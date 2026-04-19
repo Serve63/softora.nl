@@ -961,10 +961,10 @@
             `Profiel bewerken van ${String(resolvedSession.displayName || "Softora Premium")}`
         );
         paintSidebarAvatar(avatarEl, resolvedSession);
+        markPremiumSidebarProfileResolved();
         if (sidebar) {
             sidebar.dataset.sidebarProfileRenderKey = renderKey;
         }
-        markPremiumSidebarProfileResolved();
     }
 
     async function requestJson(url, options) {

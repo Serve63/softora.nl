@@ -146,6 +146,17 @@ function createCallWebhookRuntime(deps = {}) {
     return res.status(200).send(xml);
   }
 
+  function buildTwilioStreamParameterXml(parameters) {
+    return Object.entries(parameters || {})
+      .map(([name, value]) => [normalizeString(name), normalizeString(value)])
+      .filter(([name, value]) => name && value)
+      .map(
+        ([name, value]) =>
+          `      <Parameter name="${escapeHtml(name)}" value="${escapeHtml(value)}" />`
+      )
+      .join('\n');
+  }
+
   function mapTwilioInboundDigitToStack(digitValue) {
     const digit = normalizeString(digitValue);
     if (digit === '1') return 'retell_ai';
@@ -290,7 +301,8 @@ function createCallWebhookRuntime(deps = {}) {
     }
 
     const mediaWsBaseUrl = getTwilioMediaWsUrlForStack(stack);
-    const mediaWsUrl = appendQueryParamsToUrl(mediaWsBaseUrl, {
+    const mediaWsUrl = mediaWsBaseUrl;
+    const streamParameterXml = buildTwilioStreamParameterXml({
       stack,
       callSid,
       to,
@@ -354,7 +366,9 @@ function createCallWebhookRuntime(deps = {}) {
       `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="${escapeHtml(mediaWsUrl)}"${streamStatusAttributes} />
+    <Stream url="${escapeHtml(mediaWsUrl)}"${streamStatusAttributes}>
+${streamParameterXml}
+    </Stream>
   </Connect>
 </Response>`
     );

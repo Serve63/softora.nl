@@ -66,6 +66,8 @@ services:
         value: true
       - key: AMBIENT_ENABLED
         value: true
+      - key: AMBIENT_ASSET_PATH
+        value: assets/office-freesound-community-6322-8k.raw
       - key: AMBIENT_NOISE_LEVEL
         value: 0.22
       - key: AMBIENT_DUCK_LEVEL
