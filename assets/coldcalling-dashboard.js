@@ -1518,7 +1518,7 @@
 
   const FIXED_TOPBAR_TITLE = 'Coldcalling';
   const FIXED_TOPBAR_SUBTITLE =
-    'Ruben Nijhuis plant afspraken in tot 10 werkdagen vanaf het moment van bellen en stopt vanzelf wanneer de agenda vol is.';
+    'Coldcalling blokkeert automatisch wanneer de agenda in de aankomende 10 werkdagen vol zit.';
 
   function applyBusinessModeUi() {
     const mode = getCurrentBusinessMode();
