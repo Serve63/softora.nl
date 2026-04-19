@@ -217,6 +217,9 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(dashboardSource, /family=Barlow\+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600/);
   assert.match(dashboardSource, /<div class="lead-db-toolbar">[\s\S]*leadDatabaseRefreshInfo[\s\S]*leadDatabaseAddManualBtn[\s\S]*leadDatabaseImportBtn/);
   assert.match(dashboardSource, /<div id="leadDatabaseSummaryCards" class="lead-db-stats"><\/div>/);
+  assert.match(dashboardSource, /no_answer:\s*'Niet opgenomen'/);
+  assert.match(dashboardSource, /\{\s*key:\s*'no_answer',\s*label:\s*'NIET OPGENOMEN'/);
+  assert.match(dashboardSource, /grid-template-columns:\s*repeat\(7,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(dashboardSource, /class="lead-db-table-card"/);
   assert.match(dashboardSource, /lead-db-table-summary[\s\S]*Unieke mensen gebeld[\s\S]*Totale beltijd/);
   assert.match(
