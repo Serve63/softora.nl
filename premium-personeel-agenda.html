@@ -304,42 +304,26 @@
         .legend-dot.manual-serve { background: #0d9488; }
         .legend-dot.manual-martijn { background: #7c3aed; }
 
-        /* Losse spraakballon onder de agenda (niet in .calendar-wrapper) */
+        /* Ruben-planning uitleg: platte tekst, geen kader (onder de agenda) */
         .agenda-routing-bubble-wrap {
+            width: 100%;
             max-width: 1240px;
-            margin: 1.5rem auto 0;
-            padding: 0 0.2rem;
-            display: flex;
-            justify-content: flex-start;
+            margin: 1.35rem auto 0;
+            padding: 0;
         }
         .agenda-routing-bubble {
-            position: relative;
             margin: 0;
-            max-width: min(100%, 44rem);
-            padding: 0.95rem 1.25rem 1.05rem 1.2rem;
+            max-width: none;
+            padding: 0;
             font-family: 'Inter', sans-serif;
-            font-size: 0.875rem;
-            font-weight: 450;
-            line-height: 1.5;
+            font-size: 0.75rem;
+            font-weight: 400;
+            line-height: 1.55;
             color: var(--text-secondary);
-            background: var(--bg-secondary);
-            border: 1px solid rgba(139, 34, 82, 0.22);
-            border-radius: 18px;
-            box-shadow:
-                0 2px 4px rgba(0, 0, 0, 0.04),
-                0 14px 36px rgba(0, 0, 0, 0.09);
-        }
-        .agenda-routing-bubble::before {
-            content: '';
-            position: absolute;
-            left: 1.85rem;
-            top: -8px;
-            width: 14px;
-            height: 14px;
-            background: var(--bg-secondary);
-            border-left: 1px solid rgba(139, 34, 82, 0.22);
-            border-top: 1px solid rgba(139, 34, 82, 0.22);
-            transform: rotate(45deg);
+            background: none;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
         }
 
         .agenda-today-planning {
@@ -1053,12 +1037,10 @@
         @media (max-width: 768px) {
             .main-content { padding: 1.5rem; }
             .agenda-routing-bubble-wrap {
-                margin-top: 1.15rem;
-                padding: 0;
+                margin-top: 1.05rem;
             }
             .agenda-routing-bubble {
-                font-size: 0.82rem;
-                border-radius: 16px;
+                font-size: 0.72rem;
             }
             .agenda-today-planning-body {
                 font-size: 0.82rem;
