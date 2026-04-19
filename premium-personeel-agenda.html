@@ -237,6 +237,29 @@
         .calendar-day.today { background: rgba(139,34,82,0.04); }
         .calendar-day.today .day-number { color: var(--accent-light); font-weight: 700; }
 
+        .calendar-day--klantwerk .calendar-day-klantwerk-label {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            pointer-events: none;
+            z-index: 0;
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(0.88rem, 2.4vw, 1.12rem);
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: lowercase;
+            color: var(--text-tertiary);
+            padding: 0 0.35rem;
+        }
+        .calendar-day--klantwerk .day-number,
+        .calendar-day--klantwerk .appointment {
+            position: relative;
+            z-index: 1;
+        }
+
         .manual-appointment-modal {
             width: min(92vw, 480px) !important;
             max-width: none;
@@ -3072,16 +3095,22 @@
                 ? appointments.filter((a) => normalizeAgendaDateYmd(a.date) === dateStr)
                 : [];
 
+            const isSaturday = Boolean(dateStr) && i % 7 === 5;
+
             let classes = 'calendar-day';
             if (isOtherMonth) classes += ' other-month';
             if (isToday) classes += ' today';
             if (!isOtherMonth) classes += ' calendar-day-selectable';
+            if (isSaturday) classes += ' calendar-day--klantwerk';
 
             const dayDataAttr =
                 !isOtherMonth && dateStr ? ` data-calendar-date="${dateStr}"` : '';
             html += `<div class="${classes}"${dayDataAttr}>`;
             if (!isOtherMonth) {
                 html += `<div class="day-number">${day}</div>`;
+            }
+            if (isSaturday) {
+                html += '<div class="calendar-day-klantwerk-label">klantwerk</div>';
             }
 
             dayAppointments.forEach((apt) => {

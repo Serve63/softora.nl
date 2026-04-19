@@ -134,3 +134,12 @@ test('premium agenda keeps appointment color in sync with existing dossiers', ()
     /const appointmentClass = getCalendarAppointmentClass\(apt\);/
   );
 });
+
+test('premium agenda shows klantwerk label on Saturdays', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /const isSaturday = Boolean\(dateStr\) && i % 7 === 5;/);
+  assert.match(pageSource, /calendar-day--klantwerk/);
+  assert.match(pageSource, /calendar-day-klantwerk-label/);
+});
