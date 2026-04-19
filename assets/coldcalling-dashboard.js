@@ -1518,7 +1518,7 @@
 
   const FIXED_TOPBAR_TITLE = 'Coldcalling';
   const FIXED_TOPBAR_SUBTITLE =
-    'Coldcalling wordt automatisch geblokkeerd zodra de agenda voor de komende 10 werkdagen vol zit.';
+    'Coldcalling wordt automatisch geblokkeerd zodra de agenda<br>voor de komende 10 werkdagen vol zit.';
 
   function applyBusinessModeUi() {
     const mode = getCurrentBusinessMode();
@@ -1531,7 +1531,7 @@
     const dbHint = byId('leadDatabaseHeaderHint');
 
     if (topTitle) topTitle.textContent = FIXED_TOPBAR_TITLE;
-    if (topSubtitle) topSubtitle.textContent = FIXED_TOPBAR_SUBTITLE;
+    if (topSubtitle) topSubtitle.innerHTML = FIXED_TOPBAR_SUBTITLE;
     if (leadListGroupLabel) leadListGroupLabel.textContent = ui.leadListGroup;
     if (leadListOpenLabel) leadListOpenLabel.textContent = ui.leadListLabel;
     if (dbHint) dbHint.textContent = ui.dbHint;
