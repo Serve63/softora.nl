@@ -27,7 +27,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<select class="form-select magnetic" id="regio">/);
   assert.match(
     pageSource,
-    /<label class="form-label" for="regio">Omstreken Oisterwijk<span class="form-label-tip" id="campaignRegioTip">tip: start van dichtbij naar verder, bereid het steeds verder uit<\/span><\/label>/
+    /<label class="form-label" for="regio">Omstreken Oisterwijk<span class="form-label-tip" id="campaignRegioTip">TIP: Start dichtbij en breid het steeds verder uit\.<\/span><\/label>/
   );
   assert.match(pageSource, /<select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">/);
   assert.match(pageSource, /<option value="websites" data-dot-color="accent" selected>Website's<\/option>/);

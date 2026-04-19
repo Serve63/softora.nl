@@ -3093,8 +3093,8 @@
     if (!tipEl || !regioEl) return;
     const isAuto = String(regioEl.value || '').trim() === AUTO_CAMPAIGN_REGIO_VALUE;
     tipEl.textContent = isAuto
-      ? 'Belt automatisch van dichtbij naar verweg'
-      : 'tip: start van dichtbij naar verder, bereid het steeds verder uit';
+      ? 'Belt automatisch op volgorde van nabijheid.'
+      : 'TIP: Start dichtbij en breid het steeds verder uit.';
   }
 
   function paintRegioLeadCountOnCustomSelectValue() {
@@ -3110,12 +3110,6 @@
     const leads = getDialableLeadsForRegioCount();
     const count = countDialableLeadsWithinCampaignRegioRadius(leads, radiusKm);
     valueEl.textContent = `${baseLabel} · ${count} Bedrijven`;
-    if (wrapper) {
-      wrapper.setAttribute(
-        'title',
-        'Geschat aantal actieve bedrijven in het register binnen deze straal (vogelvlucht t.o.v. Oisterwijk, ruimte voor wegafstand). Alleen regels met herkenbare plaats in Regio (of plaats achter het adres) tellen mee.'
-      );
-    }
   }
 
   function hookRegioLeadCountCustomSelectSync() {
