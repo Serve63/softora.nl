@@ -1623,7 +1623,7 @@
 
   const FIXED_TOPBAR_TITLE = 'Coldcalling';
   const FIXED_TOPBAR_SUBTITLE =
-    'Coldcalling wordt automatisch geblokkeerd zodra de agenda<br>voor de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.';
+    'Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.';
 
   function applyBusinessModeUi() {
     const mode = getCurrentBusinessMode();

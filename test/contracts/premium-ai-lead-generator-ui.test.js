@@ -55,7 +55,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /\.topbar-right \.site-select--pill\[data-dot-color="blue"\] \.site-select-trigger::before \{[\s\S]*background:\s*#2563eb;/);
   assert.match(
     pageSource,
-    /<div class="form-group form-group--agenda-capacity">[\s\S]*<input type="checkbox" id="campaignFillAgendaWorkdays"[\s\S]*Start Campagne tot Ruben Nijhuis de agenda heeft volgepland voor de aankomende 10 werkdagen\./
+    /<div class="form-group form-group--agenda-capacity">[\s\S]*<input type="checkbox" id="campaignFillAgendaWorkdays"[\s\S]*Start campagne tot 10 werkdagen vooruit is volgepland\./
   );
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--agenda-capacity\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*grid-row:\s*2;/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--slider\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*grid-row:\s*3;/);
