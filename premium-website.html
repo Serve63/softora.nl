@@ -580,6 +580,12 @@
             gap: 2rem;
         }
 
+        #diensten .diensten-product-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2rem;
+        }
+
         .tilt-card {
             background: var(--bg-secondary);
             border: 1px solid var(--card-accent, var(--accent));
@@ -809,9 +815,25 @@
             clip-path: polygon(0 0, 100% 0, 100% 100%, 10% 100%);
         }
 
+        .pricing-card.pricing-card--accent-chatbot {
+            background: linear-gradient(135deg, rgba(201, 160, 18, 0.12), rgba(201, 160, 18, 0.02));
+            border-color: rgba(201, 160, 18, 0.55);
+            box-shadow: 0 10px 26px rgba(15, 17, 28, 0.07), 0 0 0 1px rgba(201, 160, 18, 0.12);
+        }
+
+        .pricing-card.pricing-card--accent-chatbot .pricing-features li::before {
+            color: #b38f00;
+        }
+
         .pricing-card:not(.featured):hover {
             transform: translateY(-3px);
             border-color: var(--text-tertiary);
+        }
+
+        .pricing-card.pricing-card--accent-chatbot:hover {
+            transform: translateY(-3px);
+            border-color: rgba(201, 160, 18, 0.85);
+            box-shadow: 0 14px 32px rgba(15, 17, 28, 0.09), 0 0 22px rgba(201, 160, 18, 0.18);
         }
 
         .pricing-header {
@@ -1224,7 +1246,7 @@
 
         .footer-grid {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr;
+            grid-template-columns: 2fr 1fr 1fr;
             gap: 60px;
             padding-bottom: 52px;
             border-bottom: 1px solid #e2ddd6;
@@ -1485,13 +1507,16 @@
                 background-position: 62% center;
             }
             .hero-content { max-width: 100%; }
+            #diensten .diensten-product-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
             .grid-3, .pricing-grid { grid-template-columns: 1fr; flex-direction: column; }
             .grid-2, .image-text-frame { grid-template-columns: 1fr; }
             .werkwijze-copy, .werkwijze-stats { width: 100%; }
             .image-side { clip-path: none; height: 400px; }
             .image-text-frame { --content-overlap: 0px; }
             .content-side { --content-panel-padding-x: 2rem; padding: 4rem 2rem; }
-            .footer-grid { grid-template-columns: 1.35fr 1fr 1fr; gap: 34px; }
+            .footer-grid { grid-template-columns: 1fr 1fr; gap: 34px; }
             .footer-brand { grid-column: 1 / -1; }
             footer.footer { padding: 52px 40px 0; }
             .pricing-card.featured { transform: none; }
@@ -1879,7 +1904,8 @@
                 line-height: 0.95 !important;
             }
 
-            .grid-3 {
+            .grid-3,
+            #diensten .diensten-product-grid {
                 grid-template-columns: 1fr;
                 gap: 14px;
             }
@@ -2058,6 +2084,12 @@
                 transform: none !important;
                 background: linear-gradient(180deg, rgba(139,34,82,0.11) 0%, rgba(255,255,255,0.98) 45%);
                 box-shadow: 0 16px 34px rgba(139,34,82,0.10);
+            }
+
+            .pricing-card.pricing-card--accent-chatbot {
+                background: linear-gradient(180deg, rgba(201, 160, 18, 0.14) 0%, rgba(255, 255, 255, 0.98) 48%);
+                border-color: rgba(201, 160, 18, 0.22);
+                box-shadow: 0 14px 30px rgba(201, 160, 18, 0.08);
             }
 
             .pricing-card.featured::before {
@@ -2307,10 +2339,10 @@
         <div class="diensten-shell">
             <div class="section-header is-centered fade-up">
                 <h2 class="diensten-title"><span class="title-mark">Wat</span> We Bouwen</h2>
-                <p class="diensten-intro"><span class="diensten-intro-desktop">Drie losse producten. Of één sterk geheel. Jij kiest waar we beginnen.</span></p>
+                <p class="diensten-intro"><span class="diensten-intro-desktop">Vier losse producten. Of één sterk geheel. Jij kiest waar we beginnen.</span></p>
             </div>
 
-            <div class="grid-3">
+            <div class="diensten-product-grid">
                 <div class="tilt-card fade-up" data-tilt style="--card-accent: #8B2252; --card-accent-rgb: 139,34,82;">
                     <div class="card-content">
                         <div class="card-number">01</div>
@@ -2332,6 +2364,14 @@
                         <div class="card-number">03</div>
                         <h3>Voicesoftware</h3>
                         <p>Nooit meer een gemiste oproep. Nooit meer een gemiste kans. Onze AI-agents nemen op, kwalificeren en werken — dag en nacht.</p>
+                    </div>
+                </div>
+
+                <div class="tilt-card fade-up" data-tilt style="transition-delay: 0.3s; --card-accent: #c9a012; --card-accent-rgb: 201,160,18;">
+                    <div class="card-content">
+                        <div class="card-number">04</div>
+                        <h3>Chatbot</h3>
+                        <p>Bezoekers willen antwoord nu — niet morgen. Een slimme chatbot die vragen afhandelt, leads vastlegt en 24/7 voor je klaarstaat.</p>
                     </div>
                 </div>
             </div>
@@ -2455,6 +2495,22 @@
                     </ul>
                     <a href="/premium-pakketten" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
                 </div>
+
+                <div id="dienst-chatbot" class="pricing-card pricing-card--accent-chatbot fade-up" data-tilt style="transition-delay: 0.3s">
+                    <div class="pricing-header">
+                        <div class="sessions">Chatbot</div>
+                        <h3 style="font-size: 1.55rem;">Chatbot</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; margin-top: 0.6rem;">Bezoekers willen antwoord nu. Een slimme chatbot die vragen afhandelt, leads vastlegt en altijd paraat staat.</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>24/7 inzetbaar op je website</li>
+                        <li>Veelgestelde vragen &amp; routing</li>
+                        <li>Lead vastleggen &amp; doorzetten naar team</li>
+                        <li>Koppeling met mail of CRM</li>
+                        <li>Tone-of-voice in jouw merkstijl</li>
+                    </ul>
+                    <a href="/premium-pakketten" class="magnetic-btn magnetic secondary" style="width: 100%; justify-content: center;">Dit heb ik nodig</a>
+                </div>
             </div>
         </div>
     </section>
@@ -2521,6 +2577,7 @@
                     <li><a href="/premium-bedrijfssoftware">Bedrijfssoftware</a></li>
                     <li><a href="/premium-voicesoftware">Voicesoftware</a></li>
                     <li><a href="/premium-websites">Premium website</a></li>
+                    <li><a href="/premium-pakketten">Chatbot</a></li>
                 </ul>
             </div>
 
@@ -2534,12 +2591,6 @@
                     <div class="contact-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
                     <div class="contact-text"><strong>Vestiging</strong>Oisterwijk, Nederland</div>
                 </div>
-            </div>
-            <div class="footer-col">
-                <div class="footer-col-title">Softora</div>
-                <ul>
-                    <li><a href="#over">Over ons</a></li>
-                </ul>
             </div>
         </div>
 

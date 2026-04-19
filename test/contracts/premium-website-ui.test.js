@@ -45,7 +45,7 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   assert.doesNotMatch(source, /<h2 style="text-align: center;">Wat We Voor Je Bouwen<\/h2>/);
   assert.match(
     source,
-    /<div class="pricing-grid">[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card fade-up"[\s\S]*id="dienst-premium-website" class="pricing-card featured fade-up"[\s\S]*id="dienst-voicesoftware" class="pricing-card fade-up"/
+    /<div class="pricing-grid">[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card fade-up"[\s\S]*id="dienst-premium-website" class="pricing-card featured fade-up"[\s\S]*id="dienst-voicesoftware" class="pricing-card fade-up"[\s\S]*id="dienst-chatbot" class="pricing-card pricing-card--accent-chatbot fade-up"/
   );
   assert.doesNotMatch(
     source,
@@ -65,6 +65,10 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
     source,
     /<div class="card-number">03<\/div>\s*<h3>Voicesoftware<\/h3>\s*<p>Nooit meer een gemiste oproep\. Nooit meer een gemiste kans\. Onze AI-agents nemen op, kwalificeren en werken — dag en nacht\.<\/p>/
   );
+  assert.match(
+    source,
+    /<div class="card-number">04<\/div>\s*<h3>Chatbot<\/h3>\s*<p>Bezoekers willen antwoord nu — niet morgen\. Een slimme chatbot die vragen afhandelt, leads vastlegt en 24\/7 voor je klaarstaat\.<\/p>/
+  );
   assert.doesNotMatch(source, /diensten-arrow-wrap/);
 });
 
@@ -77,10 +81,13 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.doesNotMatch(source, /Klaar voor de <span class="text-accent">volgende stap<\/span>\?/);
   assert.match(source, /<div class="footer-accent"><\/div>/);
   assert.match(source, /<footer id="contact" class="footer">/);
-  assert.match(source, /<a href="#over">Over ons<\/a>/);
+  assert.match(
+    source,
+    /<div class="footer-col-title">Diensten<\/div>\s*<ul>[\s\S]*<li><a href="\/premium-pakketten">Chatbot<\/a><\/li>[\s\S]*<\/ul>/s
+  );
   assert.match(source, /Wij bouwen professionele, snelle websites voor bedrijven\. Van ontwerp tot onderhoud - alles onder een dak\./);
   assert.doesNotMatch(source, /Wij bouwen professionele, snelle websites voor het MKB\./);
-  assert.match(source, /\.footer-grid\s*\{[\s\S]*grid-template-columns:\s*2fr 1fr 1fr 1fr;/s);
+  assert.match(source, /\.footer-grid\s*\{[\s\S]*grid-template-columns:\s*2fr 1fr 1fr;/s);
   assert.match(source, /\.footer-logo\s*\{[\s\S]*font-family:\s*'Oswald', sans-serif;/s);
   assert.match(source, /<div class="footer-copy">© 2026 <span>Softora\.nl<\/span> - Alle rechten voorbehouden · KvK: 12345678<\/div>/);
   assert.match(source, /<a href="#contact" class="magnetic-btn magnetic">Start Project<\/a>/);
