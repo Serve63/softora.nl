@@ -949,15 +949,15 @@
         .slider-header-question {
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.2rem;
             max-width: min(28rem, 70vw);
-            flex: 1 1 auto;
+            flex: 0 1 auto;
             min-width: 0;
         }
 
         .slider-question-label {
             margin-bottom: 0 !important;
-            flex: 1 1 auto;
+            flex: 0 1 auto;
             text-align: center;
             line-height: 1.25;
         }
@@ -965,23 +965,24 @@
         .slider-question-nav {
             flex: 0 0 auto;
             appearance: none;
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
+            border: none;
+            background: transparent;
             color: var(--accent-light);
-            width: 2rem;
-            height: 2rem;
-            border-radius: 8px;
+            width: auto;
+            height: auto;
+            min-width: 0;
+            border-radius: 0;
             cursor: pointer;
-            font-size: 1.25rem;
+            font-size: 1.35rem;
             line-height: 1;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 0;
+            padding: 0.2rem 0.15rem;
         }
 
         .slider-question-nav:hover {
-            opacity: 0.92;
+            opacity: 0.85;
         }
 
         .slider-value {
