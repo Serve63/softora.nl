@@ -41,6 +41,7 @@
   const DEFAULT_CAMPAIGN_REGIO_VALUE = 'unlimited';
   const CUSTOM_CAMPAIGN_REGIO_VALUE = 'custom';
   const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';
+  const MAX_CAMPAIGN_REGIO_KM_CHOICE = 250;
   const REMOTE_UI_STATE_SCOPE_BASE = 'coldcalling';
   const REMOTE_UI_STATE_SCOPE_PREFERENCES = 'coldcalling_preferences';
   const BUSINESS_MODE_ORDER = ['websites', 'voice_software', 'business_software'];
@@ -2977,14 +2978,15 @@
 
   function resolveAutomaticCampaignRegioKm(leads) {
     if (!Array.isArray(leads) || !leads.length) return 10;
-    const maxReach = countDialableLeadsWithinCampaignRegioRadius(leads, 150);
+    const cap = MAX_CAMPAIGN_REGIO_KM_CHOICE;
+    const maxReach = countDialableLeadsWithinCampaignRegioRadius(leads, cap);
     if (maxReach <= 0) return 10;
-    for (let km = 10; km <= 150; km += 10) {
+    for (let km = 10; km <= cap; km += 10) {
       if (countDialableLeadsWithinCampaignRegioRadius(leads, km) >= maxReach) {
         return km;
       }
     }
-    return 150;
+    return cap;
   }
 
   function getCampaignRegioLabelForApi() {
