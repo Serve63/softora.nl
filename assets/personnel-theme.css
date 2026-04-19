@@ -253,6 +253,38 @@
     opacity: 1 !important;
 }
 
+/* Coming soon / toegangsslot: slot-icoon + lagere opacity */
+.sidebar-link.sidebar-link--coming-soon {
+    opacity: 0.58 !important;
+}
+
+.sidebar-link.sidebar-link--coming-soon:hover {
+    opacity: 0.76 !important;
+}
+
+.sidebar-link.sidebar-link--coming-soon.active {
+    opacity: 0.68 !important;
+}
+
+.sidebar-link .sidebar-link-lock {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebar-link .sidebar-link-lock .sidebar-link-lock-icon {
+    width: 13px !important;
+    height: 13px !important;
+    opacity: 0.72 !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebar-link.sidebar-link--coming-soon:hover .sidebar-link-lock .sidebar-link-lock-icon,
+.sidebar-link.sidebar-link--coming-soon.active .sidebar-link-lock .sidebar-link-lock-icon {
+    opacity: 0.95 !important;
+}
+
 .sidebar-footer {
     margin-top: auto !important;
     padding: 2rem !important;

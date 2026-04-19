@@ -530,6 +530,36 @@
         };
     }
 
+    /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
+    const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
+        "websitegenerator",
+        "seo",
+        "coldmailing",
+        "ads_google",
+        "ads_facebook",
+        "ads_pinterest",
+        "ads_linkedin",
+    ]);
+
+    const COMING_SOON_LOCK_SVG =
+        '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6a3 3 0 1 0-6 0v4.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5a1.5 1.5 0 0 1-1.5 1.5H7.5A1.5 1.5 0 0 1 6 19.5V12a1.5 1.5 0 0 1 1.5-1.5z"/></svg>';
+
+    function decorateComingSoonSidebarLinks() {
+        const sidebar = document.querySelector(".sidebar");
+        if (!sidebar) return;
+        PREMIUM_SIDEBAR_COMING_SOON_KEYS.forEach(function (key) {
+            const link = sidebar.querySelector('[data-sidebar-key="' + key + '"]');
+            if (!link) return;
+            link.classList.add("sidebar-link--coming-soon");
+            if (link.querySelector(".sidebar-link-lock")) return;
+            const lockWrap = document.createElement("span");
+            lockWrap.className = "sidebar-link-lock";
+            lockWrap.setAttribute("aria-hidden", "true");
+            lockWrap.innerHTML = COMING_SOON_LOCK_SVG;
+            link.insertBefore(lockWrap, link.firstChild);
+        });
+    }
+
     const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set(["passwords", "settings"]);
 
     function getPremiumSidebarAdminExtraLinks() {
@@ -819,10 +849,22 @@
     function refreshPremiumStaticSidebarActiveState() {
         if (!isPremiumPersonnelContext) return;
         const sidebar = document.querySelector(".sidebar");
-        if (!sidebar || sidebar.dataset.staticSidebar !== "1") return;
-        const activeKey = getSidebarActiveKey(pathname);
-        syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
-        neutralizeSidebarAnchors();
+        if (!sidebar) return;
+        const path = String(window.location.pathname || "").toLowerCase();
+        const activeKey = getSidebarActiveKey(path);
+        if (sidebar.dataset.staticSidebar === "1") {
+            syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
+            neutralizeSidebarAnchors();
+            decorateComingSoonSidebarLinks();
+            return;
+        }
+        if (path.indexOf("/premium-advertenties") === 0) {
+            sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
+            syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
+            pruneDeprecatedSidebarLinks(sidebar);
+            neutralizeSidebarAnchors();
+            decorateComingSoonSidebarLinks();
+        }
     }
 
     function applyUnifiedPremiumSidebar() {
@@ -835,6 +877,7 @@
             pruneDeprecatedSidebarLinks(sidebar);
             neutralizeSidebarAnchors();
             sidebar.dataset.sidebarReady = "true";
+            decorateComingSoonSidebarLinks();
             return;
         }
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
@@ -844,6 +887,7 @@
         pruneDeprecatedSidebarLinks(sidebar);
         neutralizeSidebarAnchors();
         sidebar.dataset.sidebarReady = "true";
+        decorateComingSoonSidebarLinks();
     }
 
     function mergeSidebarCountState() {
@@ -1033,6 +1077,7 @@
                 activeKey
             );
             neutralizeSidebarAnchors();
+            decorateComingSoonSidebarLinks();
         }
 
         if (!nameEl || !roleEl || !avatarEl || !triggerEl) {
