@@ -1518,7 +1518,7 @@
 
   const FIXED_TOPBAR_TITLE = 'Coldcalling';
   const FIXED_TOPBAR_SUBTITLE =
-    'Coldcalling blokkeert automatisch wanneer de agenda in de aankomende 10 werkdagen vol zit.';
+    'Coldcalling wordt automatisch geblokkeerd zodra de agenda voor de komende 10 werkdagen vol zit.';
 
   function applyBusinessModeUi() {
     const mode = getCurrentBusinessMode();
