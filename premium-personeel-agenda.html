@@ -543,6 +543,25 @@
             height: 1rem;
         }
 
+        .modal-workspace-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.55rem;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.35;
+            max-width: 36rem;
+        }
+        .modal-workspace-check input {
+            margin-top: 0.18rem;
+            flex-shrink: 0;
+            accent-color: var(--accent-light);
+            width: 1rem;
+            height: 1rem;
+        }
+
         .modal-workspace-status {
             margin-top: 0.35rem;
             font-size: 0.7rem;
@@ -1148,6 +1167,12 @@
                     </div>
                 </div>
                 <div class="modal-workspace-field">
+                    <label class="modal-workspace-check" for="manualAppointmentFullDay">
+                        <input type="checkbox" id="manualAppointmentFullDay" autocomplete="off">
+                        <span>Gehele dag niet beschikbaar</span>
+                    </label>
+                </div>
+                <div class="modal-workspace-field">
                     <div class="modal-workspace-label">Tijdstip Activiteit</div>
                     <input type="time" class="modal-workspace-input" id="manualAppointmentTime" min="09:00" max="17:00" step="300" autocomplete="off" required>
                 </div>
@@ -1323,6 +1348,7 @@
     const manualAppointmentLocationEl = document.getElementById('manualAppointmentLocation');
     const manualAppointmentActivityEl = document.getElementById('manualAppointmentActivity');
     const manualAppointmentAvailableAgainEl = document.getElementById('manualAppointmentAvailableAgain');
+    const manualAppointmentFullDayEl = document.getElementById('manualAppointmentFullDay');
     const manualAppointmentStatusEl = document.getElementById('manualAppointmentStatus');
     const manualAppointmentCloseBtn = document.getElementById('manualAppointmentCloseBtn');
     const manualAppointmentCancelBtn = document.getElementById('manualAppointmentCancelBtn');
@@ -1969,6 +1995,24 @@
         });
     }
 
+    function syncManualAppointmentFullDayFields() {
+        const on = Boolean(manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked);
+        const toToggle = [
+            manualAppointmentTimeEl,
+            manualAppointmentLocationEl,
+            manualAppointmentActivityEl,
+            manualAppointmentAvailableAgainEl,
+        ];
+        toToggle.forEach(function (el) {
+            if (!el) return;
+            el.disabled = on;
+        });
+        if (manualAppointmentTimeEl) {
+            if (on) manualAppointmentTimeEl.removeAttribute('required');
+            else manualAppointmentTimeEl.setAttribute('required', '');
+        }
+    }
+
     function setManualAppointmentStatus(message, variant = '') {
         if (!manualAppointmentStatusEl) return;
         manualAppointmentStatusEl.textContent = message || '';
@@ -1990,6 +2034,8 @@
         }
         if (manualAppointmentActivityEl) manualAppointmentActivityEl.value = '';
         if (manualAppointmentAvailableAgainEl) manualAppointmentAvailableAgainEl.value = '';
+        if (manualAppointmentFullDayEl) manualAppointmentFullDayEl.checked = false;
+        syncManualAppointmentFullDayFields();
         resetManualAppointmentWhoRadios();
         setManualAppointmentStatus('');
         manualAppointmentOverlay.classList.add('show');
@@ -1998,7 +2044,11 @@
             void ensureAgendaPlacesReady();
         }, 0);
         window.setTimeout(() => {
-            if (manualAppointmentTimeEl) manualAppointmentTimeEl.focus();
+            if (manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked) {
+                manualAppointmentFullDayEl.focus();
+            } else if (manualAppointmentTimeEl) {
+                manualAppointmentTimeEl.focus();
+            }
         }, 30);
     }
 
@@ -2013,6 +2063,7 @@
 
     async function submitManualAppointment() {
         if (!manualAppointmentSelectedDate || manualAppointmentSaving) return;
+        const fullDay = Boolean(manualAppointmentFullDayEl && manualAppointmentFullDayEl.checked);
         const timeVal = manualAppointmentTimeEl ? String(manualAppointmentTimeEl.value || '').trim() : '';
         const location = manualAppointmentLocationEl ? String(manualAppointmentLocationEl.value || '').trim() : '';
         const activity = manualAppointmentActivityEl ? String(manualAppointmentActivityEl.value || '').trim() : '';
@@ -2020,39 +2071,42 @@
             ? String(manualAppointmentAvailableAgainEl.value || '').trim()
             : '';
 
-        if (!isManualAppointmentTimeAllowed(timeVal)) {
-            setManualAppointmentStatus(
-                'Kies een tijd tussen 09:00 en 17:00. Andere tijden worden niet in de agenda gezet.',
-                'error'
-            );
-            return;
-        }
-        if (!location) {
-            setManualAppointmentStatus('Vul een locatie in.', 'error');
-            return;
-        }
-        if (getAgendaGoogleMapsKey() && !manualAppointmentLocationPlaceConfirmed) {
-            setManualAppointmentStatus(
-                'Kies een bestaand adres uit de Google-suggesties (klik een voorstel aan).',
-                'error'
-            );
-            return;
-        }
-        if (!activity) {
-            setManualAppointmentStatus('Vul een activiteit in.', 'error');
-            return;
-        }
         const who = getManualAppointmentWho();
         if (who !== 'serve' && who !== 'martijn') {
             setManualAppointmentStatus('Kies Servé of Martijn bij wie ben je.', 'error');
             return;
         }
-        if (!availableAgain || parseManualTimeToMinutes(availableAgain) === null) {
-            setManualAppointmentStatus(
-                'Kies een geldige tijd waarop je weer beschikbaar bent voor een reis naar prospect.',
-                'error'
-            );
-            return;
+
+        if (!fullDay) {
+            if (!isManualAppointmentTimeAllowed(timeVal)) {
+                setManualAppointmentStatus(
+                    'Kies een tijd tussen 09:00 en 17:00. Andere tijden worden niet in de agenda gezet.',
+                    'error'
+                );
+                return;
+            }
+            if (!location) {
+                setManualAppointmentStatus('Vul een locatie in.', 'error');
+                return;
+            }
+            if (getAgendaGoogleMapsKey() && !manualAppointmentLocationPlaceConfirmed) {
+                setManualAppointmentStatus(
+                    'Kies een bestaand adres uit de Google-suggesties (klik een voorstel aan).',
+                    'error'
+                );
+                return;
+            }
+            if (!activity) {
+                setManualAppointmentStatus('Vul een activiteit in.', 'error');
+                return;
+            }
+            if (!availableAgain || parseManualTimeToMinutes(availableAgain) === null) {
+                setManualAppointmentStatus(
+                    'Kies een geldige tijd waarop je weer beschikbaar bent voor een reis naar prospect.',
+                    'error'
+                );
+                return;
+            }
         }
 
         manualAppointmentSaving = true;
@@ -2060,15 +2114,20 @@
         setManualAppointmentStatus('Opslaan...', '');
 
         try {
-            const result = await postJsonWithFallback('/api/agenda/appointments/manual', {
+            const payload = {
                 date: manualAppointmentSelectedDate,
-                time: timeVal,
-                location,
-                activity,
                 who,
-                availableAgain,
                 actor: 'premium-personeel-agenda',
-            });
+            };
+            if (fullDay) {
+                payload.allDayUnavailable = true;
+            } else {
+                payload.time = timeVal;
+                payload.location = location;
+                payload.activity = activity;
+                payload.availableAgain = availableAgain;
+            }
+            const result = await postJsonWithFallback('/api/agenda/appointments/manual', payload);
             const created = result?.appointment;
             if (created && mergeServerAppointments([created])) {
                 renderCalendar();
@@ -3059,6 +3118,9 @@
     }
     if (manualAppointmentCancelBtn) {
         manualAppointmentCancelBtn.addEventListener('click', () => closeManualAppointmentModal());
+    }
+    if (manualAppointmentFullDayEl) {
+        manualAppointmentFullDayEl.addEventListener('change', () => syncManualAppointmentFullDayFields());
     }
     if (manualAppointmentSubmitBtn) {
         manualAppointmentSubmitBtn.addEventListener('click', () => {

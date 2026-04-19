@@ -12,6 +12,13 @@ function resolveManualPlannerLabel(body, normalizeString) {
   return '';
 }
 
+function isTruthyAllDayUnavailable(body) {
+  const v = body?.allDayUnavailable ?? body?.geheleDagNietBeschikbaar;
+  if (v === true || v === 1) return true;
+  if (typeof v === 'string') return /^(1|true|yes)$/i.test(String(v).trim());
+  return false;
+}
+
 function createAgendaManualAppointmentCoordinator(deps = {}) {
   const {
     isSupabaseConfigured,
@@ -76,30 +83,29 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const appointmentDate = normalizeDateYyyyMmDd(body.date || '');
-    const appointmentTime = normalizeTimeHhMm(body.time || '');
-    const location = sanitizeAppointmentLocation(body.location || '');
-    const activity = truncateText(normalizeString(body.activity || ''), 500);
-    const availableAgain = normalizeTimeHhMm(body.availableAgain || '');
+    const allDayUnavailable = isTruthyAllDayUnavailable(body);
     const whoLabel = resolveManualPlannerLabel(body, normalizeString);
     const actor = truncateText(normalizeString(body.actor || body.doneBy || ''), 120);
 
+    let appointmentTime;
+    let location;
+    let activity;
+    let availableAgain;
+
+    if (allDayUnavailable) {
+      appointmentTime = '09:00';
+      availableAgain = '17:00';
+      location = sanitizeAppointmentLocation('—');
+      activity = 'Gehele dag niet beschikbaar';
+    } else {
+      appointmentTime = normalizeTimeHhMm(body.time || '');
+      location = sanitizeAppointmentLocation(body.location || '');
+      activity = truncateText(normalizeString(body.activity || ''), 500);
+      availableAgain = normalizeTimeHhMm(body.availableAgain || '');
+    }
+
     if (!appointmentDate) {
       return res.status(400).json({ ok: false, error: 'Vul een geldige datum in (YYYY-MM-DD).' });
-    }
-    if (!appointmentTime) {
-      return res.status(400).json({ ok: false, error: 'Vul een geldige tijd in (HH:MM).' });
-    }
-    if (appointmentStartMinutesWithinBusinessHours(appointmentTime) === null) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Afspraken zijn alleen tussen 09:00 en 17:00. Kies een tijd in dat venster.',
-      });
-    }
-    if (!location) {
-      return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
-    }
-    if (!activity) {
-      return res.status(400).json({ ok: false, error: 'Vul een activiteit in.' });
     }
     if (!whoLabel) {
       return res.status(400).json({
@@ -107,11 +113,28 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
         error: 'Kies wie de afspraak plant: Servé of Martijn.',
       });
     }
-    if (!availableAgain) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Kies een geldige tijd (HH:MM) voor wanneer je weer beschikbaar bent.',
-      });
+    if (!allDayUnavailable) {
+      if (!appointmentTime) {
+        return res.status(400).json({ ok: false, error: 'Vul een geldige tijd in (HH:MM).' });
+      }
+      if (appointmentStartMinutesWithinBusinessHours(appointmentTime) === null) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Afspraken zijn alleen tussen 09:00 en 17:00. Kies een tijd in dat venster.',
+        });
+      }
+      if (!location) {
+        return res.status(400).json({ ok: false, error: 'Vul een locatie in.' });
+      }
+      if (!activity) {
+        return res.status(400).json({ ok: false, error: 'Vul een activiteit in.' });
+      }
+      if (!availableAgain) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Kies een geldige tijd (HH:MM) voor wanneer je weer beschikbaar bent.',
+        });
+      }
     }
 
     const callId = `manual_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
@@ -137,6 +160,7 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       providerLabel: 'Handmatig',
       coldcallingStack: 'manual',
       manualPlannerWho: whoLabel === 'Martijn' ? 'martijn' : 'serve',
+      manualAllDayUnavailable: allDayUnavailable,
       summary,
       summaryFormatVersion: 4,
       branche: '',
@@ -184,7 +208,9 @@ function createAgendaManualAppointmentCoordinator(deps = {}) {
       {
         type: 'manual_agenda_appointment',
         title: 'Handmatige afspraak toegevoegd',
-        detail: `${activity} op ${appointmentDate} om ${appointmentTime}${location ? ` (${location})` : ''}. Door: ${whoLabel}.`,
+        detail: allDayUnavailable
+          ? `${activity} op ${appointmentDate} (09:00–17:00). Door: ${whoLabel}.`
+          : `${activity} op ${appointmentDate} om ${appointmentTime}${location ? ` (${location})` : ''}. Door: ${whoLabel}.`,
         company: activity,
         actor: actorLabel,
         taskId: Number(updatedAppointment?.id || 0) || null,

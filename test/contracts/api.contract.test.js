@@ -458,6 +458,32 @@ test('agenda manual appointment route rejects times outside 09:00–17:00 when v
   assert.equal(late.response.status, 401);
 });
 
+test('agenda manual appointment all-day flag blocks 09:00–17:00 without per-field body', async () => {
+  const authState = await getJson('/api/auth/session');
+  const configured = Boolean(authState.body?.configured);
+
+  const res = await postJson('/api/agenda/appointments/manual', {
+    date: '2099-06-15',
+    allDayUnavailable: true,
+    who: 'serve',
+    time: '18:00',
+    location: '',
+    activity: '',
+    availableAgain: '',
+  });
+  if (!configured) {
+    assert.equal(res.response.status, 503);
+    assert.equal(res.body.ok, false);
+    return;
+  }
+  if (res.response.status === 401) return;
+  assert.equal(res.response.status, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.appointment.time, '09:00');
+  assert.equal(res.body.appointment.company, 'Gehele dag niet beschikbaar');
+  assert.equal(res.body.appointment.manualAllDayUnavailable, true);
+});
+
 test('coldcalling endpoints keep their contract boundaries', async () => {
   const updatesResult = await getProtectedApiExpectation('/api/coldcalling/call-updates?limit=3');
   if (updatesResult.response.status === 200) {
