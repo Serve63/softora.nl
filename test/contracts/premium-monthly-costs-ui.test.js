@@ -74,12 +74,14 @@ test('premium terugkerende kosten gebruikt modals en delegated acties voor bewer
   assert.match(pageSource, /function editItem\(cat, id\) \{[\s\S]*edit-modal-overlay[\s\S]*document\.getElementById\('edit-naam'\)\.focus\(\);/s);
 });
 
-test('premium terugkerende kosten toont coldcalling en coldmailing bovenaan met paarse stippelrand', () => {
+test('premium terugkerende kosten toont dynamische posten bovenaan met paarse stippelrand', () => {
   const pagePath = path.join(__dirname, '../../premium-vaste-lasten.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
   assert.match(pageSource, /naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
+  assert.match(pageSource, /naam:'API kosten', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0\.00, status:'active', highlighted:true/);
+  assert.match(pageSource, /let nextId = 4;/);
   assert.doesNotMatch(pageSource, /naam:'Hostinger VPS'/);
   assert.doesNotMatch(pageSource, /naam:'softora\.nl domein'/);
   assert.doesNotMatch(pageSource, /naam:'TransIP backup'/);

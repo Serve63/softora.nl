@@ -660,6 +660,7 @@ let data = {
   'Totale kosten:': [
     { id:1, naam:'Coldcalling', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
     { id:2, naam:'Coldmailing', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
+    { id:3, naam:'API kosten', note:'Variabele maandkosten', freq:'maandelijks', bedrag:0.00, status:'active', highlighted:true },
   ],
 };
 const MONTHLY_COSTS_REMOTE_SCOPE = 'premium_monthly_costs';
@@ -668,7 +669,7 @@ const DEFAULT_MONTHLY_COSTS_CATEGORY = 'Totale kosten:';
 const DEFAULT_MONTHLY_COSTS_HIGHLIGHTED_ITEMS = (data[DEFAULT_MONTHLY_COSTS_CATEGORY] || [])
   .filter((item) => item.highlighted)
   .map((item) => ({ ...item }));
-let nextId = 3;
+let nextId = 4;
 let editingContext = null;
 let deletingContext = null;
 let monthlyCostsLoaded = false;

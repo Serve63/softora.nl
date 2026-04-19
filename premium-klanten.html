@@ -623,9 +623,14 @@
         thead th:nth-child(6) { width: 7%; }
         thead th:nth-child(7) { width: 12%; white-space: normal; line-height: 1.25; }
         thead th:nth-child(8) { width: 6%; }
-        thead th:nth-child(9) { width: 10%; }
-        thead th:nth-child(10) { width: 7%; }
+        thead th:nth-child(9) { width: 7%; }
+        thead th:nth-child(10) { width: 10%; }
         thead th:nth-child(11) { width: 6%; }
+
+        thead th:nth-child(7),
+        tbody td:nth-child(7) {
+            text-align: center;
+        }
 
         tbody tr:hover td {
             background: var(--table-hover);
@@ -983,6 +988,14 @@
                 text-transform: uppercase;
             }
 
+            tbody td.cell-assigned {
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                gap: 0.35rem;
+            }
+
             tbody tr:hover td {
                 background: transparent;
             }
@@ -1144,8 +1157,8 @@
                                     <th>Status</th>
                                     <th>Toegewezen aan</th>
                                     <th>Actief</th>
-                                    <th>Betaaldatum</th>
                                     <th>Review?</th>
+                                    <th>Betaaldatum</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -1193,10 +1206,10 @@
                     <div class="form-group">
                         <label class="form-label" for="fieldService">Service</label>
                         <select class="form-select" id="fieldService" name="service" required>
-                            <option value="website">website</option>
-                            <option value="bedrijfssoftware">bedrijfssoftware</option>
-                            <option value="voicesoftware">voicesoftware</option>
-                            <option value="chatbot">chatbot</option>
+                            <option value="website">Website</option>
+                            <option value="bedrijfssoftware">Bedrijfssoftware</option>
+                            <option value="voicesoftware">Voicesoftware</option>
+                            <option value="chatbot">Chatbot</option>
                         </select>
                     </div>
 
@@ -1397,6 +1410,16 @@
             const rawSvc = normalizeString(raw && raw.service).toLowerCase();
             if (CUSTOMER_SERVICE_OPTIONS.indexOf(rawSvc) !== -1) return rawSvc;
             return "website";
+        }
+
+        function formatCustomerServiceLabel(service) {
+            const key = normalizeString(service).toLowerCase();
+            if (key === "website") return "Website";
+            if (key === "bedrijfssoftware") return "Bedrijfssoftware";
+            if (key === "voicesoftware") return "Voicesoftware";
+            if (key === "chatbot") return "Chatbot";
+            if (!key) return "Website";
+            return key.charAt(0).toUpperCase() + key.slice(1);
         }
 
         function normalizeCustomerReview(raw) {
@@ -1887,6 +1910,7 @@
                     customer.website,
                     customer.type,
                     customer.service,
+                    formatCustomerServiceLabel(customer.service),
                     customer.review,
                     customer.status,
                     customer.verantwoordelijk,
@@ -1959,7 +1983,7 @@
                                 : ""),
                         "</td>",
                         "<td data-label=\"Telefoonnummer\" class=\"muted-cell cell-phone\">" + escapeHtml(customer.telefoon) + "</td>",
-                        "<td data-label=\"Service\" class=\"muted-cell\">" + escapeHtml(customer.service || "website") + "</td>",
+                        "<td data-label=\"Service\" class=\"muted-cell\">" + escapeHtml(formatCustomerServiceLabel(customer.service)) + "</td>",
                         "<td data-label=\"Prijs\" class=\"service-cell\">",
                             renderPrijsCell(customer),
                         "</td>",
@@ -1967,10 +1991,10 @@
                             renderServiceCell(customer, "maintenance"),
                         "</td>",
                         "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
-                        "<td data-label=\"Toegewezen aan\" class=\"muted-cell\">" + escapeHtml(formatResponsibleDisplayName(customer.verantwoordelijk || "Serve")) + "</td>",
+                        "<td data-label=\"Toegewezen aan\" class=\"muted-cell cell-assigned\">" + escapeHtml(formatResponsibleDisplayName(customer.verantwoordelijk || "Serve")) + "</td>",
                         "<td data-label=\"Actief\"><span class=\"active-text " + activeClass + "\">" + escapeHtml(customer.actief || "Ja") + "</span></td>",
-                        "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td data-label=\"Review?\"><span class=\"active-text " + (customer.review === "Ja" ? "is-yes" : "is-no") + "\">" + escapeHtml(customer.review || "Nee") + "</span></td>",
+                        "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td class=\"cell-actions\" data-label=\"Acties\">",
                             "<div class=\"actions\">",
                                 "<button type=\"button\" class=\"action-btn\" data-action=\"edit\" data-id=\"" + escapeHtml(customer.id) + "\" title=\"Bewerken\" aria-label=\"Klant bewerken\">",

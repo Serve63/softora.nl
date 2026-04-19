@@ -8,6 +8,8 @@ test('premium customers page bootstraps customer rows before async sync runs', (
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
+  assert.match(pageSource, /function formatCustomerServiceLabel\(service\)/);
+  assert.match(pageSource, /<option value="website">Website<\/option>/);
   assert.match(pageSource, /function readCustomersBootstrapPayload\(\)/);
   assert.match(pageSource, /document\.getElementById\("softoraCustomersBootstrap"\)/);
   assert.match(pageSource, /function resolveBootstrapCustomers\(\)/);
@@ -23,6 +25,8 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /<th>Toegewezen aan<\/th>/);
+  assert.match(pageSource, /<th>Review\?<\/th>\s*<th>Betaaldatum<\/th>/);
+  assert.match(pageSource, /tbody td:nth-child\(7\)[\s\S]*text-align:\s*center/);
   assert.match(pageSource, /<label class="form-label" for="fieldResponsible">Toegewezen aan<\/label>/);
   assert.match(pageSource, /<select class="form-select" id="fieldResponsible" name="verantwoordelijk" required>/);
   assert.match(pageSource, /<option value="Serve" selected>Servé<\/option>/);
