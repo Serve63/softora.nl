@@ -1520,6 +1520,13 @@
               <a href="/premium-pdfs" class="sidebar-link magnetic" data-sidebar-key="pdfs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span class="sidebar-link-text">PDF'S</span></a>
             </div>
             <div class="sidebar-section">
+              <div class="sidebar-section-label">Advertenties</div>
+              <a href="/premium-advertenties#google" class="sidebar-link magnetic" data-sidebar-key="ads_google"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Google</span></a>
+              <a href="/premium-advertenties#facebook" class="sidebar-link magnetic" data-sidebar-key="ads_facebook"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Facebook</span></a>
+              <a href="/premium-advertenties#pinterest" class="sidebar-link magnetic" data-sidebar-key="ads_pinterest"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Pinterest</span></a>
+              <a href="/premium-advertenties#linkedin" class="sidebar-link magnetic" data-sidebar-key="ads_linkedin"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">LinkedIn</span></a>
+            </div>
+            <div class="sidebar-section">
               <div class="sidebar-section-label">Extra</div>
               <a href="/premium-wachtwoordenregister" class="sidebar-link magnetic" data-sidebar-key="passwords"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg><span class="sidebar-link-text">Wachtwoordenregister</span></a>
               <a href="/premium-vaste-lasten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Terugkerende kosten</span></a>
@@ -3560,16 +3567,45 @@
 
             const requiresConfirmation = options.confirm === true && !ui.isBuilt;
             if (requiresConfirmation) {
-                const orderLabel = String(getCustomOrderById(id)?.title || order.type || order.name || 'deze opdracht').trim();
-                const confirmationMessage = `Factuur van "${orderLabel}" als betaald markeren? Deze opdracht wordt dan direct verplaatst naar voltooide opdrachten.`;
+                const invoicePaidReviewReminder =
+                    'Vergeet niet om de klant te vragen een review achter te laten!';
+                const reviewBadgeGoogleUrl = 'https://www.google.com/maps';
+                const reviewBadgeTrustpilotUrl = 'https://www.trustpilot.com';
+                const invoicePaidConfirmBodyHtml = [
+                    '<p class="softora-dialog-review-lead" style="margin:0 0 0.65rem 0">',
+                    invoicePaidReviewReminder,
+                    '</p>',
+                    '<div class="softora-dialog-badge-row">',
+                    '<a class="softora-review-badge" href="',
+                    reviewBadgeGoogleUrl,
+                    '" target="_blank" rel="noopener noreferrer" aria-label="Google Reviews">',
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="26" viewBox="0 0 90 26" aria-hidden="true">',
+                    '<rect width="90" height="26" rx="5" fill="#fff" stroke="#dadce0"/>',
+                    '<path fill="#4285F4" d="M12.5 13c0-.8.14-1.55.38-2.25H7v4.27h3.18c-.17.9-.68 1.66-1.45 2.14v1.77h2.35c1.37-1.26 2.17-3.12 2.17-5.27z"/>',
+                    '<path fill="#34A853" d="M7 18.9c1.94 0 3.58-.64 4.77-1.72l-2.35-1.77c-.64.43-1.46.69-2.42.69-1.86 0-3.44-1.26-4-2.95H.8v1.83C2 17.25 4.28 18.9 7 18.9z"/>',
+                    '<path fill="#FBBC05" d="M3 12.05c-.15-.45-.23-.93-.23-1.42s.08-.97.23-1.42V7.38H.8C.3 8.38 0 9.66 0 11s.3 2.62.8 3.62L3 12.05z"/>',
+                    '<path fill="#EA4335" d="M7 5.88c1.05 0 1.99.36 2.72 1.06l2.04-2.04C10.36 3.58 8.84 3 7 3 4.28 3 2 4.65.8 7.38L3 9.21c.56-1.69 2.14-2.95 4-2.95z"/>',
+                    '<text x="26" y="17" font-family="system-ui,-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif" font-size="9.5" font-weight="600" fill="#3c4043">Reviews</text>',
+                    '</svg></a>',
+                    '<a class="softora-review-badge" href="',
+                    reviewBadgeTrustpilotUrl,
+                    '" target="_blank" rel="noopener noreferrer" aria-label="Trustpilot">',
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">',
+                    '<rect width="96" height="26" rx="5" fill="#00b67a"/>',
+                    '<path fill="#fff" d="M13 6.5l1.65 5h5.35l-4.33 3.15 1.65 5L13 16.5l-4.32 3.15 1.65-5L6 11.5h5.35z"/>',
+                    '<text x="24" y="17" font-family="system-ui,-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif" font-size="9.5" font-weight="700" fill="#fff">Trustpilot</text>',
+                    '</svg></a>',
+                    '</div>',
+                ].join('');
                 const confirmed =
                     window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === 'function'
-                        ? await window.SoftoraDialogs.confirm(confirmationMessage, {
+                        ? await window.SoftoraDialogs.confirm(invoicePaidReviewReminder, {
                             title: 'Factuur betaald bevestigen',
                             confirmText: 'Bevestigen',
                             cancelText: 'Annuleren',
+                            bodyHtml: invoicePaidConfirmBodyHtml,
                         })
-                        : window.confirm(confirmationMessage);
+                        : window.confirm(invoicePaidReviewReminder);
                 if (!confirmed) return false;
             }
 

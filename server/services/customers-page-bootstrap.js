@@ -69,6 +69,18 @@ function createCustomersPageBootstrapService(deps = {}) {
     return Math.round(amount);
   }
 
+  const CUSTOMER_SERVICE_OPTIONS = ['website', 'bedrijfssoftware', 'voicesoftware', 'chatbot'];
+
+  function normalizeCustomerService(raw) {
+    const rawSvc = normalizeString(raw && raw.service).toLowerCase();
+    if (CUSTOMER_SERVICE_OPTIONS.includes(rawSvc)) return rawSvc;
+    return 'website';
+  }
+
+  function normalizeCustomerReview(raw) {
+    return normalizeString(raw && raw.review).toLowerCase() === 'ja' ? 'Ja' : 'Nee';
+  }
+
   function normalizeCustomer(raw, fallbackId) {
     const legacyAmount = normalizeOptionalAmount(raw && raw.bedrag);
     const rawType = normalizeString(raw && raw.type);
@@ -98,18 +110,23 @@ function createCustomersPageBootstrapService(deps = {}) {
             ? onderhoudPerMaand
             : 0;
 
+    const service = normalizeCustomerService(raw);
+    const review = normalizeCustomerReview(raw);
+
     return {
       id: normalizeString(raw && raw.id) || fallbackId || '',
       naam: normalizeString(raw && raw.naam) || 'Onbekend',
       bedrijf: normalizeString(raw && raw.bedrijf) || '-',
       telefoon: normalizeString(raw && raw.telefoon) || '-',
       type,
+      service,
       website: normalizeString(raw && raw.website) || '-',
       websiteBedrag,
       onderhoudPerMaand,
       bedrag,
       status,
       actief: normalizeActiveValue(raw && raw.actief),
+      review,
       verantwoordelijk: normalizeResponsibleValue(getResponsibleSourceValue(raw)),
       datum: normalizeDate(raw && raw.datum),
     };

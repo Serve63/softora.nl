@@ -181,6 +181,47 @@
     white-space: pre-wrap;
 }
 
+.softora-dialog-message--rich {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.98rem;
+    line-height: 1.45;
+}
+
+.softora-dialog-message--rich p {
+    margin: 0 0 0.65rem 0;
+}
+
+.softora-dialog-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    margin: 0.15rem 0 0 0;
+}
+
+.softora-review-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    border-radius: 6px;
+    overflow: hidden;
+    line-height: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.softora-review-badge:focus-visible {
+    outline: 2px solid rgba(139, 34, 82, 0.45);
+    outline-offset: 2px;
+}
+
+.softora-review-badge svg {
+    display: block;
+    height: 26px;
+    width: auto;
+}
+
 .softora-dialog-input {
     width: 100%;
     border: 1px solid var(--border);
@@ -271,6 +312,8 @@
             const mode = String(config && config.mode ? config.mode : "alert");
             const title = String(config && config.title ? config.title : "Melding");
             const message = String(config && config.message ? config.message : "");
+            const bodyHtmlRaw = config && config.bodyHtml ? String(config.bodyHtml).trim() : "";
+            const useRichBody = Boolean(bodyHtmlRaw);
             const confirmText = String(config && config.confirmText ? config.confirmText : "OK");
             const cancelText = String(config && config.cancelText ? config.cancelText : "Annuleren");
             const defaultValue = String(config && config.defaultValue ? config.defaultValue : "");
@@ -285,6 +328,9 @@
                     layer.className = "softora-dialog-layer";
                     const safeTitle = escapeHtml(title);
                     const safeMessage = escapeHtml(message);
+                    const messageBlock = useRichBody
+                        ? `<div class="softora-dialog-message softora-dialog-message--rich">${bodyHtmlRaw}</div>`
+                        : `<p class="softora-dialog-message">${safeMessage}</p>`;
                     const safeDefaultValue = escapeHtml(defaultValue);
                     const safeConfirmText = escapeHtml(confirmText);
                     const safeCancelText = escapeHtml(cancelText);
@@ -292,7 +338,7 @@
                         '<div class="softora-dialog-backdrop"></div>',
                         `<div class="softora-dialog-card" role="dialog" aria-modal="true" aria-label="${safeTitle}">`,
                         `  <h3 class="softora-dialog-title">${safeTitle}</h3>`,
-                        `  <p class="softora-dialog-message">${safeMessage}</p>`,
+                        `  ${messageBlock}`,
                         isPrompt ? `  <input class="softora-dialog-input" type="text" value="${safeDefaultValue}">` : "",
                         '  <div class="softora-dialog-actions">',
                         canCancel ? `    <button type="button" class="softora-dialog-btn" data-dialog-cancel>${safeCancelText}</button>` : "",
@@ -391,6 +437,7 @@
                     mode: "confirm",
                     title: opts.title || "Bevestigen",
                     message: String(message || ""),
+                    bodyHtml: opts.bodyHtml ? String(opts.bodyHtml) : "",
                     confirmText: opts.confirmText || "Ja",
                     cancelText: opts.cancelText || "Annuleren",
                 }).then(function (result) {
@@ -421,6 +468,16 @@
 
     function getSidebarActiveKey(path) {
         const p = String(path || "").toLowerCase();
+        const hashRaw =
+            typeof window !== "undefined" && window.location && window.location.hash
+                ? String(window.location.hash || "").replace(/^#/, "").toLowerCase()
+                : "";
+        if (p.indexOf("/premium-advertenties") === 0) {
+            if (hashRaw === "facebook") return "ads_facebook";
+            if (hashRaw === "pinterest") return "ads_pinterest";
+            if (hashRaw === "linkedin") return "ads_linkedin";
+            return "ads_google";
+        }
         if (
             p.indexOf("/premium-actieve-opdrachten") === 0 ||
             p.indexOf("/premium-opdracht-preview") === 0 ||
@@ -583,6 +640,36 @@
             },
         ];
 
+        const adsPlatformIcon =
+            '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg>';
+
+        const adsLinks = [
+            {
+                key: "ads_google",
+                href: "/premium-advertenties#google",
+                label: "Google",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "ads_facebook",
+                href: "/premium-advertenties#facebook",
+                label: "Facebook",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "ads_pinterest",
+                href: "/premium-advertenties#pinterest",
+                label: "Pinterest",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "ads_linkedin",
+                href: "/premium-advertenties#linkedin",
+                label: "LinkedIn",
+                icon: adsPlatformIcon,
+            },
+        ];
+
         const extraLinks = filterPremiumSidebarLinksForSession([
             {
                 key: "monthly_costs",
@@ -620,6 +707,10 @@
             '  <div class="sidebar-section">',
             '    <div class="sidebar-section-label">Beheer</div>',
             managementLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
+            "  </div>",
+            '  <div class="sidebar-section">',
+            '    <div class="sidebar-section-label">Advertenties</div>',
+            adsLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
             "  </div>",
             '  <div class="sidebar-section">',
             '    <div class="sidebar-section-label">Extra</div>',
@@ -723,6 +814,15 @@
             );
         });
         syncStaticSidebarActiveState(sidebar, activeKey);
+    }
+
+    function refreshPremiumStaticSidebarActiveState() {
+        if (!isPremiumPersonnelContext) return;
+        const sidebar = document.querySelector(".sidebar");
+        if (!sidebar || sidebar.dataset.staticSidebar !== "1") return;
+        const activeKey = getSidebarActiveKey(pathname);
+        syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
+        neutralizeSidebarAnchors();
     }
 
     function applyUnifiedPremiumSidebar() {
@@ -2034,6 +2134,9 @@
 
     initSoftoraDialogs();
     applyUnifiedPremiumSidebar();
+    if (isPremiumPersonnelContext) {
+        window.addEventListener("hashchange", refreshPremiumStaticSidebarActiveState);
+    }
     neutralizeSidebarAnchors();
     if (isPremiumPersonnelContext && premiumSessionSnapshot) {
         applyPremiumSidebarProfile(premiumSessionSnapshot);

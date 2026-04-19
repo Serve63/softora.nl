@@ -41,8 +41,8 @@ test('premium customers page supports toegewezen aan in table, modal and order i
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
   assert.match(pageSource, /\.hero \{[\s\S]*display: flex;[\s\S]*justify-content: space-between;/);
   assert.match(pageSource, /\.hero-side \{[\s\S]*margin-left: auto;[\s\S]*justify-content: flex-end;/);
-  assert.match(pageSource, /thead th:nth-child\(6\) \{ width: 13%; white-space: normal; line-height: 1\.25; \}/);
-  assert.match(pageSource, /thead th:nth-child\(9\) \{ width: 6%; \}/);
+  assert.match(pageSource, /thead th:nth-child\(7\) \{ width: 12%; white-space: normal; line-height: 1\.25; \}/);
+  assert.match(pageSource, /thead th:nth-child\(11\) \{ width: 6%; \}/);
   assert.match(pageSource, /\.action-btn \{[\s\S]*width: 34px;[\s\S]*height: 34px;[\s\S]*display: inline-flex;[\s\S]*justify-content: center;/);
   assert.match(pageSource, /aria-label=\\"Klant bewerken\\"/);
   assert.match(pageSource, /<svg viewBox=\\"0 0 24 24\\" fill=\\"none\\" stroke=\\"currentColor\\" stroke-width=\\"1\.8\\"><path d=\\"M12 20h9\\"\/><path d=\\"M16\.5 3\.5a2\.12 2\.12 0 113 3L7 19l-4 1 1-4 12\.5-12\.5z\\"\/><\/svg>/);

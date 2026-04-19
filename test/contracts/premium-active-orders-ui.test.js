@@ -20,6 +20,10 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /const isPaidOrder = Boolean\(paidAt\) \|\| status\.key === 'betaald';[\s\S]*if \(isPaidOrder\) \{[\s\S]*nextStatus = 'betaald';/);
   assert.match(source, /async function handleOrderPaymentAction\(id\) \{[\s\S]*if \(ui\.isPaid \|\| ui\.isBuilt\) return false;[\s\S]*return markOrderAsPaid\(id, \{ confirm: true \}\);/);
   assert.match(source, /window\.SoftoraDialogs && typeof window\.SoftoraDialogs\.confirm === 'function'[\s\S]*Factuur betaald bevestigen/);
+  assert.match(
+    source,
+    /Vergeet niet om de klant te vragen een review achter te laten![\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/
+  );
   assert.match(source, /await persistRequiredUiStateKeysOrThrow\(\s*\[CUSTOM_ORDERS_KEY, ORDER_RUNTIME_KEY\],/);
   assert.match(source, /document\.querySelectorAll\('\.complete-btn'\)\.forEach\(\(b\) => \{[\s\S]*void handleOrderPaymentAction\(id\);/);
   assert.match(source, /window\.addEventListener\('pagehide', \(\) => \{[\s\S]*void flushRemoteUiStateSave\(\);/);

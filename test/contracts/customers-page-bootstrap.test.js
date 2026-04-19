@@ -50,6 +50,8 @@ test('customers page bootstrap prefers stored customer database rows', async () 
     payload.customers.map((customer) => customer.naam),
     ['Linsey Klaus', 'Maarten Van Gemert']
   );
+  assert.equal(payload.customers[0].service, 'website');
+  assert.equal(payload.customers[0].review, 'Nee');
   assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
   assert.match(String(payload.loadedAt || ''), /^\d{4}-\d{2}-\d{2}T/);
 });
@@ -96,6 +98,8 @@ test('customers page bootstrap falls back to deriving customers from active orde
   assert.equal(payload.customers[0].naam, 'Servé Creusen');
   assert.equal(payload.customers[0].bedrijf, 'Breda');
   assert.equal(payload.customers[0].type, 'Website');
+  assert.equal(payload.customers[0].service, 'website');
+  assert.equal(payload.customers[0].review, 'Nee');
   assert.equal(payload.customers[0].status, 'Betaald');
   assert.equal(payload.customers[0].verantwoordelijk, 'Serve');
 });

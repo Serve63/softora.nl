@@ -6,7 +6,7 @@
     <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
         <link rel="stylesheet" href="/assets/iphone-optimizations.css">
-<title>Softora | Google Analytics</title>
+<title>Softora | Advertenties</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -33,10 +33,7 @@
         body {
             font-family: 'Inter', sans-serif;
             color: var(--text-primary);
-            background:
-                radial-gradient(circle at 88% 18%, rgba(139, 34, 82, 0.14), transparent 42%),
-                radial-gradient(circle at 12% 78%, rgba(166, 45, 101, 0.09), transparent 40%),
-                var(--bg-primary);
+            background: var(--bg-primary);
             min-height: 100vh;
             overflow-x: hidden;
         }
@@ -61,34 +58,59 @@
             margin-left: 280px;
             width: calc(100% - 280px);
             min-height: 100vh;
-            padding: clamp(1.6rem, 3vw, 3rem);
+            padding: 3rem 3rem 1.8rem;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+        }
+
+        .ads-shell {
+            width: 100%;
+            max-width: 52rem;
+            margin: 0;
             display: grid;
-            place-items: center;
+            gap: 1.25rem;
         }
 
-        .coming-message {
-            width: min(760px, 100%);
-            text-align: center;
-        }
-
-        h1 {
+        .page-title {
             font-family: 'Oswald', sans-serif;
-            font-size: clamp(2rem, 4vw, 3rem);
+            font-size: 2rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.03em;
-            line-height: 1.02;
-            position: relative;
-            z-index: 1;
+            letter-spacing: 0.02em;
+            line-height: 1;
+            margin-bottom: 0.3rem;
         }
 
-        .lead {
-            margin-top: 0.75rem;
-            max-width: 64ch;
+        .page-subtitle {
+            font-size: 0.9rem;
+            font-weight: 300;
+            line-height: 1.4;
+            color: var(--text-tertiary);
+        }
+
+        .ad-panel {
+            scroll-margin-top: 1.25rem;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: 0 14px 40px rgba(20, 18, 34, 0.05);
+            padding: 1.25rem 1.35rem;
+        }
+
+        .ad-panel h2 {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .ad-panel p {
+            font-size: 0.95rem;
+            line-height: 1.55;
             color: var(--text-secondary);
-            font-size: clamp(1rem, 1.6vw, 1.08rem);
-            line-height: 1.65;
-            position: relative;
-            z-index: 1;
         }
 
         @media (max-width: 900px) {
@@ -103,12 +125,11 @@
                 width: 100%;
                 padding: 1rem;
             }
-
         }
     </style>
 </head>
 <body>
-    <div class="dashboard-layout">
+    <div class="dashboard-layout" data-sidebar-shell="canonical">
         <aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">
           <a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
           <nav class="sidebar-nav">
@@ -163,12 +184,75 @@
           </div>
         </aside>
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
-        <main class="main-content">
-            <section class="coming-message">
-                <h1>Google Analytics</h1>
-                <p class="lead">Coming soon</p>
+        <main class="main-content is-premium-boot-host">
+            <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
+                <div class="premium-boot-spinner"></div>
+            </div>
+            <div class="premium-boot-shell is-booting" aria-busy="true">
+            <section class="ads-shell">
+                <header>
+                    <h1 class="page-title">Advertenties</h1>
+                    <p class="page-subtitle">Binnenkort beschikbaar.</p>
+                </header>
+                <article class="ad-panel" id="google">
+                    <h2>Google</h2>
+                    <p>Binnenkort beschikbaar.</p>
+                </article>
+                <article class="ad-panel" id="facebook">
+                    <h2>Facebook</h2>
+                    <p>Binnenkort beschikbaar.</p>
+                </article>
+                <article class="ad-panel" id="pinterest">
+                    <h2>Pinterest</h2>
+                    <p>Binnenkort beschikbaar.</p>
+                </article>
+                <article class="ad-panel" id="linkedin">
+                    <h2>LinkedIn</h2>
+                    <p>Binnenkort beschikbaar.</p>
+                </article>
             </section>
+            </div>
         </main>
     </div>
+
+    <script>
+        (function () {
+            function finishPremiumBootShell() {
+                if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+                    window.SoftoraPremiumBoot.setShellBooting(false);
+                    return;
+                }
+                var main = document.querySelector('main.is-premium-boot-host');
+                if (!main) return;
+                var shell = main.querySelector('.premium-boot-shell');
+                var loader = main.querySelector('.premium-boot-loader');
+                if (shell) {
+                    shell.classList.remove('is-booting');
+                    shell.setAttribute('aria-busy', 'false');
+                }
+                if (loader) loader.classList.add('is-hidden');
+            }
+
+            function scrollToAdsHash() {
+                var raw = (window.location.hash || '').replace(/^#/, '');
+                if (!raw) return;
+                var el = document.getElementById(raw);
+                if (el && typeof el.scrollIntoView === 'function') {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+
+            finishPremiumBootShell();
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', finishPremiumBootShell, { once: true });
+            }
+            window.addEventListener('hashchange', scrollToAdsHash);
+            if (document.readyState === 'complete') {
+                scrollToAdsHash();
+            } else {
+                window.addEventListener('load', scrollToAdsHash, { once: true });
+            }
+        })();
+    </script>
 </body>
 </html>
