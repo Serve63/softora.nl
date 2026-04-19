@@ -40,6 +40,7 @@
   const BUSINESS_MODE_STORAGE_KEY = 'softora_business_mode';
   const DEFAULT_CAMPAIGN_REGIO_VALUE = 'unlimited';
   const CUSTOM_CAMPAIGN_REGIO_VALUE = 'custom';
+  const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';
   const REMOTE_UI_STATE_SCOPE_BASE = 'coldcalling';
   const REMOTE_UI_STATE_SCOPE_PREFERENCES = 'coldcalling_preferences';
   const BUSINESS_MODE_ORDER = ['websites', 'voice_software', 'business_software'];
@@ -1260,6 +1261,7 @@
     const normalized = normalizeFreeText(value);
     if (!normalized) return '';
     if (/^geen limiet$/i.test(normalized)) return '';
+    if (/^automatisch$/i.test(normalized)) return '';
     if (/^aangepast\b/i.test(normalized)) return '';
     if (/^\d+\s*km$/i.test(normalized)) return '';
     return normalized;
@@ -2922,6 +2924,9 @@
     if (!(selectEl instanceof HTMLSelectElement)) return Infinity;
     const v = String(selectEl.value || '').trim();
     if (!v || v === DEFAULT_CAMPAIGN_REGIO_VALUE) return Infinity;
+    if (v === AUTO_CAMPAIGN_REGIO_VALUE) {
+      return resolveAutomaticCampaignRegioKm(getDialableLeadsForRegioCount());
+    }
     if (v === CUSTOM_CAMPAIGN_REGIO_VALUE) {
       const saved = readPositiveIntStorage(CAMPAIGN_REGIO_CUSTOM_KM_STORAGE_KEY, null);
       return Number.isFinite(saved) && saved > 0 ? saved : Infinity;
@@ -2953,6 +2958,29 @@
       if (d !== null && d <= limit) total += 1;
     });
     return total;
+  }
+
+  function resolveAutomaticCampaignRegioKm(leads) {
+    if (!Array.isArray(leads) || !leads.length) return 10;
+    const maxReach = countDialableLeadsWithinCampaignRegioRadius(leads, 150);
+    if (maxReach <= 0) return 10;
+    for (let km = 10; km <= 150; km += 10) {
+      if (countDialableLeadsWithinCampaignRegioRadius(leads, km) >= maxReach) {
+        return km;
+      }
+    }
+    return 150;
+  }
+
+  function getCampaignRegioLabelForApi() {
+    const regioEl = byId('regio');
+    if (!regioEl) return getSelectedText('regio');
+    const v = String(regioEl.value || '').trim();
+    if (v === AUTO_CAMPAIGN_REGIO_VALUE) {
+      const km = resolveAutomaticCampaignRegioKm(getDialableLeadsForRegioCount());
+      return `Automatisch (${km} km)`;
+    }
+    return getSelectedText('regio');
   }
 
   function paintRegioLeadCountOnCustomSelectValue() {
@@ -7301,7 +7329,7 @@
     return {
       amount,
       sector: getSelectedText('branche'),
-      region: getSelectedText('regio'),
+      region: getCampaignRegioLabelForApi(),
       minProjectValue,
       maxDiscountPct,
       extraInstructions,

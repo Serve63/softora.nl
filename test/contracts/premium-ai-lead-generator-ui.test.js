@@ -33,6 +33,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<option value="business_software" data-dot-color="blue" disabled>🔒 Bedrijfssoftware<\/option>/);
   assert.match(pageSource, /<option value="ai_chatbots" data-dot-color="accent" disabled>🔒 AI Chatbots<\/option>/);
   assert.match(pageSource, /<option value="unlimited" selected>Geen limiet<\/option>/);
+  assert.match(pageSource, /<option value="auto">Automatisch<\/option>/);
   assert.match(pageSource, /<option value="150km">150 km<\/option>/);
   assert.match(pageSource, /<option value="30km">30 km<\/option>/);
   assert.doesNotMatch(pageSource, /<option value="custom">Aangepast<\/option>/);
@@ -76,6 +77,9 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   );
   assert.match(dashboardSource, /function paintRegioLeadCountOnCustomSelectValue\(\)/);
   assert.match(dashboardSource, /function hookRegioLeadCountCustomSelectSync\(\)/);
+  assert.match(dashboardSource, /const AUTO_CAMPAIGN_REGIO_VALUE = 'auto';/);
+  assert.match(dashboardSource, /function resolveAutomaticCampaignRegioKm\(/);
+  assert.match(dashboardSource, /function getCampaignRegioLabelForApi\(/);
   assert.match(dashboardSource, /let controlWrap = byId\('leadListControlWrap'\);[\s\S]*if \(!controlWrap\)/);
   assert.match(dashboardSource, /let dispatchWrap = byId\('callDispatchControlWrap'\);[\s\S]*if \(!dispatchWrap\)/);
   assert.match(dashboardSource, /let coldcallingDashboardBootstrapPayload = null;/);
