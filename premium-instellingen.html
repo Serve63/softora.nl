@@ -773,6 +773,42 @@ body {
   gap: 10px;
 }
 
+.admin-pin-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-pin-dots {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  cursor: text;
+  padding: 8px 0 2px;
+}
+
+.admin-pin-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #d4d2ca;
+  background: #fff;
+  transition: all 0.15s ease;
+}
+
+.admin-pin-dot.filled {
+  background: var(--crimson);
+  border-color: var(--crimson);
+}
+
+.admin-pin-hidden-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+
 .btn-save,
 .btn-cancel,
 .btn-del {
@@ -1404,10 +1440,16 @@ body {
       <button class="modal-x" type="button" onclick="cancelAdminActionPin()" aria-label="Sluiten">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--text-mid);line-height:1.55;margin:0 0 14px;">Vul je pincode in om door te gaan (dezelfde server-pin als bij &quot;Start campagne&quot;, tenzij er een aparte pin voor instellingen is geconfigureerd).</p>
-      <div class="form-group">
-        <label>Pincode</label>
-        <input type="password" id="admin-action-pin-input" autocomplete="off" maxlength="64" inputmode="numeric">
+      <div class="admin-pin-wrap">
+        <div class="admin-pin-dots" id="admin-pin-dots" role="status" aria-live="polite" aria-label="Voortgang pincode">
+          <div class="admin-pin-dot"></div>
+          <div class="admin-pin-dot"></div>
+          <div class="admin-pin-dot"></div>
+          <div class="admin-pin-dot"></div>
+          <div class="admin-pin-dot"></div>
+          <div class="admin-pin-dot"></div>
+        </div>
+        <input class="admin-pin-hidden-input" type="password" id="admin-action-pin-input" autocomplete="off" maxlength="6" inputmode="numeric" pattern="[0-9]*" aria-label="Pincode invoeren">
       </div>
     </div>
     <div class="modal-foot">
@@ -1419,7 +1461,7 @@ body {
 
 <div class="toast" id="toast"></div>
 
-<script src="assets/premium-user-management.js?v=20260420b" defer></script>
+<script src="assets/premium-user-management.js?v=20260420c" defer></script>
 <script>
 (function () {
   function finishPremiumShellBoot() {

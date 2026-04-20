@@ -118,6 +118,7 @@ function requestAdminActionPin(title) {
     if (titleEl) titleEl.textContent = title || 'Bevestigen';
     var input = document.getElementById('admin-action-pin-input');
     if (input) input.value = '';
+    updateAdminPinDots('');
     openOverlay('admin-pin-overlay');
     setTimeout(function () {
       if (input) input.focus();
@@ -129,6 +130,7 @@ function cancelAdminActionPin() {
   closeOverlay('admin-pin-overlay');
   var input = document.getElementById('admin-action-pin-input');
   if (input) input.value = '';
+  updateAdminPinDots('');
   if (adminPinPending) {
     adminPinPending.reject(new Error('Geannuleerd'));
     adminPinPending = null;
@@ -138,14 +140,18 @@ function cancelAdminActionPin() {
 function confirmAdminActionPin() {
   if (!adminPinPending) return;
   var input = document.getElementById('admin-action-pin-input');
-  var pin = input ? String(input.value || '').trim() : '';
+  var pin = input ? String(input.value || '').replace(/\D+/g, '').trim() : '';
   if (!pin) {
     return showToast('Pincode invullen');
+  }
+  if (pin.length !== 6) {
+    return showToast('Pincode moet 6 cijfers zijn');
   }
   var resolve = adminPinPending.resolve;
   adminPinPending = null;
   closeOverlay('admin-pin-overlay');
   if (input) input.value = '';
+  updateAdminPinDots('');
   resolve(pin);
 }
 
@@ -316,11 +322,33 @@ document.querySelectorAll('.overlay').forEach(function (overlay) {
 
 var adminActionPinInput = document.getElementById('admin-action-pin-input');
 if (adminActionPinInput) {
+  adminActionPinInput.addEventListener('input', function () {
+    var digits = String(adminActionPinInput.value || '').replace(/\D+/g, '').slice(0, 6);
+    if (adminActionPinInput.value !== digits) {
+      adminActionPinInput.value = digits;
+    }
+    updateAdminPinDots(digits);
+  });
   adminActionPinInput.addEventListener('keydown', function (event) {
     if (event.key === 'Enter') {
       event.preventDefault();
       confirmAdminActionPin();
     }
+  });
+}
+
+function updateAdminPinDots(value) {
+  var dots = document.querySelectorAll('#admin-pin-dots .admin-pin-dot');
+  var filled = String(value || '').length;
+  dots.forEach(function (dot, index) {
+    dot.classList.toggle('filled', index < filled);
+  });
+}
+
+var adminPinDots = document.getElementById('admin-pin-dots');
+if (adminPinDots && adminActionPinInput) {
+  adminPinDots.addEventListener('click', function () {
+    adminActionPinInput.focus();
   });
 }
 
