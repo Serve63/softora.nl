@@ -146,5 +146,8 @@ test('premium opdrachtdossier toont de pdf-knop rechtsboven en laat de pagina vo
   assert.match(source, /\.dossier-page \{[\s\S]*position:\s*relative;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/);
   assert.match(source, /\.page-body \{[\s\S]*overflow:\s*visible;/);
   assert.match(source, /root\.innerHTML = `\s*<div class="page-toolbar screen-only" id="pageToolbar" style="justify-content: flex-end;">[\s\S]*<div class="paper-shell" id="paperShell">/);
-  assert.match(source, /function syncPaperScale\(\) \{[\s\S]*paperShell\.style\.setProperty\('--paper-scale', '1'\);/);
+  assert.match(
+    source,
+    /function syncPaperScale\(\) \{[\s\S]*paperShell\.style\.setProperty\('--paper-scale', String\(s\)\);/
+  );
 });

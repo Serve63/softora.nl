@@ -836,7 +836,7 @@
                             <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
                         </div>
                         <div class="loading-eyebrow">Uitvoerdossier</div>
-                        <div class="loading-title">Uitvoerdossier wordt geladen…</div>
+                        <div class="loading-title">uitvoerdossier laden</div>
                     </div>
                 </div>
             </div>
@@ -850,7 +850,7 @@
             const ORDER_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
             const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';
             const DOSSIER_LAYOUT_SCHEMA_VERSION = '20260417a';
-            const DOSSIER_LOADING_TITLE = 'Uitvoerdossier wordt geladen…';
+            const DOSSIER_LOADING_TITLE = 'uitvoerdossier laden';
             const root = document.getElementById('dossierRoot');
 
             function esc(value) {
@@ -1337,8 +1337,57 @@
 
             function syncPaperScale() {
                 const paperShell = document.getElementById('paperShell');
-                if (!paperShell) return;
-                paperShell.style.setProperty('--paper-scale', '1');
+                const wrap = document.getElementById('dossierRoot');
+                const main = document.querySelector('.dashboard-layout .main-content');
+                if (!paperShell || !wrap || !main) return;
+
+                const clearScale = () => {
+                    wrap.style.transform = '';
+                    wrap.style.transformOrigin = '';
+                    wrap.style.marginBottom = '';
+                    paperShell.style.setProperty('--paper-scale', '1');
+                };
+
+                if (wrap.querySelector(':scope > .loading.loading-shell')) {
+                    clearScale();
+                    return;
+                }
+
+                wrap.style.transform = '';
+                wrap.style.transformOrigin = '';
+                wrap.style.marginBottom = '';
+
+                const cs = window.getComputedStyle(main);
+                const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+                const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+                let availW = main.clientWidth - padX;
+                let availH = main.clientHeight - padY;
+
+                if ((!availH || availH < 160) && typeof window.innerHeight === 'number') {
+                    const rect = main.getBoundingClientRect();
+                    availH = Math.max(160, window.innerHeight - rect.top - 16);
+                }
+
+                const w = wrap.scrollWidth;
+                const h = wrap.scrollHeight;
+                if (!w || !h || availW <= 0 || availH <= 0) {
+                    clearScale();
+                    return;
+                }
+
+                const gutter = 12;
+                let s = Math.min((availW - gutter) / w, (availH - gutter) / h, 1);
+                s = Math.max(0.52, s);
+
+                if (s >= 0.998) {
+                    clearScale();
+                    return;
+                }
+
+                paperShell.style.setProperty('--paper-scale', String(s));
+                wrap.style.transform = `scale(${s})`;
+                wrap.style.transformOrigin = 'top center';
+                wrap.style.marginBottom = `${-h * (1 - s)}px`;
             }
 
             function renderLayoutBlock(block) {
@@ -1450,6 +1499,9 @@
                 }
 
                 syncPaperScale();
+                requestAnimationFrame(() => {
+                    syncPaperScale();
+                });
             }
 
             async function start() {
