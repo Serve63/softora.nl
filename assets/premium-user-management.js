@@ -299,6 +299,12 @@ async function saveEdit() {
     render();
     closeOverlay('edit-overlay');
     showToast('✓ Opgeslagen');
+    if (
+      window.SoftoraPersonnelTheme &&
+      typeof window.SoftoraPersonnelTheme.refreshPremiumSession === 'function'
+    ) {
+      void window.SoftoraPersonnelTheme.refreshPremiumSession();
+    }
   } catch (error) {
     showToast(error.message || 'Opslaan mislukt');
   } finally {

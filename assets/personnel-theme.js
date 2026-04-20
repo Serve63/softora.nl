@@ -2204,6 +2204,9 @@
     window.SoftoraPersonnelTheme.refreshSidebarAgendaCount = refreshSidebarAgendaCount;
     window.SoftoraPersonnelTheme.refreshSidebarActiveOrdersCount = refreshSidebarActiveOrdersCount;
     window.SoftoraPersonnelTheme.refreshSidebarCounts = refreshSidebarNotificationCounts;
+    window.SoftoraPersonnelTheme.refreshPremiumSession = function refreshPremiumSession() {
+        return loadPremiumSession({ force: true });
+    };
 
     initSoftoraDialogs();
     applyUnifiedPremiumSidebar();
