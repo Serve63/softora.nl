@@ -107,6 +107,24 @@ async function refreshTeam() {
   }
 }
 
+function setAdminPinDescForTitle(title) {
+  var descEl = document.getElementById('admin-pin-desc');
+  if (!descEl) return;
+  var t = String(title || '');
+  if (t.indexOf('Toevoegen') !== -1) {
+    descEl.textContent = 'Typ je zes cijfers. Daarna wordt de medewerker toegevoegd.';
+  } else if (t.indexOf('Opslaan') !== -1) {
+    descEl.textContent = 'Typ je zes cijfers. Daarna worden je wijzigingen opgeslagen.';
+  } else {
+    descEl.textContent = 'Typ je zes cijfers. Daarna wordt je actie uitgevoerd.';
+  }
+}
+
+function clearAdminPinMsg() {
+  var msg = document.getElementById('admin-pin-msg');
+  if (msg) msg.textContent = '';
+}
+
 function requestAdminActionPin(title) {
   return new Promise(function (resolve, reject) {
     if (adminPinPending) {
@@ -115,14 +133,13 @@ function requestAdminActionPin(title) {
     }
     adminPinPending = { resolve: resolve, reject: reject };
     var titleEl = document.getElementById('admin-pin-modal-title');
-    if (titleEl) titleEl.textContent = title || 'Bevestigen';
+    if (titleEl) titleEl.textContent = 'PIN invoeren';
+    setAdminPinDescForTitle(title);
+    clearAdminPinMsg();
     var input = document.getElementById('admin-action-pin-input');
     if (input) input.value = '';
     updateAdminPinDots('');
     openOverlay('admin-pin-overlay');
-    setTimeout(function () {
-      if (input) input.focus();
-    }, 0);
   });
 }
 
@@ -131,6 +148,7 @@ function cancelAdminActionPin() {
   var input = document.getElementById('admin-action-pin-input');
   if (input) input.value = '';
   updateAdminPinDots('');
+  clearAdminPinMsg();
   if (adminPinPending) {
     adminPinPending.reject(new Error('Geannuleerd'));
     adminPinPending = null;
@@ -149,6 +167,7 @@ function confirmAdminActionPin() {
   }
   var resolve = adminPinPending.resolve;
   adminPinPending = null;
+  clearAdminPinMsg();
   closeOverlay('admin-pin-overlay');
   if (input) input.value = '';
   updateAdminPinDots('');
@@ -320,19 +339,59 @@ document.querySelectorAll('.overlay').forEach(function (overlay) {
   });
 });
 
+function adminPinSyncFromInput() {
+  var input = document.getElementById('admin-action-pin-input');
+  if (!input) return;
+  var digits = String(input.value || '').replace(/\D+/g, '').slice(0, 6);
+  input.value = digits;
+  updateAdminPinDots(digits);
+  return digits;
+}
+
+function adminPinAppendDigit(d) {
+  if (!adminPinPending) return;
+  var input = document.getElementById('admin-action-pin-input');
+  if (!input) return;
+  clearAdminPinMsg();
+  var v = String(input.value || '').replace(/\D+/g, '');
+  if (v.length >= 6) return;
+  v += String(d || '').replace(/\D+/g, '').slice(0, 1);
+  input.value = v.slice(0, 6);
+  updateAdminPinDots(input.value);
+  if (input.value.length === 6) {
+    setTimeout(function () {
+      confirmAdminActionPin();
+    }, 120);
+  }
+}
+
+function adminPinBackspace() {
+  if (!adminPinPending) return;
+  var input = document.getElementById('admin-action-pin-input');
+  if (!input) return;
+  clearAdminPinMsg();
+  var v = String(input.value || '').replace(/\D+/g, '');
+  input.value = v.slice(0, -1);
+  updateAdminPinDots(input.value);
+}
+
+function adminPinClearDigits() {
+  if (!adminPinPending) return;
+  var input = document.getElementById('admin-action-pin-input');
+  if (input) input.value = '';
+  updateAdminPinDots('');
+  clearAdminPinMsg();
+}
+
 var adminActionPinInput = document.getElementById('admin-action-pin-input');
 if (adminActionPinInput) {
   adminActionPinInput.addEventListener('input', function () {
-    var digits = String(adminActionPinInput.value || '').replace(/\D+/g, '').slice(0, 6);
-    if (adminActionPinInput.value !== digits) {
-      adminActionPinInput.value = digits;
-    }
-    updateAdminPinDots(digits);
-  });
-  adminActionPinInput.addEventListener('keydown', function (event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      confirmAdminActionPin();
+    adminPinSyncFromInput();
+    var v = String(adminActionPinInput.value || '');
+    if (v.length === 6) {
+      setTimeout(function () {
+        confirmAdminActionPin();
+      }, 120);
     }
   });
 }
@@ -345,12 +404,43 @@ function updateAdminPinDots(value) {
   });
 }
 
-var adminPinDots = document.getElementById('admin-pin-dots');
-if (adminPinDots && adminActionPinInput) {
-  adminPinDots.addEventListener('click', function () {
-    adminActionPinInput.focus();
+var adminPinNumpad = document.querySelector('#admin-pin-overlay .admin-pin-numpad');
+if (adminPinNumpad) {
+  adminPinNumpad.addEventListener('click', function (event) {
+    var digitBtn = event.target.closest('[data-admin-pin-digit]');
+    if (digitBtn && digitBtn.getAttribute('data-admin-pin-digit') != null) {
+      adminPinAppendDigit(digitBtn.getAttribute('data-admin-pin-digit'));
+      return;
+    }
+    if (event.target.closest('[data-admin-pin-back]')) {
+      adminPinBackspace();
+      return;
+    }
+    if (event.target.closest('[data-admin-pin-clear]')) {
+      adminPinClearDigits();
+    }
   });
 }
+
+document.addEventListener('keydown', function (event) {
+  var overlay = document.getElementById('admin-pin-overlay');
+  if (!overlay || !overlay.classList.contains('open')) return;
+  if (!adminPinPending) return;
+  if (event.key >= '0' && event.key <= '9') {
+    event.preventDefault();
+    adminPinAppendDigit(event.key);
+    return;
+  }
+  if (event.key === 'Backspace') {
+    event.preventDefault();
+    adminPinBackspace();
+    return;
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    adminPinClearDigits();
+  }
+});
 
 function togglePw(inputId, btn) {
   var input = document.getElementById(inputId);
