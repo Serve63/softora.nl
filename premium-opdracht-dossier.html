@@ -1158,7 +1158,20 @@
                     .trim();
                 if (normalized === 'accounthouder softora' || normalized === 'softora contactpersoon') return '';
                 if (normalized === 'domein' || normalized === 'oplevertijd') return '';
+                if (normalized === 'adres') return 'Locatie';
                 return normalized === 'geclaimd door' ? 'Aangewezen aan' : label;
+            }
+
+            function buildDefaultStatusItemsForLayout(baseData) {
+                const items = [];
+                const apt = String(baseData?.sourceAppointmentLabel || '').trim();
+                const claimed = String(baseData?.claimedAt || '').trim();
+                if (apt) items.push(`Geplande afspraak: ${apt}`);
+                if (claimed) items.push(`Opdracht geclaimd op ${formatDateTime(claimed)}`);
+                if (!items.length) {
+                    items.push('Nog geen aanvullende status of afspraken vastgelegd.');
+                }
+                return items;
             }
 
             function buildFallbackLayout(baseData) {
@@ -1172,18 +1185,22 @@
                     blocks: [
                         {
                             kind: 'meta',
-                            title: 'Projectkern',
+                            title: 'Projectgegevens',
                             pairs: [
                                 { label: 'Bedrijf', value: baseData.company || '—' },
-                                { label: 'Contactpersoon', value: baseData.contact || '—' },
                                 { label: 'Aangewezen aan', value: baseData.claimedBy || '—' },
-                                { label: 'Geclaimd op', value: formatDateTime(baseData.claimedAt) },
+                                { label: 'Locatie', value: baseData.contact || '—' },
                             ],
                         },
                         {
                             kind: 'text',
-                            title: 'Klantwensen',
+                            title: 'Samenvatting klantgesprek',
                             text: narrative,
+                        },
+                        {
+                            kind: 'bullets',
+                            title: 'Status en afspraken',
+                            items: buildDefaultStatusItemsForLayout(baseData),
                         },
                     ],
                 };
@@ -1206,6 +1223,124 @@
                     .map((item) => clipText(String(item || '').trim(), 380))
                     .filter(Boolean)
                     .slice(0, Math.max(1, Math.min(20, Number(maxItems) || 12)));
+            }
+
+            const DOSSIER_PROJECT_PAIR_ORDER = ['bedrijf', 'aangewezen aan', 'locatie'];
+
+            function categorizeDossierBlockForCanonical(block) {
+                const kind = String(block?.kind || '').trim().toLowerCase();
+                const t = normalizeDossierBlockTitle(block?.title || '');
+                if (kind === 'text' && (t.includes('bouwprompt') || t.includes('website-bouw'))) {
+                    return 'skip';
+                }
+                if (kind === 'meta' && (t === 'projectkern' || t === 'projectgegevens')) {
+                    return 'project';
+                }
+                if (kind === 'meta') return 'meta_other';
+                if (kind === 'text') return 'text';
+                if (kind === 'bullets' || kind === 'checklist' || kind === 'steps' || kind === 'timeline') {
+                    return 'list';
+                }
+                return 'skip';
+            }
+
+            /* Houd logica gelijk met server/services/order-dossier.js (canonicalizeOrderDossierBlocks). */
+            function canonicalizeDossierBlocks(blocks) {
+                if (!Array.isArray(blocks) || !blocks.length) return [];
+
+                const projectPairMap = new Map();
+                const summaryParts = [];
+                const statusItems = [];
+                const seenStatus = new Set();
+
+                function pushStatus(line) {
+                    const clipped = clipText(String(line || '').trim(), 400);
+                    if (!clipped) return;
+                    const key = clipped.toLowerCase();
+                    if (seenStatus.has(key)) return;
+                    seenStatus.add(key);
+                    statusItems.push(clipped);
+                }
+
+                function absorbProjectPairs(pairs) {
+                    const normalized = normalizePairs(pairs || []);
+                    for (const pair of normalized) {
+                        const labelRaw = String(pair?.label || '').trim();
+                        const value = clipText(String(pair?.value || '').trim(), 260);
+                        if (!labelRaw || !value) continue;
+                        const ln = labelRaw.toLowerCase();
+                        if (ln === 'contactpersoon' || ln === 'geclaimd op') {
+                            pushStatus(`${labelRaw}: ${value}`);
+                            continue;
+                        }
+                        let displayLabel = labelRaw;
+                        if (ln === 'adres') displayLabel = 'Locatie';
+                        const lk = displayLabel.toLowerCase();
+                        if (!projectPairMap.has(lk)) {
+                            projectPairMap.set(lk, { label: displayLabel, value });
+                        }
+                    }
+                }
+
+                function absorbOtherMetaPairs(pairs) {
+                    const normalized = normalizePairs(pairs || []);
+                    for (const pair of normalized) {
+                        const label = String(pair?.label || '').trim();
+                        const value = clipText(String(pair?.value || '').trim(), 260);
+                        if (!label || !value) continue;
+                        pushStatus(`${label}: ${value}`);
+                    }
+                }
+
+                for (const block of blocks) {
+                    const cat = categorizeDossierBlockForCanonical(block);
+                    if (cat === 'skip') continue;
+
+                    if (cat === 'project') {
+                        absorbProjectPairs(block?.pairs || block?.items || []);
+                        continue;
+                    }
+                    if (cat === 'meta_other') {
+                        absorbOtherMetaPairs(block?.pairs || block?.items || []);
+                        continue;
+                    }
+                    if (cat === 'text') {
+                        const text = clipText(String(block?.text || block?.content || '').trim(), 5500);
+                        if (text) summaryParts.push(text);
+                        continue;
+                    }
+                    if (cat === 'list') {
+                        const rawItems = block?.items || block?.steps || [];
+                        const items = normalizeItems(rawItems, 20);
+                        for (const item of items) pushStatus(item);
+                    }
+                }
+
+                const projectPairs = [];
+                for (const key of DOSSIER_PROJECT_PAIR_ORDER) {
+                    if (projectPairMap.has(key)) projectPairs.push(projectPairMap.get(key));
+                }
+                for (const [k, pair] of projectPairMap) {
+                    if (DOSSIER_PROJECT_PAIR_ORDER.includes(k)) continue;
+                    pushStatus(`${pair.label}: ${pair.value}`);
+                }
+
+                const out = [];
+                if (projectPairs.length) {
+                    out.push({ kind: 'meta', title: 'Projectgegevens', pairs: projectPairs });
+                }
+                const summary = summaryParts.join('\n\n').trim();
+                if (summary) {
+                    out.push({ kind: 'text', title: 'Samenvatting klantgesprek', text: summary });
+                }
+                if (statusItems.length) {
+                    out.push({
+                        kind: 'bullets',
+                        title: 'Status en afspraken',
+                        items: statusItems.slice(0, 16),
+                    });
+                }
+                return out;
             }
 
             function normalizeLayoutPayload(rawLayout, baseData) {
@@ -1252,11 +1387,13 @@
                     .filter(Boolean)
                     .slice(0, 10);
 
+                const canon = canonicalizeDossierBlocks(blocks);
+
                 return {
                     documentTitle,
                     subtitle,
                     opusPrompt,
-                    blocks: blocks.length ? blocks : fallback.blocks,
+                    blocks: canon.length ? canon : fallback.blocks,
                 };
             }
 

@@ -38,8 +38,14 @@ test('order dossier helpers build a concrete website prompt and preserve assigne
   assert.match(styledPrompt, /blauw-wit/i);
 
   assert.equal(fallback.documentTitle, 'Opdracht #7');
-  assert.equal(fallback.blocks[0].pairs[2].label, 'Aangewezen aan');
-  assert.equal(fallback.blocks[0].pairs[2].value, 'Servé');
+  assert.equal(fallback.blocks[0].title, 'Projectgegevens');
+  assert.equal(fallback.blocks[0].pairs[0].label, 'Bedrijf');
+  assert.equal(fallback.blocks[0].pairs[1].label, 'Aangewezen aan');
+  assert.equal(fallback.blocks[0].pairs[1].value, 'Servé');
+  assert.equal(fallback.blocks[0].pairs[2].label, 'Locatie');
+  assert.equal(fallback.blocks[1].title, 'Samenvatting klantgesprek');
+  assert.equal(fallback.blocks[2].title, 'Status en afspraken');
+  assert.equal(fallback.blocks[2].kind, 'bullets');
 });
 
 test('order dossier helpers preserve opusPrompt from AI layout when present', () => {
@@ -97,7 +103,27 @@ test('order dossier helpers strip legacy block titles and internal pair labels',
   assert.deepEqual(layout.blocks[0].pairs, [
     { label: 'Aangewezen aan', value: 'Martijn' },
   ]);
-  assert.equal(layout.blocks[1].title, 'Klantwensen');
+  assert.equal(layout.blocks[1].title, 'Samenvatting klantgesprek');
+});
+
+test('order dossier helpers canonicalize block order (project → samenvatting → status)', () => {
+  const layout = helpers.normalizeOrderDossierLayout(
+    {
+      blocks: [
+        { kind: 'text', title: 'Klantwensen', text: 'Hallo' },
+        { kind: 'bullets', title: 'Status en afspraken', items: ['Punt A'] },
+        { kind: 'meta', title: 'Projectkern', pairs: [{ label: 'Bedrijf', value: 'ACME' }] },
+      ],
+    },
+    { title: 'X', company: 'Y' }
+  );
+
+  assert.equal(layout.blocks.length, 3);
+  assert.equal(layout.blocks[0].title, 'Projectgegevens');
+  assert.equal(layout.blocks[1].title, 'Samenvatting klantgesprek');
+  assert.equal(layout.blocks[1].text, 'Hallo');
+  assert.equal(layout.blocks[2].title, 'Status en afspraken');
+  assert.deepEqual(layout.blocks[2].items, ['Punt A']);
 });
 
 test('order dossier helpers build anthropic prompts with the fallback reference embedded', () => {

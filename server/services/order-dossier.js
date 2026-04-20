@@ -159,7 +159,164 @@ function createOrderDossierHelpers(deps = {}) {
     if (normalized === 'domein' || normalized === 'oplevertijd') {
       return '';
     }
+    if (normalized === 'adres') {
+      return 'Locatie';
+    }
     return normalized === 'geclaimd door' ? 'Aangewezen aan' : label;
+  }
+
+  const PROJECT_PAIR_ORDER = ['bedrijf', 'aangewezen aan', 'locatie'];
+
+  function categorizeOrderDossierBlock(block) {
+    const kind = normalizeString(block?.kind || '').toLowerCase();
+    const t = normalizeOrderDossierBlockTitle(block?.title || '');
+    if (kind === 'text' && (t.includes('bouwprompt') || t.includes('website-bouw'))) {
+      return 'skip';
+    }
+    if (kind === 'meta' && (t === 'projectkern' || t === 'projectgegevens')) {
+      return 'project';
+    }
+    if (kind === 'meta') {
+      return 'meta_other';
+    }
+    if (kind === 'text') {
+      return 'text';
+    }
+    if (
+      kind === 'bullets' ||
+      kind === 'checklist' ||
+      kind === 'steps' ||
+      kind === 'timeline'
+    ) {
+      return 'list';
+    }
+    return 'skip';
+  }
+
+  function buildDefaultOrderDossierStatusItems(input) {
+    const items = [];
+    const apt = normalizeString(input?.sourceAppointmentLabel || '');
+    const claimed = normalizeString(input?.claimedAt || '');
+    if (apt) {
+      items.push(`Geplande afspraak: ${apt}`);
+    }
+    if (claimed) {
+      items.push(`Opdracht geclaimd op ${claimed}`);
+    }
+    if (!items.length) {
+      items.push('Nog geen aanvullende status of afspraken vastgelegd.');
+    }
+    return items;
+  }
+
+  function canonicalizeOrderDossierBlocks(blocks) {
+    if (!Array.isArray(blocks) || !blocks.length) {
+      return [];
+    }
+
+    const projectPairMap = new Map();
+    const summaryParts = [];
+    const statusItems = [];
+    const seenStatus = new Set();
+
+    function pushStatus(line) {
+      const clipped = clipText(normalizeString(line), 400);
+      if (!clipped) return;
+      const key = clipped.toLowerCase();
+      if (seenStatus.has(key)) return;
+      seenStatus.add(key);
+      statusItems.push(clipped);
+    }
+
+    function absorbProjectPairs(pairs) {
+      const normalized = normalizeOrderDossierPairs(pairs || []);
+      for (const pair of normalized) {
+        const labelRaw = normalizeString(pair?.label || '');
+        const value = clipText(normalizeString(pair?.value || ''), 250);
+        if (!labelRaw || !value) continue;
+        const ln = labelRaw.toLowerCase();
+        if (ln === 'contactpersoon' || ln === 'geclaimd op') {
+          pushStatus(`${labelRaw}: ${value}`);
+          continue;
+        }
+        let displayLabel = labelRaw;
+        if (ln === 'adres') {
+          displayLabel = 'Locatie';
+        }
+        const lk = displayLabel.toLowerCase();
+        if (!projectPairMap.has(lk)) {
+          projectPairMap.set(lk, { label: displayLabel, value });
+        }
+      }
+    }
+
+    function absorbOtherMetaPairs(pairs) {
+      const normalized = normalizeOrderDossierPairs(pairs || []);
+      for (const pair of normalized) {
+        const label = normalizeString(pair?.label || '');
+        const value = clipText(normalizeString(pair?.value || ''), 250);
+        if (!label || !value) continue;
+        pushStatus(`${label}: ${value}`);
+      }
+    }
+
+    for (const block of blocks) {
+      const cat = categorizeOrderDossierBlock(block);
+      if (cat === 'skip') continue;
+
+      if (cat === 'project') {
+        absorbProjectPairs(block?.pairs || block?.items || []);
+        continue;
+      }
+
+      if (cat === 'meta_other') {
+        absorbOtherMetaPairs(block?.pairs || block?.items || []);
+        continue;
+      }
+
+      if (cat === 'text') {
+        const text = clipText(normalizeString(block?.text || block?.content || ''), 5500);
+        if (text) summaryParts.push(text);
+        continue;
+      }
+
+      if (cat === 'list') {
+        const rawItems = block?.items || block?.steps || [];
+        const items = normalizeOrderDossierItems(rawItems, 20);
+        for (const item of items) {
+          pushStatus(item);
+        }
+      }
+    }
+
+    const projectPairs = [];
+    for (const key of PROJECT_PAIR_ORDER) {
+      if (projectPairMap.has(key)) {
+        projectPairs.push(projectPairMap.get(key));
+      }
+    }
+    for (const [k, pair] of projectPairMap) {
+      if (PROJECT_PAIR_ORDER.includes(k)) continue;
+      pushStatus(`${pair.label}: ${pair.value}`);
+    }
+
+    const out = [];
+    if (projectPairs.length) {
+      out.push({ kind: 'meta', title: 'Projectgegevens', pairs: projectPairs });
+    }
+    const summary = summaryParts.join('\n\n').trim();
+    if (summary) {
+      out.push({ kind: 'text', title: 'Samenvatting klantgesprek', text: summary });
+    }
+    if (statusItems.length) {
+      out.push({
+        kind: 'bullets',
+        title: 'Status en afspraken',
+        items: statusItems.slice(0, 16),
+      });
+    }
+
+    return out;
   }
 
   function buildOrderDossierFallbackLayout(options = {}) {
@@ -175,18 +332,22 @@ function createOrderDossierHelpers(deps = {}) {
       blocks: [
         {
           kind: 'meta',
-          title: 'Projectkern',
+          title: 'Projectgegevens',
           pairs: [
             { label: 'Bedrijf', value: input.company || '—' },
-            { label: 'Contactpersoon', value: input.contact || '—' },
             { label: 'Aangewezen aan', value: input.claimedBy || '—' },
-            { label: 'Geclaimd op', value: input.claimedAt || '—' },
+            { label: 'Locatie', value: input.contact || '—' },
           ],
         },
         {
           kind: 'text',
-          title: 'Klantwensen',
+          title: 'Samenvatting klantgesprek',
           text: narrative,
+        },
+        {
+          kind: 'bullets',
+          title: 'Status en afspraken',
+          items: buildDefaultOrderDossierStatusItems(input),
         },
       ],
     };
@@ -260,11 +421,13 @@ function createOrderDossierHelpers(deps = {}) {
       .filter(Boolean)
       .slice(0, 10);
 
+    const canon = canonicalizeOrderDossierBlocks(blocks);
+
     return {
       documentTitle,
       subtitle,
       opusPrompt,
-      blocks: blocks.length ? blocks : fallback.blocks,
+      blocks: canon.length ? canon : fallback.blocks,
     };
   }
 
@@ -279,7 +442,8 @@ function createOrderDossierHelpers(deps = {}) {
       '- Schrijf in helder Nederlands.',
       '- Verzin geen feiten die niet in de input staan.',
       '- Gebruik alleen content die direct uit de input volgt; voeg geen generieke projectfasen of teamrichtlijnen toe.',
-      '- Gebruik een indeling die past bij de hoeveelheid inhoud (dynamisch, niet template-achtig).',
+      '- Gebruik een vaste volgorde met precies drie inhoudsblokken vóór de bouwprompt: (1) meta met titel "Projectgegevens" en uitsluitend de paren Bedrijf, Aangewezen aan en Locatie (Locatie = vestigings- of bezoekadres uit de input), (2) text met titel "Samenvatting klantgesprek" met lopende tekst uit beschrijving en transcript, (3) bullets met titel "Status en afspraken" met feitelijke punten (afspraken, bevestigingen, stijl, vervolgstappen).',
+      '- Voeg geen aparte blokken toe met titels zoals "Geplande afspraak", "Achtergrond en klantwensen", "Vastgelegde stijlvoorkeur" of "Projectkern"; werk die inhoud in Samenvatting of Status weg.',
       '- Gebruik geen bloktitels zoals "Uitvoerplan", "Ontbrekende informatie" of "Praktische aandachtspunten".',
       '- Voeg geen interne velden toe zoals "Accounthouder Softora" of "Softora-contactpersoon".',
       '- Lever een korte, direct copy-paste bouwprompt in het Nederlands voor een AI die de website ontwerpt en bouwt.',
@@ -326,8 +490,8 @@ function createOrderDossierHelpers(deps = {}) {
       input.transcript || '',
       '</customer_transcript>',
       '<required_output>',
-      '- Maak een dynamische sectie-indeling op basis van de beschikbare content.',
-      '- Zorg dat er altijd minimaal 1 meta-block en 1 inhoudsblock aanwezig is.',
+      '- Lever altijd precies die drie bloktypes in deze volgorde (geen extra blokken).',
+      '- Zorg dat elk van de drie blokken inhoud heeft; gebruik "—" alleen waar de input echt leeg is.',
       '- Gebruik alleen dossierblokken die direct op de invoer zijn gebaseerd.',
       '- Laat blokken met algemene projectplanning, ontbrekende-informatie-lijsten en praktische teamnotities weg.',
       '- Laat interne Softora-contactvelden zoals account- of contactpersoonlabels weg.',
@@ -355,6 +519,7 @@ function createOrderDossierHelpers(deps = {}) {
     normalizeOrderDossierPairs,
     normalizeOrderDossierItems,
     normalizeOrderDossierLayout,
+    canonicalizeOrderDossierBlocks,
     buildAnthropicOrderDossierPrompts,
   };
 }
