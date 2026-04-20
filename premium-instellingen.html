@@ -2050,7 +2050,10 @@ body {
     var msgEl = document.getElementById('settings-pin-msg');
     if (settingsPageInput === SETTINGS_PAGE_PIN) {
       settingsPagePinDots('success');
+      var unlockedPin = settingsPageInput;
       setTimeout(function () {
+        window.__premiumSettingsSessionActive = true;
+        window.__premiumSettingsUnlockedPin = unlockedPin;
         unlockSettingsApp();
       }, 350);
       return;
@@ -2102,6 +2105,8 @@ body {
   window.unlockSettingsApp = unlockSettingsApp;
 
   function openPersoneelPinGate() {
+    window.__premiumSettingsSessionActive = false;
+    delete window.__premiumSettingsUnlockedPin;
     window.__settingsPinAwaitingPersoneelNav = true;
     var pinEl = document.getElementById('settings-screen-pin');
     var appEl = document.getElementById('settings-screen-app');
@@ -2118,6 +2123,8 @@ body {
   window.openPersoneelPinGate = openPersoneelPinGate;
 
   function cancelPersoneelPinGate() {
+    window.__premiumSettingsSessionActive = false;
+    delete window.__premiumSettingsUnlockedPin;
     window.__settingsPinAwaitingPersoneelNav = false;
     settingsPageInput = '';
     settingsPageAttempts = 0;
@@ -2137,6 +2144,8 @@ body {
   window.cancelPersoneelPinGate = cancelPersoneelPinGate;
 
   function lockSettingsGate() {
+    window.__premiumSettingsSessionActive = false;
+    delete window.__premiumSettingsUnlockedPin;
     window.__settingsPinAwaitingPersoneelNav = false;
     var pinEl = document.getElementById('settings-screen-pin');
     var appEl = document.getElementById('settings-screen-app');
@@ -2187,7 +2196,7 @@ body {
   });
 })();
 </script>
-<script src="assets/premium-user-management.js?v=20260420d" defer></script>
+<script src="assets/premium-user-management.js?v=20260420e" defer></script>
 <script>
 (function () {
   function finishPremiumShellBoot() {

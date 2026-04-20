@@ -126,6 +126,9 @@ function clearAdminPinMsg() {
 }
 
 function requestAdminActionPin(title) {
+  if (window.__premiumSettingsSessionActive && window.__premiumSettingsUnlockedPin) {
+    return Promise.resolve(String(window.__premiumSettingsUnlockedPin));
+  }
   return new Promise(function (resolve, reject) {
     if (adminPinPending) {
       reject(new Error('Bezig met bevestigen'));
