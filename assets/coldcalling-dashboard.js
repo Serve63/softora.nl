@@ -7559,6 +7559,8 @@
     if (overlay) return overlay;
 
     const CAMPAIGN_CONFIRM_PIN_DIGITS = 6;
+    /** Zelfde vaste pin als wachtwoordenregister; moet overeenkomen met COLDCALLING_START_CONFIRM_PIN op de server (indien gezet). */
+    const CAMPAIGN_START_CONFIRM_PIN = '123456';
     let pinBuffer = '';
 
     overlay = document.createElement('div');
@@ -7630,6 +7632,17 @@
       });
     }
 
+    function flashStartCampaignPinDotsError() {
+      const dots = overlay.querySelectorAll('[data-start-campaign-pin-dot]');
+      dots.forEach((el) => {
+        el.style.background = '#c0392b';
+        el.style.borderColor = '#c0392b';
+        el.style.boxShadow = 'none';
+        el.style.transform = 'scale(1)';
+      });
+      window.setTimeout(() => paintStartCampaignPinDots(), 420);
+    }
+
     function appendPinDigit(ch) {
       if (pinBuffer.length >= CAMPAIGN_CONFIRM_PIN_DIGITS) return;
       pinBuffer += ch;
@@ -7699,8 +7712,15 @@
     }
 
     function confirmPinAndStart() {
+      const entered = String(pinBuffer || '').trim();
+      if (entered !== CAMPAIGN_START_CONFIRM_PIN) {
+        setPinError('Onjuiste pin. Probeer opnieuw.');
+        pinBuffer = '';
+        flashStartCampaignPinDotsError();
+        return;
+      }
       setPinError('');
-      pendingStartConfirmPin = String(pinBuffer || '').trim();
+      pendingStartConfirmPin = CAMPAIGN_START_CONFIRM_PIN;
       closeOverlay();
       void startCampaignRequest();
     }
