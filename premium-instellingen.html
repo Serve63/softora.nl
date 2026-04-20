@@ -609,6 +609,22 @@ main.main.is-premium-boot-host {
   font-weight: 500;
   text-align: center;
 }
+.settings-pin-back {
+  margin-top: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-mid);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.settings-pin-back:hover {
+  color: var(--crimson);
+}
 
 .beheer-title {
   font-family: 'Oswald', sans-serif;
@@ -1759,7 +1775,7 @@ body {
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
 
 <main class="main is-premium-boot-host">
-  <div id="settings-screen-pin" class="settings-screen-pin" role="dialog" aria-modal="true" aria-labelledby="settings-pin-title">
+  <div id="settings-screen-pin" class="settings-screen-pin" role="dialog" aria-modal="true" aria-labelledby="settings-pin-title" hidden>
     <div class="settings-pin-box">
       <div class="settings-pin-head">
         <div class="settings-pin-icon" aria-hidden="true">
@@ -1793,9 +1809,10 @@ body {
         </button>
       </div>
       <div class="settings-pin-msg" id="settings-pin-msg"></div>
+      <button type="button" class="settings-pin-back" onclick="cancelPersoneelPinGate()">Terug naar instellingen</button>
     </div>
   </div>
-  <div id="settings-screen-app" hidden>
+  <div id="settings-screen-app">
   <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
     <div class="premium-boot-spinner"></div>
   </div>
@@ -1804,7 +1821,7 @@ body {
     <div class="page-title">Instellingen</div>
     <div class="page-subtitle">Kies een categorie om te beheren</div>
     <div>
-      <div class="tegel" onclick="goTo('screen-personeel')">
+      <div class="tegel" onclick="openPersoneelPinGate()">
         <svg class="tegel-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         <div class="tegel-icon-wrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg>
@@ -1970,6 +1987,13 @@ body {
   var settingsPageAttempts = 0;
   var settingsPageBlocked = false;
 
+  function clearSettingsPinBlockTimer() {
+    if (window.__settingsPinBlockTimer) {
+      clearInterval(window.__settingsPinBlockTimer);
+      window.__settingsPinBlockTimer = null;
+    }
+  }
+
   function settingsPagePinDots(state) {
     document.querySelectorAll('#settings-pin-dots .settings-pin-dot').forEach(function (d, i) {
       d.className = 'settings-pin-dot';
@@ -2023,10 +2047,11 @@ body {
       settingsPageBlocked = true;
       var s = 30;
       if (msgEl) msgEl.textContent = 'Geblokkeerd — wacht ' + s + 's';
-      var t = setInterval(function () {
+      clearSettingsPinBlockTimer();
+      window.__settingsPinBlockTimer = setInterval(function () {
         s -= 1;
         if (s <= 0) {
-          clearInterval(t);
+          clearSettingsPinBlockTimer();
           settingsPageBlocked = false;
           settingsPageAttempts = 0;
           if (msgEl) msgEl.textContent = '';
@@ -2050,10 +2075,16 @@ body {
     settingsPagePinDots();
     var msg = document.getElementById('settings-pin-msg');
     if (msg) msg.textContent = '';
+    var goPersoneel = window.__settingsPinAwaitingPersoneelNav;
+    window.__settingsPinAwaitingPersoneelNav = false;
+    if (goPersoneel && typeof goTo === 'function') {
+      goTo('screen-personeel');
+    }
   }
   window.unlockSettingsApp = unlockSettingsApp;
 
-  function lockSettingsGate() {
+  function openPersoneelPinGate() {
+    window.__settingsPinAwaitingPersoneelNav = true;
     var pinEl = document.getElementById('settings-screen-pin');
     var appEl = document.getElementById('settings-screen-app');
     if (appEl) appEl.hidden = true;
@@ -2061,6 +2092,42 @@ body {
     settingsPageInput = '';
     settingsPageAttempts = 0;
     settingsPageBlocked = false;
+    clearSettingsPinBlockTimer();
+    settingsPagePinDots();
+    var msg = document.getElementById('settings-pin-msg');
+    if (msg) msg.textContent = '';
+  }
+  window.openPersoneelPinGate = openPersoneelPinGate;
+
+  function cancelPersoneelPinGate() {
+    window.__settingsPinAwaitingPersoneelNav = false;
+    settingsPageInput = '';
+    settingsPageAttempts = 0;
+    settingsPageBlocked = false;
+    clearSettingsPinBlockTimer();
+    var pinEl = document.getElementById('settings-screen-pin');
+    var appEl = document.getElementById('settings-screen-app');
+    if (pinEl) pinEl.hidden = true;
+    if (appEl) appEl.hidden = false;
+    settingsPagePinDots();
+    var msg = document.getElementById('settings-pin-msg');
+    if (msg) msg.textContent = '';
+    if (typeof goTo === 'function') {
+      goTo('screen-overzicht');
+    }
+  }
+  window.cancelPersoneelPinGate = cancelPersoneelPinGate;
+
+  function lockSettingsGate() {
+    window.__settingsPinAwaitingPersoneelNav = false;
+    var pinEl = document.getElementById('settings-screen-pin');
+    var appEl = document.getElementById('settings-screen-app');
+    if (appEl) appEl.hidden = true;
+    if (pinEl) pinEl.hidden = false;
+    settingsPageInput = '';
+    settingsPageAttempts = 0;
+    settingsPageBlocked = false;
+    clearSettingsPinBlockTimer();
     settingsPagePinDots();
     var msg = document.getElementById('settings-pin-msg');
     if (msg) msg.textContent = '';
@@ -2093,7 +2160,11 @@ body {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      settingsPagePinClear();
+      if (settingsPageInput.length > 0) {
+        settingsPagePinClear();
+      } else {
+        cancelPersoneelPinGate();
+      }
     }
   });
 })();
