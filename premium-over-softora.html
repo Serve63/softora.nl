@@ -5,249 +5,185 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
 <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
-<title>Over Softora.nl</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>Over Softora.nl – Softora.nl</title>
+<link rel="stylesheet" href="/assets/iphone-optimizations.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
+<script>
+  (function () {
+    document.documentElement.setAttribute("data-personnel-loading", "true");
+    try {
+      document.documentElement.setAttribute("data-theme-mode", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    } catch (_) {
+      /* ignore */
+    }
+  })();
+</script>
+<script src="assets/personnel-theme.js?v=20260420c" defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #f5f4f1; --white: #fff; --crimson: #9b2355;
-  --dark: #1a1a2e; --mid: #555; --light: #999; --border: #e8e5e0;
-  --nav-cta: #9b2355;
-  --nav-cta-hover: #c4346a;
+  --bg: var(--bg-primary, #f8f7f4); --crimson: var(--accent, #8b2252); --crimson-light: var(--accent-light, #a62d65);
+  --text-dark: var(--text-primary, #1a1a2e); --text-mid: var(--text-secondary, #606272); --text-light: var(--text-tertiary, #9a9cac);
+  --border: rgba(0, 0, 0, 0.08); --card: var(--bg-secondary, #ffffff); --tag: #f5f0eb;
 }
-body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); padding-top: 86px; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-dark); min-height: 100vh; }
 
-nav {
+.dashboard-layout { display: flex; min-height: 100vh; }
+.sidebar { width: 280px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; display: flex; flex-direction: column; }
+.main-content { margin-left: 280px; width: calc(100% - 280px); min-width: 0; padding: 40px 48px; }
+.page-shell { width: min(1380px, 100%); }
+
+.content-lock-overlay {
   position: fixed;
   top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 1000;
+  right: 0;
+  bottom: 0;
+  left: 280px;
+  background: #f5f4f1;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 4rem;
-  background: rgba(248, 247, 244, 0.78);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-.logo {
-  font-family: 'Oswald', sans-serif;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--dark);
-  text-decoration: none;
-  letter-spacing: -0.02em;
-  position: relative;
-  line-height: 1;
-}
-.logo::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 3.2ch;
-  height: 3px;
-  background: var(--nav-cta);
-}
-.nav-links {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.8rem;
-}
-.nav-start-btn {
-  display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 0.8rem 1.5rem;
-  background: var(--nav-cta);
+  z-index: 90;
+  padding: 24px;
+}
+.content-lock-logo {
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #8B2252;
+  margin-bottom: 48px;
+  text-transform: uppercase;
+}
+.content-lock-box {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.content-lock-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #bbb;
+  text-align: left;
+  margin-bottom: 2px;
+}
+.content-lock-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #e8e5e0;
+  border-radius: 5px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #1a1a2e;
+  background: #fff;
+  outline: none;
+  transition: border-color .15s;
+}
+.content-lock-input:focus { border-color: #8B2252; }
+.content-lock-btn {
+  width: 100%;
+  padding: 12px;
+  background: #8B2252;
   color: #fff;
   border: none;
   border-radius: 5px;
   font-family: 'Oswald', sans-serif;
-  font-size: 0.85rem;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  text-decoration: none;
-  transition: background 0.15s;
+  cursor: pointer;
+  transition: background .15s;
+  margin-top: 4px;
 }
-.nav-start-btn:hover {
-  background: var(--nav-cta-hover);
+.content-lock-btn:hover { background: #A62D65; }
+.content-lock-error {
+  font-size: 12px;
+  color: #c0392b;
+  text-align: center;
+  min-height: 16px;
 }
-/* INTRO */
-.intro { padding: 96px 80px 80px; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 100px; align-items: start; }
 
-.intro-left { }
-.eyebrow { font-size: 10px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; color: var(--light); margin-bottom: 20px; }
-.big-title { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(56px, 6vw, 88px); font-weight: 800; text-transform: uppercase; letter-spacing: -2px; line-height: .95; color: var(--dark); }
-.big-title span { color: var(--crimson); }
-.title-rule { width: 48px; height: 3px; background: var(--crimson); border-radius: 2px; margin-top: 24px; }
+.page-title { font-family: 'Oswald', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+.page-sub { font-size: 13px; color: var(--text-light); margin-bottom: 36px; }
 
-.intro-right { padding-top: 16px; }
-.lead { font-size: 20px; font-weight: 300; color: var(--dark); line-height: 1.65; margin-bottom: 28px; }
-.lead strong { font-weight: 600; }
-.body-text { font-size: 15px; color: var(--mid); line-height: 1.9; }
-.body-text p { margin-bottom: 18px; }
-.body-text p:last-child { margin-bottom: 0; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; scroll-margin-top: 24px; }
+.card + .card { margin-top: 20px; }
+.card-head { padding: 16px 22px; background: var(--tag); border-bottom: 1px solid var(--border); }
+.card-title { font-family: 'Oswald', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-dark); }
+.card-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.card-body { padding: 22px; font-size: 13px; color: var(--text-mid); line-height: 1.55; }
 
-/* DIVIDER */
-.divider { border: none; border-top: 1px solid var(--border); margin: 0 80px; }
-
-/* FEITEN BALK */
-.feiten { padding: 56px 80px; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
-.feit { padding: 0 32px; border-right: 1px solid var(--border); }
-.feit:first-child { padding-left: 0; }
-.feit:last-child { border-right: none; }
-.feit-num { font-family: 'Barlow Condensed', sans-serif; font-size: 44px; font-weight: 800; color: var(--dark); line-height: 1; margin-bottom: 4px; }
-.feit-num span { color: var(--crimson); }
-.feit-label { font-size: 13px; color: var(--light); line-height: 1.4; }
-
-/* SECTIE TEKST */
-.tekst-sectie { padding: 80px; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 260px 1fr; gap: 80px; }
-.tekst-sectie-label { font-size: 10px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; color: var(--light); padding-top: 6px; }
-.tekst-sectie-body { }
-.tekst-sectie-title { font-family: 'Barlow Condensed', sans-serif; font-size: 32px; font-weight: 800; text-transform: uppercase; letter-spacing: -.5px; color: var(--dark); margin-bottom: 20px; }
-.tekst-sectie-body p { font-size: 15px; color: var(--mid); line-height: 1.9; margin-bottom: 16px; }
-.tekst-sectie-body p:last-child { margin-bottom: 0; }
-.tekst-sectie-body strong { color: var(--dark); font-weight: 600; }
-
-/* QUOTE */
-.quote-wrap { background: var(--dark); padding: 80px; margin: 0; }
-.quote-inner { max-width: 720px; margin: 0 auto; }
-.quote-mark { font-family: 'Barlow Condensed', sans-serif; font-size: 80px; font-weight: 800; color: var(--crimson); line-height: .8; margin-bottom: 16px; }
-.quote-body { font-size: 22px; font-weight: 300; color: rgba(255,255,255,.85); line-height: 1.65; margin-bottom: 32px; }
-.quote-sig { display: flex; align-items: center; gap: 14px; }
-.quote-av { width: 38px; height: 38px; background: var(--crimson); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0; }
-.quote-name { font-size: 14px; font-weight: 500; color: #fff; }
-.quote-role { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 1px; }
-
-/* CONTACT STRIP */
-.contact-strip { padding: 64px 80px; max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 40px; }
-.contact-strip-left { }
-.contact-strip-title { font-family: 'Barlow Condensed', sans-serif; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: -.5px; margin-bottom: 6px; }
-.contact-strip-sub { font-size: 14px; color: var(--light); }
-.contact-strip-right { display: flex; gap: 10px; flex-shrink: 0; }
-.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .15s; text-decoration: none; }
-.btn-solid { background: var(--crimson); color: #fff; border: none; }
-.btn-solid:hover { background: #c4346a; }
-.btn-outline { background: none; color: var(--mid); border: 1px solid var(--border); }
-.btn-outline:hover { border-color: var(--crimson); color: var(--crimson); }
-
+@media (max-width: 900px) {
+  .main-content { margin-left: 0; width: 100%; padding: 24px 16px; }
+  .sidebar { display: none; }
+  .content-lock-overlay { left: 0; }
+}
 </style>
 </head>
 <body>
-
-<nav id="navbar">
-  <a href="/" class="logo">SOFTORA.NL</a>
-  <div class="nav-links">
-    <a href="/#contact" class="nav-start-btn">Start Project</a>
+<div class="content-lock-overlay" id="contentLockOverlay">
+  <div class="content-lock-logo">Binnenkort beschikbaar</div>
+  <div class="content-lock-box">
+    <div class="content-lock-label">Toegangscode</div>
+    <input class="content-lock-input" type="password" id="contentLockInput" placeholder="••••••••••••" autocomplete="off" onkeydown="if(event.key==='Enter')unlockOverSoftoraArea()">
+    <div class="content-lock-error" id="contentLockError"></div>
+    <button type="button" class="content-lock-btn" onclick="unlockOverSoftoraArea()">Doorgaan</button>
   </div>
-</nav>
+</div>
+<div class="dashboard-layout">
+<aside class="sidebar"></aside>
+<main class="main-content">
+<div class="page-shell">
+<div class="page-title">Over Softora.nl</div>
+<div class="page-sub">Interne premium-pagina over Softora. Inhoud en functionaliteit volgen; dezelfde toegangscode als andere premium coming-soon pagina’s.</div>
 
-<!-- INTRO -->
-<div class="intro">
-  <div class="intro-left">
-    <div class="eyebrow">Meer over ons</div>
-    <div class="big-title">Wie is<br>Softora<span>.</span>nl</div>
-    <div class="title-rule"></div>
+<div class="card">
+  <div class="card-head">
+    <div class="card-title">Binnenkort beschikbaar</div>
+    <div class="card-sub">Placeholder tot de inhoud live gaat.</div>
   </div>
-  <div class="intro-right">
-    <div class="lead">Softora.nl is een <strong>jong en gedreven digitaal bureau</strong> uit Oisterwijk, opgericht met één doel: MKB-bedrijven echt helpen groeien online.</div>
-    <div class="body-text">
-      <p>We bouwen geen standaard websites van de plank. Wij nemen de tijd om jouw bedrijf te begrijpen — wie je klanten zijn, wat je doelen zijn en hoe je wil overkomen. Pas dan bouwen we iets dat écht past.</p>
-      <p>Softora.nl is klein en dat is bewust. Je werkt altijd direct met de mensen die jouw project maken. Geen account managers, geen miscommunicatie, geen verrassingen achteraf.</p>
-    </div>
+  <div class="card-body">
+    Hier komt straks de uitgebreide interne weergave. Tot die tijd is deze route afgeschermd met de bekende toegangscode.
   </div>
 </div>
 
-<hr class="divider">
-
-<!-- FEITEN -->
-<div class="feiten">
-  <div class="feit">
-    <div class="feit-num">20<span>+</span></div>
-    <div class="feit-label">Klanten geholpen<br>in het MKB</div>
-  </div>
-  <div class="feit">
-    <div class="feit-num">3</div>
-    <div class="feit-label">Specialisaties:<br>website, software & voice</div>
-  </div>
-  <div class="feit">
-    <div class="feit-num">100<span>%</span></div>
-    <div class="feit-label">Op maat —<br>nooit van de plank</div>
-  </div>
-  <div class="feit">
-    <div class="feit-num">2023</div>
-    <div class="feit-label">Opgericht in<br>Oisterwijk</div>
-  </div>
+</div>
+</main>
 </div>
 
-<hr class="divider">
+<script>
+const CONTENT_LOCK_CODE = 'Andre2Fritz2!';
+const CONTENT_LOCK_STORAGE_KEY = 'cs-auth-premium-over-softora';
 
-<!-- SECTIE: WAAROM -->
-<div class="tekst-sectie">
-  <div class="tekst-sectie-label">Waarom Softora</div>
-  <div class="tekst-sectie-body">
-    <div class="tekst-sectie-title">Geen bureau, een partner</div>
-    <p>Veel ondernemers hebben slechte ervaringen met digitale bureaus. Trage communicatie, onduidelijke prijzen, een eindresultaat dat niet voldoet aan de verwachtingen. Wij begrijpen die frustratie.</p>
-    <p>Bij Softora.nl werkt dat anders. Wij zijn <strong>direct, eerlijk en betrokken</strong>. Je krijgt altijd te horen wat iets kost, wanneer het klaar is en waarom we bepaalde keuzes maken. En als er iets niet goed gaat, lossen we het op — zonder discussie.</p>
-    <p>Wij groeien mee met onze klanten. Veel opdrachten beginnen met een eenvoudige website en groeien uit tot een volwaardig digitaal platform. Dat is hoe we het graag zien.</p>
-  </div>
-</div>
+if (sessionStorage.getItem(CONTENT_LOCK_STORAGE_KEY) === '1') {
+  var existingOverlay = document.getElementById('contentLockOverlay');
+  if (existingOverlay) existingOverlay.style.display = 'none';
+}
 
-<hr class="divider">
+function unlockOverSoftoraArea() {
+  var input = document.getElementById('contentLockInput');
+  var error = document.getElementById('contentLockError');
+  var overlay = document.getElementById('contentLockOverlay');
+  if (!input || !error || !overlay) return;
 
-<!-- SECTIE: WAT WE DOEN -->
-<div class="tekst-sectie">
-  <div class="tekst-sectie-label">Wat we bouwen</div>
-  <div class="tekst-sectie-body">
-    <div class="tekst-sectie-title">Van website tot AI-platform</div>
-    <p>Softora.nl werkt op drie terreinen. <strong>Websites</strong> — van een eenvoudige starterspagina tot een volledig maatwerk webplatform met webshop, boekingen of klantenportaal. <strong>Bedrijfssoftware</strong> — interne systemen, dashboards en platforms die jouw processen automatiseren. En <strong>voicesoftware</strong> — AI-agents die bellen, afspraken inplannen en leads kwalificeren zonder dat je er zelf bij hoeft te zijn.</p>
-    <p>We houden het bewust bij drie disciplines. Zo blijven we scherp en leveren we kwaliteit in plaats van van alles een beetje.</p>
-  </div>
-</div>
+  if (input.value === CONTENT_LOCK_CODE) {
+    sessionStorage.setItem(CONTENT_LOCK_STORAGE_KEY, '1');
+    overlay.style.display = 'none';
+    return;
+  }
 
-<!-- QUOTE -->
-<div class="quote-wrap">
-  <div class="quote-inner">
-    <div class="quote-mark">"</div>
-    <div class="quote-body">Ik ben dit begonnen omdat ik zag hoe veel goede bedrijven online onzichtbaar bleven. Niet omdat ze geen goed product hadden, maar omdat ze nooit de juiste digitale ondersteuning kregen. Dat wil ik veranderen.</div>
-    <div class="quote-sig">
-      <div class="quote-av">SC</div>
-      <div>
-        <div class="quote-name">Serve Creusen</div>
-        <div class="quote-role">Oprichter — Softora.nl, Oisterwijk</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- SECTIE: HOE WE WERKEN -->
-<div class="tekst-sectie">
-  <div class="tekst-sectie-label">Hoe we werken</div>
-  <div class="tekst-sectie-body">
-    <div class="tekst-sectie-title">Snel, transparant, persoonlijk</div>
-    <p>Elke samenwerking begint met een goed gesprek. We luisteren, stellen de juiste vragen en denken mee over wat jij echt nodig hebt — niet wat er makkelijk te verkopen is.</p>
-    <p>Daarna krijg je een <strong>heldere offerte met vaste prijs</strong>. Geen uurtje-factuurtje, geen open einden. Gewoon afspreken wat het kost en wanneer het klaar is, en dat nakomen.</p>
-    <p>Na oplevering blijven we beschikbaar. Een berichtje sturen en je krijgt snel antwoord. Geen ticket systemen, geen helpdesk. Gewoon direct contact.</p>
-  </div>
-</div>
-
-<hr class="divider">
-
-<!-- CONTACT STRIP -->
-<div class="contact-strip">
-  <div class="contact-strip-left">
-    <div class="contact-strip-title">Benieuwd wat wij voor jou kunnen doen?</div>
-    <div class="contact-strip-sub">Neem gerust contact op — vrijblijvend en gratis.</div>
-  </div>
-  <div class="contact-strip-right">
-    <a class="btn btn-outline" href="tel:+31629917185">+31 6 2991 7185</a>
-    <a class="btn btn-solid" href="mailto:info@softora.nl">Stuur een bericht</a>
-  </div>
-</div>
-
+  error.textContent = 'Onjuiste code, probeer opnieuw.';
+  input.value = '';
+  input.focus();
+}
+</script>
 </body>
 </html>
