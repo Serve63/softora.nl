@@ -47,17 +47,6 @@ test('premium actieve opdrachten gebruiken expliciete customer identity voor kop
   assert.match(source, /return `\$\{normalizeMatchValue\(company\)\}\|\$\{normalizeMatchValue\(name\)\}\|\$\{normalizeMatchValue\(explicitPhone\)\}`;/);
 });
 
-test('premium actieve opdrachten tonen legenda voor opdrachttypen', () => {
-  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
-  const source = fs.readFileSync(filePath, 'utf8');
-
-  assert.match(source, /class="orders-type-legend"[^>]*aria-label="Legenda opdrachttypen"/);
-  assert.match(source, /orders-type-legend-item--website/);
-  assert.match(source, /orders-type-legend-item--business/);
-  assert.match(source, /orders-type-legend-item--voice/);
-  assert.match(source, /orders-type-legend-item--chatbot/);
-});
-
 test('premium actieve opdrachten tonen create-order modal zonder sample-design en domeinvelden', () => {
   const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
   const source = fs.readFileSync(filePath, 'utf8');

@@ -281,55 +281,9 @@
             margin-bottom: 3rem;
         }
 
-        .orders-type-legend {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.45rem 1.1rem;
-            margin: 0;
-        }
-
-        .topbar-right .orders-type-legend {
-            flex: 0 1 auto;
-            justify-content: flex-start;
-            max-width: min(100%, 52rem);
-        }
-
-        .orders-type-legend-item {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
-            font-weight: 600;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        .orders-type-legend-swatch {
-            width: 22px;
-            height: 11px;
-            border-radius: 999px;
-            border: 1.5px solid currentColor;
-            flex-shrink: 0;
-            box-sizing: border-box;
-        }
-
-        .orders-type-legend-item--website { color: var(--accent-light); }
-        .orders-type-legend-item--business { color: var(--service-business-blue); }
-        .orders-type-legend-item--voice { color: var(--green); }
-        .orders-type-legend-item--chatbot { color: var(--yellow); }
-
         .topbar-left h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.3rem; }
         .topbar-left p { color: var(--text-tertiary); font-size: 0.9rem; font-weight: 300; }
-        .topbar-right {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            flex-wrap: wrap;
-            gap: 0.75rem 1rem;
-        }
+        .topbar-right { display: flex; align-items: center; gap: 0.8rem; }
 
         .build-mode {
             display: inline-flex;
@@ -1442,13 +1396,7 @@
         @media (max-width: 768px) {
             .main-content { padding: 1.5rem; }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
-            .topbar-right { width: 100%; flex-direction: column; align-items: stretch; gap: 0.65rem; }
-            .topbar-right .orders-type-legend {
-                justify-content: center;
-                max-width: none;
-                order: 1;
-            }
-            .topbar-right .topbar-btn { order: 2; }
+            .topbar-right { width: 100%; flex-direction: column; align-items: stretch; gap: 0.5rem; }
             .topbar-btn { width: 100%; justify-content: center; }
             .build-mode { width: 100%; }
             .mode-btn { flex: 1; justify-content: center; }
@@ -1650,24 +1598,6 @@
                     <p>Beheer en voer klantopdrachten uit met AI</p>
                 </div>
                 <div class="topbar-right">
-                    <div class="orders-type-legend" role="list" aria-label="Legenda opdrachttypen">
-                        <div class="orders-type-legend-item orders-type-legend-item--website" role="listitem">
-                            <span class="orders-type-legend-swatch" aria-hidden="true"></span>
-                            <span>Website</span>
-                        </div>
-                        <div class="orders-type-legend-item orders-type-legend-item--business" role="listitem">
-                            <span class="orders-type-legend-swatch" aria-hidden="true"></span>
-                            <span>Bedrijfssoftware</span>
-                        </div>
-                        <div class="orders-type-legend-item orders-type-legend-item--voice" role="listitem">
-                            <span class="orders-type-legend-swatch" aria-hidden="true"></span>
-                            <span>Voicesoftware</span>
-                        </div>
-                        <div class="orders-type-legend-item orders-type-legend-item--chatbot" role="listitem">
-                            <span class="orders-type-legend-swatch" aria-hidden="true"></span>
-                            <span>Chatbots</span>
-                        </div>
-                    </div>
                     <button class="topbar-btn magnetic" type="button" id="createOrderBtn">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
                         Actieve Opdracht Aanmaken
