@@ -1086,10 +1086,6 @@ main.main.is-premium-boot-host {
   border-color: var(--crimson);
   color: var(--crimson);
 }
-.edit-avatar-btn.danger:hover {
-  border-color: var(--red);
-  color: var(--red);
-}
 
 .confirm-body {
   padding: 26px 24px;
@@ -2004,7 +2000,6 @@ body {
           <div class="edit-avatar-actions">
             <input type="file" id="edit-avatar-file" class="edit-avatar-file-input" accept="image/png,image/jpeg,image/webp,image/gif" onchange="onEditAvatarPicked(this)">
             <button type="button" class="edit-avatar-btn magnetic" onclick="pickEditAvatar()">Foto kiezen</button>
-            <button type="button" class="edit-avatar-btn danger magnetic" id="edit-avatar-remove" onclick="clearEditAvatar()" hidden>Foto verwijderen</button>
           </div>
         </div>
       </div>
@@ -2297,6 +2292,6 @@ body {
   });
 })();
 </script>
-<script src="assets/premium-user-management.js?v=20260421b" defer></script>
+<script src="assets/premium-user-management.js?v=20260421c" defer></script>
 </body>
 </html>

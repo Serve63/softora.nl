@@ -5,7 +5,7 @@ var pendingDelete = null;
 var adminPinPending = null;
 var canManageUsers = false;
 var colors = ['#8b2252', '#16733c', '#1a5f7a', '#7b3f00', '#4a1a6b', '#b45a00'];
-/** @type {'unchanged' | 'cleared' | string} */
+/** @type {'unchanged' | string} */
 var editAvatarMutation = 'unchanged';
 var editAvatarBaselineUrl = '';
 
@@ -286,7 +286,6 @@ function resizeImageToJpegDataUrl(file, maxDim, quality, callback) {
 
 function paintEditAvatarPreview() {
   var wrap = document.getElementById('edit-avatar-preview');
-  var removeBtn = document.getElementById('edit-avatar-remove');
   if (!wrap) return;
   var id = document.getElementById('edit-id') && document.getElementById('edit-id').value;
   var vn = document.getElementById('edit-voornaam').value.trim();
@@ -296,17 +295,12 @@ function paintEditAvatarPreview() {
   wrap.innerHTML = '';
   var src = '';
   var showImg = false;
-  if (editAvatarMutation === 'cleared') {
-    showImg = false;
-    if (removeBtn) removeBtn.hidden = true;
-  } else if (typeof editAvatarMutation === 'string') {
+  if (typeof editAvatarMutation === 'string') {
     src = editAvatarMutation;
     showImg = true;
-    if (removeBtn) removeBtn.hidden = false;
   } else {
     src = editAvatarBaselineUrl || '';
     showImg = Boolean(src);
-    if (removeBtn) removeBtn.hidden = !showImg;
   }
   if (showImg && src) {
     var imgEl = document.createElement('img');
@@ -325,13 +319,6 @@ function paintEditAvatarPreview() {
 function pickEditAvatar() {
   var input = document.getElementById('edit-avatar-file');
   if (input) input.click();
-}
-
-function clearEditAvatar() {
-  editAvatarMutation = 'cleared';
-  var input = document.getElementById('edit-avatar-file');
-  if (input) input.value = '';
-  paintEditAvatarPreview();
 }
 
 function onEditAvatarPicked(input) {
@@ -411,9 +398,7 @@ async function saveEdit() {
       status: document.getElementById('edit-status').value,
       actionConfirmPin: actionConfirmPin
     };
-    if (editAvatarMutation === 'cleared') {
-      patchBody.removeAvatar = true;
-    } else if (editAvatarMutation !== 'unchanged') {
+    if (editAvatarMutation !== 'unchanged') {
       patchBody.avatarDataUrl = editAvatarMutation;
     }
     var payload = await fetchJson('/api/premium-users/' + encodeURIComponent(id), {

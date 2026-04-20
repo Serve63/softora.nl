@@ -28,7 +28,7 @@ test('premium rol-labels tonen Full Acces in plaats van Administrator', () => {
   const settingsSource = fs.readFileSync(path.join(root, 'premium-instellingen.html'), 'utf8');
   assert.match(
     settingsSource,
-    /assets\/premium-user-management\.js\?v=20260421b/,
+    /assets\/premium-user-management\.js\?v=20260421c/,
     'premium-instellingen moet een versie op premium-user-management.js zetten zodat ADMIN niet uit browsercache terugkomt'
   );
 });
