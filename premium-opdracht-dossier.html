@@ -308,42 +308,9 @@
             z-index: 1;
         }
 
-        .loader-visual {
-            position: relative;
-            width: 64px;
-            height: 64px;
+        .loader-visual.premium-boot-spinner {
             margin-bottom: 0.15rem;
-        }
-
-        .loader-orbit {
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            border: 2px solid transparent;
-            border-top-color: var(--accent);
-            border-right-color: rgba(139, 34, 82, 0.12);
-            animation: dossierSpin 1.15s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-        }
-
-        .loader-orbit--inner {
-            inset: 10px;
-            border-top-color: rgba(139, 34, 82, 0.4);
-            border-right-color: transparent;
-            border-bottom-color: rgba(139, 34, 82, 0.15);
-            animation-duration: 0.82s;
-            animation-direction: reverse;
-        }
-
-        .loader-dot {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            width: 9px;
-            height: 9px;
-            margin: -4.5px 0 0 -4.5px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, var(--accent), #c24a78);
-            box-shadow: 0 0 0 12px rgba(139, 34, 82, 0.06);
+            --loader-size: 64px;
         }
 
         .loading-eyebrow {
@@ -370,12 +337,6 @@
             font-size: 0.9rem;
             line-height: 1.65;
             color: var(--muted);
-        }
-
-        @keyframes dossierSpin {
-            to {
-                transform: rotate(360deg);
-            }
         }
 
         .top-row {
@@ -406,7 +367,8 @@
             letter-spacing: 0.02em;
             text-transform: uppercase;
             color: #171b2f;
-            max-width: 26ch;
+            max-width: 100%;
+            white-space: nowrap;
         }
 
         .subtitle {
@@ -758,6 +720,8 @@
 
             .title {
                 font-size: 1.5rem !important;
+                max-width: none !important;
+                white-space: nowrap;
             }
 
             .subtitle {
@@ -853,10 +817,10 @@
             <div class="dossier-wrap" id="dossierRoot">
                 <div class="loading loading-shell">
                     <div class="loading-inner">
-                        <div class="loader-visual" aria-hidden="true">
-                            <div class="loader-orbit"></div>
-                            <div class="loader-orbit loader-orbit--inner"></div>
-                            <div class="loader-dot"></div>
+                        <div class="loader-visual premium-boot-spinner" aria-hidden="true">
+                            <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+                            <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+                            <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
                         </div>
                         <div class="loading-eyebrow">Uitvoerdossier</div>
                         <div class="loading-title">Even geduld</div>
@@ -1067,10 +1031,10 @@
                 root.innerHTML = `
                     <div class="loading loading-shell">
                         <div class="loading-inner">
-                            <div class="loader-visual" aria-hidden="true">
-                                <div class="loader-orbit"></div>
-                                <div class="loader-orbit loader-orbit--inner"></div>
-                                <div class="loader-dot"></div>
+                            <div class="loader-visual premium-boot-spinner" aria-hidden="true">
+                                <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+                                <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+                                <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
                             </div>
                             <div class="loading-eyebrow">Uitvoerdossier</div>
                             <div class="loading-title">${esc(title || 'Even geduld')}</div>

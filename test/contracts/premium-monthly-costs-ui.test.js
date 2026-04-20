@@ -31,8 +31,14 @@ test('premium terugkerende kosten gebruikt dashboard-typografie en verbergt lega
   assert.match(pageSource, /\.main-content\s*\{[\s\S]*position:\s*relative;/);
   assert.match(pageSource, /<main class="main-content">[\s\S]*id="monthly-costs-boot-loader"/);
   assert.match(pageSource, /id="monthly-costs-boot-loader"/);
-  assert.match(pageSource, /\.monthly-costs-spinner\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;[\s\S]*animation:\s*monthly-costs-spin/);
-  assert.match(pageSource, /@keyframes monthly-costs-spin/);
+  assert.match(pageSource, /<div class="monthly-costs-spinner"[^>]*>[\s\S]*softora-dossier-loader__orbit--outer/);
+  const themePath = path.join(__dirname, '../../assets/personnel-theme.css');
+  const themeSource = fs.readFileSync(themePath, 'utf8');
+  assert.match(themeSource, /@import url\('softora-dossier-loader\.css'\)/);
+  const loaderPath = path.join(__dirname, '../../assets/softora-dossier-loader.css');
+  const loaderSource = fs.readFileSync(loaderPath, 'utf8');
+  assert.match(loaderSource, /@keyframes softora-dossier-loader-spin/);
+  assert.match(loaderSource, /\.monthly-costs-spinner/);
   assert.match(
     pageSource,
     /<div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">/

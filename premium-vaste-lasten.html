@@ -83,20 +83,6 @@ body {
   opacity: 0;
   visibility: hidden;
 }
-.monthly-costs-spinner {
-  width: 44px;
-  height: 44px;
-  border: 3px solid rgba(139, 34, 82, 0.12);
-  border-top-color: var(--crimson);
-  border-radius: 50%;
-  animation: monthly-costs-spin 0.72s linear infinite;
-  box-sizing: border-box;
-}
-@keyframes monthly-costs-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 .monthly-costs-boot-shell {
   transition: opacity 0.16s ease;
 }
@@ -577,7 +563,11 @@ body {
   <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
   <main class="main-content">
     <div class="monthly-costs-boot-loader" id="monthly-costs-boot-loader" aria-hidden="true">
-      <div class="monthly-costs-spinner"></div>
+      <div class="monthly-costs-spinner" aria-hidden="true">
+        <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+        <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+        <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+      </div>
     </div>
     <div class="page-shell">
       <div class="monthly-costs-boot-shell is-booting" id="monthly-costs-boot-shell" aria-busy="true">

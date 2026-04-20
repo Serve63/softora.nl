@@ -285,7 +285,11 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
 
   <main class="main-content is-premium-boot-host">
     <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
-      <div class="premium-boot-spinner"></div>
+      <div class="premium-boot-spinner" aria-hidden="true">
+        <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+        <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+        <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+      </div>
     </div>
     <div class="premium-boot-shell is-booting" aria-busy="true">
     <div class="mail-page-shell">

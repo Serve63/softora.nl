@@ -1,3 +1,5 @@
+@import url('softora-dossier-loader.css');
+
 :root {
     --accent: #8b2252;
     --accent-dark: #6b1a3f;
@@ -43,6 +45,21 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0ms !important;
     transition-delay: 0ms !important;
+}
+
+/* Dossier-loader moet blijven draaien tijdens eerste paint (overschrijft regel hierboven). */
+:root[data-personnel-loading="true"] .premium-boot-spinner .softora-dossier-loader__orbit--outer,
+:root[data-personnel-loading="true"] .monthly-costs-spinner .softora-dossier-loader__orbit--outer {
+    animation-duration: 1.15s !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0s !important;
+}
+
+:root[data-personnel-loading="true"] .premium-boot-spinner .softora-dossier-loader__orbit--inner,
+:root[data-personnel-loading="true"] .monthly-costs-spinner .softora-dossier-loader__orbit--inner {
+    animation-duration: 0.82s !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0s !important;
 }
 
 .sidebar-theme {
@@ -1138,34 +1155,6 @@ main.is-premium-boot-host {
 .premium-boot-loader.is-hidden {
     opacity: 0;
     visibility: hidden;
-}
-
-.premium-boot-spinner {
-    width: 44px;
-    height: 44px;
-    border: 3px solid rgba(139, 34, 82, 0.12);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: premium-boot-spin 0.72s linear infinite;
-    box-sizing: border-box;
-}
-
-@keyframes premium-boot-spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-:root[data-personnel-loading="true"] .premium-boot-spinner {
-    animation-duration: 0.72s !important;
-    animation-iteration-count: infinite !important;
-    animation-delay: 0s !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .premium-boot-spinner {
-        animation-duration: 1.4s !important;
-    }
 }
 
 .premium-boot-shell {

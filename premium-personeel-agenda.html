@@ -730,33 +730,8 @@
                 0 0 0 1px rgba(255, 255, 255, 0.65) inset;
             text-align: center;
         }
-        .modal-workspace-loader {
-            width: 42px;
-            height: 42px;
-            position: relative;
-            flex-shrink: 0;
-        }
-        .modal-workspace-loader::before,
-        .modal-workspace-loader::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 50%;
-            border: 2px solid transparent;
-        }
-        .modal-workspace-loader::before {
-            border-top-color: var(--accent, #8b2252);
-            border-right-color: rgba(139, 34, 82, 0.12);
-            animation: wsLoaderSpin 1.05s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-        }
-        .modal-workspace-loader::after {
-            inset: 6px;
-            border-bottom-color: rgba(139, 34, 82, 0.42);
-            border-left-color: transparent;
-            animation: wsLoaderSpin 0.78s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite reverse;
-        }
-        @keyframes wsLoaderSpin {
-            to { transform: rotate(360deg); }
+        .modal-workspace-loader.premium-boot-spinner {
+            --loader-size: 42px;
         }
         .modal-workspace-loading-title {
             font-family: 'Oswald', sans-serif;
@@ -1220,7 +1195,11 @@
             <div class="modal-workspace" id="modalWorkspace" style="position:relative;">
                 <div class="modal-workspace-loading" id="workspaceLoadingOverlay">
                     <div class="modal-workspace-loading-card" role="status" aria-live="polite" aria-busy="true">
-                        <div class="modal-workspace-loader" aria-hidden="true"></div>
+                        <div class="modal-workspace-loader premium-boot-spinner" aria-hidden="true">
+                            <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+                            <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+                            <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+                        </div>
                         <p class="modal-workspace-loading-title">Even geduld</p>
                         <p class="modal-workspace-loading-sub">Dit kan een paar seconden duren.</p>
                     </div>
@@ -1389,7 +1368,11 @@
     <!-- Main -->
     <main class="main-content is-premium-boot-host">
         <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
-            <div class="premium-boot-spinner"></div>
+            <div class="premium-boot-spinner" aria-hidden="true">
+                <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+                <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+                <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+            </div>
         </div>
         <div class="premium-boot-shell is-booting" aria-busy="true">
         <div class="topbar">

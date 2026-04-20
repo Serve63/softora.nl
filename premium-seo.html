@@ -424,15 +424,7 @@ body {
   gap: 16px;
   padding: 60px;
 }
-.loader {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--border);
-  border-top-color: var(--crimson);
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
+.scan-loading .premium-boot-spinner { --loader-size: 36px; }
 .loader-text { font-size: 13px; color: var(--text-light); }
 
 .ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -1833,7 +1825,7 @@ function runOptimisePage(slug, btnEl, pageGoal) {
   const label = BTN_SVG_LIGHTNING + ' Pagina optimaliseren';
   if (btnEl) {
     btnEl.disabled = true;
-    btnEl.innerHTML = '<div class="loader" style="width:16px;height:16px;border-width:2px"></div> Bezig…';
+    btnEl.innerHTML = '<span class="premium-boot-spinner" style="--loader-size:20px;vertical-align:middle;display:inline-block;margin-right:8px" aria-hidden="true"><span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span><span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span><span class="softora-dossier-loader__dot" aria-hidden="true"></span></span> Bezig…';
   }
   let delay = 0;
   types.forEach((t) => {

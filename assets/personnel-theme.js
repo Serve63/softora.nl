@@ -205,10 +205,29 @@
     align-items: center;
     justify-content: center;
     text-decoration: none;
-    border-radius: 6px;
+    border-radius: 10px;
     overflow: hidden;
     line-height: 0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.28), 0 2px 6px rgba(60, 64, 67, 0.15);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.softora-review-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(60, 64, 67, 0.22), 0 4px 12px rgba(60, 64, 67, 0.12);
+}
+
+.softora-review-badge:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.24);
+}
+
+.softora-review-badge--google:hover {
+    box-shadow: 0 2px 10px rgba(66, 133, 244, 0.22), 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.softora-review-badge--trustpilot:hover {
+    box-shadow: 0 2px 12px rgba(0, 182, 122, 0.45), 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 .softora-review-badge:focus-visible {
@@ -218,8 +237,9 @@
 
 .softora-review-badge svg {
     display: block;
-    height: 26px;
+    height: 38px;
     width: auto;
+    shape-rendering: geometricPrecision;
 }
 
 .softora-dialog-input {

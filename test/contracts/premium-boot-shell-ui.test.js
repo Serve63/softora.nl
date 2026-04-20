@@ -22,8 +22,12 @@ const pages = [
 test('premium personeel pagina’s met boot-shell delen personnel-theme loader en hook', () => {
   const themePath = path.join(__dirname, '../../assets/personnel-theme.css');
   const themeSource = fs.readFileSync(themePath, 'utf8');
+  assert.match(themeSource, /@import url\('softora-dossier-loader\.css'\)/);
   assert.match(themeSource, /\.premium-boot-loader\s*\{/);
   assert.match(themeSource, /\.premium-boot-shell\.is-booting\s*\{/);
+  const loaderPath = path.join(__dirname, '../../assets/softora-dossier-loader.css');
+  const loaderSource = fs.readFileSync(loaderPath, 'utf8');
+  assert.match(loaderSource, /softora-dossier-loader__orbit--outer/);
 
   const jsPath = path.join(__dirname, '../../assets/personnel-theme.js');
   const jsSource = fs.readFileSync(jsPath, 'utf8');

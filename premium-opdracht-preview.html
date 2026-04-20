@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/softora-dossier-loader.css" />
   <style>
     * { box-sizing: border-box; }
 
@@ -228,13 +229,8 @@
       gap: 12px;
     }
 
-    .spinner {
-      width: 18px;
-      height: 18px;
-      border-radius: 999px;
-      border: 2px solid rgba(166, 45, 101, 0.16);
-      border-top-color: var(--accent-light);
-      animation: spin 0.9s linear infinite;
+    .row .premium-boot-spinner {
+      --loader-size: 40px;
       flex-shrink: 0;
     }
 
@@ -281,7 +277,7 @@
       background: rgba(166, 45, 101, 0.08);
     }
 
-    .overlay.error .spinner {
+    .overlay.error .premium-boot-spinner {
       display: none;
     }
 
@@ -417,10 +413,6 @@
 
     .preview-warning.show {
       display: block;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
     }
 
     @media (max-width: 640px) {
@@ -920,7 +912,7 @@
                 '<h2 class="title" id="overlayTitle">Even geduld</h2>' +
                 '<p class="desc" id="overlayDesc">De AI maakt nu een nieuwe versie. Je ziet de preview automatisch zodra die klaar is.</p>' +
                 '<div class="row">' +
-                  '<div class="spinner"></div>' +
+                  '<div class="premium-boot-spinner" aria-hidden="true"><span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span><span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span><span class="softora-dossier-loader__dot" aria-hidden="true"></span></div>' +
                   '<div class="status" id="overlayStatus">Nieuwe website genereren...</div>' +
                 '</div>' +
                 '<div class="meta" id="overlayMeta">Opdracht #' + String(id || '') + '</div>' +

@@ -281,6 +281,40 @@
             margin-bottom: 3rem;
         }
 
+        .orders-type-legend {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.55rem 1.6rem;
+            margin: -1.85rem 0 2.35rem;
+        }
+
+        .orders-type-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .orders-type-legend-swatch {
+            width: 22px;
+            height: 11px;
+            border-radius: 999px;
+            border: 1.5px solid currentColor;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+
+        .orders-type-legend-item--website { color: var(--accent-light); }
+        .orders-type-legend-item--business { color: var(--service-business-blue); }
+        .orders-type-legend-item--voice { color: var(--green); }
+        .orders-type-legend-item--chatbot { color: var(--yellow); }
+
         .topbar-left h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.3rem; }
         .topbar-left p { color: var(--text-tertiary); font-size: 0.9rem; font-weight: 300; }
         .topbar-right { display: flex; align-items: center; gap: 0.8rem; }
@@ -1585,7 +1619,11 @@
 
         <main class="main-content is-premium-boot-host">
             <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
-                <div class="premium-boot-spinner"></div>
+                <div class="premium-boot-spinner" aria-hidden="true">
+                    <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+                    <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+                    <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+                </div>
             </div>
             <div class="premium-boot-shell is-booting" aria-busy="true">
             <div class="topbar">
@@ -1598,6 +1636,25 @@
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
                         Actieve Opdracht Aanmaken
                     </button>
+                </div>
+            </div>
+
+            <div class="orders-type-legend" role="list" aria-label="Legenda opdrachttypen">
+                <div class="orders-type-legend-item orders-type-legend-item--website" role="listitem">
+                    <span class="orders-type-legend-swatch" aria-hidden="true"></span>
+                    <span>Website</span>
+                </div>
+                <div class="orders-type-legend-item orders-type-legend-item--business" role="listitem">
+                    <span class="orders-type-legend-swatch" aria-hidden="true"></span>
+                    <span>Bedrijfssoftware</span>
+                </div>
+                <div class="orders-type-legend-item orders-type-legend-item--voice" role="listitem">
+                    <span class="orders-type-legend-swatch" aria-hidden="true"></span>
+                    <span>Voicesoftware</span>
+                </div>
+                <div class="orders-type-legend-item orders-type-legend-item--chatbot" role="listitem">
+                    <span class="orders-type-legend-swatch" aria-hidden="true"></span>
+                    <span>Chatbots</span>
                 </div>
             </div>
 
@@ -3652,7 +3709,7 @@
             const requiresConfirmation = options.confirm === true && !ui.isBuilt;
             if (requiresConfirmation) {
                 const invoicePaidReviewReminder =
-                    'Vergeet niet om de klant te vragen een review achter te laten!';
+                    'Vergeet niet om de klant op een vriendelijk en natuurlijk moment te vragen of hij of zij een review wil achterlaten over de ervaring!';
                 const reviewBadgeGoogleUrl = 'https://www.google.com/maps';
                 const reviewBadgeTrustpilotUrl = 'https://www.trustpilot.com';
                 const invoicePaidConfirmBodyHtml = [
@@ -3660,24 +3717,26 @@
                     invoicePaidReviewReminder,
                     '</p>',
                     '<div class="softora-dialog-badge-row">',
-                    '<a class="softora-review-badge" href="',
+                    '<a class="softora-review-badge softora-review-badge--google" href="',
                     reviewBadgeGoogleUrl,
                     '" target="_blank" rel="noopener noreferrer" aria-label="Google Reviews">',
-                    '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="26" viewBox="0 0 90 26" aria-hidden="true">',
-                    '<rect width="90" height="26" rx="5" fill="#fff" stroke="#dadce0"/>',
-                    '<path fill="#4285F4" d="M12.5 13c0-.8.14-1.55.38-2.25H7v4.27h3.18c-.17.9-.68 1.66-1.45 2.14v1.77h2.35c1.37-1.26 2.17-3.12 2.17-5.27z"/>',
-                    '<path fill="#34A853" d="M7 18.9c1.94 0 3.58-.64 4.77-1.72l-2.35-1.77c-.64.43-1.46.69-2.42.69-1.86 0-3.44-1.26-4-2.95H.8v1.83C2 17.25 4.28 18.9 7 18.9z"/>',
-                    '<path fill="#FBBC05" d="M3 12.05c-.15-.45-.23-.93-.23-1.42s.08-.97.23-1.42V7.38H.8C.3 8.38 0 9.66 0 11s.3 2.62.8 3.62L3 12.05z"/>',
-                    '<path fill="#EA4335" d="M7 5.88c1.05 0 1.99.36 2.72 1.06l2.04-2.04C10.36 3.58 8.84 3 7 3 4.28 3 2 4.65.8 7.38L3 9.21c.56-1.69 2.14-2.95 4-2.95z"/>',
-                    '<text x="26" y="17" font-family="system-ui,-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif" font-size="9.5" font-weight="600" fill="#3c4043">Reviews</text>',
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="142" height="38" viewBox="0 0 142 38" aria-hidden="true" role="img">',
+                    '<rect width="142" height="38" rx="9" fill="#fff" stroke="#dadce0" stroke-width="1"/>',
+                    '<g transform="translate(8 7) scale(0.833333)">',
+                    '<path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>',
+                    '<path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>',
+                    '<path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>',
+                    '<path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>',
+                    '</g>',
+                    '<text x="44" y="24" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#202124">Google Reviews</text>',
                     '</svg></a>',
-                    '<a class="softora-review-badge" href="',
+                    '<a class="softora-review-badge softora-review-badge--trustpilot" href="',
                     reviewBadgeTrustpilotUrl,
                     '" target="_blank" rel="noopener noreferrer" aria-label="Trustpilot">',
-                    '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="26" viewBox="0 0 96 26" aria-hidden="true">',
-                    '<rect width="96" height="26" rx="5" fill="#00b67a"/>',
-                    '<path fill="#fff" d="M13 6.5l1.65 5h5.35l-4.33 3.15 1.65 5L13 16.5l-4.32 3.15 1.65-5L6 11.5h5.35z"/>',
-                    '<text x="24" y="17" font-family="system-ui,-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif" font-size="9.5" font-weight="700" fill="#fff">Trustpilot</text>',
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="148" height="38" viewBox="0 0 148 38" aria-hidden="true" role="img">',
+                    '<rect width="148" height="38" rx="9" fill="#00b67a"/>',
+                    '<path fill="#fff" d="M19.2 11.2l2.35 7.15h7.6l-6.15 5.6 2.35 7.15-6.15-4.48-6.15 4.48 2.35-7.15-6.15-5.6h7.6l2.35-7.15z"/>',
+                    '<text x="40" y="24" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#fff" letter-spacing="0.04em">Trustpilot</text>',
                     '</svg></a>',
                     '</div>',
                 ].join('');

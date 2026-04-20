@@ -678,13 +678,8 @@
             gap: 0.85rem;
         }
 
-        .lead-modal-loading-spinner {
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            border: 2px solid rgba(139, 34, 82, 0.2);
-            border-top-color: var(--accent);
-            animation: leadSpin 0.9s linear infinite;
+        .lead-modal-loading .premium-boot-spinner {
+            --loader-size: 34px;
         }
 
         .lead-modal-loading-text {
@@ -707,11 +702,6 @@
             display: none !important;
             visibility: hidden;
             pointer-events: none;
-        }
-
-        @keyframes leadSpin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
         }
 
         .lead-modal-audio-shell {
@@ -1031,7 +1021,11 @@
 
         <main class="main-content is-premium-boot-host">
             <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
-                <div class="premium-boot-spinner"></div>
+                <div class="premium-boot-spinner" aria-hidden="true">
+                    <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+                    <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+                    <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+                </div>
             </div>
             <div class="premium-boot-shell is-booting" aria-busy="true">
             <div class="topbar">
@@ -1067,7 +1061,11 @@
                 </div>
 
                 <div class="lead-modal-loading" id="leadModalLoading">
-                    <div class="lead-modal-loading-spinner" aria-hidden="true"></div>
+                    <div class="lead-modal-loading-spinner premium-boot-spinner" aria-hidden="true">
+                        <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+                        <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+                        <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+                    </div>
                     <div class="lead-modal-loading-text" id="leadModalLoadingText">Lead details laden...</div>
                 </div>
 

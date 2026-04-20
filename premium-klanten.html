@@ -452,7 +452,7 @@
         .btn-primary,
         .btn-secondary,
         .btn-danger,
-        .action-btn {
+        .btn-edit {
             appearance: none;
             transition: all 0.2s var(--ease-out-expo);
         }
@@ -740,28 +740,28 @@
             gap: 0.5rem;
         }
 
-        .action-btn {
-            border: 1px solid var(--border);
-            width: 34px;
-            height: 34px;
-            padding: 0;
-            background: transparent;
-            color: var(--text-secondary);
+        .btn-edit {
+            width: 22px;
+            height: 22px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: var(--text-tertiary);
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            transition: color 0.15s;
+            padding: 0;
             flex-shrink: 0;
         }
 
-        .action-btn svg {
-            width: 13px;
-            height: 13px;
+        .btn-edit:hover {
+            color: var(--accent);
         }
 
-        .action-btn:hover {
-            border-color: var(--accent);
-            color: var(--text-primary);
-            background: rgba(139, 34, 82, 0.08);
+        .btn-edit svg {
+            width: 13px;
+            height: 13px;
         }
 
         .empty-state {
@@ -1096,7 +1096,11 @@
 
         <main class="page-shell is-premium-boot-host">
             <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
-                <div class="premium-boot-spinner"></div>
+                <div class="premium-boot-spinner" aria-hidden="true">
+                    <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+                    <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+                    <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+                </div>
             </div>
             <div class="premium-boot-shell is-booting" aria-busy="true">
             <div class="page-content">
@@ -1998,7 +2002,7 @@
                         "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
                         "<td class=\"cell-actions\" data-label=\"Acties\">",
                             "<div class=\"actions\">",
-                                "<button type=\"button\" class=\"action-btn\" data-action=\"edit\" data-id=\"" + escapeHtml(customer.id) + "\" title=\"Bewerken\" aria-label=\"Klant bewerken\">",
+                                "<button type=\"button\" class=\"btn-edit\" data-action=\"edit\" data-id=\"" + escapeHtml(customer.id) + "\" title=\"Bewerken\" aria-label=\"Klant bewerken\">",
                                     "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z\"/></svg>",
                                 "</button>",
                             "</div>",

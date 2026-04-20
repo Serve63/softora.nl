@@ -22,7 +22,7 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /window\.SoftoraDialogs && typeof window\.SoftoraDialogs\.confirm === 'function'[\s\S]*Factuur betaald bevestigen/);
   assert.match(
     source,
-    /Vergeet niet om de klant te vragen een review achter te laten![\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/
+    /Vergeet niet om de klant op een vriendelijk en natuurlijk moment te vragen[\s\S]*bodyHtml:\s*invoicePaidConfirmBodyHtml/
   );
   assert.match(source, /await persistRequiredUiStateKeysOrThrow\(\s*\[CUSTOM_ORDERS_KEY, ORDER_RUNTIME_KEY\],/);
   assert.match(source, /document\.querySelectorAll\('\.complete-btn'\)\.forEach\(\(b\) => \{[\s\S]*void handleOrderPaymentAction\(id\);/);
@@ -45,6 +45,17 @@ test('premium actieve opdrachten gebruiken expliciete customer identity voor kop
   assert.match(source, /const explicitCompany = String\(record\?\.companyName \|\| ''\)\.trim\(\);/);
   assert.match(source, /const explicitContact = String\(record\?\.contactName \|\| ''\)\.trim\(\);/);
   assert.match(source, /return `\$\{normalizeMatchValue\(company\)\}\|\$\{normalizeMatchValue\(name\)\}\|\$\{normalizeMatchValue\(explicitPhone\)\}`;/);
+});
+
+test('premium actieve opdrachten tonen legenda voor opdrachttypen', () => {
+  const filePath = path.join(__dirname, '../../premium-actieve-opdrachten.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /class="orders-type-legend"[^>]*aria-label="Legenda opdrachttypen"/);
+  assert.match(source, /orders-type-legend-item--website/);
+  assert.match(source, /orders-type-legend-item--business/);
+  assert.match(source, /orders-type-legend-item--voice/);
+  assert.match(source, /orders-type-legend-item--chatbot/);
 });
 
 test('premium actieve opdrachten tonen create-order modal zonder sample-design en domeinvelden', () => {
