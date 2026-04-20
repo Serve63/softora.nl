@@ -50,7 +50,15 @@ function goTo(id) {
   });
   document.getElementById(id).classList.add('active');
   if (id === 'screen-personeel') {
-    refreshTeam();
+    var bootApi = window.SoftoraPremiumBoot;
+    if (bootApi && typeof bootApi.setShellBooting === 'function') {
+      bootApi.setShellBooting(true);
+    }
+    refreshTeam().finally(function () {
+      if (bootApi && typeof bootApi.setShellBooting === 'function') {
+        bootApi.setShellBooting(false);
+      }
+    });
   }
 }
 
@@ -497,5 +505,9 @@ function escapeHtml(value) {
     renderAccessDenied();
   } catch (error) {
     document.getElementById('personeel-list').innerHTML = '<div class="empty-state">' + escapeHtml(error.message || 'Instellingen laden mislukt.') + '</div>';
+  } finally {
+    if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+      window.SoftoraPremiumBoot.setShellBooting(false);
+    }
   }
 })();

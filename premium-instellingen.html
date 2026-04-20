@@ -2213,20 +2213,6 @@ body {
   });
 })();
 </script>
-<script src="assets/premium-user-management.js?v=20260420f" defer></script>
-<script>
-(function () {
-  function finishPremiumShellBoot() {
-    if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
-      window.SoftoraPremiumBoot.setShellBooting(false);
-    }
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', finishPremiumShellBoot, { once: true });
-  } else {
-    finishPremiumShellBoot();
-  }
-})();
-</script>
+<script src="assets/premium-user-management.js?v=20260420g" defer></script>
 </body>
 </html>

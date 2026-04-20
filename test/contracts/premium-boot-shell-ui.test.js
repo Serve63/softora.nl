@@ -30,13 +30,23 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
   assert.match(jsSource, /SoftoraPremiumBoot\.setShellBooting/);
   assert.match(jsSource, /main\.is-premium-boot-host/);
 
+  const userMgmtPath = path.join(__dirname, '../../assets/premium-user-management.js');
+  const userMgmtSource = fs.readFileSync(userMgmtPath, 'utf8');
+  assert.match(
+    userMgmtSource,
+    /SoftoraPremiumBoot\.setShellBooting\(false\)/,
+    'premium-user-management.js moet boot-shell sluiten na laden'
+  );
+
   for (const file of pages) {
     const pagePath = path.join(__dirname, '../../', file);
     const source = fs.readFileSync(pagePath, 'utf8');
     assert.match(source, /<main[^>]*\bis-premium-boot-host\b/, file);
     assert.match(source, /class="premium-boot-loader"/, file);
     assert.match(source, /class="premium-boot-shell is-booting"/, file);
-    assert.match(source, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
+    if (file !== 'premium-instellingen.html') {
+      assert.match(source, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
+    }
   }
 });
 
