@@ -476,6 +476,7 @@
             if (hashRaw === "facebook") return "ads_facebook";
             if (hashRaw === "pinterest") return "ads_pinterest";
             if (hashRaw === "linkedin") return "ads_linkedin";
+            if (hashRaw === "trustoo") return "ads_trustoo";
             return "ads_google";
         }
         if (
@@ -539,6 +540,7 @@
         "ads_facebook",
         "ads_pinterest",
         "ads_linkedin",
+        "ads_trustoo",
     ]);
 
     /* Klassiek hangslot: U-beugel + afgeronde kast (herkenbaar op klein formaat) */
@@ -704,6 +706,12 @@
                 key: "ads_linkedin",
                 href: "/premium-advertenties#linkedin",
                 label: "LinkedIn",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "ads_trustoo",
+                href: "/premium-advertenties#trustoo",
+                label: "Trustoo",
                 icon: adsPlatformIcon,
             },
         ];
