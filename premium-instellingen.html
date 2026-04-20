@@ -414,17 +414,30 @@ main.main.is-premium-boot-host {
   height: 14px;
 }
 
-/* Pagina-PIN (zelfde flow als premium-wachtwoordenregister) */
+/* Pagina-PIN: fixed over het hoofdvlak (naast sidebar) zodat de kaart echt gecentreerd is */
 .settings-screen-pin {
-  flex: 1;
-  width: 100%;
-  min-height: calc(100vh - 80px);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .settings-screen-pin[hidden] {
   display: none !important;
+}
+#settings-screen-pin:not([hidden]) {
+  position: fixed;
+  z-index: 85;
+  left: 280px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  min-height: 0;
+  padding: 40px 48px;
+  box-sizing: border-box;
+  background: var(--bg-primary);
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
 }
 #settings-screen-app:not([hidden]) {
   flex: 1;
@@ -1345,6 +1358,11 @@ main.main.is-premium-boot-host {
 
   main.main.is-premium-boot-host {
     width: 100%;
+  }
+
+  #settings-screen-pin:not([hidden]) {
+    left: 0;
+    padding: 28px 22px;
   }
 
   .form-row2 {
