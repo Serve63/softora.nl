@@ -7558,7 +7558,7 @@
     let overlay = byId('startCampaignConfirmOverlay');
     if (overlay) return overlay;
 
-    const MAX_CAMPAIGN_CONFIRM_PIN_LEN = 64;
+    const CAMPAIGN_CONFIRM_PIN_DIGITS = 6;
     let pinBuffer = '';
 
     overlay = document.createElement('div');
@@ -7571,23 +7571,22 @@
 
     overlay.innerHTML = [
       '<div id="startCampaignConfirmCard" style="width:min(400px,100%);border-radius:20px;border:1px solid rgba(0,0,0,0.08);background:#fff;',
-      'box-shadow:0 22px 50px rgba(17,19,34,0.12);color:#1a1a2e;padding:2.75rem 2.5rem 2.5rem;font-family:Inter,system-ui,sans-serif;position:relative;overflow:hidden;">',
+      'box-shadow:0 22px 50px rgba(17,19,34,0.12);color:#1a1a2e;padding:2.75rem 2.5rem 1.75rem;font-family:Inter,system-ui,sans-serif;position:relative;overflow:hidden;">',
       '  <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,rgba(139,34,82,0.55),transparent);pointer-events:none;"></div>',
+      '  <button type="button" id="startCampaignConfirmClose" class="magnetic" aria-label="Sluiten" style="position:absolute;top:8px;right:8px;width:40px;height:40px;border:none;background:transparent;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#606272;padding:0;">',
+      '    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+      '  </button>',
       '  <div style="display:flex;flex-direction:column;align-items:center;text-align:center;">',
       '    <div style="width:52px;height:52px;background:linear-gradient(145deg,rgba(139,34,82,0.12),rgba(139,34,82,0.05));border:1px solid rgba(139,34,82,0.15);border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">',
       '      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8b2252" stroke-width="1.65"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
       '    </div>',
       '    <p style="margin:0 0 6px;font-family:Oswald,system-ui,sans-serif;font-size:0.62rem;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#8b2252;">Beveiligde toegang</p>',
       '    <h2 id="startCampaignConfirmTitle" style="margin:0 0 8px;font-size:1.28rem;font-weight:600;letter-spacing:-0.025em;color:#1a1a2e;line-height:1.2;">PIN invoeren</h2>',
-      '    <p style="margin:0 0 22px;font-size:0.875rem;line-height:1.5;color:#606272;max-width:300px;">Typ je pin en klik op <strong>Bevestigen</strong> om coldcalling te starten.</p>',
+      '    <p style="margin:0 0 22px;font-size:0.875rem;line-height:1.5;color:#606272;max-width:300px;">Typ je zes cijfers. Is de pin juist, dan start coldcalling automatisch.</p>',
       '  </div>',
       '  <div id="startCampaignPinDotsHost" role="status" aria-live="polite" aria-label="Voortgang pin"></div>',
       '  <div id="startCampaignNumpadHost"></div>',
       '  <div id="startCampaignPinError" style="display:none;margin-top:14px;font-size:0.75rem;color:#c0392b;text-align:center;min-height:1.25em;font-weight:500;"></div>',
-      '  <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:22px;">',
-      '    <button type="button" id="startCampaignConfirmCancel" class="magnetic" style="padding:0.65rem 1.2rem;border-radius:999px;border:1px solid #dadce0;background:#fff;color:#202124;font-weight:600;cursor:pointer;">Annuleren</button>',
-      '    <button type="button" id="startCampaignConfirmOk" class="magnetic" style="padding:0.65rem 1.2rem;border-radius:999px;border:none;background:#8b2252;color:#fff;font-weight:700;cursor:pointer;">Bevestigen</button>',
-      '  </div>',
       '</div>',
     ].join('');
 
@@ -7607,8 +7606,7 @@
     }
 
     const errEl = byId('startCampaignPinError');
-    const cancelBtn = byId('startCampaignConfirmCancel');
-    const okBtn = byId('startCampaignConfirmOk');
+    const closeBtn = byId('startCampaignConfirmClose');
     const numpadHost = byId('startCampaignNumpadHost');
     numpadHost.style.cssText =
       'display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;width:100%;max-width:280px;margin:0 auto;';
@@ -7633,10 +7631,13 @@
     }
 
     function appendPinDigit(ch) {
-      if (pinBuffer.length >= MAX_CAMPAIGN_CONFIRM_PIN_LEN) return;
+      if (pinBuffer.length >= CAMPAIGN_CONFIRM_PIN_DIGITS) return;
       pinBuffer += ch;
       paintStartCampaignPinDots();
       setPinError('');
+      if (pinBuffer.length === CAMPAIGN_CONFIRM_PIN_DIGITS) {
+        window.setTimeout(() => confirmPinAndStart(), 120);
+      }
     }
 
     function backPinDigit() {
@@ -7708,9 +7709,12 @@
       if (e.target === overlay) closeOverlay();
     });
 
-    cancelBtn.addEventListener('click', () => closeOverlay());
-
-    okBtn.addEventListener('click', () => confirmPinAndStart());
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeOverlay();
+      });
+    }
 
     document.addEventListener(
       'keydown',
@@ -7719,11 +7723,6 @@
         if (e.key === 'Escape') {
           e.preventDefault();
           closeOverlay();
-          return;
-        }
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          confirmPinAndStart();
           return;
         }
         if (e.key === 'Backspace') {
