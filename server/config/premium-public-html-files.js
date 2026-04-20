@@ -17,7 +17,6 @@ const PREMIUM_PUBLIC_HTML_FILE_NAMES = Object.freeze([
   'premium-seo.html',
   'premium-bevestigingsmails.html',
   'premium-wachtwoordenregister.html',
-  'premium-ai-lead-generator.html',
 ]);
 
 function createPremiumPublicHtmlFilesSet() {

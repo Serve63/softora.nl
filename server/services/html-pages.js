@@ -250,9 +250,6 @@ function createHtmlPageCoordinator(options = {}) {
     const premiumPageAccess = await resolvePremiumHtmlPageAccess(req, res, fileName);
     if (premiumPageAccess.handled) return undefined;
     const { isLoginPage, isProtectedPremiumPage } = premiumPageAccess;
-    const isPremiumColdcallingEntryPage = fileName === 'premium-ai-lead-generator.html';
-    const useNoStoreHtmlCache =
-      isLoginPage || isProtectedPremiumPage || isPremiumColdcallingEntryPage;
 
     try {
       const html = await readHtmlPageContent(fileName);
@@ -270,14 +267,14 @@ function createHtmlPageCoordinator(options = {}) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader(
         'Cache-Control',
-        useNoStoreHtmlCache
+        isLoginPage || isProtectedPremiumPage
           ? 'no-store, private'
           : 'public, max-age=300, stale-while-revalidate=900'
       );
       return res.status(200).send(rendered);
     } catch (error) {
       logger.error('[SEO][RenderPageError]', fileName, error?.message || error);
-      if (useNoStoreHtmlCache) {
+      if (isLoginPage || isProtectedPremiumPage) {
         res.setHeader('Cache-Control', 'no-store, private');
       }
       return res.sendFile(path.join(pagesDir, fileName), (sendErr) => {
