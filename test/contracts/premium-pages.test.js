@@ -48,6 +48,7 @@ test('marketing premium landing pages are not auth-gated', () => {
   });
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-bedrijfssoftware.html'), false);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-voicesoftware.html'), false);
+  assert.equal(controller.isPremiumProtectedHtmlFile('premium-chatbot.html'), false);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-websites.html'), false);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-blog.html'), false);
   assert.equal(controller.isPremiumProtectedHtmlFile('premium-personeel-dashboard.html'), true);

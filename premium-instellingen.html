@@ -1396,9 +1396,29 @@ body {
   </div>
 </div>
 
+<div class="overlay" id="admin-pin-overlay" style="z-index: 120;">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-head-title" id="admin-pin-modal-title">Bevestigen</div>
+      <button class="modal-x" type="button" onclick="cancelAdminActionPin()" aria-label="Sluiten">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-mid);line-height:1.55;margin:0 0 14px;">Vul je pincode in om door te gaan (dezelfde server-pin als bij &quot;Start campagne&quot;, tenzij er een aparte pin voor instellingen is geconfigureerd).</p>
+      <div class="form-group">
+        <label>Pincode</label>
+        <input type="password" id="admin-action-pin-input" autocomplete="off" maxlength="64" inputmode="numeric">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" type="button" onclick="cancelAdminActionPin()">Annuleren</button>
+      <button class="btn-save" type="button" onclick="confirmAdminActionPin()">Bevestigen</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
-<script src="assets/premium-user-management.js?v=20260411a" defer></script>
+<script src="assets/premium-user-management.js?v=20260420b" defer></script>
 <script>
 (function () {
   function finishPremiumShellBoot() {

@@ -11,6 +11,7 @@ const criticalFlowChecklist = Object.freeze([
 const pageSmokeTargets = Object.freeze([
   { path: '/premium-bedrijfssoftware', marker: 'Bedrijfssoftware op maat' },
   { path: '/premium-voicesoftware', marker: 'Voicesoftware op maat' },
+  { path: '/premium-chatbot', marker: 'Chatbot op maat' },
   { path: '/premium-websites', marker: 'Premium Websites' },
   { path: '/premium-personeel-login', marker: 'Softora | Personeel Login' },
   { path: '/premium-personeel-agenda', marker: 'Servé Digital | Agenda', allowLoginFallback: true },

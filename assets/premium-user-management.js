@@ -2,6 +2,7 @@
 
 var team = [];
 var pendingDelete = null;
+var adminPinPending = null;
 var canManageUsers = false;
 var colors = ['#8b2252', '#16733c', '#1a5f7a', '#7b3f00', '#4a1a6b', '#b45a00'];
 
@@ -106,6 +107,48 @@ async function refreshTeam() {
   }
 }
 
+function requestAdminActionPin(title) {
+  return new Promise(function (resolve, reject) {
+    if (adminPinPending) {
+      reject(new Error('Bezig met bevestigen'));
+      return;
+    }
+    adminPinPending = { resolve: resolve, reject: reject };
+    var titleEl = document.getElementById('admin-pin-modal-title');
+    if (titleEl) titleEl.textContent = title || 'Bevestigen';
+    var input = document.getElementById('admin-action-pin-input');
+    if (input) input.value = '';
+    openOverlay('admin-pin-overlay');
+    setTimeout(function () {
+      if (input) input.focus();
+    }, 0);
+  });
+}
+
+function cancelAdminActionPin() {
+  closeOverlay('admin-pin-overlay');
+  var input = document.getElementById('admin-action-pin-input');
+  if (input) input.value = '';
+  if (adminPinPending) {
+    adminPinPending.reject(new Error('Geannuleerd'));
+    adminPinPending = null;
+  }
+}
+
+function confirmAdminActionPin() {
+  if (!adminPinPending) return;
+  var input = document.getElementById('admin-action-pin-input');
+  var pin = input ? String(input.value || '').trim() : '';
+  if (!pin) {
+    return showToast('Pincode invullen');
+  }
+  var resolve = adminPinPending.resolve;
+  adminPinPending = null;
+  closeOverlay('admin-pin-overlay');
+  if (input) input.value = '';
+  resolve(pin);
+}
+
 async function addPersoneel() {
   function value(id) {
     return document.getElementById(id).value.trim();
@@ -123,6 +166,14 @@ async function addPersoneel() {
   if (wachtwoord.length < 8) {
     return showToast('Wachtwoord minimaal 8 tekens');
   }
+  var actionConfirmPin;
+  try {
+    actionConfirmPin = await requestAdminActionPin('Toevoegen bevestigen');
+  } catch (error) {
+    if (error && error.message === 'Geannuleerd') return;
+    showToast((error && error.message) || 'Bevestigen mislukt');
+    return;
+  }
   setPrimaryButtonLoading(submitButton, true, 'Toevoegen...');
   try {
     var payload = await fetchJson('/api/premium-users', {
@@ -132,7 +183,8 @@ async function addPersoneel() {
         achternaam: value('new-achternaam'),
         email: email,
         password: wachtwoord,
-        rol: document.getElementById('new-rol').value
+        rol: document.getElementById('new-rol').value,
+        actionConfirmPin: actionConfirmPin
       })
     });
     team = Array.isArray(payload.users) ? payload.users : team;
@@ -177,6 +229,14 @@ async function saveEdit() {
   if (wachtwoord && wachtwoord.length < 8) {
     return showToast('Wachtwoord minimaal 8 tekens');
   }
+  var actionConfirmPin;
+  try {
+    actionConfirmPin = await requestAdminActionPin('Opslaan bevestigen');
+  } catch (error) {
+    if (error && error.message === 'Geannuleerd') return;
+    showToast((error && error.message) || 'Bevestigen mislukt');
+    return;
+  }
   setPrimaryButtonLoading(saveButton, true, 'Opslaan...');
   try {
     var payload = await fetchJson('/api/premium-users/' + encodeURIComponent(id), {
@@ -187,7 +247,8 @@ async function saveEdit() {
         email: email,
         password: wachtwoord,
         rol: document.getElementById('edit-rol').value,
-        status: document.getElementById('edit-status').value
+        status: document.getElementById('edit-status').value,
+        actionConfirmPin: actionConfirmPin
       })
     });
     team = Array.isArray(payload.users) ? payload.users : team;
@@ -244,10 +305,24 @@ function closeOverlay(id) {
 document.querySelectorAll('.overlay').forEach(function (overlay) {
   overlay.addEventListener('click', function (event) {
     if (event.target === overlay) {
+      if (overlay.id === 'admin-pin-overlay') {
+        cancelAdminActionPin();
+        return;
+      }
       overlay.classList.remove('open');
     }
   });
 });
+
+var adminActionPinInput = document.getElementById('admin-action-pin-input');
+if (adminActionPinInput) {
+  adminActionPinInput.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      confirmAdminActionPin();
+    }
+  });
+}
 
 function togglePw(inputId, btn) {
   var input = document.getElementById(inputId);

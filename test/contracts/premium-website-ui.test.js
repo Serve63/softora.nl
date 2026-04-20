@@ -45,7 +45,7 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
   assert.doesNotMatch(source, /<h2 style="text-align: center;">Wat We Voor Je Bouwen<\/h2>/);
   assert.match(
     source,
-    /<div class="pricing-grid">[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card fade-up"[\s\S]*id="dienst-premium-website" class="pricing-card featured fade-up"[\s\S]*id="dienst-voicesoftware" class="pricing-card fade-up"[\s\S]*id="dienst-chatbot" class="pricing-card pricing-card--accent-chatbot fade-up"/
+    /<div class="pricing-grid">[\s\S]*id="dienst-bedrijfssoftware" class="pricing-card fade-up"[\s\S]*id="dienst-premium-website" class="pricing-card featured fade-up"[\s\S]*id="dienst-voicesoftware" class="pricing-card fade-up"[\s\S]*id="dienst-chatbot" class="pricing-card fade-up"/
   );
   assert.doesNotMatch(
     source,
@@ -69,6 +69,10 @@ test('premium website heeft geen decoratieve diensten-pijl meer', () => {
     source,
     /<div class="card-number">04<\/div>\s*<h3>Chatbot<\/h3>\s*<p>Bezoekers willen antwoord nu — niet morgen\. Een slimme chatbot die vragen afhandelt, leads vastlegt en 24\/7 voor je klaarstaat\.<\/p>/
   );
+  assert.match(
+    source,
+    /<div class="tilt-card fade-up" data-tilt style="transition-delay: 0\.3s; --card-accent: #8B2252; --card-accent-rgb: 139,34,82;">[\s\S]*<div class="card-number">04<\/div>/
+  );
   assert.doesNotMatch(source, /diensten-arrow-wrap/);
 });
 
@@ -83,7 +87,7 @@ test('premium website heeft geen losse CTA-sectie meer en laat contactlinks op d
   assert.match(source, /<footer id="contact" class="footer">/);
   assert.match(
     source,
-    /<div class="footer-col-title">Diensten<\/div>\s*<ul>[\s\S]*<li><a href="\/premium-pakketten">Chatbot<\/a><\/li>[\s\S]*<\/ul>/s
+    /<div class="footer-col-title">Diensten<\/div>\s*<ul>[\s\S]*<li><a href="\/premium-chatbot">Chatbot<\/a><\/li>[\s\S]*<\/ul>/s
   );
   assert.match(source, /Wij bouwen professionele, snelle websites voor bedrijven\. Van ontwerp tot onderhoud - alles onder een dak\./);
   assert.doesNotMatch(source, /Wij bouwen professionele, snelle websites voor het MKB\./);

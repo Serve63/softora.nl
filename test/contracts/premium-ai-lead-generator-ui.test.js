@@ -28,8 +28,13 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /<label class="form-label form-label--regio" for="regio">/);
   assert.match(
     pageSource,
-    /id="campaignRegioTip"[\s\S]*?<span class="form-label-regio-heading">Omstreken Oisterwijk<\/span>[\s\S]*?id="campaignRegioLeadCount"/
+    /<label class="form-label form-label--regio" for="regio">[\s\S]*?<span class="form-label-regio-heading">Omstreken Oisterwijk<\/span><span id="campaignRegioLeadCount"/
   );
+  assert.match(
+    pageSource,
+    /<\/label>\s*<span class="form-label-tip form-label-tip--info" id="campaignRegioTip">[\s\S]*?<\/span>\s*<select class="form-select magnetic" id="regio">/
+  );
+  assert.match(pageSource, /if \(select\.id === 'regio'\) \{[\s\S]*?getElementById\('campaignRegioTip'\)/);
   assert.match(pageSource, /<select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">/);
   assert.match(pageSource, /<option value="websites" data-dot-color="accent" selected>Website's<\/option>/);
   assert.match(pageSource, /<option value="voice_software" data-dot-color="green" disabled>Voicesoftware<\/option>/);

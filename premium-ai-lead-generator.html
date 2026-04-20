@@ -528,10 +528,6 @@
             gap: 0.35rem 0.5rem;
         }
 
-        .form-label.form-label--regio .form-label-tip.form-label-tip--info {
-            margin-left: 0;
-        }
-
         .form-label-regio-heading {
             letter-spacing: inherit;
         }
@@ -655,7 +651,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 1rem;
+            gap: 0.5rem;
             padding: 1rem 1.2rem;
             background: rgba(255,255,255,0.03);
             border: 2px solid var(--border);
@@ -667,6 +663,18 @@
             outline: none;
             cursor: none;
             transition: all 0.3s var(--ease-out-expo);
+        }
+
+        .site-select-trigger #campaignRegioTip {
+            flex-shrink: 0;
+            margin: 0;
+            order: 1;
+        }
+
+        .site-select-trigger .site-select-value {
+            order: 0;
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
         .site-select-trigger:hover,
@@ -682,6 +690,7 @@
             flex: 0 0 12px;
             width: 12px;
             height: 8px;
+            order: 2;
             background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23555' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: center;
@@ -2010,7 +2019,8 @@
                     </div>
 
                     <div class="form-group form-group--regio">
-                        <label class="form-label form-label--regio" for="regio"><span class="form-label-tip form-label-tip--info" id="campaignRegioTip"><span class="form-label-info-wrap" tabindex="0" role="img" aria-label="TIP: Start dichtbij en breid het steeds verder uit." title="TIP: Start dichtbij en breid het steeds verder uit."><svg class="form-label-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9.25"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5V16M12 8.25v.01"></path></svg></span></span><span class="form-label-regio-heading">Omstreken Oisterwijk</span><span id="campaignRegioLeadCount" class="form-label-regio-count" aria-live="polite"></span></label>
+                        <label class="form-label form-label--regio" for="regio"><span class="form-label-regio-heading">Omstreken Oisterwijk</span><span id="campaignRegioLeadCount" class="form-label-regio-count" aria-live="polite"></span></label>
+                        <span class="form-label-tip form-label-tip--info" id="campaignRegioTip"><span class="form-label-info-wrap" tabindex="0" role="img" aria-label="TIP: Start dichtbij en breid het steeds verder uit." title="TIP: Start dichtbij en breid het steeds verder uit."><svg class="form-label-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9.25"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5V16M12 8.25v.01"></path></svg></span></span>
                         <select class="form-select magnetic" id="regio">
                             <option value="unlimited" selected>Geen limiet</option>
                             <option value="auto">Automatisch</option>
@@ -2141,6 +2151,23 @@
             const valueEl = document.createElement('span');
             valueEl.className = 'site-select-value';
             trigger.appendChild(valueEl);
+
+            if (select.id === 'regio') {
+                const regioTip = document.getElementById('campaignRegioTip');
+                if (regioTip) {
+                    trigger.appendChild(regioTip);
+                    ['mousedown', 'click'].forEach((evtName) => {
+                        regioTip.addEventListener(evtName, (event) => {
+                            event.stopPropagation();
+                        });
+                    });
+                    regioTip.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.stopPropagation();
+                        }
+                    });
+                }
+            }
 
             const menu = document.createElement('div');
             menu.className = 'site-select-menu';

@@ -7,6 +7,7 @@ const PREMIUM_PUBLIC_HTML_FILE_NAMES = Object.freeze([
   'premium-personeel-login.html',
   'premium-bedrijfssoftware.html',
   'premium-voicesoftware.html',
+  'premium-chatbot.html',
   'premium-websites.html',
   'premium-blog.html',
   'premium-algemene-voorwaarden.html',
