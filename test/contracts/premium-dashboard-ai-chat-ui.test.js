@@ -19,4 +19,8 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   assert.match(pageSource, /function renderMessageBubbleContent\(bubble, item\) \{/);
   assert.match(pageSource, /bubble\.innerHTML = renderAssistantMarkdown\(item\.content\);/);
   assert.match(pageSource, /Hoi, ik ben Ruben Nijhuis\./);
+  assert.match(
+    pageSource,
+    /class="dashboard-lead-legend-strip"[\s\S]*class="lead-type-legend"[\s\S]*Bedrijfssoftware[\s\S]*Voicesoftware[\s\S]*Chatbots/s
+  );
 });

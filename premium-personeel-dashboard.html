@@ -54,6 +54,9 @@
             --service-business-blue: #3498db;
             --red: #e74c3c;
             --yellow: #f39c12;
+            /* Zelfde legenda-tinten als /premium-leads (lead-randkleuren) */
+            --lead-business: #3b82f6;
+            --lead-chatbot: #f39c12;
 
             --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -735,6 +738,67 @@
             font-family: 'Oswald', sans-serif;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+        }
+
+        /* Legenda productlijnen (zelfde als /premium-leads) */
+        .dashboard-lead-legend-strip {
+            margin-top: 1.5rem;
+            padding: 1rem 1.25rem;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--bg-secondary);
+            opacity: 0;
+            transform: translateY(12px);
+            animation: fadeUp 0.6s var(--ease-out-expo) 0.55s forwards;
+        }
+
+        .lead-type-legend {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.65rem 1rem;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            padding: 0;
+            justify-content: center;
+        }
+
+        .lead-type-legend .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            font-size: 0.66rem;
+            white-space: nowrap;
+            color: var(--text-secondary);
+        }
+
+        .lead-type-legend .legend-item.website {
+            color: var(--accent-light);
+        }
+
+        .lead-type-legend .legend-item.business {
+            color: var(--lead-business);
+        }
+
+        .lead-type-legend .legend-item.voice {
+            color: var(--green);
+        }
+
+        .lead-type-legend .legend-item.chatbot {
+            color: var(--lead-chatbot);
+        }
+
+        .lead-type-legend .legend-swatch {
+            width: 14px;
+            height: 9px;
+            border-radius: 4px;
+            border: 1.5px solid currentColor;
+            display: inline-block;
+            flex-shrink: 0;
         }
 
         /* Revenue sources */
@@ -1599,6 +1663,15 @@
                     </div>
                 </div>
 
+            </div>
+
+            <div class="dashboard-lead-legend-strip">
+                <div class="lead-type-legend" role="note" aria-label="Legenda voor kleur productlijn">
+                    <span class="legend-item website"><span class="legend-swatch" aria-hidden="true"></span>Website</span>
+                    <span class="legend-item business"><span class="legend-swatch" aria-hidden="true"></span>Bedrijfssoftware</span>
+                    <span class="legend-item voice"><span class="legend-swatch" aria-hidden="true"></span>Voicesoftware</span>
+                    <span class="legend-item chatbot"><span class="legend-swatch" aria-hidden="true"></span>Chatbots</span>
+                </div>
             </div>
             </div>
         </main>
