@@ -1018,6 +1018,79 @@ main.main.is-premium-boot-host {
   gap: 12px;
 }
 
+.edit-avatar-row .edit-avatar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.edit-avatar-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(139, 34, 82, 0.12);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.edit-avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.edit-avatar-initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+}
+.edit-avatar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.edit-avatar-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+.edit-avatar-btn {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.edit-avatar-btn:hover {
+  border-color: var(--crimson);
+  color: var(--crimson);
+}
+.edit-avatar-btn.danger:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
 .confirm-body {
   padding: 26px 24px;
 }
@@ -1924,9 +1997,20 @@ body {
     </div>
     <div class="modal-body">
       <input type="hidden" id="edit-id">
+      <div class="form-group edit-avatar-row">
+        <label>Profielfoto</label>
+        <div class="edit-avatar-wrap">
+          <div class="edit-avatar-preview" id="edit-avatar-preview" aria-hidden="true"></div>
+          <div class="edit-avatar-actions">
+            <input type="file" id="edit-avatar-file" class="edit-avatar-file-input" accept="image/png,image/jpeg,image/webp,image/gif" onchange="onEditAvatarPicked(this)">
+            <button type="button" class="edit-avatar-btn magnetic" onclick="pickEditAvatar()">Foto kiezen</button>
+            <button type="button" class="edit-avatar-btn danger magnetic" id="edit-avatar-remove" onclick="clearEditAvatar()" hidden>Foto verwijderen</button>
+          </div>
+        </div>
+      </div>
       <div class="form-row2">
-        <div class="form-group"><label>Voornaam</label><input type="text" id="edit-voornaam"></div>
-        <div class="form-group"><label>Achternaam</label><input type="text" id="edit-achternaam"></div>
+        <div class="form-group"><label>Voornaam</label><input type="text" id="edit-voornaam" oninput="paintEditAvatarPreview()"></div>
+        <div class="form-group"><label>Achternaam</label><input type="text" id="edit-achternaam" oninput="paintEditAvatarPreview()"></div>
       </div>
       <div class="form-group"><label>E-mail</label><input type="email" id="edit-email"></div>
       <div class="form-group">
@@ -2213,6 +2297,6 @@ body {
   });
 })();
 </script>
-<script src="assets/premium-user-management.js?v=20260421a" defer></script>
+<script src="assets/premium-user-management.js?v=20260421b" defer></script>
 </body>
 </html>

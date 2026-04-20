@@ -328,6 +328,66 @@ test('premium user coordinator detects duplicate emails on create', async () => 
   assert.equal(res.body.error, 'Dit e-mailadres bestaat al.');
 });
 
+test('premium user coordinator admin update accepts profielfoto (data-url) en removeAvatar', async () => {
+  const tinyPng =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const { coordinator, premiumUsersStore } = createCoordinatorFixture([
+    {
+      id: 'usr_staff',
+      email: 'staff@softora.nl',
+      firstName: 'Staff',
+      lastName: 'User',
+      role: 'medewerker',
+      status: 'active',
+      avatarDataUrl: '',
+    },
+  ]);
+
+  const reqAvatar = createRequest({
+    originalUrl: '/api/premium-users/usr_staff',
+    body: {
+      voornaam: 'Staff',
+      achternaam: 'User',
+      email: 'staff@softora.nl',
+      rol: 'medewerker',
+      status: 'active',
+      avatarDataUrl: tinyPng,
+    },
+    premiumAuth: {
+      authenticated: true,
+      isAdmin: true,
+      email: 'admin@softora.nl',
+    },
+  });
+  const resAvatar = createResponseRecorder();
+  await coordinator.updatePremiumUserResponse(reqAvatar, resAvatar, 'usr_staff');
+  assert.equal(resAvatar.statusCode, 200);
+  const withAvatar = resAvatar.body.users.find((u) => u.id === 'usr_staff');
+  assert.equal(withAvatar.avatarDataUrl, tinyPng);
+
+  const reqRemove = createRequest({
+    originalUrl: '/api/premium-users/usr_staff',
+    body: {
+      voornaam: 'Staff',
+      achternaam: 'User',
+      email: 'staff@softora.nl',
+      rol: 'medewerker',
+      status: 'active',
+      removeAvatar: true,
+    },
+    premiumAuth: {
+      authenticated: true,
+      isAdmin: true,
+      email: 'admin@softora.nl',
+    },
+  });
+  const resRemove = createResponseRecorder();
+  await coordinator.updatePremiumUserResponse(reqRemove, resRemove, 'usr_staff');
+  assert.equal(resRemove.statusCode, 200);
+  const cleared = resRemove.body.users.find((u) => u.id === 'usr_staff');
+  assert.equal(cleared.avatarDataUrl, '');
+});
+
 test('premium user coordinator prevents removing the last active administrator', async () => {
   const { coordinator } = createCoordinatorFixture([
     {

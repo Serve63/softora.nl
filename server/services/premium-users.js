@@ -281,6 +281,24 @@ function createPremiumUserManagementCoordinator(deps = {}) {
       achternaam: req.body?.achternaam,
     });
 
+    const avatarInputProvided = req.body?.avatarDataUrl !== undefined || req.body?.avatar !== undefined;
+    const removeAvatar = /^(1|true|yes|on)$/i.test(String(req.body?.removeAvatar || ''));
+    let nextAvatarDataUrl = premiumUsersStore.sanitizeAvatarDataUrl(existingUser.avatarDataUrl || '');
+    if (removeAvatar) {
+      nextAvatarDataUrl = '';
+    } else if (avatarInputProvided) {
+      nextAvatarDataUrl = premiumUsersStore.sanitizeAvatarDataUrl(
+        req.body?.avatarDataUrl || req.body?.avatar || ''
+      );
+      const providedAvatarValue = normalizeString(req.body?.avatarDataUrl || req.body?.avatar || '');
+      if (providedAvatarValue && !nextAvatarDataUrl) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Profielfoto moet een geldige PNG, JPG, WEBP of GIF data-url zijn.',
+        });
+      }
+    }
+
     if (!nextEmail) {
       return res.status(400).json({ ok: false, error: 'Voer een geldig e-mailadres in.' });
     }
@@ -300,6 +318,7 @@ function createPremiumUserManagementCoordinator(deps = {}) {
         email: nextEmail,
         role,
         status,
+        avatarDataUrl: nextAvatarDataUrl,
         passwordHash: password ? premiumUsersStore.createPasswordHash(password) : user.passwordHash,
         source: 'managed_ui',
         updatedAt: new Date().toISOString(),

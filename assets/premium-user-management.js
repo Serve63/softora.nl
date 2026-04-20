@@ -5,6 +5,9 @@ var pendingDelete = null;
 var adminPinPending = null;
 var canManageUsers = false;
 var colors = ['#8b2252', '#16733c', '#1a5f7a', '#7b3f00', '#4a1a6b', '#b45a00'];
+/** @type {'unchanged' | 'cleared' | string} */
+var editAvatarMutation = 'unchanged';
+var editAvatarBaselineUrl = '';
 
 function getColor(id) {
   var raw = String(id || '');
@@ -244,11 +247,126 @@ async function addPersoneel() {
   }
 }
 
+function resizeImageToJpegDataUrl(file, maxDim, quality, callback) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    var img = new Image();
+    img.onload = function () {
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      var scale = Math.min(1, maxDim / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w * scale));
+      var ch = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      var dataUrl;
+      try {
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+      } catch (err) {
+        callback(err);
+        return;
+      }
+      callback(null, dataUrl);
+    };
+    img.onerror = function () {
+      callback(new Error('Afbeelding'));
+    };
+    img.src = reader.result;
+  };
+  reader.onerror = function () {
+    callback(new Error('Lezen mislukt'));
+  };
+  reader.readAsDataURL(file);
+}
+
+function paintEditAvatarPreview() {
+  var wrap = document.getElementById('edit-avatar-preview');
+  var removeBtn = document.getElementById('edit-avatar-remove');
+  if (!wrap) return;
+  var id = document.getElementById('edit-id') && document.getElementById('edit-id').value;
+  var vn = document.getElementById('edit-voornaam').value.trim();
+  var an = document.getElementById('edit-achternaam').value.trim();
+  var em = document.getElementById('edit-email').value.trim();
+  var inn = initials(vn || ' ', an || ' ', em);
+  wrap.innerHTML = '';
+  var src = '';
+  var showImg = false;
+  if (editAvatarMutation === 'cleared') {
+    showImg = false;
+    if (removeBtn) removeBtn.hidden = true;
+  } else if (typeof editAvatarMutation === 'string') {
+    src = editAvatarMutation;
+    showImg = true;
+    if (removeBtn) removeBtn.hidden = false;
+  } else {
+    src = editAvatarBaselineUrl || '';
+    showImg = Boolean(src);
+    if (removeBtn) removeBtn.hidden = !showImg;
+  }
+  if (showImg && src) {
+    var imgEl = document.createElement('img');
+    imgEl.src = src;
+    imgEl.alt = '';
+    wrap.appendChild(imgEl);
+  } else {
+    var av = document.createElement('div');
+    av.className = 'edit-avatar-initials';
+    av.textContent = inn;
+    av.style.background = getColor(id);
+    wrap.appendChild(av);
+  }
+}
+
+function pickEditAvatar() {
+  var input = document.getElementById('edit-avatar-file');
+  if (input) input.click();
+}
+
+function clearEditAvatar() {
+  editAvatarMutation = 'cleared';
+  var input = document.getElementById('edit-avatar-file');
+  if (input) input.value = '';
+  paintEditAvatarPreview();
+}
+
+function onEditAvatarPicked(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  if (!/^image\/(png|jpeg|jpg|webp|gif)$/i.test(file.type)) {
+    if (input) input.value = '';
+    return showToast('Kies een PNG-, JPG-, WEBP- of GIF-bestand');
+  }
+  if (file.size > 6 * 1024 * 1024) {
+    if (input) input.value = '';
+    return showToast('Bestand te groot (max. 6 MB)');
+  }
+  resizeImageToJpegDataUrl(file, 480, 0.85, function (err, dataUrl) {
+    if (input) input.value = '';
+    if (err || !dataUrl) {
+      return showToast('Afbeelding kon niet worden verwerkt');
+    }
+    if (dataUrl.length > 850000) {
+      return showToast('Afbeelding te groot; kies een kleinere foto');
+    }
+    editAvatarMutation = dataUrl;
+    paintEditAvatarPreview();
+  });
+}
+
 function openEdit(id) {
   var persoon = team.find(function (item) { return item.id === id; });
   if (!persoon || !canManageUsers) {
     return;
   }
+  editAvatarMutation = 'unchanged';
+  editAvatarBaselineUrl = persoon.avatarDataUrl || '';
+  var fileInput = document.getElementById('edit-avatar-file');
+  if (fileInput) fileInput.value = '';
   document.getElementById('edit-id').value = id;
   document.getElementById('edit-voornaam').value = persoon.voornaam || '';
   document.getElementById('edit-achternaam').value = persoon.achternaam || '';
@@ -256,6 +374,7 @@ function openEdit(id) {
   document.getElementById('edit-pw').value = '';
   document.getElementById('edit-rol').value = persoon.rol || 'medewerker';
   document.getElementById('edit-status').value = persoon.status || 'active';
+  paintEditAvatarPreview();
   openOverlay('edit-overlay');
 }
 
@@ -283,17 +402,23 @@ async function saveEdit() {
   }
   setPrimaryButtonLoading(saveButton, true, 'Opslaan...');
   try {
+    var patchBody = {
+      voornaam: document.getElementById('edit-voornaam').value.trim(),
+      achternaam: document.getElementById('edit-achternaam').value.trim(),
+      email: email,
+      password: wachtwoord,
+      rol: document.getElementById('edit-rol').value,
+      status: document.getElementById('edit-status').value,
+      actionConfirmPin: actionConfirmPin
+    };
+    if (editAvatarMutation === 'cleared') {
+      patchBody.removeAvatar = true;
+    } else if (editAvatarMutation !== 'unchanged') {
+      patchBody.avatarDataUrl = editAvatarMutation;
+    }
     var payload = await fetchJson('/api/premium-users/' + encodeURIComponent(id), {
       method: 'PATCH',
-      body: JSON.stringify({
-        voornaam: document.getElementById('edit-voornaam').value.trim(),
-        achternaam: document.getElementById('edit-achternaam').value.trim(),
-        email: email,
-        password: wachtwoord,
-        rol: document.getElementById('edit-rol').value,
-        status: document.getElementById('edit-status').value,
-        actionConfirmPin: actionConfirmPin
-      })
+      body: JSON.stringify(patchBody)
     });
     team = Array.isArray(payload.users) ? payload.users : team;
     render();
