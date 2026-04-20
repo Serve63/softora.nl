@@ -371,9 +371,227 @@ body {
 
 .beheer-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
   margin-bottom: 32px;
+}
+
+.settings-lock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.settings-lock-btn:hover {
+  border-color: var(--crimson);
+  color: var(--crimson);
+}
+.settings-lock-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Pagina-PIN (zelfde flow als premium-wachtwoordenregister) */
+.settings-screen-pin {
+  width: 100%;
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-screen-pin[hidden] {
+  display: none !important;
+}
+.settings-pin-box {
+  position: relative;
+  overflow: hidden;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 44px 40px 40px;
+  width: min(400px, calc(100vw - 40px));
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 4px 6px rgba(17, 19, 34, 0.03), 0 22px 50px rgba(17, 19, 34, 0.08);
+}
+.settings-pin-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(139, 34, 82, 0.55), transparent);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.settings-pin-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.settings-pin-icon {
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(145deg, rgba(139, 34, 82, 0.1), rgba(139, 34, 82, 0.04));
+  border: 1px solid rgba(139, 34, 82, 0.12);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+.settings-pin-icon svg {
+  width: 22px;
+  height: 22px;
+  color: var(--crimson);
+  stroke-width: 1.65;
+}
+.settings-pin-eyebrow {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--crimson);
+  margin-bottom: 6px;
+}
+.settings-pin-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.28rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--text-dark);
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+.settings-pin-sub {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--text-mid);
+  margin-bottom: 22px;
+  text-align: center;
+  line-height: 1.5;
+  max-width: 300px;
+}
+.settings-pin-dots {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.025);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+.settings-pin-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid rgba(22, 25, 44, 0.12);
+  background: transparent;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.settings-pin-dot.filled {
+  background: var(--crimson);
+  border-color: var(--crimson);
+  transform: scale(1.12);
+  box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.12);
+}
+.settings-pin-dot.error {
+  background: var(--red);
+  border-color: var(--red);
+  animation: settings-pin-shake 0.3s ease;
+}
+.settings-pin-dot.success {
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: none;
+}
+@keyframes settings-pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+.settings-pin-numpad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(52px, 58px));
+  gap: 11px;
+  width: 100%;
+  max-width: 280px;
+}
+.settings-num-btn {
+  border: 1px solid rgba(22, 25, 44, 0.08);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  font-family: 'Inter', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease, transform 0.08s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  width: 100%;
+  height: 100%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.settings-num-btn:hover {
+  border-color: rgba(139, 34, 82, 0.22);
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(17, 19, 34, 0.07);
+  color: var(--crimson);
+}
+.settings-num-btn:active { transform: scale(0.96); }
+.settings-num-btn:focus-visible {
+  outline: 2px solid rgba(139, 34, 82, 0.35);
+  outline-offset: 2px;
+}
+.settings-num-btn-back,
+.settings-num-btn-clear {
+  color: var(--text-mid);
+}
+.settings-num-btn-back:hover,
+.settings-num-btn-clear:hover {
+  color: var(--crimson);
+}
+.settings-num-btn-back svg,
+.settings-num-btn-clear svg {
+  width: 20px;
+  height: 20px;
+}
+.settings-pin-msg {
+  font-size: 0.75rem;
+  color: var(--red);
+  margin-top: 14px;
+  min-height: 1.25em;
+  font-weight: 500;
+  text-align: center;
 }
 
 .beheer-title {
@@ -1521,6 +1739,43 @@ body {
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
 
 <main class="main is-premium-boot-host">
+  <div id="settings-screen-pin" class="settings-screen-pin" role="dialog" aria-modal="true" aria-labelledby="settings-pin-title">
+    <div class="settings-pin-box">
+      <div class="settings-pin-head">
+        <div class="settings-pin-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        <p class="settings-pin-eyebrow">Beveiligde toegang</p>
+        <h1 class="settings-pin-title" id="settings-pin-title">PIN invoeren</h1>
+        <p class="settings-pin-sub">Typ je zes cijfers. Daarna opent personeelsbeheer automatisch.</p>
+      </div>
+      <div class="settings-pin-dots" id="settings-pin-dots" role="status" aria-live="polite" aria-label="Voortgang PIN">
+        <div class="settings-pin-dot"></div><div class="settings-pin-dot"></div>
+        <div class="settings-pin-dot"></div><div class="settings-pin-dot"></div>
+        <div class="settings-pin-dot"></div><div class="settings-pin-dot"></div>
+      </div>
+      <div class="settings-pin-numpad">
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('1')">1</button>
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('2')">2</button>
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('3')">3</button>
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('4')">4</button>
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('5')">5</button>
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('6')">6</button>
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('7')">7</button>
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('8')">8</button>
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('9')">9</button>
+        <button type="button" class="settings-num-btn settings-num-btn-clear" onclick="settingsPagePinClear()" aria-label="Volledige PIN wissen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        </button>
+        <button type="button" class="settings-num-btn" onclick="settingsPagePinDigit('0')">0</button>
+        <button type="button" class="settings-num-btn settings-num-btn-back" onclick="settingsPagePinBack()" aria-label="Laatste cijfer wissen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+        </button>
+      </div>
+      <div class="settings-pin-msg" id="settings-pin-msg"></div>
+    </div>
+  </div>
+  <div id="settings-screen-app" hidden>
   <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
     <div class="premium-boot-spinner"></div>
   </div>
@@ -1547,6 +1802,10 @@ body {
         <div class="beheer-title">Personeelsbeheer</div>
         <div class="beheer-subtitle">Inloggegevens en toegangsrollen</div>
       </div>
+      <button type="button" class="settings-lock-btn magnetic" onclick="lockSettingsGate()" title="Opnieuw PIN invoeren" aria-label="Personeelsbeheer vergrendelen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        Vergrendelen
+      </button>
     </div>
 
     <div class="beheer-layout">
@@ -1578,6 +1837,7 @@ body {
         </div>
       </div>
     </div>
+  </div>
   </div>
   </div>
 </main>
@@ -1682,6 +1942,142 @@ body {
 
 <div class="toast" id="toast"></div>
 
+<script>
+(function () {
+  /* Zelfde demo-PIN als premium-wachtwoordenregister.html (client-side gate). */
+  var SETTINGS_PAGE_PIN = '123456';
+  var settingsPageInput = '';
+  var settingsPageAttempts = 0;
+  var settingsPageBlocked = false;
+
+  function settingsPagePinDots(state) {
+    document.querySelectorAll('#settings-pin-dots .settings-pin-dot').forEach(function (d, i) {
+      d.className = 'settings-pin-dot';
+      if (state) d.classList.add(state);
+      else if (i < settingsPageInput.length) d.classList.add('filled');
+    });
+  }
+
+  function settingsPagePinDigit(d) {
+    if (settingsPageBlocked || settingsPageInput.length >= 6) return;
+    settingsPageInput += d;
+    settingsPagePinDots();
+    if (settingsPageInput.length === 6) setTimeout(settingsPagePinCheck, 120);
+  }
+
+  window.settingsPagePinDigit = settingsPagePinDigit;
+
+  function settingsPagePinBack() {
+    if (!settingsPageBlocked) {
+      settingsPageInput = settingsPageInput.slice(0, -1);
+      settingsPagePinDots();
+    }
+  }
+  window.settingsPagePinBack = settingsPagePinBack;
+
+  function settingsPagePinClear() {
+    if (settingsPageBlocked) return;
+    settingsPageInput = '';
+    settingsPagePinDots();
+    var msg = document.getElementById('settings-pin-msg');
+    if (msg) msg.textContent = '';
+  }
+  window.settingsPagePinClear = settingsPagePinClear;
+
+  function settingsPagePinCheck() {
+    var msgEl = document.getElementById('settings-pin-msg');
+    if (settingsPageInput === SETTINGS_PAGE_PIN) {
+      settingsPagePinDots('success');
+      setTimeout(function () {
+        unlockSettingsApp();
+      }, 350);
+      return;
+    }
+    settingsPageAttempts += 1;
+    settingsPagePinDots('error');
+    setTimeout(function () {
+      settingsPageInput = '';
+      settingsPagePinDots();
+    }, 450);
+    if (settingsPageAttempts >= 5) {
+      settingsPageBlocked = true;
+      var s = 30;
+      if (msgEl) msgEl.textContent = 'Geblokkeerd — wacht ' + s + 's';
+      var t = setInterval(function () {
+        s -= 1;
+        if (s <= 0) {
+          clearInterval(t);
+          settingsPageBlocked = false;
+          settingsPageAttempts = 0;
+          if (msgEl) msgEl.textContent = '';
+        } else if (msgEl) {
+          msgEl.textContent = 'Geblokkeerd — wacht ' + s + 's';
+        }
+      }, 1000);
+    } else if (msgEl) {
+      var left = 5 - settingsPageAttempts;
+      msgEl.textContent = 'Onjuist — nog ' + left + ' poging' + (left !== 1 ? 'en' : '');
+    }
+  }
+
+  function unlockSettingsApp() {
+    var pinEl = document.getElementById('settings-screen-pin');
+    var appEl = document.getElementById('settings-screen-app');
+    if (pinEl) pinEl.hidden = true;
+    if (appEl) appEl.hidden = false;
+    settingsPageInput = '';
+    settingsPageAttempts = 0;
+    settingsPagePinDots();
+    var msg = document.getElementById('settings-pin-msg');
+    if (msg) msg.textContent = '';
+  }
+  window.unlockSettingsApp = unlockSettingsApp;
+
+  function lockSettingsGate() {
+    var pinEl = document.getElementById('settings-screen-pin');
+    var appEl = document.getElementById('settings-screen-app');
+    if (appEl) appEl.hidden = true;
+    if (pinEl) pinEl.hidden = false;
+    settingsPageInput = '';
+    settingsPageAttempts = 0;
+    settingsPageBlocked = false;
+    settingsPagePinDots();
+    var msg = document.getElementById('settings-pin-msg');
+    if (msg) msg.textContent = '';
+    if (typeof cancelAdminActionPin === 'function') {
+      try {
+        cancelAdminActionPin();
+      } catch (e) { /* ignore */ }
+    }
+    if (typeof closeOverlay === 'function') {
+      try {
+        closeOverlay('edit-overlay');
+        closeOverlay('confirm-overlay');
+      } catch (e) { /* ignore */ }
+    }
+  }
+  window.lockSettingsGate = lockSettingsGate;
+
+  document.addEventListener('keydown', function (e) {
+    var pinEl = document.getElementById('settings-screen-pin');
+    if (!pinEl || pinEl.hidden) return;
+    var adminOv = document.getElementById('admin-pin-overlay');
+    if (adminOv && adminOv.classList.contains('open')) return;
+    if (e.key >= '0' && e.key <= '9') {
+      e.preventDefault();
+      settingsPagePinDigit(e.key);
+    }
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      settingsPagePinBack();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      settingsPagePinClear();
+    }
+  });
+})();
+</script>
 <script src="assets/premium-user-management.js?v=20260420d" defer></script>
 <script>
 (function () {
