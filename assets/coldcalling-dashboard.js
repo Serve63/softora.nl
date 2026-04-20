@@ -7595,7 +7595,8 @@
 
     const dotsHost = byId('startCampaignPinDotsHost');
     dotsHost.style.cssText =
-      'display:flex;gap:10px;margin-bottom:24px;padding:10px 12px;border-radius:999px;background:rgba(0,0,0,0.025);border:1px solid rgba(0,0,0,0.05);justify-content:center;';
+      'display:flex;gap:10px;align-items:center;justify-content:center;width:fit-content;max-width:100%;' +
+      'margin:0 auto 24px;padding:10px 14px;border-radius:999px;background:rgba(0,0,0,0.025);border:1px solid rgba(0,0,0,0.05);';
 
     for (let i = 0; i < 6; i += 1) {
       const d = document.createElement('div');
