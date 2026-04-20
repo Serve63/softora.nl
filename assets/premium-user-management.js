@@ -54,6 +54,14 @@ function goTo(id) {
   }
 }
 
+function backToInstellingenOverzicht() {
+  try {
+    closeOverlay('edit-overlay');
+    closeOverlay('confirm-overlay');
+  } catch (e) { /* ignore */ }
+  goTo('screen-overzicht');
+}
+
 function renderAccessDenied() {
   document.getElementById('list-count').textContent = '';
   document.getElementById('tegel-count').textContent = 'Geen toegang';

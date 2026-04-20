@@ -414,6 +414,17 @@ main.main.is-premium-boot-host {
   height: 14px;
 }
 
+.beheer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.beheer-header-actions .settings-lock-btn {
+  margin-top: 0;
+}
+
 /* Pagina-PIN: fixed over het hoofdvlak (naast sidebar) zodat de kaart echt gecentreerd is */
 .settings-screen-pin {
   display: flex;
@@ -1857,10 +1868,16 @@ body {
         <div class="beheer-title">Personeelsbeheer</div>
         <div class="beheer-subtitle">Inloggegevens en toegangsrollen</div>
       </div>
-      <button type="button" class="settings-lock-btn magnetic" onclick="lockSettingsGate()" title="Opnieuw PIN invoeren" aria-label="Personeelsbeheer vergrendelen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-        Vergrendelen
-      </button>
+      <div class="beheer-header-actions">
+        <button type="button" class="settings-lock-btn magnetic" onclick="backToInstellingenOverzicht()" title="Terug naar instellingenoverzicht" aria-label="Terug naar instellingen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          Naar instellingen
+        </button>
+        <button type="button" class="settings-lock-btn magnetic" onclick="lockSettingsGate()" title="Opnieuw PIN invoeren" aria-label="Personeelsbeheer vergrendelen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          Vergrendelen
+        </button>
+      </div>
     </div>
 
     <div class="beheer-layout">
@@ -2196,7 +2213,7 @@ body {
   });
 })();
 </script>
-<script src="assets/premium-user-management.js?v=20260420e" defer></script>
+<script src="assets/premium-user-management.js?v=20260420f" defer></script>
 <script>
 (function () {
   function finishPremiumShellBoot() {
