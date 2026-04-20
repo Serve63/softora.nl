@@ -137,7 +137,10 @@ test('premium opdrachtdossier toont de pdf-knop rechtsboven en laat de pagina vo
   assert.doesNotMatch(source, /Uitvoerdossier voor uitvoering/);
   assert.doesNotMatch(source, /Dynamisch uitvoerdossier op basis van actuele opdrachtinformatie\./);
   assert.match(source, /\.dossier-wrap \{[\s\S]*align-items:\s*stretch;/);
-  assert.match(source, /\.page-toolbar \{[\s\S]*justify-content:\s*flex-end;[\s\S]*position:\s*sticky;[\s\S]*top:\s*0;/);
+  assert.match(
+    source,
+    /\.page-toolbar \{[\s\S]*justify-content:\s*flex-end;[\s\S]*background:\s*transparent;[\s\S]*backdrop-filter:\s*none;/
+  );
   assert.match(source, /\.toolbar-actions \{[\s\S]*justify-content:\s*flex-end;[\s\S]*margin-left:\s*auto;/);
   assert.match(source, /\.paper-stage \{[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/);
   assert.match(source, /\.dossier-page \{[\s\S]*position:\s*relative;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/);

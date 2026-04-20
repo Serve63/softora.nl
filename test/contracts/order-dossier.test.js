@@ -38,8 +38,8 @@ test('order dossier helpers build a concrete website prompt and preserve assigne
   assert.match(styledPrompt, /blauw-wit/i);
 
   assert.equal(fallback.documentTitle, 'Opdracht #7');
-  assert.equal(fallback.blocks[0].pairs[4].label, 'Aangewezen aan');
-  assert.equal(fallback.blocks[0].pairs[4].value, 'Servé');
+  assert.equal(fallback.blocks[0].pairs[2].label, 'Aangewezen aan');
+  assert.equal(fallback.blocks[0].pairs[2].value, 'Servé');
 });
 
 test('order dossier helpers preserve opusPrompt from AI layout when present', () => {

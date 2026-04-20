@@ -156,6 +156,9 @@ function createOrderDossierHelpers(deps = {}) {
     ) {
       return '';
     }
+    if (normalized === 'domein' || normalized === 'oplevertijd') {
+      return '';
+    }
     return normalized === 'geclaimd door' ? 'Aangewezen aan' : label;
   }
 
@@ -176,8 +179,6 @@ function createOrderDossierHelpers(deps = {}) {
           pairs: [
             { label: 'Bedrijf', value: input.company || '—' },
             { label: 'Contactpersoon', value: input.contact || '—' },
-            { label: 'Domein', value: input.domainName || '—' },
-            { label: 'Oplevertijd', value: input.deliveryTime || '—' },
             { label: 'Aangewezen aan', value: input.claimedBy || '—' },
             { label: 'Geclaimd op', value: input.claimedAt || '—' },
           ],

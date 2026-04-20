@@ -125,12 +125,11 @@
             align-items: center;
             justify-content: flex-end;
             gap: 0.75rem;
-            position: sticky;
-            top: 0;
-            z-index: 1;
-            padding: 0.1rem 0 0.25rem;
-            background: linear-gradient(180deg, rgba(238, 241, 245, 0.98), rgba(238, 241, 245, 0.82), rgba(238, 241, 245, 0));
-            backdrop-filter: blur(6px);
+            position: relative;
+            padding: 0.1rem 0 0.55rem;
+            background: transparent;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
         }
 
         .toolbar-meta {
@@ -343,10 +342,13 @@
             display: flex;
             align-items: flex-start;
             gap: 0.5rem;
+            width: 100%;
         }
 
         .top-row > div:first-child {
             min-width: 0;
+            max-width: 100%;
+            width: 100%;
             flex: 1 1 auto;
         }
 
@@ -359,16 +361,23 @@
             color: #838aa0;
         }
 
-        .title {
+        /* Hogere specificiteit + !important: voorkomt dat globale h1-regels nowrap/grootte afdwingen (o.a. print/PDF). */
+        .dossier-page h1.title {
             margin-top: 0.24rem;
             font-family: 'Oswald', sans-serif;
-            font-size: clamp(1.8rem, 3.2vw, 2.9rem);
-            line-height: 1.04;
+            font-size: clamp(0.92rem, 0.65vw + 0.72rem, 1.28rem);
+            line-height: 1.18;
             letter-spacing: 0.02em;
             text-transform: uppercase;
             color: #171b2f;
+            width: 100%;
             max-width: 100%;
-            white-space: nowrap;
+            min-width: 0;
+            box-sizing: border-box;
+            white-space: normal !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            hyphens: none;
         }
 
         .subtitle {
@@ -718,10 +727,14 @@
                 print-color-adjust: exact;
             }
 
-            .title {
-                font-size: 1.5rem !important;
-                max-width: none !important;
-                white-space: nowrap;
+            .dossier-page h1.title {
+                font-size: 10pt !important;
+                line-height: 1.22 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                white-space: normal !important;
+                overflow-wrap: break-word !important;
+                word-break: break-word !important;
             }
 
             .subtitle {
@@ -823,8 +836,7 @@
                             <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
                         </div>
                         <div class="loading-eyebrow">Uitvoerdossier</div>
-                        <div class="loading-title">Even geduld</div>
-                        <p class="loading-copy">Opdrachtgegevens worden geladen en voor je klaargezet.</p>
+                        <div class="loading-title">Uitvoerdossier wordt geladen…</div>
                     </div>
                 </div>
             </div>
@@ -838,6 +850,7 @@
             const ORDER_RUNTIME_KEY = 'softora_order_runtime_premium_v1';
             const DOSSIER_CACHE_KEY = 'softora_order_dossier_cache_v1';
             const DOSSIER_LAYOUT_SCHEMA_VERSION = '20260417a';
+            const DOSSIER_LOADING_TITLE = 'Uitvoerdossier wordt geladen…';
             const root = document.getElementById('dossierRoot');
 
             function esc(value) {
@@ -1037,7 +1050,7 @@
                                 <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
                             </div>
                             <div class="loading-eyebrow">Uitvoerdossier</div>
-                            <div class="loading-title">${esc(title || 'Even geduld')}</div>
+                            <div class="loading-title">${esc(title || DOSSIER_LOADING_TITLE)}</div>
                             ${description ? `<p class="loading-copy">${esc(description)}</p>` : ''}
                         </div>
                     </div>
@@ -1142,6 +1155,7 @@
                     .replace(/\s+/g, ' ')
                     .trim();
                 if (normalized === 'accounthouder softora' || normalized === 'softora contactpersoon') return '';
+                if (normalized === 'domein' || normalized === 'oplevertijd') return '';
                 return normalized === 'geclaimd door' ? 'Aangewezen aan' : label;
             }
 
@@ -1160,8 +1174,6 @@
                             pairs: [
                                 { label: 'Bedrijf', value: baseData.company || '—' },
                                 { label: 'Contactpersoon', value: baseData.contact || '—' },
-                                { label: 'Domein', value: baseData.domainName || '—' },
-                                { label: 'Oplevertijd', value: baseData.deliveryTime || '—' },
                                 { label: 'Aangewezen aan', value: baseData.claimedBy || '—' },
                                 { label: 'Geclaimd op', value: formatDateTime(baseData.claimedAt) },
                             ],
@@ -1447,7 +1459,7 @@
                     return;
                 }
 
-                renderLoading('Uitvoerdossier laden');
+                renderLoading(DOSSIER_LOADING_TITLE);
                 const values = await fetchUiStateValues(REMOTE_SCOPE);
                 const customOrders = safeJsonParse(values?.[CUSTOM_ORDERS_KEY], []);
                 const runtimeMap = safeJsonParse(values?.[ORDER_RUNTIME_KEY], {});
@@ -1479,10 +1491,7 @@
                     }
                     return;
                 }
-                renderLoading(
-                    'Dossier wordt geladen...',
-                    ''
-                );
+                renderLoading(DOSSIER_LOADING_TITLE);
 
                 let layoutResponse = null;
                 try {
