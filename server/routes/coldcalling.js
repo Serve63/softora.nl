@@ -1,4 +1,5 @@
 const express = require('express');
+const { validateColdcallingStartConfirmPin } = require('../security/coldcalling-start-confirm-pin');
 
 const DEFAULT_RETELL_ESTIMATED_COST_PER_MINUTE_USD = 0.07;
 const DEFAULT_USD_TO_EUR_RATE = 0.92;
@@ -271,6 +272,11 @@ function registerColdcallingRoutes(app, deps) {
     const validated = deps.validateStartPayload(req.body);
     if (validated.error) {
       return res.status(400).json({ ok: false, error: validated.error });
+    }
+
+    const pinCheck = validateColdcallingStartConfirmPin(req.body);
+    if (!pinCheck.ok) {
+      return res.status(403).json({ ok: false, error: pinCheck.error });
     }
 
     const { campaign, leads } = validated;

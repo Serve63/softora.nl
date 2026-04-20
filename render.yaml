@@ -19,6 +19,8 @@ services:
         sync: false
       - key: WEBHOOK_SECRET
         sync: false
+      - key: COLDCALLING_START_CONFIRM_PIN
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY

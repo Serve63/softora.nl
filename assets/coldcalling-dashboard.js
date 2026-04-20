@@ -19,6 +19,7 @@
   let isPollingSequentialClientDirectStatus = false;
   let statusMessageHideTimer = null;
   let activeSequentialClientDispatch = null;
+  let pendingStartConfirmPin = '';
   const defaultLaunchBtnHtml = launchBtn.innerHTML;
   const TEST_LEAD_STORAGE_KEY = 'softora_coldcalling_test_lead_phone';
   const LEAD_ROWS_STORAGE_KEY = 'softora_coldcalling_lead_rows_json';
@@ -7216,6 +7217,7 @@
           amount: 1,
         },
         leads: [lead],
+        startConfirmPin: String(run.confirmPin || '').trim(),
       }),
     });
 
@@ -7552,6 +7554,111 @@
     }
   }
 
+  function ensureStartCampaignConfirmModal() {
+    let overlay = byId('startCampaignConfirmOverlay');
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'startCampaignConfirmOverlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'startCampaignConfirmTitle');
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(8,10,16,0.72);display:none;align-items:center;justify-content:center;padding:16px;z-index:10050';
+
+    overlay.innerHTML = [
+      '<div id="startCampaignConfirmCard" style="width:min(420px,100%);border-radius:14px;border:1px solid #c7c9cc;background:#fff;',
+      'box-shadow:0 20px 80px rgba(0,0,0,0.45);color:#202124;padding:1.5rem 1.35rem;font-family:Inter,system-ui,sans-serif;">',
+      '  <h2 id="startCampaignConfirmTitle" style="margin:0 0 0.35rem;font-size:1.35rem;font-weight:700;color:#111;">Campagne starten</h2>',
+      '  <p style="margin:0 0 1rem;font-size:0.92rem;line-height:1.45;color:#5f6368;">Vul je pincode in en klik op <strong>Bevestigen</strong> om coldcalling te starten.</p>',
+      '  <div id="startCampaignPinError" style="display:none;margin:0 0 0.75rem;font-size:0.86rem;color:#b3261e;"></div>',
+      '  <label for="startCampaignPinInput" style="display:block;font-size:0.75rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#5f6368;margin-bottom:0.35rem;">Pincode</label>',
+      '  <input id="startCampaignPinInput" type="password" maxlength="64" autocomplete="off" inputmode="numeric" class="magnetic" style="width:100%;box-sizing:border-box;padding:0.7rem 0.85rem;border-radius:8px;border:1px solid #dadce0;font-size:1rem;margin-bottom:1.1rem;" />',
+      '  <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">',
+      '    <button type="button" id="startCampaignConfirmCancel" class="magnetic" style="padding:0.65rem 1.2rem;border-radius:999px;border:1px solid #dadce0;background:#fff;color:#202124;font-weight:600;cursor:pointer;">Annuleren</button>',
+      '    <button type="button" id="startCampaignConfirmOk" class="magnetic" style="padding:0.65rem 1.2rem;border-radius:999px;border:none;background:#8b2252;color:#fff;font-weight:700;cursor:pointer;">Bevestigen</button>',
+      '  </div>',
+      '</div>',
+    ].join('');
+
+    document.body.appendChild(overlay);
+
+    const pinInput = byId('startCampaignPinInput');
+    const errEl = byId('startCampaignPinError');
+    const cancelBtn = byId('startCampaignConfirmCancel');
+    const okBtn = byId('startCampaignConfirmOk');
+
+    function setPinError(msg) {
+      if (!errEl) return;
+      if (!msg) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+        return;
+      }
+      errEl.style.display = 'block';
+      errEl.textContent = msg;
+    }
+
+    function closeOverlay() {
+      overlay.style.display = 'none';
+      setPinError('');
+      if (pinInput) pinInput.value = '';
+    }
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeOverlay();
+    });
+
+    cancelBtn.addEventListener('click', () => closeOverlay());
+
+    okBtn.addEventListener('click', () => {
+      setPinError('');
+      pendingStartConfirmPin = String(pinInput?.value || '').trim();
+      closeOverlay();
+      void startCampaignRequest();
+    });
+
+    pinInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        okBtn.click();
+      }
+    });
+
+    document.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key === 'Escape' && overlay.style.display !== 'none') {
+          e.preventDefault();
+          closeOverlay();
+        }
+      },
+      true
+    );
+
+    overlay.openStartCampaignConfirmModal = function openStartCampaignConfirmModalImpl() {
+      setPinError('');
+      if (pinInput) pinInput.value = '';
+      overlay.style.display = 'flex';
+      window.setTimeout(() => pinInput?.focus(), 10);
+    };
+
+    return overlay;
+  }
+
+  function openStartCampaignConfirmModal() {
+    if (isSubmitting) return;
+    if (activeSequentialClientDispatch && !activeSequentialClientDispatch.completed) {
+      setStatusPill('loading', '1 voor 1 actief');
+      setStatusMessage('loading', 'Er loopt al een 1 voor 1 campagne. Wacht tot deze klaar is.');
+      return;
+    }
+    const overlay = ensureStartCampaignConfirmModal();
+    if (overlay && typeof overlay.openStartCampaignConfirmModal === 'function') {
+      overlay.openStartCampaignConfirmModal();
+    }
+  }
+
   async function startCampaignRequest() {
     if (isSubmitting) return;
     if (activeSequentialClientDispatch && !activeSequentialClientDispatch.completed) {
@@ -7561,6 +7668,9 @@
     }
 
     try {
+      const startConfirmPin = String(pendingStartConfirmPin ?? '').trim();
+      pendingStartConfirmPin = '';
+
       const stateSaveResult = await persistRemoteUiStateNow();
       if (!stateSaveResult?.ok || String(stateSaveResult?.source || '').trim() !== 'supabase') {
         throw new Error(
@@ -7631,6 +7741,7 @@
           currentLeadIndex: -1,
           isAdvancing: false,
           completed: false,
+          confirmPin: startConfirmPin,
         };
 
         setStatusPill('loading', '1 voor 1 actief');
@@ -7648,6 +7759,7 @@
         body: JSON.stringify({
           campaign,
           leads,
+          startConfirmPin,
         }),
       });
 
@@ -7715,9 +7827,9 @@
     }
   }
 
-  // Overschrijf bestaande demo-functie uit de pagina zodat de knop de backend aanroept.
+  // Overschrijf bestaande demo-functie uit de pagina: eerst pin-bevestiging, daarna backend-start.
   window.toggleCampaign = function toggleCampaignColdcalling() {
-    void startCampaignRequest();
+    openStartCampaignConfirmModal();
   };
 
   async function bootstrapColdcallingUi() {
