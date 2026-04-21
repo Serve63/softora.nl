@@ -637,6 +637,40 @@
         });
     }
 
+    let premiumSidebarFitFrame = 0;
+
+    function applyPremiumSidebarFit(sidebar) {
+        if (!sidebar || typeof sidebar.classList === "undefined") return;
+        sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
+        if (window.innerWidth <= 900) {
+            return;
+        }
+        if (sidebar.scrollHeight <= sidebar.clientHeight + 1) {
+            return;
+        }
+        sidebar.classList.add("sidebar-fit-compact");
+        if (sidebar.scrollHeight <= sidebar.clientHeight + 1) {
+            return;
+        }
+        sidebar.classList.add("sidebar-fit-tight");
+    }
+
+    function schedulePremiumSidebarFit(sidebar) {
+        const targetSidebar = sidebar || document.querySelector(".sidebar");
+        if (!targetSidebar) return;
+        if (premiumSidebarFitFrame) {
+            cancelAnimationFrame(premiumSidebarFitFrame);
+        }
+        premiumSidebarFitFrame = requestAnimationFrame(function () {
+            premiumSidebarFitFrame = 0;
+            applyPremiumSidebarFit(targetSidebar);
+        });
+    }
+
+    window.addEventListener("resize", function () {
+        schedulePremiumSidebarFit();
+    }, { passive: true });
+
     function buildUnifiedPremiumSidebarHtml(activeKey) {
         const overviewLinks = [
             {
@@ -956,6 +990,7 @@
         if (!sidebar) return;
         if (!premiumInitialSessionFetched && session == null) {
             syncStaticSidebarActiveState(sidebar, activeKey);
+            schedulePremiumSidebarFit(sidebar);
             return;
         }
         const allowAdminOnlyLinks = isPremiumAdminSession(session);
@@ -974,6 +1009,7 @@
             );
         });
         syncStaticSidebarActiveState(sidebar, activeKey);
+        schedulePremiumSidebarFit(sidebar);
     }
 
     function refreshPremiumStaticSidebarActiveState() {
@@ -989,6 +1025,7 @@
             pruneDeprecatedSidebarLinks(sidebar);
             decorateComingSoonSidebarLinks();
             neutralizeSidebarAnchors();
+            schedulePremiumSidebarFit(sidebar);
             return;
         }
         if (path.indexOf("/premium-advertenties") === 0) {
@@ -998,6 +1035,7 @@
             pruneDeprecatedSidebarLinks(sidebar);
             decorateComingSoonSidebarLinks();
             neutralizeSidebarAnchors();
+            schedulePremiumSidebarFit(sidebar);
         }
     }
 
@@ -1014,6 +1052,7 @@
             decorateComingSoonSidebarLinks();
             neutralizeSidebarAnchors();
             sidebar.dataset.sidebarReady = "true";
+            schedulePremiumSidebarFit(sidebar);
             return;
         }
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
@@ -1025,6 +1064,7 @@
         decorateComingSoonSidebarLinks();
         neutralizeSidebarAnchors();
         sidebar.dataset.sidebarReady = "true";
+        schedulePremiumSidebarFit(sidebar);
     }
 
     function mergeSidebarCountState() {
