@@ -104,12 +104,12 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   cursor: pointer;
   transition: all .18s;
   position: relative;
   overflow: visible;
-  min-height: 148px;
+  min-height: 94px;
   z-index: 0;
 }
 .zone-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
@@ -119,14 +119,16 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .zone-card.z5::before { background: var(--z5); }
 .zone-card.conv-card::before { background: var(--crimson); }
 .zone-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.06); transform: translateY(-1px); z-index: 8; }
-.zone-badge { font-size: 8px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; margin-bottom: 10px; display: inline-block; padding: 2px 7px; border-radius: 999px; }
+.zone-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.zone-stat { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.zone-badge { font-size: 8px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; display: inline-block; padding: 2px 7px; border-radius: 999px; flex-shrink: 0; }
 .z1 .zone-badge { background: rgba(26,95,138,.1); color: var(--z1); }
 .z2 .zone-badge { background: rgba(180,90,0,.1); color: var(--z2); }
 .z4 .zone-badge { background: rgba(123,63,160,.1); color: var(--z4); }
 .z5 .zone-badge { background: rgba(22,115,60,.1); color: var(--z5); }
 .conv-card .zone-badge { background: rgba(155,35,85,.1); color: var(--crimson); }
-.zone-count { font-family: 'Oswald', sans-serif; font-size: 30px; font-weight: 700; line-height: 1; color: var(--dark); margin-top: 18px; }
-.zone-arrow { position: absolute; bottom: 14px; right: 14px; color: #e7e1d8; transition: color .15s; transform: scale(.8); }
+.zone-count { font-family: 'Oswald', sans-serif; font-size: 26px; font-weight: 700; line-height: 1; color: var(--dark); flex-shrink: 0; }
+.zone-arrow { color: #e7e1d8; transition: color .15s; transform: scale(.8); flex-shrink: 0; }
 .zone-card:hover .zone-arrow { color: var(--crimson); }
 .conv-card { cursor: default; }
 .conv-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.06); transform: none; }
@@ -448,32 +450,52 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   <!-- ZONE KAARTEN -->
     <div class="zones-row">
       <div class="zone-card z1" onclick="openZone(1)">
-        <div class="zone-badge">Zone 1</div>
-        <div class="zone-count" id="z1-count">0</div>
+        <div class="zone-head">
+          <div class="zone-stat">
+            <div class="zone-badge">Zone 1</div>
+            <div class="zone-count" id="z1-count">0</div>
+          </div>
+          <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
         <div class="zone-tooltip">Alle bedrijven die de eerste mail hebben ontvangen.</div>
-        <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
       </div>
       <div class="zone-card z2" onclick="openZone(2)">
-        <div class="zone-badge">Zone 2</div>
-        <div class="zone-count" id="z2-count">0</div>
+        <div class="zone-head">
+          <div class="zone-stat">
+            <div class="zone-badge">Zone 2</div>
+            <div class="zone-count" id="z2-count">0</div>
+          </div>
+          <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
         <div class="zone-tooltip">Bedrijven die een follow-up mail hebben ontvangen.</div>
-        <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
       </div>
       <div class="zone-card z4" onclick="openZone(4)">
-        <div class="zone-badge">Zone 4</div>
-        <div class="zone-count" id="z4-count">0</div>
+        <div class="zone-head">
+          <div class="zone-stat">
+            <div class="zone-badge">Zone 4</div>
+            <div class="zone-count" id="z4-count">0</div>
+          </div>
+          <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
         <div class="zone-tooltip">Bedrijven die meer dan 3 mails hebben ontvangen.</div>
-        <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
       </div>
       <div class="zone-card z5" onclick="openZone(5)">
-        <div class="zone-badge">Zone 5</div>
-        <div class="zone-count" id="z5-count">0</div>
+        <div class="zone-head">
+          <div class="zone-stat">
+            <div class="zone-badge">Zone 5</div>
+            <div class="zone-count" id="z5-count">0</div>
+          </div>
+          <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
         <div class="zone-tooltip">Bedrijven die een afspraak hebben ingepland.</div>
-        <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
       </div>
       <div class="zone-card conv-card">
-        <div class="zone-badge">Conversie</div>
-        <div class="zone-count" id="conv-zone-pct">0%</div>
+        <div class="zone-head">
+          <div class="zone-stat">
+            <div class="zone-badge">Conversie</div>
+            <div class="zone-count" id="conv-zone-pct">0%</div>
+          </div>
+        </div>
         <div class="zone-tooltip">Afspraken als percentage van alle verstuurde mails.</div>
       </div>
     </div>
