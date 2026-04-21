@@ -16,6 +16,7 @@ const PREMIUM_PUBLIC_HTML_FILE_NAMES = Object.freeze([
   'premium-pakketten.html',
   'premium-seo.html',
   'premium-bevestigingsmails.html',
+  'premium-websitegenerator.html',
   'premium-wachtwoordenregister.html',
 ]);
 
