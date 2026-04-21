@@ -36,32 +36,41 @@
   --z1: #1a5f8a; --z2: #b45a00; --z3: #9b2355; --z4: #7b3fa0;
   --z5: #16733c;
 }
-body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; }
+body { font-family: 'Inter', sans-serif; background-color: #080808; color: var(--dark); min-height: 100vh; line-height: 1.6; overflow-x: hidden; }
 .dashboard-layout { display: flex; min-height: 100vh; }
-.main-content { flex: 1; min-width: 0; margin-left: 280px; }
+.main-content { flex: 1; min-width: 0; margin-left: 280px; padding: 3rem 3rem 1.8rem; }
 
 /* ── SCHERMEN ── */
 .screen { display: none; }
 .screen.active { display: block; }
 
 /* ── DASHBOARD ── */
-#screen-dashboard { padding: 36px 48px 60px; }
-.page-header {
-  margin-bottom: 24px;
+#screen-dashboard { padding: 0; }
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
 }
-.page-header h1 {
+.topbar-left h1 {
   font-family: 'Oswald', sans-serif;
-  font-size: 34px;
-  font-weight: 600;
+  font-size: 2rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: 0.02em;
   line-height: 1;
-  color: var(--dark);
-  margin-bottom: 6px;
+  color: #f5f5f5;
+  margin-bottom: 0.3rem;
 }
-.page-header p {
-  font-size: 14px;
-  color: var(--mid);
+.topbar-left p {
+  color: #888;
+  font-size: 0.9rem;
+  font-weight: 300;
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 .page-section {
   background: var(--card);
@@ -134,7 +143,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--crimson); cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
 .slider-row { display: flex; justify-content: space-between; font-size: 10px; color: var(--light); margin-top: 4px; }
 
-.sel { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--dark); background: var(--bg); outline: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; transition: border-color .15s; }
+.sel { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--dark); background: var(--bg); outline: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; transition: border-color .15s; }
 .sel:focus { border-color: var(--crimson); outline: none; }
 
 .btn-start { width: 100%; padding: 13px; background: var(--crimson); color: #fff; border: none; border-radius: 6px; font-family: 'Oswald', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: background .15s; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; }
@@ -151,7 +160,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 
 /* FILTERS */
 .filter-bar { padding: 14px 48px; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
-.filter-inp { padding: 8px 14px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--dark); background: var(--card); outline: none; width: 240px; transition: border-color .15s; }
+.filter-inp { padding: 8px 14px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--dark); background: var(--card); outline: none; width: 240px; transition: border-color .15s; }
 .filter-inp:focus { border-color: var(--crimson); }
 .filter-count { font-size: 12px; color: var(--light); margin-left: auto; }
 
@@ -199,11 +208,11 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 .mf-row { margin-bottom: 14px; }
 .mf-row:last-child { margin-bottom: 0; }
 .mf-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); margin-bottom: 6px; }
-.mf-inp { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--dark); background: var(--bg); outline: none; transition: border-color .15s; }
+.mf-inp { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--dark); background: var(--bg); outline: none; transition: border-color .15s; }
 .mf-inp:focus { border-color: var(--crimson); }
-.mf-ta { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--dark); background: var(--bg); outline: none; resize: vertical; min-height: 180px; line-height: 1.7; transition: border-color .15s; }
+.mf-ta { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--dark); background: var(--bg); outline: none; resize: vertical; min-height: 180px; line-height: 1.7; transition: border-color .15s; }
 .mf-ta:focus { border-color: var(--crimson); }
-.mf-sel { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--dark); background: var(--bg); outline: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; }
+.mf-sel { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--dark); background: var(--bg); outline: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; }
 .var-tag { font-size: 11px; font-family: 'Oswald', sans-serif; font-weight: 500; letter-spacing: .5px; color: var(--crimson); background: rgba(155,35,85,.08); border: 1px solid rgba(155,35,85,.2); padding: 3px 9px; border-radius: 4px; cursor: default; }
 
 /* ZONE POPUP */
@@ -227,7 +236,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 .toast.show { opacity: 1; transform: translateY(0); }
 
 @media (max-width: 1024px) {
-  .main-content { margin-left: 0; }
+  .main-content { margin-left: 0; padding: 1.5rem; }
 }
 </style>
 </head>
@@ -284,9 +293,12 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 
 <!-- ══ SCHERM 1: DASHBOARD ══ -->
 <div class="screen active" id="screen-dashboard">
-  <div class="page-header">
+  <div class="topbar">
+    <div class="topbar-left">
     <h1>Coldmailing</h1>
     <p>Beheer je coldmailingcampagnes, mailinhoud en voortgang op één plek.</p>
+    </div>
+    <div class="topbar-right"></div>
   </div>
   <div class="page-section">
     <div class="page-section-inner">
@@ -294,15 +306,15 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px 24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;align-items:center;margin-bottom:14px" id="conversie-blok">
       <div style="padding-right:24px;border-right:1px solid var(--border)">
         <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--light);margin-bottom:6px">Totaal verstuurd</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:800;line-height:1;color:var(--dark)" id="conv-totaal">0</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:36px;font-weight:700;line-height:1;color:var(--dark)" id="conv-totaal">0</div>
       </div>
       <div style="padding:0 24px;border-right:1px solid var(--border)">
         <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--light);margin-bottom:6px">Afspraken</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:800;line-height:1;color:var(--green)" id="conv-afspraken">0</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:36px;font-weight:700;line-height:1;color:var(--green)" id="conv-afspraken">0</div>
       </div>
       <div style="padding:0 24px;border-right:1px solid var(--border)">
         <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--light);margin-bottom:6px">Conversie</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:800;line-height:1;color:var(--crimson)" id="conv-pct">0%</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:36px;font-weight:700;line-height:1;color:var(--crimson)" id="conv-pct">0%</div>
       </div>
 
     </div>
