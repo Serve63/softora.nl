@@ -60,17 +60,10 @@ test('premium websitegenerator trimt lege witte randen uit gegenereerde previews
   const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
-  assert.match(source, /async function trimPreviewImageDataUrl\(dataUrl\)/);
-  assert.match(source, /isPreviewWhitespaceColumn/);
-  assert.match(source, /isPreviewWhitespaceRow/);
-  assert.match(source, /samplePreviewEdgeReference/);
-  assert.match(source, /measurePreviewEdgeGutterWidth/);
-  assert.match(source, /hasPreviewEdgeBreak/);
-  assert.match(source, /getPreviewColumnActivity/);
-  assert.match(source, /measurePreviewLowActivityRun/);
-  assert.match(source, /hasPreviewActivityBreak/);
-  assert.match(source, /window\._lastPreviewImageDataUrl = normalizedImageDataUrl/);
-  assert.match(source, /await trimPreviewImageDataUrl\(imageDataUrl\)\.catch\(\(\) => imageDataUrl\)/);
-  assert.match(source, /normalizedContext\.drawImage\(canvas, 0, 0, trimmedWidth, height, 0, 0, width, height\)/);
-  assert.match(source, /object-position:left top/);
+  assert.match(source, /const WEBSITE_PREVIEW_IMAGE_WIDTH = 1536;/);
+  assert.match(source, /const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1024;/);
+  assert.match(source, /scaleX = Math\.min\(\(window\.innerWidth - 100\) \/ WEBSITE_PREVIEW_IMAGE_WIDTH, 0\.78\)/);
+  assert.match(source, /frameH = Math\.round\(WEBSITE_PREVIEW_IMAGE_HEIGHT \* scaleX\)/);
+  assert.match(source, /width:\$\{WEBSITE_PREVIEW_IMAGE_WIDTH\}px;height:\$\{WEBSITE_PREVIEW_IMAGE_HEIGHT\}px/);
+  assert.match(source, /window\._lastPreviewImageDataUrl = imageDataUrl/);
 });
