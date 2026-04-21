@@ -1377,7 +1377,7 @@ function updateCampaignScreen(step) {
   document.getElementById('campaign-metric-zone5').textContent = step.counts[5];
   document.getElementById('campaign-metric-conv').textContent = `${conversion}%`;
   document.getElementById('campaign-live-text').innerHTML = `<strong>${step.title}.</strong> ${step.liveText}`;
-  document.getElementById('campaign-primary-btn').textContent = campaignFinished ? 'Terug naar overzicht' : 'Campagne stoppen';
+  document.getElementById('campaign-primary-btn').textContent = campaignFinished ? 'Campagne afronden' : 'Campagne stoppen';
 }
 
 function completeCampaign() {
@@ -1448,7 +1448,7 @@ function stopCampagne() {
     document.getElementById('campaign-progress-pill').textContent = 'Handmatig gestopt';
     document.getElementById('campaign-progress-footer-right').textContent = 'Campagne gestopt';
     document.getElementById('campaign-live-text').innerHTML = '<strong>Campagne gestopt.</strong> De huidige stand blijft bewaard in de zones.';
-    document.getElementById('campaign-primary-btn').textContent = 'Terug naar overzicht';
+    document.getElementById('campaign-primary-btn').textContent = 'Campagne afronden';
     showToast('Campagne gestopt');
   }
 

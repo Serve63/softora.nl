@@ -68,3 +68,11 @@ test('premium bevestigingsmails renders the zone cards as a separate strip above
   assert.match(pageSource, /\.generator-grid > \.panel-zone-strip\s*\{[\s\S]*padding:\s*0;/);
   assert.doesNotMatch(pageSource, /\.generator-grid > \.panel\s*\{[\s\S]*border-top:\s*none;/);
 });
+
+test('premium bevestigingsmails gebruikt Campagne afronden als eindlabel van de tijdlijn', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /'Campagne afronden'/);
+  assert.doesNotMatch(pageSource, /Terug naar overzicht/);
+});
