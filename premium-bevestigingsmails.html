@@ -339,8 +339,10 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .mail-tab.ai-tab.active { background: rgba(155,35,85,.08); border-color: rgba(155,35,85,.24); color: var(--crimson); }
 .mail-tab.ai-tab { color: var(--crimson); border-color: rgba(155,35,85,.3); }
 .mail-tab-group { display:flex; gap:6px; align-items:center; }
-.mail-icon-tab { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--crimson); border-color: rgba(155,35,85,.3); }
-.mail-icon-tab svg { width: 14px; height: 14px; }
+.mail-icon-tab,
+.mail-icon-tab:hover,
+.mail-icon-tab.active { width: auto; height: auto; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--crimson); border-color: transparent; background: transparent; box-shadow: none; }
+.mail-icon-tab svg { width: 18px; height: 18px; }
 .mail-panel { display: none; }
 .mail-panel.active { display: block; }
 .mail-fields { padding: 18px 20px; display: flex; flex-direction: column; }
