@@ -681,11 +681,11 @@
                 label: "Coldmailing",
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
             },
+            getDatabaseSidebarLink(),
         ];
 
         const managementLinks = [
             getCustomersSidebarLink(),
-            getDatabaseSidebarLink(),
             {
                 key: "mailbox",
                 href: "/premium-mailbox",
@@ -827,18 +827,13 @@
 
     function ensureStaticSidebarLink(sidebar, sectionLabel, link, insertBeforeKeys) {
         if (!sidebar || !link || typeof sidebar.querySelector !== "function") return null;
-        const existing = sidebar.querySelector(`[data-sidebar-key="${link.key}"]`);
-        if (existing) return existing;
         const sections = Array.from(sidebar.querySelectorAll(".sidebar-section"));
         const targetSection = sections.find(function (section) {
             const label = section.querySelector(".sidebar-section-label");
             return String(label && label.textContent || "").trim().toLowerCase() === String(sectionLabel || "").trim().toLowerCase();
         });
         if (!targetSection) return null;
-        const template = document.createElement("template");
-        template.innerHTML = renderSidebarLink(link, "");
-        const nextLink = template.content.firstElementChild;
-        if (!nextLink) return null;
+        const existing = sidebar.querySelector(`[data-sidebar-key="${link.key}"]`);
         const beforeEl = Array.isArray(insertBeforeKeys)
             ? insertBeforeKeys
                 .map(function (key) {
@@ -846,6 +841,20 @@
                 })
                 .find(Boolean)
             : null;
+        if (existing) {
+            if (existing.parentNode !== targetSection) {
+                if (beforeEl && beforeEl !== existing && beforeEl.parentNode === targetSection) {
+                    targetSection.insertBefore(existing, beforeEl);
+                } else {
+                    targetSection.appendChild(existing);
+                }
+            }
+            return existing;
+        }
+        const template = document.createElement("template");
+        template.innerHTML = renderSidebarLink(link, "");
+        const nextLink = template.content.firstElementChild;
+        if (!nextLink) return null;
         if (beforeEl && beforeEl.parentNode === targetSection) {
             targetSection.insertBefore(nextLink, beforeEl);
         } else {
@@ -877,13 +886,19 @@
     function syncPremiumSidebarManagementLinks(sidebar, activeKey) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         const sections = Array.from(sidebar.querySelectorAll(".sidebar-section"));
+        const overviewSection = sections.find(function (section) {
+            const label = section.querySelector(".sidebar-section-label");
+            return String(label && label.textContent || "").trim().toLowerCase() === "overzicht";
+        });
         const managementSection = sections.find(function (section) {
             const label = section.querySelector(".sidebar-section-label");
             return String(label && label.textContent || "").trim().toLowerCase() === "beheer";
         });
-        if (!managementSection) return;
+        if (!overviewSection && !managementSection) return;
 
-        const legacyDatabaseLink = managementSection.querySelector('[data-sidebar-key="customers"]');
+        const legacyDatabaseLink = managementSection
+            ? managementSection.querySelector('[data-sidebar-key="customers"]')
+            : null;
         if (
             legacyDatabaseLink &&
             String(legacyDatabaseLink.textContent || "").trim().toLowerCase() === "database"
@@ -891,29 +906,40 @@
             resetStaticSidebarLink(legacyDatabaseLink, getDatabaseSidebarLink());
         }
 
-        const customerLink = managementSection.querySelector('[data-sidebar-key="customers"]');
+        const customerLink = managementSection
+            ? managementSection.querySelector('[data-sidebar-key="customers"]')
+            : null;
         if (customerLink) {
             resetStaticSidebarLink(customerLink, getCustomersSidebarLink());
         }
 
-        ensureStaticSidebarLink(
-            sidebar,
-            "beheer",
-            getCustomersSidebarLink(),
-            ["database", "mailbox", "websitegenerator", "seo", "packages", "pdfs"]
-        );
-
-        const databaseLink = managementSection.querySelector('[data-sidebar-key="database"]');
-        if (databaseLink) {
-            resetStaticSidebarLink(databaseLink, getDatabaseSidebarLink());
+        if (managementSection) {
+            ensureStaticSidebarLink(
+                sidebar,
+                "beheer",
+                getCustomersSidebarLink(),
+                ["mailbox", "websitegenerator", "seo", "packages", "pdfs"]
+            );
         }
 
-        ensureStaticSidebarLink(
-            sidebar,
-            "beheer",
-            getDatabaseSidebarLink(),
-            ["mailbox", "websitegenerator", "seo", "packages", "pdfs"]
-        );
+        if (overviewSection) {
+            const overviewDatabaseLink = ensureStaticSidebarLink(
+                sidebar,
+                "overzicht",
+                getDatabaseSidebarLink()
+            );
+            if (overviewDatabaseLink) {
+                resetStaticSidebarLink(overviewDatabaseLink, getDatabaseSidebarLink());
+            }
+        }
+
+        if (managementSection) {
+            managementSection.querySelectorAll('[data-sidebar-key="database"]').forEach(function (link) {
+                if (link && link.parentNode) {
+                    link.parentNode.removeChild(link);
+                }
+            });
+        }
 
         syncStaticSidebarActiveState(sidebar, activeKey);
     }
