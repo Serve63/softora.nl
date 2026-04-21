@@ -357,12 +357,6 @@
             color: var(--dark);
         }
 
-        .c-domain {
-            font-size: 11px;
-            color: var(--light);
-            margin-top: 1px;
-        }
-
         .c-mid {
             color: var(--mid);
         }
@@ -828,7 +822,7 @@
                     <div class="filter-bar">
                         <div class="search">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input type="text" id="q" placeholder="Zoek op naam of domein…">
+                            <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
                         <select class="fsel" id="f-branche">
                             <option value="">Alle branches</option>
@@ -1536,7 +1530,7 @@
             nodes.tbody.innerHTML = filtered.map(function (customer) {
                 return [
                     "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
-                        "<td><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div><div class=\"c-domain\">" + escapeHtml(customer.dom) + "</div></td>",
+                        "<td><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div></td>",
                         "<td><span class=\"c-mid\">" + escapeHtml(customer.branche) + "</span></td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
                         "<td><div class=\"kanalen\">",
@@ -1580,7 +1574,7 @@
 
             state.openId = id;
             nodes.panelName.textContent = customer.bedrijf;
-            nodes.panelSub.textContent = customer.dom + " · " + customer.stad;
+            nodes.panelSub.textContent = customer.stad;
             nodes.panelNote.value = customer.nota || "";
 
             nodes.overlay.classList.add("on");

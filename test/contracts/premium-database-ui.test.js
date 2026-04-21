@@ -27,9 +27,11 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);
   assert.match(pageSource, /<button class="btn prim" id="addButton" type="button">[\s\S]*Toevoegen/);
+  assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
   assert.match(pageSource, /<textarea class="p-ta" id="p-nota"/);
+  assert.doesNotMatch(pageSource, /class=\\"c-domain\\"/);
   assert.doesNotMatch(pageSource, /<div class="p-s-title">Gegevens<\/div>/);
   assert.doesNotMatch(pageSource, /<div class="p-s-title">Status wijzigen<\/div>/);
   assert.doesNotMatch(pageSource, /<div class="p-s-title">Tijdlijn<\/div>/);
@@ -39,6 +41,8 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /function formatResponsibleDisplayName\(value\)/);
   assert.match(pageSource, /function getResponsibleSourceValue\(raw\)/);
   assert.match(pageSource, /function openPanel\(id\)/);
+  assert.match(pageSource, /nodes\.panelSub\.textContent = customer\.stad;/);
+  assert.doesNotMatch(pageSource, /nodes\.panelSub\.textContent = customer\.dom \+ " · " \+ customer\.stad;/);
   assert.match(pageSource, /function saveNota\(\)/);
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
