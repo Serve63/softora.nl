@@ -436,11 +436,24 @@
         /* Generator panels */
         .generator-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
+            grid-template-columns: 1fr;
+            gap: 0;
             margin-bottom: 3rem;
             position: relative;
             z-index: 30;
+        }
+
+        .generator-grid > .panel-zone-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.9rem;
+            padding: 1.4rem 1.5rem 1.35rem;
+            border: 1px solid var(--border);
+            border-bottom: none;
+            background: var(--bg-secondary);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUp 0.6s var(--ease-out-expo) 0.05s forwards;
         }
 
         .panel {
@@ -452,58 +465,48 @@
             animation: fadeUp 0.6s var(--ease-out-expo) forwards;
         }
 
-        /* If only the campaign settings panel remains, let it use the full row width. */
-        .generator-grid > .panel:only-child {
+        .generator-grid > .panel {
             grid-column: 1 / -1;
             display: grid;
             grid-template-columns: minmax(360px, 1.25fr) minmax(260px, 1fr);
             column-gap: 1.5rem;
             row-gap: 1.25rem;
             align-items: end;
+            border-top: none;
         }
 
-        .generator-grid > .panel:only-child .panel-zone-strip,
-        .generator-grid > .panel:only-child .panel-header,
-        .generator-grid > .panel:only-child .form-group:first-of-type {
+        .generator-grid > .panel .panel-header,
+        .generator-grid > .panel .form-group:first-of-type {
             grid-column: 1 / -1;
         }
 
-        .generator-grid > .panel:only-child .panel-zone-strip {
-            grid-row: 1;
-            margin-bottom: 0;
-        }
-
-        .generator-grid > .panel:only-child .panel-header {
+        .generator-grid > .panel .form-group--slider {
+            grid-column: 1 / -1;
             grid-row: 2;
         }
 
-        .generator-grid > .panel:only-child .form-group--slider {
-            grid-column: 1 / -1;
+        .generator-grid > .panel .form-group--lead-list {
+            grid-column: 1;
             grid-row: 3;
         }
 
-        .generator-grid > .panel:only-child .form-group--lead-list {
+        .generator-grid > .panel .form-group--branche {
+            grid-column: 2;
+            grid-row: 3;
+        }
+
+        .generator-grid > .panel .form-group--dispatch {
             grid-column: 1;
             grid-row: 4;
         }
 
-        .generator-grid > .panel:only-child .form-group--branche {
+        .generator-grid > .panel .form-group--regio {
             grid-column: 2;
             grid-row: 4;
         }
 
-        .generator-grid > .panel:only-child .form-group--dispatch {
-            grid-column: 1;
-            grid-row: 5;
-        }
-
-        .generator-grid > .panel:only-child .form-group--regio {
-            grid-column: 2;
-            grid-row: 5;
-        }
-
-        .generator-grid > .panel:only-child .panel-header,
-        .generator-grid > .panel:only-child .form-group {
+        .generator-grid > .panel .panel-header,
+        .generator-grid > .panel .form-group {
             margin-bottom: 0;
         }
 
@@ -535,13 +538,6 @@
             color: var(--accent-light);
             padding: 0.3rem 0.8rem;
             border: 1px solid rgba(139,34,82,0.3);
-        }
-
-        .panel-zone-strip {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 0.9rem;
-            margin-bottom: 2rem;
         }
 
         .panel-zone-card {
@@ -1775,8 +1771,10 @@
 
         /* Responsive */
         @media (max-width: 1200px) {
-            .generator-grid { grid-template-columns: 1fr; }
-            .generator-grid > .panel:only-child { display: block; }
+            .generator-grid > .panel-zone-strip {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .generator-grid > .panel { display: block; }
             .stats-bar { grid-template-columns: repeat(2, 1fr); }
         }
 
@@ -1785,7 +1783,6 @@
             .cursor, .cursor-dot { display: none; }
             .sidebar { display: none; }
             .main-content { margin-left: 0; }
-            .panel-zone-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         @media (max-width: 768px) {
@@ -1793,7 +1790,10 @@
             .stats-bar { grid-template-columns: 1fr; }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
             .topbar-right { width: 100%; justify-content: flex-start; }
-            .panel-zone-strip { grid-template-columns: 1fr; }
+            .generator-grid > .panel-zone-strip {
+                grid-template-columns: 1fr;
+                padding: 1rem 1rem 1rem;
+            }
             .topbar-right .site-select--pill .site-select-trigger {
                 width: min(100%, 16rem) !important;
                 min-width: min(100%, 16rem);
@@ -1909,31 +1909,30 @@
                 </div>
             </div>
             <div class="generator-grid">
+                <div class="panel-zone-strip" aria-label="Coldmailing zones">
+                    <div class="panel-zone-card">
+                        <div class="panel-zone-label">Zone 1</div>
+                        <div class="panel-zone-title">Mail verstuurd</div>
+                        <div class="panel-zone-copy">Alle contacten naar wie de eerste mail is gestuurd.</div>
+                    </div>
+                    <div class="panel-zone-card">
+                        <div class="panel-zone-label">Zone 2</div>
+                        <div class="panel-zone-title">Reactie op mail 1</div>
+                        <div class="panel-zone-copy">Contacten die hebben gereageerd op de eerste mail.</div>
+                    </div>
+                    <div class="panel-zone-card">
+                        <div class="panel-zone-label">Zone 3</div>
+                        <div class="panel-zone-title">Reactie op mail 2</div>
+                        <div class="panel-zone-copy">Contacten die hebben gereageerd op de tweede mail.</div>
+                    </div>
+                    <div class="panel-zone-card">
+                        <div class="panel-zone-label">Zone 4</div>
+                        <div class="panel-zone-title">Afspraak ingepland</div>
+                        <div class="panel-zone-copy">Klanten die een afspraak hebben ingepland.</div>
+                    </div>
+                </div>
 
                 <div class="panel" style="animation-delay: 0.1s;">
-                    <div class="panel-zone-strip" aria-label="Coldmailing zones">
-                        <div class="panel-zone-card">
-                            <div class="panel-zone-label">Zone 1</div>
-                            <div class="panel-zone-title">Mail verstuurd</div>
-                            <div class="panel-zone-copy">Alle contacten naar wie de eerste mail is gestuurd.</div>
-                        </div>
-                        <div class="panel-zone-card">
-                            <div class="panel-zone-label">Zone 2</div>
-                            <div class="panel-zone-title">Reactie op mail 1</div>
-                            <div class="panel-zone-copy">Contacten die hebben gereageerd op de eerste mail.</div>
-                        </div>
-                        <div class="panel-zone-card">
-                            <div class="panel-zone-label">Zone 3</div>
-                            <div class="panel-zone-title">Reactie op mail 2</div>
-                            <div class="panel-zone-copy">Contacten die hebben gereageerd op de tweede mail.</div>
-                        </div>
-                        <div class="panel-zone-card">
-                            <div class="panel-zone-label">Zone 4</div>
-                            <div class="panel-zone-title">Afspraak ingepland</div>
-                            <div class="panel-zone-copy">Klanten die een afspraak hebben ingepland.</div>
-                        </div>
-                    </div>
-
                     <div class="panel-header">
                         <span class="panel-title">Coldmailing Instellingen</span>
                         <span class="panel-badge">Configuratie</span>
