@@ -121,6 +121,10 @@
             justify-content: flex-end;
         }
 
+        .add-actions {
+            position: relative;
+        }
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -161,6 +165,71 @@
             height: 12px;
         }
 
+        .btn.has-caret {
+            gap: 10px;
+            padding-right: 14px;
+        }
+
+        .btn-caret {
+            width: 11px;
+            height: 11px;
+            flex-shrink: 0;
+            transition: transform .16s ease;
+        }
+
+        .add-actions.is-open .btn-caret {
+            transform: rotate(180deg);
+        }
+
+        .add-actions-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 220px;
+            padding: 6px;
+            border: 1px solid rgba(139, 34, 82, 0.18);
+            border-radius: 8px;
+            background: var(--card);
+            box-shadow: 0 16px 34px rgba(26,26,46,.12);
+            display: none;
+            z-index: 80;
+        }
+
+        .add-actions.is-open .add-actions-menu {
+            display: grid;
+            gap: 4px;
+        }
+
+        .add-actions-item {
+            width: 100%;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--dark);
+            padding: 11px 12px;
+            text-align: left;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background .15s ease, color .15s ease;
+        }
+
+        .add-actions-item:hover {
+            background: rgba(139, 34, 82, 0.08);
+            color: var(--crimson);
+        }
+
+        .add-actions-item-title {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .add-actions-item-sub {
+            display: block;
+            font-size: 11px;
+            color: var(--light);
+        }
+
         .status-banner {
             margin: 0 48px 14px;
             padding: 11px 14px;
@@ -198,6 +267,21 @@
             align-items: center;
             gap: 10px;
             flex-wrap: wrap;
+        }
+
+        .filter-select-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 220px;
+        }
+
+        .filter-select-label {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--light);
         }
 
         .search {
@@ -249,12 +333,24 @@
         .msel {
             padding: 8px 28px 8px 12px;
             border-radius: 5px;
-            font-size: 12px;
+            font-size: 13px;
+            font-weight: 500;
             appearance: none;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 8px center;
             cursor: pointer;
+        }
+
+        .fsel {
+            min-width: 220px;
+            background-color: var(--card);
+            border-color: rgba(139, 34, 82, 0.16);
+            box-shadow: 0 1px 0 rgba(255,255,255,.3) inset;
+        }
+
+        .filter-bar .site-select {
+            min-width: 220px;
         }
 
         .status-filter {
@@ -814,14 +910,24 @@
                             <div class="page-sub" id="top-sub"></div>
                         </div>
                         <div class="top-right">
-                            <button class="btn" id="exportButton" type="button">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                CSV
-                            </button>
-                            <button class="btn prim" id="addButton" type="button">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                Toevoegen
-                            </button>
+                            <div class="add-actions" id="addActions">
+                                <button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    Toevoegen
+                                    <svg class="btn-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                                <div class="add-actions-menu" id="addActionsMenu" role="menu">
+                                    <button class="add-actions-item" id="addUploadButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">Uploaden</span>
+                                        <span class="add-actions-item-sub">Importeer bedrijven vanuit een CSV-bestand</span>
+                                    </button>
+                                    <button class="add-actions-item" id="addManualButton" type="button" role="menuitem">
+                                        <span class="add-actions-item-title">Handmatig toevoegen</span>
+                                        <span class="add-actions-item-sub">Voeg zelf een bedrijf toe via het formulier</span>
+                                    </button>
+                                </div>
+                                <input type="file" id="importFileInput" accept=".csv,text/csv" hidden>
+                            </div>
                         </div>
                     </div>
 
@@ -832,17 +938,20 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             <input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">
                         </div>
-                        <select class="fsel" id="f-branche">
-                            <option value="">Alle branches</option>
-                            <option>Horeca & Restaurants</option>
-                            <option>Retail & Winkels</option>
-                            <option>Zakelijke Dienstverlening</option>
-                            <option>Bouw & Vastgoed</option>
-                            <option>Gezondheidszorg</option>
-                            <option>Creatieve Sector</option>
-                            <option>Tech & Startups</option>
-                            <option>Overig</option>
-                        </select>
+                        <div class="filter-select-group">
+                            <label class="filter-select-label" for="f-branche">Branche</label>
+                            <select class="fsel" id="f-branche">
+                                <option value="">Alle branches</option>
+                                <option>Horeca & Restaurants</option>
+                                <option>Retail & Winkels</option>
+                                <option>Zakelijke Dienstverlening</option>
+                                <option>Bouw & Vastgoed</option>
+                                <option>Gezondheidszorg</option>
+                                <option>Creatieve Sector</option>
+                                <option>Tech & Startups</option>
+                                <option>Overig</option>
+                            </select>
+                        </div>
                         <div class="status-filter">
                             <button class="sf-btn act" data-s="alle" type="button">Alle</button>
                             <button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar</button>
@@ -988,8 +1097,12 @@
             tbody: document.getElementById("tbody"),
             statusButtons: Array.from(document.querySelectorAll(".sf-btn")),
             sortButtons: Array.from(document.querySelectorAll("[data-sort-key]")),
-            exportButton: document.getElementById("exportButton"),
+            addActions: document.getElementById("addActions"),
+            addActionsMenu: document.getElementById("addActionsMenu"),
             addButton: document.getElementById("addButton"),
+            addUploadButton: document.getElementById("addUploadButton"),
+            addManualButton: document.getElementById("addManualButton"),
+            importFileInput: document.getElementById("importFileInput"),
             overlay: document.getElementById("ov"),
             panel: document.getElementById("panel"),
             closePanelButton: document.getElementById("closePanelButton"),
@@ -1669,6 +1782,194 @@
             nodes.modalBg.classList.remove("on");
         }
 
+        function openAddActions() {
+            nodes.addActions.classList.add("is-open");
+            nodes.addButton.setAttribute("aria-expanded", "true");
+        }
+
+        function closeAddActions() {
+            nodes.addActions.classList.remove("is-open");
+            nodes.addButton.setAttribute("aria-expanded", "false");
+        }
+
+        function toggleAddActions() {
+            if (nodes.addActions.classList.contains("is-open")) {
+                closeAddActions();
+            } else {
+                openAddActions();
+            }
+        }
+
+        function normalizeCsvHeader(value) {
+            return normalizeString(value)
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]+/g, " ")
+                .trim();
+        }
+
+        function parseCsvRows(raw) {
+            const text = String(raw || "").replace(/^\uFEFF/, "");
+            const rows = [];
+            let current = "";
+            let row = [];
+            let inQuotes = false;
+
+            for (let i = 0; i < text.length; i += 1) {
+                const char = text[i];
+                const next = text[i + 1];
+
+                if (char === "\"") {
+                    if (inQuotes && next === "\"") {
+                        current += "\"";
+                        i += 1;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                    continue;
+                }
+
+                if (char === "," && !inQuotes) {
+                    row.push(current);
+                    current = "";
+                    continue;
+                }
+
+                if ((char === "\n" || char === "\r") && !inQuotes) {
+                    if (char === "\r" && next === "\n") {
+                        i += 1;
+                    }
+                    row.push(current);
+                    if (row.some(function (cell) { return normalizeString(cell) !== ""; })) {
+                        rows.push(row);
+                    }
+                    row = [];
+                    current = "";
+                    continue;
+                }
+
+                current += char;
+            }
+
+            row.push(current);
+            if (row.some(function (cell) { return normalizeString(cell) !== ""; })) {
+                rows.push(row);
+            }
+
+            return rows;
+        }
+
+        function mapCsvRowToCustomer(headers, row, index) {
+            const record = {};
+            headers.forEach(function (header, headerIndex) {
+                record[header] = normalizeString(row[headerIndex]);
+            });
+
+            const bedrijf = record.bedrijf || record.company || record.organisatie;
+            if (!bedrijf) return null;
+
+            const status = normalizeDatabaseStatus(record.status || record.fase || "benaderbaar");
+            const updatedAt = record["laatste actie"] || record.updatedat || record.datum || formatDateForStorage(new Date());
+
+            return normalizeCustomer({
+                id: "import-" + index + "-" + createId(),
+                bedrijf: bedrijf,
+                naam: record.contact || record.naam || bedrijf,
+                dom: record.domein || record.domain || record.website || bedrijf,
+                telefoon: record.telefoon || record.tel || record.phone || "—",
+                email: record["e mail"] || record.email || record.mail,
+                branche: record.branche || record.branch || "Overig",
+                stad: record.adres || record.stad || record.locatie || "Onbekend",
+                status: status,
+                verantwoordelijk: record["toegewezen aan"] || record.verantwoordelijke || record.owner || "Serve",
+                service: record.service || "website",
+                updatedAt: updatedAt,
+                hist: [{
+                    type: status,
+                    label: "Geimporteerd via upload",
+                    date: formatDateForStorage(updatedAt)
+                }]
+            }, "import-" + index);
+        }
+
+        function importCustomersFromCsv(raw) {
+            const rows = parseCsvRows(raw);
+            if (rows.length < 2) {
+                setStatusMessage("Het bestand bevat geen bruikbare CSV-rijen.", "error");
+                return;
+            }
+
+            const headers = rows[0].map(normalizeCsvHeader);
+            const importedCustomers = rows.slice(1).map(function (row, index) {
+                return mapCsvRowToCustomer(headers, row, index);
+            }).filter(Boolean);
+
+            if (!importedCustomers.length) {
+                setStatusMessage("Geen geldige bedrijven gevonden in het bestand.", "error");
+                return;
+            }
+
+            const existingKeys = new Set(state.klanten.map(function (customer) {
+                return buildCustomerIdentityKey(customer);
+            }));
+
+            let importedCount = 0;
+            const mergedCustomers = state.klanten.slice();
+
+            importedCustomers.forEach(function (customer) {
+                const key = buildCustomerIdentityKey(customer);
+                if (!key || existingKeys.has(key)) {
+                    return;
+                }
+                existingKeys.add(key);
+                mergedCustomers.unshift(customer);
+                importedCount += 1;
+            });
+
+            if (!importedCount) {
+                setStatusMessage("Alle bedrijven uit dit bestand stonden al in de database.", "info", true);
+                return;
+            }
+
+            state.klanten = sortCustomers(mergedCustomers);
+            renderPage();
+
+            persistCustomerList(state.klanten).then(function (result) {
+                if (result.ok) {
+                    toast("✓ " + importedCount + " bedrijven geupload");
+                    setStatusMessage(importedCount + " bedrijven toegevoegd via upload.", "success", true);
+                    return;
+                }
+                setStatusMessage(
+                    "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
+                    "error"
+                );
+            });
+        }
+
+        function handleImportFileChange(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function () {
+                try {
+                    importCustomersFromCsv(reader.result);
+                } catch (error) {
+                    console.error("CSV import mislukt:", error);
+                    setStatusMessage("Uploaden mislukt: ongeldig CSV-bestand.", "error");
+                } finally {
+                    nodes.importFileInput.value = "";
+                }
+            };
+            reader.onerror = function () {
+                nodes.importFileInput.value = "";
+                setStatusMessage("Bestand lezen mislukt.", "error");
+            };
+            reader.readAsText(file);
+        }
+
         function addCustomerFromModal() {
             const bedrijf = normalizeString(nodes.modalCompany.value);
             if (!bedrijf) {
@@ -1847,7 +2148,19 @@
         nodes.overlay.addEventListener("click", closePanel);
         nodes.closePanelButton.addEventListener("click", closePanel);
         nodes.saveNoteButton.addEventListener("click", saveNota);
-        nodes.addButton.addEventListener("click", openModal);
+        nodes.addButton.addEventListener("click", function (event) {
+            event.stopPropagation();
+            toggleAddActions();
+        });
+        nodes.addUploadButton.addEventListener("click", function () {
+            closeAddActions();
+            nodes.importFileInput.click();
+        });
+        nodes.addManualButton.addEventListener("click", function () {
+            closeAddActions();
+            openModal();
+        });
+        nodes.importFileInput.addEventListener("change", handleImportFileChange);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
         nodes.modalBg.addEventListener("click", function (event) {
@@ -1855,10 +2168,15 @@
                 closeModal();
             }
         });
-        nodes.exportButton.addEventListener("click", exportCSV);
+        document.addEventListener("click", function (event) {
+            if (!nodes.addActions.contains(event.target)) {
+                closeAddActions();
+            }
+        });
 
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
+                closeAddActions();
                 if (nodes.modalBg.classList.contains("on")) {
                     closeModal();
                     return;
