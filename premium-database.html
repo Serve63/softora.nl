@@ -121,6 +121,49 @@
             justify-content: flex-end;
         }
 
+        .ai-database-badge {
+            display: inline-flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 220px;
+            padding: 10px 14px;
+            border: 1px solid rgba(139, 34, 82, 0.14);
+            border-radius: 10px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,247,244,0.88));
+            box-shadow: 0 10px 24px rgba(26, 26, 46, 0.06);
+        }
+
+        .ai-database-badge-head {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ai-database-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            background: #c68a28;
+            box-shadow: 0 0 0 4px rgba(198, 138, 40, 0.12);
+            flex-shrink: 0;
+        }
+
+        .ai-database-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.3px;
+            text-transform: uppercase;
+            color: var(--crimson);
+            line-height: 1;
+        }
+
+        .ai-database-state {
+            font-size: 12px;
+            line-height: 1.35;
+            color: var(--mid);
+        }
+
         .add-actions {
             position: relative;
         }
@@ -887,6 +930,10 @@
                 justify-content: flex-start;
             }
 
+            .ai-database-badge {
+                width: 100%;
+            }
+
             .f-count {
                 margin-left: 0;
                 width: 100%;
@@ -990,6 +1037,13 @@
                             <div class="page-sub" id="top-sub"></div>
                         </div>
                         <div class="top-right">
+                            <div class="ai-database-badge" title="De AI koppelt straks databronnen en opvolgregels aan elkaar, zodat dubbele of onnodige opvolging automatisch wordt voorkomen.">
+                                <div class="ai-database-badge-head">
+                                    <span class="ai-database-dot" aria-hidden="true"></span>
+                                    <span class="ai-database-label">AI Database</span>
+                                </div>
+                                <div class="ai-database-state">Slimme aansturing in opbouw</div>
+                            </div>
                             <div class="add-actions" id="addActions">
                                 <button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">
                                     Toevoegen
