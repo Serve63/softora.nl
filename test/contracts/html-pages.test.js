@@ -214,6 +214,64 @@ test('html page coordinator falls back to sendFile when rendering throws', async
   assert.equal(res.sendFilePath, pagePath);
 });
 
+test('html page coordinator serves public pages when seo config and bootstrap reads time out', async () => {
+  const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-timeout-'));
+  const loggerCalls = [];
+  fs.writeFileSync(
+    path.join(pagesDir, 'premium-website.html'),
+    '<!DOCTYPE html><html><head><title>Orig</title></head><body><main>Publieke pagina</main></body></html>'
+  );
+
+  const coordinator = createHtmlPageCoordinator({
+    pagesDir,
+    logger: {
+      error: (...args) => loggerCalls.push(args),
+    },
+    sanitizeKnownHtmlFileName: (value) =>
+      String(value || '').trim() === 'premium-website.html' ? 'premium-website.html' : '',
+    normalizeString: (value) => String(value || '').trim(),
+    knownPrettyPageSlugToFile: new Map(),
+    publicPageDependencyWaitMs: 5,
+    resolvePremiumHtmlPageAccess: async () => ({
+      handled: false,
+      isLoginPage: false,
+      isProtectedPremiumPage: false,
+      authState: null,
+    }),
+    getSeoConfigCached: async () => new Promise(() => {}),
+    applySeoOverridesToHtml: (_fileName, html, config) => {
+      assert.deepEqual(config, {});
+      return html;
+    },
+    getPageBootstrapData: async () => new Promise(() => {}),
+  });
+
+  const res = createResponseRecorder();
+
+  await coordinator.sendSeoManagedHtmlPageResponse(
+    { originalUrl: '/premium-website' },
+    res,
+    () => {},
+    'premium-website.html'
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Cache-Control'], 'public, max-age=300, stale-while-revalidate=900');
+  assert.match(res.body, /Publieke pagina/);
+  assert.equal(
+    loggerCalls.some(
+      (args) => args[0] === '[HTML][SeoConfigTimeout]' && args[1] === 'premium-website.html'
+    ),
+    true
+  );
+  assert.equal(
+    loggerCalls.some(
+      (args) => args[0] === '[HTML][BootstrapTimeout]' && args[1] === 'premium-website.html'
+    ),
+    true
+  );
+});
+
 test('html page coordinator injects bootstrap json into html markers for dynamic pages', async () => {
   const { coordinator, pagesDir } = createFixture();
   fs.writeFileSync(

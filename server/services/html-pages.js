@@ -27,8 +27,13 @@ function createHtmlPageCoordinator(options = {}) {
     getSeoConfigCached = async () => ({}),
     applySeoOverridesToHtml = (_fileName, html) => String(html || ''),
     getPageBootstrapData = async () => null,
+    publicPageDependencyWaitMs = 1500,
   } = options;
   let premiumSidebarProfilePrefillInlineTag = null;
+
+  function getSafePublicPageDependencyWaitMs() {
+    return Math.max(0, Math.min(10000, Number(publicPageDependencyWaitMs) || 0));
+  }
 
   function escapeHtml(value) {
     return String(value || '')
@@ -221,6 +226,36 @@ function createHtmlPageCoordinator(options = {}) {
     return renderedHtml;
   }
 
+  async function resolveWithSoftTimeout(run, { fileName, label, timeoutMs, fallbackValue }) {
+    const safeTimeoutMs = Math.max(0, Number(timeoutMs) || 0);
+    if (!safeTimeoutMs) {
+      return run();
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        resolve(value);
+      };
+
+      const timeoutHandle = setTimeout(() => {
+        logger.error(`[HTML][${label}Timeout]`, fileName, `na ${safeTimeoutMs}ms`);
+        finish(fallbackValue);
+      }, safeTimeoutMs);
+
+      Promise.resolve()
+        .then(run)
+        .then((value) => finish(value))
+        .catch((error) => {
+          logger.error(`[HTML][${label}Error]`, fileName, error?.message || error);
+          finish(fallbackValue);
+        });
+    });
+  }
+
   async function readHtmlPageContent(fileNameRaw) {
     const fileName = sanitizeKnownHtmlFileName(fileNameRaw);
     if (!fileName) return '';
@@ -250,14 +285,32 @@ function createHtmlPageCoordinator(options = {}) {
     const premiumPageAccess = await resolvePremiumHtmlPageAccess(req, res, fileName);
     if (premiumPageAccess.handled) return undefined;
     const { isLoginPage, isProtectedPremiumPage } = premiumPageAccess;
+    const publicDependencyWaitMs =
+      !isLoginPage && !isProtectedPremiumPage ? getSafePublicPageDependencyWaitMs() : 0;
 
     try {
       const html = await readHtmlPageContent(fileName);
       if (!html) return next();
-      const config = await getSeoConfigCached();
+      const config =
+        publicDependencyWaitMs > 0
+          ? await resolveWithSoftTimeout(() => getSeoConfigCached(), {
+              fileName,
+              label: 'SeoConfig',
+              timeoutMs: publicDependencyWaitMs,
+              fallbackValue: {},
+            })
+          : await getSeoConfigCached();
       let rendered = applySeoOverridesToHtml(fileName, html, config);
       try {
-        const bootstrapData = await getPageBootstrapData(req, fileName);
+        const bootstrapData =
+          publicDependencyWaitMs > 0
+            ? await resolveWithSoftTimeout(() => getPageBootstrapData(req, fileName), {
+                fileName,
+                label: 'Bootstrap',
+                timeoutMs: publicDependencyWaitMs,
+                fallbackValue: null,
+              })
+            : await getPageBootstrapData(req, fileName);
         rendered = injectHtmlMarkerReplacements(rendered, bootstrapData);
         rendered = injectPageBootstrapHtml(rendered, bootstrapData);
       } catch (error) {
