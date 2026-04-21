@@ -97,7 +97,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .page-section-inner { padding: 24px; }
 
 /* ZONE BALK */
-.zones-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 0; }
+.zones-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 0; }
 .zone-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -115,6 +115,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .zone-card.z3::before { background: var(--z3); }
 .zone-card.z4::before { background: var(--z4); }
 .zone-card.z5::before { background: var(--z5); }
+.zone-card.conv-card::before { background: var(--crimson); }
 .zone-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.06); transform: translateY(-1px); }
 .zone-badge { font-size: 8px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; margin-bottom: 10px; display: inline-block; padding: 2px 7px; border-radius: 999px; }
 .z1 .zone-badge { background: rgba(26,95,138,.1); color: var(--z1); }
@@ -122,10 +123,14 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .z3 .zone-badge { background: rgba(155,35,85,.1); color: var(--z3); }
 .z4 .zone-badge { background: rgba(123,63,160,.1); color: var(--z4); }
 .z5 .zone-badge { background: rgba(22,115,60,.1); color: var(--z5); }
+.conv-card .zone-badge { background: rgba(155,35,85,.1); color: var(--crimson); }
 .zone-label { font-size: 11px; color: var(--mid); margin-bottom: 14px; line-height: 1.35; max-width: 88%; }
 .zone-count { font-family: 'Oswald', sans-serif; font-size: 30px; font-weight: 700; line-height: 1; color: var(--dark); }
 .zone-arrow { position: absolute; bottom: 14px; right: 14px; color: #e7e1d8; transition: color .15s; transform: scale(.8); }
 .zone-card:hover .zone-arrow { color: var(--crimson); }
+.conv-card { cursor: default; }
+.conv-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.06); transform: none; }
+.conv-card .zone-label { max-width: 100%; }
 
 /* BOTTOM GRID */
 .bottom-grid { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: stretch; }
@@ -254,6 +259,15 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 @media (max-width: 1024px) {
   .main-content { margin-left: 0; padding: 1.5rem; }
 }
+@media (max-width: 1400px) {
+  .zones-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .zones-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .zones-row { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
@@ -351,6 +365,11 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
         <div class="zone-label">Afspraak ingepland ✓</div>
         <div class="zone-count" id="z5-count">0</div>
         <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+      </div>
+      <div class="zone-card conv-card">
+        <div class="zone-badge">Conversie</div>
+        <div class="zone-label">Afspraken uit verstuurde mails</div>
+        <div class="zone-count" id="conv-zone-pct">0%</div>
       </div>
     </div>
     <div style="padding-top:20px" class="bottom-grid">
@@ -601,17 +620,11 @@ function updateZoneCounts() {
   [1,2,3,4,5].forEach(z => {
     document.getElementById(`z${z}-count`).textContent = bedrijven.filter(b=>b.zone===z).length;
   });
-  // update conversie
   const totaal = bedrijven.length;
   const afspraken = bedrijven.filter(b=>b.zone===5).length;
   const pct = totaal > 0 ? Math.round((afspraken/totaal)*100) : 0;
-  document.getElementById('conv-totaal').textContent = totaal;
-  document.getElementById('conv-afspraken').textContent = afspraken;
-  document.getElementById('conv-pct').textContent = pct + '%';
-  document.getElementById('conv-bar').style.width = Math.min(pct*3, 100) + '%';
-  document.getElementById('conv-sub').textContent = totaal > 0
-    ? `${afspraken} van de ${totaal} mails resulteerde in een afspraak.`
-    : 'Start een campagne om conversie te berekenen.';
+  const convZonePct = document.getElementById('conv-zone-pct');
+  if (convZonePct) convZonePct.textContent = pct + '%';
 }
 
 // ── LOG ──
@@ -623,6 +636,7 @@ function addLog(tekst, kleur) {
 }
 function renderLog() {
   const body = document.getElementById('log-body');
+  if (!body) return;
   if (!logItems.length) { body.innerHTML = '<div class="log-empty">Start een campagne om activiteit te zien.</div>'; return; }
   body.innerHTML = logItems.map(l => `
     <div class="log-item">
