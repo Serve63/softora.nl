@@ -14,6 +14,7 @@
     if (path !== '/premium-ai-lead-generator') return;
     var titleEl = document.querySelector('title');
     if (titleEl) titleEl.textContent = 'Coldcalling – Softora.nl';
+    document.documentElement.setAttribute('data-softora-lead-generator-alias', '1');
   } catch (e) {}
 })();
 </script>
@@ -143,6 +144,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 
 /* ZONE BALK */
 .zones-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 0; }
+html[data-softora-lead-generator-alias="1"] .zones-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+html[data-softora-lead-generator-alias="1"] .zone-card.z4 { display: none !important; }
+html[data-softora-lead-generator-alias="1"] .campaign-metric-zone4 { display: none !important; }
 .zone-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -691,15 +695,18 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 }
 @media (max-width: 1400px) {
   .zones-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-softora-lead-generator-alias="1"] .zones-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
   .zones-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-softora-lead-generator-alias="1"] .zones-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .campaign-progress-top { flex-direction: column; align-items: flex-start; }
   .campaign-progress-footer { flex-direction: column; }
   .campaign-metrics { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .zones-row { grid-template-columns: 1fr; }
+  html[data-softora-lead-generator-alias="1"] .zones-row { grid-template-columns: 1fr; }
   .settings-grid { grid-template-columns: 1fr; }
   .campaign-panel { padding: 18px; }
   .campaign-step { grid-template-columns: 24px 1fr; gap: 12px; }
@@ -1118,14 +1125,14 @@ info@softora.nl</textarea>
             <div class="campaign-metric-value" id="campaign-metric-total">0</div>
           </div>
           <div class="campaign-metric">
-            <div class="campaign-metric-label">Zone 1</div>
+            <div class="campaign-metric-label" id="campaign-metric-label-zone1">Zone 1</div>
             <div class="campaign-metric-value" id="campaign-metric-zone1">0</div>
           </div>
           <div class="campaign-metric">
-            <div class="campaign-metric-label">Zone 2</div>
+            <div class="campaign-metric-label" id="campaign-metric-label-zone2">Zone 2</div>
             <div class="campaign-metric-value" id="campaign-metric-zone2">0</div>
           </div>
-          <div class="campaign-metric">
+          <div class="campaign-metric campaign-metric-zone4">
             <div class="campaign-metric-label">Zone 4</div>
             <div class="campaign-metric-value" id="campaign-metric-zone4">0</div>
           </div>
@@ -1154,6 +1161,31 @@ info@softora.nl</textarea>
 // ── DATA ──
 let bedrijven = [];
 let activeZone = 0;
+
+function isPremiumAiLeadGeneratorPath() {
+  try {
+    var p = (window.location.pathname || '').split('?')[0].replace(/\/+$/, '') || '/';
+    return p === '/premium-ai-lead-generator';
+  } catch (e) {
+    return false;
+  }
+}
+
+function applyPremiumAiLeadGeneratorShell() {
+  if (!isPremiumAiLeadGeneratorPath()) return;
+  var b1 = document.querySelector('.zone-card.z1 .zone-badge');
+  var b2 = document.querySelector('.zone-card.z2 .zone-badge');
+  if (b1) b1.textContent = 'Gebeld';
+  if (b2) b2.textContent = 'Opgenomen';
+  var tip1 = document.querySelector('.zone-card.z1 .zone-tooltip');
+  var tip2 = document.querySelector('.zone-card.z2 .zone-tooltip');
+  if (tip1) tip1.textContent = 'Leads waarbij minimaal één belpoging is gedaan.';
+  if (tip2) tip2.textContent = 'Bedrijven die de telefoon hebben opgenomen.';
+  var m1 = document.getElementById('campaign-metric-label-zone1');
+  var m2 = document.getElementById('campaign-metric-label-zone2');
+  if (m1) m1.textContent = 'Gebeld';
+  if (m2) m2.textContent = 'Opgenomen';
+}
 
 const BRANCHEN  = ['Horeca & Restaurants','Retail & Winkels','Zakelijke Dienstverlening','Bouw & Vastgoed','Gezondheidszorg','Creatieve Sector','Tech & Startups','Overig'];
 const STEDEN    = ['Oisterwijk','Tilburg','Breda','Eindhoven','Den Bosch','Waalwijk','Helmond','Dongen','Boxtel','Udenhout','Haaren','Goirle','Hilvarenbeek'];
@@ -1203,8 +1235,9 @@ updateKm(4);
 
 // ── ZONE COUNTS ──
 function updateZoneCounts() {
-  [1,2,4,5].forEach(z => {
-    document.getElementById(`z${z}-count`).textContent = bedrijven.filter(b=>b.zone===z).length;
+  [1, 2, 4, 5].forEach((z) => {
+    const el = document.getElementById(`z${z}-count`);
+    if (el) el.textContent = bedrijven.filter((b) => b.zone === z).length;
   });
   const totaal = bedrijven.length;
   const afspraken = bedrijven.filter(b=>b.zone===5).length;
@@ -1520,16 +1553,26 @@ function returnToDashboard() {
 }
 
 // ── ZONE DETAIL ──
-const zoneInfo = {
+const zoneInfoColdmailing = {
   1: { label:'Zone 1', title:'Eerste mail verstuurd',     sub:'Alle bedrijven die de eerste mail hebben ontvangen.', badge:'zp1', col:'var(--z1)' },
   2: { label:'Zone 2', title:'Tweede mail verstuurd',     sub:'Bedrijven die een follow-up mail hebben ontvangen.', badge:'zp2', col:'var(--z2)' },
   4: { label:'Zone 4', title:'Meer dan 3 mails verstuurd', sub:'Bedrijven die meer dan 3 mails hebben ontvangen maar nog geen afspraak hebben ingepland.', badge:'zp4', col:'var(--z4)' },
   5: { label:'Interesse', title:'Interesse',      sub:'Bedrijven die interesse hebben getoond.', badge:'zp5', col:'var(--z5)' },
 };
 
+function getZoneInfo() {
+  if (!isPremiumAiLeadGeneratorPath()) return zoneInfoColdmailing;
+  return {
+    1: { label: 'Gebeld', title: 'Eerste belronde', sub: 'Leads waarbij minimaal één belpoging is gedaan.', badge: 'zp1', col: 'var(--z1)' },
+    2: { label: 'Opgenomen', title: 'Telefoon opgenomen', sub: 'Bedrijven die hebben opgenomen; vervolg of afspraak is mogelijk.', badge: 'zp2', col: 'var(--z2)' },
+    4: { label: 'Vervolg', title: 'Meerdere belpogingen', sub: 'Leads met extra opvolging zonder vaste afspraak.', badge: 'zp4', col: 'var(--z4)' },
+    5: zoneInfoColdmailing[5],
+  };
+}
+
 function openZone(z) {
   activeZone = z;
-  const info = zoneInfo[z];
+  const info = getZoneInfo()[z];
   const filtered = bedrijven.filter(b => b.zone === z);
 
   // set popup header
@@ -1580,7 +1623,12 @@ function renderBedrijven(lijst) {
     body.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--light);font-size:13px">Geen bedrijven gevonden in deze zone.</td></tr>`;
     return;
   }
-  body.innerHTML = lijst.map(b => `
+  const zoneMap = getZoneInfo();
+  body.innerHTML = lijst
+    .map((b) => {
+      const row = zoneMap[b.zone];
+      const label = row ? row.label : `Zone ${b.zone}`;
+      return `
     <tr>
       <td>
         <div class="bedrijf-naam">${b.naam}</div>
@@ -1588,9 +1636,11 @@ function renderBedrijven(lijst) {
       </td>
       <td><div class="bedrijf-branche">${b.branche}</div></td>
       <td style="font-size:13px;color:var(--mid)">${b.stad}</td>
-      <td><span class="zone-pill zp${b.zone}">${zoneInfo[b.zone] ? zoneInfo[b.zone].label : `Zone ${b.zone}`}</span></td>
+      <td><span class="zone-pill zp${b.zone}">${label}</span></td>
       <td class="mail-datum">${b.laatste_mail}</td>
-    </tr>`).join('');
+    </tr>`;
+    })
+    .join('');
 }
 
 function filterBedrijven() {
@@ -1739,6 +1789,7 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape') closeCustomSelects();
 });
 
+applyPremiumAiLeadGeneratorShell();
 initCampaignSelects();
 </script>
 
