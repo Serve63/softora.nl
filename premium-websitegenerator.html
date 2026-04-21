@@ -535,7 +535,7 @@ function isPreviewPixelCloseToReference(r, g, b, a, reference) {
 function isPreviewEdgeGutterColumn(pixels, width, height, x, reference) {
   if (!reference) return false;
   let mismatchCount = 0;
-  const allowedNoise = Math.max(8, Math.round(height * 0.03));
+  const allowedNoise = Math.max(14, Math.round(height * 0.055));
   for (let y = 0; y < height; y += 1) {
     const offset = (y * width + x) * 4;
     if (
@@ -560,9 +560,77 @@ function isPreviewEdgeGutterColumn(pixels, width, height, x, reference) {
   return true;
 }
 
+function getPreviewColumnActivity(pixels, width, height, x) {
+  if (x < 0 || x >= width) return 0;
+  let totalDiff = 0;
+  let count = 0;
+  for (let y = 2; y < height; y += 2) {
+    const offset = (y * width + x) * 4;
+    const topOffset = ((y - 2) * width + x) * 4;
+
+    totalDiff +=
+      Math.abs(Number(pixels[offset]) - Number(pixels[topOffset])) +
+      Math.abs(Number(pixels[offset + 1]) - Number(pixels[topOffset + 1])) +
+      Math.abs(Number(pixels[offset + 2]) - Number(pixels[topOffset + 2]));
+    count += 3;
+
+    if (x > 0) {
+      const leftOffset = (y * width + (x - 1)) * 4;
+      totalDiff +=
+        Math.abs(Number(pixels[offset]) - Number(pixels[leftOffset])) +
+        Math.abs(Number(pixels[offset + 1]) - Number(pixels[leftOffset + 1])) +
+        Math.abs(Number(pixels[offset + 2]) - Number(pixels[leftOffset + 2]));
+      count += 3;
+    }
+  }
+  return count ? totalDiff / count : 0;
+}
+
+function measurePreviewLowActivityRun(pixels, width, height, side) {
+  const maxCropWidth = Math.max(48, Math.round(width * 0.34));
+  let count = 0;
+
+  while (count < maxCropWidth) {
+    const x = side === 'right' ? width - 1 - count : count;
+    if (x < 0 || x >= width) break;
+    const activity = getPreviewColumnActivity(pixels, width, height, x);
+    if (activity > 15) break;
+    count += 1;
+  }
+
+  return count;
+}
+
+function hasPreviewActivityBreak(pixels, width, height, side, gutterWidth) {
+  if (gutterWidth <= 0) return false;
+  const sampleDepth = 14;
+  let gutterActivity = 0;
+  let contentActivity = 0;
+  let gutterCount = 0;
+  let contentCount = 0;
+
+  for (let i = 0; i < sampleDepth; i += 1) {
+    const gutterX = side === 'right' ? width - 1 - i : i;
+    const contentX = side === 'right' ? width - gutterWidth - 1 - i : gutterWidth + i;
+    if (gutterX >= 0 && gutterX < width) {
+      gutterActivity += getPreviewColumnActivity(pixels, width, height, gutterX);
+      gutterCount += 1;
+    }
+    if (contentX >= 0 && contentX < width) {
+      contentActivity += getPreviewColumnActivity(pixels, width, height, contentX);
+      contentCount += 1;
+    }
+  }
+
+  if (!gutterCount || !contentCount) return false;
+  const avgGutter = gutterActivity / gutterCount;
+  const avgContent = contentActivity / contentCount;
+  return avgGutter <= 14 && avgContent >= avgGutter * 1.8;
+}
+
 function measurePreviewEdgeGutterWidth(pixels, width, height, side, reference) {
   if (!reference) return 0;
-  const maxCropWidth = Math.max(32, Math.round(width * 0.22));
+  const maxCropWidth = Math.max(32, Math.round(width * 0.36));
   let count = 0;
 
   while (count < maxCropWidth) {
@@ -637,6 +705,8 @@ async function trimPreviewImageDataUrl(dataUrl) {
   const rightReference = samplePreviewEdgeReference(pixels, width, height, 'right');
   const leftGutterWidth = measurePreviewEdgeGutterWidth(pixels, width, height, 'left', leftReference);
   const rightGutterWidth = measurePreviewEdgeGutterWidth(pixels, width, height, 'right', rightReference);
+  const leftLowActivityRun = measurePreviewLowActivityRun(pixels, width, height, 'left');
+  const rightLowActivityRun = measurePreviewLowActivityRun(pixels, width, height, 'right');
 
   if (
     leftGutterWidth >= Math.max(40, Math.round(width * 0.05)) &&
@@ -646,10 +716,24 @@ async function trimPreviewImageDataUrl(dataUrl) {
   }
 
   if (
+    leftLowActivityRun >= Math.max(60, Math.round(width * 0.07)) &&
+    hasPreviewActivityBreak(pixels, width, height, 'left', leftLowActivityRun)
+  ) {
+    left = Math.max(left, leftLowActivityRun);
+  }
+
+  if (
     rightGutterWidth >= Math.max(40, Math.round(width * 0.05)) &&
     hasPreviewEdgeBreak(pixels, width, height, 'right', rightReference, rightGutterWidth)
   ) {
     right = Math.min(right, width - rightGutterWidth - 1);
+  }
+
+  if (
+    rightLowActivityRun >= Math.max(60, Math.round(width * 0.07)) &&
+    hasPreviewActivityBreak(pixels, width, height, 'right', rightLowActivityRun)
+  ) {
+    right = Math.min(right, width - rightLowActivityRun - 1);
   }
 
   const trimmedWidth = right - left + 1;
