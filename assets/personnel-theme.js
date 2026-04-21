@@ -983,8 +983,10 @@
         const path = String(window.location.pathname || "").toLowerCase();
         const activeKey = getSidebarActiveKey(path);
         if (sidebar.dataset.staticSidebar === "1") {
+            sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
             syncPremiumSidebarManagementLinks(sidebar, activeKey);
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
+            pruneDeprecatedSidebarLinks(sidebar);
             decorateComingSoonSidebarLinks();
             neutralizeSidebarAnchors();
             return;
@@ -1005,6 +1007,7 @@
         if (!sidebar) return;
         const activeKey = getSidebarActiveKey(pathname);
         if (sidebar.dataset.staticSidebar === "1") {
+            sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
             syncPremiumSidebarManagementLinks(sidebar, activeKey);
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
