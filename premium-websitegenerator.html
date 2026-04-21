@@ -280,20 +280,31 @@ async function startScan() {
 }
 
 async function callAI(url, hostname) {
-  const prompt = `Je bent een expert webdesigner. Genereer een volledige, professionele HTML homepage voor de website: ${url} (domein: ${hostname}). VEREISTEN: Maak een VOLLEDIGE prachtige homepage in moderne stijl. Geen externe afbeeldingen, gebruik CSS gradients en SVG iconen. Bevat: navigatiebalk, grote hero sectie, features sectie, call-to-action, footer. Gebruik Google Fonts via @import. Alles in een HTML bestand. De pagina moet 1440px breed zijn. Domein hint: als het eindigt op .nl maak Nederlandse content, anders Engels. Geef ALLEEN de HTML terug, geen uitleg.`;
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
-  });
-  if (!response.ok) throw new Error('API fout: ' + response.status);
-  const data = await response.json();
-  const text = data.content.find(b => b.type === 'text')?.text || '';
-  const match = text.match(/```html\n?([\s\S]*?)```/) || text.match(/(<!DOCTYPE[\s\S]*)/i);
-  return match ? (match[1] || match[0]) : text;
+  const endpoints = ['/api/website-preview/generate', '/api/website-preview-generate'];
+  let lastError = '';
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, hostname }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data || data.ok === false) {
+        lastError = String(data?.detail || data?.error || `API fout: ${response.status}`);
+        continue;
+      }
+      return data;
+    } catch (error) {
+      lastError = String(error?.message || 'Websitegenerator request mislukt');
+    }
+  }
+  throw new Error(lastError || 'Websitegenerator request mislukt');
 }
 
-function showPreview(html, url, hostname) {
+function showPreview(result, url, hostname) {
+  const imageDataUrl = String(result?.image?.dataUrl || '').trim();
+  if (!imageDataUrl) throw new Error('Geen previewafbeelding ontvangen van de server.');
   const scaleX = Math.min((window.innerWidth - 100) / 1440, 0.78);
   const frameH = Math.round(900 * scaleX);
   document.getElementById('scan-output').innerHTML = `
@@ -307,7 +318,7 @@ function showPreview(html, url, hostname) {
           </button>
           <button class="btn" style="padding:6px 14px;font-size:11px" onclick="downloadPreview()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Download HTML
+            Download PNG
           </button>
         </div>
       </div>
@@ -317,29 +328,28 @@ function showPreview(html, url, hostname) {
           <div class="browser-url">${url}</div>
         </div>
         <div class="scale-wrap" style="height:${frameH}px">
-          <iframe id="preview-iframe" style="transform:scale(${scaleX})"></iframe>
+          <img id="preview-image" alt="Website preview ${hostname}" style="width:1440px;height:900px;object-fit:cover;transform-origin:top left;transform:scale(${scaleX});display:block;" />
         </div>
       </div>
     </div>`;
-  document.getElementById('preview-iframe').srcdoc = html;
-  window._lastPreviewHtml = html;
+  document.getElementById('preview-image').src = imageDataUrl;
+  window._lastPreviewImageDataUrl = imageDataUrl;
+  window._lastPreviewImageFileName = String(result?.image?.fileName || `${hostname}-preview.png`).trim();
   window._lastPreviewUrl = url;
 }
 
 function openPreviewNewTab() {
-  if (!window._lastPreviewHtml) return;
-  const w = window.open('', '_blank');
-  w.document.write(window._lastPreviewHtml);
-  w.document.close();
+  if (!window._lastPreviewImageDataUrl) return;
+  window.open(window._lastPreviewImageDataUrl, '_blank', 'noopener');
 }
 
 function downloadPreview() {
-  if (!window._lastPreviewHtml) return;
+  if (!window._lastPreviewImageDataUrl) return;
   const a = document.createElement('a');
-  a.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(window._lastPreviewHtml);
-  a.download = (window._lastPreviewUrl||'preview').replace(/https?:\/\//,'').replace(/\//g,'-') + '.html';
+  a.href = window._lastPreviewImageDataUrl;
+  a.download = window._lastPreviewImageFileName || 'website-preview.png';
   a.click();
-  showToast('HTML gedownload');
+  showToast('Preview gedownload');
 }
 
 function addToHistory(url, hostname) {
