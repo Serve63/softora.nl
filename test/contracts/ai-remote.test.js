@@ -150,7 +150,7 @@ function createService(overrides = {}) {
       })),
     openAiApiBaseUrl: overrides.openAiApiBaseUrl || 'https://api.openai.test/v1',
     openAiModel: overrides.openAiModel || 'gpt-5-mini',
-    openAiImageModel: overrides.openAiImageModel || 'gpt-image-1.5',
+    openAiImageModel: overrides.openAiImageModel || 'gpt-image-2',
     anthropicApiBaseUrl: overrides.anthropicApiBaseUrl || 'https://api.anthropic.test/v1',
     anthropicModel: overrides.anthropicModel || 'claude-opus-4-6',
     websiteGenerationTimeoutMs: overrides.websiteGenerationTimeoutMs || 45000,
@@ -184,10 +184,10 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(state.fetchJsonCalls.length, 0);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.openai.test/v1/images/generations');
-  assert.match(String(calls[0].options.body || ''), /gpt-image-1\.5/);
+  assert.match(String(calls[0].options.body || ''), /gpt-image-2/);
   assert.match(String(calls[0].options.body || ''), /"quality":"high"/);
   assert.doesNotMatch(String(calls[0].options.body || ''), /response_format/);
-  assert.equal(result.model, 'gpt-image-1.5');
+  assert.equal(result.model, 'gpt-image-2');
   assert.equal(result.brief, 'Brief softora.nl');
   assert.equal(result.fileName, 'softora.nl.png');
   assert.equal(result.dataUrl, 'data:image/png;base64,YWJjZA==');

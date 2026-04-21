@@ -270,7 +270,7 @@ function createAiRemoteService(deps = {}) {
 
   function isSupportedOpenAiImageModel(modelRaw) {
     const model = normalizeString(modelRaw || '').toLowerCase();
-    return /^gpt-image-(?:1(?:\.5)?|1-mini)$/.test(model) || /^dall-e-[23]$/.test(model);
+    return /^gpt-image-(?:1(?:\.5)?|1-mini|2)$/.test(model) || /^dall-e-[23]$/.test(model);
   }
 
   function isGptImageGenerationModel(modelRaw) {
@@ -319,7 +319,7 @@ function createAiRemoteService(deps = {}) {
 
     const prompt = buildWebsitePreviewPromptFromScan(scan);
     const imageModel = normalizeString(
-      openAiImageModel || env.OPENAI_IMAGE_MODEL || env.WEBSITE_PREVIEW_IMAGE_MODEL || 'gpt-image-1.5'
+      openAiImageModel || env.WEBSITE_PREVIEW_IMAGE_MODEL || env.OPENAI_IMAGE_MODEL || 'gpt-image-2'
     );
     if (!isSupportedOpenAiImageModel(imageModel)) {
       const err = new Error(`OpenAI image-model ongeldig geconfigureerd (${imageModel || 'leeg'})`);
@@ -327,7 +327,7 @@ function createAiRemoteService(deps = {}) {
       err.data = {
         error: {
           detail:
-            'OPENAI_IMAGE_MODEL moet een ondersteund image-model zijn, bijvoorbeeld gpt-image-1, gpt-image-1.5 of gpt-image-1-mini.',
+            'OPENAI_IMAGE_MODEL moet een ondersteund image-model zijn, bijvoorbeeld gpt-image-2, gpt-image-1.5 of gpt-image-1-mini.',
         },
       };
       throw err;
