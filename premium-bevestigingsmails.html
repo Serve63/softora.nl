@@ -35,7 +35,7 @@
   --crimson: #9b2355; --clight: #c4346a; --dark: #1a1a2e;
   --mid: #555; --light: #999; --green: #16733c; --orange: #b45a00;
   --text-primary: #f5f5f5; --text-tertiary: #888;
-  --z1: #1a5f8a; --z2: #b45a00; --z3: #9b2355; --z4: #7b3fa0;
+  --z1: #1a5f8a; --z2: #b45a00; --z4: #7b3fa0;
   --z5: #16733c;
 }
 body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); min-height: 100vh; line-height: 1.6; overflow-x: hidden; }
@@ -97,7 +97,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .page-section-inner { padding: 24px; }
 
 /* ZONE BALK */
-.zones-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 0; }
+.zones-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 0; }
 .zone-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -112,7 +112,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .zone-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
 .zone-card.z1::before { background: var(--z1); }
 .zone-card.z2::before { background: var(--z2); }
-.zone-card.z3::before { background: var(--z3); }
 .zone-card.z4::before { background: var(--z4); }
 .zone-card.z5::before { background: var(--z5); }
 .zone-card.conv-card::before { background: var(--crimson); }
@@ -120,7 +119,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .zone-badge { font-size: 8px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; margin-bottom: 10px; display: inline-block; padding: 2px 7px; border-radius: 999px; }
 .z1 .zone-badge { background: rgba(26,95,138,.1); color: var(--z1); }
 .z2 .zone-badge { background: rgba(180,90,0,.1); color: var(--z2); }
-.z3 .zone-badge { background: rgba(155,35,85,.1); color: var(--z3); }
 .z4 .zone-badge { background: rgba(123,63,160,.1); color: var(--z4); }
 .z5 .zone-badge { background: rgba(22,115,60,.1); color: var(--z5); }
 .conv-card .zone-badge { background: rgba(155,35,85,.1); color: var(--crimson); }
@@ -198,7 +196,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .zone-pill { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 4px; font-family: 'Oswald', sans-serif; letter-spacing: .5px; white-space: nowrap; }
 .zp1 { background: rgba(26,95,138,.1); color: var(--z1); }
 .zp2 { background: rgba(180,90,0,.1); color: var(--z2); }
-.zp3 { background: rgba(155,35,85,.1); color: var(--z3); }
 .zp4 { background: rgba(123,63,160,.1); color: var(--z4); }
 .zp5 { background: rgba(22,115,60,.1); color: var(--z5); }
 .mail-datum { font-size: 11px; color: var(--light); }
@@ -346,12 +343,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
         <div class="zone-badge">Zone 2</div>
         <div class="zone-label">Tweede mail verstuurd</div>
         <div class="zone-count" id="z2-count">0</div>
-        <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
-      </div>
-      <div class="zone-card z3" onclick="openZone(3)">
-        <div class="zone-badge">Zone 3</div>
-        <div class="zone-label">Derde mail verstuurd</div>
-        <div class="zone-count" id="z3-count">0</div>
         <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
       </div>
       <div class="zone-card z4" onclick="openZone(4)">
@@ -617,7 +608,7 @@ updateKm(4);
 
 // ── ZONE COUNTS ──
 function updateZoneCounts() {
-  [1,2,3,4,5].forEach(z => {
+  [1,2,4,5].forEach(z => {
     document.getElementById(`z${z}-count`).textContent = bedrijven.filter(b=>b.zone===z).length;
   });
   const totaal = bedrijven.length;
@@ -676,15 +667,14 @@ function runMails() {
   campInterval = setInterval(() => {
     if (!running || campIdx >= campTotal) { stopCampagne(); return; }
     const b = bedrijven[campIdx]; campIdx++;
-    // randomly promote some to zone 2/3/4 for demo
+    // randomly promote some to zone 2/4/5 for demo
     const r = Math.random();
     if (r < .03) b.zone = 5;
     else if (r < .08) b.zone = 4;
-    else if (r < .18) b.zone = 3;
     else if (r < .38) b.zone = 2;
 
-    const zoneColors = { 1: 'var(--z1)', 2: 'var(--z2)', 3: 'var(--z3)', 4: 'var(--z4)', 5: 'var(--z5)' };
-    const zoneLabels = { 1:'Zone 1 — Eerste mail', 2:'Zone 2 — Tweede mail', 3:'Zone 3 — Derde mail', 4:'Zone 4 — Meer dan 3 mails', 5:'Zone 5 — Afspraak ✓' };
+    const zoneColors = { 1: 'var(--z1)', 2: 'var(--z2)', 4: 'var(--z4)', 5: 'var(--z5)' };
+    const zoneLabels = { 1:'Zone 1 — Eerste mail', 2:'Zone 2 — Tweede mail', 4:'Zone 4 — Meer dan 3 mails', 5:'Zone 5 — Afspraak ✓' };
     addLog(`<strong>${b.naam}</strong> · ${zoneLabels[b.zone]}`, zoneColors[b.zone]);
 
     const pct = Math.round((campIdx / campTotal) * 100);
@@ -706,7 +696,6 @@ function stopCampagne() {
 const zoneInfo = {
   1: { label:'Zone 1', title:'Eerste mail verstuurd',     sub:'Alle bedrijven die de eerste mail hebben ontvangen.', badge:'zp1', col:'var(--z1)' },
   2: { label:'Zone 2', title:'Tweede mail verstuurd',     sub:'Bedrijven die een follow-up mail hebben ontvangen.', badge:'zp2', col:'var(--z2)' },
-  3: { label:'Zone 3', title:'Derde mail verstuurd',      sub:'Bedrijven die de derde mail hebben ontvangen.', badge:'zp3', col:'var(--z3)' },
   4: { label:'Zone 4', title:'Meer dan 3 mails verstuurd', sub:'Bedrijven die meer dan 3 mails hebben ontvangen maar nog geen afspraak hebben ingepland.', badge:'zp4', col:'var(--z4)' },
   5: { label:'Zone 5', title:'Afspraak ingepland ✓',      sub:'Bedrijven die een afspraak hebben ingepland.', badge:'zp5', col:'var(--z5)' },
 };
