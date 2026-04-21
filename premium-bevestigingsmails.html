@@ -93,7 +93,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 10px 30px rgba(26,26,46,.05);
 }
 .page-section-inner { padding: 24px; }
@@ -136,7 +136,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .bottom-grid { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: stretch; }
 
 /* ACTIVITEITENLOG */
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: visible; height: 100%; display: flex; flex-direction: column; }
 .card-head { padding: 14px 20px; border-bottom: 1px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: space-between; }
 .card-title { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dark); }
 .card-body { padding: 0; }
@@ -150,13 +150,14 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .log-empty { padding: 40px; text-align: center; font-size: 13px; color: var(--light); }
 
 /* CAMPAGNE KAART */
-.campagne-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
+.campagne-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: visible; height: 100%; display: flex; flex-direction: column; }
 .campagne-head { padding: 14px 20px; border-bottom: 1px solid var(--border); background: transparent; }
 .campagne-title { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dark); }
 .campagne-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
 
 /* INSTELLINGEN */
-.field { margin-bottom: 18px; }
+.field { margin-bottom: 18px; position: relative; }
+.field.is-open { z-index: 25; }
 .field-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); margin-bottom: 8px; display: block; }
 .field-val { font-family: 'Oswald', sans-serif; font-size: 28px; font-weight: 700; color: var(--crimson); line-height: 1; margin-bottom: 6px; }
 
@@ -166,6 +167,86 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 
 .sel { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--dark); background: var(--field-bg); outline: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; transition: border-color .15s; }
 .sel:focus { border-color: var(--crimson); outline: none; }
+.native-select-hidden { position: absolute; inset: 0; opacity: 0; pointer-events: none; width: 0; height: 0; }
+.select-shell { position: relative; width: 100%; }
+.select-trigger {
+  width: 100%;
+  min-height: 41px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: var(--dark);
+  background: var(--field-bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.select-trigger:hover { border-color: rgba(155,35,85,.38); }
+.select-trigger:focus-visible {
+  border-color: var(--crimson);
+  box-shadow: 0 0 0 3px rgba(155,35,85,.08);
+  outline: none;
+}
+.select-shell.open .select-trigger {
+  border-color: var(--crimson);
+  box-shadow: 0 0 0 3px rgba(155,35,85,.08);
+}
+.select-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.select-trigger-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--light);
+  flex-shrink: 0;
+  transition: transform .16s ease;
+}
+.select-shell.open .select-trigger-icon { transform: rotate(180deg); }
+.select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  padding: 6px;
+  border: 1px solid rgba(155,35,85,.28);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 12px 30px rgba(26,26,46,.12);
+  display: none;
+  z-index: 30;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.select-shell.open-up .select-menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.select-shell.open .select-menu { display: block; }
+.select-option {
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dark);
+  padding: 10px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.select-option:hover,
+.select-option.is-active {
+  background: rgba(155,35,85,.08);
+  color: var(--crimson);
+}
 
 .btn-start { width: 100%; padding: 13px; background: var(--crimson); color: #fff; border: none; border-radius: 6px; font-family: 'Oswald', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: background .15s; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; }
 .btn-start:hover { background: var(--clight); }
@@ -789,11 +870,133 @@ function switchMail(n, el) {
   document.getElementById('mail-panel-' + n).classList.add('active');
 }
 
+function closeCustomSelects(exceptShell = null) {
+  document.querySelectorAll('.select-shell.open').forEach(shell => {
+    if (shell === exceptShell) return;
+    shell.classList.remove('open');
+    shell.classList.remove('open-up');
+    const field = shell.closest('.field');
+    if (field) field.classList.remove('is-open');
+    const trigger = shell.querySelector('.select-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function syncCustomSelect(select) {
+  const shell = select.parentElement && select.parentElement.classList.contains('select-shell')
+    ? select.parentElement
+    : null;
+  if (!shell) return;
+  const triggerLabel = shell.querySelector('.select-trigger-label');
+  const activeOption = select.options[select.selectedIndex];
+  if (triggerLabel) triggerLabel.textContent = activeOption ? activeOption.textContent : '';
+  shell.querySelectorAll('.select-option').forEach(optionButton => {
+    optionButton.classList.toggle('is-active', optionButton.dataset.value === select.value);
+  });
+}
+
+function positionCustomSelect(shell) {
+  const menu = shell.querySelector('.select-menu');
+  if (!menu) return;
+  shell.classList.remove('open-up');
+  const rect = shell.getBoundingClientRect();
+  const optionCount = shell.querySelectorAll('.select-option').length;
+  const estimatedHeight = Math.min((optionCount * 42) + 12, 240);
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const spaceAbove = rect.top;
+  if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
+    shell.classList.add('open-up');
+  }
+}
+
+function enhanceCampaignSelect(select) {
+  if (select.dataset.enhanced === 'true') return;
+  select.dataset.enhanced = 'true';
+
+  const shell = document.createElement('div');
+  shell.className = 'select-shell';
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'select-trigger';
+  trigger.setAttribute('aria-haspopup', 'listbox');
+  trigger.setAttribute('aria-expanded', 'false');
+
+  const label = document.createElement('span');
+  label.className = 'select-trigger-label';
+
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('fill', 'none');
+  icon.setAttribute('stroke', 'currentColor');
+  icon.setAttribute('stroke-width', '2');
+  icon.classList.add('select-trigger-icon');
+  const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  polyline.setAttribute('points', '6 9 12 15 18 9');
+  icon.appendChild(polyline);
+
+  const menu = document.createElement('div');
+  menu.className = 'select-menu';
+  menu.setAttribute('role', 'listbox');
+
+  Array.from(select.options).forEach(option => {
+    const optionButton = document.createElement('button');
+    optionButton.type = 'button';
+    optionButton.className = 'select-option';
+    optionButton.dataset.value = option.value;
+    optionButton.textContent = option.textContent;
+    optionButton.setAttribute('role', 'option');
+    optionButton.addEventListener('click', () => {
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      syncCustomSelect(select);
+      closeCustomSelects();
+    });
+    menu.appendChild(optionButton);
+  });
+
+  trigger.appendChild(label);
+  trigger.appendChild(icon);
+
+  select.parentNode.insertBefore(shell, select);
+  shell.appendChild(select);
+  shell.appendChild(trigger);
+  shell.appendChild(menu);
+  select.classList.add('native-select-hidden');
+
+  trigger.addEventListener('click', () => {
+    const isOpen = shell.classList.contains('open');
+    closeCustomSelects(isOpen ? null : shell);
+    if (!isOpen) positionCustomSelect(shell);
+    shell.classList.toggle('open', !isOpen);
+    const field = shell.closest('.field');
+    if (field) field.classList.toggle('is-open', !isOpen);
+    trigger.setAttribute('aria-expanded', String(!isOpen));
+  });
+
+  select.addEventListener('change', () => syncCustomSelect(select));
+  syncCustomSelect(select);
+}
+
+function initCampaignSelects() {
+  document.querySelectorAll('select.sel, select.mf-sel').forEach(enhanceCampaignSelect);
+}
+
 // TOAST
 function showToast(msg) {
   const t = document.getElementById('toast'); t.textContent = msg;
   t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2800);
 }
+
+document.addEventListener('click', event => {
+  if (!event.target.closest('.select-shell')) closeCustomSelects();
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeCustomSelects();
+});
+
+initCampaignSelects();
 </script>
 
 <!-- ZONE POPUP -->
