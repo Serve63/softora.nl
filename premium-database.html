@@ -20,22 +20,25 @@
         })();
     </script>
     <script src="assets/personnel-theme.js?v=20260421b" defer></script>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --bg: #f0ede8;
-            --card: #fff;
-            --border: #e2ddd6;
-            --crimson: #9b2355;
-            --dark: #1a1a2e;
-            --mid: #666;
-            --light: #aaa;
-            --green: #16733c;
-            --red: #c0392b;
-            --orange: #b45a00;
-            --blue: #1a5f8a;
+            --bg: #080808;
+            --card: #0d0d0d;
+            --card-soft: rgba(255, 255, 255, 0.02);
+            --field-bg: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.06);
+            --crimson: #8B2252;
+            --crimson-light: #A62D65;
+            --dark: #f5f5f5;
+            --mid: #888;
+            --light: #555;
+            --green: #2ecc71;
+            --red: #e74c3c;
+            --orange: #f39c12;
+            --blue: #3498db;
             --purple: #6b3fa0;
         }
 
@@ -46,7 +49,7 @@
         }
 
         body {
-            font-family: 'Barlow', sans-serif;
+            font-family: 'Inter', sans-serif;
             background: var(--bg);
             color: var(--dark);
             overflow-x: hidden;
@@ -84,21 +87,12 @@
             gap: 16px;
         }
 
-        .logo {
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 13px;
-            font-weight: 800;
-            letter-spacing: 1px;
-            color: var(--crimson);
-            margin-bottom: 4px;
-        }
-
         .page-title {
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: 28px;
-            font-weight: 800;
+            font-family: 'Oswald', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: -0.5px;
+            letter-spacing: 0.02em;
         }
 
         .page-sub {
@@ -123,7 +117,7 @@
             border: 1px solid var(--border);
             border-radius: 5px;
             background: var(--card);
-            font-family: 'Barlow Condensed', sans-serif;
+            font-family: 'Oswald', sans-serif;
             font-size: 11px;
             font-weight: 700;
             letter-spacing: 1px;
@@ -145,7 +139,7 @@
         }
 
         .btn.prim:hover {
-            background: #c4346a;
+            background: var(--crimson-light);
             color: #fff;
         }
 
@@ -215,7 +209,7 @@
         .msel,
         .p-ta {
             border: 1px solid var(--border);
-            background: var(--card);
+            background: var(--field-bg);
             color: var(--dark);
             outline: none;
             transition: border-color .15s ease;
@@ -260,7 +254,7 @@
             padding: 6px 14px;
             border: 1px solid var(--border);
             border-radius: 5px;
-            background: var(--card);
+            background: var(--card-soft);
             font-size: 11px;
             font-weight: 500;
             color: var(--light);
@@ -270,14 +264,14 @@
         }
 
         .sf-btn:hover {
-            border-color: var(--dark);
+            border-color: rgba(139, 34, 82, 0.38);
             color: var(--dark);
         }
 
         .sf-btn.act {
-            border-color: var(--dark);
-            background: var(--dark);
-            color: #fff;
+            border-color: rgba(139, 34, 82, 0.4);
+            background: rgba(139, 34, 82, 0.12);
+            color: var(--dark);
             font-weight: 600;
         }
 
@@ -286,9 +280,9 @@
         .sf-btn[data-s="gebeld"].act { border-color: var(--orange); background: rgba(180,90,0,.08); color: var(--orange); }
         .sf-btn[data-s="gemaild"].act { border-color: var(--crimson); background: rgba(155,35,85,.08); color: var(--crimson); }
         .sf-btn[data-s="geblokkeerd"].act { border-color: var(--red); background: rgba(192,57,43,.08); color: var(--red); }
-        .sf-btn[data-s="buiten"].act { border-color: #999; background: rgba(0,0,0,.05); color: #555; }
+        .sf-btn[data-s="buiten"].act { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: var(--mid); }
         .sf-btn[data-s="benaderbaar"].act { border-color: var(--green); background: rgba(22,115,60,.1); color: var(--green); }
-        .sf-btn[data-s="geengehoor"].act { border-color: #999; background: rgba(0,0,0,.05); color: #555; }
+        .sf-btn[data-s="geengehoor"].act { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: var(--mid); }
 
         .f-count {
             font-size: 12px;
@@ -322,7 +316,7 @@
             text-transform: uppercase;
             color: var(--light);
             border-bottom: 1px solid var(--border);
-            background: #faf9f7;
+            background: var(--card-soft);
             user-select: none;
             cursor: pointer;
             white-space: nowrap;
@@ -349,7 +343,7 @@
         }
 
         tbody tr:hover td {
-            background: #faf9f7;
+            background: rgba(255, 255, 255, 0.02);
         }
 
         .c-naam {
@@ -418,7 +412,7 @@
 
         .k-call { background: rgba(180,90,0,.1); color: var(--orange); }
         .k-mail { background: rgba(155,35,85,.1); color: var(--crimson); }
-        .k-off { background: rgba(0,0,0,.05); color: #bbb; text-decoration: line-through; }
+        .k-off { background: rgba(255,255,255,.05); color: var(--light); text-decoration: line-through; }
 
         .tbl-empty {
             text-align: center;
@@ -472,7 +466,7 @@
         }
 
         .p-naam {
-            font-family: 'Barlow Condensed', sans-serif;
+            font-family: 'Oswald', sans-serif;
             font-size: 20px;
             font-weight: 800;
             text-transform: uppercase;
@@ -521,6 +515,7 @@
         }
 
         .p-s-title {
+            font-family: 'Oswald', sans-serif;
             font-size: 9px;
             font-weight: 700;
             letter-spacing: 2px;
@@ -535,7 +530,7 @@
             color: #fff;
             border: none;
             border-radius: 5px;
-            font-family: 'Barlow Condensed', sans-serif;
+            font-family: 'Oswald', sans-serif;
             font-size: 12px;
             font-weight: 700;
             letter-spacing: 1px;
@@ -546,7 +541,7 @@
         }
 
         .p-apply:hover {
-            background: #c4346a;
+            background: var(--crimson-light);
         }
 
         .p-ta {
@@ -583,7 +578,7 @@
         }
 
         .modal-title {
-            font-family: 'Barlow Condensed', sans-serif;
+            font-family: 'Oswald', sans-serif;
             font-size: 18px;
             font-weight: 800;
             text-transform: uppercase;
@@ -623,7 +618,7 @@
             flex: 1;
             padding: 10px;
             border-radius: 5px;
-            font-family: 'Barlow Condensed', sans-serif;
+            font-family: 'Oswald', sans-serif;
             font-size: 12px;
             font-weight: 700;
             letter-spacing: 1px;
@@ -638,7 +633,7 @@
         }
 
         .mbtn.s:hover {
-            background: #c4346a;
+            background: var(--crimson-light);
         }
 
         .mbtn.c {
@@ -656,8 +651,8 @@
             position: fixed;
             bottom: 20px;
             right: 24px;
-            background: var(--dark);
-            color: #fff;
+            background: #111;
+            color: var(--dark);
             padding: 9px 14px;
             border-radius: 5px;
             font-size: 12px;

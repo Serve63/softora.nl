@@ -25,6 +25,11 @@ test('premium database page renders the dedicated database UI while preserving p
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /<title>Softora \| Database<\/title>/);
+  assert.match(pageSource, /family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700/);
+  assert.match(pageSource, /--bg: #080808;/);
+  assert.match(pageSource, /--card: #0d0d0d;/);
+  assert.match(pageSource, /font-family: 'Inter', sans-serif;/);
+  assert.match(pageSource, /\.page-title \{[\s\S]*font-family: 'Oswald', sans-serif;/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);
   assert.match(pageSource, /<button class="btn prim" id="addButton" type="button">[\s\S]*Toevoegen/);
   assert.match(pageSource, /<input type="text" id="q" placeholder="Zoek op bedrijfsnaam…">/);
