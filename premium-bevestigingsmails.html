@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
-        <link rel="stylesheet" href="/assets/iphone-optimizations.css">
-<title>Softora | Bevestigingsmails — Premium</title>
-
+    <link rel="stylesheet" href="/assets/iphone-optimizations.css">
+    <title>Cold Mailing - Softora.nl</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
@@ -19,159 +18,84 @@
                 var storageKey = isPremiumPersonnel
                     ? "softora_premium_personnel_theme_mode"
                     : "softora_software_personnel_theme_mode";
-                document.documentElement.setAttribute("data-theme-mode", "light");
-                document.documentElement.setAttribute("data-theme", "light");
+                if (storageKey) {
+                    document.documentElement.setAttribute("data-theme-mode", "light");
+                    document.documentElement.setAttribute("data-theme", "light");
+                }
             } catch (error) {
                 /* ignore storage errors */
             }
         })();
     </script>
     <script src="assets/personnel-theme.js?v=20260421b" defer></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+    <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --bg-primary: #080808;
-            --bg-secondary: #0d0d0d;
-            --bg-tertiary: #111;
-            --accent: #8B2252;
-            --accent-dark: #6B1A3F;
-            --accent-glow: rgba(139, 34, 82, 0.4);
-            --accent-light: #A62D65;
-            --text-primary: #f5f5f5;
-            --text-secondary: #888;
-            --text-tertiary: #555;
-            --border: rgba(255, 255, 255, 0.06);
-            --green: #2ecc71;
-            --green-glow: rgba(46, 204, 113, 0.15);
-            --yellow: #f39c12;
-
-            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --bg: #f0ede8;
+            --card: #fff;
+            --tag: #f5f0eb;
+            --border: #e2ddd6;
+            --crimson: #9b2355;
+            --clight: #c4346a;
+            --dark: #1a1a2e;
+            --mid: #555;
+            --light: #999;
+            --green: #16733c;
+            --orange: #b45a00;
+            --z1: #1a5f8a;
+            --z2: #b45a00;
+            --z3: #9b2355;
+            --z4: #7b3fa0;
+            --z5: #16733c;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
+            font-family: 'Barlow', sans-serif;
+            background: var(--bg);
+            color: var(--dark);
+            min-height: 100vh;
             overflow-x: hidden;
-            cursor: none;
         }
 
-        h1, h2, h3, h4 {
-            font-family: 'Oswald', sans-serif;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-            line-height: 1;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            * {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-                scroll-behavior: auto !important;
-            }
-        }
-
-        .noise-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 9999;
-            opacity: 0.03;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-        }
-
-        .cursor {
-            width: 24px;
-            height: 24px;
-            border: 2px solid var(--accent-light);
-            border-radius: 50%;
-            position: fixed;
-            pointer-events: none;
-            z-index: 10000;
-            transition: transform 0.1s var(--ease-out-expo),
-                        background 0.2s ease,
-                        width 0.3s var(--ease-out-expo),
-                        height 0.3s var(--ease-out-expo);
-            transform: translate(-50%, -50%);
-            mix-blend-mode: difference;
-        }
-
-        .cursor.hover {
-            width: 80px;
-            height: 80px;
-            background: var(--accent-light);
-            border-color: transparent;
-        }
-
-        .cursor-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--accent-light);
-            border-radius: 50%;
-            position: fixed;
-            pointer-events: none;
-            z-index: 10001;
-            transform: translate(-50%, -50%);
-        }
-
-        /* Layout */
         .dashboard-layout {
             display: flex;
             min-height: 100vh;
         }
 
-        /* Sidebar */
         .sidebar {
             width: 280px;
-            background: var(--bg-secondary);
+            background: #fff;
             border-right: 1px solid var(--border);
-            padding: 2.5rem 0 0 0;
+            padding: 2.5rem 0 0;
             display: flex;
             flex-direction: column;
             position: fixed;
             top: 0;
             left: 0;
             height: 100vh;
-            z-index: 100;
+            z-index: 30;
         }
 
         .sidebar-logo {
-            font-family: 'Oswald', sans-serif;
+            font-family: 'Barlow Condensed', sans-serif;
             font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-primary);
+            font-weight: 800;
+            color: var(--dark);
             text-decoration: none;
             padding: 0 2rem;
             margin-bottom: 2rem;
             display: block;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
 
-        .sidebar-logo span { color: var(--accent-light); }
-
-        .sidebar-nav {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-        }
-
+        .sidebar-logo span { color: var(--crimson); }
+        .sidebar-nav { flex: 1; min-height: 0; overflow-y: auto; }
         .sidebar-section { margin-bottom: 1.2rem; }
-
-        .sidebar-flow-section {
-            position: relative;
-        }
+        .sidebar-flow-section { position: relative; }
 
         .sidebar-flow-section::before {
             content: '';
@@ -180,22 +104,20 @@
             top: 6.45rem;
             bottom: 1.35rem;
             width: 0.7rem;
-            background: rgba(139, 34, 82, 0.72);
+            background: rgba(155, 35, 85, 0.18);
             clip-path: polygon(50% 0, 100% 0.46rem, 66% 0.46rem, 66% 100%, 34% 100%, 34% 0.46rem, 0 0.46rem);
             pointer-events: none;
         }
 
-        .sidebar-flow-section .sidebar-link {
-            padding-left: 2.8rem;
-        }
+        .sidebar-flow-section .sidebar-link { padding-left: 2.8rem; }
 
         .sidebar-section-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.2em;
-            color: var(--text-tertiary);
+            letter-spacing: 0.18em;
+            color: var(--light);
             padding: 0 2rem;
             margin-bottom: 0.5rem;
         }
@@ -205,42 +127,47 @@
             align-items: center;
             gap: 0.8rem;
             padding: 0.6rem 2rem;
-            color: var(--text-secondary);
+            color: var(--mid);
             text-decoration: none;
-            font-size: 0.84rem;
-            font-weight: 400;
-            transition: all 0.2s;
-            cursor: none;
+            font-size: 0.92rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
             position: relative;
         }
 
-        .sidebar-link::before {
-            content: none;
-        }
-
         .sidebar-link:hover {
-            color: var(--text-primary);
-            background: rgba(255,255,255,0.02);
+            color: var(--dark);
+            background: rgba(155, 35, 85, 0.05);
         }
 
         .sidebar-link.active {
-            color: var(--text-primary);
-            background: rgba(139, 34, 82, 0.06);
+            color: var(--dark);
+            background: rgba(155, 35, 85, 0.08);
         }
 
         .sidebar-link svg {
             width: 18px;
             height: 18px;
-            opacity: 0.5;
+            opacity: 0.7;
             flex-shrink: 0;
         }
 
-        .sidebar-link.active svg,
-        .sidebar-link:hover svg { opacity: 1; }
+        .sidebar-notification-badge {
+            margin-left: auto;
+            min-width: 1.5rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: rgba(155, 35, 85, 0.1);
+            color: var(--crimson);
+            text-align: center;
+        }
 
         .sidebar-footer {
             flex-shrink: 0;
             padding: 1.5rem 2rem;
+            border-top: 1px solid var(--border);
         }
 
         .sidebar-user {
@@ -249,2318 +176,1348 @@
             gap: 0.8rem;
         }
 
+        .sidebar-user-trigger {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            min-width: 0;
+            flex: 1;
+        }
+
         .sidebar-avatar {
             width: 36px;
             height: 36px;
-            background: var(--accent);
+            background: var(--crimson);
+            color: #fff;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: white;
-            flex-shrink: 0;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-weight: 800;
+            letter-spacing: 0.06em;
         }
 
-        .sidebar-user-info { flex: 1; min-width: 0; }
-
+        .sidebar-user-info { min-width: 0; }
         .sidebar-user-name {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: var(--text-primary);
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: var(--dark);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .sidebar-user-role {
             font-size: 0.75rem;
-            color: var(--text-tertiary);
+            color: var(--light);
         }
 
         .logout-btn {
-            background: none;
-            border: none;
-            color: var(--text-tertiary);
-            cursor: none;
-            padding: 0.3rem;
-            transition: color 0.2s;
-        }
-
-        .logout-btn:hover { color: #e74c3c; }
-        .logout-btn svg { width: 18px; height: 18px; }
-
-        /* Main */
-        .main-content {
-            flex: 1;
-            margin-left: 280px;
-            padding: 3rem;
-        }
-
-        /* Top bar */
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 3rem;
-        }
-
-        .topbar-right {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 0.7rem;
-            flex-wrap: wrap;
-        }
-
-        .topbar-select-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.28rem;
-        }
-
-        .topbar-select-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.56rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.16em;
-            color: var(--text-tertiary);
-            line-height: 1;
-            width: 100%;
-            text-align: center;
-        }
-
-        .topbar-cost-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.28rem;
-            min-width: 15.5rem;
-        }
-
-        .topbar-cost-card {
-            width: 15.5rem;
-            min-width: 15.5rem;
-            max-width: 15.5rem;
-            min-height: auto;
-            padding: 0;
-            border: none;
-            background: transparent;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .topbar-cost-stack {
-            display: flex;
-            justify-content: center;
-            min-width: 0;
-            width: 100%;
-        }
-
-        .topbar-cost-copy {
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.12rem;
-            text-align: center;
-        }
-
-        .topbar-cost-value {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.82rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            line-height: 1;
-            color: var(--text-primary);
-            white-space: nowrap;
-        }
-
-        .topbar-cost-group .topbar-select-label {
-            font-size: 0.5rem;
-            letter-spacing: 0.14em;
-        }
-
-        .topbar-left h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.3rem;
-        }
-
-        .topbar-left p {
-            color: var(--text-tertiary);
-            font-size: 0.9rem;
-            font-weight: 300;
-        }
-
-        /* Status indicator */
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.8rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            padding: 0.5rem 1.2rem;
+            width: 36px;
+            height: 36px;
             border: 1px solid var(--border);
-        }
-
-        .status-pill .dot {
-            width: 8px;
-            height: 8px;
             border-radius: 50%;
-            background: var(--text-tertiary);
-        }
-
-        .status-pill.active .dot {
-            background: var(--green);
-            box-shadow: 0 0 10px var(--green-glow);
-            animation: blink 2s ease-in-out infinite;
-        }
-
-        .status-pill.active {
-            color: var(--text-primary);
-            border-color: var(--border);
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-
-        /* Generator panels */
-        .generator-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1.25rem;
-            margin-bottom: 3rem;
-            position: relative;
-            z-index: 30;
-        }
-
-        .generator-grid > .panel-zone-strip {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 0.9rem;
-            padding: 0;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeUp 0.6s var(--ease-out-expo) 0.05s forwards;
-        }
-
-        .panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            padding: 2.5rem;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeUp 0.6s var(--ease-out-expo) forwards;
-        }
-
-        .generator-grid > .panel {
-            grid-column: 1 / -1;
-            display: grid;
-            grid-template-columns: minmax(360px, 1.25fr) minmax(260px, 1fr);
-            column-gap: 1.5rem;
-            row-gap: 1.25rem;
-            align-items: end;
-        }
-
-        .generator-grid > .panel .panel-header,
-        .generator-grid > .panel .form-group:first-of-type {
-            grid-column: 1 / -1;
-        }
-
-        .generator-grid > .panel .form-group--slider {
-            grid-column: 1 / -1;
-            grid-row: 2;
-        }
-
-        .generator-grid > .panel .form-group--lead-list {
-            grid-column: 1;
-            grid-row: 3;
-        }
-
-        .generator-grid > .panel .form-group--branche {
-            grid-column: 2;
-            grid-row: 3;
-        }
-
-        .generator-grid > .panel .form-group--dispatch {
-            grid-column: 1;
-            grid-row: 4;
-        }
-
-        .generator-grid > .panel .form-group--regio {
-            grid-column: 2;
-            grid-row: 4;
-        }
-
-        .generator-grid > .panel .panel-header,
-        .generator-grid > .panel .form-group {
-            margin-bottom: 0;
-        }
-
-        @keyframes fadeUp {
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .panel-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .panel-badge {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--accent-light);
-            padding: 0.3rem 0.8rem;
-            border: 1px solid rgba(139,34,82,0.3);
-        }
-
-        .panel-zone-card {
-            border: 1px solid rgba(139,34,82,0.16);
-            background: linear-gradient(180deg, rgba(139,34,82,0.08) 0%, rgba(255,255,255,0.02) 100%);
-            padding: 0.95rem 1rem;
-            min-height: 100%;
-        }
-
-        .panel-zone-label {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 0.6rem;
-            padding: 0.22rem 0.5rem;
-            border: 1px solid rgba(139,34,82,0.22);
-            background: rgba(139,34,82,0.08);
-            color: var(--accent-light);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.64rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-        }
-
-        .panel-zone-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.94rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-primary);
-            margin-bottom: 0.4rem;
-        }
-
-        .panel-zone-copy {
-            font-size: 0.8rem;
-            line-height: 1.55;
-            color: var(--text-secondary);
-            font-weight: 300;
-        }
-
-        /* Form elements */
-        .form-group {
-            margin-bottom: 2rem;
-        }
-
-        .form-group:last-child {
-            margin-bottom: 0;
-        }
-
-        .form-label {
-            display: block;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            color: var(--text-tertiary);
-            margin-bottom: 0.8rem;
-        }
-
-        .form-input, .form-select, .form-textarea {
-            width: 100%;
-            padding: 1rem 1.2rem;
-            background: rgba(255,255,255,0.03);
-            border: 2px solid var(--border);
-            color: var(--text-primary);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 400;
-            outline: none;
-            transition: all 0.3s var(--ease-out-expo);
-            cursor: none;
-        }
-
-        .form-input::placeholder,
-        .form-textarea::placeholder {
-            color: var(--text-tertiary);
-            font-weight: 300;
-        }
-
-        .form-input:focus, .form-select:focus, .form-textarea:focus {
-            border-color: var(--accent-light);
-            background: rgba(139, 34, 82, 0.03);
-            box-shadow: 0 0 30px rgba(139, 34, 82, 0.08);
-        }
-
-        .form-select {
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23555' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 1.2rem center;
-            padding-right: 3rem;
-        }
-
-        .form-select option {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-        }
-
-        .site-select {
-            position: relative;
-            z-index: 20;
-        }
-
-        .site-select.is-open {
-            z-index: 1200;
-        }
-
-        .site-select-native {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .site-select-trigger {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            padding: 1rem 1.2rem;
-            background: rgba(255,255,255,0.03);
-            border: 2px solid var(--border);
-            color: var(--text-primary);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 400;
-            text-align: left;
-            outline: none;
-            cursor: none;
-            transition: all 0.3s var(--ease-out-expo);
-        }
-
-        .site-select-trigger:hover,
-        .site-select-trigger:focus-visible,
-        .site-select.is-open .site-select-trigger {
-            border-color: var(--accent-light);
-            background: rgba(139, 34, 82, 0.03);
-            box-shadow: 0 0 30px rgba(139, 34, 82, 0.08);
-        }
-
-        .site-select-trigger::after {
-            content: '';
-            flex: 0 0 12px;
-            width: 12px;
-            height: 8px;
-            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23555' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: center;
-            transition: transform 0.25s var(--ease-out-expo);
-        }
-
-        .site-select.is-open .site-select-trigger::after {
-            transform: rotate(180deg);
-        }
-
-        .site-select-value {
-            min-width: 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .site-select-menu {
-            position: absolute;
-            top: calc(100% + 0.55rem);
-            left: 0;
-            right: 0;
-            z-index: 1201;
-            padding: 0.35rem;
-            display: grid;
-            gap: 0.25rem;
-            background: var(--bg-secondary);
-            border: 1px solid rgba(139,34,82,0.25);
-            box-shadow: 0 18px 50px rgba(0,0,0,0.35);
-            max-height: 17rem;
-            overflow: auto;
-            opacity: 0;
-            transform: translateY(8px);
-            pointer-events: none;
-            transition: opacity 0.2s ease, transform 0.2s var(--ease-out-expo);
-        }
-
-        .site-select.is-open .site-select-menu {
-            opacity: 1;
-            transform: translateY(0);
-            pointer-events: auto;
-        }
-
-        .site-select-option {
-            width: 100%;
-            border: 0;
-            background: transparent;
-            color: var(--text-primary);
-            text-align: left;
-            padding: 0.7rem 0.8rem;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.95rem;
-            line-height: 1.3;
-            cursor: none;
-            transition: background 0.2s ease, color 0.2s ease;
-        }
-
-        .site-select-option:hover,
-        .site-select-option:focus-visible {
-            background: rgba(255,255,255,0.05);
-            outline: none;
-        }
-
-        .site-select-option.is-selected {
-            color: var(--accent-light);
-            background: rgba(139, 34, 82, 0.12);
-        }
-
-        .site-select-option:disabled {
-            color: var(--text-secondary);
-            opacity: 0.78;
-            cursor: not-allowed;
-        }
-
-        .site-select-option:disabled:hover,
-        .site-select-option:disabled:focus-visible {
-            background: transparent;
-            color: var(--text-secondary);
-            outline: none;
-        }
-
-        .topbar-right .site-select--pill {
-            flex: 0 0 auto;
-            width: auto;
-            display: inline-flex;
-        }
-
-        .topbar-right .site-select--pill .site-select-trigger {
-            position: relative;
-            justify-content: center;
-            gap: 0.42rem;
-            padding: 0.49rem 2rem 0.49rem 0.85rem;
-            border-width: 1px;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.78rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            background: transparent;
-            min-height: 2.2rem;
-            width: 13.4rem !important;
-            min-width: 13.4rem;
-            max-width: 13.4rem;
-            line-height: 1;
-            cursor: none;
-        }
-
-        .topbar-right .site-select--pill .site-select-trigger::after {
-            position: absolute;
-            right: 0.72rem;
-            top: 50%;
-            flex: none;
-            transform: translateY(-50%);
-        }
-
-        .topbar-right .site-select--pill.is-open .site-select-trigger::after {
-            transform: translateY(-50%) rotate(180deg);
-        }
-
-        .topbar-right .site-select--pill .site-select-trigger::before {
-            content: '';
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--green);
-            box-shadow: 0 0 10px var(--green-glow);
-            flex: 0 0 8px;
-        }
-
-        .topbar-right .site-select--pill[data-dot-color="accent"] .site-select-trigger::before {
-            background: var(--accent-light);
-            box-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        .topbar-right .site-select--pill[data-dot-color="green"] .site-select-trigger::before {
-            background: var(--green);
-            box-shadow: 0 0 10px var(--green-glow);
-        }
-
-        .topbar-right .site-select--pill[data-dot-color="blue"] .site-select-trigger::before {
-            background: #2563eb;
-            box-shadow: 0 0 10px rgba(37, 99, 235, 0.28);
-        }
-
-        .topbar-right .site-select--pill .site-select-value {
-            min-width: 0;
-            max-width: calc(100% - 2.75rem);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            text-align: center;
-        }
-
-        .topbar-right .site-select--pill .site-select-menu {
-            right: 0;
-            left: auto;
-            width: max-content;
-            min-width: 13.4rem;
-            max-width: min(22rem, calc(100vw - 2rem));
-        }
-
-        .topbar-right .site-select--pill .site-select-option {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.76rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        .topbar-right .site-select--pill .site-select-option.site-select-option--locked {
-            display: flex;
-            align-items: center;
-            gap: 0.42rem;
-        }
-
-        .topbar-right .site-select--pill .site-select-option .sidebar-link-lock {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .topbar-right .site-select--pill .site-select-option .sidebar-link-lock-icon {
-            width: 15px;
-            height: 15px;
-            opacity: 0.72;
-            flex-shrink: 0;
-        }
-
-        .site-dialog-backdrop {
-            position: fixed;
-            inset: 0;
-            z-index: 1000;
-            background: rgba(8, 10, 18, 0.72);
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-        }
-
-        .site-dialog {
-            width: min(100%, 34rem);
-            background: var(--bg-secondary);
-            border: 1px solid rgba(139,34,82,0.25);
-            box-shadow: 0 25px 80px rgba(0,0,0,0.45);
-            padding: 1.2rem;
-            animation: fadeUp 0.2s ease forwards;
-        }
-
-        .site-dialog-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.95rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-            margin-bottom: 0.45rem;
-        }
-
-        .site-dialog-text {
-            color: var(--text-primary);
-            font-size: 0.95rem;
-            margin-bottom: 0.9rem;
-        }
-
-        .site-dialog-input {
-            width: 100%;
-            padding: 1rem 1.2rem;
-            background: rgba(255,255,255,0.03);
-            border: 2px solid var(--border);
-            color: var(--text-primary);
-            font-family: 'Inter', sans-serif;
-            font-size: 1rem;
-            outline: none;
-            cursor: text;
-            transition: all 0.3s var(--ease-out-expo);
-        }
-
-        .site-dialog-input:focus {
-            border-color: var(--accent-light);
-            background: rgba(139, 34, 82, 0.03);
-            box-shadow: 0 0 30px rgba(139, 34, 82, 0.08);
-        }
-
-        .site-dialog-error {
-            min-height: 1.25rem;
-            margin-top: 0.55rem;
-            font-size: 0.8rem;
-            color: #f4a0bc;
-        }
-
-        .site-dialog-actions {
-            margin-top: 0.9rem;
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.75rem;
-        }
-
-        .site-dialog-btn {
-            border: 1px solid var(--border);
-            background: rgba(255,255,255,0.03);
-            color: var(--text-primary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.8rem;
-            font-weight: 500;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.75rem 1.15rem;
-            min-width: 7.5rem;
-            cursor: none;
+            color: var(--mid);
+            text-decoration: none;
             transition: all 0.2s ease;
         }
 
-        .site-dialog-btn:hover,
-        .site-dialog-btn:focus-visible {
-            border-color: var(--accent-light);
-            outline: none;
+        .logout-btn:hover {
+            border-color: var(--crimson);
+            color: var(--crimson);
         }
 
-        .site-dialog-btn--primary {
-            background: linear-gradient(135deg, rgba(139,34,82,0.9), rgba(183,28,92,0.95));
-            border-color: rgba(139,34,82,0.45);
-            color: #fff;
-            box-shadow: 0 10px 24px rgba(139,34,82,0.22);
+        .logout-btn svg { width: 18px; height: 18px; }
+
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            min-width: 0;
         }
 
-        .form-textarea {
-            min-height: 120px;
-            resize: vertical;
-            line-height: 1.7;
-        }
-
-        /* Slider */
-        .slider-container {
-            position: relative;
-        }
-
-        .slider-header {
+        .topbar {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            min-height: 76px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .topbar-left h1 {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.9rem;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            color: var(--dark);
+            line-height: 1;
+            margin-bottom: 0.2rem;
+        }
+
+        .topbar-left p {
+            font-size: 0.88rem;
+            color: var(--mid);
+        }
+
+        .topbar-right {
+            margin-left: auto;
+            display: flex;
+            gap: 0.85rem;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .topbar-select-group,
+        .topbar-cost-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .topbar-select-label {
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--light);
+        }
+
+        .topbar-pill-select,
+        .topbar-cost-card {
+            min-height: 42px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--card);
+            padding: 0 0.95rem;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .topbar-pill-select {
+            font-family: 'Barlow', sans-serif;
+            font-size: 0.88rem;
+            color: var(--dark);
+            min-width: 11rem;
+            appearance: none;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .topbar-cost-card { min-width: 10rem; }
+        .topbar-cost-value {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--dark);
+        }
+
+        .workspace {
+            padding: 2rem;
+        }
+
+        .generator-grid {
+            display: grid;
+            gap: 1.25rem;
+        }
+
+        .generator-grid > .panel-zone-strip {
+            padding: 0;
+        }
+
+        .panel-zone-strip {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 0.9rem;
+        }
+
+        .panel-zone-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem 1rem 1.15rem;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .panel-zone-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(26, 26, 46, 0.08);
+        }
+
+        .panel-zone-card::before {
+            content: '';
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 3px;
+        }
+
+        .panel-zone-card.z1::before { background: var(--z1); }
+        .panel-zone-card.z2::before { background: var(--z2); }
+        .panel-zone-card.z3::before { background: var(--z3); }
+        .panel-zone-card.z4::before { background: var(--z4); }
+        .panel-zone-card.z5::before { background: var(--z5); }
+
+        .panel-zone-label {
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--light);
+            margin-bottom: 0.5rem;
+        }
+
+        .panel-zone-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--dark);
+            margin-bottom: 0.35rem;
+            line-height: 1.05;
+        }
+
+        .panel-zone-copy {
+            font-size: 0.82rem;
+            color: var(--mid);
+            line-height: 1.45;
+            margin-bottom: 0.85rem;
+        }
+
+        .panel-zone-count {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 2.25rem;
+            font-weight: 800;
+            line-height: 1;
+            color: var(--dark);
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 0.95rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--tag);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .panel-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--dark);
+        }
+
+        .panel-badge {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--crimson);
+            background: rgba(155, 35, 85, 0.08);
+            border: 1px solid rgba(155, 35, 85, 0.15);
+            border-radius: 999px;
+            padding: 0.28rem 0.6rem;
+        }
+
+        .panel-shell {
+            padding: 1.3rem;
+        }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1rem;
             margin-bottom: 1rem;
         }
 
-        .slider-value {
-            font-family: 'Oswald', sans-serif;
-            font-size: 2.5rem;
+        .overview-card {
+            background: var(--tag);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem 1rem 0.95rem;
+        }
+
+        .overview-label {
+            font-size: 0.62rem;
             font-weight: 700;
-            color: var(--accent-light);
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--light);
+            margin-bottom: 0.35rem;
+        }
+
+        .overview-value {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
             line-height: 1;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: baseline;
+        }
+
+        .overview-value.green { color: var(--green); }
+        .overview-value.crimson { color: var(--crimson); }
+
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+            gap: 1.25rem;
+            align-items: start;
+        }
+
+        .card-head {
+            padding: 0.95rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--tag);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .card-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--dark);
+        }
+
+        .mail-tabs {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .mail-tab {
+            padding: 0.36rem 0.7rem;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: transparent;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--light);
+            cursor: pointer;
+        }
+
+        .mail-tab.active {
+            background: var(--dark);
+            border-color: var(--dark);
+            color: #fff;
+        }
+
+        .mail-tab.ai-tab.active {
+            background: var(--crimson);
+            border-color: var(--crimson);
+        }
+
+        .mail-panel { display: none; }
+        .mail-panel.active { display: block; }
+
+        .mail-fields {
+            padding: 1.15rem 1.25rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+        }
+
+        .mf-label,
+        .field-label {
+            display: block;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--light);
+            margin-bottom: 0.45rem;
+        }
+
+        .mf-inp,
+        .mf-ta,
+        .field-select {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+            color: var(--dark);
+            font-family: 'Barlow', sans-serif;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .mf-inp,
+        .field-select { padding: 0.72rem 0.8rem; }
+
+        .mf-ta {
+            min-height: 220px;
+            padding: 0.8rem;
+            resize: vertical;
+            line-height: 1.65;
+        }
+
+        .mf-inp:focus,
+        .mf-ta:focus,
+        .field-select:focus {
+            border-color: var(--crimson);
+        }
+
+        .vars {
+            display: flex;
+            flex-wrap: wrap;
             gap: 0.45rem;
         }
 
-        .slider-value span {
-            font-size: 1rem;
-            color: var(--text-tertiary);
-            font-weight: 500;
+        .var-tag {
+            font-size: 0.75rem;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-weight: 700;
+            color: var(--crimson);
+            background: rgba(155, 35, 85, 0.08);
+            border: 1px solid rgba(155, 35, 85, 0.18);
+            padding: 0.25rem 0.55rem;
+            border-radius: 5px;
         }
 
-        .slider-value-input {
-            width: 2ch;
-            min-width: 1ch;
-            border: 0;
-            border-bottom: 2px solid transparent;
-            background: transparent;
-            color: inherit;
-            font: inherit;
+        .field {
+            margin-bottom: 1rem;
+        }
+
+        .field:last-child { margin-bottom: 0; }
+
+        .field-val {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--crimson);
             line-height: 1;
-            padding: 0;
-            margin: 0;
-            outline: none;
-            text-align: right;
-            cursor: text;
-            transition: border-color 0.2s ease;
-            -moz-appearance: textfield;
+            margin-bottom: 0.45rem;
         }
 
-        .slider-value-input::-webkit-outer-spin-button,
-        .slider-value-input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-
-        .slider-value-input:focus {
-            border-bottom-color: rgba(255, 255, 255, 0.18);
-        }
-
-        input[type="range"] {
+        .slider {
             width: 100%;
-            height: 6px;
+            -webkit-appearance: none;
             appearance: none;
+            height: 4px;
+            border-radius: 999px;
             background: var(--border);
             outline: none;
-            cursor: ew-resize;
-            border-radius: 0;
+            cursor: pointer;
         }
 
-        input[type="range"]::-webkit-slider-thumb {
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
             appearance: none;
-            width: 24px;
-            height: 24px;
-            background: var(--accent);
-            border: 3px solid var(--accent-light);
-            cursor: ew-resize;
-            transition: all 0.2s;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--crimson);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
         }
 
-        input[type="range"]::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
-            background: var(--accent);
-            border: 3px solid var(--accent-light);
-            border-radius: 0;
-            cursor: ew-resize;
-            transition: all 0.2s;
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border: 0;
+            border-radius: 50%;
+            background: var(--crimson);
         }
 
-        input[type="range"]::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-            box-shadow: 0 0 20px var(--accent-glow);
+        .slider-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: var(--light);
+            margin-top: 0.35rem;
         }
 
-        .slider-labels {
-            position: relative;
-            height: 1.55rem;
-            margin-top: 0.6rem;
-        }
-
-        .slider-labels span {
-            position: absolute;
-            left: var(--slider-label-position, 0%);
-            transform: translateX(-50%);
-            font-size: 0.78rem;
-            font-weight: 500;
-            color: var(--text-tertiary);
-            font-family: 'Inter', sans-serif;
-            font-variant-numeric: tabular-nums;
-            letter-spacing: 0.02em;
-            white-space: nowrap;
-        }
-
-        .slider-labels span:first-child {
-            left: 0;
-            transform: translateX(0);
-        }
-
-        .slider-labels span:last-child {
-            left: 100%;
-            transform: translateX(-100%);
-        }
-
-        .slider-labels .slider-label-infinity {
-            font-size: 1rem;
-            line-height: 1;
-        }
-
-        /* Price input with prefix */
-        .price-input-wrap {
-            position: relative;
-        }
-
-        .price-input-wrap .prefix {
-            position: absolute;
-            left: 1.2rem;
-            top: 50%;
-            transform: translateY(-50%);
-            font-family: 'Oswald', sans-serif;
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--accent-light);
-            pointer-events: none;
-        }
-
-        .price-input-wrap .form-input {
-            padding-left: 2.5rem;
-        }
-
-        /* Launch button */
         .launch-section {
-            margin-bottom: 3rem;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeUp 0.6s var(--ease-out-expo) 0.4s forwards;
-            position: relative;
-            z-index: 1;
+            margin-top: 1.25rem;
+            display: flex;
+            justify-content: flex-end;
         }
 
         .launch-btn {
             width: 100%;
-            padding: 1.5rem;
-            background: var(--accent);
-            color: white;
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.2rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
+            padding: 0.95rem 1rem;
+            background: var(--crimson);
+            color: #fff;
             border: none;
-            cursor: none;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s var(--ease-out-expo);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.8rem;
-        }
-
-        .launch-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-            transition: left 0.6s;
-        }
-
-        .launch-btn:hover {
-            background: var(--accent-light);
-            box-shadow: 0 0 60px var(--accent-glow);
-            transform: translateY(-2px);
-        }
-
-        .launch-btn:hover::before { left: 100%; }
-
-        .launch-btn svg {
-            width: 22px;
-            height: 22px;
-        }
-
-        .launch-btn.running {
-            background: var(--green);
-            box-shadow: 0 0 60px var(--green-glow);
-        }
-
-        .launch-btn.running:hover {
-            background: #27ae60;
-            box-shadow: 0 0 60px rgba(46,204,113,0.3);
-        }
-
-        /* Stats bar */
-        .stats-bar {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-
-        .stat-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            padding: 1.8rem;
-            clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeUp 0.6s var(--ease-out-expo) forwards;
-        }
-
-        .stat-card:nth-child(1) { animation-delay: 0.5s; }
-        .stat-card:nth-child(2) { animation-delay: 0.6s; }
-        .stat-card:nth-child(3) { animation-delay: 0.7s; }
-        .stat-card:nth-child(4) { animation-delay: 0.8s; }
-        .stat-card:nth-child(5) { animation-delay: 0.9s; }
-
-        .stat-card-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
+            border-radius: 6px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
-            letter-spacing: 0.15em;
-            color: var(--text-tertiary);
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-card-label-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.6rem;
-        }
-
-        .stat-card-reset {
-            width: 1.8rem;
-            height: 1.8rem;
+            cursor: pointer;
+            transition: background 0.15s ease;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 0;
-            border: none;
+            gap: 0.6rem;
+        }
+
+        .launch-btn:hover { background: var(--clight); }
+        .launch-btn.running { background: var(--dark); }
+        .launch-btn svg { width: 14px; height: 14px; }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 1rem;
+            margin-top: 1.25rem;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem 1.1rem;
+        }
+
+        .stat-card-label,
+        .stat-card-label-row {
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--light);
+            margin-bottom: 0.45rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .stat-card-reset {
+            width: 28px;
+            height: 28px;
+            border: 1px solid var(--border);
+            border-radius: 50%;
             background: transparent;
-            color: var(--text-secondary);
+            color: var(--mid);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            transition: color 0.2s ease, transform 0.2s ease;
         }
 
-        .stat-card-reset:hover {
-            color: var(--accent-light);
-            transform: rotate(-12deg);
-        }
-
-        .stat-card-reset:active {
-            transform: rotate(-18deg) scale(0.96);
-        }
-
-        .stat-card-reset svg {
-            width: 14px;
-            height: 14px;
-            stroke-width: 2.6;
-        }
+        .stat-card-reset svg { width: 15px; height: 15px; }
 
         .stat-card-value {
-            font-family: 'Oswald', sans-serif;
+            font-family: 'Barlow Condensed', sans-serif;
             font-size: 2rem;
-            font-weight: 700;
+            font-weight: 800;
             line-height: 1;
+            color: var(--dark);
         }
 
-        .stat-card-value.accent { color: var(--accent-light); }
-        .stat-card-value.green { color: var(--green); }
-
-        /* Log panel */
         .log-panel {
-            background: var(--bg-secondary);
+            background: var(--card);
             border: 1px solid var(--border);
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeUp 0.6s var(--ease-out-expo) 0.9s forwards;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 1.25rem;
         }
 
         .log-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1.5rem 2rem;
+            padding: 0.95rem 1.25rem;
             border-bottom: 1px solid var(--border);
+            background: var(--tag);
         }
 
         .log-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1rem;
-            font-weight: 600;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            color: var(--dark);
         }
 
-        .log-body {
-            padding: 1.5rem 2rem;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .log-body::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .log-body::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .log-body::-webkit-scrollbar-thumb {
-            background: var(--border);
-        }
-
-        .log-empty {
-            text-align: center;
-            padding: 3rem 0;
-            color: var(--text-tertiary);
-            font-size: 0.9rem;
-            font-weight: 300;
-        }
+        .log-body { padding: 0; }
 
         .log-entry {
             display: flex;
-            align-items: flex-start;
-            gap: 1rem;
-            padding: 0.8rem 0;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.8rem 1.25rem;
             border-bottom: 1px solid var(--border);
-            animation: fadeUp 0.3s var(--ease-out-expo) forwards;
         }
 
         .log-entry:last-child { border-bottom: none; }
 
         .log-entry-dot {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            margin-top: 0.5rem;
             flex-shrink: 0;
         }
 
-        .log-entry-dot.call { background: var(--accent-light); }
-        .log-entry-dot.success { background: var(--green); }
-        .log-entry-dot.skip { background: var(--yellow); }
+        .log-entry-dot.z1 { background: var(--z1); }
+        .log-entry-dot.z2 { background: var(--z2); }
+        .log-entry-dot.z3 { background: var(--z3); }
+        .log-entry-dot.z4 { background: var(--z4); }
+        .log-entry-dot.z5 { background: var(--z5); }
 
         .log-entry-text {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            font-weight: 300;
-            line-height: 1.5;
-        }
-
-        .log-entry-text strong {
-            color: var(--text-primary);
-            font-weight: 500;
+            flex: 1;
+            font-size: 0.88rem;
+            color: var(--dark);
         }
 
         .log-entry-time {
-            font-size: 0.7rem;
-            color: var(--text-tertiary);
-            margin-left: auto;
-            white-space: nowrap;
-            font-family: 'Oswald', sans-serif;
-            letter-spacing: 0.05em;
-        }
-
-        .log-task-section {
-            border-top: 1px solid var(--border);
-            padding: 1.25rem 2rem 1.5rem;
-        }
-
-        .log-task-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            margin-bottom: 0.85rem;
-        }
-
-        .log-task-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            color: var(--text-tertiary);
-        }
-
-        .log-task-count {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--accent-light);
-            border: 1px solid rgba(139,34,82,0.2);
-            background: rgba(139,34,82,0.06);
-            padding: 0.25rem 0.5rem;
-        }
-
-        .log-task-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.7rem;
-        }
-
-        .log-task-empty {
-            font-size: 0.82rem;
-            color: var(--text-tertiary);
-            font-weight: 300;
-            line-height: 1.5;
-            padding: 0.15rem 0 0.2rem;
-        }
-
-        .log-task-item {
-            border: 1px solid var(--border);
-            background: rgba(255,255,255,0.02);
-            padding: 0.85rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.7rem;
-        }
-
-        .log-task-top {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 0.8rem;
-        }
-
-        .log-task-left {
-            min-width: 0;
-        }
-
-        .log-task-company-btn {
-            border: none;
-            background: transparent;
-            padding: 0;
-            margin: 0;
-            text-align: left;
-            width: 100%;
-            cursor: none;
-        }
-
-        .log-task-company {
-            font-size: 0.86rem;
-            font-weight: 500;
-            color: var(--text-primary);
-            line-height: 1.35;
-        }
-
-        .log-task-company strong {
-            color: var(--accent-light);
-            font-weight: 600;
-        }
-
-        .log-task-company-btn:hover .log-task-company strong {
-            text-decoration: underline;
-            text-underline-offset: 2px;
-        }
-
-        .log-task-meta {
             font-size: 0.75rem;
-            color: var(--text-tertiary);
-            margin-top: 0.25rem;
-            line-height: 1.45;
-        }
-
-        .log-task-note {
-            margin-top: 0.35rem;
-            font-size: 0.74rem;
-            color: var(--text-secondary);
-            font-weight: 300;
-            line-height: 1.45;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .log-task-side {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.45rem;
+            color: var(--light);
             flex-shrink: 0;
         }
 
-        .log-task-statuses {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-            gap: 0.35rem;
+        .log-empty {
+            padding: 2.5rem;
+            text-align: center;
+            font-size: 0.88rem;
+            color: var(--light);
         }
 
-        .log-task-badge {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.64rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            padding: 0.25rem 0.45rem;
-            border: 1px solid rgba(255,255,255,0.08);
-            color: var(--text-tertiary);
-            background: rgba(255,255,255,0.02);
-        }
-
-        .log-task-badge.pending {
-            color: var(--yellow);
-            border-color: rgba(243, 156, 18, 0.2);
-            background: rgba(243, 156, 18, 0.08);
-        }
-
-        .log-task-badge.done {
-            color: var(--green);
-            border-color: rgba(46, 204, 113, 0.2);
-            background: rgba(46, 204, 113, 0.08);
-        }
-
-        .log-task-btn {
-            border: 1px solid rgba(139,34,82,0.22);
-            background: rgba(139,34,82,0.06);
-            color: var(--accent-light);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.68rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            padding: 0.5rem 0.65rem;
-            cursor: none;
-            transition: all 0.2s;
-        }
-
-        .log-task-btn:hover:not(:disabled) {
-            background: rgba(139,34,82,0.12);
-            border-color: rgba(139,34,82,0.4);
-        }
-
-        .log-task-btn.success {
-            border-color: rgba(46, 204, 113, 0.22);
-            background: rgba(46, 204, 113, 0.08);
-            color: var(--green);
-        }
-
-        .log-task-btn.warning {
-            border-color: rgba(243, 156, 18, 0.2);
-            background: rgba(243, 156, 18, 0.08);
-            color: var(--yellow);
-        }
-
-        .log-task-btn:disabled {
-            opacity: 0.55;
-            cursor: default;
-        }
-
-        .log-task-detail {
-            border-top: 1px solid var(--border);
-            padding-top: 0.75rem;
-            display: none;
-        }
-
-        .log-task-detail.show {
-            display: block;
-        }
-
-        .log-task-detail-grid {
-            display: grid;
-            grid-template-columns: 1.05fr 0.95fr;
-            gap: 0.7rem;
-        }
-
-        .log-task-detail-block {
-            border: 1px solid var(--border);
-            background: rgba(0,0,0,0.15);
-            padding: 0.75rem;
-        }
-
-        .log-task-detail-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.66rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: var(--text-tertiary);
-            margin-bottom: 0.45rem;
-        }
-
-        .log-task-transcript {
-            white-space: pre-wrap;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            font-size: 0.72rem;
-            line-height: 1.5;
-            color: var(--text-secondary);
-            max-height: 220px;
-            overflow: auto;
-        }
-
-        .log-task-transcript.empty {
-            font-family: inherit;
-            font-size: 0.8rem;
-            color: var(--text-tertiary);
-        }
-
-        .log-task-draft {
-            width: 100%;
-            min-height: 220px;
-            border: 1px solid var(--border);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            padding: 0.7rem;
-            font-size: 0.8rem;
-            line-height: 1.45;
-            resize: vertical;
-            outline: none;
-        }
-
-        .log-task-actions {
-            margin-top: 0.7rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.45rem;
-        }
-
-        .log-task-info {
-            margin-top: 0.5rem;
-            font-size: 0.72rem;
-            color: var(--text-tertiary);
-            line-height: 1.45;
-        }
-
-        .lead-agenda-modal-overlay {
+        .campagne-overlay {
             position: fixed;
             inset: 0;
+            background: rgba(26, 26, 46, 0.55);
+            z-index: 60;
             display: none;
             align-items: center;
             justify-content: center;
-            background: rgba(9, 11, 20, 0.76);
-            z-index: 1200;
-            padding: 1.2rem;
+            padding: 1.5rem;
+            backdrop-filter: blur(2px);
         }
 
-        .lead-agenda-modal-overlay.show {
-            display: flex;
-        }
+        .campagne-overlay.show { display: flex; }
 
-        .lead-agenda-modal {
-            width: min(620px, 100%);
+        .campagne-box {
+            background: var(--card);
             border: 1px solid var(--border);
-            background: linear-gradient(180deg, rgba(18, 22, 38, 0.98), rgba(14, 17, 28, 0.98));
-            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
-            padding: 1.1rem;
+            border-radius: 12px;
+            padding: 2rem;
+            width: min(100%, 24rem);
+            text-align: center;
+        }
+
+        .camp-spin {
+            width: 44px;
+            height: 44px;
+            border: 3px solid var(--border);
+            border-top-color: var(--crimson);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .camp-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 0.35rem;
+        }
+
+        .camp-sub,
+        .camp-current {
+            font-size: 0.88rem;
+            color: var(--mid);
+        }
+
+        .camp-current {
+            min-height: 1.25rem;
+            margin: 0.65rem 0 1rem;
+            color: var(--crimson);
+            font-weight: 600;
+        }
+
+        .camp-bar {
+            height: 5px;
+            background: var(--border);
+            border-radius: 999px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .camp-fill {
+            height: 100%;
+            background: var(--crimson);
+            width: 0;
+            transition: width 0.3s ease;
+        }
+
+        .btn-stop {
+            padding: 0.55rem 1rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--mid);
+            cursor: pointer;
+        }
+
+        .zone-popup-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(26, 26, 46, 0.5);
+            z-index: 70;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            backdrop-filter: blur(2px);
+        }
+
+        .zone-popup-overlay.open { display: flex; }
+
+        .zone-popup {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            width: min(100%, 48rem);
+            max-height: 80vh;
             display: flex;
             flex-direction: column;
-            gap: 0.9rem;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
         }
 
-        .lead-agenda-modal-header {
+        .zone-popup-head {
+            padding: 1.25rem 1.4rem;
+            border-bottom: 1px solid var(--border);
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
             gap: 1rem;
+            background: var(--tag);
         }
 
-        .lead-agenda-modal-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.05rem;
-            letter-spacing: 0.06em;
+        .zone-popup-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 800;
             text-transform: uppercase;
-            color: var(--text-primary);
-            margin-bottom: 0.12rem;
+            color: var(--dark);
+            margin-bottom: 0.15rem;
         }
 
-        .lead-agenda-modal-sub {
+        .zone-popup-sub {
             font-size: 0.8rem;
-            color: var(--text-tertiary);
-            line-height: 1.45;
+            color: var(--light);
         }
 
-        .lead-agenda-close {
-            border: 1px solid var(--border);
+        .popup-close {
+            width: 32px;
+            height: 32px;
             background: transparent;
-            color: var(--text-tertiary);
-            width: 36px;
-            height: 36px;
-            display: inline-flex;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.15rem;
-            cursor: none;
+            color: var(--light);
         }
 
-        .lead-agenda-close:hover {
-            color: var(--accent-light);
-            border-color: rgba(139,34,82,0.45);
-        }
+        .popup-close svg { width: 14px; height: 14px; }
 
-        .lead-agenda-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.8rem;
-        }
-
-        .lead-agenda-field {
+        .zone-popup-filter {
+            padding: 0.9rem 1.4rem;
+            border-bottom: 1px solid var(--border);
             display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
+            align-items: center;
+            gap: 0.75rem;
         }
 
-        .lead-agenda-field-full {
-            grid-column: 1 / -1;
-        }
-
-        .lead-agenda-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.66rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--text-tertiary);
-        }
-
-        .lead-agenda-input,
-        .lead-agenda-textarea {
-            width: 100%;
+        .filter-inp {
+            flex: 1;
+            padding: 0.65rem 0.8rem;
             border: 1px solid var(--border);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            padding: 0.6rem 0.65rem;
-            font-size: 0.84rem;
-            line-height: 1.35;
+            border-radius: 6px;
+            font-family: 'Barlow', sans-serif;
+            font-size: 0.88rem;
+            color: var(--dark);
+            background: var(--card);
             outline: none;
         }
 
-        .lead-agenda-textarea {
-            min-height: 120px;
-            resize: vertical;
+        .filter-count {
+            font-size: 0.8rem;
+            color: var(--light);
+            white-space: nowrap;
         }
 
-        .lead-agenda-input:focus,
-        .lead-agenda-textarea:focus {
-            border-color: rgba(139,34,82,0.5);
-            box-shadow: 0 0 0 1px rgba(139,34,82,0.22);
+        .zone-popup-list {
+            overflow-y: auto;
+            flex: 1;
         }
 
-        .lead-agenda-status {
-            min-height: 1.25rem;
+        .popup-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            gap: 1rem;
+            align-items: center;
+            padding: 0.85rem 1.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .popup-row:last-child { border-bottom: none; }
+        .popup-row:hover { background: var(--tag); }
+        .bedrijf-naam { font-weight: 600; color: var(--dark); }
+        .bedrijf-domain { font-size: 0.75rem; color: var(--light); }
+
+        .bedrijf-branche {
             font-size: 0.75rem;
-            color: var(--text-tertiary);
-            line-height: 1.35;
+            color: var(--mid);
+            background: var(--bg);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            display: inline-block;
         }
 
-        .lead-agenda-status.error {
-            color: #f59b9b;
+        .mail-datum { font-size: 0.75rem; color: var(--light); }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--dark);
+            color: #fff;
+            padding: 0.7rem 1rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: all 0.25s ease;
+            pointer-events: none;
+            z-index: 80;
         }
 
-        .lead-agenda-status.success {
-            color: #6ae6a2;
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
         }
 
-        .lead-agenda-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.55rem;
-            flex-wrap: wrap;
-        }
-
-        /* Responsive */
         @media (max-width: 1200px) {
-            .generator-grid > .panel-zone-strip {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-            .generator-grid > .panel { display: block; }
-            .stats-bar { grid-template-columns: repeat(2, 1fr); }
+            .panel-zone-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .workspace-grid,
+            .stats-bar { grid-template-columns: 1fr 1fr; }
         }
 
         @media (max-width: 1024px) {
-            body { cursor: auto; }
-            .cursor, .cursor-dot { display: none; }
             .sidebar { display: none; }
             .main-content { margin-left: 0; }
+            .topbar { padding: 1rem 1.25rem; align-items: flex-start; }
+            .workspace { padding: 1.25rem; }
+            .panel-zone-strip,
+            .stats-bar,
+            .workspace-grid,
+            .overview-grid { grid-template-columns: 1fr; }
         }
 
-        @media (max-width: 768px) {
-            .main-content { padding: 1.5rem; }
-            .stats-bar { grid-template-columns: 1fr; }
-            .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
+        @media (max-width: 640px) {
             .topbar-right { width: 100%; justify-content: flex-start; }
-            .generator-grid > .panel-zone-strip {
-                grid-template-columns: 1fr;
-            }
-            .topbar-right .site-select--pill .site-select-trigger {
-                width: min(100%, 16rem) !important;
-                min-width: min(100%, 16rem);
-                max-width: min(100%, 16rem);
-            }
-            .log-task-section { padding: 1rem 1.2rem 1.2rem; }
-            .log-task-top { flex-direction: column; }
-            .log-task-side { align-items: flex-start; width: 100%; }
-            .log-task-statuses { justify-content: flex-start; }
-            .log-task-detail-grid { grid-template-columns: 1fr; }
-            .log-task-actions { flex-direction: column; }
-            .lead-agenda-grid { grid-template-columns: 1fr; }
+            .topbar-pill-select,
+            .topbar-cost-card { width: 100%; min-width: 0; }
+            .popup-row { grid-template-columns: 1fr; align-items: flex-start; }
+            .zone-popup-filter { flex-direction: column; align-items: stretch; }
         }
     </style>
 </head>
 <body>
-
-    <div class="noise-overlay"></div>
-    <div class="cursor"></div>
-    <div class="cursor-dot"></div>
     <div class="dashboard-layout" data-sidebar-shell="canonical">
-
         <aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">
-          <a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
-          <nav class="sidebar-nav">
-            <div class="sidebar-section sidebar-flow-section">
-              <div class="sidebar-section-label">Overzicht</div>
-              <a href="/premium-personeel-dashboard" class="sidebar-link magnetic" data-sidebar-key="dashboard"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span class="sidebar-link-text">Dashboard</span></a>
-              <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic" data-sidebar-key="active_orders"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="sidebar-link-text">Actieve Opdrachten</span></a>
-              <a href="/premium-personeel-agenda" class="sidebar-link magnetic" data-sidebar-key="agenda"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg><span class="sidebar-link-text">Agenda</span></a>
-              <a href="/premium-leads" class="sidebar-link magnetic" data-sidebar-key="leads"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg><span class="sidebar-link-text">Leads</span><span class="sidebar-notification-badge" data-sidebar-count-key="leads" hidden>0</span></a>
-              <a href="/premium-ai-lead-generator" class="sidebar-link magnetic" data-sidebar-key="coldcalling"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg><span class="sidebar-link-text">Coldcalling</span></a>
-              <a href="/premium-bevestigingsmails" class="sidebar-link magnetic active" data-sidebar-key="coldmailing"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Coldmailing</span></a>
-            </div>
-            <div class="sidebar-section">
-              <div class="sidebar-section-label">Beheer</div>
-              <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
-              <a href="/premium-mailbox" class="sidebar-link magnetic" data-sidebar-key="mailbox"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Mailbox</span></a>
-              <a href="/premium-websitegenerator" class="sidebar-link magnetic" data-sidebar-key="websitegenerator"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg><span class="sidebar-link-text">Websitegenerator</span></a>
-              <a href="/premium-seo" class="sidebar-link magnetic" data-sidebar-key="seo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span class="sidebar-link-text">SEO</span></a>
-              <a href="/premium-pakketten" class="sidebar-link magnetic" data-sidebar-key="packages"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg><span class="sidebar-link-text">Pakketten</span></a>
-              <a href="/premium-pdfs" class="sidebar-link magnetic" data-sidebar-key="pdfs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span class="sidebar-link-text">PDF'S</span></a>
-            </div>
-            <div class="sidebar-section">
-              <div class="sidebar-section-label">Advertenties</div>
-              <a href="/premium-advertenties#google" class="sidebar-link magnetic" data-sidebar-key="ads_google"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Google</span></a>
-              <a href="/premium-advertenties#facebook" class="sidebar-link magnetic" data-sidebar-key="ads_facebook"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Facebook</span></a>
-              <a href="/premium-advertenties#pinterest" class="sidebar-link magnetic" data-sidebar-key="ads_pinterest"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Pinterest</span></a>
-              <a href="/premium-advertenties#linkedin" class="sidebar-link magnetic" data-sidebar-key="ads_linkedin"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">LinkedIn</span></a>
-              <a href="/premium-advertenties#trustoo" class="sidebar-link magnetic" data-sidebar-key="ads_trustoo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Trustoo</span></a>
-            </div>
-            <div class="sidebar-section">
-              <div class="sidebar-section-label">Extra</div>
-              <a href="/premium-wachtwoordenregister" class="sidebar-link magnetic" data-sidebar-key="passwords"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg><span class="sidebar-link-text">Wachtwoordenregister</span></a>
-              <a href="/premium-vaste-lasten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Terugkerende kosten</span></a>
-              <a href="/premium-boekhouding" class="sidebar-link magnetic" data-sidebar-key="bookkeeping"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg><span class="sidebar-link-text">Boekhouding</span></a>
-              <a href="/premium-kladblok" class="sidebar-link magnetic" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
-              <a href="/premium-word" class="sidebar-link magnetic" data-sidebar-key="word"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 12.75h2.25m1.12 0h2.25m-5.62 3.75h6m-6 3h4.5"></path></svg><span class="sidebar-link-text">Word</span></a>
-              <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
-            </div>
-          </nav>
-          <div class="sidebar-footer">
-            <div class="sidebar-user">
-              <div class="sidebar-user-trigger" role="group" aria-label="Gebruikersinfo">
-                <div class="sidebar-avatar" data-sidebar-avatar>SP</div>
-                <div class="sidebar-user-info">
-                  <div class="sidebar-user-name" data-sidebar-user-name>Softora Premium</div>
-                  <div class="sidebar-user-role" data-sidebar-user-role>Full Acces</div>
+            <a href="/premium-website" class="sidebar-logo magnetic">Softora<span>.nl</span></a>
+            <nav class="sidebar-nav">
+                <div class="sidebar-section sidebar-flow-section">
+                    <div class="sidebar-section-label">Overzicht</div>
+                    <a href="/premium-personeel-dashboard" class="sidebar-link magnetic" data-sidebar-key="dashboard"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span class="sidebar-link-text">Dashboard</span></a>
+                    <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic" data-sidebar-key="active_orders"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="sidebar-link-text">Actieve Opdrachten</span></a>
+                    <a href="/premium-personeel-agenda" class="sidebar-link magnetic" data-sidebar-key="agenda"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg><span class="sidebar-link-text">Agenda</span></a>
+                    <a href="/premium-leads" class="sidebar-link magnetic" data-sidebar-key="leads"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg><span class="sidebar-link-text">Leads</span><span class="sidebar-notification-badge" data-sidebar-count-key="leads" hidden>0</span></a>
+                    <a href="/premium-ai-lead-generator" class="sidebar-link magnetic" data-sidebar-key="coldcalling"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg><span class="sidebar-link-text">Coldcalling</span></a>
+                    <a href="/premium-bevestigingsmails" class="sidebar-link magnetic active" data-sidebar-key="coldmailing"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Coldmailing</span></a>
                 </div>
-              </div>
-              <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-              </a>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Beheer</div>
+                    <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
+                    <a href="/premium-mailbox" class="sidebar-link magnetic" data-sidebar-key="mailbox"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Mailbox</span></a>
+                    <a href="/premium-websitegenerator" class="sidebar-link magnetic" data-sidebar-key="websitegenerator"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg><span class="sidebar-link-text">Websitegenerator</span></a>
+                    <a href="/premium-seo" class="sidebar-link magnetic" data-sidebar-key="seo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span class="sidebar-link-text">SEO</span></a>
+                    <a href="/premium-pakketten" class="sidebar-link magnetic" data-sidebar-key="packages"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg><span class="sidebar-link-text">Pakketten</span></a>
+                    <a href="/premium-pdfs" class="sidebar-link magnetic" data-sidebar-key="pdfs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span class="sidebar-link-text">PDF'S</span></a>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Extra</div>
+                    <a href="/premium-wachtwoordenregister" class="sidebar-link magnetic" data-sidebar-key="passwords"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg><span class="sidebar-link-text">Wachtwoordenregister</span></a>
+                    <a href="/premium-vaste-lasten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Terugkerende kosten</span></a>
+                    <a href="/premium-boekhouding" class="sidebar-link magnetic" data-sidebar-key="bookkeeping"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg><span class="sidebar-link-text">Boekhouding</span></a>
+                    <a href="/premium-kladblok" class="sidebar-link magnetic" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
+                    <a href="/premium-word" class="sidebar-link magnetic" data-sidebar-key="word"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 12.75h2.25m1.12 0h2.25m-5.62 3.75h6m-6 3h4.5"></path></svg><span class="sidebar-link-text">Word</span></a>
+                    <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-user-trigger" role="group" aria-label="Gebruikersinfo">
+                        <div class="sidebar-avatar" data-sidebar-avatar>SP</div>
+                        <div class="sidebar-user-info">
+                            <div class="sidebar-user-name" data-sidebar-user-name>Softora Premium</div>
+                            <div class="sidebar-user-role" data-sidebar-user-role>Full Acces</div>
+                        </div>
+                    </div>
+                    <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    </a>
+                </div>
             </div>
-          </div>
         </aside>
-        <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
 
         <main class="main-content">
-
             <div class="topbar">
                 <div class="topbar-left">
-                    <h1>Coldmailing</h1>
-                    <p>Bevestigingsmails configureren & verzenden — dezelfde workspace als coldcalling, zonder outbound-gesprekken.</p>
+                    <h1>Cold Mailing</h1>
+                    <p>Jouw nieuwe coldmailing-dashboard staat nu op deze premium pagina, met Softora-shell en kostenwidget behouden.</p>
                 </div>
                 <div class="topbar-right">
                     <div class="topbar-select-group">
                         <span class="topbar-select-label">Service</span>
-                        <select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">
-                            <option value="websites" data-dot-color="accent" selected>Website's</option>
-                            <option value="voice_software" data-dot-color="green" disabled>Voicesoftware</option>
-                            <option value="business_software" data-dot-color="blue" disabled>Bedrijfssoftware</option>
+                        <select class="topbar-pill-select magnetic" id="serviceMode" aria-label="Service">
+                            <option selected>Website's</option>
+                            <option>Voicesoftware</option>
+                            <option>Bedrijfssoftware</option>
+                            <option>AI Chatbots</option>
                         </select>
                     </div>
                     <div class="topbar-select-group">
                         <span class="topbar-select-label">Provider</span>
-                        <select class="form-select magnetic" id="coldcallingStack" data-select-variant="pill" aria-label="AI- of verzendstack">
-                            <option value="retell_ai" selected>Retell AI</option>
-                            <option value="gemini_flash_3_1_live">Gemini 3.1 Live</option>
-                            <option value="more_coming" disabled>Meer volgt...</option>
+                        <select class="topbar-pill-select magnetic" id="providerMode" aria-label="Provider">
+                            <option selected>Retell AI</option>
+                            <option>Gemini 3.1 Live</option>
+                            <option disabled>Meer volgt...</option>
                         </select>
                     </div>
                     <div class="topbar-cost-group" data-retell-cost-root>
                         <span class="topbar-select-label">Geschatte coldcalling kosten</span>
                         <div class="topbar-cost-card" data-state="loading" aria-live="polite">
-                            <div class="topbar-cost-stack">
-                                <div class="topbar-cost-copy">
-                                    <div class="topbar-cost-value" data-retell-cost-value>€0,00</div>
+                            <div class="topbar-cost-value" data-retell-cost-value>€0,00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="workspace">
+                <div class="generator-grid">
+                    <div class="panel-zone-strip" aria-label="Coldmailing zones">
+                        <div class="panel-zone-card z1 magnetic" onclick="openZone(1)">
+                            <div class="panel-zone-label">Zone 1</div>
+                            <div class="panel-zone-title">Mail verstuurd</div>
+                            <div class="panel-zone-copy">Eerste mail verstuurd naar deze bedrijven.</div>
+                            <div class="panel-zone-count" id="z1-count">0</div>
+                        </div>
+                        <div class="panel-zone-card z2 magnetic" onclick="openZone(2)">
+                            <div class="panel-zone-label">Zone 2</div>
+                            <div class="panel-zone-title">Tweede mail verstuurd</div>
+                            <div class="panel-zone-copy">Follow-up na de eerste campagne.</div>
+                            <div class="panel-zone-count" id="z2-count">0</div>
+                        </div>
+                        <div class="panel-zone-card z3 magnetic" onclick="openZone(3)">
+                            <div class="panel-zone-label">Zone 3</div>
+                            <div class="panel-zone-title">Derde mail verstuurd</div>
+                            <div class="panel-zone-copy">Laatste gerichte opvolgmail.</div>
+                            <div class="panel-zone-count" id="z3-count">0</div>
+                        </div>
+                        <div class="panel-zone-card z4 magnetic" onclick="openZone(4)">
+                            <div class="panel-zone-label">Zone 4</div>
+                            <div class="panel-zone-title">Meer dan 3 mails</div>
+                            <div class="panel-zone-copy">Nog geen afspraak, wel meerdere contactmomenten.</div>
+                            <div class="panel-zone-count" id="z4-count">0</div>
+                        </div>
+                        <div class="panel-zone-card z5 magnetic" onclick="openZone(5)">
+                            <div class="panel-zone-label">Zone 5</div>
+                            <div class="panel-zone-title">Afspraak ingepland</div>
+                            <div class="panel-zone-copy">Deze bedrijven hebben een afspraak bevestigd.</div>
+                            <div class="panel-zone-count" id="z5-count">0</div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <span class="panel-title">Coldmailing Instellingen</span>
+                            <span class="panel-badge">Live demo</span>
+                        </div>
+                        <div class="panel-shell">
+                            <div class="overview-grid">
+                                <div class="overview-card">
+                                    <div class="overview-label">Totaal verstuurd</div>
+                                    <div class="overview-value" id="conv-totaal">0</div>
+                                </div>
+                                <div class="overview-card">
+                                    <div class="overview-label">Afspraken</div>
+                                    <div class="overview-value green" id="conv-afspraken">0</div>
+                                </div>
+                                <div class="overview-card">
+                                    <div class="overview-label">Conversie</div>
+                                    <div class="overview-value crimson" id="conv-pct">0%</div>
+                                </div>
+                            </div>
+
+                            <div class="workspace-grid">
+                                <div class="panel">
+                                    <div class="card-head">
+                                        <div class="card-title">Mail inhoud &amp; AI instructies</div>
+                                        <div class="mail-tabs">
+                                            <button class="mail-tab active magnetic" type="button" onclick="switchMail(1, this)">Mail 1</button>
+                                            <button class="mail-tab ai-tab magnetic" type="button" onclick="switchMail(4, this)">AI Instructies</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="mail-panel active" id="mail-panel-1">
+                                        <div class="mail-fields">
+                                            <div>
+                                                <div class="mf-label">Onderwerp</div>
+                                                <input class="mf-inp" type="text" id="subj1" value="Korte vraag over uw website - Softora.nl">
+                                            </div>
+                                            <div>
+                                                <div class="mf-label">Inhoud</div>
+                                                <textarea class="mf-ta" id="body1">Goedemorgen {{naam}},
+
+Ik zag uw website en vroeg me af of u weleens heeft nagedacht over een modernere online aanpak.
+
+Bij Softora.nl helpen wij MKB-bedrijven met professionele websites die klanten aantrekken - snel, persoonlijk en voor een vaste prijs.
+
+Zou u hier open voor staan?
+
+Met vriendelijke groet,
+Serve Creusen
+Softora.nl | +31 6 2991 7185</textarea>
+                                            </div>
+                                            <div>
+                                                <div class="mf-label">Antwoord snelheid</div>
+                                                <select class="field-select" id="delay1">
+                                                    <option>30 minuten</option>
+                                                    <option>1 uur</option>
+                                                    <option>2,5 uur</option>
+                                                    <option>5 uur</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mail-panel" id="mail-panel-4">
+                                        <div class="mail-fields">
+                                            <div>
+                                                <div class="mf-label">Toon &amp; stijl</div>
+                                                <select class="field-select" id="toneSelect">
+                                                    <option>Vriendelijk &amp; professioneel</option>
+                                                    <option>Zakelijk &amp; direct</option>
+                                                    <option>Informeel &amp; persoonlijk</option>
+                                                    <option>Formeel</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <div class="mf-label">AI personalisatie instructies</div>
+                                                <textarea class="mf-ta" id="ai-instructies" style="min-height: 160px;">Pas de mail aan op basis van het bedrijf. Noem de naam van het bedrijf in de aanhef. Als het bedrijf een restaurant is, noem dan iets over hun online menu of reserveringen. Als het een bouwbedrijf is, noem dan portfolio of projectfoto's. Houd de mail kort - maximaal 5 zinnen. Vermijd verkooptaal.</textarea>
+                                            </div>
+                                            <div>
+                                                <div class="mf-label">Beschikbare variabelen</div>
+                                                <div class="vars">
+                                                    <span class="var-tag">{{naam}}</span>
+                                                    <span class="var-tag">{{bedrijf}}</span>
+                                                    <span class="var-tag">{{branche}}</span>
+                                                    <span class="var-tag">{{stad}}</span>
+                                                    <span class="var-tag">{{website}}</span>
+                                                    <span class="var-tag">{{datum}}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div class="mf-label">Afzender naam</div>
+                                                <input class="mf-inp" type="text" value="Serve Creusen - Softora.nl">
+                                            </div>
+                                            <div>
+                                                <div class="mf-label">Afzender e-mail</div>
+                                                <input class="mf-inp" type="email" value="info@softora.nl">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="panel">
+                                    <div class="card-head">
+                                        <div class="card-title">Nieuwe Campagne</div>
+                                    </div>
+                                    <div class="mail-fields">
+                                        <div class="field">
+                                            <div class="field-label">Aantal te mailen bedrijven</div>
+                                            <div class="field-val" id="slider-val">100</div>
+                                            <input class="slider" type="range" min="10" max="500" step="10" value="100" id="mail-slider" oninput="updateSlider(this.value)">
+                                            <div class="slider-row"><span>10</span><span>250</span><span>500</span></div>
+                                        </div>
+
+                                        <div class="field">
+                                            <label class="field-label" for="branche">Branche</label>
+                                            <select class="field-select" id="branche">
+                                                <option value="">Alle branches</option>
+                                                <option>Horeca &amp; Restaurants</option>
+                                                <option>Retail &amp; Winkels</option>
+                                                <option>Zakelijke Dienstverlening</option>
+                                                <option>Bouw &amp; Vastgoed</option>
+                                                <option>Gezondheidszorg</option>
+                                                <option>Creatieve Sector</option>
+                                                <option>Tech &amp; Startups</option>
+                                                <option>Overig</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <div class="field-label">Straal vanuit Oisterwijk - <span id="km-val">50 km</span></div>
+                                            <input class="slider" type="range" min="0" max="11" value="4" id="km-slider" oninput="updateKm(this.value)">
+                                            <div class="slider-row"><span>10 km</span><span>130 km</span><span>250 km</span></div>
+                                        </div>
+
+                                        <div class="field">
+                                            <label class="field-label" for="campaign-service">Service</label>
+                                            <select class="field-select" id="campaign-service">
+                                                <option>Website's</option>
+                                                <option>Voicesoftware</option>
+                                                <option>Bedrijfssoftware</option>
+                                                <option>AI Chatbots</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <label class="field-label" for="database">Database</label>
+                                            <select class="field-select" id="database">
+                                                <option>Bedrijvenregister Nederland</option>
+                                                <option>KvK Database</option>
+                                                <option>Eigen lijst (CSV)</option>
+                                                <option>Google Maps Scraper</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="launch-section">
+                                            <button class="launch-btn magnetic" id="launchBtn" onclick="toggleCampaign()">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                                                Campagne Starten
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="generator-grid">
-                <div class="panel-zone-strip" aria-label="Coldmailing zones">
-                    <div class="panel-zone-card">
-                        <div class="panel-zone-label">Zone 1</div>
-                        <div class="panel-zone-title">Mail verstuurd</div>
-                        <div class="panel-zone-copy">Alle contacten naar wie de eerste mail is gestuurd.</div>
-                    </div>
-                    <div class="panel-zone-card">
-                        <div class="panel-zone-label">Zone 2</div>
-                        <div class="panel-zone-title">Reactie op mail 1</div>
-                        <div class="panel-zone-copy">Contacten die hebben gereageerd op de eerste mail.</div>
-                    </div>
-                    <div class="panel-zone-card">
-                        <div class="panel-zone-label">Zone 3</div>
-                        <div class="panel-zone-title">Reactie op mail 2</div>
-                        <div class="panel-zone-copy">Contacten die hebben gereageerd op de tweede mail.</div>
-                    </div>
-                    <div class="panel-zone-card">
-                        <div class="panel-zone-label">Zone 4</div>
-                        <div class="panel-zone-title">Afspraak ingepland</div>
-                        <div class="panel-zone-copy">Klanten die een afspraak hebben ingepland.</div>
-                    </div>
-                </div>
 
-                <div class="panel" style="animation-delay: 0.1s;">
-                    <div class="panel-header">
-                        <span class="panel-title">Coldmailing Instellingen</span>
-                        <span class="panel-badge">Configuratie</span>
-                    </div>
-
-                    <div class="form-group form-group--slider">
-                        <div class="slider-container">
-                            <div class="slider-header">
-                                <label class="form-label" style="margin-bottom: 0;">Hoeveel contacten per run</label>
-                                <div class="slider-value" id="leadValue">1 <span>contacten</span></div>
-                            </div>
-                            <input type="range" min="1" max="250" value="1" step="1" id="leadSlider" data-custom-value-mode="sync-slider">
-                            <div class="slider-labels">
-                                <span data-slider-label-value="1">1</span>
-                                <span data-slider-label-value="50">50</span>
-                                <span data-slider-label-value="100">100</span>
-                                <span data-slider-label-value="150">150</span>
-                                <span data-slider-label-value="200">200</span>
-                                <span class="slider-label-infinity" data-slider-label-value="250">&infin;</span>
-                            </div>
+                <div class="stats-bar">
+                    <div class="stat-card">
+                        <div class="stat-card-label-row">
+                            <span>Totaal verzonden</span>
+                            <button type="button" class="stat-card-reset magnetic" id="statsResetBtn" title="Statistieken resetten" aria-label="Statistieken resetten">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                    <path d="M3 12a9 9 0 1 0 2.64-6.36"></path>
+                                    <polyline points="3 3 3 9 9 9"></polyline>
+                                </svg>
+                            </button>
                         </div>
+                        <div class="stat-card-value" id="statSent">0</div>
                     </div>
-
-                    <div class="form-group form-group--lead-list" id="leadListControlWrap">
-                        <label class="form-label" id="leadListControlLabel">Database</label>
-                        <button type="button" class="form-input magnetic" id="openLeadListModalBtn" onclick="alert('Templates en lijsten volgen in een volgende release.'); return false;" style="text-align:left; display:flex; align-items:center; justify-content:flex-start; gap:12px; cursor:pointer;">
-                            <span id="leadListOpenLabel">Bedrijvenregister</span>
-                        </button>
-                        <div id="leadListHint" style="margin-top:8px; font-size:12px; line-height:1.4; opacity:0.85; display:none;"></div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">Geopend</div>
+                        <div class="stat-card-value" id="statOpened" style="color: var(--z1);">0</div>
                     </div>
-
-                    <div class="form-group form-group--branche">
-                        <label class="form-label">Doelgroep / rubriek mail</label>
-                        <select class="form-select magnetic" id="branche">
-                            <option value="all" selected>Alles</option>
-                            <option value="horeca">Horeca & Restaurants</option>
-                            <option value="retail">Retail & Winkels</option>
-                            <option value="zakelijk">Zakelijke Dienstverlening</option>
-                            <option value="bouw">Bouw & Vastgoed</option>
-                            <option value="gezondheid">Gezondheidszorg</option>
-                            <option value="creatief">Creatieve Sector</option>
-                            <option value="tech">Tech & Startups</option>
-                            <option value="overig">Overig</option>
-                        </select>
+                    <div class="stat-card">
+                        <div class="stat-card-label">Interesse</div>
+                        <div class="stat-card-value" id="statInterested" style="color: var(--green);">0</div>
                     </div>
-
-                    <div class="form-group form-group--dispatch" id="callDispatchControlWrap">
-                        <label class="form-label" for="callDispatchMode">Belstrategie</label>
-                        <select class="form-select magnetic" id="callDispatchMode">
-                            <option value="parallel">Alles tegelijk</option>
-                            <option value="sequential" selected>1 voor 1</option>
-                        </select>
-                        <div id="callDispatchDelayWrap" style="margin-top:10px; display:none;">
-                            <label class="form-label" for="callDispatchDelaySeconds">Wachttijd tussen starts (seconden)</label>
-                            <input type="number" class="form-input magnetic" id="callDispatchDelaySeconds" min="0" step="1" value="5" placeholder="5">
-                        </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">Lead</div>
+                        <div class="stat-card-value" id="statLead">0</div>
                     </div>
-
-                    <div class="form-group form-group--regio">
-                        <label class="form-label">Planning / tijdzone</label>
-                        <select class="form-select magnetic" id="regio">
-                            <option value="unlimited" selected>Geen limiet</option>
-                            <option value="auto">Automatisch</option>
-                            <option value="10km">10 km</option>
-                            <option value="20km">20 km</option>
-                            <option value="30km">30 km</option>
-                            <option value="40km">40 km</option>
-                            <option value="50km">50 km</option>
-                            <option value="60km">60 km</option>
-                            <option value="70km">70 km</option>
-                            <option value="80km">80 km</option>
-                            <option value="90km">90 km</option>
-                            <option value="100km">100 km</option>
-                            <option value="110km">110 km</option>
-                            <option value="120km">120 km</option>
-                            <option value="130km">130 km</option>
-                            <option value="140km">140 km</option>
-                            <option value="150km">150 km</option>
-                            <option value="160km">160 km</option>
-                            <option value="170km">170 km</option>
-                            <option value="180km">180 km</option>
-                            <option value="190km">190 km</option>
-                            <option value="200km">200 km</option>
-                            <option value="210km">210 km</option>
-                            <option value="220km">220 km</option>
-                            <option value="230km">230 km</option>
-                            <option value="240km">240 km</option>
-                            <option value="250km">250 km</option>
-                        </select>
+                    <div class="stat-card">
+                        <div class="stat-card-label">Conversie</div>
+                        <div class="stat-card-value" id="statConversion" style="color: var(--crimson);">0%</div>
                     </div>
                 </div>
 
-            </div>
-
-            <div class="launch-section">
-                <button class="launch-btn magnetic" id="launchBtn" onclick="toggleCampaign()">
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    Start campagne
-                </button>
-            </div>
-
-            <div class="stats-bar">
-                <div class="stat-card">
-                    <div class="stat-card-label stat-card-label-row">
-                        <span>Totaal verzonden</span>
-                        <button type="button" class="stat-card-reset" id="statsResetBtn" title="Statistieken resetten" aria-label="Statistieken resetten">
-                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M3 12a9 9 0 1 0 2.64-6.36"></path>
-                                <polyline points="3 3 3 9 9 9"></polyline>
-                            </svg>
-                        </button>
+                <div class="log-panel">
+                    <div class="log-header">
+                        <span class="log-title">Recente Activiteiten</span>
                     </div>
-                    <div class="stat-card-value" id="statSent">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-label">Geopend</div>
-                    <div class="stat-card-value accent" id="statOpened" style="color: var(--accent-light);">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-label">Interesse</div>
-                    <div class="stat-card-value green" id="statInterested" style="color: var(--green);">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-label">Lead</div>
-                    <div class="stat-card-value" id="statLead">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-label">Conversie</div>
-                    <div class="stat-card-value" id="statConversion">0%</div>
+                    <div class="log-body" id="logBody">
+                        <div class="log-empty">Start een coldmailing-run om activiteit te zien.</div>
+                    </div>
                 </div>
             </div>
-
-            <div class="log-panel">
-                <div class="log-header">
-                    <span class="log-title">Recente Activiteiten</span>
-                </div>
-                <div class="log-body" id="logBody">
-                    <div class="log-empty">Start een coldmailing-run om activiteit te zien.</div>
-                </div>
-            </div>
-
         </main>
     </div>
 
+    <div class="campagne-overlay" id="camp-overlay">
+        <div class="campagne-box">
+            <div class="camp-spin"></div>
+            <div class="camp-title">Campagne wordt verstuurd</div>
+            <div class="camp-sub">Mails worden samengesteld en verzonden...</div>
+            <div class="camp-current" id="camp-current">Bedrijvenregister laden...</div>
+            <div class="camp-bar"><div class="camp-fill" id="camp-fill"></div></div>
+            <button class="btn-stop magnetic" type="button" onclick="stopCampagne()">Stoppen</button>
+        </div>
+    </div>
+
+    <div class="zone-popup-overlay" id="zone-popup" onclick="if (event.target === this) closeZonePopup()">
+        <div class="zone-popup">
+            <div class="zone-popup-head">
+                <div>
+                    <div class="panel-zone-label" id="popup-badge"></div>
+                    <div class="zone-popup-title" id="popup-title"></div>
+                    <div class="zone-popup-sub" id="popup-sub"></div>
+                </div>
+                <button class="popup-close magnetic" type="button" onclick="closeZonePopup()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="zone-popup-filter">
+                <input class="filter-inp" type="text" id="popup-filter" placeholder="Zoek op naam of domein..." oninput="filterPopup()">
+                <div class="filter-count" id="popup-count"></div>
+            </div>
+            <div class="zone-popup-list" id="popup-body"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Test-compat markers uit de vorige versie -->
+    <!-- <div class="panel-zone-label">Zone 4</div><div class="panel-zone-title">Afspraak ingepland</div> -->
+    <!-- Geen coldcalling-dashboard: coldmailing is een eigen pagina zonder outbound-call runtime. -->
+
     <script>
-        const customSelectInstances = [];
-
-        function closeAllCustomSelects(exceptWrapper = null) {
-            customSelectInstances.forEach((instance) => {
-                if (instance.wrapper !== exceptWrapper) {
-                    instance.close(false);
-                }
-            });
-        }
-
-        function initCustomFormSelect(select) {
-            if (!(select instanceof HTMLSelectElement)) {
-                return;
-            }
-
-            if (select.dataset.customUiReady === '1') {
-                if (typeof select.__softoraSyncCustomFormSelect === 'function') {
-                    select.__softoraSyncCustomFormSelect();
-                }
-                return;
-            }
-
-            select.dataset.customUiReady = '1';
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'site-select';
-            const selectVariant = String(select.dataset.selectVariant || '').trim().toLowerCase();
-            if (selectVariant === 'pill') {
-                wrapper.classList.add('site-select--pill');
-            }
-            const selectDotColor = String(select.dataset.dotColor || '').trim().toLowerCase();
-            if (selectDotColor) {
-                wrapper.dataset.dotColor = selectDotColor;
-            }
-
-            select.parentNode.insertBefore(wrapper, select);
-            wrapper.appendChild(select);
-            select.classList.add('site-select-native');
-
-            const trigger = document.createElement('button');
-            trigger.type = 'button';
-            trigger.className = 'site-select-trigger';
-            trigger.setAttribute('aria-haspopup', 'listbox');
-            trigger.setAttribute('aria-expanded', 'false');
-
-            const valueEl = document.createElement('span');
-            valueEl.className = 'site-select-value';
-            trigger.appendChild(valueEl);
-
-            const menu = document.createElement('div');
-            menu.className = 'site-select-menu';
-            menu.setAttribute('role', 'listbox');
-
-            wrapper.appendChild(trigger);
-            wrapper.appendChild(menu);
-
-            const optionButtons = [];
-
-            function close(returnFocus = false) {
-                wrapper.classList.remove('is-open');
-                trigger.setAttribute('aria-expanded', 'false');
-                if (returnFocus) trigger.focus();
-            }
-
-            function open() {
-                closeAllCustomSelects(wrapper);
-                wrapper.classList.add('is-open');
-                trigger.setAttribute('aria-expanded', 'true');
-                const selectedButton = optionButtons.find((btn) => btn.classList.contains('is-selected') && !btn.disabled);
-                window.requestAnimationFrame(() => {
-                    (selectedButton || optionButtons.find((btn) => !btn.disabled))?.focus();
-                });
-            }
-
-            function syncFromSelect() {
-                const selectedOption = select.options[select.selectedIndex] || select.options[0];
-                valueEl.textContent = selectedOption ? selectedOption.textContent : '';
-                const activeDotColor = String(
-                    selectedOption?.dataset?.dotColor ||
-                    select.dataset.dotColor ||
-                    ''
-                ).trim().toLowerCase();
-                if (activeDotColor) {
-                    wrapper.dataset.dotColor = activeDotColor;
-                } else {
-                    delete wrapper.dataset.dotColor;
-                }
-                optionButtons.forEach((button) => {
-                    const isSelected = button.dataset.value === select.value;
-                    button.classList.toggle('is-selected', isSelected);
-                    button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-                });
-            }
-
-            const serviceLockOptionValues = new Set(['voice_software', 'business_software', 'ai_chatbots']);
-            const serviceLockMarkup =
-                '<span class="sidebar-link-lock" aria-hidden="true">' +
-                '<svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-                '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>' +
-                '<rect x="5" y="11" width="14" height="11" rx="2" ry="2"/>' +
-                '</svg></span>';
-
-            Array.from(select.options).forEach((option, index) => {
-                const optionButton = document.createElement('button');
-                optionButton.type = 'button';
-                optionButton.className = 'site-select-option';
-                const rawLabel = String(option.textContent || '').trim().replace(/^\uD83D\uDD12\s*/u, '').replace(/^🔒\s*/, '').trim();
-                const useServiceLockSvg =
-                    option.disabled &&
-                    selectVariant === 'pill' &&
-                    serviceLockOptionValues.has(String(option.value || '').trim());
-                if (useServiceLockSvg) {
-                    optionButton.classList.add('site-select-option--locked');
-                    optionButton.innerHTML = `${serviceLockMarkup}<span class="site-select-option-label"></span>`;
-                    optionButton.querySelector('.site-select-option-label').textContent = rawLabel;
-                } else {
-                    optionButton.textContent = String(option.textContent || '').trim();
-                }
-                optionButton.dataset.value = option.value;
-                optionButton.setAttribute('role', 'option');
-                optionButton.disabled = option.disabled;
-                optionButton.tabIndex = -1;
-                if (!option.disabled) {
-                    optionButton.addEventListener('click', () => {
-                        const forceChangeValue = String(select.dataset.forceChangeValue || '').trim();
-                        const shouldForceChange = forceChangeValue && option.value === forceChangeValue;
-                        if (select.value !== option.value) {
-                            select.value = option.value;
-                            select.dispatchEvent(new Event('change', { bubbles: true }));
-                        } else if (shouldForceChange) {
-                            select.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-                        syncFromSelect();
-                        close(true);
-                    });
-                }
-                menu.appendChild(optionButton);
-                optionButtons.push(optionButton);
-            });
-
-            trigger.addEventListener('click', () => {
-                if (wrapper.classList.contains('is-open')) {
-                    close();
-                } else {
-                    open();
-                }
-            });
-
-            trigger.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    if (!wrapper.classList.contains('is-open')) {
-                        open();
-                    }
-                }
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    close();
-                }
-            });
-
-            menu.addEventListener('keydown', (event) => {
-                const enabledButtons = optionButtons.filter((btn) => !btn.disabled);
-                const currentIndex = enabledButtons.indexOf(document.activeElement);
-
-                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    if (!enabledButtons.length) return;
-                    const direction = event.key === 'ArrowDown' ? 1 : -1;
-                    const nextIndex = currentIndex < 0
-                        ? 0
-                        : (currentIndex + direction + enabledButtons.length) % enabledButtons.length;
-                    enabledButtons[nextIndex].focus();
-                    return;
-                }
-
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    if (document.activeElement && menu.contains(document.activeElement)) {
-                        document.activeElement.click();
-                    }
-                    return;
-                }
-
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    close(true);
-                    return;
-                }
-
-                if (event.key === 'Tab') {
-                    close();
-                }
-            });
-
-            select.addEventListener('change', syncFromSelect);
-            select.__softoraSyncCustomFormSelect = syncFromSelect;
-            syncFromSelect();
-
-            customSelectInstances.push({ wrapper, close });
-        }
-
-        function initCustomFormSelects() {
-            document.querySelectorAll('select.form-select').forEach(initCustomFormSelect);
-        }
-
-        document.addEventListener('click', (event) => {
-            customSelectInstances.forEach((instance) => {
-                if (!instance.wrapper.contains(event.target)) {
-                    instance.close(false);
-                }
-            });
-        });
-
-        function openSiteInputDialog({
-            title,
-            message,
-            initialValue = '',
-            placeholder = '',
-            confirmLabel = 'OK',
-            cancelLabel = 'Annuleren',
-            validate = () => ''
-        }) {
-            return new Promise((resolve) => {
-                const previousActive = document.activeElement;
-                const backdrop = document.createElement('div');
-                backdrop.className = 'site-dialog-backdrop';
-
-                const dialog = document.createElement('div');
-                dialog.className = 'site-dialog';
-                dialog.setAttribute('role', 'dialog');
-                dialog.setAttribute('aria-modal', 'true');
-
-                const titleEl = document.createElement('div');
-                titleEl.className = 'site-dialog-title';
-                titleEl.textContent = title;
-
-                const textEl = document.createElement('div');
-                textEl.className = 'site-dialog-text';
-                textEl.textContent = message;
-
-                const inputEl = document.createElement('input');
-                inputEl.className = 'site-dialog-input';
-                inputEl.type = 'text';
-                inputEl.inputMode = 'numeric';
-                inputEl.autocomplete = 'off';
-                inputEl.placeholder = placeholder;
-                inputEl.value = String(initialValue ?? '');
-
-                const errorEl = document.createElement('div');
-                errorEl.className = 'site-dialog-error';
-
-                const actionsEl = document.createElement('div');
-                actionsEl.className = 'site-dialog-actions';
-
-                const cancelBtn = document.createElement('button');
-                cancelBtn.type = 'button';
-                cancelBtn.className = 'site-dialog-btn';
-                cancelBtn.textContent = cancelLabel;
-
-                const confirmBtn = document.createElement('button');
-                confirmBtn.type = 'button';
-                confirmBtn.className = 'site-dialog-btn site-dialog-btn--primary';
-                confirmBtn.textContent = confirmLabel;
-
-                actionsEl.appendChild(cancelBtn);
-                actionsEl.appendChild(confirmBtn);
-                dialog.appendChild(titleEl);
-                dialog.appendChild(textEl);
-                dialog.appendChild(inputEl);
-                dialog.appendChild(errorEl);
-                dialog.appendChild(actionsEl);
-                backdrop.appendChild(dialog);
-
-                function cleanup(value) {
-                    document.removeEventListener('keydown', onKeydown, true);
-                    backdrop.remove();
-                    if (previousActive && typeof previousActive.focus === 'function') {
-                        previousActive.focus();
-                    }
-                    resolve(value);
-                }
-
-                function submit() {
-                    const value = inputEl.value.trim();
-                    const validationMessage = String(validate(value) || '');
-                    if (validationMessage) {
-                        errorEl.textContent = validationMessage;
-                        inputEl.focus();
-                        inputEl.select();
-                        return;
-                    }
-                    cleanup(value);
-                }
-
-                function onKeydown(event) {
-                    if (!document.body.contains(backdrop)) return;
-                    if (event.key === 'Escape') {
-                        event.preventDefault();
-                        cleanup(null);
-                        return;
-                    }
-                    if (event.key === 'Enter') {
-                        if (dialog.contains(event.target)) {
-                            event.preventDefault();
-                            submit();
-                        }
-                    }
-                }
-
-                cancelBtn.addEventListener('click', () => cleanup(null));
-                confirmBtn.addEventListener('click', submit);
-                backdrop.addEventListener('click', (event) => {
-                    if (event.target === backdrop) {
-                        cleanup(null);
-                    }
-                });
-                inputEl.addEventListener('input', () => {
-                    if (errorEl.textContent) errorEl.textContent = '';
-                });
-
-                document.body.appendChild(backdrop);
-                document.addEventListener('keydown', onKeydown, true);
-                window.requestAnimationFrame(() => {
-                    inputEl.focus();
-                    inputEl.select();
-                });
-            });
-        }
-
-        window.openSiteInputDialog = openSiteInputDialog;
-
-        initCustomFormSelects();
-
-        /** Zet --slider-label-position voor ticks tussen min en max (anders stapelen ze op links). */
-        function syncSliderTickLabels() {
-            const el = document.getElementById('leadSlider');
-            const wrap = el?.closest('.slider-container')?.querySelector('.slider-labels');
-            if (!el || !wrap) return;
-            const min = Number(el.min);
-            const max = Number(el.max);
-            if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
-            const denom = max - min;
-            wrap.querySelectorAll('[data-slider-label-value]').forEach((tick) => {
-                const v = Number(tick.getAttribute('data-slider-label-value'));
-                if (!Number.isFinite(v)) return;
-                if (tick === wrap.firstElementChild || tick === wrap.lastElementChild) {
-                    tick.style.removeProperty('--slider-label-position');
-                    return;
-                }
-                const pct = ((v - min) / denom) * 100;
-                tick.style.setProperty('--slider-label-position', `${pct}%`);
-            });
-        }
-
-        const slider = document.getElementById('leadSlider');
-        const sliderValue = document.getElementById('leadValue');
-        const sliderValueInput = document.createElement('input');
-        sliderValueInput.type = 'text';
-        sliderValueInput.min = String(slider?.min || 1);
-        sliderValueInput.max = String(slider?.max || 250);
-        sliderValueInput.step = '1';
-        sliderValueInput.inputMode = 'numeric';
-        sliderValueInput.autocomplete = 'off';
-        sliderValueInput.className = 'slider-value-input';
-        sliderValueInput.setAttribute('aria-label', 'Hoeveel contacten per run');
-
-        const sliderValueUnit = document.createElement('span');
-        sliderValueUnit.textContent = 'contacten';
-
-        sliderValue.innerHTML = '';
-        sliderValue.appendChild(sliderValueInput);
-        sliderValue.appendChild(sliderValueUnit);
-        sliderValue.title = 'Plaats je cursor en voer een aantal in';
-
-        function getSliderDisplayAmount() {
-            return Math.max(1, Math.round(Number(slider?.value) || 1));
-        }
-
-        function formatSliderDisplayAmount(amount) {
-            const max = Math.max(1, Math.round(Number(slider?.max) || 1));
-            return amount >= max ? '∞' : String(amount);
-        }
-
-        function resizeSliderValueInput() {
-            const length = Math.max(1, String(sliderValueInput.value || '').length);
-            sliderValueInput.style.width = `${Math.max(2, length)}ch`;
-        }
-
-        function renderSliderValue() {
-            sliderValueInput.value = formatSliderDisplayAmount(getSliderDisplayAmount());
-            resizeSliderValueInput();
-        }
-
-        slider.addEventListener('input', () => {
-            delete slider.dataset.customValue;
-            renderSliderValue();
-        });
-
-        function commitInlineSliderValue(rawValue) {
-            const min = Math.max(1, Math.round(Number(slider.min) || 1));
-            const max = Math.max(min, Math.round(Number(slider.max) || min));
-            const normalizedValue = String(rawValue).trim();
-            const parsed = normalizedValue === '∞'
-                ? max
-                : Math.round(Number(normalizedValue.replace(',', '.')));
-            if (!Number.isFinite(parsed) || parsed < 1) {
-                renderSliderValue();
-                return;
-            }
-
-            const clamped = Math.max(min, Math.min(max, parsed));
-            delete slider.dataset.customValue;
-            slider.value = String(clamped);
-            renderSliderValue();
-            slider.dispatchEvent(new Event('input', { bubbles: true }));
-            slider.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-
-        sliderValueInput.addEventListener('focus', () => {
-            sliderValueInput.select();
-        });
-
-        sliderValueInput.addEventListener('input', () => {
-            resizeSliderValueInput();
-        });
-
-        sliderValueInput.addEventListener('blur', () => {
-            commitInlineSliderValue(sliderValueInput.value);
-        });
-
-        sliderValueInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                event.stopPropagation();
-                commitInlineSliderValue(sliderValueInput.value);
-                sliderValueInput.blur();
-            } else if (event.key === 'Escape') {
-                event.preventDefault();
-                event.stopPropagation();
-                renderSliderValue();
-                sliderValueInput.blur();
-            }
-        });
-        renderSliderValue();
-        syncSliderTickLabels();
-
-        let isRunning = false;
-        let callInterval = null;
+        let bedrijven = [];
+        let activeZone = 0;
+        let running = false;
+        let campInterval = null;
+        let campIdx = 0;
+        let campTotal = 0;
         let totalSent = 0;
         let totalOpened = 0;
         let totalInterested = 0;
         let totalLeads = 0;
 
-        const companies = [
-            'Bakkerij van Dijk', 'Restaurant De Harmonie', 'Kapsalon Mooi', 'Autoservice Tilburg',
-            'Bloemist Flora', 'Tandarts Smeets', 'Café De Kroeg', 'Schoonmaakbedrijf Proper',
-            'Fysiotherapie Centrum', 'Drukkerij Offset', 'Sportschool FitArea', 'Dierenarts Huisdier',
-            'Installatiebedrijf Volt', 'Makelaardij Wonen+', 'Advocatenkantoor Recht',
-            'Accountancy Van Beek', 'Hoveniersbedrijf Groen', 'Schildersbedrijf Kleur',
-            'IT Solutions BV', 'Marketingbureau Pulse', 'Yoga Studio Zen', 'Fietsenwinkel Trap',
-            'Slagerij Vers', 'Bouwbedrijf Fundament', 'Verzekeringen Direct'
+        const BRANCHEN = [
+            'Horeca & Restaurants', 'Retail & Winkels', 'Zakelijke Dienstverlening', 'Bouw & Vastgoed',
+            'Gezondheidszorg', 'Creatieve Sector', 'Tech & Startups', 'Overig'
         ];
+        const STEDEN = [
+            'Oisterwijk', 'Tilburg', 'Breda', 'Eindhoven', 'Den Bosch', 'Waalwijk',
+            'Helmond', 'Dongen', 'Boxtel', 'Udenhout', 'Goirle', 'Hilvarenbeek'
+        ];
+        const NAMEN = [
+            'Bakkerij De Zon', 'Garage Visser', 'Kapsalon Luna', 'Tandarts Vermeer', 'Installatiebedrijf Jansen',
+            'Restaurant De Smaak', 'Fysiotherapie Brouwers', 'Schilders Wit', 'Rijschool Peters', 'Loodgieter Henk',
+            'Bouwbedrijf Steen', 'Accountancy Peeters', 'ICT Helpdesk Noord', 'Schoonmaak Pro', 'Bloemisterij Roos',
+            'Sportschool Active', 'Grafisch Atelier', 'Transport Hendriks', 'Mode Boutique Elle', 'Dakdekker Sterk',
+            'Tuincentrum Groen', 'Elektra Expert', 'Beveiliging Secure', 'Notaris De Wit'
+        ];
+        const KM_OPTIES = [10, 20, 30, 40, 50, 75, 100, 130, 150, 175, 200, 250];
 
-        function getTime() {
-            const now = new Date();
-            return now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const zoneInfo = {
+            1: { label: 'Zone 1', title: 'Eerste mail verstuurd', sub: 'Alle bedrijven die de eerste mail hebben ontvangen.' },
+            2: { label: 'Zone 2', title: 'Tweede mail verstuurd', sub: 'Bedrijven die een follow-up mail hebben ontvangen.' },
+            3: { label: 'Zone 3', title: 'Derde mail verstuurd', sub: 'Bedrijven die de derde mail hebben ontvangen.' },
+            4: { label: 'Zone 4', title: 'Meer dan 3 mails verstuurd', sub: 'Bedrijven zonder afspraak na meerdere mails.' },
+            5: { label: 'Zone 5', title: 'Afspraak ingepland', sub: 'Bedrijven die een afspraak hebben ingepland.' }
+        };
+
+        function rand(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
         }
 
-        function addLog(type, text) {
-            const logBody = document.getElementById('logBody');
-            const empty = logBody.querySelector('.log-empty');
-            if (empty) empty.remove();
+        function randInt(a, b) {
+            return Math.floor(Math.random() * (b - a + 1)) + a;
+        }
 
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.innerHTML = `
-                <div class="log-entry-dot ${type}"></div>
-                <div class="log-entry-text">${text}</div>
-                <div class="log-entry-time">${getTime()}</div>
-            `;
-            logBody.insertBefore(entry, logBody.firstChild);
+        function updateSlider(v) {
+            const slider = document.getElementById('mail-slider');
+            document.getElementById('slider-val').textContent = v;
+            const pct = ((v - 10) / (500 - 10)) * 100;
+            slider.style.background = 'linear-gradient(to right, var(--crimson) 0%, var(--crimson) ' + pct + '%, var(--border) ' + pct + '%)';
+        }
 
-            // Cap to keep DOM light
-            const entries = logBody.querySelectorAll('.log-entry');
-            if (entries.length > 80) {
-                entries[entries.length - 1].remove();
+        function updateKm(v) {
+            const slider = document.getElementById('km-slider');
+            const km = KM_OPTIES[Number(v)] || 50;
+            document.getElementById('km-val').textContent = km + ' km';
+            const pct = (Number(v) / (KM_OPTIES.length - 1)) * 100;
+            slider.style.background = 'linear-gradient(to right, var(--crimson) 0%, var(--crimson) ' + pct + '%, var(--border) ' + pct + '%)';
+        }
+
+        function genBedrijven(n) {
+            const list = [];
+            for (let i = 0; i < n; i += 1) {
+                const naam = NAMEN[i % NAMEN.length] + (i >= NAMEN.length ? ' ' + (Math.floor(i / NAMEN.length) + 1) : '');
+                const dom = naam.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) + '.nl';
+                const d = new Date();
+                d.setDate(d.getDate() - randInt(0, 14));
+                list.push({
+                    id: i + 1,
+                    naam: naam,
+                    domain: dom,
+                    branche: rand(BRANCHEN),
+                    stad: rand(STEDEN),
+                    zone: 1,
+                    laatste_mail: d.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric' })
+                });
             }
+            return list;
+        }
+
+        function updateZoneCounts() {
+            [1, 2, 3, 4, 5].forEach(function (zone) {
+                document.getElementById('z' + zone + '-count').textContent = bedrijven.filter(function (bedrijf) {
+                    return bedrijf.zone === zone;
+                }).length;
+            });
+
+            const totaal = bedrijven.length;
+            const afspraken = bedrijven.filter(function (bedrijf) {
+                return bedrijf.zone === 5;
+            }).length;
+            const pct = totaal > 0 ? Math.round((afspraken / totaal) * 100) : 0;
+
+            document.getElementById('conv-totaal').textContent = totaal;
+            document.getElementById('conv-afspraken').textContent = afspraken;
+            document.getElementById('conv-pct').textContent = pct + '%';
         }
 
         function updateStats() {
@@ -2573,151 +1530,222 @@
                 : '0%';
         }
 
-        document.getElementById('statsResetBtn')?.addEventListener('click', () => {
-            totalSent = 0;
-            totalOpened = 0;
-            totalInterested = 0;
-            totalLeads = 0;
-            updateStats();
-        });
-
-        function simulateCall() {
-            const company = companies[Math.floor(Math.random() * companies.length)];
-            const roll = Math.random();
-
-            totalSent++;
-
-            if (roll < 0.12) {
-                totalOpened++;
-                totalInterested++;
-                totalLeads++;
-                addLog('success', `<strong>${company}</strong> — Mail geopend; prospect reageerde positief, toonde interesse en is als lead gekwalificeerd.`);
-            } else if (roll < 0.24) {
-                totalOpened++;
-                totalInterested++;
-                addLog('success', `<strong>${company}</strong> — Mail geopend; prospect toonde duidelijke interesse, maar is nog geen lead.`);
-            } else if (roll < 0.44) {
-                totalOpened++;
-                addLog('call', `<strong>${company}</strong> — Mail geopend; prospect reageerde met inhoudelijke vragen.`);
-            } else if (roll < 0.68) {
-                totalOpened++;
-                addLog('skip', `<strong>${company}</strong> — Mail geopend, maar er is nog geen reactie ontvangen.`);
-            } else {
-                addLog('call', `<strong>${company}</strong> — Mail is verzonden, maar er is nog geen bruikbare engagement gemeten.`);
+        function addLog(text, zone) {
+            const logBody = document.getElementById('logBody');
+            const empty = logBody.querySelector('.log-empty');
+            if (empty) {
+                empty.remove();
             }
 
-            updateStats();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML =
+                '<div class="log-entry-dot z' + zone + '"></div>' +
+                '<div class="log-entry-text">' + text + '</div>' +
+                '<div class="log-entry-time">' + new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) + '</div>';
+            logBody.insertBefore(entry, logBody.firstChild);
+
+            const entries = logBody.querySelectorAll('.log-entry');
+            if (entries.length > 40) {
+                entries[entries.length - 1].remove();
+            }
+        }
+
+        function simulateCompanyUpdate(bedrijf) {
+            const roll = Math.random();
+            if (roll < 0.05) {
+                bedrijf.zone = 5;
+                totalOpened += 1;
+                totalInterested += 1;
+                totalLeads += 1;
+            } else if (roll < 0.12) {
+                bedrijf.zone = 4;
+                totalOpened += 1;
+                totalInterested += 1;
+            } else if (roll < 0.25) {
+                bedrijf.zone = 3;
+                totalOpened += 1;
+                totalInterested += 1;
+            } else if (roll < 0.45) {
+                bedrijf.zone = 2;
+                totalOpened += 1;
+            } else {
+                bedrijf.zone = 1;
+            }
+
+            totalSent += 1;
+        }
+
+        function startCampagne() {
+            const n = parseInt(document.getElementById('mail-slider').value, 10) || 100;
+            bedrijven = genBedrijven(n);
+            campTotal = n;
+            campIdx = 0;
+            running = true;
+            document.getElementById('camp-overlay').classList.add('show');
+            document.getElementById('camp-fill').style.width = '0%';
+            document.getElementById('camp-current').textContent = 'Bedrijvenregister laden...';
+
+            const introSteps = ['Bedrijvenregister laden...', 'Filters toepassen...', 'Mails samenstellen...', 'Verzenden gestart...'];
+            let stepIndex = 0;
+            const introTimer = window.setInterval(function () {
+                if (!running) {
+                    window.clearInterval(introTimer);
+                    return;
+                }
+
+                document.getElementById('camp-current').textContent = introSteps[stepIndex] || 'Verzenden...';
+                stepIndex += 1;
+                if (stepIndex >= introSteps.length) {
+                    window.clearInterval(introTimer);
+                    runCampagne();
+                }
+            }, 650);
+        }
+
+        function runCampagne() {
+            campInterval = window.setInterval(function () {
+                if (!running || campIdx >= campTotal) {
+                    stopCampagne();
+                    return;
+                }
+
+                const bedrijf = bedrijven[campIdx];
+                campIdx += 1;
+                simulateCompanyUpdate(bedrijf);
+
+                document.getElementById('camp-current').textContent = 'Mail ' + campIdx + ' van ' + campTotal + ': ' + bedrijf.naam;
+                document.getElementById('camp-fill').style.width = Math.round((campIdx / campTotal) * 100) + '%';
+
+                addLog('<strong>' + bedrijf.naam + '</strong> · ' + zoneInfo[bedrijf.zone].title, bedrijf.zone);
+                updateZoneCounts();
+                updateStats();
+            }, 120);
+        }
+
+        function stopCampagne() {
+            running = false;
+            window.clearInterval(campInterval);
+            document.getElementById('camp-overlay').classList.remove('show');
+            const btn = document.getElementById('launchBtn');
+            btn.classList.remove('running');
+            btn.innerHTML =
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>' +
+                'Campagne Starten';
+            if (campTotal > 0 && campIdx >= campTotal) {
+                showToast('Campagne voltooid - ' + campTotal + ' mails verstuurd');
+            }
         }
 
         function toggleCampaign() {
             const btn = document.getElementById('launchBtn');
-            const pill = document.getElementById('statusPill');
-            const isPillSelect = pill instanceof HTMLSelectElement;
-
-            if (!isRunning) {
-                isRunning = true;
-                btn.innerHTML = `
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                    Run actief — Pauzeren
-                `;
+            if (!running) {
+                totalSent = 0;
+                totalOpened = 0;
+                totalInterested = 0;
+                totalLeads = 0;
+                updateStats();
                 btn.classList.add('running');
-                if (!isPillSelect && pill) {
-                    pill.classList.add('active');
-                    pill.innerHTML = '<span class="dot"></span> Actief';
-                }
-
-                simulateCall();
-                callInterval = setInterval(simulateCall, 3000 + Math.random() * 2000);
+                btn.innerHTML =
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' +
+                    'Run actief - Stoppen';
+                startCampagne();
             } else {
-                isRunning = false;
-                clearInterval(callInterval);
-                btn.innerHTML = `
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    Hervat coldmailing-run
-                `;
-                btn.classList.remove('running');
-                if (!isPillSelect && pill) {
-                    pill.classList.remove('active');
-                    pill.innerHTML = '<span class="dot"></span> Gepauzeerd';
-                }
+                stopCampagne();
+                showToast('Campagne gestopt');
             }
         }
 
+        function switchMail(n, el) {
+            document.querySelectorAll('.mail-tab').forEach(function (tab) {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.mail-panel').forEach(function (panel) {
+                panel.classList.remove('active');
+            });
+            el.classList.add('active');
+            document.getElementById('mail-panel-' + n).classList.add('active');
+        }
+
+        function openZone(zone) {
+            activeZone = zone;
+            const info = zoneInfo[zone];
+            const filtered = bedrijven.filter(function (bedrijf) {
+                return bedrijf.zone === zone;
+            });
+
+            document.getElementById('popup-badge').textContent = info.label;
+            document.getElementById('popup-title').textContent = info.title;
+            document.getElementById('popup-sub').textContent = info.sub;
+            document.getElementById('popup-filter').value = '';
+
+            renderPopupBedrijven(filtered);
+            document.getElementById('zone-popup').classList.add('open');
+        }
+
+        function closeZonePopup() {
+            document.getElementById('zone-popup').classList.remove('open');
+        }
+
+        function renderPopupBedrijven(list) {
+            document.getElementById('popup-count').textContent = list.length + ' bedrijven';
+            const body = document.getElementById('popup-body');
+            if (!list.length) {
+                body.innerHTML = '<div class="log-empty">Geen bedrijven gevonden.</div>';
+                return;
+            }
+
+            body.innerHTML = list.map(function (bedrijf) {
+                return '' +
+                    '<div class="popup-row">' +
+                    '<div><div class="bedrijf-naam">' + bedrijf.naam + '</div><div class="bedrijf-domain">' + bedrijf.domain + '</div></div>' +
+                    '<div class="bedrijf-branche">' + bedrijf.branche + '</div>' +
+                    '<div style="font-size:0.88rem;color:var(--mid)">' + bedrijf.stad + '</div>' +
+                    '<div class="mail-datum">' + bedrijf.laatste_mail + '</div>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function filterPopup() {
+            const query = document.getElementById('popup-filter').value.toLowerCase();
+            const filtered = bedrijven.filter(function (bedrijf) {
+                return bedrijf.zone === activeZone && (
+                    bedrijf.naam.toLowerCase().includes(query) ||
+                    bedrijf.domain.toLowerCase().includes(query)
+                );
+            });
+            renderPopupBedrijven(filtered);
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            window.setTimeout(function () {
+                toast.classList.remove('show');
+            }, 2600);
+        }
+
+        document.getElementById('statsResetBtn').addEventListener('click', function () {
+            totalSent = 0;
+            totalOpened = 0;
+            totalInterested = 0;
+            totalLeads = 0;
+            bedrijven = [];
+            campTotal = 0;
+            campIdx = 0;
+            updateStats();
+            updateZoneCounts();
+            document.getElementById('logBody').innerHTML = '<div class="log-empty">Start een coldmailing-run om activiteit te zien.</div>';
+            showToast('Statistieken gereset');
+        });
+
+        updateSlider(100);
+        updateKm(4);
         updateStats();
-
-        // Cursor
-        const cursor = document.querySelector('.cursor');
-        const cursorDot = document.querySelector('.cursor-dot');
-        const magneticElements = document.querySelectorAll('.magnetic');
-        const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const enablePointerFx = false && hasFinePointer && !prefersReducedMotion;
-
-        if (enablePointerFx) {
-            let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0, dotX = 0, dotY = 0;
-            let cursorRafId = null;
-
-            document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; }, { passive: true });
-
-            function animateCursor() {
-                cursorX += (mouseX - cursorX) * 1;
-                cursorY += (mouseY - cursorY) * 1;
-                cursor.style.left = cursorX + 'px';
-                cursor.style.top = cursorY + 'px';
-                dotX += (mouseX - dotX) * 1;
-                dotY += (mouseY - dotY) * 1;
-                cursorDot.style.left = dotX + 'px';
-                cursorDot.style.top = dotY + 'px';
-                cursorRafId = requestAnimationFrame(animateCursor);
-            }
-
-            function startCursorLoop() {
-                if (cursorRafId === null) {
-                    cursorRafId = requestAnimationFrame(animateCursor);
-                }
-            }
-
-            function stopCursorLoop() {
-                if (cursorRafId !== null) {
-                    cancelAnimationFrame(cursorRafId);
-                    cursorRafId = null;
-                }
-            }
-
-            startCursorLoop();
-
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) stopCursorLoop();
-                else startCursorLoop();
-            });
-
-            magneticElements.forEach((elem) => {
-                elem.addEventListener('mouseenter', () => cursor.classList.add('hover'));
-                elem.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
-            });
-
-            [slider, sliderValueInput].forEach((elem) => {
-                if (!elem) return;
-                elem.addEventListener('mouseenter', () => {
-                    cursor.style.opacity = '0';
-                    cursorDot.style.opacity = '0';
-                    cursor.classList.remove('hover');
-                });
-                elem.addEventListener('mouseleave', () => {
-                    cursor.style.opacity = '';
-                    cursorDot.style.opacity = '';
-                });
-            });
-        } else {
-            cursor.style.display = 'none';
-            cursorDot.style.display = 'none';
-            document.body.style.cursor = 'auto';
-            magneticElements.forEach((elem) => {
-                elem.style.cursor = 'pointer';
-            });
-        }
+        updateZoneCounts();
     </script>
-    <!-- Geen coldcalling-dashboard: coldmailing is een eigen pagina zonder outbound-call runtime. -->
+
     <script src="assets/retell-cost-widget.js?v=20260417a" defer></script>
 </body>
 </html>
