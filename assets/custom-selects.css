@@ -63,6 +63,11 @@
     outline: none;
 }
 
+.site-select.is-open .site-select-trigger {
+    opacity: 0;
+    pointer-events: none;
+}
+
 .site-select-trigger::after {
     content: "";
     position: absolute;
@@ -124,7 +129,7 @@
 
 .site-select-menu {
     position: absolute;
-    top: calc(100% + 0.45rem);
+    top: 0;
     left: 0;
     right: 0;
     z-index: 1201;
