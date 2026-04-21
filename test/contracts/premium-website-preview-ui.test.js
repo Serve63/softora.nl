@@ -63,6 +63,9 @@ test('premium websitegenerator trimt lege witte randen uit gegenereerde previews
   assert.match(source, /async function trimPreviewImageDataUrl\(dataUrl\)/);
   assert.match(source, /isPreviewWhitespaceColumn/);
   assert.match(source, /isPreviewWhitespaceRow/);
+  assert.match(source, /samplePreviewEdgeReference/);
+  assert.match(source, /measurePreviewEdgeGutterWidth/);
+  assert.match(source, /hasPreviewEdgeBreak/);
   assert.match(source, /window\._lastPreviewImageDataUrl = normalizedImageDataUrl/);
   assert.match(source, /await trimPreviewImageDataUrl\(imageDataUrl\)\.catch\(\(\) => imageDataUrl\)/);
 });
