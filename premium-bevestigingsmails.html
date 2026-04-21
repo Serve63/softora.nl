@@ -462,34 +462,44 @@
             align-items: end;
         }
 
+        .generator-grid > .panel:only-child .panel-zone-strip,
         .generator-grid > .panel:only-child .panel-header,
         .generator-grid > .panel:only-child .form-group:first-of-type {
             grid-column: 1 / -1;
         }
 
+        .generator-grid > .panel:only-child .panel-zone-strip {
+            grid-row: 1;
+            margin-bottom: 0;
+        }
+
+        .generator-grid > .panel:only-child .panel-header {
+            grid-row: 2;
+        }
+
         .generator-grid > .panel:only-child .form-group--slider {
             grid-column: 1 / -1;
-            grid-row: 2;
+            grid-row: 3;
         }
 
         .generator-grid > .panel:only-child .form-group--lead-list {
             grid-column: 1;
-            grid-row: 3;
+            grid-row: 4;
         }
 
         .generator-grid > .panel:only-child .form-group--branche {
             grid-column: 2;
-            grid-row: 3;
+            grid-row: 4;
         }
 
         .generator-grid > .panel:only-child .form-group--dispatch {
             grid-column: 1;
-            grid-row: 4;
+            grid-row: 5;
         }
 
         .generator-grid > .panel:only-child .form-group--regio {
             grid-column: 2;
-            grid-row: 4;
+            grid-row: 5;
         }
 
         .generator-grid > .panel:only-child .panel-header,
@@ -1901,11 +1911,6 @@
             <div class="generator-grid">
 
                 <div class="panel" style="animation-delay: 0.1s;">
-                    <div class="panel-header">
-                        <span class="panel-title">Coldmailing Instellingen</span>
-                        <span class="panel-badge">Configuratie</span>
-                    </div>
-
                     <div class="panel-zone-strip" aria-label="Coldmailing zones">
                         <div class="panel-zone-card">
                             <div class="panel-zone-label">Zone 1</div>
@@ -1927,6 +1932,11 @@
                             <div class="panel-zone-title">Afspraak ingepland</div>
                             <div class="panel-zone-copy">Klanten die een afspraak hebben ingepland.</div>
                         </div>
+                    </div>
+
+                    <div class="panel-header">
+                        <span class="panel-title">Coldmailing Instellingen</span>
+                        <span class="panel-badge">Configuratie</span>
                     </div>
 
                     <div class="form-group form-group--slider">
