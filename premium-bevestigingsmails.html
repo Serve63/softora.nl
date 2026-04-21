@@ -325,6 +325,262 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 /* ── ZONE DETAIL SCHERM ── */
 #screen-zone { padding: 0 0 60px; }
 
+/* ── CAMPAGNE TIJDLIJN SCHERM ── */
+#screen-campaign { padding: 0; }
+.campaign-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.campaign-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+.campaign-header-left { max-width: 760px; }
+.campaign-back {
+  margin-bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.campaign-back:hover { color: var(--crimson); }
+.campaign-header h2 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
+}
+.campaign-header p {
+  color: var(--text-tertiary);
+  font-size: 0.95rem;
+  font-weight: 300;
+  line-height: 1.55;
+}
+.campaign-status-card,
+.campaign-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(26,26,46,.05);
+}
+.campaign-status-card {
+  width: 320px;
+  padding: 18px 20px;
+  flex-shrink: 0;
+}
+.campaign-status-label,
+.campaign-panel-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--crimson);
+  margin-bottom: 8px;
+}
+.campaign-status-day {
+  font-family: 'Oswald', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--dark);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.campaign-status-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dark);
+  margin-bottom: 6px;
+}
+.campaign-status-text {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--mid);
+}
+.campaign-progress-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 10px 30px rgba(26,26,46,.05);
+}
+.campaign-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.campaign-progress-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dark);
+}
+.campaign-progress-copy {
+  font-size: 13px;
+  color: var(--mid);
+}
+.campaign-progress-pill {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--crimson);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(155,35,85,.08);
+  white-space: nowrap;
+}
+.campaign-progress-footer {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--light);
+}
+.campaign-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) 340px;
+  gap: 20px;
+  align-items: start;
+}
+.campaign-panel { padding: 22px 24px; }
+.campaign-panel-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--dark);
+  margin-bottom: 18px;
+}
+.campaign-timeline {
+  display: flex;
+  flex-direction: column;
+}
+.campaign-step {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 14px;
+}
+.campaign-step:last-child .campaign-step-line { display: none; }
+.campaign-step-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.campaign-step-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(155,35,85,.18);
+  background: #fff;
+  margin-top: 2px;
+}
+.campaign-step-line {
+  flex: 1;
+  width: 2px;
+  background: rgba(155,35,85,.12);
+  margin-top: 8px;
+  min-height: 46px;
+}
+.campaign-step-content { padding-bottom: 22px; }
+.campaign-step-meta {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--light);
+  margin-bottom: 6px;
+}
+.campaign-step-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dark);
+  margin-bottom: 6px;
+}
+.campaign-step-detail {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--mid);
+}
+.campaign-step.done .campaign-step-dot {
+  border-color: var(--crimson);
+  background: var(--crimson);
+  box-shadow: 0 0 0 5px rgba(155,35,85,.08);
+}
+.campaign-step.done .campaign-step-line {
+  background: linear-gradient(to bottom, var(--crimson), rgba(155,35,85,.18));
+}
+.campaign-step.active .campaign-step-dot {
+  border-color: var(--crimson);
+  background: #fff;
+  box-shadow: 0 0 0 7px rgba(155,35,85,.12);
+}
+.campaign-step.active .campaign-step-title { color: var(--crimson); }
+.campaign-step.pending .campaign-step-detail { color: var(--light); }
+.campaign-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.campaign-metric {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  background: rgba(255,255,255,.7);
+}
+.campaign-metric-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--light);
+  margin-bottom: 6px;
+}
+.campaign-metric-value {
+  font-family: 'Oswald', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--dark);
+  line-height: 1;
+}
+.campaign-note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--mid);
+}
+.campaign-note strong {
+  color: var(--dark);
+  font-weight: 600;
+}
+.campaign-primary {
+  width: 100%;
+  margin-top: 16px;
+}
+
 .zone-hero { padding: 28px 48px; border-bottom: 1px solid var(--border); background: var(--card); }
 .zone-hero-badge { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; display: inline-block; padding: 3px 10px; border-radius: 4px; }
 .zone-hero-title { font-family: 'Oswald', sans-serif; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
@@ -423,16 +679,25 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   .topbar-right { width: 100%; }
   .topbar-note { max-width: none; width: 100%; }
   .topbar-note-text { white-space: normal; }
+  .campaign-header { flex-direction: column; }
+  .campaign-header-left { max-width: none; }
+  .campaign-status-card { width: 100%; }
+  .campaign-layout { grid-template-columns: 1fr; }
 }
 @media (max-width: 1400px) {
   .zones-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
   .zones-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .campaign-progress-top { flex-direction: column; align-items: flex-start; }
+  .campaign-progress-footer { flex-direction: column; }
+  .campaign-metrics { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .zones-row { grid-template-columns: 1fr; }
   .settings-grid { grid-template-columns: 1fr; }
+  .campaign-panel { padding: 18px; }
+  .campaign-step { grid-template-columns: 24px 1fr; gap: 12px; }
 }
 </style>
 </head>
@@ -776,6 +1041,85 @@ info@softora.nl</textarea>
   </div>
 </div>
 
+<!-- ══ SCHERM 3: CAMPAGNE TIJDLIJN ══ -->
+<div class="screen" id="screen-campaign">
+  <div class="campaign-shell">
+    <div class="campaign-header">
+      <div class="campaign-header-left">
+        <button class="campaign-back" type="button" onclick="returnToDashboard()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          Terug naar coldmailing
+        </button>
+        <h2>Campagne tijdlijn</h2>
+        <p id="campaign-subtitle">100 bedrijven doorlopen deze campagne in 14 dagen, van eerste verzending tot laatste checkpoint.</p>
+      </div>
+      <div class="campaign-status-card">
+        <div class="campaign-status-label">Huidige checkpoint</div>
+        <div class="campaign-status-day" id="campaign-status-day">Dag 1</div>
+        <div class="campaign-status-title" id="campaign-status-title">Eerste mail verstuurd</div>
+        <div class="campaign-status-text" id="campaign-status-text">Alle geselecteerde bedrijven ontvangen de eerste mail. Daarna wacht het systeem op reacties.</div>
+      </div>
+    </div>
+
+    <div class="campaign-progress-card">
+      <div class="campaign-progress-top">
+        <div>
+          <div class="campaign-progress-title">Voortgang</div>
+          <div class="campaign-progress-copy" id="campaign-progress-copy">De campagne simuleert nu de volledige 14-daagse opvolging.</div>
+        </div>
+        <div class="campaign-progress-pill" id="campaign-progress-pill">Checkpoint 1 / 7</div>
+      </div>
+      <div class="camp-bar"><div class="camp-fill" id="campaign-progress-fill" style="width:0%"></div></div>
+      <div class="campaign-progress-footer">
+        <span id="campaign-progress-footer-left">Dag 1 van 14</span>
+        <span id="campaign-progress-footer-right">Mail 1 is verzonden</span>
+      </div>
+    </div>
+
+    <div class="campaign-layout">
+      <div class="campaign-panel">
+        <div class="campaign-panel-title">14-dagen tijdlijn</div>
+        <div class="campaign-timeline" id="campaign-timeline"></div>
+      </div>
+
+      <div class="campaign-panel">
+        <div class="campaign-panel-title">Stand van zaken</div>
+        <div class="campaign-metrics">
+          <div class="campaign-metric">
+            <div class="campaign-metric-label">Totaal</div>
+            <div class="campaign-metric-value" id="campaign-metric-total">0</div>
+          </div>
+          <div class="campaign-metric">
+            <div class="campaign-metric-label">Zone 1</div>
+            <div class="campaign-metric-value" id="campaign-metric-zone1">0</div>
+          </div>
+          <div class="campaign-metric">
+            <div class="campaign-metric-label">Zone 2</div>
+            <div class="campaign-metric-value" id="campaign-metric-zone2">0</div>
+          </div>
+          <div class="campaign-metric">
+            <div class="campaign-metric-label">Zone 4</div>
+            <div class="campaign-metric-value" id="campaign-metric-zone4">0</div>
+          </div>
+          <div class="campaign-metric">
+            <div class="campaign-metric-label">Interesse</div>
+            <div class="campaign-metric-value" id="campaign-metric-zone5">0</div>
+          </div>
+          <div class="campaign-metric">
+            <div class="campaign-metric-label">Conversie</div>
+            <div class="campaign-metric-value" id="campaign-metric-conv">0%</div>
+          </div>
+        </div>
+
+        <div class="campaign-panel-label" style="margin-top:18px">Live update</div>
+        <div class="campaign-note" id="campaign-live-text"><strong>Mail 1 is verzonden.</strong> De campagne wacht nu op de eerste antwoorden voordat de volgende stap start.</div>
+
+        <button class="btn-start campaign-primary" id="campaign-primary-btn" type="button" onclick="handleCampaignPrimaryAction()">Campagne stoppen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -863,56 +1207,268 @@ function renderLog() {
 // ── CAMPAGNE ──
 let running = false;
 let campInterval = null;
-let campIdx = 0;
 let campTotal = 0;
+let campaignTimeline = [];
+let campaignStepIndex = -1;
+let campaignFinished = false;
+
+function showScreen(screenId) {
+  document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+  const target = document.getElementById(screenId);
+  if (target) target.classList.add('active');
+  closeZonePopup();
+  closeCustomSelects();
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function formatCampaignDate(day) {
+  const d = new Date();
+  d.setDate(d.getDate() + (day - 1));
+  return d.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function buildCountPlan(total, ratios) {
+  const zones = [1, 2, 4, 5];
+  const counts = { 1: 0, 2: 0, 4: 0, 5: 0 };
+  const raw = zones.map(zone => {
+    const value = (ratios[zone] || 0) * total;
+    counts[zone] = Math.floor(value);
+    return { zone, fraction: value - Math.floor(value) };
+  });
+
+  let diff = total - (counts[1] + counts[2] + counts[4] + counts[5]);
+  raw.sort((a, b) => b.fraction - a.fraction);
+
+  let idx = 0;
+  while (diff > 0 && raw.length) {
+    counts[raw[idx % raw.length].zone] += 1;
+    diff -= 1;
+    idx += 1;
+  }
+
+  return counts;
+}
+
+function buildCampaignTimeline(total) {
+  return [
+    {
+      day: 1,
+      title: 'Eerste mail verstuurd',
+      detail: 'Alle geselecteerde bedrijven ontvangen direct de eerste mail. Daarna wacht de campagne op de eerste reacties.',
+      liveText: 'Mail 1 is naar alle bedrijven verzonden. Het systeem wacht nu rustig op de eerste antwoorden.',
+      counts: buildCountPlan(total, { 1: 1, 2: 0, 4: 0, 5: 0 })
+    },
+    {
+      day: 3,
+      title: 'Wachten op antwoorden',
+      detail: 'De eerste reacties komen binnen. Bedrijven met interesse worden apart gezet en krijgen geen dubbele opvolging.',
+      liveText: 'Nieuwe antwoorden worden verwerkt. Bedrijven met interesse schuiven automatisch door naar Interesse.',
+      counts: buildCountPlan(total, { 1: 0.94, 2: 0, 4: 0, 5: 0.06 })
+    },
+    {
+      day: 5,
+      title: 'Tweede mail verstuurd',
+      detail: 'Bedrijven zonder reactie ontvangen een tweede opvolgmail. Daarna wacht het systeem opnieuw op antwoorden.',
+      liveText: 'Mail 2 is verstuurd naar alle niet-responders. Reagerende bedrijven blijven buiten de nieuwe batch.',
+      counts: buildCountPlan(total, { 1: 0.42, 2: 0.50, 4: 0, 5: 0.08 })
+    },
+    {
+      day: 8,
+      title: 'Antwoorden na mail 2',
+      detail: 'Het systeem controleert wie reageert na de tweede mail en voorkomt dubbele opvolging via andere kanalen.',
+      liveText: 'De AI wacht op nieuwe reacties na mail 2 en filtert iedereen die al in gesprek is.',
+      counts: buildCountPlan(total, { 1: 0.20, 2: 0.67, 4: 0.02, 5: 0.11 })
+    },
+    {
+      day: 10,
+      title: 'Laatste follow-up verstuurd',
+      detail: 'De laatste follow-up gaat alleen naar bedrijven zonder antwoord. Contacten zonder interesse blijven buiten beeld.',
+      liveText: 'De laatste follow-up is verzonden naar de resterende niet-responders.',
+      counts: buildCountPlan(total, { 1: 0.06, 2: 0.58, 4: 0.23, 5: 0.13 })
+    },
+    {
+      day: 12,
+      title: 'Laatste checkpoint',
+      detail: 'Nog openstaande reacties worden gecontroleerd. Stopverzoeken en bedrijven zonder interesse blijven uitgesloten.',
+      liveText: 'Het systeem doet een laatste antwoordcheck en houdt de database schoon zonder dubbele acties.',
+      counts: buildCountPlan(total, { 1: 0.02, 2: 0.46, 4: 0.37, 5: 0.15 })
+    },
+    {
+      day: 14,
+      title: 'Campagne afgelopen',
+      detail: 'Dag 14 is bereikt. De volledige mailcampagne is afgerond en alle uitkomsten zijn verwerkt.',
+      liveText: 'Dag 14 is bereikt. De campagne is klaar en de eindstatus staat nu vast.',
+      counts: buildCountPlan(total, { 1: 0, 2: 0.38, 4: 0.44, 5: 0.18 }),
+      complete: true
+    }
+  ];
+}
+
+function applyCampaignCounts(step) {
+  const ordered = [...bedrijven].sort((a, b) => a.id - b.id);
+  const day = step.day;
+  const firstMailDate = formatCampaignDate(1);
+  const secondMailDate = formatCampaignDate(Math.min(day, 5));
+  const finalFollowupDate = formatCampaignDate(Math.min(day, 10));
+  const currentDate = formatCampaignDate(day);
+  let cursor = 0;
+
+  function assign(zone, amount, latestMail) {
+    for (let i = 0; i < amount && cursor < ordered.length; i += 1) {
+      ordered[cursor].zone = zone;
+      ordered[cursor].laatste_mail = latestMail;
+      cursor += 1;
+    }
+  }
+
+  assign(1, step.counts[1], firstMailDate);
+  assign(2, step.counts[2], secondMailDate);
+  assign(4, step.counts[4], finalFollowupDate);
+  assign(5, step.counts[5], currentDate);
+
+  while (cursor < ordered.length) {
+    ordered[cursor].zone = 4;
+    ordered[cursor].laatste_mail = finalFollowupDate;
+    cursor += 1;
+  }
+
+  updateZoneCounts();
+}
+
+function renderCampaignTimeline() {
+  const timeline = document.getElementById('campaign-timeline');
+  if (!timeline) return;
+  timeline.innerHTML = campaignTimeline.map((step, index) => {
+    const state = index < campaignStepIndex ? 'done' : index === campaignStepIndex ? 'active' : 'pending';
+    return `
+      <div class="campaign-step ${state}">
+        <div class="campaign-step-rail">
+          <div class="campaign-step-dot"></div>
+          <div class="campaign-step-line"></div>
+        </div>
+        <div class="campaign-step-content">
+          <div class="campaign-step-meta">Dag ${step.day}</div>
+          <div class="campaign-step-title">${step.title}</div>
+          <div class="campaign-step-detail">${step.detail}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateCampaignScreen(step) {
+  const progress = campTotal > 0 ? Math.round((step.day / 14) * 100) : 0;
+  const conversion = campTotal > 0 ? Math.round((step.counts[5] / campTotal) * 100) : 0;
+
+  document.getElementById('campaign-status-day').textContent = `Dag ${step.day}`;
+  document.getElementById('campaign-status-title').textContent = step.title;
+  document.getElementById('campaign-status-text').textContent = step.detail;
+  document.getElementById('campaign-progress-copy').textContent = step.detail;
+  document.getElementById('campaign-progress-pill').textContent = step.complete
+    ? 'Dag 14 afgerond'
+    : `Checkpoint ${campaignStepIndex + 1} / ${campaignTimeline.length}`;
+  document.getElementById('campaign-progress-fill').style.width = `${progress}%`;
+  document.getElementById('campaign-progress-footer-left').textContent = `Dag ${step.day} van 14`;
+  document.getElementById('campaign-progress-footer-right').textContent = step.title;
+  document.getElementById('campaign-metric-total').textContent = campTotal;
+  document.getElementById('campaign-metric-zone1').textContent = step.counts[1];
+  document.getElementById('campaign-metric-zone2').textContent = step.counts[2];
+  document.getElementById('campaign-metric-zone4').textContent = step.counts[4];
+  document.getElementById('campaign-metric-zone5').textContent = step.counts[5];
+  document.getElementById('campaign-metric-conv').textContent = `${conversion}%`;
+  document.getElementById('campaign-live-text').innerHTML = `<strong>${step.title}.</strong> ${step.liveText}`;
+  document.getElementById('campaign-primary-btn').textContent = campaignFinished ? 'Terug naar overzicht' : 'Campagne stoppen';
+}
+
+function completeCampaign() {
+  if (campaignFinished) return;
+  running = false;
+  campaignFinished = true;
+  clearInterval(campInterval);
+  campInterval = null;
+  const finalStep = campaignTimeline[campaignTimeline.length - 1];
+  if (finalStep) {
+    applyCampaignCounts(finalStep);
+    updateCampaignScreen(finalStep);
+    renderCampaignTimeline();
+  }
+  showToast('✓ Dag 14 bereikt — campagne afgelopen');
+}
+
+function advanceCampaignTimeline() {
+  if (!running) return;
+  if (campaignStepIndex >= campaignTimeline.length - 1) {
+    completeCampaign();
+    return;
+  }
+
+  campaignStepIndex += 1;
+  const step = campaignTimeline[campaignStepIndex];
+  applyCampaignCounts(step);
+  updateCampaignScreen(step);
+  renderCampaignTimeline();
+  addLog(`<strong>Dag ${step.day}</strong> · ${step.title}`, step.complete ? 'var(--z5)' : 'var(--crimson)');
+
+  if (step.complete) completeCampaign();
+}
 
 function startCampagne() {
   if (running) return;
-  const n = parseInt(document.getElementById('mail-slider').value) || 100;
+  const n = parseInt(document.getElementById('mail-slider').value, 10) || 100;
+  const fillWorkdays = !!document.getElementById('campaign-full-workdays')?.checked;
+
   bedrijven = genBedrijven(n);
   campTotal = n;
-  campIdx = 0;
+  campaignTimeline = buildCampaignTimeline(n);
+  campaignStepIndex = -1;
+  campaignFinished = false;
   running = true;
-  document.getElementById('camp-overlay').classList.add('show');
-  document.getElementById('camp-fill').style.width = '0%';
 
-  const steps = ['Bedrijvenregister laden…','Filters toepassen…','Mails samenstellen…','Verzenden gestart…'];
-  let si = 0;
-  const si_int = setInterval(() => {
-    if (!running) { clearInterval(si_int); return; }
-    document.getElementById('camp-current').textContent = steps[si] || 'Verzenden…';
-    si++;
-    if (si >= steps.length) { clearInterval(si_int); runMails(); }
-  }, 700);
-}
+  document.getElementById('campaign-subtitle').textContent = fillWorkdays
+    ? `${n} bedrijven doorlopen deze campagne in 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.`
+    : `${n} bedrijven doorlopen deze campagne in 14 dagen, van eerste verzending tot laatste checkpoint.`;
 
-function runMails() {
-  campInterval = setInterval(() => {
-    if (!running || campIdx >= campTotal) { stopCampagne(); return; }
-    const b = bedrijven[campIdx]; campIdx++;
-    // randomly promote some to zone 2/4/5 for demo
-    const r = Math.random();
-    if (r < .03) b.zone = 5;
-    else if (r < .08) b.zone = 4;
-    else if (r < .38) b.zone = 2;
-
-    const zoneColors = { 1: 'var(--z1)', 2: 'var(--z2)', 4: 'var(--z4)', 5: 'var(--z5)' };
-    const zoneLabels = { 1:'Zone 1 — Eerste mail', 2:'Zone 2 — Tweede mail', 4:'Zone 4 — Meer dan 3 mails', 5:'Interesse' };
-    addLog(`<strong>${b.naam}</strong> · ${zoneLabels[b.zone]}`, zoneColors[b.zone]);
-
-    const pct = Math.round((campIdx / campTotal) * 100);
-    document.getElementById('camp-fill').style.width = pct + '%';
-    document.getElementById('camp-current').textContent = `Mail ${campIdx} van ${campTotal}: ${b.naam}`;
-    updateZoneCounts();
-  }, 120);
+  showScreen('screen-campaign');
+  document.getElementById('campaign-progress-fill').style.width = '0%';
+  advanceCampaignTimeline();
+  clearInterval(campInterval);
+  campInterval = setInterval(advanceCampaignTimeline, 1250);
 }
 
 function stopCampagne() {
-  running = false;
   clearInterval(campInterval);
-  document.getElementById('camp-overlay').classList.remove('show');
+  campInterval = null;
+  running = false;
+
+  if (!campaignFinished) {
+    campaignFinished = true;
+    document.getElementById('campaign-status-title').textContent = 'Campagne handmatig gestopt';
+    document.getElementById('campaign-status-text').textContent = 'De tijdlijn is gepauzeerd voordat dag 14 is bereikt. Je kunt nu terug naar het overzicht.';
+    document.getElementById('campaign-progress-copy').textContent = 'De campagne is handmatig gestopt en is niet volledig tot het laatste checkpoint doorlopen.';
+    document.getElementById('campaign-progress-pill').textContent = 'Handmatig gestopt';
+    document.getElementById('campaign-progress-footer-right').textContent = 'Campagne gestopt';
+    document.getElementById('campaign-live-text').innerHTML = '<strong>Campagne gestopt.</strong> De huidige stand blijft bewaard in de zones.';
+    document.getElementById('campaign-primary-btn').textContent = 'Terug naar overzicht';
+    showToast('Campagne gestopt');
+  }
+
   updateZoneCounts();
-  showToast('✓ Campagne voltooid — ' + campTotal + ' mails verstuurd');
+}
+
+function handleCampaignPrimaryAction() {
+  if (running) {
+    stopCampagne();
+    return;
+  }
+  returnToDashboard();
+}
+
+function returnToDashboard() {
+  clearInterval(campInterval);
+  campInterval = null;
+  running = false;
+  showScreen('screen-dashboard');
+  updateZoneCounts();
 }
 
 // ── ZONE DETAIL ──
@@ -996,10 +1552,7 @@ function filterBedrijven() {
 }
 
 function goBack() {
-  document.getElementById('screen-zone').classList.remove('active');
-  document.getElementById('screen-dashboard').classList.add('active');
-  document.getElementById('topbar-back').classList.remove('show');
-  document.getElementById('topbar-info').textContent = '';
+  returnToDashboard();
 }
 
 
