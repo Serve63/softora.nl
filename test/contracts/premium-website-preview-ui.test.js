@@ -56,19 +56,26 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /const errorParts = \[data\?\.detail, data\?\.upstreamDetail\]/);
 });
 
-test('premium websitegenerator trimt lege witte randen uit gegenereerde previews', () => {
+test('premium websitegenerator behoudt hoge full-page previews zonder portrait-crop', () => {
   const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
-  assert.match(source, /const WEBSITE_PREVIEW_IMAGE_WIDTH = 1536;/);
-  assert.match(source, /const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1024;/);
+  assert.match(source, /const WEBSITE_PREVIEW_IMAGE_WIDTH = 1024;/);
+  assert.match(source, /const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1536;/);
   assert.match(source, /async function cropPreviewImageDataUrl\(dataUrl\)/);
+  assert.match(source, /if \(height > width\) \{\s*return \{ dataUrl: raw, width, height \};\s*\}/);
   assert.match(source, /getPreviewReferenceMatchRatio/);
   assert.match(source, /measurePreviewRightGutterWidth/);
   assert.match(source, /const croppedPreview = await cropPreviewImageDataUrl\(imageDataUrl\)/);
   assert.match(source, /const previewWidth = Number\(croppedPreview\?\.width \|\| WEBSITE_PREVIEW_IMAGE_WIDTH\)/);
   assert.match(source, /const frameW = Math\.min\(window\.innerWidth - 100, previewWidth\)/);
   assert.match(source, /preview-media" style="max-width:\$\{frameW\}px;"/);
-  assert.match(source, /id="preview-image" alt="Website preview \$\{hostname\}" style="width:100%;height:auto;display:block;"/);
+  assert.match(source, /id="preview-image" alt="Website preview \$\{safeHost\}" style="width:100%;height:auto;display:block;"/);
+  assert.match(source, /softora_website_preview_library_v1/);
+  assert.match(source, /data-tab="library"/);
+  assert.match(source, /id="tab-library"/);
+  assert.doesNotMatch(source, /function openPreviewNewTab\(/);
+  assert.match(source, /SCAN_URL_BATCH_MAX = 50/);
+  assert.match(source, /function tokenizeScanUrlInput/);
   assert.match(source, /window\._lastPreviewImageDataUrl = previewDataUrl/);
 });
