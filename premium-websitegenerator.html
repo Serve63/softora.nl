@@ -464,35 +464,10 @@ function isPreviewWhitespacePixel(r, g, b, a) {
   return avg >= 245 && spread <= 18;
 }
 
-function isPreviewWhitespaceColumn(pixels, width, height, x) {
-  let nonWhitespaceCount = 0;
-  const allowedNoise = Math.max(4, Math.round(height * 0.006));
-  for (let y = 0; y < height; y += 1) {
-    const offset = (y * width + x) * 4;
-    if (!isPreviewWhitespacePixel(pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3])) {
-      nonWhitespaceCount += 1;
-      if (nonWhitespaceCount > allowedNoise) return false;
-    }
-  }
-  return true;
-}
-
-function isPreviewWhitespaceRow(pixels, width, height, y) {
-  let nonWhitespaceCount = 0;
-  const allowedNoise = Math.max(4, Math.round(width * 0.006));
-  for (let x = 0; x < width; x += 1) {
-    const offset = (y * width + x) * 4;
-    if (!isPreviewWhitespacePixel(pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3])) {
-      nonWhitespaceCount += 1;
-      if (nonWhitespaceCount > allowedNoise) return false;
-    }
-  }
-  return true;
-}
-
 function samplePreviewEdgeReference(pixels, width, height, side) {
-  const startX = side === 'right' ? Math.max(0, width - 3) : 0;
-  const endX = side === 'right' ? width : Math.min(width, 3);
+  const stripWidth = Math.max(4, Math.round(width * 0.01));
+  const startX = side === 'right' ? Math.max(0, width - stripWidth) : 0;
+  const endX = side === 'right' ? width : Math.min(width, stripWidth);
   let totalR = 0;
   let totalG = 0;
   let totalB = 0;
@@ -500,7 +475,7 @@ function samplePreviewEdgeReference(pixels, width, height, side) {
   let count = 0;
 
   for (let x = startX; x < endX; x += 1) {
-    for (let y = 0; y < height; y += 2) {
+    for (let y = 0; y < height; y += 3) {
       const offset = (y * width + x) * 4;
       const alpha = Number(pixels[offset + 3]);
       if (alpha <= 10) continue;
@@ -564,9 +539,9 @@ function getPreviewColumnActivity(pixels, width, height, x) {
   if (x < 0 || x >= width) return 0;
   let totalDiff = 0;
   let count = 0;
-  for (let y = 2; y < height; y += 2) {
+  for (let y = 3; y < height; y += 3) {
     const offset = (y * width + x) * 4;
-    const topOffset = ((y - 2) * width + x) * 4;
+    const topOffset = ((y - 3) * width + x) * 4;
 
     totalDiff +=
       Math.abs(Number(pixels[offset]) - Number(pixels[topOffset])) +
@@ -586,80 +561,65 @@ function getPreviewColumnActivity(pixels, width, height, x) {
   return count ? totalDiff / count : 0;
 }
 
-function measurePreviewLowActivityRun(pixels, width, height, side) {
-  const maxCropWidth = Math.max(48, Math.round(width * 0.34));
-  let count = 0;
+function isPreviewSideGutterColumn(pixels, width, height, x, reference) {
+  if (!reference) return false;
+  let mismatchCount = 0;
+  const allowedNoise = Math.max(8, Math.round(height * 0.03));
 
-  while (count < maxCropWidth) {
-    const x = side === 'right' ? width - 1 - count : count;
-    if (x < 0 || x >= width) break;
-    const activity = getPreviewColumnActivity(pixels, width, height, x);
-    if (activity > 15) break;
-    count += 1;
-  }
-
-  return count;
-}
-
-function hasPreviewActivityBreak(pixels, width, height, side, gutterWidth) {
-  if (gutterWidth <= 0) return false;
-  const sampleDepth = 14;
-  let gutterActivity = 0;
-  let contentActivity = 0;
-  let gutterCount = 0;
-  let contentCount = 0;
-
-  for (let i = 0; i < sampleDepth; i += 1) {
-    const gutterX = side === 'right' ? width - 1 - i : i;
-    const contentX = side === 'right' ? width - gutterWidth - 1 - i : gutterWidth + i;
-    if (gutterX >= 0 && gutterX < width) {
-      gutterActivity += getPreviewColumnActivity(pixels, width, height, gutterX);
-      gutterCount += 1;
-    }
-    if (contentX >= 0 && contentX < width) {
-      contentActivity += getPreviewColumnActivity(pixels, width, height, contentX);
-      contentCount += 1;
+  for (let y = 0; y < height; y += 3) {
+    const offset = (y * width + x) * 4;
+    if (
+      !isPreviewWhitespacePixel(
+        pixels[offset],
+        pixels[offset + 1],
+        pixels[offset + 2],
+        pixels[offset + 3]
+      ) &&
+      !isPreviewPixelCloseToReference(
+        pixels[offset],
+        pixels[offset + 1],
+        pixels[offset + 2],
+        pixels[offset + 3],
+        reference
+      )
+    ) {
+      mismatchCount += 1;
+      if (mismatchCount > allowedNoise) return false;
     }
   }
 
-  if (!gutterCount || !contentCount) return false;
-  const avgGutter = gutterActivity / gutterCount;
-  const avgContent = contentActivity / contentCount;
-  return avgGutter <= 14 && avgContent >= avgGutter * 1.8;
+  return getPreviewColumnActivity(pixels, width, height, x) <= 10;
 }
 
-function measurePreviewEdgeGutterWidth(pixels, width, height, side, reference) {
+function measurePreviewSideCrop(pixels, width, height, side, reference) {
   if (!reference) return 0;
-  const maxCropWidth = Math.max(32, Math.round(width * 0.36));
+  const maxCropWidth = Math.max(80, Math.round(width * 0.32));
   let count = 0;
 
   while (count < maxCropWidth) {
     const x = side === 'right' ? width - 1 - count : count;
     if (x < 0 || x >= width) break;
-    if (!isPreviewEdgeGutterColumn(pixels, width, height, x, reference)) break;
+    if (!isPreviewSideGutterColumn(pixels, width, height, x, reference)) break;
     count += 1;
   }
 
   return count;
 }
 
-function hasPreviewEdgeBreak(pixels, width, height, side, reference, gutterWidth) {
-  if (!reference || gutterWidth <= 0) return false;
-  const sampleColumns = 8;
-  let mismatchColumns = 0;
+function hasPreviewContentBreak(pixels, width, height, side, cropWidth, reference) {
+  if (!reference || cropWidth < 60) return false;
+  let escapedColumns = 0;
+  const sampleColumns = 14;
 
   for (let i = 0; i < sampleColumns; i += 1) {
-    const x =
-      side === 'right'
-        ? width - gutterWidth - 1 - i
-        : gutterWidth + i;
+    const x = side === 'right' ? width - cropWidth - 1 - i : cropWidth + i;
     if (x < 0 || x >= width) break;
-    if (!isPreviewEdgeGutterColumn(pixels, width, height, x, reference)) {
-      mismatchColumns += 1;
+    if (!isPreviewSideGutterColumn(pixels, width, height, x, reference)) {
+      escapedColumns += 1;
     }
   }
 
-  return mismatchColumns >= Math.max(2, Math.floor(sampleColumns / 3));
+  return escapedColumns >= 5;
 }
 
 function loadPreviewImage(dataUrl) {
@@ -675,11 +635,100 @@ function loadPreviewImage(dataUrl) {
 const WEBSITE_PREVIEW_IMAGE_WIDTH = 1536;
 const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1024;
 
+async function cropPreviewImageDataUrl(dataUrl) {
+  const raw = String(dataUrl || '').trim();
+  if (!raw.startsWith('data:image/')) {
+    return {
+      dataUrl: raw,
+      width: WEBSITE_PREVIEW_IMAGE_WIDTH,
+      height: WEBSITE_PREVIEW_IMAGE_HEIGHT,
+    };
+  }
+
+  const image = await loadPreviewImage(raw);
+  const width = Number(image.naturalWidth || image.width || 0);
+  const height = Number(image.naturalHeight || image.height || 0);
+  if (!width || !height) {
+    return {
+      dataUrl: raw,
+      width: WEBSITE_PREVIEW_IMAGE_WIDTH,
+      height: WEBSITE_PREVIEW_IMAGE_HEIGHT,
+    };
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) {
+    return { dataUrl: raw, width, height };
+  }
+
+  context.drawImage(image, 0, 0);
+  const imageData = context.getImageData(0, 0, width, height);
+  const pixels = imageData.data;
+
+  const leftReference = samplePreviewEdgeReference(pixels, width, height, 'left');
+  const rightReference = samplePreviewEdgeReference(pixels, width, height, 'right');
+
+  let leftCrop = measurePreviewSideCrop(pixels, width, height, 'left', leftReference);
+  let rightCrop = measurePreviewSideCrop(pixels, width, height, 'right', rightReference);
+
+  if (!hasPreviewContentBreak(pixels, width, height, 'left', leftCrop, leftReference)) {
+    leftCrop = 0;
+  }
+  if (!hasPreviewContentBreak(pixels, width, height, 'right', rightCrop, rightReference)) {
+    rightCrop = 0;
+  }
+
+  const croppedWidth = width - leftCrop - rightCrop;
+  if (croppedWidth <= Math.round(width * 0.55)) {
+    return { dataUrl: raw, width, height };
+  }
+  if (leftCrop < 40 && rightCrop < 40) {
+    return { dataUrl: raw, width, height };
+  }
+
+  const croppedCanvas = document.createElement('canvas');
+  croppedCanvas.width = croppedWidth;
+  croppedCanvas.height = height;
+  const croppedContext = croppedCanvas.getContext('2d');
+  if (!croppedContext) {
+    return { dataUrl: raw, width, height };
+  }
+
+  croppedContext.drawImage(
+    canvas,
+    leftCrop,
+    0,
+    croppedWidth,
+    height,
+    0,
+    0,
+    croppedWidth,
+    height
+  );
+
+  return {
+    dataUrl: croppedCanvas.toDataURL('image/png'),
+    width: croppedWidth,
+    height,
+  };
+}
+
 async function showPreview(result, url, hostname) {
   const imageDataUrl = String(result?.image?.dataUrl || '').trim();
   if (!imageDataUrl) throw new Error('Geen previewafbeelding ontvangen van de server.');
-  const scaleX = Math.min((window.innerWidth - 100) / WEBSITE_PREVIEW_IMAGE_WIDTH, 0.78);
-  const frameH = Math.round(WEBSITE_PREVIEW_IMAGE_HEIGHT * scaleX);
+  const croppedPreview = await cropPreviewImageDataUrl(imageDataUrl).catch(() => ({
+    dataUrl: imageDataUrl,
+    width: WEBSITE_PREVIEW_IMAGE_WIDTH,
+    height: WEBSITE_PREVIEW_IMAGE_HEIGHT,
+  }));
+  const previewWidth = Number(croppedPreview?.width || WEBSITE_PREVIEW_IMAGE_WIDTH);
+  const previewHeight = Number(croppedPreview?.height || WEBSITE_PREVIEW_IMAGE_HEIGHT);
+  const previewDataUrl = String(croppedPreview?.dataUrl || imageDataUrl);
+  const scaleX = Math.min((window.innerWidth - 100) / previewWidth, 0.78);
+  const frameH = Math.round(previewHeight * scaleX);
   document.getElementById('scan-output').innerHTML = `
     <div class="preview-zone">
       <div class="preview-label">
@@ -701,12 +750,12 @@ async function showPreview(result, url, hostname) {
           <div class="browser-url">${url}</div>
         </div>
         <div class="scale-wrap" style="height:${frameH}px">
-          <img id="preview-image" alt="Website preview ${hostname}" style="width:${WEBSITE_PREVIEW_IMAGE_WIDTH}px;height:${WEBSITE_PREVIEW_IMAGE_HEIGHT}px;transform-origin:top left;transform:scale(${scaleX});display:block;" />
+          <img id="preview-image" alt="Website preview ${hostname}" style="width:${previewWidth}px;height:${previewHeight}px;transform-origin:top left;transform:scale(${scaleX});display:block;" />
         </div>
       </div>
     </div>`;
-  document.getElementById('preview-image').src = imageDataUrl;
-  window._lastPreviewImageDataUrl = imageDataUrl;
+  document.getElementById('preview-image').src = previewDataUrl;
+  window._lastPreviewImageDataUrl = previewDataUrl;
   window._lastPreviewImageFileName = String(result?.image?.fileName || `${hostname}-preview.png`).trim();
   window._lastPreviewUrl = url;
 }
