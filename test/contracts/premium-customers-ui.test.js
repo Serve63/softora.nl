@@ -30,7 +30,9 @@ test('premium customers page renders the new database UI while preserving persis
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
   assert.match(pageSource, /<textarea class="p-ta" id="p-nota"/);
-  assert.match(pageSource, /<select class="p-sel" id="p-status">/);
+  assert.doesNotMatch(pageSource, /<div class="p-s-title">Gegevens<\/div>/);
+  assert.doesNotMatch(pageSource, /<div class="p-s-title">Status wijzigen<\/div>/);
+  assert.doesNotMatch(pageSource, /<div class="p-s-title">Tijdlijn<\/div>/);
   assert.match(pageSource, /<select class="msel" id="m-responsible">[\s\S]*Servé[\s\S]*Martijn/);
   assert.match(pageSource, /function parseResponsibleValue\(value\)/);
   assert.match(pageSource, /function normalizeResponsibleValue\(value\)/);
@@ -38,7 +40,7 @@ test('premium customers page renders the new database UI while preserving persis
   assert.match(pageSource, /function getResponsibleSourceValue\(raw\)/);
   assert.match(pageSource, /function openPanel\(id\)/);
   assert.match(pageSource, /function saveNota\(\)/);
-  assert.match(pageSource, /function applyPanelStatus\(\)/);
+  assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /function exportCSV\(\)/);
   assert.match(pageSource, /fetchUiStateSetWithFallback\(CUSTOMER_DB_SCOPE/);

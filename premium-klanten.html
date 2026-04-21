@@ -535,42 +535,6 @@
             margin-bottom: 10px;
         }
 
-        .p-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
-            font-size: 13px;
-        }
-
-        .p-row:last-child {
-            border-bottom: none;
-        }
-
-        .p-row-label {
-            color: var(--light);
-        }
-
-        .p-row-val {
-            font-weight: 500;
-            color: var(--dark);
-            text-align: right;
-            word-break: break-word;
-        }
-
-        .p-status-row {
-            display: flex;
-            gap: 8px;
-        }
-
-        .p-sel {
-            flex: 1;
-            padding: 9px 12px;
-            border-radius: 5px;
-            font-size: 13px;
-        }
-
         .p-apply {
             padding: 9px 16px;
             background: var(--crimson);
@@ -589,55 +553,6 @@
 
         .p-apply:hover {
             background: #c4346a;
-        }
-
-        .tl {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .tl-item {
-            display: flex;
-            gap: 12px;
-            padding-bottom: 14px;
-            position: relative;
-        }
-
-        .tl-item:last-child {
-            padding-bottom: 0;
-        }
-
-        .tl-item::before {
-            content: '';
-            position: absolute;
-            left: 7px;
-            top: 17px;
-            bottom: 0;
-            width: 1px;
-            background: var(--border);
-        }
-
-        .tl-item:last-child::before {
-            display: none;
-        }
-
-        .tl-dot {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-
-        .tl-msg {
-            font-size: 13px;
-            color: var(--dark);
-        }
-
-        .tl-date {
-            font-size: 11px;
-            color: var(--light);
-            margin-top: 1px;
         }
 
         .p-ta {
@@ -974,40 +889,6 @@
         </div>
         <div class="p-body">
             <div class="p-section">
-                <div class="p-s-title">Gegevens</div>
-                <div class="p-row"><span class="p-row-label">Contact</span><span class="p-row-val" id="p-contact"></span></div>
-                <div class="p-row"><span class="p-row-label">Domein</span><span class="p-row-val" id="p-domain"></span></div>
-                <div class="p-row"><span class="p-row-label">Telefoon</span><span class="p-row-val" id="p-phone"></span></div>
-                <div class="p-row"><span class="p-row-label">E-mail</span><span class="p-row-val" id="p-email"></span></div>
-                <div class="p-row"><span class="p-row-label">Branche</span><span class="p-row-val" id="p-branch"></span></div>
-                <div class="p-row"><span class="p-row-label">Adres</span><span class="p-row-val" id="p-city"></span></div>
-                <div class="p-row"><span class="p-row-label">Toegewezen aan</span><span class="p-row-val" id="p-responsible"></span></div>
-            </div>
-
-            <div class="p-section">
-                <div class="p-s-title">Status wijzigen</div>
-                <div class="p-status-row">
-                    <select class="p-sel" id="p-status">
-                        <option value="prospect">Prospect</option>
-                        <option value="benaderbaar">Benaderbaar</option>
-                        <option value="gebeld">Gebeld</option>
-                        <option value="geengehoor">Geen gehoor</option>
-                        <option value="gemaild">Gemaild</option>
-                        <option value="afspraak">Afspraak</option>
-                        <option value="klant">Klant</option>
-                        <option value="geblokkeerd">Geen interesse</option>
-                        <option value="buiten">Buiten gebruik</option>
-                    </select>
-                    <button class="p-apply" id="applyStatusButton" type="button">Opslaan</button>
-                </div>
-            </div>
-
-            <div class="p-section">
-                <div class="p-s-title">Tijdlijn</div>
-                <div class="tl" id="p-timeline"></div>
-            </div>
-
-            <div class="p-section">
                 <div class="p-s-title">Notitie</div>
                 <textarea class="p-ta" id="p-nota" placeholder="Bijv. contactpersoon is Jan, bel niet voor 9u…"></textarea>
                 <button class="p-apply" id="saveNoteButton" type="button" style="width:100%">Opslaan</button>
@@ -1113,18 +994,8 @@
             closePanelButton: document.getElementById("closePanelButton"),
             panelName: document.getElementById("p-naam"),
             panelSub: document.getElementById("p-sub"),
-            panelContact: document.getElementById("p-contact"),
-            panelDomain: document.getElementById("p-domain"),
-            panelPhone: document.getElementById("p-phone"),
-            panelEmail: document.getElementById("p-email"),
-            panelBranch: document.getElementById("p-branch"),
-            panelCity: document.getElementById("p-city"),
-            panelResponsible: document.getElementById("p-responsible"),
-            panelStatus: document.getElementById("p-status"),
-            panelTimeline: document.getElementById("p-timeline"),
             panelNote: document.getElementById("p-nota"),
             saveNoteButton: document.getElementById("saveNoteButton"),
-            applyStatusButton: document.getElementById("applyStatusButton"),
             modalBg: document.getElementById("mbg"),
             modalTitle: document.getElementById("modalTitle"),
             modalCompany: document.getElementById("m-bedrijf"),
@@ -1652,39 +1523,6 @@
             return labels[status] || "Prospect";
         }
 
-        function renderTimeline(customer) {
-            const items = Array.isArray(customer.hist) ? customer.hist : [];
-            if (!items.length) {
-                nodes.panelTimeline.innerHTML = "<div class=\"tl-item\"><div class=\"tl-dot\" style=\"background:#bbb\"></div><div><div class=\"tl-msg\">Nog geen geschiedenis beschikbaar</div><div class=\"tl-date\">-</div></div></div>";
-                return;
-            }
-
-            nodes.panelTimeline.innerHTML = items.slice().reverse().map(function (item) {
-                const colorMap = {
-                    prospect: "var(--blue)",
-                    gebeld: "var(--orange)",
-                    gemaild: "var(--crimson)",
-                    afspraak: "var(--green)",
-                    klant: "var(--green)",
-                    geblokkeerd: "var(--red)",
-                    buiten: "#bbb",
-                    benaderbaar: "var(--green)",
-                    geengehoor: "#aaa",
-                    nota: "var(--light)"
-                };
-                const itemType = normalizeDatabaseStatus(item.type || "prospect");
-                return [
-                    "<div class=\"tl-item\">",
-                        "<div class=\"tl-dot\" style=\"background:" + escapeHtml(colorMap[itemType] || "var(--light)") + "\"></div>",
-                        "<div>",
-                            "<div class=\"tl-msg\">" + escapeHtml(item.label || "Bijgewerkt") + "</div>",
-                            "<div class=\"tl-date\">" + escapeHtml(formatDisplayDate(item.date)) + "</div>",
-                        "</div>",
-                    "</div>"
-                ].join("");
-            }).join("");
-        }
-
         function renderTable() {
             const filtered = getSortedCustomers(getFilteredCustomers());
 
@@ -1744,16 +1582,7 @@
             state.openId = id;
             nodes.panelName.textContent = customer.bedrijf;
             nodes.panelSub.textContent = customer.dom + " · " + customer.stad;
-            nodes.panelContact.textContent = customer.naam;
-            nodes.panelDomain.textContent = customer.dom;
-            nodes.panelPhone.textContent = customer.tel;
-            nodes.panelEmail.textContent = customer.email;
-            nodes.panelBranch.textContent = customer.branche;
-            nodes.panelCity.textContent = customer.stad;
-            nodes.panelResponsible.textContent = formatResponsibleDisplayName(customer.verantwoordelijk);
-            nodes.panelStatus.value = customer.status;
             nodes.panelNote.value = customer.nota || "";
-            renderTimeline(customer);
 
             nodes.overlay.classList.add("on");
             nodes.panel.classList.add("on");
@@ -1816,28 +1645,6 @@
             });
             if (!updated) return;
             void saveCurrentState("Notitie opgeslagen");
-        }
-
-        function applyPanelStatus() {
-            const nextStatus = normalizeDatabaseStatus(nodes.panelStatus.value);
-            const updated = updateCurrentCustomer(function (customer) {
-                const nextHistory = customer.hist.slice();
-                nextHistory.push({
-                    type: nextStatus,
-                    label: createStatusTimelineLabel(nextStatus),
-                    date: formatDateForStorage(new Date())
-                });
-                return {
-                    ...customer,
-                    status: nextStatus,
-                    call: nextStatus !== "geblokkeerd" && nextStatus !== "buiten",
-                    mail: nextStatus !== "geblokkeerd" && nextStatus !== "buiten",
-                    hist: nextHistory,
-                    updatedAt: formatDateForStorage(new Date())
-                };
-            });
-            if (!updated) return;
-            void saveCurrentState("Status bijgewerkt");
         }
 
         function resetModal() {
@@ -2039,7 +1846,6 @@
         nodes.overlay.addEventListener("click", closePanel);
         nodes.closePanelButton.addEventListener("click", closePanel);
         nodes.saveNoteButton.addEventListener("click", saveNota);
-        nodes.applyStatusButton.addEventListener("click", applyPanelStatus);
         nodes.addButton.addEventListener("click", openModal);
         nodes.cancelModalButton.addEventListener("click", closeModal);
         nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
