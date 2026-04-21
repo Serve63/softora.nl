@@ -112,10 +112,10 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 .zone-card:hover .zone-arrow { color: var(--crimson); }
 
 /* BOTTOM GRID */
-.bottom-grid { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
+.bottom-grid { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: stretch; }
 
 /* ACTIVITEITENLOG */
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
 .card-head { padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--tag); display: flex; align-items: center; justify-content: space-between; }
 .card-title { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dark); }
 .card-body { padding: 0; }
@@ -129,10 +129,10 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dar
 .log-empty { padding: 40px; text-align: center; font-size: 13px; color: var(--light); }
 
 /* CAMPAGNE KAART */
-.campagne-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.campagne-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
 .campagne-head { padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--tag); }
 .campagne-title { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dark); }
-.campagne-body { padding: 20px; }
+.campagne-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
 
 /* INSTELLINGEN */
 .field { margin-bottom: 18px; }
