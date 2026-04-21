@@ -46,13 +46,13 @@ function createFixture(overrides = {}) {
       dataUrl: 'data:image/png;base64,abcd',
       mimeType: 'image/png',
       fileName: 'preview.png',
-      model: 'gpt-image-1',
+      model: 'gpt-image-1.5',
       revisedPrompt: 'Verbeterde prompt',
       usage: { totalTokens: 50 },
     })),
     appendDashboardActivity: (payload, reason) => activities.push({ payload, reason }),
     getOpenAiApiKey: () => overrides.openAiApiKey || 'openai-key',
-    openAiImageModel: overrides.openAiImageModel || 'gpt-image-1',
+    openAiImageModel: overrides.openAiImageModel || 'gpt-image-1.5',
     buildOrderDossierInput: overrides.buildOrderDossierInput || ((value) => ({ ...value })),
     generateDynamicOrderDossierWithAnthropic:
       overrides.generateDynamicOrderDossierWithAnthropic ||
@@ -147,7 +147,7 @@ test('ai tools coordinator wraps website preview failures in a stable error payl
     res.body.detail,
     'OpenAI image provider offline: Image quota bereikt'
   );
-  assert.equal(res.body.imageModel, 'gpt-image-1');
+  assert.equal(res.body.imageModel, 'gpt-image-1.5');
   assert.equal(res.body.upstreamDetail, 'Image quota bereikt');
 });
 

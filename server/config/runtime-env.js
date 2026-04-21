@@ -74,7 +74,7 @@ function loadRuntimeEnv(env = process.env) {
       openaiApiBaseUrl: safeEnv.OPENAI_API_BASE_URL || 'https://api.openai.com/v1',
       openaiModel: safeEnv.OPENAI_MODEL || 'gpt-4o-mini',
       openaiImageModel:
-        safeEnv.OPENAI_IMAGE_MODEL || safeEnv.WEBSITE_PREVIEW_IMAGE_MODEL || 'gpt-image-1',
+        safeEnv.OPENAI_IMAGE_MODEL || safeEnv.WEBSITE_PREVIEW_IMAGE_MODEL || 'gpt-image-1.5',
       anthropicApiBaseUrl: safeEnv.ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com/v1',
       anthropicModel: safeEnv.ANTHROPIC_MODEL || safeEnv.CLAUDE_MODEL || 'claude-opus-4-6',
       websiteAnthropicModel:

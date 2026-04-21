@@ -318,7 +318,9 @@ function createAiRemoteService(deps = {}) {
     }
 
     const prompt = buildWebsitePreviewPromptFromScan(scan);
-    const imageModel = normalizeString(openAiImageModel || env.OPENAI_IMAGE_MODEL || env.WEBSITE_PREVIEW_IMAGE_MODEL || 'gpt-image-1');
+    const imageModel = normalizeString(
+      openAiImageModel || env.OPENAI_IMAGE_MODEL || env.WEBSITE_PREVIEW_IMAGE_MODEL || 'gpt-image-1.5'
+    );
     if (!isSupportedOpenAiImageModel(imageModel)) {
       const err = new Error(`OpenAI image-model ongeldig geconfigureerd (${imageModel || 'leeg'})`);
       err.status = 500;
