@@ -151,6 +151,11 @@ function createPremiumAuthStateManager(options = {}) {
     };
   }
 
+  function resolveHydratedUsers(hydrated) {
+    const hydratedUsers = Array.isArray(hydrated?.users) ? hydrated.users : [];
+    return hydratedUsers.length > 0 ? hydratedUsers : premiumUsersStore.getCachedUsers();
+  }
+
   async function getResolvedPremiumAuthState(req) {
     const basicAuthState = getPremiumAuthState(req);
     const timeoutMs = getSafeResolveTimeoutMs();
@@ -187,8 +192,12 @@ function createPremiumAuthStateManager(options = {}) {
           });
       });
     }
-    const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
-    const configured = Boolean(sessionSecret && hydrated?.source === 'supabase' && users.length > 0);
+    const users = resolveHydratedUsers(hydrated);
+    const configured = Boolean(
+      sessionSecret &&
+        users.length > 0 &&
+        hydrated?.source !== 'unavailable'
+    );
 
     if (hydrated?.source === 'timeout') {
       return buildTokenFallbackState(basicAuthState);

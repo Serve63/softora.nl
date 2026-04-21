@@ -172,8 +172,56 @@ test('premium auth login returns 503 when auth is not fully configured', async (
   await coordinator.loginResponse(req, res);
 
   assert.equal(res.statusCode, 503);
-  assert.match(res.body.error, /Premium login is nog niet volledig/i);
+  assert.match(res.body.error, /PREMIUM_SESSION_SECRET/i);
   assert.equal(auditEvents[0].reason, 'security_login_rejected');
+});
+
+test('premium auth login accepts bootstrap-backed users when supabase hydration falls back', async () => {
+  const { coordinator } = createFixture({
+    hydrationSource: 'bootstrap_env',
+  });
+  const req = createRequest({
+    body: { email: 'admin@softora.nl', password: 'secret123' },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.loginResponse(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.authenticated, true);
+});
+
+test('premium auth login reports temporary user store failures separately from config errors', async () => {
+  const { auditEvents, coordinator } = createFixture({
+    premiumUsersStore: {
+      async ensureUsersHydrated() {
+        return { source: 'unavailable', users: [] };
+      },
+      getCachedUsers() {
+        return [];
+      },
+      findUserByEmail() {
+        return null;
+      },
+      normalizeUserStatus(status) {
+        return String(status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
+      },
+      verifyPasswordHash() {
+        return false;
+      },
+    },
+  });
+  const req = createRequest({
+    body: { email: 'admin@softora.nl', password: 'secret123' },
+  });
+  const res = createResponseRecorder();
+
+  await coordinator.loginResponse(req, res);
+
+  assert.equal(res.statusCode, 503);
+  assert.match(res.body.error, /tijdelijk niet beschikbaar/i);
+  assert.match(auditEvents[0].payload.detail, /tijdelijk niet beschikbaar/i);
 });
 
 test('premium auth login blocks disallowed admin ips before password checks', async () => {

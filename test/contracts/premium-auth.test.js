@@ -213,3 +213,44 @@ test('premium auth manager falls back to cached or token auth state when user hy
   assert.equal(resolved.email, 'info@softora.nl');
   assert.equal(resolved.isAdmin, true);
 });
+
+test('premium auth manager treats bootstrap-backed users as configured auth state', async () => {
+  const users = [
+    {
+      id: 'usr_bootstrap',
+      email: 'info@softora.nl',
+      role: 'admin',
+      status: 'active',
+      firstName: 'Serve',
+      lastName: 'Creusen',
+      avatarDataUrl: 'data:image/png;base64,abc',
+    },
+  ];
+
+  const manager = createPremiumAuthStateManager({
+    sessionSecret: 'secret',
+    normalizeString,
+    truncateText,
+    normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
+    readSessionTokenFromRequest: () => 'token',
+    verifySessionToken: () => ({
+      ok: true,
+      expired: false,
+      payload: {
+        email: 'info@softora.nl',
+        uid: 'usr_bootstrap',
+        role: 'admin',
+        exp: Date.now() + 60_000,
+      },
+    }),
+    premiumUsersStore: createPremiumUsersStoreStub(users, 'bootstrap_env'),
+    getRequestPathname: () => '/',
+  });
+
+  const resolved = await manager.getResolvedPremiumAuthState({});
+
+  assert.equal(resolved.configured, true);
+  assert.equal(resolved.authenticated, true);
+  assert.equal(resolved.email, 'info@softora.nl');
+  assert.equal(resolved.isAdmin, true);
+});

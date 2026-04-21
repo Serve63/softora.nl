@@ -52,6 +52,26 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
     return res.status(200).json(buildPremiumAuthSessionPayload(authState));
   }
 
+  async function loadUsersForLogin() {
+    const attempts = [{ force: false }, { force: true }];
+    let lastHydrated = null;
+
+    for (const options of attempts) {
+      lastHydrated = await premiumUsersStore.ensureUsersHydrated(options);
+      const hydratedUsers = Array.isArray(lastHydrated?.users) ? lastHydrated.users : [];
+      const cachedUsers = premiumUsersStore.getCachedUsers();
+      const users = hydratedUsers.length > 0 ? hydratedUsers : cachedUsers;
+      if (users.length > 0 || lastHydrated?.source !== 'unavailable') {
+        return { hydrated: lastHydrated, users };
+      }
+    }
+
+    return {
+      hydrated: lastHydrated,
+      users: premiumUsersStore.getCachedUsers(),
+    };
+  }
+
   async function loginResponse(req, res) {
     const email = normalizePremiumSessionEmail(req.body?.email || '');
     const password = String(req.body?.password || '');
@@ -61,10 +81,9 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
 
     res.setHeader('Cache-Control', 'no-store, private');
 
-    const hydrated = await premiumUsersStore.ensureUsersHydrated();
-    const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
+    const { hydrated, users } = await loadUsersForLogin();
 
-    if (!sessionSecret || hydrated?.source !== 'supabase' || users.length === 0) {
+    if (!sessionSecret) {
       appendAuditEvent(
         req,
         {
@@ -72,14 +91,37 @@ function createPremiumAuthRouteCoordinator(deps = {}) {
           severity: 'warning',
           success: false,
           email,
-          detail: 'Premium login niet geconfigureerd op de server.',
+          detail: 'Premium login niet geconfigureerd: sessie-secret ontbreekt.',
         },
         'security_login_rejected'
       );
       return res.status(503).json({
         ok: false,
         error:
-          'Premium login is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase en zet PREMIUM_SESSION_SECRET.',
+          'Premium login is nog niet volledig via Supabase geconfigureerd op de server. Zet PREMIUM_SESSION_SECRET opnieuw in de productie-omgeving.',
+      });
+    }
+
+    if (users.length === 0) {
+      const isTemporaryUserStoreFailure = hydrated?.source === 'unavailable';
+      appendAuditEvent(
+        req,
+        {
+          type: 'login_rejected',
+          severity: 'warning',
+          success: false,
+          email,
+          detail: isTemporaryUserStoreFailure
+            ? 'Premium login tijdelijk niet beschikbaar: gebruikerslijst kon niet worden geladen.'
+            : 'Premium login niet geconfigureerd: geen premium gebruikers gevonden.',
+        },
+        'security_login_rejected'
+      );
+      return res.status(503).json({
+        ok: false,
+        error: isTemporaryUserStoreFailure
+          ? 'Premium login is tijdelijk niet beschikbaar omdat de gebruikerslijst niet kon worden geladen. Probeer het zo opnieuw.'
+          : 'Premium login is nog niet volledig via Supabase geconfigureerd op de server. Voeg eerst minimaal één premium gebruiker toe in Supabase.',
       });
     }
 
