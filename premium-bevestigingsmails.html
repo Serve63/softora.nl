@@ -25,7 +25,7 @@
         }
     })();
 </script>
-<script src="assets/personnel-theme.js?v=20260421b" defer></script>
+<script src="assets/personnel-theme.js?v=20260422b" defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1199,12 +1199,33 @@ function renderLog() {
 }
 
 // ── CAMPAGNE ──
+/** Canonical coldmailing-overzicht (push / systeemmeldingen verwijzen hierheen). */
+const PREMIUM_BEVESTIGINGSMAILS_CANONICAL = 'https://www.softora.nl/premium-bevestigingsmails';
+
 let running = false;
 let campInterval = null;
 let campTotal = 0;
 let campaignTimeline = [];
 let campaignStepIndex = -1;
 let campaignFinished = false;
+
+async function notifyColdmailingCampaignAfronden() {
+  if (!('Notification' in window)) return;
+  const title = 'Coldmailing campagne afgerond';
+  const body = `Eindstatus staat vast. Overzicht: ${PREMIUM_BEVESTIGINGSMAILS_CANONICAL}`;
+  try {
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body, tag: 'softora-coldmailing-campaign-done' });
+      return;
+    }
+    if (Notification.permission === 'default') {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        new Notification(title, { body, tag: 'softora-coldmailing-campaign-done' });
+      }
+    }
+  } catch (_) {}
+}
 
 function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
@@ -1447,11 +1468,12 @@ function stopCampagne() {
   updateZoneCounts();
 }
 
-function handleCampaignPrimaryAction() {
+async function handleCampaignPrimaryAction() {
   if (running) {
     stopCampagne();
     return;
   }
+  await notifyColdmailingCampaignAfronden();
   returnToDashboard();
 }
 
