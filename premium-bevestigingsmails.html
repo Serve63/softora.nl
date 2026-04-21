@@ -296,91 +296,6 @@
             padding: 3rem;
         }
 
-        /* Coming soon lock: alleen over content rechts, sidebar blijft zichtbaar */
-        .content-lock-overlay {
-            position: fixed;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 280px;
-            background: #f5f4f1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 900;
-            padding: 24px;
-        }
-
-        .content-lock-logo {
-            font-family: 'Oswald', sans-serif;
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: 1.5px;
-            color: #8B2252;
-            margin-bottom: 48px;
-            text-transform: uppercase;
-        }
-
-        .content-lock-box {
-            width: 100%;
-            max-width: 320px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .content-lock-label {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: #bbb;
-            text-align: left;
-            margin-bottom: 2px;
-        }
-
-        .content-lock-input {
-            width: 100%;
-            padding: 12px 14px;
-            border: 1px solid #e8e5e0;
-            border-radius: 5px;
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            color: #1a1a2e;
-            background: #fff;
-            outline: none;
-            transition: border-color .15s;
-        }
-
-        .content-lock-input:focus { border-color: #8B2252; }
-
-        .content-lock-btn {
-            width: 100%;
-            padding: 12px;
-            background: #8B2252;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
-            font-family: 'Oswald', sans-serif;
-            font-size: 13px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: background .15s;
-            margin-top: 4px;
-        }
-
-        .content-lock-btn:hover { background: #A62D65; }
-
-        .content-lock-error {
-            font-size: 12px;
-            color: #c0392b;
-            text-align: center;
-            min-height: 16px;
-        }
-
         /* Top bar */
         .topbar {
             display: flex;
@@ -1813,7 +1728,6 @@
             .cursor, .cursor-dot { display: none; }
             .sidebar { display: none; }
             .main-content { margin-left: 0; }
-            .content-lock-overlay { left: 0; }
         }
 
         @media (max-width: 768px) {
@@ -1841,16 +1755,6 @@
     <div class="noise-overlay"></div>
     <div class="cursor"></div>
     <div class="cursor-dot"></div>
-    <div class="content-lock-overlay" id="contentLockOverlay">
-        <div class="content-lock-logo">Binnenkort beschikbaar</div>
-        <div class="content-lock-box">
-            <div class="content-lock-label">Toegangscode</div>
-            <input class="content-lock-input" type="password" id="contentLockInput" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')unlockContentArea()">
-            <div class="content-lock-error" id="contentLockError"></div>
-            <button class="content-lock-btn" onclick="unlockContentArea()">Doorgaan</button>
-        </div>
-    </div>
-
     <div class="dashboard-layout" data-sidebar-shell="canonical">
 
         <aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">
@@ -2426,30 +2330,6 @@
         window.openSiteInputDialog = openSiteInputDialog;
 
         initCustomFormSelects();
-
-        const CONTENT_LOCK_CODE = 'Andre2Fritz2!';
-        const CONTENT_LOCK_STORAGE_KEY = 'cs-auth-premium-bevestigingsmails';
-        if (sessionStorage.getItem(CONTENT_LOCK_STORAGE_KEY) === '1') {
-            const existingOverlay = document.getElementById('contentLockOverlay');
-            if (existingOverlay) existingOverlay.style.display = 'none';
-        }
-
-        function unlockContentArea() {
-            const input = document.getElementById('contentLockInput');
-            const error = document.getElementById('contentLockError');
-            const overlay = document.getElementById('contentLockOverlay');
-            if (!input || !error || !overlay) return;
-
-            if (input.value === CONTENT_LOCK_CODE) {
-                sessionStorage.setItem(CONTENT_LOCK_STORAGE_KEY, '1');
-                overlay.style.display = 'none';
-                return;
-            }
-
-            error.textContent = 'Onjuiste code, probeer opnieuw.';
-            input.value = '';
-            input.focus();
-        }
 
         /** Zet --slider-label-position voor ticks tussen min en max (anders stapelen ze op links). */
         function syncSliderTickLabels() {

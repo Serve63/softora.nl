@@ -37,3 +37,20 @@ test('premium bevestigingsmails shows the shared Retell cost counter without loa
   assert.doesNotMatch(pageSource, /data-retell-cost-meta/);
   assert.doesNotMatch(pageSource, /<script[^>]+src=["']assets\/coldcalling-dashboard\.js[^"']*["'][^>]*>/);
 });
+
+test('premium bevestigingsmails is directly accessible without coming-soon lock styling', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const themePath = path.join(__dirname, '../../assets/personnel-theme.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const themeSource = fs.readFileSync(themePath, 'utf8');
+  const comingSoonKeysMatch = themeSource.match(
+    /const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[([\s\S]*?)\]\);/
+  );
+
+  assert.doesNotMatch(pageSource, /content-lock-overlay/);
+  assert.doesNotMatch(pageSource, /unlockContentArea\(/);
+  assert.doesNotMatch(pageSource, /Binnenkort beschikbaar/);
+  assert.ok(comingSoonKeysMatch);
+  assert.doesNotMatch(comingSoonKeysMatch[1], /"coldmailing"/);
+  assert.match(themeSource, /key: "coldmailing"/);
+});
