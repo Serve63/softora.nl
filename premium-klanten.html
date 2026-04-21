@@ -5,20 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
-        <link rel="stylesheet" href="/assets/iphone-optimizations.css">
-<title>Softora | Klanten database</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="/assets/iphone-optimizations.css">
+    <title>Softora | Database</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
             try {
-                var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
-                var storageKey = isPremiumPersonnel
-                    ? "softora_premium_personnel_theme_mode"
-                    : "softora_software_personnel_theme_mode";
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
             } catch (error) {
@@ -27,51 +20,23 @@
         })();
     </script>
     <script src="assets/personnel-theme.js?v=20260421b" defer></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --bg-primary: #080808;
-            --bg-secondary: #0d0d0d;
-            --bg-tertiary: #111111;
-            --bg-card: rgba(255, 255, 255, 0.02);
-            --accent: #8b2252;
-            --accent-dark: #6b1a3f;
-            --accent-glow: rgba(139, 34, 82, 0.4);
-            --accent-light: #a62d65;
-            --accent-soft: rgba(139, 34, 82, 0.12);
-            --text-primary: #f5f5f5;
-            --text-secondary: #8a8a94;
-            --text-tertiary: #5f5f68;
-            --border: rgba(255, 255, 255, 0.08);
-            --success: #2ecc71;
-            --success-soft: rgba(46, 204, 113, 0.14);
-            --success-glow: rgba(46, 204, 113, 0.15);
-            --info: #4f7cff;
-            --info-soft: rgba(79, 124, 255, 0.14);
-            --warning: #f39c12;
-            --warning-soft: rgba(243, 156, 18, 0.14);
-            --input-bg: rgba(255, 255, 255, 0.03);
-            --table-hover: rgba(255, 255, 255, 0.02);
-            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        :root[data-theme="light"] {
-            --bg-primary: #f8f7f4;
-            --bg-secondary: #ffffff;
-            --bg-tertiary: #efeee9;
-            --bg-card: rgba(15, 23, 42, 0.03);
-            --text-primary: #1a1a2e;
-            --text-secondary: #606272;
-            --text-tertiary: #9599a8;
-            --border: rgba(0, 0, 0, 0.08);
-            --input-bg: rgba(15, 23, 42, 0.04);
-            --table-hover: rgba(0, 0, 0, 0.02);
+            --bg: #f0ede8;
+            --card: #fff;
+            --border: #e2ddd6;
+            --crimson: #9b2355;
+            --dark: #1a1a2e;
+            --mid: #666;
+            --light: #aaa;
+            --green: #16733c;
+            --red: #c0392b;
+            --orange: #b45a00;
+            --blue: #1a5f8a;
+            --purple: #6b3fa0;
         }
 
         html,
@@ -81,25 +46,17 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
+            font-family: 'Barlow', sans-serif;
+            background: var(--bg);
+            color: var(--dark);
             overflow-x: hidden;
         }
 
-        body::before,
-        body::after {
-            display: none;
-        }
-
-        .noise-overlay {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 9999;
-            opacity: 0.03;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        button,
+        input,
+        select,
+        textarea {
+            font: inherit;
         }
 
         .dashboard-layout {
@@ -107,455 +64,103 @@
             min-height: 100vh;
         }
 
-        .sidebar {
-            width: 280px;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border);
-            padding: 2.5rem 0 0 0;
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            z-index: 100;
-        }
-
-        .sidebar-logo {
-            font-family: 'Oswald', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent);
-            text-decoration: none;
-            padding: 0 2rem;
-            margin-bottom: 2rem;
-            display: block;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-            line-height: 1;
-        }
-
-        .sidebar-nav {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-        }
-
-        .sidebar-section {
-            margin-bottom: 1.2rem;
-        }
-
-        .sidebar-flow-section {
-            position: relative;
-        }
-
-        .sidebar-flow-section::before {
-            content: '';
-            position: absolute;
-            left: 0.82rem;
-            top: 6.45rem;
-            bottom: 1.35rem;
-            width: 0.7rem;
-            background: rgba(139, 34, 82, 0.72);
-            clip-path: polygon(50% 0, 100% 0.46rem, 66% 0.46rem, 66% 100%, 34% 100%, 34% 0.46rem, 0 0.46rem);
-            pointer-events: none;
-        }
-
-        .sidebar-flow-section .sidebar-link {
-            padding-left: 2.8rem;
-        }
-
-        .sidebar-section-label {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            color: var(--text-tertiary);
-            padding: 0 2rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .sidebar-link {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            padding: 0.6rem 2rem;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.84rem;
-            font-weight: 400;
-            transition: all 0.2s;
-            position: relative;
-        }
-
-        .sidebar-link::before {
-            content: none;
-        }
-
-        .sidebar-link:hover {
-            color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .sidebar-link.active {
-            color: var(--text-primary);
-            background: var(--accent-soft);
-        }
-
-        .sidebar-link svg {
-            width: 18px;
-            height: 18px;
-            opacity: 0.5;
-            flex-shrink: 0;
-        }
-
-        .sidebar-link.active svg,
-        .sidebar-link:hover svg {
-            opacity: 1;
-        }
-
-        .sidebar-footer {
-            flex-shrink: 0;
-            padding: 1.5rem 2rem;
-        }
-
-        .sidebar-user {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-
-        .sidebar-avatar {
-            width: 36px;
-            height: 36px;
-            background: var(--accent);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #fff;
-            flex-shrink: 0;
-        }
-
-        .sidebar-user-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .sidebar-user-name {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .sidebar-user-role {
-            font-size: 0.75rem;
-            color: var(--text-tertiary);
-        }
-
-        .logout-btn {
-            background: none;
-            border: none;
-            color: var(--text-tertiary);
-            padding: 0.3rem;
-            transition: color 0.2s;
-        }
-
-        .logout-btn:hover {
-            color: #d85f51;
-        }
-
-        .logout-btn svg {
-            width: 18px;
-            height: 18px;
-            transform: scaleX(-1);
-            transform-origin: center;
-        }
-
-        h1,
-        h2,
-        h3 {
-            margin: 0;
-            font-family: 'Oswald', sans-serif;
-            font-weight: 600;
-            text-transform: uppercase;
-            line-height: 1;
-            letter-spacing: 0.03em;
-        }
-
-        button,
-        input,
-        select {
-            font: inherit;
-        }
-
         .page-shell {
             position: relative;
-            z-index: 1;
             margin-left: 280px;
             width: calc(100% - 280px);
-            padding: 3rem;
+            min-height: 100vh;
         }
 
         .page-content {
             width: 100%;
-            margin: 0;
         }
 
-        .hero {
+        .top {
+            padding: 32px 48px 0;
             display: flex;
-            align-items: flex-start;
+            align-items: flex-end;
             justify-content: space-between;
-            gap: 1.5rem;
-            margin-bottom: 2.5rem;
+            margin-bottom: 24px;
+            gap: 16px;
         }
 
-        .hero-copy {
-            min-width: 0;
+        .logo {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--crimson);
+            margin-bottom: 4px;
         }
 
-        .hero-side {
-            margin-left: auto;
+        .page-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+        }
+
+        .page-sub {
+            font-size: 13px;
+            color: var(--light);
+            margin-top: 2px;
+        }
+
+        .top-right {
             display: flex;
-            justify-content: flex-end;
-            flex-shrink: 0;
-        }
-
-        .hero-title {
-            font-size: 2.35rem;
-            margin-bottom: 0.35rem;
-        }
-
-        .hero-text {
-            margin: 0;
-            color: var(--text-tertiary);
-            font-size: 0.95rem;
-            font-weight: 300;
-            line-height: 1.65;
-        }
-
-        .database-card {
-            overflow: hidden;
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-        }
-
-        .database-toolbar,
-        .filter-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            padding: 1.35rem 1.5rem;
-        }
-
-        .database-toolbar {
-            border-bottom: 1px solid var(--border);
-        }
-
-        .database-toolbar-copy {
-            display: block;
-        }
-
-        .database-toolbar-copy h2 {
-            font-size: 1.18rem;
-            margin-bottom: 0;
-        }
-
-        .database-toolbar-copy p {
-            display: none;
-        }
-
-        .database-toolbar-actions {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 0.9rem;
+            gap: 8px;
             flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
-        .leaderboard-card {
-            display: inline-flex;
-            align-items: flex-start;
-            gap: 0.8rem;
-            min-width: 0;
-            width: min(320px, 100%);
-            padding: 0;
-            border: none;
-            background: transparent;
-        }
-
-        .leaderboard-icon {
-            width: 32px;
-            height: 32px;
+        .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: 50%;
-            background: rgba(139, 34, 82, 0.14);
-            color: var(--accent);
-            flex-shrink: 0;
-        }
-
-        .leaderboard-icon svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .leaderboard-copy {
-            display: grid;
-            gap: 0.45rem;
-            min-width: 0;
-            width: 100%;
-        }
-
-        .leaderboard-list {
-            display: grid;
-            gap: 0.42rem;
-        }
-
-        .leaderboard-entry {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 0.8rem;
-        }
-
-        .leaderboard-entry.is-leading .leaderboard-entry-name {
-            color: var(--accent);
-        }
-
-        .leaderboard-entry-name {
-            color: var(--text-primary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.94rem;
-            font-weight: 600;
-            letter-spacing: 0.04em;
+            gap: 6px;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: var(--card);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
             text-transform: uppercase;
-            line-height: 1.1;
-            white-space: nowrap;
+            color: var(--mid);
+            cursor: pointer;
+            transition: all .15s ease;
         }
 
-        .leaderboard-entry-count {
-            color: var(--text-secondary);
-            font-size: 0.78rem;
-            font-weight: 500;
-            line-height: 1.2;
-            text-align: right;
-            white-space: nowrap;
+        .btn:hover {
+            border-color: var(--crimson);
+            color: var(--crimson);
         }
 
-        .btn-primary,
-        .btn-secondary,
-        .btn-danger,
-        .btn-edit {
-            appearance: none;
-            transition: all 0.2s var(--ease-out-expo);
-        }
-
-        .btn-primary {
-            border: 1px solid rgba(139,34,82,0.35);
-            padding: 0.78rem 1rem;
-            background: linear-gradient(135deg, rgba(139,34,82,0.12), rgba(167,43,100,0.06));
-            color: var(--accent-light);
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.72rem;
-            font-weight: 500;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-        }
-
-        .btn-primary:hover {
+        .btn.prim {
+            background: var(--crimson);
+            border-color: var(--crimson);
             color: #fff;
-            background: var(--accent);
-            border-color: var(--accent);
-            box-shadow: 0 0 20px var(--accent-glow);
         }
 
-        .btn-secondary {
-            border: 1px solid var(--border);
-            padding: 0.78rem 1rem;
-            background: transparent;
-            color: var(--text-secondary);
-            font-size: 0.88rem;
+        .btn.prim:hover {
+            background: #c4346a;
+            color: #fff;
         }
 
-        .btn-secondary:hover {
-            color: var(--text-primary);
-            border-color: var(--accent);
-        }
-
-        .btn-danger {
-            border: 1px solid rgba(231, 76, 60, 0.4);
-            padding: 0.78rem 1rem;
-            background: rgba(231, 76, 60, 0.12);
-            color: #d85f51;
-            font-size: 0.88rem;
-            font-weight: 600;
-        }
-
-        .btn-danger:hover {
-            background: rgba(231, 76, 60, 0.18);
-            border-color: rgba(231, 76, 60, 0.55);
-            color: #b63f33;
-        }
-
-        .search-wrap {
-            position: relative;
-            flex: 1;
-            max-width: 420px;
-        }
-
-        .search-wrap svg {
-            position: absolute;
-            top: 50%;
-            left: 1rem;
-            width: 18px;
-            height: 18px;
-            color: var(--text-tertiary);
-            transform: translateY(-50%);
-            pointer-events: none;
-        }
-
-        .search-input,
-        .form-input,
-        .form-select {
-            width: 100%;
-            border: 1px solid var(--border);
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            outline: none;
-            transition: border-color 0.2s ease, background 0.2s ease;
-        }
-
-        .search-input {
-            padding: 0.82rem 0.95rem 0.82rem 2.7rem;
-            font-size: 0.92rem;
-        }
-
-        .search-input:focus,
-        .form-input:focus,
-        .form-select:focus {
-            border-color: rgba(139, 34, 82, 0.42);
-        }
-
-        .results-meta {
-            display: none;
+        .btn svg {
+            width: 12px;
+            height: 12px;
         }
 
         .status-banner {
+            margin: 0 48px 14px;
+            padding: 11px 14px;
+            border-radius: 6px;
+            border: 1px solid transparent;
             display: none;
-            margin: 0 1.5rem 1rem;
-            padding: 0.95rem 1rem;
-            border: 1px solid var(--border);
-            background: var(--bg-card);
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 12px;
         }
 
         .status-banner.is-visible {
@@ -563,336 +168,600 @@
         }
 
         .status-banner[data-tone="success"] {
-            border-color: rgba(46, 204, 113, 0.26);
-            background: rgba(46, 204, 113, 0.08);
-            color: #fff;
+            border-color: rgba(22,115,60,.18);
+            background: rgba(22,115,60,.08);
+            color: var(--green);
         }
 
         .status-banner[data-tone="error"] {
-            border-color: rgba(231, 76, 60, 0.24);
-            background: rgba(231, 76, 60, 0.08);
-            color: #ffc6c0;
+            border-color: rgba(192,57,43,.18);
+            background: rgba(192,57,43,.08);
+            color: var(--red);
         }
 
-        .table-wrap {
-            padding: 0;
-            overflow-x: auto;
+        .status-banner[data-tone="info"] {
+            border-color: rgba(26,95,138,.16);
+            background: rgba(26,95,138,.08);
+            color: var(--blue);
+        }
+
+        .filter-bar {
+            padding: 0 48px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .search {
+            position: relative;
+        }
+
+        .search svg {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 13px;
+            height: 13px;
+            color: var(--light);
+            pointer-events: none;
+        }
+
+        .search input,
+        .fsel,
+        .p-sel,
+        .minp,
+        .msel,
+        .p-ta {
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--dark);
+            outline: none;
+            transition: border-color .15s ease;
+        }
+
+        .search input {
+            padding: 8px 12px 8px 30px;
+            border-radius: 5px;
+            font-size: 13px;
+            width: 260px;
+        }
+
+        .search input:focus,
+        .fsel:focus,
+        .p-sel:focus,
+        .minp:focus,
+        .msel:focus,
+        .p-ta:focus {
+            border-color: var(--crimson);
+        }
+
+        .fsel,
+        .p-sel,
+        .msel {
+            padding: 8px 28px 8px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            cursor: pointer;
+        }
+
+        .status-filter {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .sf-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: var(--card);
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--light);
+            cursor: pointer;
+            transition: all .15s ease;
+            white-space: nowrap;
+        }
+
+        .sf-btn:hover {
+            border-color: var(--dark);
+            color: var(--dark);
+        }
+
+        .sf-btn.act {
+            border-color: var(--dark);
+            background: var(--dark);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .sf-btn[data-s="klant"].act { border-color: var(--green); background: rgba(22,115,60,.1); color: var(--green); }
+        .sf-btn[data-s="afspraak"].act { border-color: var(--green); background: rgba(22,115,60,.08); color: var(--green); }
+        .sf-btn[data-s="gebeld"].act { border-color: var(--orange); background: rgba(180,90,0,.08); color: var(--orange); }
+        .sf-btn[data-s="gemaild"].act { border-color: var(--crimson); background: rgba(155,35,85,.08); color: var(--crimson); }
+        .sf-btn[data-s="geblokkeerd"].act { border-color: var(--red); background: rgba(192,57,43,.08); color: var(--red); }
+        .sf-btn[data-s="buiten"].act { border-color: #999; background: rgba(0,0,0,.05); color: #555; }
+        .sf-btn[data-s="benaderbaar"].act { border-color: var(--green); background: rgba(22,115,60,.1); color: var(--green); }
+        .sf-btn[data-s="geengehoor"].act { border-color: #999; background: rgba(0,0,0,.05); color: #555; }
+
+        .f-count {
+            font-size: 12px;
+            color: var(--light);
+            margin-left: auto;
+        }
+
+        .tbl-wrap {
+            padding: 0 48px 60px;
+        }
+
+        .table-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
         }
 
         table {
             width: 100%;
-            min-width: 0;
-            table-layout: fixed;
             border-collapse: separate;
             border-spacing: 0;
         }
 
         thead th {
-            padding: 0.85rem 0.75rem;
-            border-bottom: 1px solid var(--border);
+            padding: 10px 18px;
             text-align: left;
-            color: var(--text-tertiary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.64rem;
-            letter-spacing: 0.14em;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
             text-transform: uppercase;
+            color: var(--light);
+            border-bottom: 1px solid var(--border);
+            background: #faf9f7;
+            user-select: none;
+            cursor: pointer;
             white-space: nowrap;
         }
 
+        thead th:hover {
+            color: var(--dark);
+        }
+
         tbody td {
-            padding: 0.9rem 0.75rem;
+            padding: 14px 18px;
             border-bottom: 1px solid var(--border);
-            vertical-align: top;
-        }
-
-        thead th:first-child,
-        tbody td:first-child {
-            padding-left: 1rem;
-        }
-
-        thead th:last-child,
-        tbody td:last-child {
-            padding-right: 1rem;
-        }
-
-        thead th:nth-child(1) { width: 16%; }
-        thead th:nth-child(2) { width: 12%; }
-        thead th:nth-child(3) { width: 10%; }
-        thead th:nth-child(4) { width: 8%; }
-        thead th:nth-child(5) { width: 10%; }
-        thead th:nth-child(6) { width: 7%; }
-        thead th:nth-child(7) { width: 12%; white-space: normal; line-height: 1.25; }
-        thead th:nth-child(8) { width: 6%; }
-        thead th:nth-child(9) { width: 7%; }
-        thead th:nth-child(10) { width: 10%; }
-        thead th:nth-child(11) { width: 6%; }
-
-        thead th:nth-child(7),
-        tbody td:nth-child(7) {
-            text-align: center;
-        }
-
-        tbody tr:hover td {
-            background: var(--table-hover);
+            font-size: 13px;
+            vertical-align: middle;
         }
 
         tbody tr:last-child td {
             border-bottom: none;
         }
 
-        .client-name {
-            font-weight: 700;
-            color: var(--text-primary);
-            font-size: 0.82rem;
-            line-height: 1.35;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .client-company {
-            margin-top: 0.25rem;
-            color: var(--text-secondary);
-            font-size: 0.80rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .muted-cell {
-            color: var(--text-secondary);
-            font-size: 0.84rem;
-        }
-
-        .cell-phone {
-            font-size: 0.86rem;
-            white-space: nowrap;
-        }
-
-        .service-cell {
-            min-width: 0;
-        }
-
-        .service-stack {
-            display: grid;
-            gap: 0.2rem;
-        }
-
-        .service-name {
-            color: var(--text-primary);
-            font-size: 0.88rem;
-            line-height: 1.45;
-            word-break: break-word;
-        }
-
-        .service-price {
-            color: var(--text-secondary);
-            font-size: 0.84rem;
-            line-height: 1.45;
-            white-space: nowrap;
-        }
-
-        .service-na {
-            color: var(--text-tertiary);
-            font-size: 0.82rem;
-            line-height: 1.45;
-        }
-
-        .status-text {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.74rem;
-            font-weight: 500;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        .status-text.is-paid {
-            color: var(--success);
-        }
-
-        .status-text.is-open {
-            color: var(--warning);
-        }
-
-        .active-text {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.74rem;
-            font-weight: 500;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            white-space: nowrap;
-            color: var(--text-secondary);
-        }
-
-        .active-text.is-yes {
-            color: var(--text-secondary);
-        }
-
-        .active-text.is-no {
-            color: var(--text-secondary);
-        }
-
-        .actions {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-edit {
-            width: 22px;
-            height: 22px;
-            border: none;
-            background: none;
+        tbody tr {
             cursor: pointer;
-            color: var(--text-tertiary);
-            display: inline-flex;
+            transition: background .1s ease;
+        }
+
+        tbody tr:hover td {
+            background: #faf9f7;
+        }
+
+        .c-naam {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .c-domain {
+            font-size: 11px;
+            color: var(--light);
+            margin-top: 1px;
+        }
+
+        .c-mid {
+            color: var(--mid);
+        }
+
+        .c-light {
+            color: var(--light);
+            font-size: 12px;
+        }
+
+        .s-wrap {
+            display: flex;
             align-items: center;
-            justify-content: center;
-            transition: color 0.15s;
-            padding: 0;
+            gap: 7px;
+        }
+
+        .s-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
             flex-shrink: 0;
         }
 
-        .btn-edit:hover {
-            color: var(--accent);
+        .s-label {
+            font-size: 12px;
+            font-weight: 500;
         }
 
-        .btn-edit svg {
-            width: 13px;
-            height: 13px;
+        .s-prospect .s-dot { background: var(--blue); }
+        .s-prospect .s-label { color: var(--blue); }
+        .s-gebeld .s-dot { background: var(--orange); }
+        .s-gebeld .s-label { color: var(--orange); }
+        .s-gemaild .s-dot { background: var(--crimson); }
+        .s-gemaild .s-label { color: var(--crimson); }
+        .s-afspraak .s-dot { background: var(--green); }
+        .s-afspraak .s-label { color: var(--green); }
+        .s-klant .s-dot { background: var(--green); }
+        .s-klant .s-label { color: var(--green); font-weight: 700; }
+        .s-geblokkeerd .s-dot { background: var(--red); }
+        .s-geblokkeerd .s-label { color: var(--red); }
+        .s-buiten .s-dot { background: #bbb; }
+        .s-buiten .s-label { color: #888; }
+        .s-benaderbaar .s-dot { background: var(--green); }
+        .s-benaderbaar .s-label { color: var(--green); }
+        .s-geengehoor .s-dot { background: #aaa; }
+        .s-geengehoor .s-label { color: #888; }
+
+        .kanalen {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
         }
 
-        .empty-state {
-            padding: 3rem 1.5rem 3.25rem;
+        .k-tag {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 3px;
+        }
+
+        .k-call { background: rgba(180,90,0,.1); color: var(--orange); }
+        .k-mail { background: rgba(155,35,85,.1); color: var(--crimson); }
+        .k-off { background: rgba(0,0,0,.05); color: #bbb; text-decoration: line-through; }
+
+        .tbl-empty {
             text-align: center;
-            color: var(--text-secondary);
-            font-size: 0.95rem;
+            padding: 60px;
+            color: var(--light);
+            font-size: 13px;
         }
 
-        .empty-state[hidden] {
-            display: none;
-        }
-
-        .modal-overlay {
+        .overlay {
             position: fixed;
             inset: 0;
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-            background: rgba(0, 0, 0, 0.56);
+            background: rgba(0,0,0,.25);
+            z-index: 40;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s ease;
         }
 
-        .modal-overlay[hidden] {
+        .overlay.on {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 420px;
+            background: var(--card);
+            border-left: 1px solid var(--border);
+            z-index: 41;
+            transform: translateX(100%);
+            transition: transform .24s cubic-bezier(.4,0,.2,1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel.on {
+            transform: none;
+        }
+
+        .p-head {
+            padding: 22px 24px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .p-naam {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            margin-bottom: 2px;
+        }
+
+        .p-sub {
+            font-size: 12px;
+            color: var(--light);
+        }
+
+        .p-x {
+            width: 28px;
+            height: 28px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--light);
+            transition: all .15s ease;
+            flex-shrink: 0;
+        }
+
+        .p-x:hover {
+            border-color: var(--crimson);
+            color: var(--crimson);
+        }
+
+        .p-x svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        .p-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        .p-section {
+            margin-bottom: 22px;
+        }
+
+        .p-s-title {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--light);
+            margin-bottom: 10px;
+        }
+
+        .p-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+
+        .p-row:last-child {
+            border-bottom: none;
+        }
+
+        .p-row-label {
+            color: var(--light);
+        }
+
+        .p-row-val {
+            font-weight: 500;
+            color: var(--dark);
+            text-align: right;
+            word-break: break-word;
+        }
+
+        .p-status-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .p-sel {
+            flex: 1;
+            padding: 9px 12px;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+
+        .p-apply {
+            padding: 9px 16px;
+            background: var(--crimson);
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background .15s ease;
+            white-space: nowrap;
+        }
+
+        .p-apply:hover {
+            background: #c4346a;
+        }
+
+        .tl {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tl-item {
+            display: flex;
+            gap: 12px;
+            padding-bottom: 14px;
+            position: relative;
+        }
+
+        .tl-item:last-child {
+            padding-bottom: 0;
+        }
+
+        .tl-item::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 17px;
+            bottom: 0;
+            width: 1px;
+            background: var(--border);
+        }
+
+        .tl-item:last-child::before {
             display: none;
+        }
+
+        .tl-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .tl-msg {
+            font-size: 13px;
+            color: var(--dark);
+        }
+
+        .tl-date {
+            font-size: 11px;
+            color: var(--light);
+            margin-top: 1px;
+        }
+
+        .p-ta {
+            width: 100%;
+            padding: 9px 12px;
+            border-radius: 5px;
+            resize: none;
+            min-height: 72px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .modal-bg {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 60;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-bg.on {
+            display: flex;
         }
 
         .modal {
-            width: min(560px, calc(100% - 24px));
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-            padding: 1.5rem;
+            background: var(--card);
+            border-radius: 8px;
+            padding: 28px;
+            width: 420px;
+            max-width: 100%;
         }
 
-        .modal-header {
-            display: grid;
-            gap: 0.35rem;
-            margin-bottom: 1.3rem;
+        .modal-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            margin-bottom: 18px;
         }
 
-        .modal-header h3 {
-            font-size: 1.18rem;
+        .mrow {
+            margin-bottom: 12px;
         }
 
-        .modal-header p {
-            margin: 0;
-            color: var(--text-secondary);
-            font-size: 0.92rem;
-        }
-
-        .modal-error {
-            display: none;
-            margin-bottom: 1rem;
-            padding: 0.9rem 1rem;
-            border: 1px solid rgba(231, 76, 60, 0.24);
-            background: rgba(231, 76, 60, 0.08);
-            color: #b33b33;
-            font-size: 0.9rem;
-            line-height: 1.55;
-        }
-
-        .modal-error.is-visible {
+        .mlabel {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--light);
+            margin-bottom: 5px;
             display: block;
         }
 
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.95rem;
+        .minp,
+        .msel {
+            width: 100%;
+            padding: 9px 12px;
+            border-radius: 5px;
+            font-size: 13px;
         }
 
-        .form-group {
-            display: grid;
-            gap: 0.4rem;
-        }
-
-        .form-group[hidden] {
-            display: none;
-        }
-
-        .form-group.is-full {
-            grid-column: 1 / -1;
-        }
-
-        .form-label {
-            color: var(--text-tertiary);
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.66rem;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-        }
-
-        .form-input,
-        .form-select {
-            padding: 0.82rem 0.9rem;
-            font-size: 0.92rem;
-        }
-
-        .form-input.is-invalid,
-        .form-select.is-invalid {
-            border-color: rgba(231, 76, 60, 0.55);
-            background: rgba(231, 76, 60, 0.04);
-        }
-
-        .modal-actions {
+        .mbtns {
             display: flex;
-            justify-content: flex-end;
-            gap: 0.75rem;
-            margin-top: 1.3rem;
+            gap: 8px;
+            margin-top: 18px;
         }
 
-        .modal-delete {
-            margin-right: auto;
+        .mbtn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border: none;
         }
 
-        .modal-delete[hidden] {
-            display: none;
+        .mbtn.s {
+            background: var(--crimson);
+            color: #fff;
         }
 
-        @media (max-width: 1100px) {
-            .hero {
-                flex-direction: column;
-                align-items: stretch;
-            }
+        .mbtn.s:hover {
+            background: #c4346a;
+        }
 
-            .hero-side {
-                margin-left: 0;
-                justify-content: flex-start;
-            }
+        .mbtn.c {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--mid);
+        }
+
+        .mbtn.c:hover {
+            border-color: var(--crimson);
+            color: var(--crimson);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 24px;
+            background: var(--dark);
+            color: #fff;
+            padding: 9px 14px;
+            border-radius: 5px;
+            font-size: 12px;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: all .2s ease;
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        .toast.on {
+            opacity: 1;
+            transform: none;
         }
 
         @media (max-width: 900px) {
@@ -900,143 +769,60 @@
                 flex-direction: column;
             }
 
-            .sidebar {
-                position: static;
-                width: 100%;
-                height: auto;
-                border-right: none;
-                border-bottom: 1px solid var(--border);
-            }
-
             .page-shell {
                 margin-left: 0;
                 width: 100%;
-                padding: 1.35rem;
             }
         }
 
-        @media (max-width: 820px) {
-            .page-shell {
-                padding: 1rem;
+        @media (max-width: 860px) {
+            .top,
+            .filter-bar,
+            .tbl-wrap,
+            .status-banner {
+                padding-left: 20px;
+                padding-right: 20px;
             }
 
-            .page-content {
-                width: 100%;
-            }
-
-            .database-toolbar,
-            .filter-row {
+            .top {
                 flex-direction: column;
-                align-items: stretch;
+                align-items: flex-start;
             }
 
-            .database-toolbar-actions {
+            .top-right {
+                width: 100%;
                 justify-content: flex-start;
             }
 
-            .leaderboard-card {
+            .f-count {
+                margin-left: 0;
                 width: 100%;
             }
 
-            .search-wrap {
-                max-width: none;
-            }
-
-            .results-meta {
-                justify-content: space-between;
-            }
-
-            .table-wrap {
-                padding: 0 0.9rem 0.9rem;
-            }
-
-            table {
+            .search input {
+                width: 100%;
                 min-width: 0;
             }
 
-            thead {
-                display: none;
-            }
-
-            tbody {
-                display: grid;
-                gap: 0.75rem;
-            }
-
-            tbody tr {
-                display: grid;
-                border: 1px solid var(--border);
-                overflow: hidden;
-                background: var(--bg-secondary);
-            }
-
-            tbody td {
-                display: flex;
-                justify-content: space-between;
-                gap: 1rem;
-                padding: 0.9rem 1rem;
-                border-bottom: 1px solid var(--border);
-            }
-
-            tbody td::before {
-                content: attr(data-label);
-                flex-shrink: 0;
-                color: var(--text-tertiary);
-                font-family: 'Oswald', sans-serif;
-                font-size: 0.66rem;
-                letter-spacing: 0.14em;
-                text-transform: uppercase;
-            }
-
-            tbody td.cell-assigned {
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                gap: 0.35rem;
-            }
-
-            tbody tr:hover td {
-                background: transparent;
-            }
-
-            td.cell-client,
-            td.cell-actions {
-                display: block;
-            }
-
-            td.cell-client::before,
-            td.cell-actions::before {
-                display: none;
-            }
-
-            .actions {
-                justify-content: flex-start;
-            }
-
-            .form-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .modal-actions {
-                flex-direction: column-reverse;
-            }
-
-            .btn-primary,
-            .btn-secondary,
-            .btn-danger {
+            .search {
                 width: 100%;
-                justify-content: center;
             }
 
-            .modal-delete {
-                margin-right: 0;
+            .table-card {
+                overflow-x: auto;
+            }
+
+            table {
+                min-width: 760px;
+            }
+
+            .panel {
+                width: min(420px, 100%);
             }
         }
     </style>
 </head>
 <body>
-    <div class="noise-overlay"></div>
     <div class="dashboard-layout">
         <aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">
           <a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
@@ -1045,15 +831,15 @@
               <div class="sidebar-section-label">Overzicht</div>
               <a href="/premium-personeel-dashboard" class="sidebar-link magnetic" data-sidebar-key="dashboard"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span class="sidebar-link-text">Dashboard</span></a>
               <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic" data-sidebar-key="active_orders"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="sidebar-link-text">Actieve Opdrachten</span></a>
-              <a href="/premium-personeel-agenda" class="sidebar-link magnetic" data-sidebar-key="agenda"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg><span class="sidebar-link-text">Agenda</span></a>
+              <a href="/premium-personeel-agenda" class="sidebar-link magnetic" data-sidebar-key="agenda"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 0 1-2-2V6a2 2 0 012-2z"></path></svg><span class="sidebar-link-text">Agenda</span></a>
               <a href="/premium-ai-coldmailing" class="sidebar-link magnetic" data-sidebar-key="leads"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg><span class="sidebar-link-text">Leads</span><span class="sidebar-notification-badge" data-sidebar-count-key="leads" hidden>0</span></a>
               <a href="/premium-ai-lead-generator" class="sidebar-link magnetic" data-sidebar-key="coldcalling"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg><span class="sidebar-link-text">Coldcalling</span></a>
               <a href="/premium-bevestigingsmails" class="sidebar-link magnetic" data-sidebar-key="coldmailing"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Coldmailing</span></a>
             </div>
             <div class="sidebar-section">
               <div class="sidebar-section-label">Beheer</div>
-              <a href="/premium-klanten" class="sidebar-link magnetic active" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
-              <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5.25" rx="6.75" ry="2.25"></ellipse><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 11.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path></svg><span class="sidebar-link-text">Database</span></a>
+              <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
+              <a href="/premium-klanten" class="sidebar-link magnetic active" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5.25" rx="6.75" ry="2.25"></ellipse><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 11.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path></svg><span class="sidebar-link-text">Database</span></a>
               <a href="/premium-mailbox" class="sidebar-link magnetic" data-sidebar-key="mailbox"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Mailbox</span></a>
               <a href="/premium-websitegenerator" class="sidebar-link magnetic" data-sidebar-key="websitegenerator"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg><span class="sidebar-link-text">Websitegenerator</span></a>
               <a href="/premium-seo" class="sidebar-link magnetic" data-sidebar-key="seo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span class="sidebar-link-text">SEO</span></a>
@@ -1104,182 +890,179 @@
                 </div>
             </div>
             <div class="premium-boot-shell is-booting" aria-busy="true">
-            <div class="page-content">
-                <section class="hero">
-                    <div class="hero-copy">
-                        <h1 class="hero-title">Klanten</h1>
-                        <p class="hero-text">Overzicht van al je klanten en betalingen.</p>
-                    </div>
-                    <div class="hero-side">
-                        <div class="leaderboard-card" id="leaderboardCard">
-                            <div class="leaderboard-copy">
-                                <div class="leaderboard-list" id="leaderboardList">
-                                    <div class="leaderboard-entry is-leading">
-                                        <span class="leaderboard-entry-name">Servé</span>
-                                        <span class="leaderboard-entry-count">0 opdrachten</span>
-                                    </div>
-                                    <div class="leaderboard-entry">
-                                        <span class="leaderboard-entry-name">Martijn</span>
-                                        <span class="leaderboard-entry-count">0 opdrachten</span>
-                                    </div>
-                                </div>
-                            </div>
+                <div class="page-content">
+                    <div class="top">
+                        <div class="top-left">
+                            <div class="logo">SOFTORA.NL</div>
+                            <div class="page-title">Database</div>
+                            <div class="page-sub" id="top-sub"></div>
                         </div>
-                    </div>
-                </section>
-
-                <section class="database-card" aria-labelledby="databaseTitle">
-                    <div class="database-toolbar">
-                        <div class="database-toolbar-copy">
-                            <h2 id="databaseTitle">Klantenbestand</h2>
+                        <div class="top-right">
+                            <button class="btn" id="exportButton" type="button">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                CSV
+                            </button>
+                            <button class="btn prim" id="addButton" type="button">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Toevoegen
+                            </button>
                         </div>
-                        <div class="database-toolbar-actions">
-                            <button type="button" class="btn-primary" id="addCustomerButton">Klant toevoegen</button>
-                        </div>
-                    </div>
-
-                    <div class="filter-row">
-                        <label class="search-wrap" for="searchInput">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <circle cx="11" cy="11" r="7"></circle>
-                                <line x1="20" y1="20" x2="16.65" y2="16.65"></line>
-                            </svg>
-                            <input class="search-input" id="searchInput" type="text" placeholder="Zoek op naam, bedrijf, telefoon of project...">
-                        </label>
-
                     </div>
 
                     <div class="status-banner" id="statusBanner" aria-live="polite"></div>
 
-                    <div class="table-wrap">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Klant</th>
-                                    <th>Telefoonnummer</th>
-                                    <th>Service</th>
-                                    <th>Prijs</th>
-                                    <th>Onderhoud</th>
-                                    <th>Status</th>
-                                    <th>Toegewezen aan</th>
-                                    <th>Actief</th>
-                                    <th>Review?</th>
-                                    <th>Betaaldatum</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody id="customersBody"></tbody>
-                        </table>
+                    <div class="filter-bar">
+                        <div class="search">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="q" placeholder="Zoek op naam of domein…">
+                        </div>
+                        <select class="fsel" id="f-branche">
+                            <option value="">Alle branches</option>
+                            <option>Horeca & Restaurants</option>
+                            <option>Retail & Winkels</option>
+                            <option>Zakelijke Dienstverlening</option>
+                            <option>Bouw & Vastgoed</option>
+                            <option>Gezondheidszorg</option>
+                            <option>Creatieve Sector</option>
+                            <option>Tech & Startups</option>
+                            <option>Overig</option>
+                        </select>
+                        <div class="status-filter">
+                            <button class="sf-btn act" data-s="alle" type="button">Alle</button>
+                            <button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar</button>
+                            <button class="sf-btn" data-s="gebeld" type="button">Gebeld</button>
+                            <button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button>
+                            <button class="sf-btn" data-s="gemaild" type="button">Gemaild</button>
+                            <button class="sf-btn" data-s="afspraak" type="button">Afspraak</button>
+                            <button class="sf-btn" data-s="klant" type="button">Klant</button>
+                            <button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button>
+                            <button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
+                        </div>
+                        <div class="f-count" id="f-count"></div>
                     </div>
 
-                    <div class="empty-state" id="emptyState" hidden>Geen klanten gevonden.</div>
-                </section>
-            </div>
+                    <div class="tbl-wrap">
+                        <div class="table-card">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th data-sort-key="naam">Bedrijf</th>
+                                        <th data-sort-key="branche">Branche</th>
+                                        <th data-sort-key="stad">Adres</th>
+                                        <th>Gebruikte kanalen</th>
+                                        <th data-sort-key="status">Status</th>
+                                        <th data-sort-key="updatedAt">Laatste actie</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
 
-    <div class="modal-overlay" id="modalOverlay" hidden>
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-            <div class="modal-header">
-                <h3 id="modalTitle">Klant toevoegen</h3>
-                <p>Beheer contactgegevens, type werk en betaalstatus vanuit een centrale lijst.</p>
+    <div class="overlay" id="ov"></div>
+    <div class="panel" id="panel" aria-hidden="true">
+        <div class="p-head">
+            <div>
+                <div class="p-naam" id="p-naam"></div>
+                <div class="p-sub" id="p-sub"></div>
+            </div>
+            <button class="p-x" id="closePanelButton" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <div class="p-body">
+            <div class="p-section">
+                <div class="p-s-title">Gegevens</div>
+                <div class="p-row"><span class="p-row-label">Contact</span><span class="p-row-val" id="p-contact"></span></div>
+                <div class="p-row"><span class="p-row-label">Domein</span><span class="p-row-val" id="p-domain"></span></div>
+                <div class="p-row"><span class="p-row-label">Telefoon</span><span class="p-row-val" id="p-phone"></span></div>
+                <div class="p-row"><span class="p-row-label">E-mail</span><span class="p-row-val" id="p-email"></span></div>
+                <div class="p-row"><span class="p-row-label">Branche</span><span class="p-row-val" id="p-branch"></span></div>
+                <div class="p-row"><span class="p-row-label">Adres</span><span class="p-row-val" id="p-city"></span></div>
+                <div class="p-row"><span class="p-row-label">Toegewezen aan</span><span class="p-row-val" id="p-responsible"></span></div>
             </div>
 
-            <form id="customerForm" novalidate>
-                <div class="modal-error" id="modalError" aria-live="polite"></div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label class="form-label" for="fieldName">Naam</label>
-                        <input class="form-input" id="fieldName" name="naam" autocomplete="name" placeholder="Jan de Vries" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldProject">Website</label>
-                        <input class="form-input" id="fieldProject" name="website" placeholder="softora.nl" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldCompany">Bedrijfsnaam</label>
-                        <input class="form-input" id="fieldCompany" name="bedrijf" autocomplete="organization" placeholder="De Vries BV" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldPhone">Telefoonnummer</label>
-                        <input class="form-input" id="fieldPhone" name="telefoon" autocomplete="tel" placeholder="+31 6 12345678" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldService">Service</label>
-                        <select class="form-select" id="fieldService" name="service" required>
-                            <option value="website">Website</option>
-                            <option value="bedrijfssoftware">Bedrijfssoftware</option>
-                            <option value="voicesoftware">Voicesoftware</option>
-                            <option value="chatbot">Chatbots</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldAmount">Bedrag (EUR)</label>
-                        <input class="form-input" id="fieldAmount" name="bedrag" type="number" min="0" step="1" placeholder="1500">
-                    </div>
-
-                    <div class="form-group" id="websiteAmountGroup">
-                        <label class="form-label" for="fieldWebsiteAmount">Prijs (EUR)</label>
-                        <input class="form-input" id="fieldWebsiteAmount" name="websiteBedrag" type="number" min="0" step="1" placeholder="1500">
-                    </div>
-
-                    <div class="form-group" id="maintenanceAmountGroup">
-                        <label class="form-label" for="fieldMaintenanceAmount">Onderhoud per maand (EUR)</label>
-                        <input class="form-input" id="fieldMaintenanceAmount" name="onderhoudPerMaand" type="number" min="0" step="1" placeholder="49" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldStatus">Status</label>
-                        <select class="form-select" id="fieldStatus" name="status" required>
-                            <option value="Betaald">Betaald</option>
-                            <option value="Open">Open</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldActive">Actief</label>
-                        <select class="form-select" id="fieldActive" name="actief" required>
-                            <option value="Ja" selected>Ja</option>
-                            <option value="Nee">Nee</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldReview">Review?</label>
-                        <select class="form-select" id="fieldReview" name="review" required>
-                            <option value="Nee" selected>Nee</option>
-                            <option value="Ja">Ja</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="fieldResponsible">Toegewezen aan</label>
-                        <select class="form-select" id="fieldResponsible" name="verantwoordelijk" required>
-                            <option value="Serve" selected>Servé</option>
-                            <option value="Martijn">Martijn</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group is-full">
-                        <label class="form-label" for="fieldDate">Betaaldatum</label>
-                        <input class="form-input" id="fieldDate" name="datum" type="date" required>
-                    </div>
+            <div class="p-section">
+                <div class="p-s-title">Status wijzigen</div>
+                <div class="p-status-row">
+                    <select class="p-sel" id="p-status">
+                        <option value="prospect">Prospect</option>
+                        <option value="benaderbaar">Benaderbaar</option>
+                        <option value="gebeld">Gebeld</option>
+                        <option value="geengehoor">Geen gehoor</option>
+                        <option value="gemaild">Gemaild</option>
+                        <option value="afspraak">Afspraak</option>
+                        <option value="klant">Klant</option>
+                        <option value="geblokkeerd">Geen interesse</option>
+                        <option value="buiten">Buiten gebruik</option>
+                    </select>
+                    <button class="p-apply" id="applyStatusButton" type="button">Opslaan</button>
                 </div>
+            </div>
 
-                <div class="modal-actions">
-                    <button type="button" class="btn-danger modal-delete" id="deleteCustomerButton" hidden>Klant verwijderen</button>
-                    <button type="button" class="btn-secondary" id="cancelButton">Annuleren</button>
-                    <button type="submit" class="btn-primary">Opslaan</button>
-                </div>
-            </form>
+            <div class="p-section">
+                <div class="p-s-title">Tijdlijn</div>
+                <div class="tl" id="p-timeline"></div>
+            </div>
+
+            <div class="p-section">
+                <div class="p-s-title">Notitie</div>
+                <textarea class="p-ta" id="p-nota" placeholder="Bijv. contactpersoon is Jan, bel niet voor 9u…"></textarea>
+                <button class="p-apply" id="saveNoteButton" type="button" style="width:100%">Opslaan</button>
+            </div>
         </div>
     </div>
+
+    <div class="modal-bg" id="mbg">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <div class="modal-title" id="modalTitle">Bedrijf toevoegen</div>
+            <div class="mrow"><label class="mlabel" for="m-bedrijf">Bedrijfsnaam *</label><input class="minp" id="m-bedrijf" placeholder="Bakkerij De Zon"></div>
+            <div class="mrow"><label class="mlabel" for="m-contact">Contactpersoon</label><input class="minp" id="m-contact" placeholder="Jan Jansen"></div>
+            <div class="mrow"><label class="mlabel" for="m-dom">Domein</label><input class="minp" id="m-dom" placeholder="bakkerijdezon.nl"></div>
+            <div class="mrow"><label class="mlabel" for="m-tel">Telefoon</label><input class="minp" id="m-tel" placeholder="+31 6 …"></div>
+            <div class="mrow"><label class="mlabel" for="m-mail">E-mail</label><input class="minp" id="m-mail" placeholder="info@…"></div>
+            <div class="mrow"><label class="mlabel" for="m-branche">Branche</label>
+                <select class="msel" id="m-branche">
+                    <option>Horeca & Restaurants</option>
+                    <option>Retail & Winkels</option>
+                    <option>Zakelijke Dienstverlening</option>
+                    <option>Bouw & Vastgoed</option>
+                    <option>Gezondheidszorg</option>
+                    <option>Creatieve Sector</option>
+                    <option>Tech & Startups</option>
+                    <option selected>Overig</option>
+                </select>
+            </div>
+            <div class="mrow"><label class="mlabel" for="m-stad">Adres</label><input class="minp" id="m-stad" placeholder="Tilburg"></div>
+            <div class="mrow"><label class="mlabel" for="m-status">Status</label>
+                <select class="msel" id="m-status">
+                    <option value="benaderbaar">Benaderbaar</option>
+                    <option value="prospect">Prospect</option>
+                    <option value="gebeld">Gebeld</option>
+                    <option value="geengehoor">Geen gehoor</option>
+                    <option value="gemaild">Gemaild</option>
+                    <option value="afspraak">Afspraak</option>
+                    <option value="klant">Klant</option>
+                    <option value="geblokkeerd">Geen interesse</option>
+                    <option value="buiten">Buiten gebruik</option>
+                </select>
+            </div>
+            <div class="mrow"><label class="mlabel" for="m-responsible">Toegewezen aan</label>
+                <select class="msel" id="m-responsible">
+                    <option value="Serve" selected>Servé</option>
+                    <option value="Martijn">Martijn</option>
+                </select>
+            </div>
+            <div class="mbtns">
+                <button class="mbtn c" id="cancelModalButton" type="button">Annuleren</button>
+                <button class="mbtn s" id="saveModalButton" type="button">Toevoegen</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
 
     <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
     <script>
@@ -1287,6 +1070,7 @@
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
         const ORDER_SCOPE = "premium_active_orders";
         const ORDER_KEY = "softora_custom_orders_premium_v1";
+        const DATABASE_STATUS_OPTIONS = ["prospect", "gebeld", "gemaild", "afspraak", "klant", "geblokkeerd", "buiten", "benaderbaar", "geengehoor"];
 
         function readCustomersBootstrapPayload() {
             const element = document.getElementById("softoraCustomersBootstrap");
@@ -1305,44 +1089,57 @@
             klanten: [],
             orders: [],
             query: "",
-            editId: null,
+            activeStatus: "alle",
+            activeBranch: "",
+            sortKey: "updatedAt",
+            sortAsc: false,
+            openId: null,
             messageTimer: null
         };
 
         const nodes = {
-            body: document.getElementById("customersBody"),
-            empty: document.getElementById("emptyState"),
-            search: document.getElementById("searchInput"),
+            topSub: document.getElementById("top-sub"),
             statusBanner: document.getElementById("statusBanner"),
-            leaderboardCard: document.getElementById("leaderboardCard"),
-            leaderboardList: document.getElementById("leaderboardList"),
-            modalOverlay: document.getElementById("modalOverlay"),
+            query: document.getElementById("q"),
+            branch: document.getElementById("f-branche"),
+            count: document.getElementById("f-count"),
+            tbody: document.getElementById("tbody"),
+            statusButtons: Array.from(document.querySelectorAll(".sf-btn")),
+            sortButtons: Array.from(document.querySelectorAll("[data-sort-key]")),
+            exportButton: document.getElementById("exportButton"),
+            addButton: document.getElementById("addButton"),
+            overlay: document.getElementById("ov"),
+            panel: document.getElementById("panel"),
+            closePanelButton: document.getElementById("closePanelButton"),
+            panelName: document.getElementById("p-naam"),
+            panelSub: document.getElementById("p-sub"),
+            panelContact: document.getElementById("p-contact"),
+            panelDomain: document.getElementById("p-domain"),
+            panelPhone: document.getElementById("p-phone"),
+            panelEmail: document.getElementById("p-email"),
+            panelBranch: document.getElementById("p-branch"),
+            panelCity: document.getElementById("p-city"),
+            panelResponsible: document.getElementById("p-responsible"),
+            panelStatus: document.getElementById("p-status"),
+            panelTimeline: document.getElementById("p-timeline"),
+            panelNote: document.getElementById("p-nota"),
+            saveNoteButton: document.getElementById("saveNoteButton"),
+            applyStatusButton: document.getElementById("applyStatusButton"),
+            modalBg: document.getElementById("mbg"),
             modalTitle: document.getElementById("modalTitle"),
-            modalError: document.getElementById("modalError"),
-            form: document.getElementById("customerForm"),
-            addButton: document.getElementById("addCustomerButton"),
-            deleteButton: document.getElementById("deleteCustomerButton"),
-            cancelButton: document.getElementById("cancelButton"),
-            fieldName: document.getElementById("fieldName"),
-            fieldCompany: document.getElementById("fieldCompany"),
-            fieldPhone: document.getElementById("fieldPhone"),
-            fieldService: document.getElementById("fieldService"),
-            fieldProject: document.getElementById("fieldProject"),
-            fieldReview: document.getElementById("fieldReview"),
-            fieldAmount: document.getElementById("fieldAmount"),
-            websiteAmountGroup: document.getElementById("websiteAmountGroup"),
-            maintenanceAmountGroup: document.getElementById("maintenanceAmountGroup"),
-            fieldWebsiteAmount: document.getElementById("fieldWebsiteAmount"),
-            fieldMaintenanceAmount: document.getElementById("fieldMaintenanceAmount"),
-            fieldStatus: document.getElementById("fieldStatus"),
-            fieldActive: document.getElementById("fieldActive"),
-            fieldResponsible: document.getElementById("fieldResponsible"),
-            fieldDate: document.getElementById("fieldDate")
+            modalCompany: document.getElementById("m-bedrijf"),
+            modalContact: document.getElementById("m-contact"),
+            modalDomain: document.getElementById("m-dom"),
+            modalPhone: document.getElementById("m-tel"),
+            modalMail: document.getElementById("m-mail"),
+            modalBranch: document.getElementById("m-branche"),
+            modalCity: document.getElementById("m-stad"),
+            modalStatus: document.getElementById("m-status"),
+            fieldResponsible: document.getElementById("m-responsible"),
+            cancelModalButton: document.getElementById("cancelModalButton"),
+            saveModalButton: document.getElementById("saveModalButton"),
+            toast: document.getElementById("toast")
         };
-
-        function createId() {
-            return "klant-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
-        }
 
         function normalizeString(value) {
             return String(value || "").trim();
@@ -1350,6 +1147,10 @@
 
         function normalizeSearchValue(value) {
             return normalizeString(value).toLowerCase();
+        }
+
+        function createId() {
+            return "db-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
         }
 
         function parseResponsibleValue(value) {
@@ -1369,8 +1170,7 @@
         }
 
         function formatResponsibleDisplayName(value) {
-            const normalized = parseResponsibleValue(value);
-            return normalized === "Martijn" ? "Martijn" : "Servé";
+            return parseResponsibleValue(value) === "Martijn" ? "Martijn" : "Servé";
         }
 
         function getResponsibleSourceValue(raw) {
@@ -1387,35 +1187,19 @@
             );
         }
 
-        function normalizeDate(value) {
-            const raw = normalizeString(value);
-            return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
-        }
-
-        function normalizeActiveValue(value) {
-            return normalizeString(value).toLowerCase() === "nee" ? "Nee" : "Ja";
-        }
-
-        function normalizeOptionalAmount(value) {
-            if (value === null || value === undefined || value === "") return null;
-            const amount = Number(value);
-            if (!Number.isFinite(amount) || amount < 0) return null;
-            return Math.round(amount);
-        }
-
-        function setModalError(message) {
-            if (!nodes.modalError) return;
-            const text = normalizeString(message);
-            nodes.modalError.textContent = text;
-            nodes.modalError.classList.toggle("is-visible", Boolean(text));
-        }
-
-        const CUSTOMER_SERVICE_OPTIONS = ["website", "bedrijfssoftware", "voicesoftware", "chatbot"];
-
-        function normalizeCustomerService(raw) {
-            const rawSvc = normalizeString(raw && raw.service).toLowerCase();
-            if (CUSTOMER_SERVICE_OPTIONS.indexOf(rawSvc) !== -1) return rawSvc;
-            return "website";
+        function slugifyDomain(value) {
+            const normalized = normalizeString(value)
+                .toLowerCase()
+                .replace(/^https?:\/\//, "")
+                .replace(/^www\./, "")
+                .replace(/\/.*$/, "")
+                .trim();
+            if (normalized.indexOf(".") !== -1) return normalized;
+            const slug = normalizeString(value)
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "")
+                .slice(0, 18);
+            return slug ? slug + ".nl" : "onbekend.nl";
         }
 
         function formatCustomerServiceLabel(service) {
@@ -1423,96 +1207,123 @@
             if (key === "website") return "Website";
             if (key === "bedrijfssoftware") return "Bedrijfssoftware";
             if (key === "voicesoftware") return "Voicesoftware";
-            if (key === "chatbot") return "Chatbots";
-            if (!key) return "Website";
-            return key.charAt(0).toUpperCase() + key.slice(1);
+            if (key === "chatbot") return "Chatbot";
+            return key ? key.charAt(0).toUpperCase() + key.slice(1) : "Website";
         }
 
-        function normalizeCustomerReview(raw) {
-            return normalizeString(raw && raw.review).toLowerCase() === "ja" ? "Ja" : "Nee";
+        function normalizeHistoryItem(item) {
+            if (!item || typeof item !== "object") return null;
+            const type = normalizeDatabaseStatus(item.type || item.status || "prospect");
+            return {
+                type: type,
+                label: normalizeString(item.label || item.message || item.title) || "Bijgewerkt",
+                date: normalizeString(item.date || item.createdAt || item.updatedAt) || formatDateForStorage(new Date())
+            };
         }
 
-        function getModalFieldNodes() {
-            return [
-                nodes.fieldName,
-                nodes.fieldCompany,
-                nodes.fieldPhone,
-                nodes.fieldService,
-                nodes.fieldProject,
-                nodes.fieldWebsiteAmount,
-                nodes.fieldMaintenanceAmount,
-                nodes.fieldStatus,
-                nodes.fieldActive,
-                nodes.fieldReview,
-                nodes.fieldResponsible,
-                nodes.fieldDate
-            ].filter(Boolean);
+        function buildFallbackHistory(status, updatedAt) {
+            const labelMap = {
+                prospect: "Toegevoegd als prospect",
+                benaderbaar: "Gemarkeerd als benaderbaar",
+                gebeld: "Gebeld",
+                geengehoor: "Geen gehoor",
+                gemaild: "Mail verstuurd",
+                afspraak: "Afspraak ingepland",
+                klant: "Geworden klant",
+                geblokkeerd: "Geen interesse aangegeven",
+                buiten: "Nummer buiten gebruik"
+            };
+            return [{
+                type: status,
+                label: labelMap[status] || "Status bijgewerkt",
+                date: updatedAt
+            }];
         }
 
-        function clearModalValidationState() {
-            setModalError("");
-            getModalFieldNodes().forEach(function (node) {
-                node.classList.remove("is-invalid");
-            });
+        function formatDateForStorage(value) {
+            const date = value instanceof Date ? value : new Date(value);
+            if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
+            return date.toISOString().slice(0, 10);
         }
 
-        function markFieldInvalid(node) {
-            if (!node) return;
-            node.classList.add("is-invalid");
+        function parseDateValue(value) {
+            const raw = normalizeString(value);
+            if (!raw) return 0;
+            const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? (raw + "T12:00:00") : raw;
+            const timestamp = Date.parse(normalized);
+            return Number.isFinite(timestamp) ? timestamp : 0;
         }
 
-        function isFieldVisible(node) {
-            if (!node) return false;
-            const group = node.closest(".form-group");
-            if (!group) return true;
-            return !group.hidden;
+        function formatDisplayDate(value) {
+            const timestamp = parseDateValue(value);
+            if (!timestamp) return "-";
+            return new Intl.DateTimeFormat("nl-NL", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric"
+            }).format(new Date(timestamp));
+        }
+
+        function normalizeDatabaseStatus(value, rawCustomer) {
+            const normalized = normalizeString(value).toLowerCase();
+            if (DATABASE_STATUS_OPTIONS.indexOf(normalized) !== -1) return normalized;
+            if (normalized === "betaald") return "klant";
+            if (normalized === "open") return "benaderbaar";
+            if (normalizeString(rawCustomer && rawCustomer.actief).toLowerCase() === "nee") return "buiten";
+            return "prospect";
+        }
+
+        function createStatusTimelineLabel(status) {
+            const labelMap = {
+                prospect: "Toegevoegd als prospect",
+                benaderbaar: "Gemarkeerd als benaderbaar",
+                gebeld: "Belpoging geregistreerd",
+                geengehoor: "Geen gehoor geregistreerd",
+                gemaild: "Mailcontact geregistreerd",
+                afspraak: "Afspraak ingepland",
+                klant: "Klant geworden",
+                geblokkeerd: "Geen interesse aangegeven",
+                buiten: "Buiten gebruik gemarkeerd"
+            };
+            return labelMap[status] || "Status bijgewerkt";
         }
 
         function normalizeCustomer(raw, fallbackId) {
-            const legacyAmount = normalizeOptionalAmount(raw && raw.bedrag);
-            const rawType = normalizeString(raw && raw.type);
-            const type = rawType === "Onderhoud" || rawType === "Website + onderhoud"
-                ? rawType
-                : "Website";
-            const status = normalizeString(raw && raw.status) === "Open" ? "Open" : "Betaald";
-            const websiteAmountRaw = normalizeOptionalAmount(raw && raw.websiteBedrag);
-            const maintenanceAmountRaw = normalizeOptionalAmount(raw && raw.onderhoudPerMaand);
-            const websiteBedrag = websiteAmountRaw !== null
-                ? websiteAmountRaw
-                : ((type === "Website" || type === "Website + onderhoud") ? legacyAmount : null);
-            const onderhoudPerMaand = maintenanceAmountRaw !== null
-                ? maintenanceAmountRaw
-                : (type === "Onderhoud" ? legacyAmount : null);
-            const bedrag = legacyAmount !== null
-                ? legacyAmount
-                : (websiteBedrag !== null ? websiteBedrag : (onderhoudPerMaand !== null ? onderhoudPerMaand : 0));
-
-            const service = normalizeCustomerService(raw);
-            const review = normalizeCustomerReview(raw);
+            const bedrijf = normalizeString(raw && (raw.bedrijf || raw.company || raw.companyName)) || "Onbekend bedrijf";
+            const naam = normalizeString(raw && (raw.naam || raw.contact || raw.contactName || raw.clientName)) || bedrijf;
+            const dom = slugifyDomain(raw && (raw.dom || raw.domain || raw.website || bedrijf));
+            const email = normalizeString(raw && (raw.email || raw.contactEmail)) || ("info@" + dom);
+            const status = normalizeDatabaseStatus(raw && (raw.databaseStatus || raw.status), raw);
+            const updatedAt = normalizeString(raw && (raw.updatedAt || raw.updated || raw.datum || raw.paidAt)) || formatDateForStorage(new Date());
+            const parsedHistory = Array.isArray(raw && raw.hist)
+                ? raw.hist.map(normalizeHistoryItem).filter(Boolean)
+                : [];
+            const hist = parsedHistory.length ? parsedHistory : buildFallbackHistory(status, updatedAt);
 
             return {
                 id: normalizeString(raw && raw.id) || fallbackId || createId(),
-                naam: normalizeString(raw && raw.naam) || "Onbekend",
-                bedrijf: normalizeString(raw && raw.bedrijf) || "-",
-                telefoon: normalizeString(raw && raw.telefoon) || "-",
-                type: type,
-                service: service,
-                website: normalizeString(raw && raw.website) || "-",
-                websiteBedrag: websiteBedrag,
-                onderhoudPerMaand: onderhoudPerMaand,
-                bedrag: bedrag,
+                naam: naam,
+                bedrijf: bedrijf,
+                dom: dom,
+                tel: normalizeString(raw && (raw.tel || raw.telefoon || raw.contactPhone)) || "—",
+                email: email,
+                branche: normalizeString(raw && raw.branche) || "Overig",
+                stad: normalizeString(raw && (raw.stad || raw.location || raw.address)) || "Onbekend",
                 status: status,
-                actief: normalizeActiveValue(raw && raw.actief),
-                review: review,
+                call: raw && typeof raw.call === "boolean" ? raw.call : (status !== "geblokkeerd" && status !== "buiten"),
+                mail: raw && typeof raw.mail === "boolean" ? raw.mail : (status !== "geblokkeerd" && status !== "buiten"),
+                hist: hist,
+                nota: normalizeString(raw && raw.nota),
+                updatedAt: updatedAt,
+                updatedMs: parseDateValue(updatedAt),
                 verantwoordelijk: normalizeResponsibleValue(getResponsibleSourceValue(raw)),
-                datum: normalizeDate(raw && raw.datum)
+                website: normalizeString(raw && raw.website),
+                service: normalizeString(raw && raw.service) || "website"
             };
         }
 
         function sortCustomers(list) {
             return list.slice().sort(function (a, b) {
-                const nameCompare = a.naam.localeCompare(b.naam, "nl");
-                if (nameCompare !== 0) return nameCompare;
                 return a.bedrijf.localeCompare(b.bedrijf, "nl");
             });
         }
@@ -1526,116 +1337,220 @@
                 .replace(/'/g, "&#039;");
         }
 
-        function formatMoney(value) {
-            const amount = Number(value) || 0;
-            return new Intl.NumberFormat("nl-NL", {
-                style: "currency",
-                currency: "EUR",
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-            }).format(amount);
+        function fetchUiStateGetWithFallback(scope) {
+            const encodedScope = encodeURIComponent(String(scope || ""));
+            const urls = [
+                "/api/ui-state-get?scope=" + encodedScope,
+                "/api/ui-state/" + encodedScope
+            ];
+            let lastError = null;
+
+            return urls.reduce(function (promise, url) {
+                return promise.catch(function () {
+                    return fetch(url, { method: "GET", cache: "no-store" }).then(function (response) {
+                        if (!response.ok) {
+                            throw new Error("UI-state GET mislukt (" + response.status + ")");
+                        }
+                        return response.json().catch(function () {
+                            return {};
+                        });
+                    });
+                }).catch(function (error) {
+                    lastError = error;
+                    throw error;
+                });
+            }, Promise.reject()).catch(function () {
+                throw lastError || new Error("UI-state GET mislukt");
+            });
         }
 
-        function formatDate(value) {
-            const raw = normalizeDate(value);
-            if (!raw) return "-";
+        function fetchUiStateSetWithFallback(scope, body) {
+            const encodedScope = encodeURIComponent(String(scope || ""));
+            const urls = [
+                "/api/ui-state-set?scope=" + encodedScope,
+                "/api/ui-state/" + encodedScope
+            ];
+            let lastError = null;
 
-            const date = new Date(raw + "T12:00:00");
-            if (Number.isNaN(date.getTime())) return "-";
+            return urls.reduce(function (promise, url) {
+                return promise.catch(function () {
+                    return fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body || {})
+                    }).then(function (response) {
+                        if (!response.ok) {
+                            throw new Error("UI-state POST mislukt (" + response.status + ")");
+                        }
+                        return response.json().catch(function () {
+                            return {};
+                        });
+                    });
+                }).catch(function (error) {
+                    lastError = error;
+                    throw error;
+                });
+            }, Promise.reject()).catch(function () {
+                throw lastError || new Error("UI-state POST mislukt");
+            });
+        }
 
-            return new Intl.DateTimeFormat("nl-NL", {
-                day: "numeric",
-                month: "short",
-                year: "numeric"
-            }).format(date);
+        function parseCustomers(raw) {
+            try {
+                const parsed = JSON.parse(String(raw || "[]"));
+                if (!Array.isArray(parsed)) return [];
+                return sortCustomers(parsed.map(function (item, index) {
+                    return normalizeCustomer(item, "customer-" + index);
+                }));
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function parseOrders(raw) {
+            try {
+                const parsed = JSON.parse(String(raw || "[]"));
+                if (!Array.isArray(parsed)) return [];
+                return parsed.map(function (item) {
+                    return {
+                        id: normalizeString(item && item.id),
+                        clientName: normalizeString(item && item.clientName),
+                        companyName: normalizeString(item && item.companyName),
+                        contactName: normalizeString(item && item.contactName),
+                        contactPhone: normalizeString(item && item.contactPhone),
+                        contactEmail: normalizeString(item && item.contactEmail),
+                        location: normalizeString(item && item.location),
+                        title: normalizeString(item && item.title) || "Website opdracht",
+                        status: normalizeString(item && item.status),
+                        claimedBy: normalizeString(item && (item.claimedBy || item.leadOwnerName || item.leadOwnerFullName)),
+                        paidAt: normalizeString(item && item.paidAt),
+                        lastRunAt: normalizeString(item && item.lastRunAt)
+                    };
+                }).filter(function (item) {
+                    return item.companyName || item.clientName;
+                });
+            } catch (error) {
+                return [];
+            }
         }
 
         function buildCustomerIdentityKey(raw) {
             return [
                 normalizeSearchValue(raw && raw.bedrijf),
                 normalizeSearchValue(raw && raw.naam),
-                normalizeSearchValue(raw && raw.telefoon)
+                normalizeSearchValue(raw && (raw.tel || raw.telefoon))
             ].join("|");
         }
 
-        function customerHasWebsite(customer) {
-            const type = normalizeString(customer && customer.type);
-            return type === "Website" || type === "Website + onderhoud";
+        function buildDerivedCustomerSeedFromOrder(order) {
+            const explicitCompany = normalizeString(order && order.companyName);
+            const explicitContact = normalizeString(order && order.contactName);
+            const explicitPhone = normalizeString(order && order.contactPhone);
+            const legacyClientName = normalizeString(order && order.clientName);
+            const legacyLocation = normalizeString(order && order.location);
+
+            return {
+                naam: explicitContact || legacyClientName || explicitCompany || "Onbekend",
+                bedrijf: explicitCompany || legacyClientName || legacyLocation || "Onbekend bedrijf",
+                tel: explicitPhone || "—",
+                verantwoordelijk: normalizeResponsibleValue(order && order.claimedBy),
+                email: normalizeString(order && order.contactEmail),
+                stad: legacyLocation
+            };
         }
 
-        function customerHasMaintenance(customer) {
-            const type = normalizeString(customer && customer.type);
-            return type === "Onderhoud" || type === "Website + onderhoud";
+        function deriveCustomersFromOrders(orders) {
+            const seen = new Map();
+
+            orders.forEach(function (order) {
+                const seed = buildDerivedCustomerSeedFromOrder(order);
+                const key = buildCustomerIdentityKey(seed);
+                if (!key || seen.has(key)) return;
+
+                seen.set(key, normalizeCustomer({
+                    id: "seed-" + (order.id || createId()),
+                    naam: seed.naam,
+                    bedrijf: seed.bedrijf,
+                    telefoon: seed.tel,
+                    email: seed.email,
+                    stad: seed.stad,
+                    website: order.title,
+                    status: order.paidAt || normalizeString(order.status).toLowerCase() === "betaald" ? "klant" : "benaderbaar",
+                    verantwoordelijk: seed.verantwoordelijk,
+                    updatedAt: order.paidAt || order.lastRunAt || formatDateForStorage(new Date()),
+                    hist: [{
+                        type: order.paidAt ? "klant" : "benaderbaar",
+                        label: order.paidAt ? "Geimporteerd als klant vanuit opdracht" : "Geimporteerd vanuit actieve opdracht",
+                        date: order.paidAt || order.lastRunAt || formatDateForStorage(new Date())
+                    }]
+                }, "seed-" + createId()));
+            });
+
+            return sortCustomers(Array.from(seen.values()));
         }
 
-        function getServiceAmount(customer, kind) {
-            if (kind === "website") {
-                return normalizeOptionalAmount(customer && customer.websiteBedrag);
-            }
-            return normalizeOptionalAmount(customer && customer.onderhoudPerMaand);
+        function mergeCustomersWithResponsible(customers, orders) {
+            if (!Array.isArray(customers) || !customers.length) return [];
+            if (!Array.isArray(orders) || !orders.length) return sortCustomers(customers);
+
+            const responsibleByCustomerKey = new Map();
+            orders.forEach(function (order) {
+                const seed = buildDerivedCustomerSeedFromOrder(order);
+                const key = buildCustomerIdentityKey(seed);
+                const responsible = parseResponsibleValue(seed.verantwoordelijk);
+                if (key && responsible && !responsibleByCustomerKey.has(key)) {
+                    responsibleByCustomerKey.set(key, responsible);
+                }
+            });
+
+            return sortCustomers(customers.map(function (customer, index) {
+                const normalizedCustomer = normalizeCustomer(customer, "customer-merge-" + index);
+                const explicitResponsible = parseResponsibleValue(getResponsibleSourceValue(customer));
+                const key = buildCustomerIdentityKey(normalizedCustomer);
+                const matchedResponsible = explicitResponsible || responsibleByCustomerKey.get(key) || normalizedCustomer.verantwoordelijk;
+                if (matchedResponsible === normalizedCustomer.verantwoordelijk) {
+                    return normalizedCustomer;
+                }
+                return { ...normalizedCustomer, verantwoordelijk: matchedResponsible };
+            }));
         }
 
-        function renderServiceCell(customer, kind) {
-            const isWebsite = kind === "website";
-            const isApplicable = isWebsite ? customerHasWebsite(customer) : customerHasMaintenance(customer);
+        function resolveBootstrapCustomers() {
+            const rawCustomers = Array.isArray(customersBootstrapPayload && customersBootstrapPayload.customers)
+                ? customersBootstrapPayload.customers
+                : [];
 
-            if (!isApplicable) {
-                return isWebsite
-                    ? "<span class=\"service-na\">Niet van toepassing</span>"
-                    : "<span class=\"service-na\">Nee</span>";
-            }
-
-            const serviceName = "";
-            const serviceAmount = getServiceAmount(customer, kind);
-            const priceLabel = serviceAmount !== null
-                ? (isWebsite ? formatMoney(serviceAmount) : (formatMoney(serviceAmount) + " p/m"))
-                : "Nog niet ingevuld";
-            const priceClass = serviceAmount !== null ? "service-price" : "service-price service-na";
-
-            return [
-                "<div class=\"service-stack\">",
-                    (serviceName ? "<div class=\"service-name\">" + escapeHtml(serviceName) + "</div>" : ""),
-                    "<div class=\"" + priceClass + "\">" + escapeHtml(priceLabel) + "</div>",
-                "</div>"
-            ].join("");
+            return sortCustomers(rawCustomers.map(function (item, index) {
+                return normalizeCustomer(item, "bootstrap-" + index);
+            }));
         }
 
-        function renderPrijsCell(customer) {
-            const serviceAmount = getServiceAmount(customer, "website");
-            const type = normalizeString(customer && customer.type);
-            const websiteApplicable = type === "Website" || type === "Website + onderhoud";
-
-            if (!websiteApplicable && serviceAmount === null) {
-                return "<span class=\"service-na\">—</span>";
-            }
-            if (serviceAmount === null) {
-                return "<span class=\"service-price service-na\">Nog niet ingevuld</span>";
-            }
-            return "<div class=\"service-price\">" + escapeHtml(formatMoney(serviceAmount)) + "</div>";
+        function serializeCustomerList(customers) {
+            return JSON.stringify(sortCustomers((customers || []).map(function (item, index) {
+                return normalizeCustomer(item, "serialize-" + index);
+            })));
         }
 
-        function updateAmountFieldVisibility() {
-            if (nodes.fieldAmount) {
-                nodes.fieldAmount.closest(".form-group").hidden = true;
-                nodes.fieldAmount.required = false;
-                nodes.fieldAmount.disabled = true;
-                nodes.fieldAmount.value = "";
-            }
-            if (nodes.websiteAmountGroup) {
-                nodes.websiteAmountGroup.hidden = false;
-            }
-            if (nodes.maintenanceAmountGroup) {
-                nodes.maintenanceAmountGroup.hidden = false;
-            }
-            if (nodes.fieldWebsiteAmount) {
-                nodes.fieldWebsiteAmount.required = false;
-                nodes.fieldWebsiteAmount.disabled = false;
-            }
-            if (nodes.fieldMaintenanceAmount) {
-                nodes.fieldMaintenanceAmount.required = false;
-                nodes.fieldMaintenanceAmount.disabled = false;
-            }
-            clearModalValidationState();
+        function customerListsDiffer(nextCustomers) {
+            return serializeCustomerList(state.klanten) !== serializeCustomerList(nextCustomers);
+        }
+
+        function persistCustomerList(customers) {
+            const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
+                return normalizeCustomer(item, "persist-" + index);
+            }));
+
+            return fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
+                patch: {
+                    [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers)
+                },
+                source: "premium-klanten",
+                actor: "Premium klanten database"
+            }).then(function () {
+                return { ok: true };
+            }).catch(function (error) {
+                return { ok: false, error: error };
+            });
         }
 
         function setStatusMessage(message, tone, autoClear) {
@@ -1662,571 +1577,367 @@
             }
         }
 
-        async function fetchUiStateGetWithFallback(scope) {
-            const encodedScope = encodeURIComponent(String(scope || ""));
-            const urls = [
-                "/api/ui-state-get?scope=" + encodedScope,
-                "/api/ui-state/" + encodedScope
-            ];
-            let lastError = null;
-
-            for (const url of urls) {
-                try {
-                    const response = await fetch(url, {
-                        method: "GET",
-                        cache: "no-store"
-                    });
-                    if (!response.ok) {
-                        throw new Error("UI-state GET mislukt (" + response.status + ")");
-                    }
-                    return await response.json().catch(function () {
-                        return {};
-                    });
-                } catch (error) {
-                    lastError = error;
-                }
-            }
-
-            throw lastError || new Error("UI-state GET mislukt");
-        }
-
-        async function fetchUiStateSetWithFallback(scope, body) {
-            const encodedScope = encodeURIComponent(String(scope || ""));
-            const urls = [
-                "/api/ui-state-set?scope=" + encodedScope,
-                "/api/ui-state/" + encodedScope
-            ];
-            let lastError = null;
-
-            for (const url of urls) {
-                try {
-                    const response = await fetch(url, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(body || {})
-                    });
-                    if (!response.ok) {
-                        throw new Error("UI-state POST mislukt (" + response.status + ")");
-                    }
-                    return await response.json().catch(function () {
-                        return {};
-                    });
-                } catch (error) {
-                    lastError = error;
-                }
-            }
-
-            throw lastError || new Error("UI-state POST mislukt");
-        }
-
-        function parseCustomers(raw) {
-            try {
-                const parsed = JSON.parse(String(raw || "[]"));
-                if (!Array.isArray(parsed)) return [];
-                return sortCustomers(parsed.map(function (item, index) {
-                    return normalizeCustomer(item, "klant-import-" + index);
-                }));
-            } catch (error) {
-                return [];
-            }
-        }
-
-        function parseOrders(raw) {
-            try {
-                const parsed = JSON.parse(String(raw || "[]"));
-                if (!Array.isArray(parsed)) return [];
-
-                return parsed
-                    .map(function (item) {
-                        const id = Number(item && item.id);
-                        const amount = Number(item && item.amount);
-                        const clientName = normalizeString(item && item.clientName);
-                        const companyName = normalizeString(item && item.companyName);
-                        const contactName = normalizeString(item && item.contactName);
-                        const contactPhone = normalizeString(item && item.contactPhone);
-                        const contactEmail = normalizeString(item && item.contactEmail);
-                        if (!Number.isFinite(id) || id <= 0 || (!companyName && !clientName)) return null;
-
-                        return {
-                            id: id,
-                            clientName: clientName,
-                            location: normalizeString(item && item.location),
-                            companyName: companyName,
-                            contactName: contactName,
-                            contactPhone: contactPhone,
-                            contactEmail: contactEmail,
-                            title: normalizeString(item && item.title) || "Website opdracht",
-                            description: normalizeString(item && item.description),
-                            prompt: normalizeString(item && item.prompt),
-                            amount: Number.isFinite(amount) && amount > 0 ? Math.round(amount) : 0,
-                            status: normalizeString(item && item.status).toLowerCase(),
-                            claimedBy: normalizeString(item && (item.claimedBy || item.leadOwnerName || item.leadOwnerFullName)),
-                            paidAt: normalizeString(item && item.paidAt),
-                            lastRunAt: normalizeString(item && item.lastRunAt)
-                        };
-                    })
-                    .filter(Boolean);
-            } catch (error) {
-                return [];
-            }
-        }
-
-        function inferTypeFromOrder(order) {
-            const haystack = [
-                order && order.title,
-                order && order.description,
-                order && order.prompt
-            ].join(" ").toLowerCase();
-            const maintenanceKeywords = ["onderhoud", "maintenance", "support", "beheer", "hosting", "servicecontract"];
-            return maintenanceKeywords.some(function (keyword) {
-                return haystack.indexOf(keyword) !== -1;
-            }) ? "Website + onderhoud" : "Website";
-        }
-
-        function buildDerivedCustomerSeedFromOrder(order) {
-            const explicitCompany = normalizeString(order && order.companyName);
-            const explicitContact = normalizeString(order && order.contactName);
-            const explicitPhone = normalizeString(order && order.contactPhone);
-            const legacyClientName = normalizeString(order && order.clientName);
-            const legacyLocation = normalizeString(order && order.location);
-            const hasExplicitIdentity = Boolean(explicitCompany || explicitContact || explicitPhone);
-            const customerName = hasExplicitIdentity
-                ? (explicitContact || legacyLocation || legacyClientName || "Onbekend")
-                : (legacyClientName || "Onbekend");
-            const customerCompany = hasExplicitIdentity
-                ? (explicitCompany || legacyClientName || legacyLocation || "-")
-                : (legacyLocation || "-");
-            const customerPhone = explicitPhone || "-";
-            return {
-                naam: customerName,
-                bedrijf: customerCompany,
-                telefoon: customerPhone,
-                verantwoordelijk: normalizeResponsibleValue(order && order.claimedBy)
-            };
-        }
-
-        function deriveCustomersFromOrders(orders) {
-            const seen = new Map();
-
-            orders.forEach(function (order) {
-                const customerSeed = buildDerivedCustomerSeedFromOrder(order);
-                const key = buildCustomerIdentityKey(customerSeed);
-                if (seen.has(key)) return;
-
-                const paidDate = normalizeString(order.paidAt).slice(0, 10);
-                const status = paidDate || order.status === "betaald" ? "Betaald" : "Open";
-
-                seen.set(key, normalizeCustomer({
-                    id: "seed-" + order.id,
-                    naam: customerSeed.naam,
-                    bedrijf: customerSeed.bedrijf,
-                    telefoon: customerSeed.telefoon,
-                    type: inferTypeFromOrder(order),
-                    website: order.title || "-",
-                    bedrag: order.amount || 0,
-                    status: status,
-                    actief: "Ja",
-                    verantwoordelijk: customerSeed.verantwoordelijk,
-                    datum: paidDate
-                }));
-            });
-
-            return sortCustomers(Array.from(seen.values()));
-        }
-
-        function mergeCustomersWithResponsible(customers, orders) {
-            if (!Array.isArray(customers) || !customers.length) return [];
-            if (!Array.isArray(orders) || !orders.length) return sortCustomers(customers);
-
-            const responsibleByCustomerKey = new Map();
-            orders.forEach(function (order) {
-                const customerSeed = buildDerivedCustomerSeedFromOrder(order);
-                const key = buildCustomerIdentityKey(customerSeed);
-                const responsible = parseResponsibleValue(customerSeed.verantwoordelijk);
-                if (!key || !responsible || responsibleByCustomerKey.has(key)) return;
-                responsibleByCustomerKey.set(key, responsible);
-            });
-
-            return sortCustomers(customers.map(function (customer, index) {
-                const normalizedCustomer = normalizeCustomer(customer, "klant-responsible-" + index);
-                const key = buildCustomerIdentityKey(normalizedCustomer);
-                const explicitResponsible = parseResponsibleValue(getResponsibleSourceValue(customer));
-                const matchedResponsible = explicitResponsible || responsibleByCustomerKey.get(key) || normalizedCustomer.verantwoordelijk;
-                if (matchedResponsible === normalizedCustomer.verantwoordelijk) {
-                    return normalizedCustomer;
-                }
-                return {
-                    ...normalizedCustomer,
-                    verantwoordelijk: matchedResponsible
-                };
-            }));
-        }
-
-        function resolveBootstrapCustomers() {
-            const rawCustomers = Array.isArray(customersBootstrapPayload && customersBootstrapPayload.customers)
-                ? customersBootstrapPayload.customers
-                : [];
-
-            return sortCustomers(rawCustomers.map(function (item, index) {
-                return normalizeCustomer(item, "klant-bootstrap-" + index);
-            }));
-        }
-
-        function serializeCustomerList(customers) {
-            return JSON.stringify(sortCustomers((customers || []).map(function (item, index) {
-                return normalizeCustomer(item, "klant-compare-" + index);
-            })));
-        }
-
-        function customerListsDiffer(nextCustomers) {
-            return serializeCustomerList(state.klanten) !== serializeCustomerList(nextCustomers);
-        }
-
-        async function persistCustomerList(customers) {
-            const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
-                return normalizeCustomer(item, "klant-save-" + index);
-            }));
-
-            try {
-                await fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
-                    patch: {
-                        [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers)
-                    },
-                    source: "premium-klanten",
-                    actor: "Premium klanten database"
-                });
-                return { ok: true };
-            } catch (error) {
-                return {
-                    ok: false,
-                    error: error
-                };
-            }
+        function toast(message) {
+            nodes.toast.textContent = String(message || "");
+            nodes.toast.classList.add("on");
+            window.clearTimeout(toast._timer);
+            toast._timer = window.setTimeout(function () {
+                nodes.toast.classList.remove("on");
+            }, 2200);
         }
 
         function getFilteredCustomers() {
             const query = normalizeSearchValue(state.query);
-            if (!query) return state.klanten.slice();
-
             return state.klanten.filter(function (customer) {
+                if (state.activeStatus !== "alle" && customer.status !== state.activeStatus) return false;
+                if (state.activeBranch && customer.branche !== state.activeBranch) return false;
+                if (!query) return true;
+
                 const haystack = [
-                    customer.naam,
                     customer.bedrijf,
-                    customer.telefoon,
-                    customer.website,
-                    customer.type,
-                    customer.service,
-                    formatCustomerServiceLabel(customer.service),
-                    customer.review,
+                    customer.naam,
+                    customer.dom,
+                    customer.tel,
+                    customer.email,
+                    customer.stad,
+                    customer.branche,
                     customer.status,
                     customer.verantwoordelijk,
-                    customer.actief
+                    customer.website,
+                    formatCustomerServiceLabel(customer.service)
                 ].join(" ").toLowerCase();
+
                 return haystack.indexOf(query) !== -1;
             });
         }
 
-        function updateLeaderboard() {
-            if (!nodes.leaderboardCard || !nodes.leaderboardList) return;
+        function getSortedCustomers(customers) {
+            const sorted = customers.slice();
+            sorted.sort(function (a, b) {
+                let left;
+                let right;
 
-            const counts = state.klanten.reduce(function (result, customer) {
-                const responsible = normalizeResponsibleValue(customer && customer.verantwoordelijk);
-                if (responsible === "Serve" || responsible === "Martijn") {
-                    result[responsible] = (result[responsible] || 0) + 1;
+                if (state.sortKey === "updatedAt") {
+                    left = Number(a.updatedMs || parseDateValue(a.updatedAt));
+                    right = Number(b.updatedMs || parseDateValue(b.updatedAt));
+                } else {
+                    left = normalizeSearchValue(a[state.sortKey]);
+                    right = normalizeSearchValue(b[state.sortKey]);
                 }
-                return result;
-            }, { Serve: 0, Martijn: 0 });
 
-            const entries = [
-                { name: "Serve", displayName: formatResponsibleDisplayName("Serve"), count: Number(counts.Serve || 0) },
-                { name: "Martijn", displayName: formatResponsibleDisplayName("Martijn"), count: Number(counts.Martijn || 0) }
-            ].sort(function (a, b) {
-                if (b.count !== a.count) return b.count - a.count;
-                return a.displayName.localeCompare(b.displayName, "nl");
+                if (left === right) {
+                    left = normalizeSearchValue(a.bedrijf);
+                    right = normalizeSearchValue(b.bedrijf);
+                }
+
+                if (left < right) return state.sortAsc ? -1 : 1;
+                if (left > right) return state.sortAsc ? 1 : -1;
+                return 0;
             });
+            return sorted;
+        }
 
-            nodes.leaderboardCard.hidden = false;
-            nodes.leaderboardList.innerHTML = entries.map(function (entry, index) {
-                const assignmentLabel = entry.count === 1 ? "opdracht" : "opdrachten";
-                const rowClassName = index === 0 ? "leaderboard-entry is-leading" : "leaderboard-entry";
+        function getStatusLabel(status) {
+            const labels = {
+                prospect: "Prospect",
+                gebeld: "Gebeld",
+                gemaild: "Gemaild",
+                afspraak: "Afspraak",
+                klant: "Klant",
+                geblokkeerd: "Geen interesse",
+                buiten: "Buiten gebruik",
+                benaderbaar: "Benaderbaar",
+                geengehoor: "Geen gehoor"
+            };
+            return labels[status] || "Prospect";
+        }
+
+        function renderTimeline(customer) {
+            const items = Array.isArray(customer.hist) ? customer.hist : [];
+            if (!items.length) {
+                nodes.panelTimeline.innerHTML = "<div class=\"tl-item\"><div class=\"tl-dot\" style=\"background:#bbb\"></div><div><div class=\"tl-msg\">Nog geen geschiedenis beschikbaar</div><div class=\"tl-date\">-</div></div></div>";
+                return;
+            }
+
+            nodes.panelTimeline.innerHTML = items.slice().reverse().map(function (item) {
+                const colorMap = {
+                    prospect: "var(--blue)",
+                    gebeld: "var(--orange)",
+                    gemaild: "var(--crimson)",
+                    afspraak: "var(--green)",
+                    klant: "var(--green)",
+                    geblokkeerd: "var(--red)",
+                    buiten: "#bbb",
+                    benaderbaar: "var(--green)",
+                    geengehoor: "#aaa",
+                    nota: "var(--light)"
+                };
+                const itemType = normalizeDatabaseStatus(item.type || "prospect");
                 return [
-                    "<div class=\"" + rowClassName + "\">",
-                        "<span class=\"leaderboard-entry-name\">" + escapeHtml(entry.displayName) + "</span>",
-                        "<span class=\"leaderboard-entry-count\">" + escapeHtml(entry.count + " " + assignmentLabel) + "</span>",
+                    "<div class=\"tl-item\">",
+                        "<div class=\"tl-dot\" style=\"background:" + escapeHtml(colorMap[itemType] || "var(--light)") + "\"></div>",
+                        "<div>",
+                            "<div class=\"tl-msg\">" + escapeHtml(item.label || "Bijgewerkt") + "</div>",
+                            "<div class=\"tl-date\">" + escapeHtml(formatDisplayDate(item.date)) + "</div>",
+                        "</div>",
                     "</div>"
                 ].join("");
             }).join("");
         }
 
-        function updateStats() {
-            updateLeaderboard();
-        }
-
         function renderTable() {
-            const filtered = getFilteredCustomers();
+            const filtered = getSortedCustomers(getFilteredCustomers());
 
-            nodes.empty.hidden = filtered.length !== 0;
+            nodes.topSub.textContent = state.klanten.length.toLocaleString("nl-NL") + " bedrijven in database";
+            nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
 
             if (!filtered.length) {
-                nodes.body.innerHTML = "";
+                nodes.tbody.innerHTML = "<tr><td colspan=\"6\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
                 return;
             }
 
-            nodes.body.innerHTML = filtered.map(function (customer) {
-                const statusClass = customer.status === "Betaald" ? "is-paid" : "is-open";
-                const activeClass = customer.actief === "Ja" ? "is-yes" : "is-no";
-                const websiteLabel = normalizeString(customer && customer.website);
-                const customerSubLabel = websiteLabel && websiteLabel !== "-"
-                    ? websiteLabel
-                    : ((customer.bedrijf && customer.bedrijf !== "-") ? customer.bedrijf : "");
-
+            nodes.tbody.innerHTML = filtered.map(function (customer) {
                 return [
-                    "<tr>",
-                        "<td class=\"cell-client\" data-label=\"Klant\">",
-                            "<div class=\"client-name\">" + escapeHtml(customer.naam) + "</div>",
-                            (customerSubLabel
-                                ? "<div class=\"client-company\">" + escapeHtml(customerSubLabel) + "</div>"
-                                : ""),
-                        "</td>",
-                        "<td data-label=\"Telefoonnummer\" class=\"muted-cell cell-phone\">" + escapeHtml(customer.telefoon) + "</td>",
-                        "<td data-label=\"Service\" class=\"muted-cell\">" + escapeHtml(formatCustomerServiceLabel(customer.service)) + "</td>",
-                        "<td data-label=\"Prijs\" class=\"service-cell\">",
-                            renderPrijsCell(customer),
-                        "</td>",
-                        "<td data-label=\"Onderhoud\" class=\"service-cell\">",
-                            renderServiceCell(customer, "maintenance"),
-                        "</td>",
-                        "<td data-label=\"Status\"><span class=\"status-text " + statusClass + "\">" + escapeHtml(customer.status) + "</span></td>",
-                        "<td data-label=\"Toegewezen aan\" class=\"muted-cell cell-assigned\">" + escapeHtml(formatResponsibleDisplayName(customer.verantwoordelijk || "Serve")) + "</td>",
-                        "<td data-label=\"Actief\"><span class=\"active-text " + activeClass + "\">" + escapeHtml(customer.actief || "Ja") + "</span></td>",
-                        "<td data-label=\"Review?\"><span class=\"active-text " + (customer.review === "Ja" ? "is-yes" : "is-no") + "\">" + escapeHtml(customer.review || "Nee") + "</span></td>",
-                        "<td data-label=\"Betaaldatum\" class=\"muted-cell\">" + escapeHtml(formatDate(customer.datum)) + "</td>",
-                        "<td class=\"cell-actions\" data-label=\"Acties\">",
-                            "<div class=\"actions\">",
-                                "<button type=\"button\" class=\"btn-edit\" data-action=\"edit\" data-id=\"" + escapeHtml(customer.id) + "\" title=\"Bewerken\" aria-label=\"Klant bewerken\">",
-                                    "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z\"/></svg>",
-                                "</button>",
-                            "</div>",
-                        "</td>",
+                    "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
+                        "<td><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div><div class=\"c-domain\">" + escapeHtml(customer.dom) + "</div></td>",
+                        "<td><span class=\"c-mid\">" + escapeHtml(customer.branche) + "</span></td>",
+                        "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
+                        "<td><div class=\"kanalen\">",
+                            "<span class=\"k-tag " + (customer.call ? "k-call" : "k-off") + "\">Bellen</span>",
+                            "<span class=\"k-tag " + (customer.mail ? "k-mail" : "k-off") + "\">Mailen</span>",
+                        "</div></td>",
+                        "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(getStatusLabel(customer.status)) + "</div></div></td>",
+                        "<td class=\"c-light\">" + escapeHtml(formatDisplayDate(customer.updatedAt)) + "</td>",
                     "</tr>"
                 ].join("");
             }).join("");
         }
 
         function renderPage() {
-            updateStats();
             renderTable();
         }
 
-        function resetForm() {
-            nodes.form.reset();
-            if (nodes.fieldService) nodes.fieldService.value = "website";
-            nodes.fieldStatus.value = "Betaald";
-            if (nodes.fieldActive) nodes.fieldActive.value = "Ja";
-            if (nodes.fieldReview) nodes.fieldReview.value = "Nee";
-            if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Serve";
-            nodes.fieldDate.value = "";
-            if (nodes.fieldWebsiteAmount) nodes.fieldWebsiteAmount.value = "";
-            if (nodes.fieldMaintenanceAmount) nodes.fieldMaintenanceAmount.value = "";
-            clearModalValidationState();
-            updateAmountFieldVisibility();
-        }
-
-        function openModal(customerId) {
-            const nextEditId = customerId || null;
-
-            if (nextEditId) {
-                const customer = state.klanten.find(function (item) {
-                    return item.id === nextEditId;
-                });
-
-                if (!customer) {
-                    state.editId = null;
-                    return;
-                }
-
-                state.editId = nextEditId;
-                nodes.modalTitle.textContent = "Klant bewerken";
-                nodes.deleteButton.hidden = false;
-                nodes.fieldName.value = customer.naam;
-                nodes.fieldCompany.value = customer.bedrijf === "-" ? "" : customer.bedrijf;
-                nodes.fieldPhone.value = customer.telefoon === "-" ? "" : customer.telefoon;
-                if (nodes.fieldService) nodes.fieldService.value = customer.service || "website";
-                nodes.fieldProject.value = customer.website === "-" ? "" : customer.website;
-                if (nodes.fieldWebsiteAmount) {
-                    nodes.fieldWebsiteAmount.value = customer.websiteBedrag !== null && customer.websiteBedrag !== undefined
-                        ? String(customer.websiteBedrag)
-                        : "";
-                }
-                if (nodes.fieldMaintenanceAmount) {
-                    nodes.fieldMaintenanceAmount.value = customer.onderhoudPerMaand !== null && customer.onderhoudPerMaand !== undefined
-                        ? String(customer.onderhoudPerMaand)
-                        : "";
-                }
-                nodes.fieldStatus.value = customer.status;
-                if (nodes.fieldActive) nodes.fieldActive.value = customer.actief || "Ja";
-                if (nodes.fieldReview) nodes.fieldReview.value = customer.review || "Nee";
-                if (nodes.fieldResponsible) nodes.fieldResponsible.value = customer.verantwoordelijk || "Serve";
-                nodes.fieldDate.value = customer.datum || "";
-                updateAmountFieldVisibility();
-            } else {
-                nodes.modalTitle.textContent = "Klant toevoegen";
-                nodes.deleteButton.hidden = true;
-                resetForm();
-            }
-
-            nodes.modalOverlay.hidden = false;
-            clearModalValidationState();
-            window.requestAnimationFrame(function () {
-                nodes.fieldName.focus();
+        function setStatus(status, button) {
+            state.activeStatus = status;
+            nodes.statusButtons.forEach(function (item) {
+                item.classList.toggle("act", item === button);
             });
-        }
-
-        function closeModal() {
-            nodes.modalOverlay.hidden = true;
-            nodes.deleteButton.hidden = true;
-            state.editId = null;
-            resetForm();
-        }
-
-        function deleteCurrentCustomerFromModal() {
-            const customerId = state.editId;
-            if (!customerId) return;
-            closeModal();
-            void deleteCustomer(customerId);
-        }
-
-        function collectFormCustomer() {
-            clearModalValidationState();
-
-            const missingFields = [];
-            let firstInvalidField = null;
-
-            function addMissingField(node, label) {
-                missingFields.push(label);
-                markFieldInvalid(node);
-                if (!firstInvalidField && isFieldVisible(node) && !node.disabled) {
-                    firstInvalidField = node;
-                }
-            }
-
-            if (!normalizeString(nodes.fieldName.value)) addMissingField(nodes.fieldName, "naam");
-            if (!normalizeString(nodes.fieldProject.value)) addMissingField(nodes.fieldProject, "website");
-            if (!normalizeString(nodes.fieldCompany.value)) addMissingField(nodes.fieldCompany, "bedrijfsnaam");
-            if (!normalizeString(nodes.fieldPhone.value)) addMissingField(nodes.fieldPhone, "telefoonnummer");
-            if (!normalizeDate(nodes.fieldDate.value)) addMissingField(nodes.fieldDate, "betaaldatum");
-
-            const naam = normalizeString(nodes.fieldName.value);
-            const websiteBedrag = normalizeOptionalAmount(nodes.fieldWebsiteAmount && nodes.fieldWebsiteAmount.value);
-            const onderhoudPerMaand = normalizeOptionalAmount(nodes.fieldMaintenanceAmount && nodes.fieldMaintenanceAmount.value);
-            const hasW = websiteBedrag !== null;
-            const hasM = onderhoudPerMaand !== null && onderhoudPerMaand > 0;
-
-            if (!hasW && !hasM) {
-                addMissingField(nodes.fieldWebsiteAmount, "prijs of onderhoud per maand");
-            }
-
-            if (missingFields.length) {
-                if (firstInvalidField && typeof firstInvalidField.focus === "function") {
-                    firstInvalidField.focus();
-                }
-                throw new Error("Vul deze velden in: " + missingFields.join(", ") + ".");
-            }
-
-            const derivedType = hasM && hasW
-                ? "Website + onderhoud"
-                : (hasM && !hasW ? "Onderhoud" : "Website");
-
-            return normalizeCustomer({
-                id: state.editId || createId(),
-                naam: naam,
-                bedrijf: normalizeString(nodes.fieldCompany.value),
-                telefoon: normalizeString(nodes.fieldPhone.value),
-                type: derivedType,
-                service: nodes.fieldService ? nodes.fieldService.value : "website",
-                website: normalizeString(nodes.fieldProject.value),
-                websiteBedrag: websiteBedrag,
-                onderhoudPerMaand: onderhoudPerMaand,
-                status: nodes.fieldStatus.value,
-                actief: nodes.fieldActive ? nodes.fieldActive.value : "Ja",
-                review: nodes.fieldReview ? nodes.fieldReview.value : "Nee",
-                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : "Serve",
-                datum: nodes.fieldDate.value
-            });
-        }
-
-        async function saveCustomer(event) {
-            event.preventDefault();
-
-            let nextCustomer;
-            try {
-                nextCustomer = collectFormCustomer();
-            } catch (error) {
-                setModalError(error.message || "Controleer de ingevoerde gegevens.");
-                return;
-            }
-
-            const isEditing = Boolean(state.editId);
-            const nextCustomers = isEditing
-                ? state.klanten.map(function (customer) {
-                    return customer.id === state.editId ? nextCustomer : customer;
-                })
-                : state.klanten.concat(nextCustomer);
-
-            state.klanten = sortCustomers(nextCustomers);
             renderPage();
-            closeModal();
-
-            const result = await persistCustomerList(state.klanten);
-            if (result.ok) {
-                setStatusMessage(isEditing ? "Klant bijgewerkt." : "Klant toegevoegd.", "success", true);
-                return;
-            }
-
-            setStatusMessage(
-                "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
-                "error"
-            );
         }
 
-        async function deleteCustomer(customerId) {
+        function sort(key) {
+            if (state.sortKey === key) {
+                state.sortAsc = !state.sortAsc;
+            } else {
+                state.sortKey = key;
+                state.sortAsc = key !== "updatedAt";
+            }
+            renderPage();
+        }
+
+        function openPanel(id) {
             const customer = state.klanten.find(function (item) {
-                return item.id === customerId;
+                return item.id === id;
             });
             if (!customer) return;
 
-            const confirmed =
-                window.SoftoraDialogs && typeof window.SoftoraDialogs.confirm === "function"
-                    ? await window.SoftoraDialogs.confirm("Klant \"" + customer.naam + "\" verwijderen?", {
-                        title: "Klant verwijderen",
-                        confirmText: "Verwijderen",
-                        cancelText: "Annuleren",
-                    })
-                    : false;
-            if (!confirmed) return;
+            state.openId = id;
+            nodes.panelName.textContent = customer.bedrijf;
+            nodes.panelSub.textContent = customer.dom + " · " + customer.stad;
+            nodes.panelContact.textContent = customer.naam;
+            nodes.panelDomain.textContent = customer.dom;
+            nodes.panelPhone.textContent = customer.tel;
+            nodes.panelEmail.textContent = customer.email;
+            nodes.panelBranch.textContent = customer.branche;
+            nodes.panelCity.textContent = customer.stad;
+            nodes.panelResponsible.textContent = formatResponsibleDisplayName(customer.verantwoordelijk);
+            nodes.panelStatus.value = customer.status;
+            nodes.panelNote.value = customer.nota || "";
+            renderTimeline(customer);
 
-            state.klanten = state.klanten.filter(function (item) {
-                return item.id !== customerId;
+            nodes.overlay.classList.add("on");
+            nodes.panel.classList.add("on");
+            nodes.panel.setAttribute("aria-hidden", "false");
+        }
+
+        function closePanel() {
+            state.openId = null;
+            nodes.overlay.classList.remove("on");
+            nodes.panel.classList.remove("on");
+            nodes.panel.setAttribute("aria-hidden", "true");
+        }
+
+        function updateCurrentCustomer(mutator) {
+            const customerIndex = state.klanten.findIndex(function (item) {
+                return item.id === state.openId;
             });
-            renderPage();
+            if (customerIndex === -1) return null;
 
-            const result = await persistCustomerList(state.klanten);
-            if (result.ok) {
-                setStatusMessage("Klant verwijderd.", "success", true);
+            const current = state.klanten[customerIndex];
+            const updated = normalizeCustomer(mutator(current), current.id);
+            state.klanten = state.klanten.slice();
+            state.klanten[customerIndex] = updated;
+            return updated;
+        }
+
+        function saveCurrentState(successMessage) {
+            renderPage();
+            if (state.openId) {
+                openPanel(state.openId);
+            }
+            return persistCustomerList(state.klanten).then(function (result) {
+                if (result.ok) {
+                    toast(successMessage);
+                    setStatusMessage(successMessage, "success", true);
+                    return;
+                }
+                setStatusMessage(
+                    "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
+                    "error"
+                );
+            });
+        }
+
+        function saveNota() {
+            const note = normalizeString(nodes.panelNote.value);
+            const updated = updateCurrentCustomer(function (customer) {
+                const nextHistory = customer.hist.slice();
+                nextHistory.push({
+                    type: "nota",
+                    label: "Notitie bijgewerkt",
+                    date: formatDateForStorage(new Date())
+                });
+                return {
+                    ...customer,
+                    nota: note,
+                    hist: nextHistory,
+                    updatedAt: formatDateForStorage(new Date())
+                };
+            });
+            if (!updated) return;
+            void saveCurrentState("Notitie opgeslagen");
+        }
+
+        function applyPanelStatus() {
+            const nextStatus = normalizeDatabaseStatus(nodes.panelStatus.value);
+            const updated = updateCurrentCustomer(function (customer) {
+                const nextHistory = customer.hist.slice();
+                nextHistory.push({
+                    type: nextStatus,
+                    label: createStatusTimelineLabel(nextStatus),
+                    date: formatDateForStorage(new Date())
+                });
+                return {
+                    ...customer,
+                    status: nextStatus,
+                    call: nextStatus !== "geblokkeerd" && nextStatus !== "buiten",
+                    mail: nextStatus !== "geblokkeerd" && nextStatus !== "buiten",
+                    hist: nextHistory,
+                    updatedAt: formatDateForStorage(new Date())
+                };
+            });
+            if (!updated) return;
+            void saveCurrentState("Status bijgewerkt");
+        }
+
+        function resetModal() {
+            nodes.modalCompany.value = "";
+            nodes.modalContact.value = "";
+            nodes.modalDomain.value = "";
+            nodes.modalPhone.value = "";
+            nodes.modalMail.value = "";
+            nodes.modalBranch.value = "Overig";
+            nodes.modalCity.value = "";
+            nodes.modalStatus.value = "benaderbaar";
+            if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Serve";
+        }
+
+        function openModal() {
+            resetModal();
+            nodes.modalBg.classList.add("on");
+        }
+
+        function closeModal() {
+            nodes.modalBg.classList.remove("on");
+        }
+
+        function addCustomerFromModal() {
+            const bedrijf = normalizeString(nodes.modalCompany.value);
+            if (!bedrijf) {
+                toast("Vul een bedrijfsnaam in");
+                nodes.modalCompany.focus();
                 return;
             }
 
-            setStatusMessage(
-                "Verwijderen in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
-                "error"
-            );
+            const dom = slugifyDomain(nodes.modalDomain.value || bedrijf);
+            const customer = normalizeCustomer({
+                id: createId(),
+                naam: normalizeString(nodes.modalContact.value) || bedrijf,
+                bedrijf: bedrijf,
+                dom: dom,
+                telefoon: normalizeString(nodes.modalPhone.value) || "—",
+                email: normalizeString(nodes.modalMail.value) || ("info@" + dom),
+                branche: normalizeString(nodes.modalBranch.value) || "Overig",
+                stad: normalizeString(nodes.modalCity.value) || "Onbekend",
+                status: normalizeDatabaseStatus(nodes.modalStatus.value),
+                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : "Serve",
+                hist: [{
+                    type: normalizeDatabaseStatus(nodes.modalStatus.value),
+                    label: "Toegevoegd aan database",
+                    date: formatDateForStorage(new Date())
+                }],
+                updatedAt: formatDateForStorage(new Date())
+            });
+
+            state.klanten = sortCustomers([customer].concat(state.klanten));
+            renderPage();
+            closeModal();
+
+            persistCustomerList(state.klanten).then(function (result) {
+                if (result.ok) {
+                    toast("✓ " + bedrijf + " toegevoegd");
+                    setStatusMessage("Bedrijf toegevoegd.", "success", true);
+                    return;
+                }
+                setStatusMessage(
+                    "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
+                    "error"
+                );
+            });
+        }
+
+        function exportCSV() {
+            const rows = getSortedCustomers(getFilteredCustomers());
+            const headers = ["Bedrijf", "Contact", "Domein", "Telefoon", "E-mail", "Branche", "Adres", "Status", "Toegewezen aan", "Laatste actie"];
+            const lines = rows.map(function (customer) {
+                return [
+                    customer.bedrijf,
+                    customer.naam,
+                    customer.dom,
+                    customer.tel,
+                    customer.email,
+                    customer.branche,
+                    customer.stad,
+                    getStatusLabel(customer.status),
+                    formatResponsibleDisplayName(customer.verantwoordelijk),
+                    formatDisplayDate(customer.updatedAt)
+                ].map(function (value) {
+                    return "\"" + String(value || "").replace(/"/g, "\"\"") + "\"";
+                }).join(",");
+            });
+
+            const anchor = document.createElement("a");
+            anchor.href = "data:text/csv;charset=utf-8," + encodeURIComponent([headers.join(",")].concat(lines).join("\n"));
+            anchor.download = "database.csv";
+            anchor.click();
+            toast("✓ CSV gedownload");
         }
 
         async function bootstrapCustomers() {
             const hadBootstrapCustomers = state.klanten.length > 0;
 
             if (!hadBootstrapCustomers) {
-                setStatusMessage("Klantenbestand laden...", "info");
+                setStatusMessage("Database laden...", "info");
             }
 
             try {
@@ -2244,17 +1955,13 @@
                         console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
                     }
 
-                    const shouldRerender = customerListsDiffer(enrichedCustomers);
-                    state.klanten = enrichedCustomers;
-                    if (shouldRerender || !hadBootstrapCustomers) {
+                    if (customerListsDiffer(enrichedCustomers) || !hadBootstrapCustomers) {
+                        state.klanten = enrichedCustomers;
                         renderPage();
+                    } else {
+                        state.klanten = enrichedCustomers;
                     }
-                    if (serializeCustomerList(remoteCustomers) !== serializeCustomerList(enrichedCustomers)) {
-                        const persistResult = await persistCustomerList(enrichedCustomers);
-                        if (!persistResult.ok) {
-                            console.error("Klant-verantwoordelijke backfill opslaan mislukt:", persistResult.error);
-                        }
-                    }
+
                     setStatusMessage("");
                     return;
                 }
@@ -2268,39 +1975,30 @@
                 state.orders = Array.isArray(orders) ? orders : [];
                 const importedCustomers = deriveCustomersFromOrders(orders);
 
-                const shouldRerender = customerListsDiffer(importedCustomers);
-                state.klanten = importedCustomers;
-                if (shouldRerender || !hadBootstrapCustomers) {
+                if (customerListsDiffer(importedCustomers) || !hadBootstrapCustomers) {
+                    state.klanten = importedCustomers;
                     renderPage();
+                } else {
+                    state.klanten = importedCustomers;
                 }
 
                 if (importedCustomers.length) {
                     const persistResult = await persistCustomerList(importedCustomers);
-                    if (persistResult.ok) {
-                        if (!hadBootstrapCustomers) {
-                            setStatusMessage("Klanten uit actieve opdrachten geimporteerd.", "success", true);
-                        } else {
-                            setStatusMessage("");
-                        }
+                    if (persistResult.ok && !hadBootstrapCustomers) {
+                        setStatusMessage("Database gevuld vanuit actieve opdrachten.", "success", true);
+                    } else if (!persistResult.ok) {
+                        setStatusMessage("Import gelukt, maar Supabase-opslag mislukte.", "error");
                     } else {
-                        if (!hadBootstrapCustomers) {
-                            setStatusMessage("Klanten geimporteerd, maar Supabase-opslag mislukte.", "error");
-                        } else {
-                            console.error("Klanten bootstrap persist in Supabase mislukt:", persistResult.error);
-                            setStatusMessage("");
-                        }
+                        setStatusMessage("");
                     }
                     return;
                 }
             } catch (error) {
-                /* ignore import errors */
+                console.error("Klanten importeren vanuit opdrachten mislukt:", error);
             }
 
-            const shouldRerender = customerListsDiffer([]);
             state.klanten = [];
-            if (shouldRerender || !hadBootstrapCustomers) {
-                renderPage();
-            }
+            renderPage();
             setStatusMessage("");
         }
 
@@ -2310,66 +2008,57 @@
         }
         renderPage();
 
-        nodes.search.addEventListener("input", function (event) {
+        nodes.query.addEventListener("input", function (event) {
             state.query = normalizeString(event.target.value);
-            renderTable();
+            renderPage();
         });
 
-        nodes.addButton.addEventListener("click", function () {
-            openModal();
+        nodes.branch.addEventListener("change", function (event) {
+            state.activeBranch = normalizeString(event.target.value);
+            renderPage();
         });
 
-        getModalFieldNodes().forEach(function (node) {
-            node.addEventListener("input", function () {
-                node.classList.remove("is-invalid");
-                if (nodes.modalError && nodes.modalError.classList.contains("is-visible")) {
-                    setModalError("");
-                }
-            });
-            node.addEventListener("change", function () {
-                node.classList.remove("is-invalid");
-                if (nodes.modalError && nodes.modalError.classList.contains("is-visible")) {
-                    setModalError("");
-                }
+        nodes.statusButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                setStatus(button.dataset.s || "alle", button);
             });
         });
 
-        nodes.cancelButton.addEventListener("click", function () {
-            closeModal();
+        nodes.sortButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                sort(button.dataset.sortKey);
+            });
         });
 
-        nodes.deleteButton.addEventListener("click", function () {
-            deleteCurrentCustomerFromModal();
+        nodes.tbody.addEventListener("click", function (event) {
+            const row = event.target.closest("tr[data-id]");
+            if (!row) return;
+            openPanel(row.getAttribute("data-id"));
         });
 
-        nodes.form.addEventListener("submit", saveCustomer);
-
-        nodes.body.addEventListener("click", function (event) {
-            const button = event.target.closest("[data-action][data-id]");
-            if (!button) return;
-
-            const action = button.getAttribute("data-action");
-            const customerId = button.getAttribute("data-id");
-
-            if (action === "edit") {
-                openModal(customerId);
-                return;
-            }
-
-            if (action === "delete") {
-                void deleteCustomer(customerId);
-            }
-        });
-
-        nodes.modalOverlay.addEventListener("click", function (event) {
-            if (event.target === nodes.modalOverlay) {
+        nodes.overlay.addEventListener("click", closePanel);
+        nodes.closePanelButton.addEventListener("click", closePanel);
+        nodes.saveNoteButton.addEventListener("click", saveNota);
+        nodes.applyStatusButton.addEventListener("click", applyPanelStatus);
+        nodes.addButton.addEventListener("click", openModal);
+        nodes.cancelModalButton.addEventListener("click", closeModal);
+        nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
+        nodes.modalBg.addEventListener("click", function (event) {
+            if (event.target === nodes.modalBg) {
                 closeModal();
             }
         });
+        nodes.exportButton.addEventListener("click", exportCSV);
 
         document.addEventListener("keydown", function (event) {
-            if (event.key === "Escape" && !nodes.modalOverlay.hidden) {
-                closeModal();
+            if (event.key === "Escape") {
+                if (nodes.modalBg.classList.contains("on")) {
+                    closeModal();
+                    return;
+                }
+                if (nodes.panel.classList.contains("on")) {
+                    closePanel();
+                }
             }
         });
 
@@ -2377,7 +2066,7 @@
             try {
                 await bootstrapCustomers();
             } finally {
-                if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === 'function') {
+                if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") {
                     window.SoftoraPremiumBoot.setShellBooting(false);
                 }
             }
