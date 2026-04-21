@@ -690,37 +690,13 @@ async function trimPreviewImageDataUrl(dataUrl) {
   context.drawImage(image, 0, 0);
   const imageData = context.getImageData(0, 0, width, height);
   const pixels = imageData.data;
-
-  let left = 0;
   let right = width - 1;
-  let top = 0;
-  let bottom = height - 1;
 
-  while (left < right && isPreviewWhitespaceColumn(pixels, width, height, left)) left += 1;
-  while (right > left && isPreviewWhitespaceColumn(pixels, width, height, right)) right -= 1;
-  while (top < bottom && isPreviewWhitespaceRow(pixels, width, height, top)) top += 1;
-  while (bottom > top && isPreviewWhitespaceRow(pixels, width, height, bottom)) bottom -= 1;
+  while (right > 0 && isPreviewWhitespaceColumn(pixels, width, height, right)) right -= 1;
 
-  const leftReference = samplePreviewEdgeReference(pixels, width, height, 'left');
   const rightReference = samplePreviewEdgeReference(pixels, width, height, 'right');
-  const leftGutterWidth = measurePreviewEdgeGutterWidth(pixels, width, height, 'left', leftReference);
   const rightGutterWidth = measurePreviewEdgeGutterWidth(pixels, width, height, 'right', rightReference);
-  const leftLowActivityRun = measurePreviewLowActivityRun(pixels, width, height, 'left');
   const rightLowActivityRun = measurePreviewLowActivityRun(pixels, width, height, 'right');
-
-  if (
-    leftGutterWidth >= Math.max(40, Math.round(width * 0.05)) &&
-    hasPreviewEdgeBreak(pixels, width, height, 'left', leftReference, leftGutterWidth)
-  ) {
-    left = Math.max(left, leftGutterWidth);
-  }
-
-  if (
-    leftLowActivityRun >= Math.max(60, Math.round(width * 0.07)) &&
-    hasPreviewActivityBreak(pixels, width, height, 'left', leftLowActivityRun)
-  ) {
-    left = Math.max(left, leftLowActivityRun);
-  }
 
   if (
     rightGutterWidth >= Math.max(40, Math.round(width * 0.05)) &&
@@ -736,24 +712,22 @@ async function trimPreviewImageDataUrl(dataUrl) {
     right = Math.min(right, width - rightLowActivityRun - 1);
   }
 
-  const trimmedWidth = right - left + 1;
-  const trimmedHeight = bottom - top + 1;
+  const trimmedWidth = right + 1;
   const removedWidth = width - trimmedWidth;
-  const removedHeight = height - trimmedHeight;
 
-  if (trimmedWidth <= 0 || trimmedHeight <= 0) return raw;
-  if (removedWidth < Math.max(24, Math.round(width * 0.03)) && removedHeight < Math.max(24, Math.round(height * 0.03))) {
+  if (trimmedWidth <= 0) return raw;
+  if (removedWidth < Math.max(24, Math.round(width * 0.03))) {
     return raw;
   }
 
-  const trimmedCanvas = document.createElement('canvas');
-  trimmedCanvas.width = trimmedWidth;
-  trimmedCanvas.height = trimmedHeight;
-  const trimmedContext = trimmedCanvas.getContext('2d');
-  if (!trimmedContext) return raw;
+  const normalizedCanvas = document.createElement('canvas');
+  normalizedCanvas.width = width;
+  normalizedCanvas.height = height;
+  const normalizedContext = normalizedCanvas.getContext('2d');
+  if (!normalizedContext) return raw;
 
-  trimmedContext.drawImage(canvas, left, top, trimmedWidth, trimmedHeight, 0, 0, trimmedWidth, trimmedHeight);
-  return trimmedCanvas.toDataURL('image/png');
+  normalizedContext.drawImage(canvas, 0, 0, trimmedWidth, height, 0, 0, width, height);
+  return normalizedCanvas.toDataURL('image/png');
 }
 
 async function showPreview(result, url, hostname) {
@@ -783,7 +757,7 @@ async function showPreview(result, url, hostname) {
           <div class="browser-url">${url}</div>
         </div>
         <div class="scale-wrap" style="height:${frameH}px">
-          <img id="preview-image" alt="Website preview ${hostname}" style="width:1440px;height:900px;object-fit:cover;transform-origin:top left;transform:scale(${scaleX});display:block;" />
+          <img id="preview-image" alt="Website preview ${hostname}" style="width:1440px;height:900px;object-fit:cover;object-position:left top;transform-origin:top left;transform:scale(${scaleX});display:block;" />
         </div>
       </div>
     </div>`;
