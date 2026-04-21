@@ -199,3 +199,63 @@ test('agenda read coordinator listAppointments forceert fresh shared-state sync 
   assert.equal(syncCalls[1]?.maxAgeMs, 0,
     'freshSharedState=true (bv. bij focus/pageshow) omzeilt de cooldown');
 });
+
+test('agenda read coordinator falls back to current in-memory rows when preparation times out', async () => {
+  const loggerCalls = [];
+  const appointments = [
+    {
+      id: 31,
+      confirmationTaskType: 'send_confirmation_email',
+      callId: 'call-timeout-safe',
+      company: 'Softora',
+      contact: 'Serve',
+      phone: '0600000000',
+      createdAt: '2026-04-22T10:00:00.000Z',
+    },
+  ];
+  const coordinator = createAgendaReadCoordinator({
+    logger: {
+      error: (...args) => loggerCalls.push(args),
+    },
+    readPreparationTimeoutMs: 5,
+    runtimeSyncCooldownMs: 4000,
+    demoConfirmationTaskEnabled: false,
+    isSupabaseConfigured: () => true,
+    getSupabaseStateHydrated: () => true,
+    forceHydrateRuntimeStateWithRetries: async () => {},
+    syncRuntimeStateFromSupabaseIfNewer: async () => new Promise(() => {}),
+    ensureDismissedLeadsFreshFromSupabase: async () => true,
+    isImapMailConfigured: () => false,
+    syncInboundConfirmationEmailsFromImap: async () => {},
+    backfillInsightsAndAppointmentsFromRecentCallUpdates: () => {},
+    refreshAgendaAppointmentCallSourcesIfNeeded: async () => {},
+    backfillGeneratedAgendaAppointmentsMetadataIfNeeded: () => {},
+    refreshGeneratedAgendaSummariesIfNeeded: async () => {},
+    getGeneratedAgendaAppointments: () => appointments,
+    isGeneratedAppointmentVisibleForAgenda: () => true,
+    compareAgendaAppointments: () => 0,
+    mapAppointmentToConfirmationTask: (appointment) => ({
+      ...appointment,
+      type: normalizeString(appointment?.confirmationTaskType || ''),
+      title: 'Timeout safe task',
+    }),
+    ensureConfirmationEmailDraftAtIndex: () => {},
+    compareConfirmationTasks,
+    buildAllInterestedLeadRows: () => [{ id: 'lead-timeout-safe' }],
+    isInterestedLeadDismissedForRow: () => false,
+    normalizeString,
+  });
+
+  const tasks = await coordinator.listConfirmationTasks({ limit: 20 });
+  const leads = await coordinator.listInterestedLeads({ limit: 20 });
+
+  assert.equal(tasks.ok, true);
+  assert.equal(tasks.count, 1);
+  assert.equal(tasks.tasks[0].callId, 'call-timeout-safe');
+  assert.equal(leads.ok, true);
+  assert.equal(leads.count, 1);
+  assert.equal(
+    loggerCalls.some((args) => args[0] === '[Agenda Read][PreparationTimeout]'),
+    true
+  );
+});

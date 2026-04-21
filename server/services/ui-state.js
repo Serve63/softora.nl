@@ -7,10 +7,15 @@ function createUiStateStore(deps = {}) {
     supabaseStateTable = '',
     fetchSupabaseRowByKeyViaRest = async () => ({ ok: false }),
     upsertSupabaseRowViaRest = async () => ({ ok: false }),
+    uiStateReadTimeoutMs = 1500,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value, maxLength = 500) => String(value || '').slice(0, maxLength),
     logger = console,
   } = deps;
+
+  function getSafeUiStateReadTimeoutMs() {
+    return Math.max(0, Math.min(10000, Number(uiStateReadTimeoutMs) || 0));
+  }
 
   function normalizeUiStateScope(scope) {
     const value = normalizeString(scope || '').toLowerCase();
@@ -39,6 +44,17 @@ function createUiStateStore(deps = {}) {
     return out;
   }
 
+  function buildInMemoryState(scope) {
+    const cachedValues = inMemoryUiStateByScope.get(scope);
+    if (!cachedValues || typeof cachedValues !== 'object') return null;
+    const values = sanitizeUiStateValues(cachedValues);
+    return {
+      values: { ...values },
+      updatedAt: null,
+      source: 'memory',
+    };
+  }
+
   async function getUiStateValues(scope) {
     const normalizedScope = normalizeUiStateScope(scope);
     if (!normalizedScope) return null;
@@ -47,7 +63,7 @@ function createUiStateStore(deps = {}) {
       return null;
     }
 
-    try {
+    const executeRead = async () => {
       const rowKey = getUiStateRowKey(normalizedScope);
       const client = getSupabaseClient();
       let row = null;
@@ -63,7 +79,7 @@ function createUiStateStore(deps = {}) {
             '[UI State][Supabase][GetError]',
             `${clientError?.message || clientError || 'Supabase client ontbreekt.'}${fallbackMsg}`
           );
-          return null;
+          return buildInMemoryState(normalizedScope);
         }
         return Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
       }
@@ -96,11 +112,48 @@ function createUiStateStore(deps = {}) {
       return {
         values: { ...values },
         updatedAt: normalizeString(row?.updated_at || '') || null,
-        source: 'supabase',
+        source: row?.source || 'supabase',
       };
+    };
+
+    const timeoutMs = getSafeUiStateReadTimeoutMs();
+    const memoryState = buildInMemoryState(normalizedScope);
+
+    if (!timeoutMs) {
+      try {
+        return await executeRead();
+      } catch (error) {
+        logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
+        return memoryState;
+      }
+    }
+
+    try {
+      return await new Promise((resolve) => {
+        let settled = false;
+        const finish = (value) => {
+          if (settled) return;
+          settled = true;
+          if (timeoutHandle) clearTimeout(timeoutHandle);
+          resolve(value);
+        };
+
+        const timeoutHandle = setTimeout(() => {
+          logger.error('[UI State][Supabase][GetTimeout]', normalizedScope, `na ${timeoutMs}ms`);
+          finish(memoryState);
+        }, timeoutMs);
+
+        Promise.resolve()
+          .then(executeRead)
+          .then((value) => finish(value))
+          .catch((error) => {
+            logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
+            finish(memoryState);
+          });
+      });
     } catch (error) {
       logger.error('[UI State][Supabase][GetCrash]', error?.message || error);
-      return null;
+      return memoryState;
     }
   }
 

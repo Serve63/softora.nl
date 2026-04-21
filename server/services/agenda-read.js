@@ -29,6 +29,48 @@ function buildConfirmationTaskDedupeKey(task, normalizeString) {
 }
 
 function createAgendaReadCoordinator(deps) {
+  function getSafePreparationTimeoutMs() {
+    return Math.max(0, Math.min(10000, Number(deps.readPreparationTimeoutMs) || 1500));
+  }
+
+  async function runPreparationWithinSoftTimeout(label, run) {
+    const timeoutMs = getSafePreparationTimeoutMs();
+    if (!timeoutMs) {
+      return run();
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        resolve();
+      };
+
+      const timeoutHandle = setTimeout(() => {
+        if (typeof deps.logger?.error === 'function') {
+          deps.logger.error('[Agenda Read][PreparationTimeout]', label, `na ${timeoutMs}ms`);
+        }
+        finish();
+      }, timeoutMs);
+
+      Promise.resolve()
+        .then(run)
+        .then(() => finish())
+        .catch((error) => {
+          if (typeof deps.logger?.error === 'function') {
+            deps.logger.error(
+              '[Agenda Read][PreparationError]',
+              label,
+              error?.message || error
+            );
+          }
+          finish();
+        });
+    });
+  }
+
   async function ensureHydratedIfNeeded() {
     if (deps.isSupabaseConfigured() && !deps.getSupabaseStateHydrated()) {
       await deps.forceHydrateRuntimeStateWithRetries(3);
@@ -42,19 +84,21 @@ function createAgendaReadCoordinator(deps) {
     // halen we direct de laatste Supabase-state op (maxAgeMs: 0). Gebruikt
     // door de agenda-pagina bij eerste load / focus / pageshow.
     const freshSharedState = Boolean(options.freshSharedState);
-    await ensureHydratedIfNeeded();
-    if (deps.isSupabaseConfigured()) {
-      await deps.syncRuntimeStateFromSupabaseIfNewer({
-        maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
-      });
-    }
-    if (deps.isImapMailConfigured()) {
-      await deps.syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
-    }
-    deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
-    await deps.refreshAgendaAppointmentCallSourcesIfNeeded();
-    deps.backfillGeneratedAgendaAppointmentsMetadataIfNeeded();
-    await deps.refreshGeneratedAgendaSummariesIfNeeded();
+    await runPreparationWithinSoftTimeout('appointments', async () => {
+      await ensureHydratedIfNeeded();
+      if (deps.isSupabaseConfigured()) {
+        await deps.syncRuntimeStateFromSupabaseIfNewer({
+          maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
+        });
+      }
+      if (deps.isImapMailConfigured()) {
+        await deps.syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
+      }
+      deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
+      await deps.refreshAgendaAppointmentCallSourcesIfNeeded();
+      deps.backfillGeneratedAgendaAppointmentsMetadataIfNeeded();
+      await deps.refreshGeneratedAgendaSummariesIfNeeded();
+    });
   }
 
   // Vercel serverless: elke warme instance heeft eigen in-memory dismissed-sets.
@@ -71,32 +115,38 @@ function createAgendaReadCoordinator(deps) {
   async function prepareConfirmationTasks(options = {}) {
     const quickMode = Boolean(options.quickMode);
     const freshSharedState = Boolean(options.freshSharedState);
-    await ensureHydratedIfNeeded();
-    await deps.syncRuntimeStateFromSupabaseIfNewer({
-      maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
-    });
-    await ensureDismissedLeadsFresh({ maxAgeMs: freshSharedState ? 0 : 2000 });
-    if (!quickMode && deps.isImapMailConfigured()) {
-      await deps.syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
-    }
-    deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
-    if (!quickMode) {
-      deps.getGeneratedAgendaAppointments().forEach((appointment, idx) => {
-        if (!appointment) return;
-        if (!deps.mapAppointmentToConfirmationTask(appointment)) return;
-        deps.ensureConfirmationEmailDraftAtIndex(idx, { reason: 'confirmation_task_list_auto_draft' });
+    await runPreparationWithinSoftTimeout('confirmation-tasks', async () => {
+      await ensureHydratedIfNeeded();
+      await deps.syncRuntimeStateFromSupabaseIfNewer({
+        maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
       });
-    }
+      await ensureDismissedLeadsFresh({ maxAgeMs: freshSharedState ? 0 : 2000 });
+      if (!quickMode && deps.isImapMailConfigured()) {
+        await deps.syncInboundConfirmationEmailsFromImap({ maxMessages: 15 });
+      }
+      deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
+      if (!quickMode) {
+        deps.getGeneratedAgendaAppointments().forEach((appointment, idx) => {
+          if (!appointment) return;
+          if (!deps.mapAppointmentToConfirmationTask(appointment)) return;
+          deps.ensureConfirmationEmailDraftAtIndex(idx, {
+            reason: 'confirmation_task_list_auto_draft',
+          });
+        });
+      }
+    });
   }
 
   async function prepareInterestedLeads(options = {}) {
     const freshSharedState = Boolean(options.freshSharedState);
-    await ensureHydratedIfNeeded();
-    await deps.syncRuntimeStateFromSupabaseIfNewer({
-      maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
+    await runPreparationWithinSoftTimeout('interested-leads', async () => {
+      await ensureHydratedIfNeeded();
+      await deps.syncRuntimeStateFromSupabaseIfNewer({
+        maxAgeMs: freshSharedState ? 0 : deps.runtimeSyncCooldownMs,
+      });
+      await ensureDismissedLeadsFresh({ maxAgeMs: freshSharedState ? 0 : 2000 });
+      deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
     });
-    await ensureDismissedLeadsFresh({ maxAgeMs: freshSharedState ? 0 : 2000 });
-    deps.backfillInsightsAndAppointmentsFromRecentCallUpdates();
   }
 
   async function listAppointments(options = {}) {

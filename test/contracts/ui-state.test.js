@@ -16,8 +16,12 @@ function createFixture(overrides = {}) {
       overrides.isSupabaseConfigured === undefined ? true : Boolean(overrides.isSupabaseConfigured),
     getSupabaseClient: () => overrides.client || null,
     supabaseStateTable: 'app_state',
+    uiStateReadTimeoutMs: overrides.uiStateReadTimeoutMs,
     fetchSupabaseRowByKeyViaRest: async (rowKey, columns) => {
       restReads.push({ rowKey, columns });
+      if (overrides.fetchResult && typeof overrides.fetchResult.then === 'function') {
+        return overrides.fetchResult;
+      }
       return overrides.fetchResult || { ok: true, body: null };
     },
     upsertSupabaseRowViaRest: async (row) => {
@@ -182,4 +186,26 @@ test('ui-state store writes values through REST fallback when client upsert cras
   assert.equal(restWrites.length, 1);
   assert.equal(restWrites[0].state_key, 'ui_state:dashboard');
   assert.equal(state.source, 'supabase');
+});
+
+test('ui-state store serves in-memory values when remote reads time out', async () => {
+  const { inMemoryUiStateByScope, loggerCalls, store } = createFixture({
+    uiStateReadTimeoutMs: 5,
+    fetchResult: new Promise(() => {}),
+  });
+  inMemoryUiStateByScope.set('dashboard', {
+    panel: 'cached',
+  });
+
+  const state = await store.getUiStateValues('dashboard');
+
+  assert.deepEqual(state, {
+    values: { panel: 'cached' },
+    updatedAt: null,
+    source: 'memory',
+  });
+  assert.equal(
+    loggerCalls.some((args) => args[0] === '[UI State][Supabase][GetTimeout]'),
+    true
+  );
 });
