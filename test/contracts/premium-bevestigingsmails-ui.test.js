@@ -76,3 +76,10 @@ test('premium bevestigingsmails gebruikt Campagne afronden als eindlabel van de 
   assert.match(pageSource, /'Campagne afronden'/);
   assert.doesNotMatch(pageSource, /Terug naar overzicht/);
 });
+
+test('premium bevestigingsmails hides the verbose checkpoint text block in the status card', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.doesNotMatch(pageSource, /campaign-status-text/);
+});

@@ -407,11 +407,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   color: var(--dark);
   margin-bottom: 6px;
 }
-.campaign-status-text {
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--mid);
-}
 .campaign-progress-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1057,7 +1052,6 @@ info@softora.nl</textarea>
         <div class="campaign-status-label">Huidige checkpoint</div>
         <div class="campaign-status-day" id="campaign-status-day">Dag 1</div>
         <div class="campaign-status-title" id="campaign-status-title">Eerste mail verstuurd</div>
-        <div class="campaign-status-text" id="campaign-status-text">Alle geselecteerde bedrijven ontvangen de eerste mail. Daarna wacht het systeem op reacties.</div>
       </div>
     </div>
 
@@ -1362,7 +1356,6 @@ function updateCampaignScreen(step) {
 
   document.getElementById('campaign-status-day').textContent = `Dag ${step.day}`;
   document.getElementById('campaign-status-title').textContent = step.title;
-  document.getElementById('campaign-status-text').textContent = step.detail;
   document.getElementById('campaign-progress-copy').textContent = step.detail;
   document.getElementById('campaign-progress-pill').textContent = step.complete
     ? 'Dag 14 afgerond'
@@ -1443,7 +1436,6 @@ function stopCampagne() {
   if (!campaignFinished) {
     campaignFinished = true;
     document.getElementById('campaign-status-title').textContent = 'Campagne handmatig gestopt';
-    document.getElementById('campaign-status-text').textContent = 'De tijdlijn is gepauzeerd voordat dag 14 is bereikt. Je kunt nu terug naar het overzicht.';
     document.getElementById('campaign-progress-copy').textContent = 'De campagne is handmatig gestopt en is niet volledig tot het laatste checkpoint doorlopen.';
     document.getElementById('campaign-progress-pill').textContent = 'Handmatig gestopt';
     document.getElementById('campaign-progress-footer-right').textContent = 'Campagne gestopt';
