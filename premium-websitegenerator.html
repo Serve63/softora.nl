@@ -163,15 +163,6 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
 .textarea-code:focus { border-color: var(--crimson); background: #fff; }
 .link-url { font-family: monospace; font-size: 13px; color: var(--crimson); flex: 1; word-break: break-all; }
 
-/* HISTORY */
-.history-list { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
-.history-item { background: var(--card); border: 1px solid var(--border); border-radius: 5px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background .12s; }
-.history-item:hover { background: var(--tag); }
-.history-thumb { width: 48px; height: 32px; background: var(--tag); border: 1px solid var(--border); border-radius: 3px; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--text-light); }
-.history-url { font-size: 13px; font-weight: 600; color: var(--text-dark); }
-.history-time { font-size: 11px; color: var(--text-light); }
-.history-load { font-size: 11px; color: var(--crimson); margin-left: auto; font-family: 'Oswald', sans-serif; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
-
 /* BIBLIOTHEEK (opgeslagen preview-foto's) */
 .library-grid {
   display: grid;
@@ -272,7 +263,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   <div class="card">
     <div class="card-head">
       <div class="card-title">Bibliotheek</div>
-      <div class="card-sub">Elke preview die je maakt via Website Scan &amp; Preview (AI-foto-api) wordt hier automatisch bewaard — lokaal in je browser.</div>
+      <div class="card-sub">Elke preview die je maakt via Website Scan &amp; Preview (AI-foto-api) wordt hier automatisch opgeslagen in <strong>Supabase</strong>, gekoppeld aan je premium-account. Bij een tijdelijke serverfout kun je nog steeds een lokale kopie in je browser hebben.</div>
     </div>
     <div class="card-body">
       <div id="library-empty" class="empty-state" style="padding: 48px 24px;">
@@ -280,7 +271,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
         <p>Nog geen opgeslagen previews. Genereer een preview onder Website Scan &amp; Preview — die verschijnt dan hier.</p>
       </div>
       <div id="library-grid" class="library-grid" style="display: none;" aria-live="polite"></div>
-      <p style="font-size: 11px; color: var(--text-light); margin-top: 18px; line-height: 1.5;">Maximaal 24 items. Als je browseropslag vol raakt, worden oudere items automatisch verwijderd.</p>
+      <p style="font-size: 11px; color: var(--text-light); margin-top: 18px; line-height: 1.5;">Maximaal 50 items per account. Als de limiet bereikt is, worden oudere previews automatisch verwijderd. Lokale browseropslag dient als reservekopie.</p>
     </div>
   </div>
 </div>
@@ -312,13 +303,6 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
       <p>Voer één of meerdere URL’s in en klik op &quot;AI Genereren&quot;. Bij meerdere URL’s verschijnen de previews onder elkaar (max. 50).</p>
     </div>
   </div>
-
-  <!-- RECENTE SCANS -->
-  <div id="history-section" style="display:none">
-    <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-light);margin:32px 0 12px">Recente scans</div>
-    <div class="history-list" id="history-list"></div>
-  </div>
-
 </div>
 
 <!-- ═══════════════════════════════════════
@@ -364,7 +348,9 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
 
 <script>
 const LIBRARY_STORAGE_KEY = 'softora_website_preview_library_v1';
-const LIBRARY_MAX_ITEMS = 24;
+const LIBRARY_MAX_ITEMS = 50;
+let websitePreviewLibraryRemoteEntries = null;
+let websitePreviewLibraryUseRemote = false;
 
 function escapeHtml(str) {
   return String(str || '')
@@ -375,10 +361,10 @@ function escapeHtml(str) {
 }
 
 function isSafeLibraryDataUrl(value) {
-  return typeof value === 'string' && value.startsWith('data:image/') && value.length < 14 * 1024 * 1024;
+  return typeof value === 'string' && value.startsWith('data:image/') && value.length < 12 * 1024 * 1024;
 }
 
-function loadLibraryEntries() {
+function readLocalLibraryEntries() {
   try {
     const raw = localStorage.getItem(LIBRARY_STORAGE_KEY);
     if (!raw) return [];
@@ -389,7 +375,7 @@ function loadLibraryEntries() {
   }
 }
 
-function persistLibraryEntries(entries) {
+function persistLocalLibraryEntries(entries) {
   try {
     localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(entries));
     return true;
@@ -406,11 +392,40 @@ function persistLibraryEntries(entries) {
   }
 }
 
-function savePreviewToLibrary({ dataUrl, url, hostname, fileName, width, height }) {
+function loadLibraryEntries() {
+  if (websitePreviewLibraryUseRemote && Array.isArray(websitePreviewLibraryRemoteEntries)) {
+    return websitePreviewLibraryRemoteEntries.slice();
+  }
+  return readLocalLibraryEntries();
+}
+
+async function maybeHydrateWebsitePreviewLibraryFromServer() {
+  if (!websiteGeneratorAuthState.authenticated) return;
+  try {
+    const response = await fetch('/api/website-preview-library', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data || data.ok === false) {
+      throw new Error(String(data?.detail || data?.error || 'Bibliotheek laden mislukt'));
+    }
+    websitePreviewLibraryRemoteEntries = Array.isArray(data.entries) ? data.entries : [];
+    websitePreviewLibraryUseRemote = true;
+    try {
+      persistLocalLibraryEntries(websitePreviewLibraryRemoteEntries.slice(0, LIBRARY_MAX_ITEMS));
+    } catch (_) {}
+  } catch (_) {
+    websitePreviewLibraryUseRemote = false;
+    websitePreviewLibraryRemoteEntries = null;
+  }
+}
+
+async function savePreviewToLibrary({ dataUrl, url, hostname, fileName, width, height }) {
   if (!dataUrl || !url) return;
-  const list = loadLibraryEntries();
-  const entry = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+  const baseEntry = {
     dataUrl,
     url,
     hostname: String(hostname || '').trim(),
@@ -419,9 +434,42 @@ function savePreviewToLibrary({ dataUrl, url, hostname, fileName, width, height 
     height: Number(height) || WEBSITE_PREVIEW_IMAGE_HEIGHT,
     createdAt: new Date().toISOString(),
   };
+
+  if (websiteGeneratorAuthState.authenticated) {
+    try {
+      const response = await fetch('/api/website-preview-library', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(baseEntry),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        await loadWebsiteGeneratorAuthState(true);
+      }
+      if (response.ok && data && data.ok && data.entry && data.entry.id) {
+        const entry = data.entry;
+        const merged = [entry, ...(websitePreviewLibraryRemoteEntries || []).filter((x) => x.id !== entry.id)];
+        websitePreviewLibraryRemoteEntries = merged.slice(0, LIBRARY_MAX_ITEMS);
+        websitePreviewLibraryUseRemote = true;
+        try {
+          persistLocalLibraryEntries(loadLibraryEntries());
+        } catch (_) {}
+        return;
+      }
+    } catch (_) {}
+  }
+
+  const list = readLocalLibraryEntries();
+  const entry = {
+    ...baseEntry,
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+  };
   list.unshift(entry);
   const trimmed = list.slice(0, LIBRARY_MAX_ITEMS);
-  persistLibraryEntries(trimmed);
+  persistLocalLibraryEntries(trimmed);
+  websitePreviewLibraryUseRemote = false;
+  websitePreviewLibraryRemoteEntries = null;
 }
 
 function renderLibraryPanel() {
@@ -464,10 +512,48 @@ function renderLibraryPanel() {
   }).join('');
 }
 
-function removeLibraryEntry(id, ev) {
+async function removeLibraryEntry(id, ev) {
   if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
-  const next = loadLibraryEntries().filter((x) => x.id !== id);
-  persistLibraryEntries(next);
+  if (websiteGeneratorAuthState.authenticated && websitePreviewLibraryUseRemote) {
+    try {
+      const response = await fetch(`/api/website-preview-library/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        await loadWebsiteGeneratorAuthState(true);
+      }
+      if (response.ok && data && data.ok) {
+        if (Array.isArray(websitePreviewLibraryRemoteEntries)) {
+          websitePreviewLibraryRemoteEntries = websitePreviewLibraryRemoteEntries.filter((x) => x.id !== id);
+        }
+        try {
+          persistLocalLibraryEntries(loadLibraryEntries());
+        } catch (_) {}
+        renderLibraryPanel();
+        showToast('Verwijderd uit bibliotheek');
+        return;
+      }
+      if (response.status === 404) {
+        await maybeHydrateWebsitePreviewLibraryFromServer();
+        renderLibraryPanel();
+        showToast('Item bestond niet meer; bibliotheek vernieuwd.');
+        return;
+      }
+      showToast(String(data?.detail || data?.error || 'Verwijderen mislukt'));
+      return;
+    } catch (_) {
+      showToast('Verwijderen mislukt — controleer je verbinding.');
+      return;
+    }
+  }
+  const next = readLocalLibraryEntries().filter((x) => x.id !== id);
+  persistLocalLibraryEntries(next);
+  websitePreviewLibraryUseRemote = false;
+  websitePreviewLibraryRemoteEntries = null;
   renderLibraryPanel();
   showToast('Verwijderd uit bibliotheek');
 }
@@ -494,14 +580,17 @@ function openLibraryEntry(id) {
   showToast('Preview geopend');
 }
 
-function switchTab(name, el) {
+async function switchTab(name, el) {
   document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
   const tabBtn = el || document.querySelector(`.tab[data-tab="${name}"]`);
   const panel = document.getElementById('tab-' + name);
   if (panel) panel.classList.add('active');
   if (tabBtn) tabBtn.classList.add('active');
-  if (name === 'library') renderLibraryPanel();
+  if (name === 'library') {
+    await maybeHydrateWebsitePreviewLibraryFromServer();
+    renderLibraryPanel();
+  }
   try {
     const base = `${window.location.pathname || '/premium-websitegenerator'}${window.location.search || ''}`;
     if (name === 'library') {
@@ -516,7 +605,6 @@ function switchTab(name, el) {
   } catch (_) {}
 }
 
-const scanHistory = [];
 let websiteGeneratorAuthState = {
   loaded: false,
   authenticated: false,
@@ -595,6 +683,13 @@ async function loadWebsiteGeneratorAuthState(force = false) {
     }
 
     applyWebsiteGeneratorAuthState();
+    if (websiteGeneratorAuthState.authenticated) {
+      await maybeHydrateWebsitePreviewLibraryFromServer();
+      const libPanel = document.getElementById('tab-library');
+      if (libPanel && libPanel.classList.contains('active') && typeof renderLibraryPanel === 'function') {
+        renderLibraryPanel();
+      }
+    }
     return websiteGeneratorAuthState;
   })();
 
@@ -744,7 +839,7 @@ async function appendPreviewFromResult(result, url, hostname) {
   const blockId = newPreviewBlockId();
   stack.insertAdjacentHTML('beforeend', previewZoneHtml(blockId, hostname, previewWidth, false));
   wirePreviewBlock(blockId, previewDataUrl, url, hostname, resolvedName);
-  savePreviewToLibrary({
+  await savePreviewToLibrary({
     dataUrl: previewDataUrl,
     url,
     hostname,
@@ -789,7 +884,6 @@ async function runBatchScan(urls) {
       await delay(200);
       ph.remove();
       await appendPreviewFromResult(generated, url, hostname);
-      addToHistory(url, hostname);
       const last = stack.lastElementChild;
       if (last) last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (e) {
@@ -839,7 +933,6 @@ async function runSingleScanWithSteps(url) {
     const generated = await callAI(url, hostname);
     await delay(300);
     await showPreview(generated, url, hostname);
-    addToHistory(url, hostname);
   } catch (e) {
     document.getElementById('scan-output').innerHTML = `
       <div class="empty-state">
@@ -1145,7 +1238,7 @@ async function showPreview(result, url, hostname) {
   const previewDataUrl = String(croppedPreview?.dataUrl || imageDataUrl);
   const resolvedName = String(result?.image?.fileName || `${hostname}-preview.png`).trim();
   mountScanPreviewUI(previewDataUrl, url, hostname, resolvedName, previewWidth, previewHeight);
-  savePreviewToLibrary({
+  await savePreviewToLibrary({
     dataUrl: previewDataUrl,
     url,
     hostname,
@@ -1163,21 +1256,6 @@ function downloadPreview() {
   a.click();
   showToast('Preview gedownload');
 }
-
-function addToHistory(url, hostname) {
-  scanHistory.unshift({ url, hostname, time: new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}) });
-  if (scanHistory.length > 5) scanHistory.pop();
-  if (!scanHistory.length) return;
-  document.getElementById('history-section').style.display = 'block';
-  document.getElementById('history-list').innerHTML = scanHistory.map(h => `
-    <div class="history-item" onclick="reScan('${h.url}')">
-      <div class="history-thumb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
-      <div><div class="history-url">${h.hostname}</div><div class="history-time">Gescand om ${h.time}</div></div>
-      <div class="history-load">Opnieuw -&gt;</div>
-    </div>`).join('');
-}
-
-function reScan(url) { document.getElementById('scan-url').value = url; startScan(); }
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
 
@@ -1267,8 +1345,10 @@ loadWebsiteGeneratorAuthState();
       .toLowerCase();
     if (raw !== "bibliotheek" && raw !== "library") return;
     const libBtn = document.querySelector('.tab[data-tab="library"]');
-    if (libBtn) switchTab("library", libBtn);
-    if (typeof renderLibraryPanel === "function") renderLibraryPanel();
+    void (async () => {
+      if (libBtn) await switchTab("library", libBtn);
+      else if (typeof renderLibraryPanel === "function") renderLibraryPanel();
+    })();
   }
   window.addEventListener("hashchange", applyLibraryHash);
   if (document.readyState === "loading") {

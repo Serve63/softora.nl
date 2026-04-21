@@ -40,6 +40,18 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.match(source, /\/api\/website-links\/create/);
 });
 
+test('premium websitegenerator shows no recent scans section anymore', () => {
+  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.doesNotMatch(source, /Recente scans/);
+  assert.doesNotMatch(source, /id="history-section"/);
+  assert.doesNotMatch(source, /id="history-list"/);
+  assert.doesNotMatch(source, /function addToHistory\(/);
+  assert.doesNotMatch(source, /function reScan\(/);
+  assert.doesNotMatch(source, /const scanHistory = \[\];/);
+});
+
 test('premium websitegenerator toont een login-fallback voor protected acties', () => {
   const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
   const source = fs.readFileSync(filePath, 'utf8');
