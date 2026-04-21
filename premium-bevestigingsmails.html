@@ -335,10 +335,10 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .btn-stop:hover { border-color: var(--red,#c0392b); color: var(--red,#c0392b); }
 
 /* MAIL EDITOR */
-.mail-tab { padding: 5px 12px; border: 1px solid var(--border); border-radius: 4px; background: none; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: var(--light); cursor: pointer; transition: all .15s; }
-.mail-tab:hover { border-color: var(--crimson); color: var(--crimson); }
-.mail-tab.active { background: var(--dark); border-color: var(--dark); color: #fff; }
-.mail-tab.ai-tab.active { background: var(--crimson); border-color: var(--crimson); }
+.mail-tab { padding: 5px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: var(--mid); cursor: pointer; transition: all .15s; }
+.mail-tab:hover { border-color: rgba(155,35,85,.3); color: var(--crimson); background: rgba(155,35,85,.04); }
+.mail-tab.active { background: rgba(155,35,85,.08); border-color: rgba(155,35,85,.24); color: var(--crimson); }
+.mail-tab.ai-tab.active { background: rgba(155,35,85,.08); border-color: rgba(155,35,85,.24); color: var(--crimson); }
 .mail-tab.ai-tab { color: var(--crimson); border-color: rgba(155,35,85,.3); }
 .mail-panel { display: none; }
 .mail-panel.active { display: block; }
