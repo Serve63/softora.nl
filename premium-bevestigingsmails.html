@@ -1184,6 +1184,16 @@ function applyPremiumAiLeadGeneratorShell() {
   if (m2) m2.textContent = 'Opgenomen';
 }
 
+function applyPremiumAiLeadGeneratorBelmethodeRow() {
+  if (!isPremiumAiLeadGeneratorPath()) return;
+  const sel = document.getElementById('delay1');
+  if (!sel) return;
+  const row = sel.closest('.mf-row');
+  const label = row && row.querySelector('.mf-label');
+  if (label) label.textContent = 'Belmethode';
+  sel.innerHTML = '<option>Los van elkaar</option><option>Alles tegelijk</option>';
+}
+
 const BRANCHEN  = ['Horeca & Restaurants','Retail & Winkels','Zakelijke Dienstverlening','Bouw & Vastgoed','Gezondheidszorg','Creatieve Sector','Tech & Startups','Overig'];
 const STEDEN    = ['Oisterwijk','Tilburg','Breda','Eindhoven','Den Bosch','Waalwijk','Helmond','Dongen','Boxtel','Udenhout','Haaren','Goirle','Hilvarenbeek'];
 const NAMEN     = ['Bakkerij De Zon','Garage Visser','Kapsalon Luna','Tandarts Vermeer','Installatiebedrijf Jansen','Restaurant De Smaak','Fysiotherapie Brouwers','Schilders Wit','Rijschool Peters','Loodgieter Henk','Bouwbedrijf Steen','Accountancy Peeters','ICT Helpdesk Noord','Schoonmaak Pro','Bloemisterij Roos','Sportschool Active','Grafisch Atelier','Transport Hendriks','Mode Boutique Elle','Dakdekker Sterk','Tuincentrum Groen','Elektra Expert','Beveiliging Secure','Notaris De Wit'];
@@ -1787,6 +1797,7 @@ document.addEventListener('keydown', event => {
 });
 
 applyPremiumAiLeadGeneratorShell();
+applyPremiumAiLeadGeneratorBelmethodeRow();
 initCampaignSelects();
 </script>
 
