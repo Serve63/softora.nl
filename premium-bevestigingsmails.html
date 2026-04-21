@@ -64,7 +64,8 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 1.5rem;
   margin-bottom: 1.9rem;
 }
 .topbar-left h1 {
@@ -84,8 +85,41 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 }
 .topbar-right {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 1rem;
+  flex-shrink: 0;
+}
+.topbar-note {
+  min-width: 220px;
+  max-width: 260px;
+  padding: 14px 16px;
+  border: 1px solid rgba(155,35,85,.18);
+  border-radius: 12px;
+  background: rgba(255,255,255,.04);
+  box-shadow: 0 10px 24px rgba(26,26,46,.08);
+}
+.topbar-note-label {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--crimson);
+  margin-bottom: 6px;
+}
+.topbar-note-text {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.topbar-note-text strong {
+  font-weight: 600;
+}
+.topbar-note-sub {
+  margin-top: 6px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.45;
 }
 .page-section {
   background: var(--card);
@@ -384,6 +418,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 
 @media (max-width: 1024px) {
   .main-content { margin-left: 0; padding: 1.5rem; }
+  .topbar { flex-direction: column; }
+  .topbar-right { width: 100%; }
+  .topbar-note { max-width: none; width: 100%; }
 }
 @media (max-width: 1400px) {
   .zones-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -457,7 +494,13 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
     <h1>Coldmailing</h1>
     <p>Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.</p>
     </div>
-    <div class="topbar-right"></div>
+    <div class="topbar-right">
+      <div class="topbar-note">
+        <div class="topbar-note-label">Looptijd</div>
+        <div class="topbar-note-text">Een mailcampagne duurt gemiddeld <strong>2 weken</strong>.</div>
+        <div class="topbar-note-sub">Houd rekening met opvolgmomenten en reacties die verspreid binnenkomen.</div>
+      </div>
+    </div>
   </div>
   <div class="page-section">
     <div class="page-section-inner">
