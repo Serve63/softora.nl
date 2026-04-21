@@ -437,7 +437,7 @@
         .generator-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 0;
+            gap: 1.25rem;
             margin-bottom: 3rem;
             position: relative;
             z-index: 30;
@@ -447,10 +447,7 @@
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 0.9rem;
-            padding: 1.4rem 1.5rem 1.35rem;
-            border: 1px solid var(--border);
-            border-bottom: none;
-            background: var(--bg-secondary);
+            padding: 0;
             opacity: 0;
             transform: translateY(20px);
             animation: fadeUp 0.6s var(--ease-out-expo) 0.05s forwards;
@@ -472,7 +469,6 @@
             column-gap: 1.5rem;
             row-gap: 1.25rem;
             align-items: end;
-            border-top: none;
         }
 
         .generator-grid > .panel .panel-header,
@@ -1792,7 +1788,6 @@
             .topbar-right { width: 100%; justify-content: flex-start; }
             .generator-grid > .panel-zone-strip {
                 grid-template-columns: 1fr;
-                padding: 1rem 1rem 1rem;
             }
             .topbar-right .site-select--pill .site-select-trigger {
                 width: min(100%, 16rem) !important;

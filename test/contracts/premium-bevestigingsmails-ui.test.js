@@ -59,3 +59,12 @@ test('premium bevestigingsmails is directly accessible without coming-soon lock 
   assert.doesNotMatch(comingSoonKeysMatch[1], /"coldmailing"/);
   assert.match(themeSource, /key: "coldmailing"/);
 });
+
+test('premium bevestigingsmails renders the zone cards as a separate strip above the settings panel', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /\.generator-grid\s*\{[\s\S]*gap:\s*1\.25rem;/);
+  assert.match(pageSource, /\.generator-grid > \.panel-zone-strip\s*\{[\s\S]*padding:\s*0;/);
+  assert.doesNotMatch(pageSource, /\.generator-grid > \.panel\s*\{[\s\S]*border-top:\s*none;/);
+});
