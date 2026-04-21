@@ -1719,7 +1719,7 @@
         function renderTable() {
             const filtered = getSortedCustomers(getFilteredCustomers());
 
-            nodes.topSub.textContent = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben of niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
+            nodes.topSub.textContent = "De AI koppelt alle data slim aan elkaar, zodat klanten, lopende gesprekken en mensen die geen interesse hebben\nof niet meer benaderd willen worden automatisch worden uitgesloten van dubbele of onnodige opvolging.";
             nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
 
             if (!filtered.length) {
