@@ -32,6 +32,7 @@ test('server app runtime wiring composes AI dashboard coordinators into feature 
         premiumRouteRuntime: { sessionSecret: 'secret' },
         coldcalling: { openAiModel: 'gpt-test' },
         websiteLinkCoordinator: { scope: 'website-link' },
+        websitePreviewLibraryCoordinator: { scope: 'website-preview-library' },
         runtimeOpsCoordinator: { scope: 'runtime-ops' },
         runtimeDebugOpsCoordinator: { scope: 'runtime-debug' },
         requireRuntimeDebugAccess: () => true,

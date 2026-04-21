@@ -5,6 +5,7 @@ const {
 const { registerAiDashboardRoutes } = require('../routes/ai-dashboard');
 const { registerAiToolRoutes } = require('../routes/ai-tools');
 const { registerWebsiteLinkRoutes } = require('../routes/website-links');
+const { registerWebsitePreviewLibraryRoutes } = require('../routes/website-preview-library');
 const { registerActiveOrderRoutes } = require('../routes/active-orders');
 const { registerRuntimeOpsRoutes } = require('../routes/runtime-ops');
 const { registerRuntimeDebugOpsRoutes } = require('../routes/runtime-debug-ops');
@@ -22,6 +23,7 @@ function registerFeatureRoutes(app, deps = {}) {
     aiDashboardCoordinator,
     aiToolsCoordinator,
     websiteLinkCoordinator,
+    websitePreviewLibraryCoordinator,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
@@ -45,6 +47,7 @@ function registerFeatureRoutes(app, deps = {}) {
   registerAiDashboardRoutes(app, { coordinator: aiDashboardCoordinator });
   registerAiToolRoutes(app, { coordinator: aiToolsCoordinator });
   registerWebsiteLinkRoutes(app, { coordinator: websiteLinkCoordinator });
+  registerWebsitePreviewLibraryRoutes(app, { coordinator: websitePreviewLibraryCoordinator });
   registerActiveOrderRoutes(app, { coordinator: activeOrdersCoordinator });
   registerRuntimeOpsRoutes(app, {
     coordinator: runtimeOpsCoordinator,

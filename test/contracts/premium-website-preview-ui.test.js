@@ -84,6 +84,7 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /preview-media" style="max-width:\$\{frameW\}px;"/);
   assert.match(source, /id="preview-image" alt="Website preview \$\{safeHost\}" style="width:100%;height:auto;display:block;"/);
   assert.match(source, /softora_website_preview_library_v1/);
+  assert.match(source, /\/api\/website-preview-library/);
   assert.match(source, /data-tab="library"/);
   assert.match(source, /id="tab-library"/);
   assert.doesNotMatch(source, /function openPreviewNewTab\(/);

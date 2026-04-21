@@ -195,6 +195,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         getOpenAiApiKey: platformRuntime.getOpenAiApiKey,
       },
       websiteLinkCoordinator: uiSeoRuntime.websiteLinkCoordinator,
+      websitePreviewLibraryCoordinator: uiSeoRuntime.websitePreviewLibraryCoordinator,
       runtimeOpsCoordinator: uiSeoRuntime.runtimeOpsCoordinator,
       runtimeDebugOpsCoordinator: uiSeoRuntime.runtimeDebugOpsCoordinator,
       requireRuntimeDebugAccess: securityRuntime.requireRuntimeDebugAccess,

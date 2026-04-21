@@ -7,6 +7,7 @@ const { createSeoWriteCoordinator } = require('./seo-write');
 const { createRuntimeOpsCoordinator } = require('./runtime-ops');
 const { createRuntimeDebugOpsCoordinator } = require('./runtime-debug-ops');
 const { createWebsiteLinkCoordinator } = require('./website-links');
+const { createWebsitePreviewLibraryCoordinator } = require('./website-preview-library');
 
 function createUiSeoRuntime(deps = {}) {
   const {
@@ -16,6 +17,8 @@ function createUiSeoRuntime(deps = {}) {
     getSupabaseClient,
     supabaseStateTable,
     fetchSupabaseRowByKeyViaRest,
+    fetchSupabaseRowsByStateKeyPrefixViaRest,
+    deleteSupabaseRowByStateKeyViaRest,
     upsertSupabaseRowViaRest,
     normalizeString,
     truncateText,
@@ -52,6 +55,7 @@ function createUiSeoRuntime(deps = {}) {
     resolveLegacyPrettyPageRedirect,
     getPublicBaseUrlFromRequest,
     websiteLinkStateKeyPrefix,
+    websitePreviewLibraryMaxItems = 50,
     seoConfigScope,
     seoConfigKey,
     seoConfigCacheTtlMs,
@@ -198,6 +202,20 @@ function createUiSeoRuntime(deps = {}) {
     getAfterState,
   });
 
+  const websitePreviewLibraryCoordinator = createWebsitePreviewLibraryCoordinator({
+    logger,
+    normalizeString,
+    truncateText,
+    slugifyAutomationText,
+    isSupabaseConfigured,
+    fetchSupabaseRowsByStateKeyPrefixViaRest,
+    fetchSupabaseRowByKeyViaRest,
+    upsertSupabaseRowViaRest,
+    deleteSupabaseRowByStateKeyViaRest,
+    supabaseStateKey,
+    websitePreviewLibraryMaxItems,
+  });
+
   const websiteLinkCoordinator = createWebsiteLinkCoordinator({
     logger,
     normalizeString,
@@ -227,6 +245,7 @@ function createUiSeoRuntime(deps = {}) {
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
     websiteLinkCoordinator,
+    websitePreviewLibraryCoordinator,
   };
 }
 

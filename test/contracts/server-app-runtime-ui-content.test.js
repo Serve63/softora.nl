@@ -56,6 +56,7 @@ function createContext() {
       parseIntSafe: Number.parseInt,
       fetchJsonWithTimeout: async () => ({}),
       fetchTextWithTimeout: async () => '<html></html>',
+      fetchBinaryWithTimeout: async () => ({ response: { ok: true, status: 200 }, bytes: Buffer.from('') }),
       assertWebsitePreviewUrlIsPublic: async () => true,
       normalizeAbsoluteHttpUrl: (value) => value,
       normalizeWebsitePreviewTargetUrl: (value) => value,
@@ -144,6 +145,7 @@ test('server app runtime ui/content wiring preserves ui-seo config and runtime s
     runtimeOpsCoordinator: {},
     runtimeDebugOpsCoordinator: {},
     websiteLinkCoordinator: {},
+    websitePreviewLibraryCoordinator: {},
   };
   const aiContentRuntime = {
     aiSummaryService: {},
@@ -185,6 +187,7 @@ test('server app runtime ui/content wiring preserves ui-seo config and runtime s
   assert.equal(capturedAiContentOptions.anthropicApiBaseUrl, 'https://anthropic.test');
   assert.equal(capturedAiContentOptions.openAiImageModel, 'gpt-image-test');
   assert.equal(capturedAiContentOptions.extractWebsitePreviewScanFromHtml, uiSeoRuntime.extractWebsitePreviewScanFromHtml);
+  assert.equal(capturedAiContentOptions.fetchBinaryWithTimeout, context.shared.fetchBinaryWithTimeout);
   assert.equal(result.websiteInputRuntime, websiteInputRuntime);
   assert.equal(result.uiSeoRuntime, uiSeoRuntime);
   assert.equal(result.aiContentRuntime, aiContentRuntime);

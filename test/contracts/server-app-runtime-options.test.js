@@ -79,6 +79,7 @@ test('server app runtime option builders keep feature route coordinators and gua
   const aiDashboardCoordinator = {};
   const aiToolsCoordinator = {};
   const websiteLinkCoordinator = {};
+  const websitePreviewLibraryCoordinator = {};
   const activeOrdersCoordinator = {};
   const runtimeOpsCoordinator = {};
   const runtimeDebugOpsCoordinator = {};
@@ -92,6 +93,7 @@ test('server app runtime option builders keep feature route coordinators and gua
     aiDashboardCoordinator,
     aiToolsCoordinator,
     websiteLinkCoordinator,
+    websitePreviewLibraryCoordinator,
     activeOrdersCoordinator,
     runtimeOpsCoordinator,
     runtimeDebugOpsCoordinator,
@@ -105,6 +107,7 @@ test('server app runtime option builders keep feature route coordinators and gua
   assert.equal(options.aiDashboardCoordinator, aiDashboardCoordinator);
   assert.equal(options.aiToolsCoordinator, aiToolsCoordinator);
   assert.equal(options.websiteLinkCoordinator, websiteLinkCoordinator);
+  assert.equal(options.websitePreviewLibraryCoordinator, websitePreviewLibraryCoordinator);
   assert.equal(options.activeOrdersCoordinator, activeOrdersCoordinator);
   assert.equal(options.runtimeOpsCoordinator, runtimeOpsCoordinator);
   assert.equal(options.runtimeDebugOpsCoordinator, runtimeDebugOpsCoordinator);

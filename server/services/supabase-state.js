@@ -230,6 +230,50 @@ function createSupabaseStateStore(deps = {}) {
     });
   }
 
+  async function fetchSupabaseRowsByStateKeyPrefixViaRest(
+    prefix,
+    limit = 100,
+    selectColumns = 'state_key,payload,updated_at'
+  ) {
+    const normalizedPrefix = normalizeString(prefix || '');
+    if (!normalizedPrefix) {
+      return { ok: false, status: null, body: null, error: 'Ongeldige state key-prefix.' };
+    }
+    const safeLimit = Math.max(1, Math.min(500, Number(limit) || 100));
+    const baseUrl = supabaseUrl.replace(/\/+$/, '');
+    const likePattern = `${normalizedPrefix}%`;
+    const url =
+      `${baseUrl}/rest/v1/${encodeURIComponent(supabaseStateTable)}` +
+      `?select=${encodeURIComponent(selectColumns)}` +
+      `&state_key=like.${encodeURIComponent(likePattern)}` +
+      '&order=updated_at.desc' +
+      `&limit=${safeLimit}`;
+
+    return performRestRequest(url, {
+      method: 'GET',
+      headers: buildRestHeaders(),
+    });
+  }
+
+  async function deleteSupabaseRowByStateKeyViaRest(rowKey) {
+    const normalizedRowKey = normalizeString(rowKey || '');
+    if (!normalizedRowKey) {
+      return { ok: false, status: null, body: null, error: 'Ongeldige state key.' };
+    }
+
+    const baseUrl = supabaseUrl.replace(/\/+$/, '');
+    const url =
+      `${baseUrl}/rest/v1/${encodeURIComponent(supabaseStateTable)}` +
+      `?state_key=eq.${encodeURIComponent(normalizedRowKey)}`;
+
+    return performRestRequest(url, {
+      method: 'DELETE',
+      headers: buildRestHeaders({
+        Prefer: 'return=minimal',
+      }),
+    });
+  }
+
   function getSupabaseClient() {
     if (!isSupabaseConfigured()) return null;
     if (supabaseClient) return supabaseClient;
@@ -248,6 +292,8 @@ function createSupabaseStateStore(deps = {}) {
     buildSupabaseCallUpdateStateKey,
     extractCallIdFromSupabaseCallUpdateStateKey,
     fetchSupabaseCallUpdateRowsViaRest,
+    fetchSupabaseRowsByStateKeyPrefixViaRest,
+    deleteSupabaseRowByStateKeyViaRest,
     fetchSupabaseRowByKeyViaRest: fetchRowByKeyViaRest,
     fetchSupabaseStateRowViaRest: fetchStateRowViaRest,
     getSupabaseClient,

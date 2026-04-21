@@ -85,14 +85,26 @@ function applyAppMiddleware(app, deps = {}) {
     })
   );
 
-  app.use(
-    express.json({
-      limit: '8mb',
-      verify: (req, _res, buf) => {
-        req.rawBody = buf;
-      },
-    })
-  );
+  const jsonBodyParser8mb = express.json({
+    limit: '8mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  });
+  const jsonBodyParserPreviewLibrary = express.json({
+    limit: '18mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  });
+
+  app.use((req, res, next) => {
+    const pathname = getRequestPathname(req);
+    if (req.method === 'POST' && pathname === '/api/website-preview-library') {
+      return jsonBodyParserPreviewLibrary(req, res, next);
+    }
+    return jsonBodyParser8mb(req, res, next);
+  });
 
   const generalApiRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,

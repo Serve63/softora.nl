@@ -186,6 +186,7 @@ test('server app runtime composition builders preserve feature wiring groups and
     uiSeoRuntime: {
       getUiStateValues: async () => ({}),
       websiteLinkCoordinator: {},
+      websitePreviewLibraryCoordinator: {},
       runtimeOpsCoordinator: {},
       runtimeDebugOpsCoordinator: {},
       seoReadCoordinator: {},
