@@ -1182,6 +1182,12 @@ function applyPremiumAiLeadGeneratorShell() {
   var m2 = document.getElementById('campaign-metric-label-zone2');
   if (m1) m1.textContent = 'Gebeld';
   if (m2) m2.textContent = 'Opgenomen';
+  var bodyTa = document.getElementById('body1');
+  if (bodyTa) {
+    var bodyRow = bodyTa.closest('.mf-row');
+    var inhoudLabel = bodyRow && bodyRow.querySelector('.mf-label');
+    if (inhoudLabel) inhoudLabel.textContent = 'Prompt / Instructiebrief';
+  }
 }
 
 function applyPremiumAiLeadGeneratorBelmethodeRow() {
