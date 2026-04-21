@@ -229,6 +229,10 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   border-color: var(--crimson);
   box-shadow: 0 0 0 3px rgba(155,35,85,.08);
 }
+.select-shell.open .select-trigger {
+  opacity: 0;
+  pointer-events: none;
+}
 .select-trigger-label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -244,7 +248,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .select-shell.open .select-trigger-icon { transform: rotate(180deg); }
 .select-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: 0;
   left: 0;
   right: 0;
   padding: 6px;
@@ -259,7 +263,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 }
 .select-shell.open-up .select-menu {
   top: auto;
-  bottom: calc(100% + 6px);
+  bottom: 0;
 }
 .select-shell.open .select-menu { display: block; }
 .select-option {
