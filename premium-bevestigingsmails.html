@@ -90,8 +90,8 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   flex-shrink: 0;
 }
 .topbar-note {
-  min-width: 220px;
-  max-width: 260px;
+  min-width: 360px;
+  max-width: 420px;
   padding: 14px 16px;
   border: 1px solid rgba(155,35,85,.18);
   border-radius: 12px;
@@ -111,6 +111,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.5;
+  white-space: nowrap;
 }
 .topbar-note-text strong {
   font-weight: 600;
@@ -421,6 +422,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   .topbar { flex-direction: column; }
   .topbar-right { width: 100%; }
   .topbar-note { max-width: none; width: 100%; }
+  .topbar-note-text { white-space: normal; }
 }
 @media (max-width: 1400px) {
   .zones-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
