@@ -344,6 +344,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .mail-panel { display: none; }
 .mail-panel.active { display: block; }
 .mail-fields { padding: 18px 20px; display: flex; flex-direction: column; }
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.settings-grid .mf-row { margin-bottom: 0; }
+.settings-intro { margin-bottom: 2px; font-size: 13px; color: var(--mid); line-height: 1.6; }
 .mf-row { margin-bottom: 14px; }
 .mf-row:last-child { margin-bottom: 0; }
 .mf-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); margin-bottom: 6px; }
@@ -388,6 +391,7 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 }
 @media (max-width: 560px) {
   .zones-row { grid-template-columns: 1fr; }
+  .settings-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -516,12 +520,12 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
         <div class="mail-tab-group">
           <button class="mail-tab active" onclick="switchMail(1,this)">Mail 1</button>
           <button class="mail-tab ai-tab" onclick="switchMail(4,this)">AI Instructies</button>
-          <span class="mail-tab mail-icon-tab" aria-hidden="true">
+          <button class="mail-tab mail-icon-tab" type="button" onclick="switchMail(5,this)" aria-label="Instellingen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.36.3.58.75.6 1.22V10a2 2 0 0 1 0 4h-.09c-.47.02-.92.24-1.22.6Z"></path>
             </svg>
-          </span>
+          </button>
         </div>
       </div>
 
@@ -590,6 +594,48 @@ Softora.nl | +31 6 2991 7185</textarea>
               <span class="var-tag">{{website}}</span>
               <span class="var-tag">{{datum}}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INSTELLINGEN -->
+      <div class="mail-panel" id="mail-panel-5">
+        <div class="mail-fields">
+          <div class="settings-intro">Stel hier in vanaf welk e-mailadres de coldmails worden verzonden en welke afzenderinformatie meegaat.</div>
+          <div class="settings-grid">
+            <div class="mf-row">
+              <div class="mf-label">Afzender naam</div>
+              <input class="mf-inp" type="text" id="sender-name" value="Servé Creusen">
+            </div>
+            <div class="mf-row">
+              <div class="mf-label">Afzender e-mail</div>
+              <input class="mf-inp" type="email" id="sender-email" value="info@softora.nl">
+            </div>
+            <div class="mf-row">
+              <div class="mf-label">Antwoordadres</div>
+              <input class="mf-inp" type="email" id="reply-email" value="info@softora.nl">
+            </div>
+            <div class="mf-row">
+              <div class="mf-label">Telefoonnummer</div>
+              <input class="mf-inp" type="text" id="sender-phone" value="+31 6 2991 7185">
+            </div>
+            <div class="mf-row">
+              <div class="mf-label">Bedrijfsnaam</div>
+              <input class="mf-inp" type="text" id="sender-company" value="Softora.nl">
+            </div>
+            <div class="mf-row">
+              <div class="mf-label">Domein / website</div>
+              <input class="mf-inp" type="text" id="sender-domain" value="www.softora.nl">
+            </div>
+          </div>
+          <div class="mf-row">
+            <div class="mf-label">Handtekening</div>
+            <textarea class="mf-ta" id="sender-signature" style="height:180px">Met vriendelijke groet,
+
+Servé Creusen
+Softora.nl | +31 6 2991 7185
+info@softora.nl</textarea>
+            <div class="mf-help">Deze gegevens kun je later gebruiken als vaste afzenderinformatie voor alle coldmails.</div>
           </div>
         </div>
       </div>
