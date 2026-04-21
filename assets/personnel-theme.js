@@ -514,7 +514,10 @@
         if (p.indexOf("/premium-klanten") === 0) return "customers";
         if (p.indexOf("/premium-database") === 0) return "database";
         if (p.indexOf("/premium-mailbox") === 0) return "mailbox";
-        if (p.indexOf("/premium-websitegenerator") === 0) return "websitegenerator";
+        if (p.indexOf("/premium-websitegenerator") === 0) {
+            if (hashRaw === "bibliotheek" || hashRaw === "library") return "websitegenerator_library";
+            return "websitegenerator";
+        }
         if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
         if (p.indexOf("/premium-pakketten") === 0) return "packages";
         if (p.indexOf("/premium-pdfs") === 0) return "pdfs";
@@ -559,6 +562,15 @@
             href: "/premium-websitegenerator",
             label: "Websitegenerator",
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg>',
+        };
+    }
+
+    function getWebsiteGeneratorLibrarySidebarLink() {
+        return {
+            key: "websitegenerator_library",
+            href: "/premium-websitegenerator#bibliotheek",
+            label: "Bibliotheek",
+            icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7.5" height="7.5" rx="1"></rect><rect x="13.5" y="3" width="7.5" height="7.5" rx="1"></rect><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1"></rect><rect x="3" y="13.5" width="7.5" height="7.5" rx="1"></rect></svg>',
         };
     }
 
@@ -723,6 +735,7 @@
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
             },
             getWebsitePreviewSidebarLink(),
+            getWebsiteGeneratorLibrarySidebarLink(),
             {
                 key: "seo",
                 href: "/premium-seo",
@@ -967,7 +980,7 @@
                 sidebar,
                 "beheer",
                 getCustomersSidebarLink(),
-                ["mailbox", "websitegenerator", "seo", "packages", "pdfs"]
+                ["mailbox", "websitegenerator", "websitegenerator_library", "seo", "packages", "pdfs"]
             );
         }
 
@@ -1050,6 +1063,11 @@
             pruneDeprecatedSidebarLinks(sidebar);
             decorateComingSoonSidebarLinks();
             neutralizeSidebarAnchors();
+            schedulePremiumSidebarFit(sidebar);
+            return;
+        }
+        if (path.indexOf("/premium-websitegenerator") === 0) {
+            syncStaticSidebarActiveState(sidebar, activeKey);
             schedulePremiumSidebarFit(sidebar);
         }
     }
@@ -2381,6 +2399,7 @@
     window.SoftoraPersonnelTheme.refreshSidebarAgendaCount = refreshSidebarAgendaCount;
     window.SoftoraPersonnelTheme.refreshSidebarActiveOrdersCount = refreshSidebarActiveOrdersCount;
     window.SoftoraPersonnelTheme.refreshSidebarCounts = refreshSidebarNotificationCounts;
+    window.SoftoraPersonnelTheme.refreshPremiumStaticSidebarActiveState = refreshPremiumStaticSidebarActiveState;
     window.SoftoraPersonnelTheme.refreshPremiumSession = function refreshPremiumSession() {
         return loadPremiumSession({ force: true });
     };

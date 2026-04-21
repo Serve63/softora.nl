@@ -72,6 +72,12 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
+  assert.match(themeJsSource, /key:\s*"websitegenerator_library"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-websitegenerator#bibliotheek"/);
+  assert.match(
+    themeJsSource,
+    /window\.SoftoraPersonnelTheme\.refreshPremiumStaticSidebarActiveState\s*=\s*refreshPremiumStaticSidebarActiveState/
+  );
   assert.match(themeJsSource, /persistPremiumSidebarSessionSnapshot/);
   assert.match(themeJsSource, /buildSidebarProfileRenderKey/);
   assert.match(themeJsSource, /sidebar\.dataset\.sidebarProfileRenderKey === renderKey/);

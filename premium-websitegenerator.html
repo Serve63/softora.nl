@@ -20,7 +20,7 @@
     }
   })();
 </script>
-<script src="assets/personnel-theme.js?v=20260421b" defer></script>
+<script src="assets/personnel-theme.js?v=20260422a" defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -40,7 +40,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .page-sub { font-size: 13px; color: var(--text-light); margin-bottom: 36px; }
 
 /* TABS */
-.tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 32px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: flex-end; border-bottom: 2px solid var(--border); margin-bottom: 32px; }
 .tab { font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-light); padding: 8px 22px; cursor: pointer; border: none; background: none; position: relative; transition: color .15s; }
 .tab:hover { color: var(--text-dark); }
 .tab.active { color: var(--crimson); }
@@ -502,6 +502,18 @@ function switchTab(name, el) {
   if (panel) panel.classList.add('active');
   if (tabBtn) tabBtn.classList.add('active');
   if (name === 'library') renderLibraryPanel();
+  try {
+    const base = `${window.location.pathname || '/premium-websitegenerator'}${window.location.search || ''}`;
+    if (name === 'library') {
+      if (window.location.hash !== '#bibliotheek') {
+        window.location.hash = 'bibliotheek';
+      }
+    } else if (window.location.hash) {
+      window.history.replaceState(null, '', base);
+      const refresh = window.SoftoraPersonnelTheme && window.SoftoraPersonnelTheme.refreshPremiumStaticSidebarActiveState;
+      if (typeof refresh === 'function') refresh();
+    }
+  } catch (_) {}
 }
 
 const scanHistory = [];
@@ -1245,6 +1257,25 @@ loadWebsiteGeneratorAuthState();
       applyWebsiteGeneratorAuthState();
     }
   });
+})();
+
+(function initWebsiteGeneratorLibraryHash() {
+  function applyLibraryHash() {
+    const raw = String(window.location.hash || "")
+      .replace(/^#/, "")
+      .trim()
+      .toLowerCase();
+    if (raw !== "bibliotheek" && raw !== "library") return;
+    const libBtn = document.querySelector('.tab[data-tab="library"]');
+    if (libBtn) switchTab("library", libBtn);
+    if (typeof renderLibraryPanel === "function") renderLibraryPanel();
+  }
+  window.addEventListener("hashchange", applyLibraryHash);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", applyLibraryHash);
+  } else {
+    applyLibraryHash();
+  }
 })();
 
 </script>
