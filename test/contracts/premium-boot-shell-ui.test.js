@@ -9,6 +9,7 @@ const pages = [
   'premium-personeel-agenda.html',
   'premium-ai-coldmailing.html',
   'premium-ai-lead-generator.html',
+  'premium-database.html',
   'premium-klanten.html',
   'premium-mailbox.html',
   'premium-pakketten.html',

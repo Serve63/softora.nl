@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
+    <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
+    <link rel="stylesheet" href="/assets/iphone-optimizations.css">
+    <title>Softora | Database</title>
+    <link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
+    <script>
+        (function () {
+            document.documentElement.setAttribute("data-personnel-loading", "true");
+            try {
+                document.documentElement.setAttribute("data-theme-mode", "light");
+                document.documentElement.setAttribute("data-theme", "light");
+            } catch (error) {
+                /* ignore storage errors */
+            }
+        })();
+    </script>
+    <script src="assets/personnel-theme.js?v=20260421b" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f0ede8;
+            --card: #fff;
+            --border: #e2ddd6;
+            --crimson: #9b2355;
+            --dark: #1a1a2e;
+            --mid: #666;
+            --light: #aaa;
+            --green: #16733c;
+            --red: #c0392b;
+            --orange: #b45a00;
+            --blue: #1a5f8a;
+            --purple: #6b3fa0;
+        }
+
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
+        }
+
+        body {
+            font-family: 'Barlow', sans-serif;
+            background: var(--bg);
+            color: var(--dark);
+            overflow-x: hidden;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            font: inherit;
+        }
+
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .page-shell {
+            position: relative;
+            margin-left: 280px;
+            width: calc(100% - 280px);
+            min-height: 100vh;
+        }
+
+        .page-content {
+            width: 100%;
+        }
+
+        .top {
+            padding: 32px 48px 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            gap: 16px;
+        }
+
+        .logo {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--crimson);
+            margin-bottom: 4px;
+        }
+
+        .page-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+        }
+
+        .page-sub {
+            font-size: 13px;
+            color: var(--light);
+            margin-top: 2px;
+        }
+
+        .top-right {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: var(--card);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--mid);
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+
+        .btn:hover {
+            border-color: var(--crimson);
+            color: var(--crimson);
+        }
+
+        .btn.prim {
+            background: var(--crimson);
+            border-color: var(--crimson);
+            color: #fff;
+        }
+
+        .btn.prim:hover {
+            background: #c4346a;
+            color: #fff;
+        }
+
+        .btn svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        .status-banner {
+            margin: 0 48px 14px;
+            padding: 11px 14px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            display: none;
+            font-size: 12px;
+        }
+
+        .status-banner.is-visible {
+            display: block;
+        }
+
+        .status-banner[data-tone="success"] {
+            border-color: rgba(22,115,60,.18);
+            background: rgba(22,115,60,.08);
+            color: var(--green);
+        }
+
+        .status-banner[data-tone="error"] {
+            border-color: rgba(192,57,43,.18);
+            background: rgba(192,57,43,.08);
+            color: var(--red);
+        }
+
+        .status-banner[data-tone="info"] {
+            border-color: rgba(26,95,138,.16);
+            background: rgba(26,95,138,.08);
+            color: var(--blue);
+        }
+
+        .filter-bar {
+            padding: 0 48px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .search {
+            position: relative;
+        }
+
+        .search svg {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 13px;
+            height: 13px;
+            color: var(--light);
+            pointer-events: none;
+        }
+
+        .search input,
+        .fsel,
+        .p-sel,
+        .minp,
+        .msel,
+        .p-ta {
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--dark);
+            outline: none;
+            transition: border-color .15s ease;
+        }
+
+        .search input {
+            padding: 8px 12px 8px 30px;
+            border-radius: 5px;
+            font-size: 13px;
+            width: 260px;
+        }
+
+        .search input:focus,
+        .fsel:focus,
+        .p-sel:focus,
+        .minp:focus,
+        .msel:focus,
+        .p-ta:focus {
+            border-color: var(--crimson);
+        }
+
+        .fsel,
+        .p-sel,
+        .msel {
+            padding: 8px 28px 8px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            cursor: pointer;
+        }
+
+        .status-filter {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .sf-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: var(--card);
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--light);
+            cursor: pointer;
+            transition: all .15s ease;
+            white-space: nowrap;
+        }
+
+        .sf-btn:hover {
+            border-color: var(--dark);
+            color: var(--dark);
+        }
+
+        .sf-btn.act {
+            border-color: var(--dark);
+            background: var(--dark);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .sf-btn[data-s="klant"].act { border-color: var(--green); background: rgba(22,115,60,.1); color: var(--green); }
+        .sf-btn[data-s="afspraak"].act { border-color: var(--green); background: rgba(22,115,60,.08); color: var(--green); }
+        .sf-btn[data-s="gebeld"].act { border-color: var(--orange); background: rgba(180,90,0,.08); color: var(--orange); }
+        .sf-btn[data-s="gemaild"].act { border-color: var(--crimson); background: rgba(155,35,85,.08); color: var(--crimson); }
+        .sf-btn[data-s="geblokkeerd"].act { border-color: var(--red); background: rgba(192,57,43,.08); color: var(--red); }
+        .sf-btn[data-s="buiten"].act { border-color: #999; background: rgba(0,0,0,.05); color: #555; }
+        .sf-btn[data-s="benaderbaar"].act { border-color: var(--green); background: rgba(22,115,60,.1); color: var(--green); }
+        .sf-btn[data-s="geengehoor"].act { border-color: #999; background: rgba(0,0,0,.05); color: #555; }
+
+        .f-count {
+            font-size: 12px;
+            color: var(--light);
+            margin-left: auto;
+        }
+
+        .tbl-wrap {
+            padding: 0 48px 60px;
+        }
+
+        .table-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        thead th {
+            padding: 10px 18px;
+            text-align: left;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--light);
+            border-bottom: 1px solid var(--border);
+            background: #faf9f7;
+            user-select: none;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        thead th:hover {
+            color: var(--dark);
+        }
+
+        tbody td {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            vertical-align: middle;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr {
+            cursor: pointer;
+            transition: background .1s ease;
+        }
+
+        tbody tr:hover td {
+            background: #faf9f7;
+        }
+
+        .c-naam {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .c-domain {
+            font-size: 11px;
+            color: var(--light);
+            margin-top: 1px;
+        }
+
+        .c-mid {
+            color: var(--mid);
+        }
+
+        .c-light {
+            color: var(--light);
+            font-size: 12px;
+        }
+
+        .s-wrap {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .s-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .s-label {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .s-prospect .s-dot { background: var(--blue); }
+        .s-prospect .s-label { color: var(--blue); }
+        .s-gebeld .s-dot { background: var(--orange); }
+        .s-gebeld .s-label { color: var(--orange); }
+        .s-gemaild .s-dot { background: var(--crimson); }
+        .s-gemaild .s-label { color: var(--crimson); }
+        .s-afspraak .s-dot { background: var(--green); }
+        .s-afspraak .s-label { color: var(--green); }
+        .s-klant .s-dot { background: var(--green); }
+        .s-klant .s-label { color: var(--green); font-weight: 700; }
+        .s-geblokkeerd .s-dot { background: var(--red); }
+        .s-geblokkeerd .s-label { color: var(--red); }
+        .s-buiten .s-dot { background: #bbb; }
+        .s-buiten .s-label { color: #888; }
+        .s-benaderbaar .s-dot { background: var(--green); }
+        .s-benaderbaar .s-label { color: var(--green); }
+        .s-geengehoor .s-dot { background: #aaa; }
+        .s-geengehoor .s-label { color: #888; }
+
+        .kanalen {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .k-tag {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 3px;
+        }
+
+        .k-call { background: rgba(180,90,0,.1); color: var(--orange); }
+        .k-mail { background: rgba(155,35,85,.1); color: var(--crimson); }
+        .k-off { background: rgba(0,0,0,.05); color: #bbb; text-decoration: line-through; }
+
+        .tbl-empty {
+            text-align: center;
+            padding: 60px;
+            color: var(--light);
+            font-size: 13px;
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.25);
+            z-index: 40;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s ease;
+        }
+
+        .overlay.on {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 420px;
+            background: var(--card);
+            border-left: 1px solid var(--border);
+            z-index: 41;
+            transform: translateX(100%);
+            transition: transform .24s cubic-bezier(.4,0,.2,1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel.on {
+            transform: none;
+        }
+
+        .p-head {
+            padding: 22px 24px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .p-naam {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            margin-bottom: 2px;
+        }
+
+        .p-sub {
+            font-size: 12px;
+            color: var(--light);
+        }
+
+        .p-x {
+            width: 28px;
+            height: 28px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--light);
+            transition: all .15s ease;
+            flex-shrink: 0;
+        }
+
+        .p-x:hover {
+            border-color: var(--crimson);
+            color: var(--crimson);
+        }
+
+        .p-x svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        .p-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        .p-section {
+            margin-bottom: 22px;
+        }
+
+        .p-s-title {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--light);
+            margin-bottom: 10px;
+        }
+
+        .p-apply {
+            padding: 9px 16px;
+            background: var(--crimson);
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background .15s ease;
+            white-space: nowrap;
+        }
+
+        .p-apply:hover {
+            background: #c4346a;
+        }
+
+        .p-ta {
+            width: 100%;
+            padding: 9px 12px;
+            border-radius: 5px;
+            resize: none;
+            min-height: 72px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .modal-bg {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 60;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-bg.on {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--card);
+            border-radius: 8px;
+            padding: 28px;
+            width: 420px;
+            max-width: 100%;
+        }
+
+        .modal-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            margin-bottom: 18px;
+        }
+
+        .mrow {
+            margin-bottom: 12px;
+        }
+
+        .mlabel {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--light);
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .minp,
+        .msel {
+            width: 100%;
+            padding: 9px 12px;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+
+        .mbtns {
+            display: flex;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .mbtn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border: none;
+        }
+
+        .mbtn.s {
+            background: var(--crimson);
+            color: #fff;
+        }
+
+        .mbtn.s:hover {
+            background: #c4346a;
+        }
+
+        .mbtn.c {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--mid);
+        }
+
+        .mbtn.c:hover {
+            border-color: var(--crimson);
+            color: var(--crimson);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 24px;
+            background: var(--dark);
+            color: #fff;
+            padding: 9px 14px;
+            border-radius: 5px;
+            font-size: 12px;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: all .2s ease;
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        .toast.on {
+            opacity: 1;
+            transform: none;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-layout {
+                flex-direction: column;
+            }
+
+            .page-shell {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 860px) {
+            .top,
+            .filter-bar,
+            .tbl-wrap,
+            .status-banner {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .top {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .top-right {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .f-count {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .search input {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .search {
+                width: 100%;
+            }
+
+            .table-card {
+                overflow-x: auto;
+            }
+
+            table {
+                min-width: 760px;
+            }
+
+            .panel {
+                width: min(420px, 100%);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar" data-sidebar-ready="true" data-static-sidebar="1">
+          <a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>
+          <nav class="sidebar-nav">
+            <div class="sidebar-section sidebar-flow-section">
+              <div class="sidebar-section-label">Overzicht</div>
+              <a href="/premium-personeel-dashboard" class="sidebar-link magnetic" data-sidebar-key="dashboard"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><span class="sidebar-link-text">Dashboard</span></a>
+              <a href="/premium-actieve-opdrachten" class="sidebar-link magnetic" data-sidebar-key="active_orders"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h6M9 8h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7 20h10a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="sidebar-link-text">Actieve Opdrachten</span></a>
+              <a href="/premium-personeel-agenda" class="sidebar-link magnetic" data-sidebar-key="agenda"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 2v2m8-2v2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 0 1-2-2V6a2 2 0 012-2z"></path></svg><span class="sidebar-link-text">Agenda</span></a>
+              <a href="/premium-ai-coldmailing" class="sidebar-link magnetic" data-sidebar-key="leads"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg><span class="sidebar-link-text">Leads</span><span class="sidebar-notification-badge" data-sidebar-count-key="leads" hidden>0</span></a>
+              <a href="/premium-ai-lead-generator" class="sidebar-link magnetic" data-sidebar-key="coldcalling"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 4.25h2.214c.498 0 .933.334 1.062.815l1.146 4.289a1.125 1.125 0 0 1-.418 1.171l-1.33.997a14.34 14.34 0 0 0 4.304 4.304l.997-1.33a1.125 1.125 0 0 1 1.171-.418l4.289 1.146c.481.129.815.564.815 1.062V18.5a1.75 1.75 0 0 1-1.75 1.75h-1C9.88 20.25 3.75 14.12 3.75 6.5v-.5A1.75 1.75 0 0 1 5.5 4.25Z"></path></svg><span class="sidebar-link-text">Coldcalling</span></a>
+              <a href="/premium-bevestigingsmails" class="sidebar-link magnetic" data-sidebar-key="coldmailing"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Coldmailing</span></a>
+            </div>
+            <div class="sidebar-section">
+              <div class="sidebar-section-label">Beheer</div>
+              <a href="/premium-klanten" class="sidebar-link magnetic" data-sidebar-key="customers"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span class="sidebar-link-text">Klanten</span></a>
+              <a href="/premium-database" class="sidebar-link magnetic active" data-sidebar-key="database"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5.25" rx="6.75" ry="2.25"></ellipse><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 11.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path></svg><span class="sidebar-link-text">Database</span></a>
+              <a href="/premium-mailbox" class="sidebar-link magnetic" data-sidebar-key="mailbox"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg><span class="sidebar-link-text">Mailbox</span></a>
+              <a href="/premium-websitegenerator" class="sidebar-link magnetic" data-sidebar-key="websitegenerator"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg><span class="sidebar-link-text">Websitegenerator</span></a>
+              <a href="/premium-seo" class="sidebar-link magnetic" data-sidebar-key="seo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m20 20-3.5-3.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.5 11.5l1.7 1.7L13.6 9.8"></path></svg><span class="sidebar-link-text">SEO</span></a>
+              <a href="/premium-pakketten" class="sidebar-link magnetic" data-sidebar-key="packages"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5h13.5A1.5 1.5 0 0 1 20.25 9v6a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 15V9a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12h2.25m4.5 0h2.25M9.75 9.75v4.5"></path></svg><span class="sidebar-link-text">Pakketten</span></a>
+              <a href="/premium-pdfs" class="sidebar-link magnetic" data-sidebar-key="pdfs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5h6M9 16.5h6"></path></svg><span class="sidebar-link-text">PDF'S</span></a>
+            </div>
+            <div class="sidebar-section">
+              <div class="sidebar-section-label">Advertenties</div>
+              <a href="/premium-advertenties#google" class="sidebar-link magnetic" data-sidebar-key="ads_google"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Google</span></a>
+              <a href="/premium-advertenties#facebook" class="sidebar-link magnetic" data-sidebar-key="ads_facebook"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Facebook</span></a>
+              <a href="/premium-advertenties#pinterest" class="sidebar-link magnetic" data-sidebar-key="ads_pinterest"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Pinterest</span></a>
+              <a href="/premium-advertenties#linkedin" class="sidebar-link magnetic" data-sidebar-key="ads_linkedin"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">LinkedIn</span></a>
+              <a href="/premium-advertenties#trustoo" class="sidebar-link magnetic" data-sidebar-key="ads_trustoo"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"></path></svg><span class="sidebar-link-text">Trustoo</span></a>
+            </div>
+            <div class="sidebar-section">
+              <div class="sidebar-section-label">Extra</div>
+              <a href="/premium-wachtwoordenregister" class="sidebar-link magnetic" data-sidebar-key="passwords"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 10.5h10.5A1.5 1.5 0 0 1 18.75 12v7.5A1.5 1.5 0 0 1 17.25 21H6.75A1.5 1.5 0 0 1 5.25 19.5V12a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75v1.5"></path></svg><span class="sidebar-link-text">Wachtwoordenregister</span></a>
+              <a href="/premium-vaste-lasten" class="sidebar-link magnetic" data-sidebar-key="monthly_costs"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 9h9M7.5 13h4.5"></path><circle cx="16.5" cy="13" r="1.25"></circle></svg><span class="sidebar-link-text">Terugkerende kosten</span></a>
+              <a href="/premium-boekhouding" class="sidebar-link magnetic" data-sidebar-key="bookkeeping"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="15" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9M7.5 12h9M7.5 15.75h5.25"></path></svg><span class="sidebar-link-text">Boekhouding</span></a>
+              <a href="/premium-kladblok" class="sidebar-link magnetic" data-sidebar-key="notepad"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8 13.5h4m-4 2.5h6"></path></svg><span class="sidebar-link-text">Kladblok</span></a>
+              <a href="/premium-word" class="sidebar-link magnetic" data-sidebar-key="word"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3h6L19.5 9v10.5A1.5 1.5 0 0 1 18 21H7.5A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3V9H19.5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 12.75h2.25m1.12 0h2.25m-5.62 3.75h6m-6 3h4.5"></path></svg><span class="sidebar-link-text">Word</span></a>
+              <a href="/premium-instellingen" class="sidebar-link magnetic" data-sidebar-key="settings"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg><span class="sidebar-link-text">Instellingen</span></a>
+            </div>
+          </nav>
+          <div class="sidebar-footer">
+            <div class="sidebar-user">
+              <div class="sidebar-user-trigger" role="group" aria-label="Gebruikersinfo">
+                <div class="sidebar-avatar" data-sidebar-avatar>SP</div>
+                <div class="sidebar-user-info">
+                  <div class="sidebar-user-name" data-sidebar-user-name>Softora Premium</div>
+                  <div class="sidebar-user-role" data-sidebar-user-role>Full Acces</div>
+                </div>
+              </div>
+              <a href="/premium-personeel-login?logout=1" class="logout-btn magnetic" title="Uitloggen" aria-label="Uitloggen">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+              </a>
+            </div>
+          </div>
+        </aside>
+        <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
+
+        <main class="page-shell is-premium-boot-host">
+            <div class="premium-boot-loader" id="premium-boot-loader" aria-hidden="true">
+                <div class="premium-boot-spinner" aria-hidden="true">
+                    <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
+                    <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
+                    <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
+                </div>
+            </div>
+            <div class="premium-boot-shell is-booting" aria-busy="true">
+                <div class="page-content">
+                    <div class="top">
+                        <div class="top-left">
+                            <div class="page-title">Database</div>
+                            <div class="page-sub" id="top-sub"></div>
+                        </div>
+                        <div class="top-right">
+                            <button class="btn" id="exportButton" type="button">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                CSV
+                            </button>
+                            <button class="btn prim" id="addButton" type="button">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Toevoegen
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="status-banner" id="statusBanner" aria-live="polite"></div>
+
+                    <div class="filter-bar">
+                        <div class="search">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="q" placeholder="Zoek op naam of domein…">
+                        </div>
+                        <select class="fsel" id="f-branche">
+                            <option value="">Alle branches</option>
+                            <option>Horeca & Restaurants</option>
+                            <option>Retail & Winkels</option>
+                            <option>Zakelijke Dienstverlening</option>
+                            <option>Bouw & Vastgoed</option>
+                            <option>Gezondheidszorg</option>
+                            <option>Creatieve Sector</option>
+                            <option>Tech & Startups</option>
+                            <option>Overig</option>
+                        </select>
+                        <div class="status-filter">
+                            <button class="sf-btn act" data-s="alle" type="button">Alle</button>
+                            <button class="sf-btn" data-s="benaderbaar" type="button">Benaderbaar</button>
+                            <button class="sf-btn" data-s="gebeld" type="button">Gebeld</button>
+                            <button class="sf-btn" data-s="geengehoor" type="button">Geen gehoor</button>
+                            <button class="sf-btn" data-s="gemaild" type="button">Gemaild</button>
+                            <button class="sf-btn" data-s="afspraak" type="button">Afspraak</button>
+                            <button class="sf-btn" data-s="klant" type="button">Klant</button>
+                            <button class="sf-btn" data-s="geblokkeerd" type="button">Geen interesse</button>
+                            <button class="sf-btn" data-s="buiten" type="button">Buiten gebruik</button>
+                        </div>
+                        <div class="f-count" id="f-count"></div>
+                    </div>
+
+                    <div class="tbl-wrap">
+                        <div class="table-card">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th data-sort-key="naam">Bedrijf</th>
+                                        <th data-sort-key="branche">Branche</th>
+                                        <th data-sort-key="stad">Adres</th>
+                                        <th>Gebruikte kanalen</th>
+                                        <th data-sort-key="status">Status</th>
+                                        <th data-sort-key="updatedAt">Laatste actie</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="overlay" id="ov"></div>
+    <div class="panel" id="panel" aria-hidden="true">
+        <div class="p-head">
+            <div>
+                <div class="p-naam" id="p-naam"></div>
+                <div class="p-sub" id="p-sub"></div>
+            </div>
+            <button class="p-x" id="closePanelButton" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <div class="p-body">
+            <div class="p-section">
+                <div class="p-s-title">Notitie</div>
+                <textarea class="p-ta" id="p-nota" placeholder="Bijv. contactpersoon is Jan, bel niet voor 9u…"></textarea>
+                <button class="p-apply" id="saveNoteButton" type="button" style="width:100%">Opslaan</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-bg" id="mbg">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <div class="modal-title" id="modalTitle">Bedrijf toevoegen</div>
+            <div class="mrow"><label class="mlabel" for="m-bedrijf">Bedrijfsnaam *</label><input class="minp" id="m-bedrijf" placeholder="Bakkerij De Zon"></div>
+            <div class="mrow"><label class="mlabel" for="m-contact">Contactpersoon</label><input class="minp" id="m-contact" placeholder="Jan Jansen"></div>
+            <div class="mrow"><label class="mlabel" for="m-dom">Domein</label><input class="minp" id="m-dom" placeholder="bakkerijdezon.nl"></div>
+            <div class="mrow"><label class="mlabel" for="m-tel">Telefoon</label><input class="minp" id="m-tel" placeholder="+31 6 …"></div>
+            <div class="mrow"><label class="mlabel" for="m-mail">E-mail</label><input class="minp" id="m-mail" placeholder="info@…"></div>
+            <div class="mrow"><label class="mlabel" for="m-branche">Branche</label>
+                <select class="msel" id="m-branche">
+                    <option>Horeca & Restaurants</option>
+                    <option>Retail & Winkels</option>
+                    <option>Zakelijke Dienstverlening</option>
+                    <option>Bouw & Vastgoed</option>
+                    <option>Gezondheidszorg</option>
+                    <option>Creatieve Sector</option>
+                    <option>Tech & Startups</option>
+                    <option selected>Overig</option>
+                </select>
+            </div>
+            <div class="mrow"><label class="mlabel" for="m-stad">Adres</label><input class="minp" id="m-stad" placeholder="Tilburg"></div>
+            <div class="mrow"><label class="mlabel" for="m-status">Status</label>
+                <select class="msel" id="m-status">
+                    <option value="benaderbaar">Benaderbaar</option>
+                    <option value="prospect">Prospect</option>
+                    <option value="gebeld">Gebeld</option>
+                    <option value="geengehoor">Geen gehoor</option>
+                    <option value="gemaild">Gemaild</option>
+                    <option value="afspraak">Afspraak</option>
+                    <option value="klant">Klant</option>
+                    <option value="geblokkeerd">Geen interesse</option>
+                    <option value="buiten">Buiten gebruik</option>
+                </select>
+            </div>
+            <div class="mrow"><label class="mlabel" for="m-responsible">Toegewezen aan</label>
+                <select class="msel" id="m-responsible">
+                    <option value="Serve" selected>Servé</option>
+                    <option value="Martijn">Martijn</option>
+                </select>
+            </div>
+            <div class="mbtns">
+                <button class="mbtn c" id="cancelModalButton" type="button">Annuleren</button>
+                <button class="mbtn s" id="saveModalButton" type="button">Toevoegen</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->
+    <script>
+        const CUSTOMER_DB_SCOPE = "premium_customers_database";
+        const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
+        const ORDER_SCOPE = "premium_active_orders";
+        const ORDER_KEY = "softora_custom_orders_premium_v1";
+        const DATABASE_STATUS_OPTIONS = ["prospect", "gebeld", "gemaild", "afspraak", "klant", "geblokkeerd", "buiten", "benaderbaar", "geengehoor"];
+
+        function readCustomersBootstrapPayload() {
+            const element = document.getElementById("softoraCustomersBootstrap");
+            if (!element) return { customers: [] };
+            try {
+                const parsed = JSON.parse(String(element.textContent || "{}"));
+                return parsed && typeof parsed === "object" ? parsed : { customers: [] };
+            } catch (error) {
+                return { customers: [] };
+            }
+        }
+
+        const customersBootstrapPayload = readCustomersBootstrapPayload();
+
+        const state = {
+            klanten: [],
+            orders: [],
+            query: "",
+            activeStatus: "alle",
+            activeBranch: "",
+            sortKey: "updatedAt",
+            sortAsc: false,
+            openId: null,
+            messageTimer: null
+        };
+
+        const nodes = {
+            topSub: document.getElementById("top-sub"),
+            statusBanner: document.getElementById("statusBanner"),
+            query: document.getElementById("q"),
+            branch: document.getElementById("f-branche"),
+            count: document.getElementById("f-count"),
+            tbody: document.getElementById("tbody"),
+            statusButtons: Array.from(document.querySelectorAll(".sf-btn")),
+            sortButtons: Array.from(document.querySelectorAll("[data-sort-key]")),
+            exportButton: document.getElementById("exportButton"),
+            addButton: document.getElementById("addButton"),
+            overlay: document.getElementById("ov"),
+            panel: document.getElementById("panel"),
+            closePanelButton: document.getElementById("closePanelButton"),
+            panelName: document.getElementById("p-naam"),
+            panelSub: document.getElementById("p-sub"),
+            panelNote: document.getElementById("p-nota"),
+            saveNoteButton: document.getElementById("saveNoteButton"),
+            modalBg: document.getElementById("mbg"),
+            modalTitle: document.getElementById("modalTitle"),
+            modalCompany: document.getElementById("m-bedrijf"),
+            modalContact: document.getElementById("m-contact"),
+            modalDomain: document.getElementById("m-dom"),
+            modalPhone: document.getElementById("m-tel"),
+            modalMail: document.getElementById("m-mail"),
+            modalBranch: document.getElementById("m-branche"),
+            modalCity: document.getElementById("m-stad"),
+            modalStatus: document.getElementById("m-status"),
+            fieldResponsible: document.getElementById("m-responsible"),
+            cancelModalButton: document.getElementById("cancelModalButton"),
+            saveModalButton: document.getElementById("saveModalButton"),
+            toast: document.getElementById("toast")
+        };
+
+        function normalizeString(value) {
+            return String(value || "").trim();
+        }
+
+        function normalizeSearchValue(value) {
+            return normalizeString(value).toLowerCase();
+        }
+
+        function createId() {
+            return "db-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+        }
+
+        function parseResponsibleValue(value) {
+            const normalized = normalizeString(value)
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]+/g, " ")
+                .trim();
+            if (normalized.indexOf("martijn") !== -1) return "Martijn";
+            if (normalized.indexOf("serve") !== -1) return "Serve";
+            return "";
+        }
+
+        function normalizeResponsibleValue(value) {
+            return parseResponsibleValue(value) || "Serve";
+        }
+
+        function formatResponsibleDisplayName(value) {
+            return parseResponsibleValue(value) === "Martijn" ? "Martijn" : "Servé";
+        }
+
+        function getResponsibleSourceValue(raw) {
+            if (!raw || typeof raw !== "object") return "";
+            return normalizeString(
+                raw.verantwoordelijk
+                || raw.responsible
+                || raw.claimedBy
+                || raw.leadOwnerName
+                || raw.leadOwnerFullName
+                || raw.assignedToName
+                || raw.assignedToFullName
+                || ""
+            );
+        }
+
+        function slugifyDomain(value) {
+            const normalized = normalizeString(value)
+                .toLowerCase()
+                .replace(/^https?:\/\//, "")
+                .replace(/^www\./, "")
+                .replace(/\/.*$/, "")
+                .trim();
+            if (normalized.indexOf(".") !== -1) return normalized;
+            const slug = normalizeString(value)
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "")
+                .slice(0, 18);
+            return slug ? slug + ".nl" : "onbekend.nl";
+        }
+
+        function formatCustomerServiceLabel(service) {
+            const key = normalizeString(service).toLowerCase();
+            if (key === "website") return "Website";
+            if (key === "bedrijfssoftware") return "Bedrijfssoftware";
+            if (key === "voicesoftware") return "Voicesoftware";
+            if (key === "chatbot") return "Chatbot";
+            return key ? key.charAt(0).toUpperCase() + key.slice(1) : "Website";
+        }
+
+        function normalizeHistoryItem(item) {
+            if (!item || typeof item !== "object") return null;
+            const type = normalizeDatabaseStatus(item.type || item.status || "prospect");
+            return {
+                type: type,
+                label: normalizeString(item.label || item.message || item.title) || "Bijgewerkt",
+                date: normalizeString(item.date || item.createdAt || item.updatedAt) || formatDateForStorage(new Date())
+            };
+        }
+
+        function buildFallbackHistory(status, updatedAt) {
+            const labelMap = {
+                prospect: "Toegevoegd als prospect",
+                benaderbaar: "Gemarkeerd als benaderbaar",
+                gebeld: "Gebeld",
+                geengehoor: "Geen gehoor",
+                gemaild: "Mail verstuurd",
+                afspraak: "Afspraak ingepland",
+                klant: "Geworden klant",
+                geblokkeerd: "Geen interesse aangegeven",
+                buiten: "Nummer buiten gebruik"
+            };
+            return [{
+                type: status,
+                label: labelMap[status] || "Status bijgewerkt",
+                date: updatedAt
+            }];
+        }
+
+        function formatDateForStorage(value) {
+            const date = value instanceof Date ? value : new Date(value);
+            if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
+            return date.toISOString().slice(0, 10);
+        }
+
+        function parseDateValue(value) {
+            const raw = normalizeString(value);
+            if (!raw) return 0;
+            const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? (raw + "T12:00:00") : raw;
+            const timestamp = Date.parse(normalized);
+            return Number.isFinite(timestamp) ? timestamp : 0;
+        }
+
+        function formatDisplayDate(value) {
+            const timestamp = parseDateValue(value);
+            if (!timestamp) return "-";
+            return new Intl.DateTimeFormat("nl-NL", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric"
+            }).format(new Date(timestamp));
+        }
+
+        function normalizeDatabaseStatus(value, rawCustomer) {
+            const normalized = normalizeString(value).toLowerCase();
+            if (DATABASE_STATUS_OPTIONS.indexOf(normalized) !== -1) return normalized;
+            if (normalized === "betaald") return "klant";
+            if (normalized === "open") return "benaderbaar";
+            if (normalizeString(rawCustomer && rawCustomer.actief).toLowerCase() === "nee") return "buiten";
+            return "prospect";
+        }
+
+        function createStatusTimelineLabel(status) {
+            const labelMap = {
+                prospect: "Toegevoegd als prospect",
+                benaderbaar: "Gemarkeerd als benaderbaar",
+                gebeld: "Belpoging geregistreerd",
+                geengehoor: "Geen gehoor geregistreerd",
+                gemaild: "Mailcontact geregistreerd",
+                afspraak: "Afspraak ingepland",
+                klant: "Klant geworden",
+                geblokkeerd: "Geen interesse aangegeven",
+                buiten: "Buiten gebruik gemarkeerd"
+            };
+            return labelMap[status] || "Status bijgewerkt";
+        }
+
+        function normalizeCustomer(raw, fallbackId) {
+            const bedrijf = normalizeString(raw && (raw.bedrijf || raw.company || raw.companyName)) || "Onbekend bedrijf";
+            const naam = normalizeString(raw && (raw.naam || raw.contact || raw.contactName || raw.clientName)) || bedrijf;
+            const dom = slugifyDomain(raw && (raw.dom || raw.domain || raw.website || bedrijf));
+            const email = normalizeString(raw && (raw.email || raw.contactEmail)) || ("info@" + dom);
+            const status = normalizeDatabaseStatus(raw && (raw.databaseStatus || raw.status), raw);
+            const updatedAt = normalizeString(raw && (raw.updatedAt || raw.updated || raw.datum || raw.paidAt)) || formatDateForStorage(new Date());
+            const parsedHistory = Array.isArray(raw && raw.hist)
+                ? raw.hist.map(normalizeHistoryItem).filter(Boolean)
+                : [];
+            const hist = parsedHistory.length ? parsedHistory : buildFallbackHistory(status, updatedAt);
+
+            return {
+                id: normalizeString(raw && raw.id) || fallbackId || createId(),
+                naam: naam,
+                bedrijf: bedrijf,
+                dom: dom,
+                tel: normalizeString(raw && (raw.tel || raw.telefoon || raw.contactPhone)) || "—",
+                email: email,
+                branche: normalizeString(raw && raw.branche) || "Overig",
+                stad: normalizeString(raw && (raw.stad || raw.location || raw.address)) || "Onbekend",
+                status: status,
+                call: raw && typeof raw.call === "boolean" ? raw.call : (status !== "geblokkeerd" && status !== "buiten"),
+                mail: raw && typeof raw.mail === "boolean" ? raw.mail : (status !== "geblokkeerd" && status !== "buiten"),
+                hist: hist,
+                nota: normalizeString(raw && raw.nota),
+                updatedAt: updatedAt,
+                updatedMs: parseDateValue(updatedAt),
+                verantwoordelijk: normalizeResponsibleValue(getResponsibleSourceValue(raw)),
+                website: normalizeString(raw && raw.website),
+                service: normalizeString(raw && raw.service) || "website"
+            };
+        }
+
+        function sortCustomers(list) {
+            return list.slice().sort(function (a, b) {
+                return a.bedrijf.localeCompare(b.bedrijf, "nl");
+            });
+        }
+
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function fetchUiStateGetWithFallback(scope) {
+            const encodedScope = encodeURIComponent(String(scope || ""));
+            const urls = [
+                "/api/ui-state-get?scope=" + encodedScope,
+                "/api/ui-state/" + encodedScope
+            ];
+            let lastError = null;
+
+            return urls.reduce(function (promise, url) {
+                return promise.catch(function () {
+                    return fetch(url, { method: "GET", cache: "no-store" }).then(function (response) {
+                        if (!response.ok) {
+                            throw new Error("UI-state GET mislukt (" + response.status + ")");
+                        }
+                        return response.json().catch(function () {
+                            return {};
+                        });
+                    });
+                }).catch(function (error) {
+                    lastError = error;
+                    throw error;
+                });
+            }, Promise.reject()).catch(function () {
+                throw lastError || new Error("UI-state GET mislukt");
+            });
+        }
+
+        function fetchUiStateSetWithFallback(scope, body) {
+            const encodedScope = encodeURIComponent(String(scope || ""));
+            const urls = [
+                "/api/ui-state-set?scope=" + encodedScope,
+                "/api/ui-state/" + encodedScope
+            ];
+            let lastError = null;
+
+            return urls.reduce(function (promise, url) {
+                return promise.catch(function () {
+                    return fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body || {})
+                    }).then(function (response) {
+                        if (!response.ok) {
+                            throw new Error("UI-state POST mislukt (" + response.status + ")");
+                        }
+                        return response.json().catch(function () {
+                            return {};
+                        });
+                    });
+                }).catch(function (error) {
+                    lastError = error;
+                    throw error;
+                });
+            }, Promise.reject()).catch(function () {
+                throw lastError || new Error("UI-state POST mislukt");
+            });
+        }
+
+        function parseCustomers(raw) {
+            try {
+                const parsed = JSON.parse(String(raw || "[]"));
+                if (!Array.isArray(parsed)) return [];
+                return sortCustomers(parsed.map(function (item, index) {
+                    return normalizeCustomer(item, "customer-" + index);
+                }));
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function parseOrders(raw) {
+            try {
+                const parsed = JSON.parse(String(raw || "[]"));
+                if (!Array.isArray(parsed)) return [];
+                return parsed.map(function (item) {
+                    return {
+                        id: normalizeString(item && item.id),
+                        clientName: normalizeString(item && item.clientName),
+                        companyName: normalizeString(item && item.companyName),
+                        contactName: normalizeString(item && item.contactName),
+                        contactPhone: normalizeString(item && item.contactPhone),
+                        contactEmail: normalizeString(item && item.contactEmail),
+                        location: normalizeString(item && item.location),
+                        title: normalizeString(item && item.title) || "Website opdracht",
+                        status: normalizeString(item && item.status),
+                        claimedBy: normalizeString(item && (item.claimedBy || item.leadOwnerName || item.leadOwnerFullName)),
+                        paidAt: normalizeString(item && item.paidAt),
+                        lastRunAt: normalizeString(item && item.lastRunAt)
+                    };
+                }).filter(function (item) {
+                    return item.companyName || item.clientName;
+                });
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function buildCustomerIdentityKey(raw) {
+            return [
+                normalizeSearchValue(raw && raw.bedrijf),
+                normalizeSearchValue(raw && raw.naam),
+                normalizeSearchValue(raw && (raw.tel || raw.telefoon))
+            ].join("|");
+        }
+
+        function buildDerivedCustomerSeedFromOrder(order) {
+            const explicitCompany = normalizeString(order && order.companyName);
+            const explicitContact = normalizeString(order && order.contactName);
+            const explicitPhone = normalizeString(order && order.contactPhone);
+            const legacyClientName = normalizeString(order && order.clientName);
+            const legacyLocation = normalizeString(order && order.location);
+
+            return {
+                naam: explicitContact || legacyClientName || explicitCompany || "Onbekend",
+                bedrijf: explicitCompany || legacyClientName || legacyLocation || "Onbekend bedrijf",
+                tel: explicitPhone || "—",
+                verantwoordelijk: normalizeResponsibleValue(order && order.claimedBy),
+                email: normalizeString(order && order.contactEmail),
+                stad: legacyLocation
+            };
+        }
+
+        function deriveCustomersFromOrders(orders) {
+            const seen = new Map();
+
+            orders.forEach(function (order) {
+                const seed = buildDerivedCustomerSeedFromOrder(order);
+                const key = buildCustomerIdentityKey(seed);
+                if (!key || seen.has(key)) return;
+
+                seen.set(key, normalizeCustomer({
+                    id: "seed-" + (order.id || createId()),
+                    naam: seed.naam,
+                    bedrijf: seed.bedrijf,
+                    telefoon: seed.tel,
+                    email: seed.email,
+                    stad: seed.stad,
+                    website: order.title,
+                    status: order.paidAt || normalizeString(order.status).toLowerCase() === "betaald" ? "klant" : "benaderbaar",
+                    verantwoordelijk: seed.verantwoordelijk,
+                    updatedAt: order.paidAt || order.lastRunAt || formatDateForStorage(new Date()),
+                    hist: [{
+                        type: order.paidAt ? "klant" : "benaderbaar",
+                        label: order.paidAt ? "Geimporteerd als klant vanuit opdracht" : "Geimporteerd vanuit actieve opdracht",
+                        date: order.paidAt || order.lastRunAt || formatDateForStorage(new Date())
+                    }]
+                }, "seed-" + createId()));
+            });
+
+            return sortCustomers(Array.from(seen.values()));
+        }
+
+        function mergeCustomersWithResponsible(customers, orders) {
+            if (!Array.isArray(customers) || !customers.length) return [];
+            if (!Array.isArray(orders) || !orders.length) return sortCustomers(customers);
+
+            const responsibleByCustomerKey = new Map();
+            orders.forEach(function (order) {
+                const seed = buildDerivedCustomerSeedFromOrder(order);
+                const key = buildCustomerIdentityKey(seed);
+                const responsible = parseResponsibleValue(seed.verantwoordelijk);
+                if (key && responsible && !responsibleByCustomerKey.has(key)) {
+                    responsibleByCustomerKey.set(key, responsible);
+                }
+            });
+
+            return sortCustomers(customers.map(function (customer, index) {
+                const normalizedCustomer = normalizeCustomer(customer, "customer-merge-" + index);
+                const explicitResponsible = parseResponsibleValue(getResponsibleSourceValue(customer));
+                const key = buildCustomerIdentityKey(normalizedCustomer);
+                const matchedResponsible = explicitResponsible || responsibleByCustomerKey.get(key) || normalizedCustomer.verantwoordelijk;
+                if (matchedResponsible === normalizedCustomer.verantwoordelijk) {
+                    return normalizedCustomer;
+                }
+                return { ...normalizedCustomer, verantwoordelijk: matchedResponsible };
+            }));
+        }
+
+        function resolveBootstrapCustomers() {
+            const rawCustomers = Array.isArray(customersBootstrapPayload && customersBootstrapPayload.customers)
+                ? customersBootstrapPayload.customers
+                : [];
+
+            return sortCustomers(rawCustomers.map(function (item, index) {
+                return normalizeCustomer(item, "bootstrap-" + index);
+            }));
+        }
+
+        function serializeCustomerList(customers) {
+            return JSON.stringify(sortCustomers((customers || []).map(function (item, index) {
+                return normalizeCustomer(item, "serialize-" + index);
+            })));
+        }
+
+        function customerListsDiffer(nextCustomers) {
+            return serializeCustomerList(state.klanten) !== serializeCustomerList(nextCustomers);
+        }
+
+        function persistCustomerList(customers) {
+            const normalizedCustomers = sortCustomers(customers.map(function (item, index) {
+                return normalizeCustomer(item, "persist-" + index);
+            }));
+
+            return fetchUiStateSetWithFallback(CUSTOMER_DB_SCOPE, {
+                patch: {
+                    [CUSTOMER_DB_KEY]: JSON.stringify(normalizedCustomers)
+                },
+                source: "premium-database",
+                actor: "Premium database"
+            }).then(function () {
+                return { ok: true };
+            }).catch(function (error) {
+                return { ok: false, error: error };
+            });
+        }
+
+        function setStatusMessage(message, tone, autoClear) {
+            if (state.messageTimer) {
+                clearTimeout(state.messageTimer);
+                state.messageTimer = null;
+            }
+
+            if (!message) {
+                nodes.statusBanner.textContent = "";
+                nodes.statusBanner.classList.remove("is-visible");
+                nodes.statusBanner.dataset.tone = "";
+                return;
+            }
+
+            nodes.statusBanner.textContent = String(message);
+            nodes.statusBanner.dataset.tone = tone || "info";
+            nodes.statusBanner.classList.add("is-visible");
+
+            if (autoClear) {
+                state.messageTimer = window.setTimeout(function () {
+                    setStatusMessage("");
+                }, 3200);
+            }
+        }
+
+        function toast(message) {
+            nodes.toast.textContent = String(message || "");
+            nodes.toast.classList.add("on");
+            window.clearTimeout(toast._timer);
+            toast._timer = window.setTimeout(function () {
+                nodes.toast.classList.remove("on");
+            }, 2200);
+        }
+
+        function getFilteredCustomers() {
+            const query = normalizeSearchValue(state.query);
+            return state.klanten.filter(function (customer) {
+                if (state.activeStatus !== "alle" && customer.status !== state.activeStatus) return false;
+                if (state.activeBranch && customer.branche !== state.activeBranch) return false;
+                if (!query) return true;
+
+                const haystack = [
+                    customer.bedrijf,
+                    customer.naam,
+                    customer.dom,
+                    customer.tel,
+                    customer.email,
+                    customer.stad,
+                    customer.branche,
+                    customer.status,
+                    customer.verantwoordelijk,
+                    customer.website,
+                    formatCustomerServiceLabel(customer.service)
+                ].join(" ").toLowerCase();
+
+                return haystack.indexOf(query) !== -1;
+            });
+        }
+
+        function getSortedCustomers(customers) {
+            const sorted = customers.slice();
+            sorted.sort(function (a, b) {
+                let left;
+                let right;
+
+                if (state.sortKey === "updatedAt") {
+                    left = Number(a.updatedMs || parseDateValue(a.updatedAt));
+                    right = Number(b.updatedMs || parseDateValue(b.updatedAt));
+                } else {
+                    left = normalizeSearchValue(a[state.sortKey]);
+                    right = normalizeSearchValue(b[state.sortKey]);
+                }
+
+                if (left === right) {
+                    left = normalizeSearchValue(a.bedrijf);
+                    right = normalizeSearchValue(b.bedrijf);
+                }
+
+                if (left < right) return state.sortAsc ? -1 : 1;
+                if (left > right) return state.sortAsc ? 1 : -1;
+                return 0;
+            });
+            return sorted;
+        }
+
+        function getStatusLabel(status) {
+            const labels = {
+                prospect: "Prospect",
+                gebeld: "Gebeld",
+                gemaild: "Gemaild",
+                afspraak: "Afspraak",
+                klant: "Klant",
+                geblokkeerd: "Geen interesse",
+                buiten: "Buiten gebruik",
+                benaderbaar: "Benaderbaar",
+                geengehoor: "Geen gehoor"
+            };
+            return labels[status] || "Prospect";
+        }
+
+        function renderTable() {
+            const filtered = getSortedCustomers(getFilteredCustomers());
+
+            nodes.topSub.textContent = state.klanten.length.toLocaleString("nl-NL") + " bedrijven in database";
+            nodes.count.textContent = filtered.length.toLocaleString("nl-NL") + " resultaten";
+
+            if (!filtered.length) {
+                nodes.tbody.innerHTML = "<tr><td colspan=\"6\"><div class=\"tbl-empty\">Geen bedrijven gevonden.</div></td></tr>";
+                return;
+            }
+
+            nodes.tbody.innerHTML = filtered.map(function (customer) {
+                return [
+                    "<tr data-id=\"" + escapeHtml(customer.id) + "\">",
+                        "<td><div class=\"c-naam\">" + escapeHtml(customer.bedrijf) + "</div><div class=\"c-domain\">" + escapeHtml(customer.dom) + "</div></td>",
+                        "<td><span class=\"c-mid\">" + escapeHtml(customer.branche) + "</span></td>",
+                        "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
+                        "<td><div class=\"kanalen\">",
+                            "<span class=\"k-tag " + (customer.call ? "k-call" : "k-off") + "\">Bellen</span>",
+                            "<span class=\"k-tag " + (customer.mail ? "k-mail" : "k-off") + "\">Mailen</span>",
+                        "</div></td>",
+                        "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(getStatusLabel(customer.status)) + "</div></div></td>",
+                        "<td class=\"c-light\">" + escapeHtml(formatDisplayDate(customer.updatedAt)) + "</td>",
+                    "</tr>"
+                ].join("");
+            }).join("");
+        }
+
+        function renderPage() {
+            renderTable();
+        }
+
+        function setStatus(status, button) {
+            state.activeStatus = status;
+            nodes.statusButtons.forEach(function (item) {
+                item.classList.toggle("act", item === button);
+            });
+            renderPage();
+        }
+
+        function sort(key) {
+            if (state.sortKey === key) {
+                state.sortAsc = !state.sortAsc;
+            } else {
+                state.sortKey = key;
+                state.sortAsc = key !== "updatedAt";
+            }
+            renderPage();
+        }
+
+        function openPanel(id) {
+            const customer = state.klanten.find(function (item) {
+                return item.id === id;
+            });
+            if (!customer) return;
+
+            state.openId = id;
+            nodes.panelName.textContent = customer.bedrijf;
+            nodes.panelSub.textContent = customer.dom + " · " + customer.stad;
+            nodes.panelNote.value = customer.nota || "";
+
+            nodes.overlay.classList.add("on");
+            nodes.panel.classList.add("on");
+            nodes.panel.setAttribute("aria-hidden", "false");
+        }
+
+        function closePanel() {
+            state.openId = null;
+            nodes.overlay.classList.remove("on");
+            nodes.panel.classList.remove("on");
+            nodes.panel.setAttribute("aria-hidden", "true");
+        }
+
+        function updateCurrentCustomer(mutator) {
+            const customerIndex = state.klanten.findIndex(function (item) {
+                return item.id === state.openId;
+            });
+            if (customerIndex === -1) return null;
+
+            const current = state.klanten[customerIndex];
+            const updated = normalizeCustomer(mutator(current), current.id);
+            state.klanten = state.klanten.slice();
+            state.klanten[customerIndex] = updated;
+            return updated;
+        }
+
+        function saveCurrentState(successMessage) {
+            renderPage();
+            if (state.openId) {
+                openPanel(state.openId);
+            }
+            return persistCustomerList(state.klanten).then(function (result) {
+                if (result.ok) {
+                    toast(successMessage);
+                    setStatusMessage(successMessage, "success", true);
+                    return;
+                }
+                setStatusMessage(
+                    "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
+                    "error"
+                );
+            });
+        }
+
+        function saveNota() {
+            const note = normalizeString(nodes.panelNote.value);
+            const updated = updateCurrentCustomer(function (customer) {
+                const nextHistory = customer.hist.slice();
+                nextHistory.push({
+                    type: "nota",
+                    label: "Notitie bijgewerkt",
+                    date: formatDateForStorage(new Date())
+                });
+                return {
+                    ...customer,
+                    nota: note,
+                    hist: nextHistory,
+                    updatedAt: formatDateForStorage(new Date())
+                };
+            });
+            if (!updated) return;
+            void saveCurrentState("Notitie opgeslagen");
+        }
+
+        function resetModal() {
+            nodes.modalCompany.value = "";
+            nodes.modalContact.value = "";
+            nodes.modalDomain.value = "";
+            nodes.modalPhone.value = "";
+            nodes.modalMail.value = "";
+            nodes.modalBranch.value = "Overig";
+            nodes.modalCity.value = "";
+            nodes.modalStatus.value = "benaderbaar";
+            if (nodes.fieldResponsible) nodes.fieldResponsible.value = "Serve";
+        }
+
+        function openModal() {
+            resetModal();
+            nodes.modalBg.classList.add("on");
+        }
+
+        function closeModal() {
+            nodes.modalBg.classList.remove("on");
+        }
+
+        function addCustomerFromModal() {
+            const bedrijf = normalizeString(nodes.modalCompany.value);
+            if (!bedrijf) {
+                toast("Vul een bedrijfsnaam in");
+                nodes.modalCompany.focus();
+                return;
+            }
+
+            const dom = slugifyDomain(nodes.modalDomain.value || bedrijf);
+            const customer = normalizeCustomer({
+                id: createId(),
+                naam: normalizeString(nodes.modalContact.value) || bedrijf,
+                bedrijf: bedrijf,
+                dom: dom,
+                telefoon: normalizeString(nodes.modalPhone.value) || "—",
+                email: normalizeString(nodes.modalMail.value) || ("info@" + dom),
+                branche: normalizeString(nodes.modalBranch.value) || "Overig",
+                stad: normalizeString(nodes.modalCity.value) || "Onbekend",
+                status: normalizeDatabaseStatus(nodes.modalStatus.value),
+                verantwoordelijk: nodes.fieldResponsible ? nodes.fieldResponsible.value : "Serve",
+                hist: [{
+                    type: normalizeDatabaseStatus(nodes.modalStatus.value),
+                    label: "Toegevoegd aan database",
+                    date: formatDateForStorage(new Date())
+                }],
+                updatedAt: formatDateForStorage(new Date())
+            });
+
+            state.klanten = sortCustomers([customer].concat(state.klanten));
+            renderPage();
+            closeModal();
+
+            persistCustomerList(state.klanten).then(function (result) {
+                if (result.ok) {
+                    toast("✓ " + bedrijf + " toegevoegd");
+                    setStatusMessage("Bedrijf toegevoegd.", "success", true);
+                    return;
+                }
+                setStatusMessage(
+                    "Opslaan in Supabase mislukt: " + String(result.error && result.error.message || "onbekende fout"),
+                    "error"
+                );
+            });
+        }
+
+        function exportCSV() {
+            const rows = getSortedCustomers(getFilteredCustomers());
+            const headers = ["Bedrijf", "Contact", "Domein", "Telefoon", "E-mail", "Branche", "Adres", "Status", "Toegewezen aan", "Laatste actie"];
+            const lines = rows.map(function (customer) {
+                return [
+                    customer.bedrijf,
+                    customer.naam,
+                    customer.dom,
+                    customer.tel,
+                    customer.email,
+                    customer.branche,
+                    customer.stad,
+                    getStatusLabel(customer.status),
+                    formatResponsibleDisplayName(customer.verantwoordelijk),
+                    formatDisplayDate(customer.updatedAt)
+                ].map(function (value) {
+                    return "\"" + String(value || "").replace(/"/g, "\"\"") + "\"";
+                }).join(",");
+            });
+
+            const anchor = document.createElement("a");
+            anchor.href = "data:text/csv;charset=utf-8," + encodeURIComponent([headers.join(",")].concat(lines).join("\n"));
+            anchor.download = "database.csv";
+            anchor.click();
+            toast("✓ CSV gedownload");
+        }
+
+        async function bootstrapCustomers() {
+            const hadBootstrapCustomers = state.klanten.length > 0;
+
+            if (!hadBootstrapCustomers) {
+                setStatusMessage("Database laden...", "info");
+            }
+
+            try {
+                const remoteState = await fetchUiStateGetWithFallback(CUSTOMER_DB_SCOPE);
+                const remoteCustomers = parseCustomers(remoteState && remoteState.values && remoteState.values[CUSTOMER_DB_KEY]);
+
+                if (remoteCustomers.length) {
+                    let enrichedCustomers = remoteCustomers;
+                    try {
+                        const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
+                        const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
+                        state.orders = Array.isArray(orders) ? orders : [];
+                        enrichedCustomers = mergeCustomersWithResponsible(remoteCustomers, orders);
+                    } catch (error) {
+                        console.error("Klant-verantwoordelijke uit actieve opdrachten laden mislukt:", error);
+                    }
+
+                    if (customerListsDiffer(enrichedCustomers) || !hadBootstrapCustomers) {
+                        state.klanten = enrichedCustomers;
+                        renderPage();
+                    } else {
+                        state.klanten = enrichedCustomers;
+                    }
+
+                    setStatusMessage("");
+                    return;
+                }
+            } catch (error) {
+                console.error("Klanten laden via Supabase mislukt:", error);
+            }
+
+            try {
+                const orderState = await fetchUiStateGetWithFallback(ORDER_SCOPE);
+                const orders = parseOrders(orderState && orderState.values && orderState.values[ORDER_KEY]);
+                state.orders = Array.isArray(orders) ? orders : [];
+                const importedCustomers = deriveCustomersFromOrders(orders);
+
+                if (customerListsDiffer(importedCustomers) || !hadBootstrapCustomers) {
+                    state.klanten = importedCustomers;
+                    renderPage();
+                } else {
+                    state.klanten = importedCustomers;
+                }
+
+                if (importedCustomers.length) {
+                    const persistResult = await persistCustomerList(importedCustomers);
+                    if (persistResult.ok && !hadBootstrapCustomers) {
+                        setStatusMessage("Database gevuld vanuit actieve opdrachten.", "success", true);
+                    } else if (!persistResult.ok) {
+                        setStatusMessage("Import gelukt, maar Supabase-opslag mislukte.", "error");
+                    } else {
+                        setStatusMessage("");
+                    }
+                    return;
+                }
+            } catch (error) {
+                console.error("Klanten importeren vanuit opdrachten mislukt:", error);
+            }
+
+            state.klanten = [];
+            renderPage();
+            setStatusMessage("");
+        }
+
+        const initialBootstrapCustomers = resolveBootstrapCustomers();
+        if (initialBootstrapCustomers.length) {
+            state.klanten = initialBootstrapCustomers;
+        }
+        renderPage();
+
+        nodes.query.addEventListener("input", function (event) {
+            state.query = normalizeString(event.target.value);
+            renderPage();
+        });
+
+        nodes.branch.addEventListener("change", function (event) {
+            state.activeBranch = normalizeString(event.target.value);
+            renderPage();
+        });
+
+        nodes.statusButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                setStatus(button.dataset.s || "alle", button);
+            });
+        });
+
+        nodes.sortButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                sort(button.dataset.sortKey);
+            });
+        });
+
+        nodes.tbody.addEventListener("click", function (event) {
+            const row = event.target.closest("tr[data-id]");
+            if (!row) return;
+            openPanel(row.getAttribute("data-id"));
+        });
+
+        nodes.overlay.addEventListener("click", closePanel);
+        nodes.closePanelButton.addEventListener("click", closePanel);
+        nodes.saveNoteButton.addEventListener("click", saveNota);
+        nodes.addButton.addEventListener("click", openModal);
+        nodes.cancelModalButton.addEventListener("click", closeModal);
+        nodes.saveModalButton.addEventListener("click", addCustomerFromModal);
+        nodes.modalBg.addEventListener("click", function (event) {
+            if (event.target === nodes.modalBg) {
+                closeModal();
+            }
+        });
+        nodes.exportButton.addEventListener("click", exportCSV);
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                if (nodes.modalBg.classList.contains("on")) {
+                    closeModal();
+                    return;
+                }
+                if (nodes.panel.classList.contains("on")) {
+                    closePanel();
+                }
+            }
+        });
+
+        void (async function () {
+            try {
+                await bootstrapCustomers();
+            } finally {
+                if (window.SoftoraPremiumBoot && typeof window.SoftoraPremiumBoot.setShellBooting === "function") {
+                    window.SoftoraPremiumBoot.setShellBooting(false);
+                }
+            }
+        })();
+    </script>
+</body>
+</html>

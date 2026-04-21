@@ -8,6 +8,8 @@ test('premium customers page bootstraps customer rows before async sync runs', (
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->/);
+  assert.match(pageSource, /function formatCustomerServiceLabel\(service\)/);
+  assert.match(pageSource, /<option value="website">Website<\/option>/);
   assert.match(pageSource, /function readCustomersBootstrapPayload\(\)/);
   assert.match(pageSource, /document\.getElementById\("softoraCustomersBootstrap"\)/);
   assert.match(pageSource, /function resolveBootstrapCustomers\(\)/);
@@ -17,33 +19,44 @@ test('premium customers page bootstraps customer rows before async sync runs', (
   );
   assert.match(pageSource, /const hadBootstrapCustomers = state\.klanten\.length > 0;/);
   assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
-  assert.match(pageSource, /function deriveCustomersFromOrders\(orders\)/);
 });
 
-test('premium customers page renders the new database UI while preserving persistence hooks', () => {
+test('premium customers page supports toegewezen aan in table, modal and order import', () => {
   const pagePath = path.join(__dirname, '../../premium-klanten.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /<title>Softora \| Database<\/title>/);
-  assert.match(pageSource, /<div class="page-title">Database<\/div>/);
-  assert.match(pageSource, /<button class="btn prim" id="addButton" type="button">[\s\S]*Toevoegen/);
-  assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
-  assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);
-  assert.match(pageSource, /<textarea class="p-ta" id="p-nota"/);
-  assert.doesNotMatch(pageSource, /<div class="p-s-title">Gegevens<\/div>/);
-  assert.doesNotMatch(pageSource, /<div class="p-s-title">Status wijzigen<\/div>/);
-  assert.doesNotMatch(pageSource, /<div class="p-s-title">Tijdlijn<\/div>/);
-  assert.match(pageSource, /<select class="msel" id="m-responsible">[\s\S]*Servé[\s\S]*Martijn/);
+  assert.match(pageSource, /<th>Toegewezen aan<\/th>/);
+  assert.match(pageSource, /<th>Review\?<\/th>\s*<th>Betaaldatum<\/th>/);
+  assert.match(pageSource, /<label class="form-label" for="fieldResponsible">Toegewezen aan<\/label>/);
+  assert.match(pageSource, /<select class="form-select" id="fieldResponsible" name="verantwoordelijk" required>/);
+  assert.match(pageSource, /<option value="Serve" selected>Servé<\/option>/);
+  assert.match(pageSource, /<option value="Martijn">Martijn<\/option>/);
+  assert.match(pageSource, /fieldResponsible: document\.getElementById\("fieldResponsible"\),/);
   assert.match(pageSource, /function parseResponsibleValue\(value\)/);
   assert.match(pageSource, /function normalizeResponsibleValue\(value\)/);
   assert.match(pageSource, /function formatResponsibleDisplayName\(value\)/);
   assert.match(pageSource, /function getResponsibleSourceValue\(raw\)/);
-  assert.match(pageSource, /function openPanel\(id\)/);
-  assert.match(pageSource, /function saveNota\(\)/);
-  assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
-  assert.match(pageSource, /function addCustomerFromModal\(\)/);
-  assert.match(pageSource, /function exportCSV\(\)/);
-  assert.match(pageSource, /fetchUiStateSetWithFallback\(CUSTOMER_DB_SCOPE/);
-  assert.match(pageSource, /source: "premium-klanten"/);
-  assert.match(pageSource, /actor: "Premium klanten database"/);
+  assert.match(pageSource, /claimedBy: normalizeString\(item && \(item\.claimedBy \|\| item\.leadOwnerName \|\| item\.leadOwnerFullName\)\),/);
+  assert.match(pageSource, /customer\.verantwoordelijk,/);
+  assert.match(pageSource, /if \(nodes\.fieldResponsible\) nodes\.fieldResponsible\.value = "Serve";/);
+  assert.match(pageSource, /if \(nodes\.fieldResponsible\) nodes\.fieldResponsible\.value = customer\.verantwoordelijk \|\| "Serve";/);
+  assert.match(pageSource, /verantwoordelijk: nodes\.fieldResponsible \? nodes\.fieldResponsible\.value : "Serve",/);
+  assert.match(pageSource, /function mergeCustomersWithResponsible\(customers, orders\)/);
+  assert.match(pageSource, /<section class="hero">[\s\S]*<div class="hero-copy">[\s\S]*<div class="hero-side">[\s\S]*<div class="leaderboard-card" id="leaderboardCard">/);
+  assert.doesNotMatch(pageSource, /Meeste opdrachten/);
+  assert.match(
+    pageSource,
+    /<div class="leaderboard-copy">\s*<div class="leaderboard-list" id="leaderboardList">[\s\S]*Servé[\s\S]*0 opdrachten[\s\S]*Martijn[\s\S]*0 opdrachten/
+  );
+  assert.match(pageSource, /leaderboardCard: document\.getElementById\("leaderboardCard"\),/);
+  assert.match(pageSource, /leaderboardList: document\.getElementById\("leaderboardList"\),/);
+  assert.match(pageSource, /function updateLeaderboard\(\)/);
+  assert.match(pageSource, /const counts = state\.klanten\.reduce\(function \(result, customer\)/);
+  assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Serve"\)/);
+  assert.match(pageSource, /displayName: formatResponsibleDisplayName\("Martijn"\)/);
+  assert.match(pageSource, /nodes\.leaderboardList\.innerHTML = entries\.map\(function \(entry, index\) \{/);
+  assert.match(pageSource, /const rowClassName = index === 0 \? "leaderboard-entry is-leading" : "leaderboard-entry";/);
+  assert.match(pageSource, /escapeHtml\(entry\.displayName\)/);
+  assert.match(pageSource, /escapeHtml\(entry\.count \+ " " \+ assignmentLabel\)/);
+  assert.match(pageSource, /function updateStats\(\) \{[\s\S]*updateLeaderboard\(\);[\s\S]*\}/);
 });

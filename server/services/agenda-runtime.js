@@ -477,7 +477,7 @@ function createAgendaRuntime(deps = {}) {
       };
     }
 
-    if (fileName === 'premium-klanten.html') {
+    if (fileName === 'premium-klanten.html' || fileName === 'premium-database.html') {
       return {
         marker: 'SOFTORA_CUSTOMERS_BOOTSTRAP',
         scriptId: 'softoraCustomersBootstrap',

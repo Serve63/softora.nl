@@ -49,6 +49,7 @@ const premiumSidebarThemeVersionTargets = [
   'premium-ai-lead-generator.html',
   'premium-bevestigingsmails.html',
   'premium-boekhouding.html',
+  'premium-database.html',
   'premium-instellingen-personeel.html',
   'premium-instellingen.html',
   'premium-kladblok.html',

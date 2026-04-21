@@ -27,6 +27,7 @@ const canonicalPages = [
 
 const customLayoutPages = [
   'premium-analytics.html',
+  'premium-database.html',
   'premium-instellingen-personeel.html',
   'premium-klanten.html',
   'premium-mailbox.html',
@@ -39,6 +40,7 @@ const customLayoutPages = [
 const staticSidebarPages = [
   ...canonicalPages,
   'premium-analytics.html',
+  'premium-database.html',
   'premium-instellingen-personeel.html',
   'premium-klanten.html',
   'premium-mailbox.html',
@@ -116,24 +118,24 @@ test('static premium sidebars ship the websitegenerator link in html', () => {
   }
 });
 
+test('static premium sidebars ship the klanten link in html', () => {
+  for (const relativePath of staticSidebarPages) {
+    const pageSource = readRepoFile(relativePath);
+    assert.match(
+      pageSource,
+      /href="\/premium-klanten"[\s\S]*<span class="sidebar-link-text">Klanten<\/span>/,
+      `${relativePath} hoort Klanten direct in de sidebar html te hebben`
+    );
+  }
+});
+
 test('static premium sidebars ship the database link in html', () => {
   for (const relativePath of staticSidebarPages) {
     const pageSource = readRepoFile(relativePath);
     assert.match(
       pageSource,
-      /<span class="sidebar-link-text">Database<\/span>/,
+      /href="\/premium-database"[\s\S]*<span class="sidebar-link-text">Database<\/span>/,
       `${relativePath} hoort Database direct in de sidebar html te hebben`
-    );
-  }
-});
-
-test('static premium sidebars no longer duplicate the old klanten link', () => {
-  for (const relativePath of staticSidebarPages) {
-    const pageSource = readRepoFile(relativePath);
-    assert.doesNotMatch(
-      pageSource,
-      /<span class="sidebar-link-text">Klanten<\/span>/,
-      `${relativePath} hoort geen losse Klanten-link meer naast Database te hebben`
     );
   }
 });

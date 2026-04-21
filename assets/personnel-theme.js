@@ -511,6 +511,7 @@
         if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldcalling";
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
+        if (p.indexOf("/premium-database") === 0) return "database";
         if (p.indexOf("/premium-mailbox") === 0) return "mailbox";
         if (p.indexOf("/premium-websitegenerator") === 0) return "websitegenerator";
         if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
@@ -542,6 +543,15 @@
         return `<a href="${link.href}" class="${classes}" data-sidebar-key="${link.key}">${link.icon}${labelHtml}${countBadgeHtml}</a>`;
     }
 
+    function getCustomersSidebarLink() {
+        return {
+            key: "customers",
+            href: "/premium-klanten",
+            label: "Klanten",
+            icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>',
+        };
+    }
+
     function getWebsitePreviewSidebarLink() {
         return {
             key: "websitegenerator",
@@ -553,8 +563,8 @@
 
     function getDatabaseSidebarLink() {
         return {
-            key: "customers",
-            href: "/premium-klanten",
+            key: "database",
+            href: "/premium-database",
             label: "Database",
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5.25" rx="6.75" ry="2.25"></ellipse><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 11.25v6c0 1.243 3.022 2.25 6.75 2.25s6.75-1.007 6.75-2.25v-6"></path></svg>',
         };
@@ -674,6 +684,7 @@
         ];
 
         const managementLinks = [
+            getCustomersSidebarLink(),
             getDatabaseSidebarLink(),
             {
                 key: "mailbox",
@@ -843,6 +854,17 @@
         return nextLink;
     }
 
+    function resetStaticSidebarLink(linkEl, link) {
+        if (!linkEl || !link || !link.key) return null;
+        linkEl.classList.add("sidebar-link", "magnetic");
+        linkEl.setAttribute("data-sidebar-key", link.key);
+        linkEl.setAttribute("href", link.href);
+        linkEl.innerHTML = `${link.icon}<span class="sidebar-link-text">${link.label}</span>`;
+        linkEl.removeAttribute("data-sidebar-nav-init");
+        linkEl.removeAttribute("data-sidebar-href");
+        return linkEl;
+    }
+
     function removeSidebarLinkByKey(sidebar, key) {
         if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
         sidebar.querySelectorAll(`[data-sidebar-key="${String(key || "").trim()}"]`).forEach(function (link) {
@@ -850,6 +872,50 @@
                 link.parentNode.removeChild(link);
             }
         });
+    }
+
+    function syncPremiumSidebarManagementLinks(sidebar, activeKey) {
+        if (!sidebar || typeof sidebar.querySelectorAll !== "function") return;
+        const sections = Array.from(sidebar.querySelectorAll(".sidebar-section"));
+        const managementSection = sections.find(function (section) {
+            const label = section.querySelector(".sidebar-section-label");
+            return String(label && label.textContent || "").trim().toLowerCase() === "beheer";
+        });
+        if (!managementSection) return;
+
+        const legacyDatabaseLink = managementSection.querySelector('[data-sidebar-key="customers"]');
+        if (
+            legacyDatabaseLink &&
+            String(legacyDatabaseLink.textContent || "").trim().toLowerCase() === "database"
+        ) {
+            resetStaticSidebarLink(legacyDatabaseLink, getDatabaseSidebarLink());
+        }
+
+        const customerLink = managementSection.querySelector('[data-sidebar-key="customers"]');
+        if (customerLink) {
+            resetStaticSidebarLink(customerLink, getCustomersSidebarLink());
+        }
+
+        ensureStaticSidebarLink(
+            sidebar,
+            "beheer",
+            getCustomersSidebarLink(),
+            ["database", "mailbox", "websitegenerator", "seo", "packages", "pdfs"]
+        );
+
+        const databaseLink = managementSection.querySelector('[data-sidebar-key="database"]');
+        if (databaseLink) {
+            resetStaticSidebarLink(databaseLink, getDatabaseSidebarLink());
+        }
+
+        ensureStaticSidebarLink(
+            sidebar,
+            "beheer",
+            getDatabaseSidebarLink(),
+            ["mailbox", "websitegenerator", "seo", "packages", "pdfs"]
+        );
+
+        syncStaticSidebarActiveState(sidebar, activeKey);
     }
 
     function syncStaticSidebarActiveState(sidebar, activeKey) {
@@ -891,6 +957,7 @@
         const path = String(window.location.pathname || "").toLowerCase();
         const activeKey = getSidebarActiveKey(path);
         if (sidebar.dataset.staticSidebar === "1") {
+            syncPremiumSidebarManagementLinks(sidebar, activeKey);
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
             decorateComingSoonSidebarLinks();
             neutralizeSidebarAnchors();
@@ -898,6 +965,7 @@
         }
         if (path.indexOf("/premium-advertenties") === 0) {
             sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
+            syncPremiumSidebarManagementLinks(sidebar, activeKey);
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
             decorateComingSoonSidebarLinks();
@@ -911,6 +979,7 @@
         if (!sidebar) return;
         const activeKey = getSidebarActiveKey(pathname);
         if (sidebar.dataset.staticSidebar === "1") {
+            syncPremiumSidebarManagementLinks(sidebar, activeKey);
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
             decorateComingSoonSidebarLinks();
@@ -921,6 +990,7 @@
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
         // Alleen legacy/lege sidebars nog opbouwen; statische sidebars blijven onaangeroerd.
         sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
+        syncPremiumSidebarManagementLinks(sidebar, activeKey);
         syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
         pruneDeprecatedSidebarLinks(sidebar);
         decorateComingSoonSidebarLinks();
@@ -1118,6 +1188,7 @@
         const activeKey = getSidebarActiveKey(pathname);
 
         if (sidebar) {
+            syncPremiumSidebarManagementLinks(sidebar, activeKey);
             syncPremiumSidebarAdminLinks(
                 sidebar,
                 session && session.authenticated ? session : null,
