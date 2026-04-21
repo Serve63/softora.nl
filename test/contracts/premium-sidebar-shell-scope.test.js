@@ -126,3 +126,14 @@ test('static premium sidebars ship the database link in html', () => {
     );
   }
 });
+
+test('static premium sidebars no longer duplicate the old klanten link', () => {
+  for (const relativePath of staticSidebarPages) {
+    const pageSource = readRepoFile(relativePath);
+    assert.doesNotMatch(
+      pageSource,
+      /<span class="sidebar-link-text">Klanten<\/span>/,
+      `${relativePath} hoort geen losse Klanten-link meer naast Database te hebben`
+    );
+  }
+});
