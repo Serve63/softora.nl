@@ -29,6 +29,7 @@ function createWebsiteGenerationHelpers(deps = {}) {
       'Generate exactly 1 fully new ultra-premium redesign as a full-page desktop website screenshot from header to footer in a single image.',
       'Create a clearly different layout and art direction from the current site, but preserve the same core brand colors, accent usage, contrast relationships, and overall visual atmosphere.',
       'Do not invent a new color palette. The detected brand colors below should remain dominant throughout the redesign.',
+      'The homepage must fill the frame edge-to-edge with no empty white gutter, no unused side canvas, and no blank margin on the right side.',
       'This must look like a finished modern website homepage, not a wireframe, not a device mockup, not a browser window, and not a collage.',
       'Be pixel-perfect in spacing, typography, hierarchy, whitespace, depth, polish, and premium visual detail.',
       'Show a strong hero, clean navigation, clear CTA buttons, supporting content sections, trust signals, refined spacing, and polished typography.',

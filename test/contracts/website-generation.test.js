@@ -49,6 +49,7 @@ test('website generation helpers build preview prompt, brief and filename from s
   assert.match(prompt, /Brand or domain: softora\.nl\./);
   assert.match(prompt, /preserve the same core brand colors, accent usage, contrast relationships/i);
   assert.match(prompt, /Do not invent a new color palette/i);
+  assert.match(prompt, /fill the frame edge-to-edge with no empty white gutter/i);
   assert.match(prompt, /Primary heading on current site: Meer klanten met een premium site\./);
   assert.match(prompt, /Detected brand color variables: accent: #8b2252 \| accent-light: #a62d65\./);
   assert.match(prompt, /Detected recurring brand colors: #8b2252 \| #a62d65 \| #f8f7f4 \| #1a1a2e\./);

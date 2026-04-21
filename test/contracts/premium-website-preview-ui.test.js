@@ -55,3 +55,14 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /Log eerst in om websitelinks aan te maken\./);
   assert.match(source, /const errorParts = \[data\?\.detail, data\?\.upstreamDetail\]/);
 });
+
+test('premium websitegenerator trimt lege witte randen uit gegenereerde previews', () => {
+  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /async function trimPreviewImageDataUrl\(dataUrl\)/);
+  assert.match(source, /isPreviewWhitespaceColumn/);
+  assert.match(source, /isPreviewWhitespaceRow/);
+  assert.match(source, /window\._lastPreviewImageDataUrl = normalizedImageDataUrl/);
+  assert.match(source, /await trimPreviewImageDataUrl\(imageDataUrl\)\.catch\(\(\) => imageDataUrl\)/);
+});
