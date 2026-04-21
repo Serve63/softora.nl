@@ -52,6 +52,15 @@ test('premium websitegenerator shows no recent scans section anymore', () => {
   assert.doesNotMatch(source, /const scanHistory = \[\];/);
 });
 
+test('premium websitegenerator removes the legacy openen button but keeps download actions', () => {
+  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.doesNotMatch(source, />Openen</);
+  assert.match(source, /Download PNG/);
+  assert.match(source, /class="library-card"[\s\S]*onclick="openLibraryEntry\(/);
+});
+
 test('premium websitegenerator toont een login-fallback voor protected acties', () => {
   const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
   const source = fs.readFileSync(filePath, 'utf8');

@@ -176,6 +176,13 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.library-card:hover {
+  border-color: rgba(155,35,85,.28);
+  box-shadow: 0 10px 24px rgba(26,26,46,.08);
+  transform: translateY(-1px);
 }
 .library-thumb-wrap {
   aspect-ratio: 2 / 3;
@@ -496,7 +503,7 @@ function renderLibraryPanel() {
       ? `<img src="${thumbSrc}" alt="" loading="lazy" width="200" height="300" />`
       : '<span style="font-size:11px;color:#9aa3b5;padding:12px;text-align:center">Geen geldige afbeelding</span>';
     return `
-      <div class="library-card" data-library-id="${escapeHtml(entry.id)}">
+      <div class="library-card" data-library-id="${escapeHtml(entry.id)}" role="button" tabindex="0" onclick="openLibraryEntry(${idJson})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLibraryEntry(${idJson});}">
         <div class="library-thumb-wrap">
           ${thumbInner}
         </div>
@@ -504,7 +511,6 @@ function renderLibraryPanel() {
           <div class="library-card-host" title="${host}">${host}</div>
           <div class="library-card-date">${escapeHtml(when)}</div>
           <div class="library-card-actions">
-            <button type="button" class="btn" style="padding:6px 12px;font-size:10px" onclick="openLibraryEntry(${idJson})">Openen</button>
             <button type="button" class="btn outline" style="padding:6px 12px;font-size:10px" onclick="removeLibraryEntry(${idJson}, event)">Verwijderen</button>
           </div>
         </div>
