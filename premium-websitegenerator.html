@@ -94,6 +94,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .preview-zone { margin-top: 24px; }
 .preview-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-light); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
 .preview-actions { display: flex; gap: 8px; }
+.preview-media { display: block; width: 100%; }
 
 /* BROWSER FRAME */
 .browser-frame { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,.1); }
@@ -681,9 +682,7 @@ async function showPreview(result, url, hostname) {
   const previewWidth = Number(croppedPreview?.width || WEBSITE_PREVIEW_IMAGE_WIDTH);
   const previewHeight = Number(croppedPreview?.height || WEBSITE_PREVIEW_IMAGE_HEIGHT);
   const previewDataUrl = String(croppedPreview?.dataUrl || imageDataUrl);
-  const scaleX = Math.min((window.innerWidth - 100) / previewWidth, 0.78);
-  const frameW = Math.round(previewWidth * scaleX);
-  const frameH = Math.round(previewHeight * scaleX);
+  const frameW = Math.min(window.innerWidth - 100, previewWidth);
   document.getElementById('scan-output').innerHTML = `
     <div class="preview-zone">
       <div class="preview-label">
@@ -699,14 +698,8 @@ async function showPreview(result, url, hostname) {
           </button>
         </div>
       </div>
-      <div class="browser-frame" style="width:${frameW}px;max-width:100%;">
-        <div class="browser-bar">
-          <div class="browser-dots"><div class="bdot bdot-r"></div><div class="bdot bdot-y"></div><div class="bdot bdot-g"></div></div>
-          <div class="browser-url">${url}</div>
-        </div>
-        <div class="scale-wrap" style="width:${frameW}px;height:${frameH}px">
-          <img id="preview-image" alt="Website preview ${hostname}" style="width:${previewWidth}px;height:${previewHeight}px;transform-origin:top left;transform:scale(${scaleX});display:block;" />
-        </div>
+      <div class="preview-media" style="max-width:${frameW}px;">
+        <img id="preview-image" alt="Website preview ${hostname}" style="width:100%;height:auto;display:block;" />
       </div>
     </div>`;
   document.getElementById('preview-image').src = previewDataUrl;
