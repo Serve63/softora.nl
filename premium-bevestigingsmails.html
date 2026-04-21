@@ -340,6 +340,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .mail-tab.active { background: rgba(155,35,85,.08); border-color: rgba(155,35,85,.24); color: var(--crimson); }
 .mail-tab.ai-tab.active { background: rgba(155,35,85,.08); border-color: rgba(155,35,85,.24); color: var(--crimson); }
 .mail-tab.ai-tab { color: var(--crimson); border-color: rgba(155,35,85,.3); }
+.mail-tab-group { display:flex; gap:6px; align-items:center; }
+.mail-icon-tab { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--crimson); border-color: rgba(155,35,85,.3); }
+.mail-icon-tab svg { width: 14px; height: 14px; }
 .mail-panel { display: none; }
 .mail-panel.active { display: block; }
 .mail-fields { padding: 18px 20px; display: flex; flex-direction: column; }
@@ -512,9 +515,15 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
     <div class="card">
       <div class="card-head">
         <div class="card-title">Mail inhoud & AI instructies</div>
-        <div style="display:flex;gap:6px">
+        <div class="mail-tab-group">
           <button class="mail-tab active" onclick="switchMail(1,this)">Mail 1</button>
           <button class="mail-tab ai-tab" onclick="switchMail(4,this)">AI Instructies</button>
+          <span class="mail-tab mail-icon-tab" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.36.3.58.75.6 1.22V10a2 2 0 0 1 0 4h-.09c-.47.02-.92.24-1.22.6Z"></path>
+            </svg>
+          </span>
         </div>
       </div>
 
