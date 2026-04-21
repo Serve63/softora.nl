@@ -7,6 +7,16 @@
 <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Cold Mailing – Softora.nl</title>
+<script>
+(function () {
+  try {
+    var path = (window.location.pathname || '').split('?')[0].replace(/\/+$/, '') || '/';
+    if (path !== '/premium-ai-lead-generator') return;
+    var titleEl = document.querySelector('title');
+    if (titleEl) titleEl.textContent = 'Coldcalling – Softora.nl';
+  } catch (e) {}
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
@@ -755,6 +765,20 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
     <div class="topbar-left">
     <h1>Coldmailing</h1>
     <p>Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.</p>
+    <script>
+    (function () {
+      try {
+        var path = (window.location.pathname || '').split('?')[0].replace(/\/+$/, '') || '/';
+        if (path !== '/premium-ai-lead-generator') return;
+        var h1 = document.querySelector('#screen-dashboard .topbar-left h1');
+        var intro = document.querySelector('#screen-dashboard .topbar-left p');
+        if (h1) h1.textContent = 'Coldcalling';
+        if (intro) {
+          intro.innerHTML = 'Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.';
+        }
+      } catch (e) {}
+    })();
+    </script>
     </div>
     <div class="topbar-right">
       <div class="topbar-note">
@@ -1043,8 +1067,18 @@ info@softora.nl</textarea>
       <div class="campaign-header-left">
         <button class="campaign-back" type="button" onclick="returnToDashboard()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
-          Terug naar coldmailing
+          <span data-coldmailing-lead-alias-label="1">Terug naar coldmailing</span>
         </button>
+        <script>
+        (function () {
+          try {
+            var path = (window.location.pathname || '').split('?')[0].replace(/\/+$/, '') || '/';
+            if (path !== '/premium-ai-lead-generator') return;
+            var label = document.querySelector('[data-coldmailing-lead-alias-label="1"]');
+            if (label) label.textContent = 'Terug naar coldcalling';
+          } catch (e) {}
+        })();
+        </script>
         <h2>Campagne tijdlijn</h2>
         <p id="campaign-subtitle">100 bedrijven doorlopen deze campagne in 14 dagen, van eerste verzending tot laatste checkpoint.</p>
       </div>
