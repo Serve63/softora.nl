@@ -107,6 +107,7 @@ function createAiToolsCoordinator(deps = {}) {
     } catch (error) {
       const status = Number(error?.status) || 500;
       const safeStatus = status >= 400 && status < 600 ? status : 500;
+      const baseDetail = normalizeString(error?.message || 'Onbekende fout');
       const upstreamDetail = truncateText(
         normalizeString(
           error?.data?.error?.message ||
@@ -117,6 +118,12 @@ function createAiToolsCoordinator(deps = {}) {
         ),
         500
       );
+      const detail = truncateText(
+        upstreamDetail && !baseDetail.includes(upstreamDetail)
+          ? `${baseDetail}: ${upstreamDetail}`
+          : baseDetail,
+        500
+      );
 
       return res.status(safeStatus).json({
         ok: false,
@@ -124,7 +131,7 @@ function createAiToolsCoordinator(deps = {}) {
           safeStatus === 503
             ? 'Websitegenerator AI niet beschikbaar'
             : 'Websitegenerator genereren mislukt',
-        detail: String(error?.message || 'Onbekende fout'),
+        detail,
         openAiEnabled: Boolean(getOpenAiApiKey()),
         imageModel: openAiImageModel,
         upstreamDetail: upstreamDetail || null,

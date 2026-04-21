@@ -53,4 +53,5 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /Log in met je premium account om scans te genereren en websitelinks te publiceren\./);
   assert.match(source, /Log eerst in om AI previews te genereren\./);
   assert.match(source, /Log eerst in om websitelinks aan te maken\./);
+  assert.match(source, /const errorParts = \[data\?\.detail, data\?\.upstreamDetail\]/);
 });

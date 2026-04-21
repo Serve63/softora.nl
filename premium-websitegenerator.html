@@ -441,7 +441,12 @@ async function callAI(url, hostname) {
         throw new Error('Log eerst in om AI previews te genereren.');
       }
       if (!response.ok || !data || data.ok === false) {
-        lastError = String(data?.detail || data?.error || `API fout: ${response.status}`);
+        const errorParts = [data?.detail, data?.upstreamDetail]
+          .map((value) => String(value || '').trim())
+          .filter(Boolean);
+        lastError = String(
+          errorParts.join(' — ') || data?.error || `API fout: ${response.status}`
+        );
         continue;
       }
       return data;

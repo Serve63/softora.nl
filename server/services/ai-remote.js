@@ -268,6 +268,15 @@ function createAiRemoteService(deps = {}) {
     return palette.slice(0, 6);
   }
 
+  function isSupportedOpenAiImageModel(modelRaw) {
+    const model = normalizeString(modelRaw || '').toLowerCase();
+    return /^gpt-image-(?:1(?:\.5)?|1-mini)$/.test(model) || /^dall-e-[23]$/.test(model);
+  }
+
+  function isGptImageGenerationModel(modelRaw) {
+    return /^gpt-image-/i.test(normalizeString(modelRaw || ''));
+  }
+
   async function fetchWebsitePreviewCssSources(htmlRaw, pageUrlRaw) {
     const inlineCssSources = extractInlineStyleBlocksFromHtml(htmlRaw);
     const stylesheetUrls = extractStylesheetUrlsFromHtml(htmlRaw, pageUrlRaw);
@@ -309,6 +318,29 @@ function createAiRemoteService(deps = {}) {
     }
 
     const prompt = buildWebsitePreviewPromptFromScan(scan);
+    const imageModel = normalizeString(openAiImageModel || env.OPENAI_IMAGE_MODEL || env.WEBSITE_PREVIEW_IMAGE_MODEL || 'gpt-image-1');
+    if (!isSupportedOpenAiImageModel(imageModel)) {
+      const err = new Error(`OpenAI image-model ongeldig geconfigureerd (${imageModel || 'leeg'})`);
+      err.status = 500;
+      err.data = {
+        error: {
+          detail:
+            'OPENAI_IMAGE_MODEL moet een ondersteund image-model zijn, bijvoorbeeld gpt-image-1, gpt-image-1.5 of gpt-image-1-mini.',
+        },
+      };
+      throw err;
+    }
+
+    const requestBody = {
+      model: imageModel,
+      prompt,
+      size: '1536x1024',
+      quality: 'high',
+    };
+    if (!isGptImageGenerationModel(imageModel)) {
+      requestBody.response_format = 'b64_json';
+    }
+
     const { response, data } = await fetchJsonWithTimeout(
       `${openAiApiBaseUrl}/images/generations`,
       {
@@ -317,13 +349,7 @@ function createAiRemoteService(deps = {}) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model: openAiImageModel,
-          prompt,
-          size: '1536x1024',
-          quality: 'high',
-          response_format: 'b64_json',
-        }),
+        body: JSON.stringify(requestBody),
       },
       180000
     );
@@ -347,7 +373,7 @@ function createAiRemoteService(deps = {}) {
     return {
       prompt,
       brief: buildWebsitePreviewBriefFromScan(scan),
-      model: openAiImageModel,
+      model: imageModel,
       mimeType: 'image/png',
       dataUrl: `data:image/png;base64,${b64}`,
       fileName: buildWebsitePreviewDownloadFileName(scan),

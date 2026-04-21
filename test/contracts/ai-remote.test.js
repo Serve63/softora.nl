@@ -186,11 +186,51 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(calls[0].url, 'https://api.openai.test/v1/images/generations');
   assert.match(String(calls[0].options.body || ''), /gpt-image-1/);
   assert.match(String(calls[0].options.body || ''), /"quality":"high"/);
+  assert.doesNotMatch(String(calls[0].options.body || ''), /response_format/);
   assert.equal(result.model, 'gpt-image-1');
   assert.equal(result.brief, 'Brief softora.nl');
   assert.equal(result.fileName, 'softora.nl.png');
   assert.equal(result.dataUrl, 'data:image/png;base64,YWJjZA==');
   assert.equal(result.revisedPrompt, 'Verbeterde prompt');
+});
+
+test('ai remote service keeps b64_json response format for legacy dall-e image models', async () => {
+  const calls = [];
+  const { service } = createService({
+    openAiImageModel: 'dall-e-3',
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          data: [{ b64_json: 'YWJjZA==' }],
+        },
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({ host: 'softora.nl' });
+
+  assert.equal(calls.length, 1);
+  assert.match(String(calls[0].options.body || ''), /"model":"dall-e-3"/);
+  assert.match(String(calls[0].options.body || ''), /"response_format":"b64_json"/);
+  assert.equal(result.model, 'dall-e-3');
+});
+
+test('ai remote service rejects non-image model configuration before calling OpenAI', async () => {
+  const { service } = createService({
+    openAiImageModel: 'gpt-4o-mini',
+  });
+
+  await assert.rejects(
+    () => service.generateWebsitePreviewImageWithAi({ host: 'softora.nl' }),
+    (error) => {
+      assert.equal(error.status, 500);
+      assert.match(String(error.message || ''), /image-model ongeldig geconfigureerd/i);
+      assert.match(String(error?.data?.error?.detail || ''), /OPENAI_IMAGE_MODEL moet een ondersteund image-model/i);
+      return true;
+    }
+  );
 });
 
 test('ai remote service fetches and normalizes website preview scan metadata including stylesheet colors', async () => {

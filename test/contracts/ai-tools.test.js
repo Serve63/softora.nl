@@ -143,6 +143,10 @@ test('ai tools coordinator wraps website preview failures in a stable error payl
   assert.equal(res.statusCode, 503);
   assert.equal(res.body.ok, false);
   assert.equal(res.body.error, 'Websitegenerator AI niet beschikbaar');
+  assert.equal(
+    res.body.detail,
+    'OpenAI image provider offline: Image quota bereikt'
+  );
   assert.equal(res.body.imageModel, 'gpt-image-1');
   assert.equal(res.body.upstreamDetail, 'Image quota bereikt');
 });
