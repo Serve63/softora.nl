@@ -9,10 +9,16 @@ const {
 } = require('../../server/config/page-routing');
 
 test('premium leads exposes a clean pretty route and redirects the old slug', () => {
-  const knownPages = new Set(['premium-ai-coldmailing.html', 'premium-ai-lead-generator.html']);
+  const knownPages = new Set([
+    'premium-ai-coldmailing.html',
+    'premium-ai-lead-generator.html',
+    'premium-bevestigingsmails.html',
+  ]);
   const slugMap = createKnownPrettyPageSlugToFile(knownPages);
 
   assert.equal(slugMap.get('premium-leads'), 'premium-ai-coldmailing.html');
+  assert.equal(slugMap.get('premium-ai-lead-generator'), 'premium-bevestigingsmails.html');
+  assert.equal(slugMap.get('premium-bevestigingsmails'), 'premium-bevestigingsmails.html');
   assert.equal(resolveLegacyPrettyPageRedirect('premium-ai-coldmailing'), 'premium-leads');
 });
 

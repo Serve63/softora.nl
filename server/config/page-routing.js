@@ -38,6 +38,10 @@ function createKnownPrettyPageSlugToFile(knownHtmlPageFiles) {
   if (map.has('premium-ai-coldmailing')) {
     map.set('premium-leads', map.get('premium-ai-coldmailing'));
   }
+  // Zelfde coldmailing-UI als /premium-bevestigingsmails, aparte URL voor legacy/bookmarks.
+  if (map.has('premium-bevestigingsmails')) {
+    map.set('premium-ai-lead-generator', map.get('premium-bevestigingsmails'));
+  }
   return map;
 }
 

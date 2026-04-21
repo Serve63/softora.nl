@@ -509,7 +509,7 @@
         }
         if (p.indexOf("/premium-personeel-agenda") === 0) return "agenda";
         if (isLeadsPagePath(p)) return "leads";
-        if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldcalling";
+        if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldmailing";
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
         if (p.indexOf("/premium-database") === 0) return "database";

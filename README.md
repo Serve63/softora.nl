@@ -122,7 +122,7 @@ npm start
 Open daarna:
 
 - `http://localhost:3000/ai-lead-generator.html`
-- `http://localhost:3000/premium-ai-lead-generator.html`
+- `http://localhost:3000/premium-ai-lead-generator` (zelfde coldmailing-UI als `/premium-bevestigingsmails`; het `.html`-bestand `premium-ai-lead-generator.html` is legacy/coldcalling-markup voor tests)
 
 ## Webhook instellen in Retell
 
