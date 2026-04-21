@@ -771,18 +771,14 @@ html[data-softora-lead-generator-alias="1"] .campaign-metric-zone4 { display: no
   <div class="topbar">
     <div class="topbar-left">
     <h1>Coldmailing</h1>
-    <p>Coldmailing wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.</p>
+    <p>Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.</p>
     <script>
     (function () {
       try {
         var path = (window.location.pathname || '').split('?')[0].replace(/\/+$/, '') || '/';
         if (path !== '/premium-ai-lead-generator') return;
         var h1 = document.querySelector('#screen-dashboard .topbar-left h1');
-        var intro = document.querySelector('#screen-dashboard .topbar-left p');
         if (h1) h1.textContent = 'Coldcalling';
-        if (intro) {
-          intro.innerHTML = 'Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.';
-        }
       } catch (e) {}
     })();
     </script>
