@@ -194,6 +194,42 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(result.revisedPrompt, 'Verbeterde prompt');
 });
 
+test('ai remote service falls back to gpt-image-1.5 when gpt-image-2 is blocked pending verification', async () => {
+  const calls = [];
+  const { service } = createService({
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      if (calls.length === 1) {
+        return {
+          response: { ok: false, status: 403 },
+          data: {
+            error: {
+              message:
+                'Your organization must be verified to use the model `gpt-image-2`. Please go to: https://platform.openai.com/settings/organization/general and click on Verify Organization.',
+            },
+          },
+        };
+      }
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          data: [{ b64_json: 'YWJjZA==', revised_prompt: 'Fallback prompt' }],
+          usage: { total_tokens: 25 },
+        },
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({ host: 'softora.nl' });
+
+  assert.equal(calls.length, 2);
+  assert.match(String(calls[0].options.body || ''), /gpt-image-2/);
+  assert.match(String(calls[1].options.body || ''), /gpt-image-1\.5/);
+  assert.equal(result.model, 'gpt-image-1.5');
+  assert.equal(result.revisedPrompt, 'Fallback prompt');
+  assert.equal(result.dataUrl, 'data:image/png;base64,YWJjZA==');
+});
+
 test('ai remote service keeps b64_json response format for legacy dall-e image models', async () => {
   const calls = [];
   const { service } = createService({

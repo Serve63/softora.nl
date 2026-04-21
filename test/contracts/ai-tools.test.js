@@ -148,7 +148,7 @@ test('ai tools coordinator wraps website preview failures in a stable error payl
     'OpenAI image provider offline: Image quota bereikt'
   );
   assert.equal(res.body.imageModel, 'gpt-image-2');
-  assert.equal(res.body.upstreamDetail, 'Image quota bereikt');
+  assert.equal(res.body.upstreamDetail, null);
 });
 
 test('ai tools coordinator validates dossier input and falls back safely on anthropic errors', async () => {

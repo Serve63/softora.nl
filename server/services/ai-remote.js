@@ -277,6 +277,18 @@ function createAiRemoteService(deps = {}) {
     return /^gpt-image-/i.test(normalizeString(modelRaw || ''));
   }
 
+  function isOpenAiImageVerificationBlocked(response, data, modelRaw) {
+    const model = normalizeString(modelRaw || '').toLowerCase();
+    if (model !== 'gpt-image-2') return false;
+    if (Number(response?.status) !== 403) return false;
+
+    const detail = normalizeString(
+      data?.error?.message || data?.error?.detail || data?.error || data?.detail || ''
+    ).toLowerCase();
+
+    return detail.includes('organization must be verified') && detail.includes('gpt-image-2');
+  }
+
   async function fetchWebsitePreviewCssSources(htmlRaw, pageUrlRaw) {
     const inlineCssSources = extractInlineStyleBlocksFromHtml(htmlRaw);
     const stylesheetUrls = extractStylesheetUrlsFromHtml(htmlRaw, pageUrlRaw);
@@ -333,55 +345,74 @@ function createAiRemoteService(deps = {}) {
       throw err;
     }
 
-    const requestBody = {
-      model: imageModel,
-      prompt,
-      size: '1536x1024',
-      quality: 'high',
-    };
-    if (!isGptImageGenerationModel(imageModel)) {
-      requestBody.response_format = 'b64_json';
+    const candidateModels = [imageModel];
+    if (String(imageModel).toLowerCase() === 'gpt-image-2') {
+      candidateModels.push('gpt-image-1.5');
     }
 
-    const { response, data } = await fetchJsonWithTimeout(
-      `${openAiApiBaseUrl}/images/generations`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
+    for (let index = 0; index < candidateModels.length; index += 1) {
+      const candidateModel = candidateModels[index];
+      const requestBody = {
+        model: candidateModel,
+        prompt,
+        size: '1536x1024',
+        quality: 'high',
+      };
+      if (!isGptImageGenerationModel(candidateModel)) {
+        requestBody.response_format = 'b64_json';
+      }
+
+      const { response, data } = await fetchJsonWithTimeout(
+        `${openAiApiBaseUrl}/images/generations`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(requestBody),
         },
-        body: JSON.stringify(requestBody),
-      },
-      180000
-    );
+        180000
+      );
 
-    if (!response.ok) {
-      const err = new Error(`OpenAI websitegenerator mislukt (${response.status})`);
-      err.status = response.status;
-      err.data = data;
-      throw err;
+      if (!response.ok) {
+        const canFallback =
+          index < candidateModels.length - 1 &&
+          isOpenAiImageVerificationBlocked(response, data, candidateModel);
+        if (canFallback) continue;
+
+        const err = new Error(`OpenAI websitegenerator mislukt (${response.status})`);
+        err.status = response.status;
+        err.data = data;
+        err.model = candidateModel;
+        throw err;
+      }
+
+      const imageEntry = Array.isArray(data?.data) ? data.data[0] : null;
+      const b64 = normalizeString(imageEntry?.b64_json || '');
+      if (!b64) {
+        const err = new Error('OpenAI gaf geen afbeelding terug voor de websitegenerator.');
+        err.status = 502;
+        err.data = data;
+        err.model = candidateModel;
+        throw err;
+      }
+
+      return {
+        prompt,
+        brief: buildWebsitePreviewBriefFromScan(scan),
+        model: candidateModel,
+        mimeType: 'image/png',
+        dataUrl: `data:image/png;base64,${b64}`,
+        fileName: buildWebsitePreviewDownloadFileName(scan),
+        revisedPrompt: normalizeString(imageEntry?.revised_prompt || ''),
+        usage: data?.usage || null,
+      };
     }
 
-    const imageEntry = Array.isArray(data?.data) ? data.data[0] : null;
-    const b64 = normalizeString(imageEntry?.b64_json || '');
-    if (!b64) {
-      const err = new Error('OpenAI gaf geen afbeelding terug voor de websitegenerator.');
-      err.status = 502;
-      err.data = data;
-      throw err;
-    }
-
-    return {
-      prompt,
-      brief: buildWebsitePreviewBriefFromScan(scan),
-      model: imageModel,
-      mimeType: 'image/png',
-      dataUrl: `data:image/png;base64,${b64}`,
-      fileName: buildWebsitePreviewDownloadFileName(scan),
-      revisedPrompt: normalizeString(imageEntry?.revised_prompt || ''),
-      usage: data?.usage || null,
-    };
+    const err = new Error('OpenAI websitegenerator kon geen bruikbaar image-model uitvoeren.');
+    err.status = 502;
+    throw err;
   }
 
   async function fetchWebsitePreviewScanFromUrl(targetUrlRaw) {

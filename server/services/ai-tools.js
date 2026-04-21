@@ -124,6 +124,8 @@ function createAiToolsCoordinator(deps = {}) {
           : baseDetail,
         500
       );
+      const safeUpstreamDetail =
+        upstreamDetail && !detail.includes(upstreamDetail) ? upstreamDetail : null;
 
       return res.status(safeStatus).json({
         ok: false,
@@ -134,7 +136,7 @@ function createAiToolsCoordinator(deps = {}) {
         detail,
         openAiEnabled: Boolean(getOpenAiApiKey()),
         imageModel: openAiImageModel,
-        upstreamDetail: upstreamDetail || null,
+        upstreamDetail: safeUpstreamDetail,
       });
     }
   }
