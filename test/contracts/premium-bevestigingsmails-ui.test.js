@@ -15,6 +15,10 @@ test('premium bevestigingsmails mirrors lead-generator shell without coldcalling
   );
   assert.match(pageSource, /<div class="generator-grid">/);
   assert.match(pageSource, /<span class="panel-title">Coldmailing Instellingen<\/span>/);
+  assert.match(pageSource, /<div class="panel-zone-label">Zone 1<\/div>/);
+  assert.match(pageSource, /<div class="panel-zone-title">Mail verstuurd<\/div>/);
+  assert.match(pageSource, /<div class="panel-zone-label">Zone 4<\/div>/);
+  assert.match(pageSource, /<div class="panel-zone-title">Afspraak ingepland<\/div>/);
   assert.match(pageSource, /<button class="launch-btn magnetic" id="launchBtn" onclick="toggleCampaign\(\)">/);
   assert.match(pageSource, /id="statSent"/);
   assert.match(pageSource, /id="statOpened"/);

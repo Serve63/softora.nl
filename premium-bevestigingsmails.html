@@ -527,6 +527,53 @@
             border: 1px solid rgba(139,34,82,0.3);
         }
 
+        .panel-zone-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.9rem;
+            margin-bottom: 2rem;
+        }
+
+        .panel-zone-card {
+            border: 1px solid rgba(139,34,82,0.16);
+            background: linear-gradient(180deg, rgba(139,34,82,0.08) 0%, rgba(255,255,255,0.02) 100%);
+            padding: 0.95rem 1rem;
+            min-height: 100%;
+        }
+
+        .panel-zone-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.6rem;
+            padding: 0.22rem 0.5rem;
+            border: 1px solid rgba(139,34,82,0.22);
+            background: rgba(139,34,82,0.08);
+            color: var(--accent-light);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.64rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .panel-zone-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.94rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+            margin-bottom: 0.4rem;
+        }
+
+        .panel-zone-copy {
+            font-size: 0.8rem;
+            line-height: 1.55;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+
         /* Form elements */
         .form-group {
             margin-bottom: 2rem;
@@ -1728,6 +1775,7 @@
             .cursor, .cursor-dot { display: none; }
             .sidebar { display: none; }
             .main-content { margin-left: 0; }
+            .panel-zone-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         @media (max-width: 768px) {
@@ -1735,6 +1783,7 @@
             .stats-bar { grid-template-columns: 1fr; }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
             .topbar-right { width: 100%; justify-content: flex-start; }
+            .panel-zone-strip { grid-template-columns: 1fr; }
             .topbar-right .site-select--pill .site-select-trigger {
                 width: min(100%, 16rem) !important;
                 min-width: min(100%, 16rem);
@@ -1855,6 +1904,29 @@
                     <div class="panel-header">
                         <span class="panel-title">Coldmailing Instellingen</span>
                         <span class="panel-badge">Configuratie</span>
+                    </div>
+
+                    <div class="panel-zone-strip" aria-label="Coldmailing zones">
+                        <div class="panel-zone-card">
+                            <div class="panel-zone-label">Zone 1</div>
+                            <div class="panel-zone-title">Mail verstuurd</div>
+                            <div class="panel-zone-copy">Alle contacten naar wie de eerste mail is gestuurd.</div>
+                        </div>
+                        <div class="panel-zone-card">
+                            <div class="panel-zone-label">Zone 2</div>
+                            <div class="panel-zone-title">Reactie op mail 1</div>
+                            <div class="panel-zone-copy">Contacten die hebben gereageerd op de eerste mail.</div>
+                        </div>
+                        <div class="panel-zone-card">
+                            <div class="panel-zone-label">Zone 3</div>
+                            <div class="panel-zone-title">Reactie op mail 2</div>
+                            <div class="panel-zone-copy">Contacten die hebben gereageerd op de tweede mail.</div>
+                        </div>
+                        <div class="panel-zone-card">
+                            <div class="panel-zone-label">Zone 4</div>
+                            <div class="panel-zone-title">Afspraak ingepland</div>
+                            <div class="panel-zone-copy">Klanten die een afspraak hebben ingepland.</div>
+                        </div>
                     </div>
 
                     <div class="form-group form-group--slider">
