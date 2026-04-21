@@ -493,9 +493,10 @@
                 ? String(window.location.hash || "").replace(/^#/, "").toLowerCase()
                 : "";
         if (p.indexOf("/premium-advertenties") === 0) {
-            if (hashRaw === "facebook") return "ads_facebook";
-            if (hashRaw === "pinterest") return "ads_pinterest";
-            if (hashRaw === "linkedin") return "ads_linkedin";
+            if (hashRaw === "instagram") return "social_instagram";
+            if (hashRaw === "facebook") return "social_facebook";
+            if (hashRaw === "pinterest") return "social_pinterest";
+            if (hashRaw === "linkedin") return "social_linkedin";
             if (hashRaw === "trustoo") return "ads_trustoo";
             return "ads_google";
         }
@@ -574,10 +575,11 @@
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
         "seo",
         "ads_google",
-        "ads_facebook",
-        "ads_pinterest",
-        "ads_linkedin",
         "ads_trustoo",
+        "social_instagram",
+        "social_facebook",
+        "social_pinterest",
+        "social_linkedin",
     ]);
 
     /* Klassiek hangslot: U-beugel + afgeronde kast (herkenbaar op klein formaat) */
@@ -752,27 +754,36 @@
                 icon: adsPlatformIcon,
             },
             {
-                key: "ads_facebook",
-                href: "/premium-advertenties#facebook",
-                label: "Facebook",
+                key: "ads_trustoo",
+                href: "/premium-advertenties#trustoo",
+                label: "Trustoo",
+                icon: adsPlatformIcon,
+            },
+        ];
+
+        const socialLinks = [
+            {
+                key: "social_instagram",
+                href: "/premium-advertenties#instagram",
+                label: "Instagram",
                 icon: adsPlatformIcon,
             },
             {
-                key: "ads_pinterest",
-                href: "/premium-advertenties#pinterest",
-                label: "Pinterest",
-                icon: adsPlatformIcon,
-            },
-            {
-                key: "ads_linkedin",
+                key: "social_linkedin",
                 href: "/premium-advertenties#linkedin",
                 label: "LinkedIn",
                 icon: adsPlatformIcon,
             },
             {
-                key: "ads_trustoo",
-                href: "/premium-advertenties#trustoo",
-                label: "Trustoo",
+                key: "social_facebook",
+                href: "/premium-advertenties#facebook",
+                label: "Facebook",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "social_pinterest",
+                href: "/premium-advertenties#pinterest",
+                label: "Pinterest",
                 icon: adsPlatformIcon,
             },
         ];
@@ -824,6 +835,10 @@
             '  <div class="sidebar-section">',
             '    <div class="sidebar-section-label">Advertenties</div>',
             adsLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
+            "  </div>",
+            '  <div class="sidebar-section">',
+            '    <div class="sidebar-section-label">Socialmedia</div>',
+            socialLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
             "  </div>",
             '  <div class="sidebar-section">',
             '    <div class="sidebar-section-label">Extra</div>',
