@@ -584,14 +584,6 @@ Softora.nl | +31 6 2991 7185</textarea>
               <span class="var-tag">{{datum}}</span>
             </div>
           </div>
-          <div class="mf-row">
-            <div class="mf-label">Afzender naam</div>
-            <input class="mf-inp" type="text" value="Servé Creusen — Softora.nl">
-          </div>
-          <div class="mf-row">
-            <div class="mf-label">Afzender e-mail</div>
-            <input class="mf-inp" type="email" value="info@softora.nl">
-          </div>
         </div>
       </div>
 
@@ -1045,19 +1037,7 @@ function enhanceCampaignSelect(select) {
 }
 
 function initCampaignSelects() {
-  document.querySelectorAll('select.sel, select.mf-sel').forEach(select => {
-    const shell = select.parentElement && select.parentElement.classList.contains('select-shell')
-      ? select.parentElement
-      : null;
-    if (shell && shell.parentNode) {
-      shell.parentNode.insertBefore(select, shell);
-      shell.remove();
-    }
-    select.classList.remove('native-select-hidden');
-    select.hidden = false;
-    select.removeAttribute('aria-hidden');
-    delete select.dataset.enhanced;
-  });
+  document.querySelectorAll('select.sel, select.mf-sel').forEach(enhanceCampaignSelect);
 }
 
 // TOAST
