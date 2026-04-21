@@ -63,8 +63,8 @@ test('premium websitegenerator trimt lege witte randen uit gegenereerde previews
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_WIDTH = 1536;/);
   assert.match(source, /const WEBSITE_PREVIEW_IMAGE_HEIGHT = 1024;/);
   assert.match(source, /async function cropPreviewImageDataUrl\(dataUrl\)/);
-  assert.match(source, /measurePreviewSideCrop/);
-  assert.match(source, /hasPreviewContentBreak/);
+  assert.match(source, /getPreviewReferenceMatchRatio/);
+  assert.match(source, /measurePreviewRightGutterWidth/);
   assert.match(source, /const croppedPreview = await cropPreviewImageDataUrl\(imageDataUrl\)/);
   assert.match(source, /const previewWidth = Number\(croppedPreview\?\.width \|\| WEBSITE_PREVIEW_IMAGE_WIDTH\)/);
   assert.match(source, /const frameW = Math\.round\(previewWidth \* scaleX\)/);

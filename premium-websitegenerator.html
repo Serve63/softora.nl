@@ -457,13 +457,6 @@ async function callAI(url, hostname) {
   throw new Error(lastError || 'Websitegenerator request mislukt');
 }
 
-function isPreviewWhitespacePixel(r, g, b, a) {
-  if (Number(a) <= 10) return true;
-  const avg = (Number(r) + Number(g) + Number(b)) / 3;
-  const spread = Math.max(Number(r), Number(g), Number(b)) - Math.min(Number(r), Number(g), Number(b));
-  return avg >= 245 && spread <= 18;
-}
-
 function samplePreviewEdgeReference(pixels, width, height, side) {
   const stripWidth = Math.max(4, Math.round(width * 0.01));
   const startX = side === 'right' ? Math.max(0, width - stripWidth) : 0;
@@ -498,41 +491,13 @@ function samplePreviewEdgeReference(pixels, width, height, side) {
 
 function isPreviewPixelCloseToReference(r, g, b, a, reference) {
   if (!reference) return false;
-  if (Number(a) <= 10) return true;
+  if (Number(a) <= 10) return false;
   const diffR = Math.abs(Number(r) - reference.r);
   const diffG = Math.abs(Number(g) - reference.g);
   const diffB = Math.abs(Number(b) - reference.b);
   const totalDiff = diffR + diffG + diffB;
   const maxDiff = Math.max(diffR, diffG, diffB);
   return totalDiff <= 66 && maxDiff <= 28;
-}
-
-function isPreviewEdgeGutterColumn(pixels, width, height, x, reference) {
-  if (!reference) return false;
-  let mismatchCount = 0;
-  const allowedNoise = Math.max(14, Math.round(height * 0.055));
-  for (let y = 0; y < height; y += 1) {
-    const offset = (y * width + x) * 4;
-    if (
-      !isPreviewWhitespacePixel(
-        pixels[offset],
-        pixels[offset + 1],
-        pixels[offset + 2],
-        pixels[offset + 3]
-      ) &&
-      !isPreviewPixelCloseToReference(
-        pixels[offset],
-        pixels[offset + 1],
-        pixels[offset + 2],
-        pixels[offset + 3],
-        reference
-      )
-    ) {
-      mismatchCount += 1;
-      if (mismatchCount > allowedNoise) return false;
-    }
-  }
-  return true;
 }
 
 function getPreviewColumnActivity(pixels, width, height, x) {
@@ -561,21 +526,18 @@ function getPreviewColumnActivity(pixels, width, height, x) {
   return count ? totalDiff / count : 0;
 }
 
-function isPreviewSideGutterColumn(pixels, width, height, x, reference) {
-  if (!reference) return false;
-  let mismatchCount = 0;
-  const allowedNoise = Math.max(8, Math.round(height * 0.03));
+function getPreviewReferenceMatchRatio(pixels, width, height, x, reference) {
+  if (!reference || x < 0 || x >= width) return 0;
+  let matches = 0;
+  let total = 0;
 
   for (let y = 0; y < height; y += 3) {
     const offset = (y * width + x) * 4;
+    const alpha = Number(pixels[offset + 3]);
+    if (alpha <= 10) continue;
+    total += 1;
     if (
-      !isPreviewWhitespacePixel(
-        pixels[offset],
-        pixels[offset + 1],
-        pixels[offset + 2],
-        pixels[offset + 3]
-      ) &&
-      !isPreviewPixelCloseToReference(
+      isPreviewPixelCloseToReference(
         pixels[offset],
         pixels[offset + 1],
         pixels[offset + 2],
@@ -583,43 +545,46 @@ function isPreviewSideGutterColumn(pixels, width, height, x, reference) {
         reference
       )
     ) {
-      mismatchCount += 1;
-      if (mismatchCount > allowedNoise) return false;
+      matches += 1;
     }
   }
 
-  return getPreviewColumnActivity(pixels, width, height, x) <= 10;
+  return total ? matches / total : 0;
 }
 
-function measurePreviewSideCrop(pixels, width, height, side, reference) {
+function measurePreviewRightGutterWidth(pixels, width, height, reference) {
   if (!reference) return 0;
-  const maxCropWidth = Math.max(80, Math.round(width * 0.32));
-  let count = 0;
 
-  while (count < maxCropWidth) {
-    const x = side === 'right' ? width - 1 - count : count;
+  const maxCropWidth = Math.max(120, Math.round(width * 0.34));
+  let gutterWidth = 0;
+
+  while (gutterWidth < maxCropWidth) {
+    const x = width - 1 - gutterWidth;
     if (x < 0 || x >= width) break;
-    if (!isPreviewSideGutterColumn(pixels, width, height, x, reference)) break;
-    count += 1;
+
+    const matchRatio = getPreviewReferenceMatchRatio(pixels, width, height, x, reference);
+    const activity = getPreviewColumnActivity(pixels, width, height, x);
+    if (matchRatio < 0.78 || activity > 13) break;
+
+    gutterWidth += 1;
   }
 
-  return count;
-}
+  if (gutterWidth < 70) return 0;
 
-function hasPreviewContentBreak(pixels, width, height, side, cropWidth, reference) {
-  if (!reference || cropWidth < 60) return false;
-  let escapedColumns = 0;
-  const sampleColumns = 14;
-
-  for (let i = 0; i < sampleColumns; i += 1) {
-    const x = side === 'right' ? width - cropWidth - 1 - i : cropWidth + i;
+  let breakSignals = 0;
+  const confirmDepth = 18;
+  for (let i = 0; i < confirmDepth; i += 1) {
+    const x = width - gutterWidth - 1 - i;
     if (x < 0 || x >= width) break;
-    if (!isPreviewSideGutterColumn(pixels, width, height, x, reference)) {
-      escapedColumns += 1;
+
+    const matchRatio = getPreviewReferenceMatchRatio(pixels, width, height, x, reference);
+    const activity = getPreviewColumnActivity(pixels, width, height, x);
+    if (matchRatio < 0.66 || activity > 17) {
+      breakSignals += 1;
     }
   }
 
-  return escapedColumns >= 5;
+  return breakSignals >= 6 ? gutterWidth : 0;
 }
 
 function loadPreviewImage(dataUrl) {
@@ -668,24 +633,13 @@ async function cropPreviewImageDataUrl(dataUrl) {
   const imageData = context.getImageData(0, 0, width, height);
   const pixels = imageData.data;
 
-  const leftReference = samplePreviewEdgeReference(pixels, width, height, 'left');
   const rightReference = samplePreviewEdgeReference(pixels, width, height, 'right');
-
-  let leftCrop = measurePreviewSideCrop(pixels, width, height, 'left', leftReference);
-  let rightCrop = measurePreviewSideCrop(pixels, width, height, 'right', rightReference);
-
-  if (!hasPreviewContentBreak(pixels, width, height, 'left', leftCrop, leftReference)) {
-    leftCrop = 0;
-  }
-  if (!hasPreviewContentBreak(pixels, width, height, 'right', rightCrop, rightReference)) {
-    rightCrop = 0;
-  }
-
-  const croppedWidth = width - leftCrop - rightCrop;
+  const rightCrop = measurePreviewRightGutterWidth(pixels, width, height, rightReference);
+  const croppedWidth = width - rightCrop;
   if (croppedWidth <= Math.round(width * 0.55)) {
     return { dataUrl: raw, width, height };
   }
-  if (leftCrop < 40 && rightCrop < 40) {
+  if (rightCrop < 70) {
     return { dataUrl: raw, width, height };
   }
 
@@ -699,7 +653,7 @@ async function cropPreviewImageDataUrl(dataUrl) {
 
   croppedContext.drawImage(
     canvas,
-    leftCrop,
+    0,
     0,
     croppedWidth,
     height,
