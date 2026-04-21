@@ -115,3 +115,14 @@ test('static premium sidebars ship the websitegenerator link in html', () => {
     );
   }
 });
+
+test('static premium sidebars ship the database link in html', () => {
+  for (const relativePath of staticSidebarPages) {
+    const pageSource = readRepoFile(relativePath);
+    assert.match(
+      pageSource,
+      /<span class="sidebar-link-text">Database<\/span>/,
+      `${relativePath} hoort Database direct in de sidebar html te hebben`
+    );
+  }
+});
