@@ -37,6 +37,8 @@ test('website generation helpers build preview prompt, brief and filename from s
     headings: ['Diensten', 'Cases'],
     paragraphs: ['Sterke websites voor Nederlandse bedrijven.'],
     visualCues: ['licht design', 'grote hero'],
+    brandColorHints: ['accent: #8b2252', 'accent-light: #a62d65'],
+    brandPalette: ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e'],
     bodyTextSample: 'Wij bouwen websites die converteren.',
   };
 
@@ -45,10 +47,14 @@ test('website generation helpers build preview prompt, brief and filename from s
   const fileName = helpers.buildWebsitePreviewDownloadFileName(scan);
 
   assert.match(prompt, /Brand or domain: softora\.nl\./);
+  assert.match(prompt, /preserve the same core brand colors, accent usage, contrast relationships/i);
+  assert.match(prompt, /Do not invent a new color palette/i);
   assert.match(prompt, /Primary heading on current site: Meer klanten met een premium site\./);
+  assert.match(prompt, /Detected brand color variables: accent: #8b2252 \| accent-light: #a62d65\./);
+  assert.match(prompt, /Detected recurring brand colors: #8b2252 \| #a62d65 \| #f8f7f4 \| #1a1a2e\./);
   assert.equal(
     brief,
-    'Titel: Softora · Hoofdboodschap: Meer klanten met een premium site · Omschrijving: Premium websites · Secties: Diensten, Cases · Beeldreferenties: licht design, grote hero'
+    'Titel: Softora · Hoofdboodschap: Meer klanten met een premium site · Omschrijving: Premium websites · Secties: Diensten, Cases · Beeldreferenties: licht design, grote hero · Kleuren: #8b2252, #a62d65, #f8f7f4, #1a1a2e'
   );
   assert.equal(fileName, 'softora.nl-preview.png');
 });

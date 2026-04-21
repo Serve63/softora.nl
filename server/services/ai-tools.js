@@ -88,6 +88,8 @@ function createAiToolsCoordinator(deps = {}) {
           headings: fetched.scan.headings || [],
           paragraphs: fetched.scan.paragraphs || [],
           visualCues: fetched.scan.visualCues || [],
+          brandColorHints: fetched.scan.brandColorHints || [],
+          brandPalette: fetched.scan.brandPalette || [],
           imageCount: Number(fetched.scan.imageCount || 0) || 0,
         },
         brief: generated.brief,

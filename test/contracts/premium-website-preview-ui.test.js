@@ -39,3 +39,18 @@ test('premium websitegenerator biedt een websitelink-aanmaken flow met html inpu
   assert.match(source, /if \(\s*!urlInput \|\|[\s\S]*!websiteLinkCopyEl[\s\S]*\) \{\s*return;\s*\}/);
   assert.match(source, /\/api\/website-links\/create/);
 });
+
+test('premium websitegenerator toont een login-fallback voor protected acties', () => {
+  const filePath = path.join(__dirname, '../../premium-websitegenerator.html');
+  const source = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(source, /id="websitegenerator-auth-card"/);
+  assert.match(source, /id="websitegenerator-login-link"/);
+  assert.match(source, /\/api\/auth\/session/);
+  assert.match(source, /premium-personeel-login\?next=/);
+  assert.match(source, /id="scan-btn"[\s\S]*disabled/);
+  assert.match(source, /id="website-link-create-btn"[\s\S]*disabled/);
+  assert.match(source, /Log in met je premium account om scans te genereren en websitelinks te publiceren\./);
+  assert.match(source, /Log eerst in om AI previews te genereren\./);
+  assert.match(source, /Log eerst in om websitelinks aan te maken\./);
+});

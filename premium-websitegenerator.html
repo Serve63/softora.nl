@@ -55,6 +55,30 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .card-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; }
 .card-body { padding: 22px; }
 
+.auth-card { margin-bottom: 24px; }
+.auth-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.auth-card-copy { flex: 1 1 320px; }
+.auth-card-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-dark);
+  margin-bottom: 6px;
+}
+.auth-card-text {
+  font-size: 13px;
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+
 /* INPUTS */
 .input-row { display: flex; gap: 10px; }
 .inp { flex: 1; padding: 11px 14px; border: 1px solid var(--border); border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text-dark); background: var(--bg); outline: none; transition: border-color .15s; }
@@ -141,6 +165,20 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 <div class="page-title">Website Generator</div>
 <div class="page-sub">Scan een website en genereer een visuele preview, of maak een live paginalink aan</div>
 
+<div class="card auth-card" id="websitegenerator-auth-card">
+  <div class="card-body auth-card-body">
+    <div class="auth-card-copy">
+      <div class="auth-card-title">Premium sessie vereist</div>
+      <div class="auth-card-text" id="websitegenerator-auth-message">
+        Log in met je premium account om scans te genereren en websitelinks te publiceren.
+      </div>
+    </div>
+    <a class="btn" id="websitegenerator-login-link" href="/premium-personeel-login?next=%2Fpremium-websitegenerator">
+      Log in om te starten
+    </a>
+  </div>
+</div>
+
 <div class="tabs">
   <button class="tab active" onclick="switchTab('scan', this)">Website Scan & Preview</button>
   <button class="tab" onclick="switchTab('link', this)">Maak Website Link Aan</button>
@@ -159,7 +197,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
     <div class="card-body">
       <div class="input-row">
         <input class="inp" type="url" id="scan-url" placeholder="https://softora.nl" value="https://softora.nl">
-        <button class="btn" id="scan-btn" onclick="startScan()">
+        <button class="btn" id="scan-btn" onclick="startScan()" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           AI Genereren
         </button>
@@ -207,13 +245,13 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 </html>"></textarea>
 
       <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
-        <button class="btn" id="website-link-create-btn" type="button">
+        <button class="btn" id="website-link-create-btn" type="button" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           Websitelink aanmaken
         </button>
         <button class="btn outline" id="website-link-copy" type="button" hidden>Kopieer websitelink</button>
       </div>
-      <div id="website-link-status" style="margin-top:12px;font-size:12px;color:var(--text-mid);"></div>
+      <div id="website-link-status" style="margin-top:12px;font-size:12px;color:#c0392b;">Log in om websitelinks aan te maken.</div>
     </div>
   </div>
 </div>
@@ -232,8 +270,116 @@ function switchTab(name, el) {
 }
 
 const scanHistory = [];
+let websiteGeneratorAuthState = {
+  loaded: false,
+  authenticated: false,
+};
+let websiteGeneratorAuthPromise = null;
+
+function getWebsiteGeneratorLoginHref() {
+  const nextPath = `${window.location.pathname || '/premium-websitegenerator'}${window.location.search || ''}`;
+  return `/premium-personeel-login?next=${encodeURIComponent(nextPath)}`;
+}
+
+function applyWebsiteGeneratorAuthState() {
+  const authCard = document.getElementById('websitegenerator-auth-card');
+  const authMessageEl = document.getElementById('websitegenerator-auth-message');
+  const loginLinkEl = document.getElementById('websitegenerator-login-link');
+  const scanBtn = document.getElementById('scan-btn');
+  const websiteLinkCreateEl = document.getElementById('website-link-create-btn');
+  const websiteLinkStatusEl = document.getElementById('website-link-status');
+
+  if (loginLinkEl) {
+    loginLinkEl.href = getWebsiteGeneratorLoginHref();
+  }
+
+  if (authMessageEl && !websiteGeneratorAuthState.authenticated) {
+    authMessageEl.textContent = 'Log in met je premium account om scans te genereren en websitelinks te publiceren.';
+  }
+
+  if (authCard) {
+    authCard.hidden = Boolean(websiteGeneratorAuthState.authenticated);
+  }
+
+  if (scanBtn) {
+    scanBtn.disabled = !websiteGeneratorAuthState.authenticated;
+  }
+
+  if (websiteLinkCreateEl) {
+    websiteLinkCreateEl.disabled = !websiteGeneratorAuthState.authenticated;
+  }
+
+  if (websiteLinkStatusEl) {
+    if (websiteGeneratorAuthState.authenticated) {
+      if (String(websiteLinkStatusEl.textContent || '').trim() === 'Log in om websitelinks aan te maken.') {
+        websiteLinkStatusEl.textContent = '';
+      }
+      websiteLinkStatusEl.style.color = 'var(--text-mid)';
+    } else if (!String(websiteLinkStatusEl.textContent || '').trim()) {
+      websiteLinkStatusEl.textContent = 'Log in om websitelinks aan te maken.';
+      websiteLinkStatusEl.style.color = '#c0392b';
+    }
+  }
+}
+
+async function loadWebsiteGeneratorAuthState(force = false) {
+  if (websiteGeneratorAuthPromise && !force) return websiteGeneratorAuthPromise;
+
+  websiteGeneratorAuthPromise = (async function () {
+    try {
+      const response = await fetch('/api/auth/session', {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+      const payload = await response.json().catch(() => ({}));
+      websiteGeneratorAuthState = {
+        loaded: true,
+        authenticated: Boolean(response.ok && payload && payload.authenticated),
+      };
+    } catch (_) {
+      websiteGeneratorAuthState = {
+        loaded: true,
+        authenticated: false,
+      };
+    }
+
+    applyWebsiteGeneratorAuthState();
+    return websiteGeneratorAuthState;
+  })();
+
+  try {
+    return await websiteGeneratorAuthPromise;
+  } finally {
+    websiteGeneratorAuthPromise = null;
+  }
+}
+
+async function ensureWebsiteGeneratorAuth(message) {
+  const authState = websiteGeneratorAuthState.loaded
+    ? websiteGeneratorAuthState
+    : await loadWebsiteGeneratorAuthState();
+  if (authState.authenticated) return true;
+
+  applyWebsiteGeneratorAuthState();
+  const authCard = document.getElementById('websitegenerator-auth-card');
+  const authMessageEl = document.getElementById('websitegenerator-auth-message');
+  if (authMessageEl && message) {
+    authMessageEl.textContent = String(message);
+  }
+  if (authCard) {
+    authCard.hidden = false;
+    authCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  if (message) showToast(message);
+  return false;
+}
 
 async function startScan() {
+  if (!(await ensureWebsiteGeneratorAuth('Log eerst in om AI previews te genereren.'))) return;
   const url = document.getElementById('scan-url').value.trim();
   if (!url) { showToast('Voer een URL in'); return; }
   if (!url.startsWith('http')) { showToast('Gebruik een volledige URL (https://...)'); return; }
@@ -276,7 +422,7 @@ async function startScan() {
         <p>Er ging iets mis: ${e.message}</p>
       </div>`;
   }
-  btn.disabled = false;
+  applyWebsiteGeneratorAuthState();
 }
 
 async function callAI(url, hostname) {
@@ -290,6 +436,10 @@ async function callAI(url, hostname) {
         body: JSON.stringify({ url, hostname }),
       });
       const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        await loadWebsiteGeneratorAuthState(true);
+        throw new Error('Log eerst in om AI previews te genereren.');
+      }
       if (!response.ok || !data || data.ok === false) {
         lastError = String(data?.detail || data?.error || `API fout: ${response.status}`);
         continue;
@@ -374,6 +524,9 @@ function showToast(msg) {
   t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2800);
 }
 
+applyWebsiteGeneratorAuthState();
+loadWebsiteGeneratorAuthState();
+
 (function () {
   const urlInput = document.getElementById('scan-url');
   const htmlInput = document.getElementById('html-code');
@@ -400,6 +553,7 @@ function showToast(msg) {
   });
 
   websiteLinkCreateEl.addEventListener('click', async function () {
+    if (!(await ensureWebsiteGeneratorAuth('Log eerst in om websitelinks aan te maken.'))) return;
     const html = String(htmlInput.value || '').trim();
     if (!html) {
       setWebsiteLinkStatus('Plak eerst HTML code in.', true);
@@ -422,6 +576,10 @@ function showToast(msg) {
         })
       });
       const payload = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        await loadWebsiteGeneratorAuthState(true);
+        throw new Error('Log eerst in om websitelinks aan te maken.');
+      }
       if (!response.ok || !payload || payload.ok === false) {
         throw new Error(String(payload?.detail || payload?.error || 'Websitelink aanmaken mislukt'));
       }
@@ -434,7 +592,7 @@ function showToast(msg) {
     } catch (error) {
       setWebsiteLinkStatus(String(error?.message || 'Websitelink aanmaken mislukt'), true);
     } finally {
-      websiteLinkCreateEl.disabled = false;
+      applyWebsiteGeneratorAuthState();
     }
   });
 })();

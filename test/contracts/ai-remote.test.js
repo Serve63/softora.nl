@@ -185,6 +185,7 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.openai.test/v1/images/generations');
   assert.match(String(calls[0].options.body || ''), /gpt-image-1/);
+  assert.match(String(calls[0].options.body || ''), /"quality":"high"/);
   assert.equal(result.model, 'gpt-image-1');
   assert.equal(result.brief, 'Brief softora.nl');
   assert.equal(result.fileName, 'softora.nl.png');
@@ -192,11 +193,32 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(result.revisedPrompt, 'Verbeterde prompt');
 });
 
-test('ai remote service fetches and normalizes website preview scan metadata', async () => {
+test('ai remote service fetches and normalizes website preview scan metadata including stylesheet colors', async () => {
   const calls = [];
   const { service, state } = createService({
     fetchTextWithTimeout: async (url, options, timeoutMs) => {
       calls.push({ url, options, timeoutMs });
+      if (url === 'https://softora.nl/site.css') {
+        return {
+          response: {
+            ok: true,
+            status: 200,
+            url,
+            headers: {
+              get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/css; charset=utf-8' : ''),
+            },
+          },
+          text: `
+            :root {
+              --accent: #8B2252;
+              --accent-light: #A62D65;
+              --bg-primary: #F8F7F4;
+              --text-primary: #1A1A2E;
+            }
+            .btn { background: #8B2252; color: #ffffff; }
+          `,
+        };
+      }
       return {
         response: {
           ok: true,
@@ -206,7 +228,14 @@ test('ai remote service fetches and normalizes website preview scan metadata', a
             get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : ''),
           },
         },
-        text: '<html><body><h1>Softora</h1></body></html>',
+        text: `
+          <html>
+            <head>
+              <link rel="stylesheet" href="/site.css">
+            </head>
+            <body><h1>Softora</h1></body>
+          </html>
+        `,
       };
     },
   });
@@ -214,11 +243,18 @@ test('ai remote service fetches and normalizes website preview scan metadata', a
   const result = await service.fetchWebsitePreviewScanFromUrl('https://softora.nl');
 
   assert.equal(state.fetchTextCalls.length, 0);
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(result.normalizedUrl, 'https://softora.nl');
   assert.equal(result.finalUrl, 'https://softora.nl/landing');
   assert.equal(result.scan.title, 'Softora');
   assert.equal(result.scan.sourceUrl, 'https://softora.nl/landing');
+  assert.deepEqual(result.scan.brandColorHints, [
+    'accent: #8b2252',
+    'accent-light: #a62d65',
+    'bg-primary: #f8f7f4',
+    'text-primary: #1a1a2e',
+  ]);
+  assert.deepEqual(result.scan.brandPalette, ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e', '#ffffff']);
 });
 
 test('ai remote service generates website html via OpenAI and preserves cost metadata', async () => {

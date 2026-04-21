@@ -16,14 +16,23 @@ function createWebsiteGenerationHelpers(deps = {}) {
     const headings = Array.isArray(scan.headings) ? scan.headings.filter(Boolean).slice(0, 6) : [];
     const paragraphs = Array.isArray(scan.paragraphs) ? scan.paragraphs.filter(Boolean).slice(0, 5) : [];
     const visualCues = Array.isArray(scan.visualCues) ? scan.visualCues.filter(Boolean).slice(0, 6) : [];
+    const brandColorHints = Array.isArray(scan.brandColorHints)
+      ? scan.brandColorHints.filter(Boolean).slice(0, 6)
+      : [];
+    const brandPalette = Array.isArray(scan.brandPalette)
+      ? scan.brandPalette.filter(Boolean).slice(0, 6)
+      : [];
     const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 1800);
 
     return [
-      'Create a single high-end desktop homepage redesign mockup as a realistic marketing screenshot.',
-      'Use the current website scan as inspiration, but make the design cleaner, more premium, more conversion-focused, and visually stronger.',
+      'First study the current website represented by the scan below before designing anything.',
+      'Generate exactly 1 fully new ultra-premium redesign as a full-page desktop website screenshot from header to footer in a single image.',
+      'Create a clearly different layout and art direction from the current site, but preserve the same core brand colors, accent usage, contrast relationships, and overall visual atmosphere.',
+      'Do not invent a new color palette. The detected brand colors below should remain dominant throughout the redesign.',
       'This must look like a finished modern website homepage, not a wireframe, not a device mockup, not a browser window, and not a collage.',
+      'Be pixel-perfect in spacing, typography, hierarchy, whitespace, depth, polish, and premium visual detail.',
       'Show a strong hero, clean navigation, clear CTA buttons, supporting content sections, trust signals, refined spacing, and polished typography.',
-      'Use a modern Dutch business aesthetic: trustworthy, sharp, premium, warm, and commercial.',
+      'Use a high-end Dutch business aesthetic: trustworthy, sharp, premium, warm, and commercial.',
       'Avoid generic templates. Make the design feel tailored to the business context below.',
       host ? `Brand or domain: ${host}.` : '',
       title ? `Current page title: ${title}.` : '',
@@ -32,6 +41,8 @@ function createWebsiteGenerationHelpers(deps = {}) {
       headings.length ? `Other current headings: ${headings.join(' | ')}.` : '',
       paragraphs.length ? `Content cues from the current site: ${paragraphs.join(' | ')}.` : '',
       visualCues.length ? `Visual cues found on the current site: ${visualCues.join(' | ')}.` : '',
+      brandColorHints.length ? `Detected brand color variables: ${brandColorHints.join(' | ')}.` : '',
+      brandPalette.length ? `Detected recurring brand colors: ${brandPalette.join(' | ')}.` : '',
       bodyTextSample ? `Current site text sample: ${bodyTextSample}` : '',
       'Output one single landscape image of the redesigned homepage only.',
     ]
@@ -49,6 +60,9 @@ function createWebsiteGenerationHelpers(deps = {}) {
     }
     if (Array.isArray(scan.visualCues) && scan.visualCues.length) {
       parts.push(`Beeldreferenties: ${scan.visualCues.slice(0, 4).join(', ')}`);
+    }
+    if (Array.isArray(scan.brandPalette) && scan.brandPalette.length) {
+      parts.push(`Kleuren: ${scan.brandPalette.slice(0, 4).join(', ')}`);
     }
     return parts.join(' · ');
   }

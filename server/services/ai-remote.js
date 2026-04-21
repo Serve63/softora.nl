@@ -74,6 +74,232 @@ function createAiRemoteService(deps = {}) {
     websiteGenerationStrictHtml = false,
   } = deps;
 
+  function parseHtmlTagAttributes(tagRaw) {
+    const tag = String(tagRaw || '');
+    const attrs = {};
+    const pattern = /([^\s=/>]+)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/g;
+    let match;
+    while ((match = pattern.exec(tag))) {
+      const key = normalizeString(match[1] || '').toLowerCase();
+      const value = normalizeString(match[3] || match[4] || match[5] || '');
+      if (!key) continue;
+      attrs[key] = value;
+    }
+    return attrs;
+  }
+
+  function extractInlineStyleBlocksFromHtml(htmlRaw) {
+    const html = String(htmlRaw || '');
+    const out = [];
+    const pattern = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+    let match;
+    while ((match = pattern.exec(html))) {
+      const cssText = String(match[1] || '').trim();
+      if (!cssText) continue;
+      out.push(cssText);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }
+
+  function extractStylesheetUrlsFromHtml(htmlRaw, pageUrlRaw) {
+    const html = String(htmlRaw || '');
+    const pageUrl = normalizeString(pageUrlRaw || '');
+    const out = [];
+    const seen = new Set();
+    const pattern = /<link\b[^>]*>/gi;
+    let match;
+    while ((match = pattern.exec(html))) {
+      const attrs = parseHtmlTagAttributes(match[0]);
+      const rel = normalizeString(attrs.rel || '').toLowerCase();
+      const hrefRaw = normalizeString(attrs.href || '');
+      if (!hrefRaw || !rel.split(/\s+/).includes('stylesheet')) continue;
+      if (/fonts\.googleapis\.com|fonts\.gstatic\.com/i.test(hrefRaw)) continue;
+      let absoluteUrl = '';
+      try {
+        absoluteUrl = new URL(hrefRaw, pageUrl).toString();
+      } catch {
+        continue;
+      }
+      const normalized = normalizeString(absoluteUrl);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      out.push(normalized);
+      if (out.length >= 4) break;
+    }
+    return out;
+  }
+
+  function extractColorTokensFromCss(textRaw) {
+    const text = String(textRaw || '');
+    if (!text) return [];
+    const matches = text.match(/#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b|rgba?\([^)]*\)|hsla?\([^)]*\)/gi);
+    if (!Array.isArray(matches)) return [];
+    return matches
+      .map((value) => normalizeString(value).toLowerCase().replace(/\s+/g, ' '))
+      .filter(Boolean);
+  }
+
+  function parseCssColorToRgb(colorRaw) {
+    const color = normalizeString(colorRaw || '').toLowerCase();
+    if (!color) return null;
+
+    const hex = color.match(/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+    if (hex) {
+      const value = hex[1];
+      if (value.length === 3 || value.length === 4) {
+        const r = Number.parseInt(value[0] + value[0], 16);
+        const g = Number.parseInt(value[1] + value[1], 16);
+        const b = Number.parseInt(value[2] + value[2], 16);
+        return { r, g, b };
+      }
+      const r = Number.parseInt(value.slice(0, 2), 16);
+      const g = Number.parseInt(value.slice(2, 4), 16);
+      const b = Number.parseInt(value.slice(4, 6), 16);
+      return { r, g, b };
+    }
+
+    const rgb = color.match(/^rgba?\(([^)]*)\)$/i);
+    if (rgb) {
+      const parts = rgb[1]
+        .split(',')
+        .map((item) => Number.parseFloat(String(item || '').trim()))
+        .filter((value) => Number.isFinite(value));
+      if (parts.length >= 3) {
+        return {
+          r: Math.max(0, Math.min(255, parts[0])),
+          g: Math.max(0, Math.min(255, parts[1])),
+          b: Math.max(0, Math.min(255, parts[2])),
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function isLikelyNeutralCssColor(colorRaw) {
+    const parsed = parseCssColorToRgb(colorRaw);
+    if (!parsed) return false;
+    const values = [parsed.r, parsed.g, parsed.b];
+    const spread = Math.max(...values) - Math.min(...values);
+    return spread <= 18;
+  }
+
+  function extractCssVariableColorHints(cssSources = []) {
+    const hits = new Map();
+    const keywordWeights = [
+      ['accent', 10],
+      ['primary', 9],
+      ['brand', 9],
+      ['secondary', 8],
+      ['highlight', 7],
+      ['cta', 7],
+      ['hero', 5],
+      ['theme', 5],
+      ['bg', 3],
+      ['background', 3],
+      ['text', 2],
+    ];
+
+    for (const cssText of cssSources) {
+      const pattern = /--([a-z0-9-_]{2,60})\s*:\s*([^;}{]+)/gi;
+      let match;
+      while ((match = pattern.exec(String(cssText || '')))) {
+        const variableName = normalizeString(match[1] || '').toLowerCase();
+        const declaration = String(match[2] || '');
+        const colors = extractColorTokensFromCss(declaration);
+        if (!variableName || colors.length === 0) continue;
+
+        const color = colors[0];
+        let score = isLikelyNeutralCssColor(color) ? 1 : 4;
+        for (const [keyword, weight] of keywordWeights) {
+          if (variableName.includes(keyword)) score += weight;
+        }
+        if (variableName.includes('text')) score -= 5;
+        if (variableName.includes('bg') || variableName.includes('background')) score -= 2;
+
+        const key = `${variableName}:${color}`;
+        const existing = hits.get(key);
+        if (!existing || existing.score < score) {
+          hits.set(key, {
+            name: variableName,
+            color,
+            score,
+          });
+        }
+      }
+    }
+
+    return Array.from(hits.values())
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+      .slice(0, 6)
+      .map((entry) => `${entry.name}: ${entry.color}`);
+  }
+
+  function extractCssBrandPalette(cssSources = [], preferredColors = []) {
+    const counts = new Map();
+    const preferred = preferredColors
+      .map((value) => normalizeString(value || '').toLowerCase())
+      .filter(Boolean);
+
+    for (const cssText of cssSources) {
+      for (const color of extractColorTokensFromCss(cssText)) {
+        const current = counts.get(color) || 0;
+        const neutralPenalty = isLikelyNeutralCssColor(color) ? 0 : 2;
+        counts.set(color, current + 1 + neutralPenalty);
+      }
+    }
+
+    const palette = [];
+    for (const color of preferred) {
+      if (!palette.includes(color)) palette.push(color);
+      if (palette.length >= 6) return palette;
+    }
+
+    const ranked = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([color]) => color);
+
+    for (const color of ranked) {
+      if (!palette.includes(color)) palette.push(color);
+      if (palette.length >= 6) break;
+    }
+
+    return palette.slice(0, 6);
+  }
+
+  async function fetchWebsitePreviewCssSources(htmlRaw, pageUrlRaw) {
+    const inlineCssSources = extractInlineStyleBlocksFromHtml(htmlRaw);
+    const stylesheetUrls = extractStylesheetUrlsFromHtml(htmlRaw, pageUrlRaw);
+
+    for (const stylesheetUrl of stylesheetUrls) {
+      try {
+        const safeUrl = await assertWebsitePreviewUrlIsPublic(stylesheetUrl);
+        const { response, text } = await fetchTextWithTimeout(
+          safeUrl,
+          {
+            method: 'GET',
+            redirect: 'follow',
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (compatible; SoftoraWebsitePreview/1.0; +https://softora.nl)',
+              Accept: 'text/css,text/plain;q=0.9,*/*;q=0.1',
+            },
+          },
+          12000
+        );
+        if (!response.ok) continue;
+        const cssText = String(text || '').trim();
+        if (!cssText) continue;
+        inlineCssSources.push(cssText);
+      } catch (_) {
+        /* ignore stylesheet fetch failures; html scan is still primary */
+      }
+    }
+
+    return inlineCssSources.slice(0, 8);
+  }
+
   async function generateWebsitePreviewImageWithAi(scan = {}) {
     const apiKey = getOpenAiApiKey();
     if (!apiKey) {
@@ -95,6 +321,7 @@ function createAiRemoteService(deps = {}) {
           model: openAiImageModel,
           prompt,
           size: '1536x1024',
+          quality: 'high',
           response_format: 'b64_json',
         }),
       },
@@ -170,6 +397,22 @@ function createAiRemoteService(deps = {}) {
     }
 
     const scan = extractWebsitePreviewScanFromHtml(html, response.url || normalizedUrl);
+    const cssSources = await fetchWebsitePreviewCssSources(html, response.url || normalizedUrl);
+    const brandColorHints = extractCssVariableColorHints(cssSources);
+    const brandPalette = extractCssBrandPalette(
+      cssSources,
+      brandColorHints.map((item) => {
+        const color = item.split(':').slice(1).join(':');
+        return normalizeString(color || '').toLowerCase();
+      })
+    );
+    if (brandColorHints.length) {
+      scan.brandColorHints = brandColorHints;
+    }
+    if (brandPalette.length) {
+      scan.brandPalette = brandPalette;
+    }
+    scan.stylesheetCount = cssSources.length;
     if (!scan.title && !scan.h1 && !scan.metaDescription && !scan.bodyTextSample) {
       const err = new Error('Er kon te weinig bruikbare inhoud uit deze website worden gelezen.');
       err.status = 422;
