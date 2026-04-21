@@ -62,9 +62,11 @@ test('supabase state store reports config, redacts urls and memoizes the client'
 
   assert.equal(firstClient, secondClient);
   assert.equal(fixture.clientCalls.length, 1);
-  assert.deepEqual(fixture.clientCalls[0][2], {
-    auth: { persistSession: false, autoRefreshToken: false },
+  assert.deepEqual(fixture.clientCalls[0][2].auth, {
+    persistSession: false,
+    autoRefreshToken: false,
   });
+  assert.equal(typeof fixture.clientCalls[0][2].global.fetch, 'function');
 });
 
 test('supabase state store builds stable REST requests for the main runtime snapshot', async () => {
@@ -185,4 +187,27 @@ test('supabase state store aborts hung REST requests with a timeout error', asyn
 
   assert.equal(result.ok, false);
   assert.match(result.error || '', /Supabase REST timeout na/);
+});
+
+test('supabase state store wires a timeout-wrapped fetch into the Supabase client', async () => {
+  let upstreamSignal = null;
+  const fixture = createFixture({
+    supabaseRestTimeoutMs: 5,
+    fetchImpl: async (_url, options = {}) =>
+      new Promise((_, reject) => {
+        upstreamSignal = options.signal || null;
+        options.signal?.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      }),
+  });
+
+  fixture.store.getSupabaseClient();
+  const fetchWithTimeout = fixture.clientCalls[0][2].global.fetch;
+
+  await assert.rejects(fetchWithTimeout('https://example.supabase.co/rest/v1/runtime_state'));
+  assert.ok(upstreamSignal, 'Supabase client fetch hoort een abort-signaal te krijgen');
+  assert.equal(upstreamSignal.aborted, true);
 });

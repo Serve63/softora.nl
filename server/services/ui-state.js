@@ -51,34 +51,44 @@ function createUiStateStore(deps = {}) {
       const rowKey = getUiStateRowKey(normalizedScope);
       const client = getSupabaseClient();
       let row = null;
-
-      if (client) {
-        const { data, error } = await client
-          .from(supabaseStateTable)
-          .select('payload, updated_at')
-          .eq('state_key', rowKey)
-          .maybeSingle();
-
-        if (!error) {
-          row = data || null;
-        } else {
-          const fallback = await fetchSupabaseRowByKeyViaRest(rowKey, 'payload,updated_at');
-          if (!fallback.ok) {
-            logger.error('[UI State][Supabase][GetError]', error.message || error);
-            return null;
-          }
-          row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
-        }
-      } else {
+      async function readRowViaRest(clientError = null) {
         const fallback = await fetchSupabaseRowByKeyViaRest(rowKey, 'payload,updated_at');
         if (!fallback.ok) {
+          const fallbackMsg = fallback.error
+            ? ` | REST fallback: ${fallback.error}`
+            : fallback.status
+              ? ` | REST fallback status: ${fallback.status}`
+              : '';
           logger.error(
             '[UI State][Supabase][GetError]',
-            'Supabase client ontbreekt en REST fallback faalde.'
+            `${clientError?.message || clientError || 'Supabase client ontbreekt.'}${fallbackMsg}`
           );
           return null;
         }
-        row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
+        return Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
+      }
+
+      if (client) {
+        try {
+          const { data, error } = await client
+            .from(supabaseStateTable)
+            .select('payload, updated_at')
+            .eq('state_key', rowKey)
+            .maybeSingle();
+
+          if (!error) {
+            row = data || null;
+          } else {
+            row = await readRowViaRest(error);
+            if (row === null) return null;
+          }
+        } catch (error) {
+          row = await readRowViaRest(error);
+          if (row === null) return null;
+        }
+      } else {
+        row = await readRowViaRest(new Error('Supabase client ontbreekt.'));
+        if (row === null) return null;
       }
 
       const values = sanitizeUiStateValues(row?.payload?.values || {});
@@ -125,10 +135,14 @@ function createUiStateStore(deps = {}) {
 
       let upsertError = null;
       if (client) {
-        const { error } = await client.from(supabaseStateTable).upsert(row, {
-          onConflict: 'state_key',
-        });
-        upsertError = error || null;
+        try {
+          const { error } = await client.from(supabaseStateTable).upsert(row, {
+            onConflict: 'state_key',
+          });
+          upsertError = error || null;
+        } catch (error) {
+          upsertError = error;
+        }
       } else {
         upsertError = new Error('Supabase client ontbreekt.');
       }

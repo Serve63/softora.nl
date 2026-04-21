@@ -16,9 +16,14 @@ function createSupabaseStateStore(deps = {}) {
   } = deps;
 
   let supabaseClient = null;
+  let timedSupabaseFetch = null;
 
   function isSupabaseConfigured() {
     return Boolean(supabaseUrl && supabaseServiceRoleKey);
+  }
+
+  function getSafeSupabaseTimeoutMs() {
+    return Math.max(1000, Math.min(60000, Number(supabaseRestTimeoutMs) || 12000));
   }
 
   function redactSupabaseUrlForDebug(url = supabaseUrl) {
@@ -40,6 +45,52 @@ function createSupabaseStateStore(deps = {}) {
     };
   }
 
+  function getTimedSupabaseFetch() {
+    if (timedSupabaseFetch) return timedSupabaseFetch;
+    if (typeof fetchImpl !== 'function') return null;
+
+    timedSupabaseFetch = async (url, options = {}) => {
+      const timeoutMs = getSafeSupabaseTimeoutMs();
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      const upstreamSignal = options?.signal;
+      let timeout = null;
+      let abortListener = null;
+
+      if (controller && upstreamSignal && typeof upstreamSignal.addEventListener === 'function') {
+        if (upstreamSignal.aborted) {
+          controller.abort(upstreamSignal.reason);
+        } else {
+          abortListener = () => controller.abort(upstreamSignal.reason);
+          upstreamSignal.addEventListener('abort', abortListener, { once: true });
+        }
+      }
+
+      if (controller) {
+        timeout = setTimeout(() => {
+          const timeoutError = new Error(
+            `Supabase client timeout na ${Math.round(timeoutMs / 1000)}s`
+          );
+          timeoutError.name = 'AbortError';
+          controller.abort(timeoutError);
+        }, timeoutMs);
+      }
+
+      try {
+        return await fetchImpl(url, {
+          ...options,
+          signal: controller ? controller.signal : upstreamSignal,
+        });
+      } finally {
+        if (timeout) clearTimeout(timeout);
+        if (abortListener && typeof upstreamSignal?.removeEventListener === 'function') {
+          upstreamSignal.removeEventListener('abort', abortListener);
+        }
+      }
+    };
+
+    return timedSupabaseFetch;
+  }
+
   async function performRestRequest(url, options = {}) {
     if (!isSupabaseConfigured()) {
       return { ok: false, status: null, body: null, error: 'Supabase niet geconfigureerd.' };
@@ -48,7 +99,7 @@ function createSupabaseStateStore(deps = {}) {
       return { ok: false, status: null, body: null, error: 'Fetch is niet beschikbaar.' };
     }
 
-    const timeoutMs = Math.max(1000, Math.min(60000, Number(supabaseRestTimeoutMs) || 12000));
+    const timeoutMs = getSafeSupabaseTimeoutMs();
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
@@ -182,9 +233,14 @@ function createSupabaseStateStore(deps = {}) {
   function getSupabaseClient() {
     if (!isSupabaseConfigured()) return null;
     if (supabaseClient) return supabaseClient;
-    supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    const clientOptions = {
       auth: { persistSession: false, autoRefreshToken: false },
-    });
+    };
+    const fetchWithTimeout = getTimedSupabaseFetch();
+    if (fetchWithTimeout) {
+      clientOptions.global = { fetch: fetchWithTimeout };
+    }
+    supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, clientOptions);
     return supabaseClient;
   }
 

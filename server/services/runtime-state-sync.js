@@ -307,26 +307,45 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
 
     runtimeState.supabaseStateHydrationPromise = (async () => {
       try {
-        const client = getSupabaseClient();
-        if (!client) return false;
+        async function completeHydration(row, options = {}) {
+          if (row && row.payload && typeof row.payload === 'object') {
+            applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
+            if (options.logLoad) {
+              logInfo(
+                '[Supabase] Runtime state geladen',
+                JSON.stringify({
+                  table: supabaseStateTable,
+                  stateKey: supabaseStateKey,
+                  updatedAt: row.updated_at || null,
+                  callUpdates: recentCallUpdates.length,
+                  insights: recentAiCallInsights.length,
+                  dashboardActivities: recentDashboardActivities.length,
+                  appointments: generatedAgendaAppointments.length,
+                })
+              );
+            }
+          }
 
-        const { data, error } = await client
-          .from(supabaseStateTable)
-          .select('payload, updated_at')
-          .eq('state_key', supabaseStateKey)
-          .maybeSingle();
+          await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
+          await hydrateDismissedLeadsFromSupabase();
 
-        if (error) {
+          runtimeState.supabaseStateHydrated = true;
+          runtimeState.supabaseLastHydrateError = '';
+          runtimeState.supabaseHydrateRetryNotBeforeMs = 0;
+          return true;
+        }
+
+        async function hydrateViaRest(primaryError = null) {
           const fallback = await fetchSupabaseStateRowViaRest('payload,updated_at');
           if (!fallback.ok) {
-            logError('[Supabase][HydrateError]', error.message || error);
+            logError('[Supabase][HydrateError]', primaryError?.message || primaryError);
             const fallbackMsg = fallback.error
               ? ` | REST fallback: ${fallback.error}`
               : fallback.status
                 ? ` | REST fallback status: ${fallback.status}`
                 : '';
             runtimeState.supabaseLastHydrateError = truncateText(
-              `${error.message || String(error)}${fallbackMsg}`,
+              `${primaryError?.message || String(primaryError || 'Supabase client ontbreekt.')}${fallbackMsg}`,
               500
             );
             runtimeState.supabaseHydrateRetryNotBeforeMs = Date.now() + 60_000;
@@ -334,40 +353,29 @@ function createRuntimeStateSyncCoordinator(deps = {}) {
           }
 
           const row = Array.isArray(fallback.body) ? fallback.body[0] || null : fallback.body;
-          if (row && row.payload && typeof row.payload === 'object') {
-            applyRuntimeStateSnapshotPayload(row.payload, { updatedAt: row.updated_at || '' });
+          return completeHydration(row);
+        }
+
+        const client = getSupabaseClient();
+        if (!client) {
+          return hydrateViaRest(new Error('Supabase client ontbreekt.'));
+        }
+
+        try {
+          const { data, error } = await client
+            .from(supabaseStateTable)
+            .select('payload, updated_at')
+            .eq('state_key', supabaseStateKey)
+            .maybeSingle();
+
+          if (error) {
+            return hydrateViaRest(error);
           }
-          await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
-          await hydrateDismissedLeadsFromSupabase();
-          runtimeState.supabaseStateHydrated = true;
-          runtimeState.supabaseLastHydrateError = '';
-          runtimeState.supabaseHydrateRetryNotBeforeMs = 0;
-          return true;
+
+          return completeHydration(data || null, { logLoad: true });
+        } catch (error) {
+          return hydrateViaRest(error);
         }
-
-        if (data && data.payload && typeof data.payload === 'object') {
-          applyRuntimeStateSnapshotPayload(data.payload, { updatedAt: data.updated_at || '' });
-          logInfo(
-            '[Supabase] Runtime state geladen',
-            JSON.stringify({
-              table: supabaseStateTable,
-              stateKey: supabaseStateKey,
-              updatedAt: data.updated_at || null,
-              callUpdates: recentCallUpdates.length,
-              insights: recentAiCallInsights.length,
-              dashboardActivities: recentDashboardActivities.length,
-              appointments: generatedAgendaAppointments.length,
-            })
-          );
-        }
-
-        await syncCallUpdatesFromSupabaseRows({ force: true, maxAgeMs: 0 });
-        await hydrateDismissedLeadsFromSupabase();
-
-        runtimeState.supabaseStateHydrated = true;
-        runtimeState.supabaseLastHydrateError = '';
-        runtimeState.supabaseHydrateRetryNotBeforeMs = 0;
-        return true;
       } catch (error) {
         logError('[Supabase][HydrateCrash]', error?.message || error);
         runtimeState.supabaseLastHydrateError = truncateText(error?.message || String(error), 500);

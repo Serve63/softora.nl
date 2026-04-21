@@ -17,7 +17,13 @@ function applyAppMiddleware(app, deps = {}) {
     noindexHeaderValue,
     isSupabaseConfigured,
     ensureRuntimeStateHydratedFromSupabase,
+    supabaseHydrateMiddlewareWaitMs = 1500,
   } = deps;
+
+  const safeSupabaseHydrateMiddlewareWaitMs = Math.max(
+    250,
+    Math.min(10000, Number(supabaseHydrateMiddlewareWaitMs) || 1500)
+  );
 
   app.disable('x-powered-by');
 
@@ -180,11 +186,30 @@ function applyAppMiddleware(app, deps = {}) {
     if (!isSupabaseConfigured()) return next();
     if (!requestPath.startsWith('/api/')) return next();
 
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      next();
+    };
+
+    const timeout = setTimeout(() => {
+      console.warn(
+        '[Supabase][HydrateMiddlewareTimeout]',
+        `${requestPath} na ${safeSupabaseHydrateMiddlewareWaitMs}ms doorgelaten`
+      );
+      release();
+    }, safeSupabaseHydrateMiddlewareWaitMs);
+
     ensureRuntimeStateHydratedFromSupabase()
-      .then(() => next())
+      .then(() => {
+        clearTimeout(timeout);
+        release();
+      })
       .catch((error) => {
+        clearTimeout(timeout);
         console.error('[Supabase][HydrateMiddlewareError]', error?.message || error);
-        next();
+        release();
       });
   });
 

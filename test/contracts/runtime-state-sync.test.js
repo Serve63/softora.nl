@@ -347,6 +347,58 @@ test('runtime state sync coordinator hydrates from REST fallback and clears hydr
   assert.equal(fixture.generatedAgendaAppointments[0].id, 55);
 });
 
+test('runtime state sync coordinator hydrates from REST fallback when the client read crashes', async () => {
+  const fixture = createFixture({
+    getSupabaseClient: () => ({
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  async maybeSingle() {
+                    throw new Error('hydrate client explode');
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    }),
+    fetchSupabaseStateRowViaRest: async () => ({
+      ok: true,
+      status: 200,
+      body: [
+        {
+          updated_at: '2026-04-22T08:00:00.000Z',
+          payload: {
+            savedAt: '2026-04-22T08:00:00.000Z',
+            recentWebhookEvents: [],
+            recentCallUpdates: [],
+            recentAiCallInsights: [],
+            recentDashboardActivities: [],
+            recentSecurityAuditEvents: [],
+            generatedAgendaAppointments: [],
+            dismissedInterestedLeadCallIds: [],
+            dismissedInterestedLeadKeys: [],
+            leadOwnerAssignments: [],
+            nextLeadOwnerRotationIndex: 0,
+            nextGeneratedAgendaAppointmentId: 100001,
+          },
+        },
+      ],
+    }),
+    fetchSupabaseCallUpdateRowsViaRest: async () => ({ ok: true, status: 200, body: [] }),
+  });
+
+  const ok = await fixture.coordinator.ensureRuntimeStateHydratedFromSupabase();
+
+  assert.equal(ok, true);
+  assert.equal(fixture.runtimeState.supabaseStateHydrated, true);
+  assert.equal(fixture.runtimeState.supabaseLastHydrateError, '');
+});
+
 test('runtime state sync coordinator treats queued runtime snapshot await as a no-op when Supabase is disabled', async () => {
   const fixture = createFixture({
     isSupabaseConfigured: false,

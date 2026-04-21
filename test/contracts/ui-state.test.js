@@ -120,3 +120,66 @@ test('ui-state store writes values through REST fallback when client upsert fail
     nullable: '',
   });
 });
+
+test('ui-state store reads values through REST fallback when client read crashes', async () => {
+  const crashingClient = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                async maybeSingle() {
+                  throw new Error('client read explode');
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const { store } = createFixture({
+    client: crashingClient,
+    fetchResult: {
+      ok: true,
+      body: {
+        payload: {
+          values: {
+            panel: 'fallback',
+          },
+        },
+        updated_at: '2026-04-22T08:00:00.000Z',
+      },
+    },
+  });
+
+  const state = await store.getUiStateValues('dashboard');
+
+  assert.deepEqual(state, {
+    values: { panel: 'fallback' },
+    updatedAt: '2026-04-22T08:00:00.000Z',
+    source: 'supabase',
+  });
+});
+
+test('ui-state store writes values through REST fallback when client upsert crashes', async () => {
+  const crashingClient = {
+    from() {
+      return {
+        async upsert() {
+          throw new Error('client write explode');
+        },
+      };
+    },
+  };
+  const { restWrites, store } = createFixture({
+    client: crashingClient,
+  });
+
+  const state = await store.setUiStateValues('dashboard', { panel: 'overview' }, { source: 'frontend' });
+
+  assert.equal(restWrites.length, 1);
+  assert.equal(restWrites[0].state_key, 'ui_state:dashboard');
+  assert.equal(state.source, 'supabase');
+});
