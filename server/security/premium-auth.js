@@ -35,6 +35,7 @@ function getPublicApiPathVariants(requestPath) {
 function createPremiumAuthStateManager(options = {}) {
   const {
     sessionSecret = '',
+    resolveTimeoutMs = 1500,
     normalizeString = (value) => String(value || '').trim(),
     truncateText = (value) => String(value || '').trim(),
     normalizeSessionEmail = (value) => String(value || '').trim().toLowerCase(),
@@ -44,6 +45,10 @@ function createPremiumAuthStateManager(options = {}) {
     isPremiumMfaConfigured = () => false,
     getRequestPathname = () => '/',
   } = options;
+
+  function getSafeResolveTimeoutMs() {
+    return Math.max(0, Math.min(10000, Number(resolveTimeoutMs) || 0));
+  }
 
   function getPremiumAuthState(req) {
     const configured = Boolean(sessionSecret);
@@ -74,39 +79,135 @@ function createPremiumAuthStateManager(options = {}) {
     };
   }
 
+  function buildConfiguredAnonymousState(basicAuthState) {
+    return {
+      ...basicAuthState,
+      configured: Boolean(sessionSecret),
+      authenticated: false,
+      userId: '',
+      role: '',
+      isAdmin: false,
+      revoked: false,
+      user: null,
+      displayName: '',
+    };
+  }
+
+  function buildAuthenticatedStateFromUser(basicAuthState, user) {
+    return {
+      ...basicAuthState,
+      configured: true,
+      authenticated: true,
+      email: user.email,
+      userId: user.id,
+      role: user.role,
+      isAdmin: premiumUsersStore.isAdminRole(user.role),
+      revoked: false,
+      user,
+      displayName: premiumUsersStore.buildUserDisplayName(user),
+      firstName: normalizeString(user.firstName || ''),
+      lastName: normalizeString(user.lastName || ''),
+      avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(user.avatarDataUrl || ''),
+    };
+  }
+
+  function buildTokenFallbackState(basicAuthState) {
+    if (!basicAuthState.authenticated) {
+      return buildConfiguredAnonymousState(basicAuthState);
+    }
+
+    const cachedUsers = premiumUsersStore.getCachedUsers();
+    const cachedUser =
+      premiumUsersStore.findUserById(cachedUsers, basicAuthState.userId) ||
+      premiumUsersStore.findUserByEmail(cachedUsers, basicAuthState.email);
+
+    if (cachedUser) {
+      if (premiumUsersStore.normalizeUserStatus(cachedUser.status) !== 'active') {
+        return {
+          ...basicAuthState,
+          configured: true,
+          authenticated: false,
+          role: '',
+          isAdmin: false,
+          revoked: true,
+          user: null,
+          displayName: '',
+        };
+      }
+      return buildAuthenticatedStateFromUser(basicAuthState, cachedUser);
+    }
+
+    return {
+      ...basicAuthState,
+      configured: true,
+      authenticated: true,
+      isAdmin: premiumUsersStore.isAdminRole(basicAuthState.role),
+      revoked: false,
+      user: null,
+      displayName: '',
+      firstName: '',
+      lastName: '',
+      avatarDataUrl: '',
+    };
+  }
+
   async function getResolvedPremiumAuthState(req) {
     const basicAuthState = getPremiumAuthState(req);
-    const hydrated = await premiumUsersStore.ensureUsersHydrated();
+    const timeoutMs = getSafeResolveTimeoutMs();
+    let hydrated;
+    if (!timeoutMs) {
+      hydrated = await premiumUsersStore.ensureUsersHydrated();
+    } else {
+      hydrated = await new Promise((resolve) => {
+        let settled = false;
+        const finish = (value) => {
+          if (settled) return;
+          settled = true;
+          if (timeoutHandle) clearTimeout(timeoutHandle);
+          resolve(value);
+        };
+
+        const timeoutHandle = setTimeout(() => {
+          console.error('[PremiumAuth][ResolveTimeout]', `na ${timeoutMs}ms`);
+          finish({
+            users: premiumUsersStore.getCachedUsers(),
+            source: 'timeout',
+          });
+        }, timeoutMs);
+
+        Promise.resolve()
+          .then(() => premiumUsersStore.ensureUsersHydrated())
+          .then((value) => finish(value))
+          .catch((error) => {
+            console.error('[PremiumAuth][ResolveError]', error?.message || error);
+            finish({
+              users: premiumUsersStore.getCachedUsers(),
+              source: 'timeout',
+            });
+          });
+      });
+    }
     const users = Array.isArray(hydrated?.users) ? hydrated.users : premiumUsersStore.getCachedUsers();
     const configured = Boolean(sessionSecret && hydrated?.source === 'supabase' && users.length > 0);
 
+    if (hydrated?.source === 'timeout') {
+      return buildTokenFallbackState(basicAuthState);
+    }
+
     if (!configured) {
-      return {
+      return buildConfiguredAnonymousState({
         ...basicAuthState,
         configured: false,
         authenticated: false,
         expired: false,
-        userId: '',
-        role: '',
-        isAdmin: false,
-        revoked: false,
-        user: null,
-        displayName: '',
-      };
+      });
     }
 
     if (!basicAuthState.authenticated) {
-      return {
+      return buildConfiguredAnonymousState({
         ...basicAuthState,
         configured: true,
-        authenticated: false,
-        userId: '',
-        role: '',
-        isAdmin: false,
-        revoked: false,
-        user: null,
-        displayName: '',
-      };
+      });
     }
 
     const user =
@@ -126,21 +227,7 @@ function createPremiumAuthStateManager(options = {}) {
       };
     }
 
-    return {
-      ...basicAuthState,
-      configured: true,
-      authenticated: true,
-      email: user.email,
-      userId: user.id,
-      role: user.role,
-      isAdmin: premiumUsersStore.isAdminRole(user.role),
-      revoked: false,
-      user,
-      displayName: premiumUsersStore.buildUserDisplayName(user),
-      firstName: normalizeString(user.firstName || ''),
-      lastName: normalizeString(user.lastName || ''),
-      avatarDataUrl: premiumUsersStore.sanitizeAvatarDataUrl(user.avatarDataUrl || ''),
-    };
+    return buildAuthenticatedStateFromUser(basicAuthState, user);
   }
 
   function buildPremiumAuthSessionPayload(authState) {

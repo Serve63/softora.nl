@@ -147,3 +147,69 @@ test('premium auth manager rejects unsafe redirects and recognizes public api pa
     false
   );
 });
+
+test('premium auth manager falls back to cached or token auth state when user hydration times out', async () => {
+  const cachedUsers = [
+    {
+      id: 'usr_1',
+      email: 'info@softora.nl',
+      role: 'admin',
+      status: 'active',
+      firstName: 'Serve',
+      lastName: 'Creusen',
+      avatarDataUrl: 'data:image/png;base64,abc',
+    },
+  ];
+  const manager = createPremiumAuthStateManager({
+    sessionSecret: 'secret',
+    resolveTimeoutMs: 5,
+    normalizeString,
+    truncateText,
+    normalizeSessionEmail: (value) => normalizeString(value).toLowerCase(),
+    readSessionTokenFromRequest: () => 'token',
+    verifySessionToken: () => ({
+      ok: true,
+      expired: false,
+      payload: {
+        email: 'info@softora.nl',
+        uid: 'usr_1',
+        role: 'admin',
+        exp: Date.now() + 60_000,
+      },
+    }),
+    premiumUsersStore: {
+      async ensureUsersHydrated() {
+        return new Promise(() => {});
+      },
+      getCachedUsers() {
+        return cachedUsers;
+      },
+      findUserById(list, userId) {
+        return list.find((item) => item.id === userId) || null;
+      },
+      findUserByEmail(list, email) {
+        return list.find((item) => item.email === email) || null;
+      },
+      normalizeUserStatus(status) {
+        return String(status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
+      },
+      isAdminRole(role) {
+        return String(role || '').toLowerCase() === 'admin';
+      },
+      buildUserDisplayName(user) {
+        return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || '';
+      },
+      sanitizeAvatarDataUrl(value) {
+        return normalizeString(value);
+      },
+    },
+    getRequestPathname: () => '/',
+  });
+
+  const resolved = await manager.getResolvedPremiumAuthState({});
+
+  assert.equal(resolved.configured, true);
+  assert.equal(resolved.authenticated, true);
+  assert.equal(resolved.email, 'info@softora.nl');
+  assert.equal(resolved.isAdmin, true);
+});
