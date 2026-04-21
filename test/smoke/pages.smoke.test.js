@@ -41,6 +41,33 @@ const unifiedPersonnelThemeTargets = [
   'premium-personeel-dashboard.html',
 ];
 
+const premiumSidebarThemeVersionTargets = [
+  'premium-actieve-opdrachten.html',
+  'premium-advertenties.html',
+  'premium-analytics.html',
+  'premium-ai-coldmailing.html',
+  'premium-ai-lead-generator.html',
+  'premium-bevestigingsmails.html',
+  'premium-boekhouding.html',
+  'premium-instellingen-personeel.html',
+  'premium-instellingen.html',
+  'premium-kladblok.html',
+  'premium-klanten.html',
+  'premium-mailbox.html',
+  'premium-opdracht-dossier.html',
+  'premium-pakketten.html',
+  'premium-pdfs.html',
+  'premium-personeel-agenda.html',
+  'premium-personeel-dashboard.html',
+  'premium-seo-crm-system.html',
+  'premium-seo.html',
+  'premium-vaste-lasten.html',
+  'premium-wachtwoordenregister.html',
+  'premium-websitegenerator.html',
+  'premium-websitepreview.html',
+  'premium-word.html',
+];
+
 for (const filePath of unifiedPersonnelThemeTargets) {
   test(`page smoke: ${filePath} uses unified personnel theme cache key`, () => {
     const html = fs.readFileSync(path.join(repoRoot, filePath), 'utf8');
@@ -51,6 +78,17 @@ for (const filePath of unifiedPersonnelThemeTargets) {
     );
   });
 }
+
+test('page smoke: premium sidebar pages pin the refreshed personnel theme script version', () => {
+  for (const filePath of premiumSidebarThemeVersionTargets) {
+    const html = fs.readFileSync(path.join(repoRoot, filePath), 'utf8');
+    assert.match(
+      html,
+      /assets\/personnel-theme\.js\?v=20260421b/,
+      `Nieuwe sidebar scriptversie ontbreekt voor ${filePath}`
+    );
+  }
+});
 
 test('page smoke: premium-ai-coldmailing.html promotes suppression after lead removal regardless of persistence state', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-ai-coldmailing.html'), 'utf8');
