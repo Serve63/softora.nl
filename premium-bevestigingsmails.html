@@ -37,7 +37,7 @@
   --crimson: #9b2355; --clight: #c4346a; --dark: #1a1a2e;
   --mid: #555; --light: #999; --green: #16733c; --orange: #b45a00;
   --text-primary: #f5f5f5; --text-tertiary: #888;
-  --z1: #1a5f8a; --z2: #b45a00; --z4: #7b3fa0;
+  --z1: #8B2252; --z2: #8B2252; --z4: #8B2252;
   --z5: #16733c;
 }
 body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); min-height: 100vh; line-height: 1.6; overflow-x: hidden; }
@@ -122,9 +122,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .zone-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .zone-stat { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .zone-badge { font-size: 8px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; display: inline-block; padding: 2px 7px; border-radius: 999px; flex-shrink: 0; }
-.z1 .zone-badge { background: rgba(26,95,138,.1); color: var(--z1); }
-.z2 .zone-badge { background: rgba(180,90,0,.1); color: var(--z2); }
-.z4 .zone-badge { background: rgba(123,63,160,.1); color: var(--z4); }
+.z1 .zone-badge { background: rgba(139,34,82,.1); color: var(--z1); }
+.z2 .zone-badge { background: rgba(139,34,82,.1); color: var(--z2); }
+.z4 .zone-badge { background: rgba(139,34,82,.1); color: var(--z4); }
 .z5 .zone-badge { background: rgba(22,115,60,.1); color: var(--z5); }
 .conv-card .zone-badge { background: rgba(155,35,85,.1); color: var(--crimson); }
 .zone-count { font-family: 'Oswald', sans-serif; font-size: 26px; font-weight: 700; line-height: 1; color: var(--dark); flex-shrink: 0; }
@@ -314,9 +314,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
 .bedrijf-domain { font-size: 11px; color: var(--light); }
 .bedrijf-branche { font-size: 11px; color: var(--mid); background: var(--bg); padding: 2px 8px; border-radius: 3px; display: inline-block; }
 .zone-pill { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 4px; font-family: 'Oswald', sans-serif; letter-spacing: .5px; white-space: nowrap; }
-.zp1 { background: rgba(26,95,138,.1); color: var(--z1); }
-.zp2 { background: rgba(180,90,0,.1); color: var(--z2); }
-.zp4 { background: rgba(123,63,160,.1); color: var(--z4); }
+.zp1 { background: rgba(139,34,82,.1); color: var(--z1); }
+.zp2 { background: rgba(139,34,82,.1); color: var(--z2); }
+.zp4 { background: rgba(139,34,82,.1); color: var(--z4); }
 .zp5 { background: rgba(22,115,60,.1); color: var(--z5); }
 .mail-datum { font-size: 11px; color: var(--light); }
 
@@ -489,12 +489,12 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
       <div class="zone-card z5" onclick="openZone(5)">
         <div class="zone-head">
           <div class="zone-stat">
-            <div class="zone-badge">Zone 5</div>
+            <div class="zone-badge">Interesse</div>
             <div class="zone-count" id="z5-count">0</div>
           </div>
           <div class="zone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
         </div>
-        <div class="zone-tooltip">Bedrijven die een afspraak hebben ingepland.</div>
+        <div class="zone-tooltip">Bedrijven die interesse hebben getoond.</div>
       </div>
       <div class="zone-card conv-card">
         <div class="zone-head">
@@ -821,7 +821,7 @@ function runMails() {
     else if (r < .38) b.zone = 2;
 
     const zoneColors = { 1: 'var(--z1)', 2: 'var(--z2)', 4: 'var(--z4)', 5: 'var(--z5)' };
-    const zoneLabels = { 1:'Zone 1 — Eerste mail', 2:'Zone 2 — Tweede mail', 4:'Zone 4 — Meer dan 3 mails', 5:'Zone 5 — Afspraak ✓' };
+    const zoneLabels = { 1:'Zone 1 — Eerste mail', 2:'Zone 2 — Tweede mail', 4:'Zone 4 — Meer dan 3 mails', 5:'Interesse' };
     addLog(`<strong>${b.naam}</strong> · ${zoneLabels[b.zone]}`, zoneColors[b.zone]);
 
     const pct = Math.round((campIdx / campTotal) * 100);
@@ -844,7 +844,7 @@ const zoneInfo = {
   1: { label:'Zone 1', title:'Eerste mail verstuurd',     sub:'Alle bedrijven die de eerste mail hebben ontvangen.', badge:'zp1', col:'var(--z1)' },
   2: { label:'Zone 2', title:'Tweede mail verstuurd',     sub:'Bedrijven die een follow-up mail hebben ontvangen.', badge:'zp2', col:'var(--z2)' },
   4: { label:'Zone 4', title:'Meer dan 3 mails verstuurd', sub:'Bedrijven die meer dan 3 mails hebben ontvangen maar nog geen afspraak hebben ingepland.', badge:'zp4', col:'var(--z4)' },
-  5: { label:'Zone 5', title:'Afspraak ingepland ✓',      sub:'Bedrijven die een afspraak hebben ingepland.', badge:'zp5', col:'var(--z5)' },
+  5: { label:'Interesse', title:'Interesse',      sub:'Bedrijven die interesse hebben getoond.', badge:'zp5', col:'var(--z5)' },
 };
 
 function openZone(z) {
@@ -908,7 +908,7 @@ function renderBedrijven(lijst) {
       </td>
       <td><div class="bedrijf-branche">${b.branche}</div></td>
       <td style="font-size:13px;color:var(--mid)">${b.stad}</td>
-      <td><span class="zone-pill zp${b.zone}">Zone ${b.zone}</span></td>
+      <td><span class="zone-pill zp${b.zone}">${zoneInfo[b.zone] ? zoneInfo[b.zone].label : `Zone ${b.zone}`}</span></td>
       <td class="mail-datum">${b.laatste_mail}</td>
     </tr>`).join('');
 }
@@ -1045,7 +1045,19 @@ function enhanceCampaignSelect(select) {
 }
 
 function initCampaignSelects() {
-  document.querySelectorAll('select.sel, select.mf-sel').forEach(enhanceCampaignSelect);
+  document.querySelectorAll('select.sel, select.mf-sel').forEach(select => {
+    const shell = select.parentElement && select.parentElement.classList.contains('select-shell')
+      ? select.parentElement
+      : null;
+    if (shell && shell.parentNode) {
+      shell.parentNode.insertBefore(select, shell);
+      shell.remove();
+    }
+    select.classList.remove('native-select-hidden');
+    select.hidden = false;
+    select.removeAttribute('aria-hidden');
+    delete select.dataset.enhanced;
+  });
 }
 
 // TOAST
