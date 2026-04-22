@@ -332,6 +332,77 @@ function createSeoCore(deps = {}) {
     );
   }
 
+  function resolveWebsitePreviewAssetUrl(assetUrlRaw, pageUrlRaw) {
+    const assetUrl = normalizeString(assetUrlRaw || '');
+    const pageUrl = normalizeWebsitePreviewTargetUrl(pageUrlRaw);
+    if (!assetUrl) return '';
+    if (/^(?:data|blob|javascript|mailto|tel):/i.test(assetUrl)) return '';
+
+    try {
+      if (pageUrl) {
+        return truncateText(normalizeString(new URL(assetUrl, pageUrl).toString()), 1800);
+      }
+      return truncateText(normalizeString(new URL(assetUrl).toString()), 1800);
+    } catch {
+      return '';
+    }
+  }
+
+  function isLikelyUsefulWebsitePreviewImageUrl(urlRaw) {
+    const url = normalizeString(urlRaw || '').toLowerCase();
+    if (!url) return false;
+    if (/^data:|^blob:|^javascript:/i.test(url)) return false;
+    if (/\.(?:svg|ico)(?:[?#].*)?$/i.test(url)) return false;
+    return /^https?:\/\//i.test(url);
+  }
+
+  function scoreWebsitePreviewReferenceImage(entry = {}, index = 0) {
+    const url = normalizeString(entry.url || '').toLowerCase();
+    const alt = normalizeString(entry.alt || '').toLowerCase();
+    let score = Math.max(12, 70 - index * 6);
+
+    if (entry.source === 'og') score += 120;
+    if (entry.source === 'twitter') score += 105;
+    if (alt) score += 12;
+    if (/hero|banner|cover|feature|showcase|header/i.test(url)) score += 16;
+    if (/logo|icon|favicon|sprite|avatar|thumb|thumbnail|badge/i.test(url)) score -= 35;
+    if (/logo|icon|avatar|thumbnail|badge/i.test(alt)) score -= 18;
+    if (/\.(?:gif)(?:[?#].*)?$/i.test(url)) score -= 20;
+
+    return score;
+  }
+
+  function extractWebsitePreviewReferenceImageUrls(source = {}, images = [], pageUrlRaw = '') {
+    const ranked = new Map();
+
+    const pushCandidate = (assetUrlRaw, sourceLabel, alt = '', index = 0) => {
+      const url = resolveWebsitePreviewAssetUrl(assetUrlRaw, pageUrlRaw);
+      if (!isLikelyUsefulWebsitePreviewImageUrl(url)) return;
+      const next = {
+        url,
+        alt: truncateText(normalizeString(alt || ''), 220),
+        source: sourceLabel,
+        score: scoreWebsitePreviewReferenceImage({ url, alt, source: sourceLabel }, index),
+      };
+      const existing = ranked.get(url);
+      if (!existing || existing.score < next.score) {
+        ranked.set(url, next);
+      }
+    };
+
+    pushCandidate(source.ogImage, 'og', source.ogTitle || source.title || '', 0);
+    pushCandidate(source.twitterImage, 'twitter', source.twitterTitle || source.title || '', 1);
+
+    images.forEach((entry, index) => {
+      pushCandidate(entry?.src, 'page', entry?.alt || '', index);
+    });
+
+    return Array.from(ranked.values())
+      .sort((a, b) => b.score - a.score || a.url.localeCompare(b.url))
+      .slice(0, 4)
+      .map((entry) => entry.url);
+  }
+
   function extractWebsitePreviewScanFromHtml(htmlRaw, pageUrlRaw) {
     const html = String(htmlRaw || '');
     const normalizedUrl = normalizeWebsitePreviewTargetUrl(pageUrlRaw);
@@ -346,6 +417,7 @@ function createSeoCore(deps = {}) {
       maxLength: 280,
     });
     const images = extractImageEntriesFromHtml(html).slice(0, 8);
+    const referenceImageUrls = extractWebsitePreviewReferenceImageUrls(source, images, normalizedUrl);
     const visualCues = Array.from(
       new Set(
         images
@@ -376,6 +448,7 @@ function createSeoCore(deps = {}) {
       headings,
       paragraphs,
       visualCues,
+      referenceImageUrls,
       imageCount: images.length,
       bodyTextSample,
     };

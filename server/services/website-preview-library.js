@@ -103,45 +103,54 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     }
   }
 
-  async function saveLibraryResponse(req, res) {
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const dataUrl = String(body.dataUrl || '').trim();
-    const url = String(body.url || '').trim();
+  /**
+   * Slaat een preview op voor de gegeven premium-auth (ook server-side jobs zonder volledige Request).
+   * @returns {Promise<{ ok: true, entry: object }|{ ok: false, status: number, error: string, detail: string }>}
+   */
+  async function persistPreviewLibraryEntry(premiumAuth, body) {
+    const bodyObj = body && typeof body === 'object' ? body : {};
+    const dataUrl = String(bodyObj.dataUrl || '').trim();
+    const url = String(bodyObj.url || '').trim();
 
     if (!dataUrl || !url) {
-      return res.status(400).json({
+      return {
         ok: false,
+        status: 400,
         error: 'Preview onvolledig',
         detail: 'dataUrl en url zijn verplicht.',
-      });
+      };
     }
 
     if (!dataUrl.startsWith('data:image/')) {
-      return res.status(400).json({
+      return {
         ok: false,
+        status: 400,
         error: 'Ongeldige afbeelding',
         detail: 'Alleen data:image/… (PNG/JPEG) is toegestaan.',
-      });
+      };
     }
 
     if (dataUrl.length > maxDataUrlChars) {
-      return res.status(400).json({
+      return {
         ok: false,
+        status: 400,
         error: 'Afbeelding te groot',
         detail: 'Verklein de preview of scan opnieuw met een lichtere pagina.',
-      });
+      };
     }
 
     if (!isSupabaseConfigured()) {
-      return res.status(503).json({
+      return {
         ok: false,
+        status: 503,
         error: 'Bibliotheek is niet beschikbaar',
         detail: 'Supabase is niet geconfigureerd voor deze omgeving.',
-      });
+      };
     }
 
+    const reqLike = { premiumAuth };
     try {
-      const ownerSlug = buildOwnerSlug(req);
+      const ownerSlug = buildOwnerSlug(reqLike);
       const prefix = buildUserKeyPrefix(ownerSlug);
       const listResult = await fetchSupabaseRowsByStateKeyPrefixViaRest(prefix, maxItems + 25);
       if (!listResult.ok) {
@@ -149,11 +158,12 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
           '[WebsitePreviewLibrary][SaveList]',
           listResult.error || listResult.status || listResult.body
         );
-        return res.status(500).json({
+        return {
           ok: false,
+          status: 500,
           error: 'Bibliotheek opslaan mislukt',
           detail: 'Kon bestaande items niet ophalen.',
-        });
+        };
       }
 
       const existingRows = Array.isArray(listResult.body) ? listResult.body : [];
@@ -169,10 +179,10 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
 
       const entryId = randomUUID();
       const stateKey = buildStateKey(ownerSlug, entryId);
-      const hostname = truncateText(normalizeString(body.hostname || ''), 200);
-      const fileName = truncateText(normalizeString(body.fileName || ''), 240);
-      const width = Math.max(16, Math.min(4096, Number(body.width) || 1024));
-      const height = Math.max(16, Math.min(8192, Number(body.height) || 1536));
+      const hostname = truncateText(normalizeString(bodyObj.hostname || ''), 200);
+      const fileName = truncateText(normalizeString(bodyObj.fileName || ''), 240);
+      const width = Math.max(16, Math.min(4096, Number(bodyObj.width) || 1024));
+      const height = Math.max(16, Math.min(8192, Number(bodyObj.height) || 1536));
       const now = new Date().toISOString();
 
       const row = {
@@ -192,7 +202,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
           type: 'website_preview_library',
           source: 'premium-websitegenerator',
           actor: normalizeString(
-            req?.premiumAuth?.displayName || req?.premiumAuth?.email || 'dashboard'
+            premiumAuth?.displayName || premiumAuth?.email || 'dashboard'
           ),
         },
         updated_at: now,
@@ -204,23 +214,41 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
           '[WebsitePreviewLibrary][Save]',
           saveResult.error || saveResult.status || saveResult.body
         );
-        return res.status(500).json({
+        return {
           ok: false,
+          status: 500,
           error: 'Bibliotheek opslaan mislukt',
           detail: 'De preview kon niet in Supabase worden opgeslagen.',
-        });
+        };
       }
 
-      const entry = mapSupabaseRowToClientEntry({ state_key: stateKey, payload: row.payload, updated_at: now });
-      return res.status(200).json({ ok: true, entry });
+      const entry = mapSupabaseRowToClientEntry({
+        state_key: stateKey,
+        payload: row.payload,
+        updated_at: now,
+      });
+      return { ok: true, entry };
     } catch (error) {
       logger.error('[WebsitePreviewLibrary][SaveCrash]', error?.message || error);
-      return res.status(500).json({
+      return {
         ok: false,
+        status: 500,
         error: 'Bibliotheek opslaan mislukt',
         detail: String(error?.message || 'Onbekende fout'),
+      };
+    }
+  }
+
+  async function saveLibraryResponse(req, res) {
+    const result = await persistPreviewLibraryEntry(req.premiumAuth, req.body);
+    if (!result.ok) {
+      return res.status(result.status).json({
+        ok: false,
+        error: result.error,
+        detail: result.detail,
       });
     }
+    return res.status(200).json({ ok: true, entry: result.entry });
   }
 
   async function deleteLibraryResponse(req, res) {
@@ -289,6 +317,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     listLibraryResponse,
     saveLibraryResponse,
     deleteLibraryResponse,
+    persistPreviewLibraryEntry,
   };
 }
 

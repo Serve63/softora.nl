@@ -47,6 +47,54 @@ function createAiToolsCoordinator(deps = {}) {
     logger = console,
   } = deps;
 
+  async function runWebsitePreviewGeneratePipeline(inputUrl) {
+    const fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
+    const generated = await generateWebsitePreviewImageWithAi(fetched.scan);
+
+    appendDashboardActivity(
+      {
+        type: 'website_preview_generated',
+        title: 'Websitegenerator gegenereerd',
+        detail: `Nieuwe AI preview gemaakt voor ${fetched.scan.host || fetched.finalUrl}.`,
+        actor: 'api',
+        source: 'premium-websitegenerator',
+      },
+      'dashboard_activity_website_preview_generated'
+    );
+
+    return {
+      ok: true,
+      site: {
+        requestedUrl: inputUrl,
+        normalizedUrl: fetched.normalizedUrl,
+        finalUrl: fetched.finalUrl,
+        host: fetched.scan.host || '',
+      },
+      scan: {
+        title: fetched.scan.title || '',
+        metaDescription: fetched.scan.metaDescription || '',
+        h1: fetched.scan.h1 || '',
+        headings: fetched.scan.headings || [],
+        paragraphs: fetched.scan.paragraphs || [],
+        visualCues: fetched.scan.visualCues || [],
+        brandColorHints: fetched.scan.brandColorHints || [],
+        brandPalette: fetched.scan.brandPalette || [],
+        imageCount: Number(fetched.scan.imageCount || 0) || 0,
+      },
+      brief: generated.brief,
+      prompt: generated.prompt,
+      image: {
+        dataUrl: generated.dataUrl,
+        mimeType: generated.mimeType,
+        fileName: generated.fileName,
+      },
+      model: generated.model,
+      revisedPrompt: generated.revisedPrompt || '',
+      usage: generated.usage,
+      openAiEnabled: true,
+    };
+  }
+
   async function sendWebsitePreviewGenerateResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -59,51 +107,8 @@ function createAiToolsCoordinator(deps = {}) {
         });
       }
 
-      const fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
-      const generated = await generateWebsitePreviewImageWithAi(fetched.scan);
-
-      appendDashboardActivity(
-        {
-          type: 'website_preview_generated',
-          title: 'Websitegenerator gegenereerd',
-          detail: `Nieuwe AI preview gemaakt voor ${fetched.scan.host || fetched.finalUrl}.`,
-          actor: 'api',
-          source: 'premium-websitegenerator',
-        },
-        'dashboard_activity_website_preview_generated'
-      );
-
-      return res.status(200).json({
-        ok: true,
-        site: {
-          requestedUrl: inputUrl,
-          normalizedUrl: fetched.normalizedUrl,
-          finalUrl: fetched.finalUrl,
-          host: fetched.scan.host || '',
-        },
-        scan: {
-          title: fetched.scan.title || '',
-          metaDescription: fetched.scan.metaDescription || '',
-          h1: fetched.scan.h1 || '',
-          headings: fetched.scan.headings || [],
-          paragraphs: fetched.scan.paragraphs || [],
-          visualCues: fetched.scan.visualCues || [],
-          brandColorHints: fetched.scan.brandColorHints || [],
-          brandPalette: fetched.scan.brandPalette || [],
-          imageCount: Number(fetched.scan.imageCount || 0) || 0,
-        },
-        brief: generated.brief,
-        prompt: generated.prompt,
-        image: {
-          dataUrl: generated.dataUrl,
-          mimeType: generated.mimeType,
-          fileName: generated.fileName,
-        },
-        model: generated.model,
-        revisedPrompt: generated.revisedPrompt || '',
-        usage: generated.usage,
-        openAiEnabled: true,
-      });
+      const payload = await runWebsitePreviewGeneratePipeline(inputUrl);
+      return res.status(200).json(payload);
     } catch (error) {
       const status = Number(error?.status) || 500;
       const safeStatus = status >= 400 && status < 600 ? status : 500;
@@ -360,6 +365,7 @@ function createAiToolsCoordinator(deps = {}) {
     sendOrderDossierResponse,
     sendTranscriptToPromptResponse,
     sendWebsitePreviewGenerateResponse,
+    runWebsitePreviewGeneratePipeline,
   };
 }
 

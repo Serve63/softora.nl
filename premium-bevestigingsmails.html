@@ -10,8 +10,16 @@
 <script>
 (function () {
   try {
-    var path = (window.location.pathname || '').split('?')[0].replace(/\/+$/, '') || '/';
-    if (path !== '/premium-ai-lead-generator') return;
+    var raw = (window.location.pathname || '').split('?')[0];
+    var path = raw.replace(/\/+$/, '') || '/';
+    try {
+      path = decodeURIComponent(path);
+    } catch (e) {}
+    path = String(path).toLowerCase();
+    if (path.endsWith('.html')) path = path.slice(0, -5);
+    var isLeadGen =
+      path === '/premium-ai-lead-generator' || /\/premium-ai-lead-generator$/.test(path);
+    if (!isLeadGen) return;
     var titleEl = document.querySelector('title');
     if (titleEl) titleEl.textContent = 'Coldcalling – Softora.nl';
     document.documentElement.setAttribute('data-softora-lead-generator-alias', '1');
@@ -148,6 +156,8 @@ html[data-softora-lead-generator-alias="1"] .zones-row { grid-template-columns: 
 html[data-softora-lead-generator-alias="1"] .zone-card.z4 { display: none !important; }
 html[data-softora-lead-generator-alias="1"] .campaign-metric-zone4 { display: none !important; }
 html[data-softora-lead-generator-alias="1"] #screen-dashboard .topbar-right { display: none !important; }
+html[data-softora-lead-generator-alias="1"] #mail-subj-row { display: none !important; }
+html[data-softora-lead-generator-alias="1"] .mail-tab-group > .mail-tab:not(.mail-icon-tab) { display: none !important; }
 .zone-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -240,6 +250,48 @@ html[data-softora-lead-generator-alias="1"] #screen-dashboard .topbar-right { di
 .field { margin-bottom: 18px; position: relative; }
 .field.is-open { z-index: 25; }
 .field-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); margin-bottom: 8px; display: block; }
+.field-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.field-label-nav {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field-bg);
+  color: var(--mid);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.field-label-nav:hover {
+  border-color: rgba(155,35,85,.42);
+  color: var(--crimson);
+}
+.field-label-nav:focus-visible {
+  outline: none;
+  border-color: var(--crimson);
+  box-shadow: 0 0 0 3px rgba(155,35,85,.1);
+}
+.field-label-nav svg { width: 14px; height: 14px; }
+.field-label--toggle {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+  text-transform: none;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--dark);
+  line-height: 1.35;
+}
 .field-val { font-family: 'Oswald', sans-serif; font-size: 28px; font-weight: 700; color: var(--crimson); line-height: 1; margin-bottom: 6px; }
 
 .slider { width: 100%; -webkit-appearance: none; height: 4px; border-radius: 2px; background: var(--border); outline: none; cursor: pointer; }
@@ -683,6 +735,69 @@ html[data-softora-lead-generator-alias="1"] #screen-dashboard .topbar-right { di
 .toast { position: fixed; bottom: 24px; right: 24px; background: var(--dark); color: #fff; padding: 10px 16px; border-radius: 5px; font-size: 12px; font-weight: 500; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; z-index: 99; }
 .toast.show { opacity: 1; transform: translateY(0); }
 
+/* Campagne start — laadscherm (alleen lead-generator-alias; z-index boven premium-modals) */
+.campaign-boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 16000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 18, 22, 0.72);
+  backdrop-filter: blur(6px);
+}
+.campaign-boot-overlay:not([hidden]) { display: flex; }
+.campaign-boot-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 26px 24px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.22);
+}
+.campaign-boot-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin: 0 0 18px;
+  color: var(--text);
+}
+.campaign-boot-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tag);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.campaign-boot-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--crimson), #e85a6b);
+  transition: width 0.08s linear;
+}
+.campaign-boot-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--light);
+  margin-bottom: 14px;
+}
+.campaign-boot-meta #campaign-boot-pct { font-weight: 700; color: var(--text); }
+.campaign-boot-status {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  min-height: 3.2em;
+}
+
 @media (max-width: 1024px) {
   .main-content { margin-left: 0; padding: 1.5rem; }
   .topbar { flex-direction: column; }
@@ -776,8 +891,7 @@ html[data-softora-lead-generator-alias="1"] #screen-dashboard .topbar-right { di
     <script>
     (function () {
       try {
-        var path = (window.location.pathname || '').split('?')[0].replace(/\/+$/, '') || '/';
-        if (path !== '/premium-ai-lead-generator') return;
+        if (document.documentElement.getAttribute('data-softora-lead-generator-alias') !== '1') return;
         var h1 = document.querySelector('#screen-dashboard .topbar-left h1');
         if (h1) h1.textContent = 'Coldcalling';
       } catch (e) {}
@@ -866,7 +980,7 @@ html[data-softora-lead-generator-alias="1"] #screen-dashboard .topbar-right { di
       <!-- MAIL 1 -->
       <div class="mail-panel active" id="mail-panel-1">
         <div class="mail-fields">
-          <div class="mf-row">
+          <div class="mf-row" id="mail-subj-row">
             <div class="mf-label">Onderwerp</div>
             <input class="mf-inp" type="text" id="subj1" value="Korte vraag over uw website — Softora.nl">
           </div>
@@ -982,7 +1096,15 @@ info@softora.nl</textarea>
       <div class="campagne-body">
 
         <div class="field">
-          <div class="field-label">Aantal te mailen bedrijven</div>
+          <div class="field-label-row" role="group" aria-label="Doel van de campagne">
+            <button type="button" class="field-label-nav" aria-label="Vorige optie" onclick="cycleCampaignCountMode(-1)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div class="field-label field-label--toggle" id="campaign-count-mode-label">Hoeveel bedrijven mailen?</div>
+            <button type="button" class="field-label-nav" aria-label="Volgende optie" onclick="cycleCampaignCountMode(1)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
           <div class="field-val" id="slider-val">100</div>
           <input class="slider" type="range" min="10" max="500" step="10" value="100" id="mail-slider" oninput="updateSlider(this.value)">
           <div class="slider-row"><span>10</span><span>250</span><span>500</span></div>
@@ -1076,8 +1198,7 @@ info@softora.nl</textarea>
         <script>
         (function () {
           try {
-            var path = (window.location.pathname || '').split('?')[0].replace(/\/+$/, '') || '/';
-            if (path !== '/premium-ai-lead-generator') return;
+            if (document.documentElement.getAttribute('data-softora-lead-generator-alias') !== '1') return;
             var label = document.querySelector('[data-coldmailing-lead-alias-label="1"]');
             if (label) label.textContent = 'Terug naar coldcalling';
           } catch (e) {}
@@ -1154,6 +1275,18 @@ info@softora.nl</textarea>
 
 <div class="toast" id="toast"></div>
 
+<div id="campaign-boot-overlay" class="campaign-boot-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="campaign-boot-title">
+  <div class="campaign-boot-card">
+    <h2 class="campaign-boot-title" id="campaign-boot-title">Campagne wordt voorbereid</h2>
+    <div class="campaign-boot-bar" aria-hidden="true"><div class="campaign-boot-bar-fill"></div></div>
+    <div class="campaign-boot-meta">
+      <span id="campaign-boot-pct">0%</span>
+      <span id="campaign-boot-eta"></span>
+    </div>
+    <p class="campaign-boot-status" id="campaign-boot-status"></p>
+  </div>
+</div>
+
 <script>
 // ── DATA ──
 let bedrijven = [];
@@ -1161,8 +1294,7 @@ let activeZone = 0;
 
 function isPremiumAiLeadGeneratorPath() {
   try {
-    var p = (window.location.pathname || '').split('?')[0].replace(/\/+$/, '') || '/';
-    return p === '/premium-ai-lead-generator';
+    return document.documentElement.getAttribute('data-softora-lead-generator-alias') === '1';
   } catch (e) {
     return false;
   }
@@ -1197,7 +1329,7 @@ function applyPremiumAiLeadGeneratorBelmethodeRow() {
   const row = sel.closest('.mf-row');
   const label = row && row.querySelector('.mf-label');
   if (label) label.textContent = 'Belmethode';
-  sel.innerHTML = '<option>Los van elkaar</option><option>Alles tegelijk</option>';
+  sel.innerHTML = '<option>Apart</option><option>Alles tegelijk</option>';
 }
 
 const BRANCHEN  = ['Horeca & Restaurants','Retail & Winkels','Zakelijke Dienstverlening','Bouw & Vastgoed','Gezondheidszorg','Creatieve Sector','Tech & Startups','Overig'];
@@ -1228,6 +1360,29 @@ function genBedrijven(n) {
 }
 
 // ── SLIDER ──
+const CAMPAIGN_COUNT_MODES = [
+  { id: 'mail', label: 'Hoeveel bedrijven mailen?' },
+  { id: 'appointments', label: 'Hoeveel afspraken inplannen?' },
+];
+let campaignCountModeIndex = 0;
+
+function getCampaignCountMode() {
+  return CAMPAIGN_COUNT_MODES[campaignCountModeIndex]?.id || 'mail';
+}
+
+function renderCampaignCountModeLabel() {
+  const el = document.getElementById('campaign-count-mode-label');
+  if (!el) return;
+  const mode = CAMPAIGN_COUNT_MODES[campaignCountModeIndex];
+  el.textContent = mode ? mode.label : '';
+}
+
+function cycleCampaignCountMode(delta) {
+  const len = CAMPAIGN_COUNT_MODES.length;
+  campaignCountModeIndex = (campaignCountModeIndex + delta + len) % len;
+  renderCampaignCountModeLabel();
+}
+
 function updateSlider(v) {
   document.getElementById('slider-val').textContent = v;
   const pct = ((v-10)/(500-10))*100;
@@ -1235,6 +1390,7 @@ function updateSlider(v) {
     `linear-gradient(to right, var(--crimson) 0%, var(--crimson) ${pct}%, var(--border) ${pct}%)`;
 }
 updateSlider(100);
+renderCampaignCountModeLabel();
 
 const KM_OPTIES = [10,20,30,40,50,75,100,130,150,175,200,250];
 function updateKm(v) {
@@ -1283,6 +1439,7 @@ function renderLog() {
 const PREMIUM_BEVESTIGINGSMAILS_CANONICAL = 'https://www.softora.nl/premium-bevestigingsmails';
 
 let running = false;
+let campaignBootInProgress = false;
 let campInterval = null;
 let campTotal = 0;
 let campaignTimeline = [];
@@ -1508,6 +1665,80 @@ function advanceCampaignTimeline() {
 
 function startCampagne() {
   if (running) return;
+  if (isPremiumAiLeadGeneratorPath()) {
+    void startCampagneWithLeadGeneratorBoot();
+    return;
+  }
+  startCampagneImmediate();
+}
+
+async function startCampagneWithLeadGeneratorBoot() {
+  if (running || campaignBootInProgress) return;
+  campaignBootInProgress = true;
+  const overlay = document.getElementById('campaign-boot-overlay');
+  const barFill = overlay && overlay.querySelector('.campaign-boot-bar-fill');
+  const statusEl = document.getElementById('campaign-boot-status');
+  const etaEl = document.getElementById('campaign-boot-eta');
+  const pctEl = document.getElementById('campaign-boot-pct');
+  try {
+    if (!overlay) {
+      startCampagneImmediate();
+      return;
+    }
+    overlay.hidden = false;
+    overlay.setAttribute('aria-hidden', 'false');
+    if (statusEl) statusEl.textContent = 'Campagne-instellingen worden gelezen…';
+    if (pctEl) pctEl.textContent = '0%';
+    if (barFill) barFill.style.width = '0%';
+
+    const totalMs = 4000;
+    const messages = [
+      { at: 0, text: 'Campagne-instellingen worden gelezen…' },
+      { at: 800, text: 'Leads worden voorbereid op basis van je filters…' },
+      { at: 1600, text: 'Bellijst en belmethode worden gecontroleerd…' },
+      { at: 2400, text: 'Scenario en AI-scripts worden klaargezet…' },
+      { at: 3200, text: 'Campagne-overzicht wordt geopend…' },
+    ];
+
+    await new Promise(function (resolve) {
+      const t0 = Date.now();
+      function tick() {
+        const elapsed = Date.now() - t0;
+        const t = Math.min(1, elapsed / totalMs);
+        const pct = Math.round(t * 100);
+        if (barFill) barFill.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+        const secLeft = Math.max(0, Math.ceil((totalMs - elapsed) / 1000));
+        if (etaEl) {
+          etaEl.textContent = secLeft > 0
+            ? 'Geschatte afronding over ca. ' + secLeft + ' s'
+            : 'Afronden…';
+        }
+        var msg = messages[0].text;
+        for (var i = messages.length - 1; i >= 0; i--) {
+          if (elapsed >= messages[i].at) {
+            msg = messages[i].text;
+            break;
+          }
+        }
+        if (statusEl) statusEl.textContent = msg;
+        if (t < 1) requestAnimationFrame(tick);
+        else resolve();
+      }
+      requestAnimationFrame(tick);
+    });
+
+    overlay.hidden = true;
+    overlay.setAttribute('aria-hidden', 'true');
+    if (barFill) barFill.style.width = '0%';
+    startCampagneImmediate();
+  } finally {
+    campaignBootInProgress = false;
+  }
+}
+
+function startCampagneImmediate() {
+  if (running) return;
   const n = parseInt(document.getElementById('mail-slider').value, 10) || 100;
   const fillWorkdays = !!document.getElementById('campaign-full-workdays')?.checked;
 
@@ -1518,9 +1749,14 @@ function startCampagne() {
   campaignFinished = false;
   running = true;
 
+  const countMode = getCampaignCountMode();
   document.getElementById('campaign-subtitle').textContent = fillWorkdays
-    ? `${n} bedrijven doorlopen deze campagne in 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.`
-    : `${n} bedrijven doorlopen deze campagne in 14 dagen, van eerste verzending tot laatste checkpoint.`;
+    ? countMode === 'appointments'
+      ? `${n} afspraken inplannen binnen deze campagne van 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.`
+      : `${n} bedrijven doorlopen deze campagne in 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.`
+    : countMode === 'appointments'
+      ? `${n} afspraken inplannen binnen deze campagne van 14 dagen, van eerste benadering tot laatste checkpoint.`
+      : `${n} bedrijven doorlopen deze campagne in 14 dagen, van eerste verzending tot laatste checkpoint.`;
 
   showScreen('screen-campaign');
   document.getElementById('campaign-progress-fill').style.width = '0%';
@@ -1667,11 +1903,31 @@ function goBack() {
 }
 
 
+function ensureLeadGeneratorSettingsBackRow() {
+  if (!isPremiumAiLeadGeneratorPath()) return;
+  var p5 = document.getElementById('mail-panel-5');
+  if (!p5 || p5.querySelector('.lead-gen-back-to-script')) return;
+  var fields = p5.querySelector('.mail-fields');
+  if (!fields) return;
+  var wrap = document.createElement('div');
+  wrap.className = 'mf-row lead-gen-back-to-script';
+  wrap.innerHTML =
+    '<button type="button" class="mail-tab" style="cursor:pointer" id="leadGenBackToScriptBtn">Terug naar script</button>';
+  fields.insertBefore(wrap, fields.firstChild);
+  document.getElementById('leadGenBackToScriptBtn').addEventListener('click', function () {
+    var m1 = document.querySelector('.mail-tab-group button.mail-tab[onclick*="switchMail(1"]');
+    if (m1) switchMail(1, m1);
+  });
+}
+
 function switchMail(n, el) {
   document.querySelectorAll('.mail-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.mail-panel').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('mail-panel-' + n).classList.add('active');
+  if (n === 5) {
+    ensureLeadGeneratorSettingsBackRow();
+  }
 }
 
 function closeCustomSelects(exceptShell = null) {

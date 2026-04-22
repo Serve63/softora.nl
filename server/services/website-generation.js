@@ -22,30 +22,34 @@ function createWebsiteGenerationHelpers(deps = {}) {
     const brandPalette = Array.isArray(scan.brandPalette)
       ? scan.brandPalette.filter(Boolean).slice(0, 6)
       : [];
+    const referenceImageCount = Math.max(0, Number(scan.referenceImageCount || 0) || 0);
     const bodyTextSample = truncateText(normalizeString(scan.bodyTextSample || ''), 1800);
 
     return [
-      'First study the current website represented by the scan below before designing anything.',
-      'Generate exactly 1 fully new ultra-premium redesign as a full-page desktop website screenshot from header to footer in a single image.',
-      'Create a clearly different layout and art direction from the current site, but preserve the same core brand colors, accent usage, contrast relationships, and overall visual atmosphere.',
-      'Do not invent a new color palette. The detected brand colors below should remain dominant throughout the redesign.',
-      'The homepage must fill the frame edge-to-edge with no empty white gutter, no unused side canvas, and no blank margin on the right side.',
-      'This must look like a finished modern website homepage, not a wireframe, not a device mockup, not a browser window, and not a collage.',
-      'Be pixel-perfect in spacing, typography, hierarchy, whitespace, depth, polish, and premium visual detail.',
-      'Show a strong hero, clean navigation, clear CTA buttons, supporting content sections, trust signals, refined spacing, and polished typography.',
-      'Use a high-end Dutch business aesthetic: trustworthy, sharp, premium, warm, and commercial.',
-      'Avoid generic templates. Make the design feel tailored to the business context below.',
-      host ? `Brand or domain: ${host}.` : '',
-      title ? `Current page title: ${title}.` : '',
-      description ? `Current meta description: ${description}.` : '',
-      h1 ? `Primary heading on current site: ${h1}.` : '',
-      headings.length ? `Other current headings: ${headings.join(' | ')}.` : '',
-      paragraphs.length ? `Content cues from the current site: ${paragraphs.join(' | ')}.` : '',
-      visualCues.length ? `Visual cues found on the current site: ${visualCues.join(' | ')}.` : '',
-      brandColorHints.length ? `Detected brand color variables: ${brandColorHints.join(' | ')}.` : '',
-      brandPalette.length ? `Detected recurring brand colors: ${brandPalette.join(' | ')}.` : '',
-      bodyTextSample ? `Current site text sample: ${bodyTextSample}` : '',
-      'Output one single landscape image of the redesigned homepage only.',
+      'Bekijk eerst de website op basis van de scan hieronder en analyseer de huidige structuur, content, merkuitstraling en vooral het bestaande kleurenthema voordat je iets ontwerpt.',
+      referenceImageCount
+        ? `Gebruik de ${referenceImageCount} meegeleverde referentiebeeld(en) als harde visuele bron voor kleurgebruik, fotografie, contrast, materiaalgevoel en merkuitstraling, maar ontwerp wel een volledig nieuwe compositie en layout.`
+        : '',
+      'Genereer daarna precies 1 volledig nieuwe ultra-premium redesign als full-page desktop website screenshot van header tot footer in een enkel beeld.',
+      'De layout en art direction moeten duidelijk totaal anders zijn dan de huidige site, maar behoud exact dezelfde hoofdkleuren, accenten, contrastverhoudingen en visuele sfeer van het huidige merk.',
+      'Introduceer nadrukkelijk geen nieuw kleurenpalet. De bestaande merkkleuren moeten dominant blijven in de redesign.',
+      'Gebruik een hoge verticale full-page compositie zodat de volledige desktop-homepage van header tot footer zichtbaar is in één afbeelding. Dit is geen mobiele screenshot.',
+      'Toon een echte desktop navigatie en desktop lay-out met duidelijke secties, meerdere kolommen waar logisch, premium typografie en sterke visuele hiërarchie.',
+      'Het beeld moet edge-to-edge gevuld zijn zonder leeg wit canvas, zonder browser chrome, zonder device mockup, zonder wireframe en zonder collage.',
+      'Streef naar uitzonderlijk hoge kwaliteit: pixel-perfect spacing, high-end typografie, royale witruimte, subtiele diepte, premium details en een zeer overtuigend afgewerkt eindresultaat.',
+      'Gebruik geloofwaardige Nederlandse websitecopy geïnspireerd op de huidige site-inhoud, diensten en tone of voice. Geen lorem ipsum en geen generieke placeholder-copy.',
+      'Maak het resultaat uitgesproken, maatwerk en commercieel sterk, alsof het een high-end redesign voor exact hetzelfde bedrijf is.',
+      host ? `Domein of merk: ${host}.` : '',
+      title ? `Huidige paginatitel: ${title}.` : '',
+      description ? `Huidige meta-omschrijving: ${description}.` : '',
+      h1 ? `Belangrijkste huidige heading: ${h1}.` : '',
+      headings.length ? `Overige huidige headings: ${headings.join(' | ')}.` : '',
+      paragraphs.length ? `Inhoudelijke cues van de huidige site: ${paragraphs.join(' | ')}.` : '',
+      visualCues.length ? `Visuele cues van de huidige site: ${visualCues.join(' | ')}.` : '',
+      brandColorHints.length ? `Gedetecteerde merkkleur-variabelen: ${brandColorHints.join(' | ')}.` : '',
+      brandPalette.length ? `Gedetecteerde terugkerende merkkleuren: ${brandPalette.join(' | ')}.` : '',
+      bodyTextSample ? `Tekstsample van de huidige site: ${bodyTextSample}` : '',
+      'Lever exact 1 hoge portrait full-page desktop homepage screenshot op.',
     ]
       .filter(Boolean)
       .join('\n');

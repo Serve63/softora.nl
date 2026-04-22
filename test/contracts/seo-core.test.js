@@ -192,6 +192,7 @@ test('seo core extracts website preview scan data from html', () => {
   <head>
     <title>Softora Preview</title>
     <meta name="description" content="Een korte preview beschrijving">
+    <meta property="og:image" content="/og-softora.jpg">
   </head>
   <body>
     <h1>Welkom bij Softora</h1>
@@ -209,5 +210,9 @@ test('seo core extracts website preview scan data from html', () => {
   assert.equal(scan.h1, 'Welkom bij Softora');
   assert.deepEqual(scan.headings, ['Onze aanpak']);
   assert.deepEqual(scan.visualCues, ['Hero visual']);
+  assert.deepEqual(scan.referenceImageUrls, [
+    'https://softora.nl/og-softora.jpg',
+    'https://softora.nl/hero-image.png',
+  ]);
   assert.ok(scan.bodyTextSample.includes('Wij bouwen websites die converteren.'));
 });

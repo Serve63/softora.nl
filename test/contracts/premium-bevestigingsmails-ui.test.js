@@ -69,10 +69,12 @@ test('premium bevestigingsmails renders the zone cards as a separate strip above
   assert.doesNotMatch(pageSource, /\.generator-grid > \.panel\s*\{[\s\S]*border-top:\s*none;/);
 });
 
-test('premium bevestigingsmails gebruikt Campagne afronden als eindlabel van de tijdlijn', () => {
+test('premium bevestigingsmails campaign finish uses Campagne afronden label and canonical URL for notifications', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
+  assert.match(pageSource, /PREMIUM_BEVESTIGINGSMAILS_CANONICAL\s*=\s*'https:\/\/www\.softora\.nl\/premium-bevestigingsmails'/);
+  assert.match(pageSource, /notifyColdmailingCampaignAfronden/);
   assert.match(pageSource, /'Campagne afronden'/);
   assert.doesNotMatch(pageSource, /Terug naar overzicht/);
 });
@@ -82,4 +84,52 @@ test('premium bevestigingsmails hides the verbose checkpoint text block in the s
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.doesNotMatch(pageSource, /campaign-status-text/);
+});
+
+test('premium bevestigingsmails includes lead-generator campaign boot overlay before immediate start', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /id="campaign-boot-overlay"/);
+  assert.match(pageSource, /id="campaign-boot-status"/);
+  assert.match(pageSource, /id="campaign-boot-eta"/);
+  assert.match(pageSource, /function startCampagneWithLeadGeneratorBoot/);
+  assert.match(pageSource, /function startCampagneImmediate/);
+  assert.match(
+    pageSource,
+    /function startCampagne\(\) \{[\s\S]*?isPremiumAiLeadGeneratorPath\(\)[\s\S]*?startCampagneWithLeadGeneratorBoot/
+  );
+});
+
+test('premium bevestigingsmails campaign volume label toggles mail vs appointments with arrow controls', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /id="campaign-count-mode-label"/);
+  assert.match(pageSource, /function cycleCampaignCountMode/);
+  assert.match(pageSource, /Hoeveel bedrijven mailen\?/);
+  assert.match(pageSource, /Hoeveel afspraken inplannen\?/);
+  assert.doesNotMatch(pageSource, /Aantal te mailen bedrijven/);
+});
+
+test('premium bevestigingsmails hides mail onderwerp row only on lead-generator alias', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /id="mail-subj-row"/);
+  assert.match(
+    pageSource,
+    /html\[data-softora-lead-generator-alias="1"\] #mail-subj-row \{ display: none !important; \}/
+  );
+});
+
+test('premium bevestigingsmails hides mail 1 and ai instructies tabs on lead-generator alias', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(
+    pageSource,
+    /html\[data-softora-lead-generator-alias="1"\] \.mail-tab-group > \.mail-tab:not\(\.mail-icon-tab\) \{ display: none !important; \}/
+  );
+  assert.match(pageSource, /function ensureLeadGeneratorSettingsBackRow/);
 });

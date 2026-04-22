@@ -4,16 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="format-detection" content="telephone=no">
-    <meta name="theme-color" content="#f8f7f4">
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f7f4">
+    <meta name="theme-color" content="#f4ede5">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4ede5">
     <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
     <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <title>Softora | Premium Webdesign & Development</title>
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+    <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
     <link rel="stylesheet" href="assets/public-theme.css">
     <script>
         (function () {
@@ -24,9 +22,6 @@
             }
         })();
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
-    
     <style>
         * {
             margin: 0;
@@ -374,7 +369,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=2000&q=85') center 42% / cover no-repeat;
+            background: url('/assets/home-hero-generated-v2.jpg') center 48% / cover no-repeat;
             z-index: 0;
         }
 
@@ -2276,6 +2271,626 @@
                 box-shadow: 0 14px 30px rgba(37, 211, 102, 0.22);
             }
         }
+
+        /* 2026 homepage redesign */
+        body {
+            background:
+                radial-gradient(circle at top left, rgba(139, 34, 82, 0.1), transparent 20%),
+                radial-gradient(circle at 86% 12%, rgba(139, 34, 82, 0.08), transparent 18%),
+                linear-gradient(180deg, #f6f1ea 0%, #f7f2ec 36%, #faf7f3 70%, #f2ebe4 100%);
+        }
+
+        nav,
+        nav.scrolled {
+            padding-inline: clamp(1.5rem, 4vw, 4rem);
+            background: rgba(250, 246, 241, 0.78);
+            border-bottom: 1px solid rgba(27, 24, 31, 0.08);
+            box-shadow: 0 14px 40px rgba(20, 16, 12, 0.08);
+            backdrop-filter: blur(20px);
+        }
+
+        .logo {
+            color: #161316;
+        }
+
+        .logo::after {
+            background: linear-gradient(90deg, var(--accent) 0%, #cf7a91 100%);
+        }
+
+        .nav-link {
+            color: rgba(26, 26, 46, 0.72);
+        }
+
+        .magnetic-btn {
+            border-radius: 999px;
+            clip-path: none;
+            box-shadow: 0 18px 36px rgba(139, 34, 82, 0.18);
+        }
+
+        .magnetic-btn.secondary {
+            box-shadow: none;
+        }
+
+        section.hero {
+            min-height: clamp(720px, 92vh, 980px);
+            padding: clamp(7.5rem, 14vh, 9rem) clamp(1.5rem, 4vw, 4rem) clamp(5rem, 10vh, 6.5rem);
+        }
+
+        .hero::before {
+            background: url('/assets/home-hero-generated-v2.jpg') center 52% / cover no-repeat;
+            transform: scale(1.03);
+        }
+
+        .hero::after {
+            background:
+                linear-gradient(96deg, rgba(16, 12, 12, 0.8) 0%, rgba(16, 12, 12, 0.55) 34%, rgba(16, 12, 12, 0.14) 68%, rgba(16, 12, 12, 0.44) 100%),
+                radial-gradient(circle at 74% 22%, rgba(247, 224, 206, 0.2), transparent 26%);
+        }
+
+        .hero-content {
+            width: min(1240px, calc(100vw - 5rem));
+            max-width: min(1240px, calc(100vw - 5rem));
+            display: grid;
+            grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.72fr);
+            gap: clamp(1.5rem, 3vw, 2.75rem);
+            align-items: end;
+            text-align: left !important;
+        }
+
+        .hero-content > * {
+            min-width: 0;
+        }
+
+        .hero-copy-panel {
+            max-width: 44rem;
+            padding: clamp(1.4rem, 4vw, 2rem) 0 clamp(1.2rem, 2vw, 1.6rem);
+        }
+
+        .hero-eyebrow {
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(12px);
+            margin-bottom: 1.1rem;
+        }
+
+        .hero-kicker {
+            margin: 0 0 0.95rem;
+            color: rgba(255, 255, 255, 0.76);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .hero h1 {
+            max-width: 8ch;
+            margin-bottom: 1.3rem;
+            text-align: left !important;
+            text-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+        }
+
+        .hero .text-accent {
+            color: #f7e0ce;
+            text-shadow: 0 0 24px rgba(247, 224, 206, 0.24);
+        }
+
+        .hero p {
+            max-width: 34rem;
+            margin: 0 0 2rem;
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 1.1rem;
+            line-height: 1.8;
+            text-align: left !important;
+        }
+
+        .hero-buttons {
+            justify-content: flex-start !important;
+            margin-bottom: 2rem;
+        }
+
+        .hero .magnetic-btn.secondary {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .hero-proof-strip {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.9rem;
+        }
+
+        .hero-proof-item {
+            min-height: 100%;
+            padding: 1rem 1.05rem;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 22px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 18px 40px rgba(10, 10, 14, 0.12);
+        }
+
+        .hero-proof-item strong {
+            display: block;
+            margin-bottom: 0.45rem;
+            color: #ffffff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.92rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .hero-proof-item span {
+            display: block;
+            color: rgba(255, 255, 255, 0.74);
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+
+        .hero-story-card {
+            justify-self: end;
+            width: min(100%, 380px);
+            padding: 1.35rem;
+            background: linear-gradient(180deg, rgba(255, 250, 246, 0.96) 0%, rgba(244, 234, 225, 0.92) 100%);
+            border: 1px solid rgba(139, 34, 82, 0.12);
+            border-radius: 30px;
+            box-shadow: 0 26px 60px rgba(17, 13, 10, 0.18);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-story-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(139, 34, 82, 0.12) 0%, transparent 48%);
+            pointer-events: none;
+        }
+
+        .hero-story-card > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-story-top {
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(26, 26, 46, 0.08);
+        }
+
+        .story-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            margin-bottom: 0.7rem;
+            padding: 0.42rem 0.75rem;
+            border-radius: 999px;
+            background: rgba(139, 34, 82, 0.08);
+            color: var(--accent);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .story-title {
+            font-size: clamp(1.5rem, 2.5vw, 2.2rem);
+            color: var(--text-primary);
+            line-height: 0.96;
+        }
+
+        .hero-story-list {
+            list-style: none;
+            display: grid;
+            gap: 0.85rem;
+            margin: 0 0 1.1rem;
+            padding: 0;
+        }
+
+        .hero-story-list li {
+            position: relative;
+            padding-left: 1.1rem;
+            color: var(--text-secondary);
+            font-size: 0.96rem;
+            line-height: 1.6;
+        }
+
+        .hero-story-list li::before {
+            content: '';
+            position: absolute;
+            top: 0.62rem;
+            left: 0;
+            width: 0.42rem;
+            height: 0.42rem;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 0 6px rgba(139, 34, 82, 0.08);
+        }
+
+        .hero-story-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.8rem;
+        }
+
+        .story-metric {
+            padding: 0.95rem;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.68);
+            border: 1px solid rgba(139, 34, 82, 0.08);
+        }
+
+        .story-metric-value {
+            display: block;
+            margin-bottom: 0.28rem;
+            color: var(--text-primary);
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .story-metric-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            line-height: 1.45;
+        }
+
+        #diensten .section-header,
+        #diensten-overzicht .section-header,
+        .faq-section-inner,
+        #werkwijze > div,
+        #diensten-overzicht > div {
+            max-width: 1240px;
+        }
+
+        .section-header p {
+            max-width: 42rem;
+        }
+
+        #diensten .diensten-product-grid {
+            gap: 1.4rem;
+        }
+
+        .tilt-card {
+            min-height: 100%;
+            padding: 2rem 1.9rem;
+            border-radius: 30px;
+            border: 1px solid rgba(139, 34, 82, 0.12);
+            border-top: 1px solid rgba(139, 34, 82, 0.12);
+            box-shadow: 0 18px 44px rgba(15, 17, 28, 0.08);
+            clip-path: none;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(247, 239, 233, 0.94) 100%);
+        }
+
+        .tilt-card::before {
+            opacity: 1;
+        }
+
+        .tilt-card::after {
+            content: '';
+            position: absolute;
+            left: 2rem;
+            right: 2rem;
+            bottom: 1.05rem;
+            height: 1px;
+            background: linear-gradient(90deg, rgba(139, 34, 82, 0), rgba(139, 34, 82, 0.42), rgba(139, 34, 82, 0));
+            opacity: 0.65;
+        }
+
+        .card-content {
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+        .tilt-card h3 {
+            font-size: 1.7rem;
+        }
+
+        .tilt-card p {
+            margin-top: auto;
+            padding-top: 1rem;
+            font-size: 0.98rem;
+            line-height: 1.7;
+        }
+
+        .image-text-frame {
+            gap: clamp(1.6rem, 3vw, 2.5rem);
+            align-items: stretch;
+            min-height: auto;
+        }
+
+        .image-side {
+            border-radius: 34px;
+            clip-path: none;
+            box-shadow: 0 24px 54px rgba(15, 17, 28, 0.12);
+        }
+
+        .image-side img {
+            filter: saturate(0.98) contrast(1.02);
+        }
+
+        .content-side.about-panel {
+            width: auto;
+            margin-left: -4rem;
+            padding: clamp(2.2rem, 4vw, 3.2rem);
+            border-radius: 34px;
+            clip-path: none;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 242, 236, 0.94) 100%);
+            box-shadow: 0 26px 58px rgba(15, 17, 28, 0.08);
+        }
+
+        .content-side.about-panel .eyebrow {
+            border: 1px solid rgba(139, 34, 82, 0.12);
+            border-radius: 999px;
+            background: rgba(139, 34, 82, 0.06);
+            color: var(--accent) !important;
+            padding: 0.42rem 0.75rem !important;
+        }
+
+        .about-highlights {
+            list-style: none;
+            display: grid;
+            gap: 0.85rem;
+            margin: 0 0 2rem;
+            padding: 0;
+        }
+
+        .about-highlights li {
+            position: relative;
+            padding-left: 1.2rem;
+            color: var(--text-secondary);
+            font-size: 0.97rem;
+            line-height: 1.65;
+        }
+
+        .about-highlights li::before {
+            content: '';
+            position: absolute;
+            top: 0.58rem;
+            left: 0;
+            width: 0.44rem;
+            height: 0.44rem;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 0 6px rgba(139, 34, 82, 0.07);
+        }
+
+        .werkwijze-copy {
+            padding: clamp(2rem, 4vw, 2.7rem);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(247, 241, 235, 0.94) 100%);
+            border: 1px solid rgba(139, 34, 82, 0.1);
+            border-radius: 32px;
+            box-shadow: 0 24px 52px rgba(15, 17, 28, 0.08);
+        }
+
+        .werkwijze-copy ul li {
+            border-bottom-color: rgba(27, 24, 31, 0.08) !important;
+            font-size: 0.94rem;
+        }
+
+        .werkwijze-stats {
+            gap: 1rem;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.84);
+            border: 1px solid rgba(139, 34, 82, 0.1);
+            border-left: 4px solid var(--accent);
+            border-radius: 28px;
+            box-shadow: 0 16px 36px rgba(15, 17, 28, 0.06);
+        }
+
+        .pricing-grid {
+            gap: 1.5rem;
+            align-items: stretch;
+        }
+
+        .pricing-card {
+            border-radius: 32px;
+            clip-path: none;
+            border: 1px solid rgba(139, 34, 82, 0.1);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(247, 241, 235, 0.92) 100%);
+            box-shadow: 0 18px 42px rgba(15, 17, 28, 0.08);
+        }
+
+        .pricing-card.featured {
+            transform: translateY(-10px) scale(1.01);
+            background: linear-gradient(180deg, rgba(139, 34, 82, 0.13) 0%, rgba(255, 255, 255, 0.98) 46%);
+            box-shadow: 0 24px 52px rgba(139, 34, 82, 0.12);
+        }
+
+        .pricing-card.featured::before {
+            top: 1rem;
+            right: 1rem;
+            padding: 0.45rem 0.9rem;
+            border-radius: 999px;
+            clip-path: none;
+        }
+
+        .pricing-header {
+            text-align: left;
+        }
+
+        .faq-section {
+            padding-top: 1rem;
+        }
+
+        .faq-split-main,
+        .faq-contact-card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(247, 241, 235, 0.92) 100%);
+            border: 1px solid rgba(139, 34, 82, 0.1);
+            border-radius: 32px;
+            box-shadow: 0 22px 48px rgba(15, 17, 28, 0.08);
+        }
+
+        .faq-split-main {
+            padding: 2rem;
+        }
+
+        .faq-item {
+            border-top-color: rgba(27, 24, 31, 0.08);
+        }
+
+        .faq-item:last-child {
+            border-bottom-color: rgba(27, 24, 31, 0.08);
+        }
+
+        footer.footer {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(244, 236, 228, 0.98) 100%);
+            border-top: 1px solid rgba(139, 34, 82, 0.08);
+        }
+
+        .footer-grid {
+            gap: 2rem;
+        }
+
+        .footer-col {
+            padding: 1.35rem 1.4rem;
+            border-radius: 28px;
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid rgba(139, 34, 82, 0.08);
+        }
+
+        .footer-brand {
+            padding-right: 1rem;
+        }
+
+        .social-btn,
+        .contact-icon {
+            background: rgba(255, 255, 255, 0.76);
+            border-color: rgba(139, 34, 82, 0.12);
+        }
+
+        @media (max-width: 1100px) {
+            .hero-content {
+                grid-template-columns: 1fr;
+                align-items: end;
+            }
+
+            .hero-copy-panel {
+                max-width: 100%;
+            }
+
+            .hero-story-card {
+                justify-self: start;
+                max-width: 560px;
+            }
+
+            .hero-proof-strip {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            #diensten .diensten-product-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .image-text-frame {
+                grid-template-columns: 1fr;
+            }
+
+            .content-side.about-panel {
+                width: 100%;
+                margin-left: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            nav,
+            nav.scrolled {
+                padding: calc(14px + env(safe-area-inset-top)) 18px 14px !important;
+            }
+
+            section.hero {
+                min-height: auto;
+                padding: 108px 18px 42px !important;
+            }
+
+            .hero-content {
+                width: 100%;
+                max-width: none;
+                gap: 14px;
+                padding: 0;
+                background: none;
+                border: none;
+                box-shadow: none;
+            }
+
+            .hero-copy-panel {
+                padding: 24px 20px;
+                border-radius: 28px;
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                backdrop-filter: blur(12px);
+                box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+            }
+
+            .hero h1 {
+                font-size: clamp(3.15rem, 16vw, 4.8rem) !important;
+                max-width: 6.5ch;
+            }
+
+            .hero p {
+                font-size: 0.98rem !important;
+            }
+
+            .hero-buttons {
+                margin-bottom: 1.4rem;
+            }
+
+            .hero-proof-strip {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-story-card {
+                width: 100%;
+                max-width: none;
+                padding: 1.1rem;
+                border-radius: 28px;
+            }
+
+            #diensten .diensten-product-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tilt-card,
+            .pricing-card,
+            .werkwijze-copy,
+            .stat-item,
+            .faq-split-main,
+            .faq-contact-card,
+            footer.footer {
+                border-radius: 26px;
+            }
+
+            .image-side {
+                height: 260px !important;
+                border-radius: 28px 28px 0 0;
+            }
+
+            .content-side.about-panel {
+                margin-top: -20px;
+                padding: 24px 20px !important;
+                border-radius: 0 0 28px 28px !important;
+            }
+
+            .werkwijze-stats {
+                gap: 12px;
+            }
+
+            .pricing-card.featured {
+                transform: none;
+            }
+
+            .footer-col {
+                border-radius: 22px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2299,14 +2914,53 @@
     <!-- HERO -->
     <section class="hero">
         <div class="hero-content">
-            <h1>
-                Digitaal <span class="text-accent">Geregeld.</span>
-            </h1>
-            <p>Websites die overtuigen, software die processen stroomlijnt, AI-agents die de telefoon opnemen.</p>
-            <div class="hero-buttons">
-                <a href="#contact" class="magnetic-btn magnetic">Start Project</a>
-                <a href="#werkwijze" class="magnetic-btn magnetic secondary">Bekijk Werkwijze</a>
+            <div class="hero-copy-panel">
+                <span class="eyebrow hero-eyebrow">Premium websites, software en AI</span>
+                <p class="hero-kicker">Softora ontwerpt digitale ervaringen die stijl, snelheid en conversie tegelijk dragen.</p>
+                <h1>
+                    Digitaal <span class="text-accent">Geregeld.</span>
+                </h1>
+                <p>Websites die overtuigen, software die processen stroomlijnt, AI-agents die de telefoon opnemen.</p>
+                <div class="hero-buttons">
+                    <a href="#contact" class="magnetic-btn magnetic">Start Project</a>
+                    <a href="#werkwijze" class="magnetic-btn magnetic secondary">Bekijk Werkwijze</a>
+                </div>
+                <div class="hero-proof-strip">
+                    <div class="hero-proof-item">
+                        <strong>Design met richting</strong>
+                        <span>Geen generieke templates, maar een visuele stijl die echt als jouw merk voelt.</span>
+                    </div>
+                    <div class="hero-proof-item">
+                        <strong>Gebouwd voor groei</strong>
+                        <span>Snelle websites, slimme software en AI-oplossingen die processen echt lichter maken.</span>
+                    </div>
+                    <div class="hero-proof-item">
+                        <strong>Korte lijnen</strong>
+                        <span>Je spreekt direct met het team dat ontwerpt, bouwt en doorontwikkelt.</span>
+                    </div>
+                </div>
             </div>
+            <aside class="hero-story-card fade-up" style="transition-delay: 0.08s" aria-label="Softora projectaanpak">
+                <div class="hero-story-top">
+                    <span class="story-label">Nieuw homepage concept</span>
+                    <h2 class="story-title">Premium uitstraling zonder bureau-ruis.</h2>
+                </div>
+                <ul class="hero-story-list">
+                    <li>Positionering, design en development lopen in een traject door.</li>
+                    <li>Mobiel eerst, snel geladen en gericht op vertrouwen en aanvragen.</li>
+                    <li>Van eerste wireframe tot livegang met directe, heldere feedbackrondes.</li>
+                </ul>
+                <div class="hero-story-metrics">
+                    <div class="story-metric">
+                        <span class="story-metric-value">4-8 weken</span>
+                        <span class="story-metric-label">Gemiddelde livegang</span>
+                    </div>
+                    <div class="story-metric">
+                        <span class="story-metric-value">100%</span>
+                        <span class="story-metric-label">Op maat gebouwd</span>
+                    </div>
+                </div>
+            </aside>
         </div>
     </section>
 
@@ -2315,7 +2969,7 @@
         <div class="diensten-shell">
             <div class="section-header is-centered fade-up">
                 <h2 class="diensten-title"><span class="title-mark">Wat</span> We Bouwen</h2>
-                <p class="diensten-intro"><span class="diensten-intro-desktop">Vier losse producten. Of één sterk geheel. Jij kiest waar we beginnen.</span></p>
+                <p class="diensten-intro"><span class="diensten-intro-desktop">Vier losse producten. Of een digitaal ecosysteem dat als een geheel aanvoelt. Jij kiest waar we beginnen.</span></p>
             </div>
 
             <div class="diensten-product-grid">
@@ -2358,7 +3012,7 @@
     <section class="image-text-section perf-deferred-section" id="over" style="padding: 1rem 4rem 3.5rem;">
         <div class="image-text-frame">
             <div class="image-side">
-                <img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1000&q=80" srcset="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=480&q=75 480w, https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=768&q=75 768w, https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1000&q=80 1000w, https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1400&q=80 1400w" sizes="(max-width: 980px) 92vw, 46vw" alt="Developer at work" width="1000" height="667" loading="lazy" decoding="async" fetchpriority="low">
+                <img src="/assets/home-hero-generated-v2.jpg" alt="Softora team werkt samen aan een premium digitale ervaring" width="1536" height="1024" loading="lazy" decoding="async" fetchpriority="low">
             </div>
             <div class="content-side about-panel fade-up">
                 <span class="eyebrow" style="border: none; padding: 0; color: var(--text-tertiary); font-size: 0.85rem; display: inline-block; margin-bottom: 1.4rem;">Over Ons</span>
@@ -2369,6 +3023,11 @@
                 <p style="color: var(--text-secondary); font-size: 1.04rem; line-height: 1.78; margin-bottom: 2rem; font-weight: 300;">
                     Vanuit Oisterwijk werken wij voor ambitieuze bedrijven door heel Nederland. Van lokale ondernemers tot scale-ups — als je het beste wilt, ben je hier aan het juiste adres.
                 </p>
+                <ul class="about-highlights">
+                    <li>Een premium uitstraling die vertrouwen wekt vanaf de eerste scroll.</li>
+                    <li>Strategie, design en development in een compact traject zonder losse schakels.</li>
+                    <li>Gebouwd om mooi te ogen, snel te laden en aanvragen op te leveren.</li>
+                </ul>
                 <a href="#contact" class="magnetic-btn magnetic" style="padding: 0.95rem 1.8rem; font-size: 0.92rem; text-transform: none; letter-spacing: 0.02em;">neem contact op | info@softora.nl</a>
             </div>
         </div>

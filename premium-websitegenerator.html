@@ -358,6 +358,8 @@ const LIBRARY_STORAGE_KEY = 'softora_website_preview_library_v1';
 const LIBRARY_MAX_ITEMS = 50;
 let websitePreviewLibraryRemoteEntries = null;
 let websitePreviewLibraryUseRemote = false;
+const BATCH_JOB_STORAGE_KEY = 'softora_wpv_preview_batch_job';
+let websitePreviewBatchPollTimer = null;
 
 function escapeHtml(str) {
   return String(str || '')
@@ -695,6 +697,9 @@ async function loadWebsiteGeneratorAuthState(force = false) {
       if (libPanel && libPanel.classList.contains('active') && typeof renderLibraryPanel === 'function') {
         renderLibraryPanel();
       }
+      await resumeWebsitePreviewBatchIfAny();
+    } else {
+      clearWebsitePreviewBatchPoll();
     }
     return websiteGeneratorAuthState;
   })();
@@ -823,131 +828,209 @@ function mountScanPreviewUI(previewDataUrl, url, hostname, fileName, previewWidt
   wirePreviewBlock(blockId, previewDataUrl, url, hostname, fileName);
 }
 
-async function appendPreviewFromResult(result, url, hostname) {
-  const imageDataUrl = String(result?.image?.dataUrl || '').trim();
-  if (!imageDataUrl) throw new Error('Geen previewafbeelding ontvangen van de server.');
-  const croppedPreview = await cropPreviewImageDataUrl(imageDataUrl).catch(() => ({
-    dataUrl: imageDataUrl,
-    width: WEBSITE_PREVIEW_IMAGE_WIDTH,
-    height: WEBSITE_PREVIEW_IMAGE_HEIGHT,
-  }));
-  const previewWidth = Number(croppedPreview?.width || WEBSITE_PREVIEW_IMAGE_WIDTH);
-  const previewHeight = Number(croppedPreview?.height || WEBSITE_PREVIEW_IMAGE_HEIGHT);
-  const previewDataUrl = String(croppedPreview?.dataUrl || imageDataUrl);
-  const resolvedName = String(result?.image?.fileName || `${hostname}-preview.png`).trim();
-
-  let stack = document.getElementById('scan-previews-stack');
-  if (!stack) {
-    document.getElementById('scan-output').innerHTML =
-      '<div class="scan-batch-bar" id="scan-batch-bar"></div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
-    stack = document.getElementById('scan-previews-stack');
+function clearWebsitePreviewBatchPoll() {
+  if (websitePreviewBatchPollTimer) {
+    clearInterval(websitePreviewBatchPollTimer);
+    websitePreviewBatchPollTimer = null;
   }
-  const blockId = newPreviewBlockId();
-  stack.insertAdjacentHTML('beforeend', previewZoneHtml(blockId, hostname, previewWidth, false));
-  wirePreviewBlock(blockId, previewDataUrl, url, hostname, resolvedName);
-  await savePreviewToLibrary({
-    dataUrl: previewDataUrl,
-    url,
-    hostname,
-    fileName: resolvedName,
-    width: previewWidth,
-    height: previewHeight,
-  });
 }
 
-async function runBatchScan(urls) {
-  const out = document.getElementById('scan-output');
-  out.innerHTML = `
-    <div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite"></div>
-    <div class="scan-previews-stack" id="scan-previews-stack"></div>`;
-  const stack = document.getElementById('scan-previews-stack');
-  const bar = document.getElementById('scan-batch-bar');
-  const setBar = (i, total, host) => {
-    if (bar) bar.textContent = `Preview ${i} van ${total} — ${host}`;
-  };
-
-  for (let i = 0; i < urls.length; i += 1) {
-    const url = urls[i];
-    let hostname = '';
-    try {
-      hostname = new URL(url).hostname;
-    } catch (_) {
-      continue;
-    }
-    setBar(i + 1, urls.length, hostname);
-    const ph = document.createElement('div');
-    ph.className = 'preview-loading-row';
-    ph.innerHTML = `
+function createBatchLoadingRow(hostname) {
+  const ph = document.createElement('div');
+  ph.className = 'preview-loading-row';
+  ph.innerHTML = `
       <div class="premium-boot-spinner" aria-hidden="true" style="--loader-size:28px">
         <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
         <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
         <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
       </div>
       <div>Bezig met <strong>${escapeHtml(hostname)}</strong>…</div>`;
-    stack.appendChild(ph);
-    try {
-      const generated = await callAI(url, hostname);
-      await delay(200);
-      ph.remove();
-      await appendPreviewFromResult(generated, url, hostname);
-      const last = stack.lastElementChild;
-      if (last) last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    } catch (e) {
-      ph.className = 'preview-zone';
-      ph.innerHTML = `<div class="empty-state" style="padding:20px;margin:0;border:1px solid var(--border);border-radius:8px">
-        <p><strong>${escapeHtml(hostname)}</strong><br><span style="color:var(--text-mid)">${escapeHtml(e.message)}</span></p>
-      </div>`;
-    }
-  }
-  if (bar) bar.textContent = `Klaar — ${urls.length} website(s)`;
-  showToast(`${urls.length} URL('s) verwerkt`);
+  return ph;
 }
 
-async function runSingleScanWithSteps(url) {
-  const btn = document.getElementById('scan-btn');
-  btn.disabled = true;
-  document.getElementById('scan-output').innerHTML = `
-    <div class="loading-state">
-      <div class="premium-boot-spinner" aria-hidden="true">
-        <span class="softora-dossier-loader__orbit--outer" aria-hidden="true"></span>
-        <span class="softora-dossier-loader__orbit--inner" aria-hidden="true"></span>
-        <span class="softora-dossier-loader__dot" aria-hidden="true"></span>
-      </div>
-      <div class="loading-steps">
-        <div class="load-step active" id="ls1"><div class="load-step-dot"></div>URL analyseren...</div>
-        <div class="load-step" id="ls2"><div class="load-step-dot"></div>Site-informatie ophalen</div>
-        <div class="load-step" id="ls3"><div class="load-step-dot"></div>AI genereert homepage design</div>
-        <div class="load-step" id="ls4"><div class="load-step-dot"></div>Preview renderen</div>
-      </div>
-    </div>`;
-  const steps = ['ls1', 'ls2', 'ls3', 'ls4'];
-  for (let i = 0; i < steps.length; i += 1) {
-    await delay(900);
-    if (i > 0) {
-      const prev = document.getElementById(steps[i - 1]);
-      if (prev) {
-        prev.className = 'load-step done';
-        const dot = prev.querySelector('.load-step-dot');
-        if (dot) dot.style.background = '#16733c';
-      }
-    }
-    const cur = document.getElementById(steps[i]);
-    if (cur) cur.className = 'load-step active';
+function scheduleWebsitePreviewBatchPoll() {
+  clearWebsitePreviewBatchPoll();
+  websitePreviewBatchPollTimer = setInterval(() => {
+    void pollWebsitePreviewBatch();
+  }, 1400);
+  void pollWebsitePreviewBatch();
+}
+
+async function startBackgroundBatchScan(urls) {
+  const out = document.getElementById('scan-output');
+  if (out) {
+    out.innerHTML =
+      '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Batch wordt gestart…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
+  }
+  const response = await fetch('/api/website-preview/batch', {
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ urls }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    await loadWebsiteGeneratorAuthState(true);
+    throw new Error('Log eerst in om AI previews te genereren.');
+  }
+  if (!response.ok || !data || !data.ok || !data.jobId) {
+    throw new Error(String(data?.detail || data?.error || 'Batch start mislukt'));
   }
   try {
-    const hostname = new URL(url).hostname;
-    const generated = await callAI(url, hostname);
-    await delay(300);
-    await showPreview(generated, url, hostname);
-  } catch (e) {
-    document.getElementById('scan-output').innerHTML = `
-      <div class="empty-state">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-        <p>Er ging iets mis: ${escapeHtml(e.message)}</p>
-      </div>`;
-  } finally {
-    btn.disabled = false;
+    sessionStorage.setItem(BATCH_JOB_STORAGE_KEY, data.jobId);
+  } catch (_) {}
+  scheduleWebsitePreviewBatchPoll();
+}
+
+async function pollWebsitePreviewBatch() {
+  let jobId = null;
+  try {
+    jobId = sessionStorage.getItem(BATCH_JOB_STORAGE_KEY);
+  } catch (_) {
+    jobId = null;
   }
+  if (!jobId) {
+    clearWebsitePreviewBatchPoll();
+    return;
+  }
+  const res = await fetch(`/api/website-preview/batch/${encodeURIComponent(jobId)}`, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    clearWebsitePreviewBatchPoll();
+    return;
+  }
+  if (res.status === 403 || res.status === 404) {
+    try {
+      sessionStorage.removeItem(BATCH_JOB_STORAGE_KEY);
+    } catch (_) {}
+    clearWebsitePreviewBatchPoll();
+    if (res.status === 403 && payload?.detail) {
+      showToast(String(payload.detail));
+    }
+    return;
+  }
+  if (!res.ok || !payload || !payload.job) {
+    return;
+  }
+  await renderBatchJobProgress(payload.job);
+  if (payload.job.status === 'done' || payload.job.status === 'error') {
+    try {
+      sessionStorage.removeItem(BATCH_JOB_STORAGE_KEY);
+    } catch (_) {}
+    clearWebsitePreviewBatchPoll();
+    const n = Number(payload.job.total || 0) || 0;
+    if (payload.job.status === 'done') {
+      showToast(`${n} URL('s) verwerkt`);
+    } else if (payload.job.error) {
+      showToast(String(payload.job.error));
+    }
+    await maybeHydrateWebsitePreviewLibraryFromServer();
+    if (typeof renderLibraryPanel === 'function') {
+      renderLibraryPanel();
+    }
+  }
+}
+
+async function renderBatchJobProgress(job) {
+  const stack = document.getElementById('scan-previews-stack');
+  const bar = document.getElementById('scan-batch-bar');
+  if (!stack || !bar) return;
+
+  const items = Array.isArray(job.items) ? job.items : [];
+  const total = items.length || Number(job.total || 0) || 0;
+  let runningIdx = -1;
+  let runningHost = '';
+  items.forEach((it, idx) => {
+    if (it && it.status === 'running') {
+      runningIdx = idx;
+      runningHost = String(it.hostname || '').trim();
+    }
+  });
+
+  if (job.status === 'error' && job.error) {
+    bar.textContent = String(job.error);
+  } else if (job.status === 'done') {
+    bar.textContent = `Klaar — ${total} website(s)`;
+  } else if (runningIdx >= 0) {
+    bar.textContent = `Preview ${runningIdx + 1} van ${total} — ${runningHost || '…'}`;
+  } else {
+    bar.textContent = total ? `Batch bezig… (${total} URL's)` : 'Batch bezig…';
+  }
+
+  if (websiteGeneratorAuthState.authenticated) {
+    await maybeHydrateWebsitePreviewLibraryFromServer().catch(() => {});
+  }
+  const entries = loadLibraryEntries();
+
+  stack.innerHTML = '';
+  for (let idx = 0; idx < items.length; idx += 1) {
+    const it = items[idx];
+    if (!it) continue;
+    const st = String(it.status || '').trim();
+    const host = String(it.hostname || '').trim() || 'site';
+    if (st === 'pending') {
+      const row = document.createElement('div');
+      row.className = 'preview-pending-row';
+      row.style.cssText = 'padding:12px 0;font-size:13px;color:var(--text-mid)';
+      row.innerHTML = `Wachtend — <strong>${escapeHtml(host)}</strong>`;
+      stack.appendChild(row);
+    } else if (st === 'running') {
+      stack.appendChild(createBatchLoadingRow(host));
+    } else if (st === 'error') {
+      const row = document.createElement('div');
+      row.className = 'preview-zone';
+      row.innerHTML = `<div class="empty-state" style="padding:20px;margin:0;border:1px solid var(--border);border-radius:8px">
+        <p><strong>${escapeHtml(host)}</strong><br><span style="color:var(--text-mid)">${escapeHtml(
+          String(it.error || 'Onbekende fout')
+        )}</span></p>
+      </div>`;
+      stack.appendChild(row);
+    } else if (st === 'done') {
+      const entryId = String(it.libraryEntryId || '').trim();
+      const entry = entryId ? entries.find((e) => String(e.id) === entryId) : null;
+      if (entry && isSafeLibraryDataUrl(entry.dataUrl)) {
+        const blockId = newPreviewBlockId();
+        const w = Number(entry.width) || WEBSITE_PREVIEW_IMAGE_WIDTH;
+        const h = Number(entry.height) || WEBSITE_PREVIEW_IMAGE_HEIGHT;
+        stack.insertAdjacentHTML('beforeend', previewZoneHtml(blockId, entry.hostname || host, w, false));
+        wirePreviewBlock(
+          blockId,
+          entry.dataUrl,
+          entry.url || it.url || '',
+          entry.hostname || host,
+          entry.fileName || `${host}-preview.png`
+        );
+      } else {
+        stack.appendChild(createBatchLoadingRow(`${host} (preview laden…)`));
+      }
+    }
+  }
+  const last = stack.lastElementChild;
+  if (last && job.status === 'running') {
+    last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+async function resumeWebsitePreviewBatchIfAny() {
+  let jobId = null;
+  try {
+    jobId = sessionStorage.getItem(BATCH_JOB_STORAGE_KEY);
+  } catch (_) {
+    jobId = null;
+  }
+  if (!jobId) return;
+  const path = String(window.location.pathname || '');
+  if (path.indexOf('premium-websitegenerator') === -1) return;
+  const out = document.getElementById('scan-output');
+  if (!out) return;
+  out.innerHTML =
+    '<div class="scan-batch-bar" id="scan-batch-bar" role="status" aria-live="polite">Batch hervatten…</div><div class="scan-previews-stack" id="scan-previews-stack"></div>';
+  scheduleWebsitePreviewBatchPoll();
 }
 
 async function startScan() {
@@ -970,49 +1053,23 @@ async function startScan() {
 
   const btn = document.getElementById('scan-btn');
   btn.disabled = true;
+  clearWebsitePreviewBatchPoll();
 
   try {
-    if (urls.length === 1) {
-      await runSingleScanWithSteps(urls[0]);
-    } else {
-      await runBatchScan(urls);
+    await startBackgroundBatchScan(urls);
+  } catch (e) {
+    showToast(String(e?.message || e || 'Batch mislukt'));
+    const out = document.getElementById('scan-output');
+    if (out) {
+      out.innerHTML = `<div class="empty-state"><p>${escapeHtml(String(e?.message || e || 'Batch mislukt'))}</p></div>`;
     }
+    try {
+      sessionStorage.removeItem(BATCH_JOB_STORAGE_KEY);
+    } catch (_) {}
   } finally {
     btn.disabled = false;
     applyWebsiteGeneratorAuthState();
   }
-}
-
-async function callAI(url, hostname) {
-  const endpoints = ['/api/website-preview/generate', '/api/website-preview-generate'];
-  let lastError = '';
-  for (const endpoint of endpoints) {
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, hostname }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.status === 401) {
-        await loadWebsiteGeneratorAuthState(true);
-        throw new Error('Log eerst in om AI previews te genereren.');
-      }
-      if (!response.ok || !data || data.ok === false) {
-        const errorParts = [data?.detail, data?.upstreamDetail]
-          .map((value) => String(value || '').trim())
-          .filter(Boolean);
-        lastError = String(
-          errorParts.join(' — ') || data?.error || `API fout: ${response.status}`
-        );
-        continue;
-      }
-      return data;
-    } catch (error) {
-      lastError = String(error?.message || 'Websitegenerator request mislukt');
-    }
-  }
-  throw new Error(lastError || 'Websitegenerator request mislukt');
 }
 
 function samplePreviewEdgeReference(pixels, width, height, side) {
@@ -1231,29 +1288,6 @@ async function cropPreviewImageDataUrl(dataUrl) {
   };
 }
 
-async function showPreview(result, url, hostname) {
-  const imageDataUrl = String(result?.image?.dataUrl || '').trim();
-  if (!imageDataUrl) throw new Error('Geen previewafbeelding ontvangen van de server.');
-  const croppedPreview = await cropPreviewImageDataUrl(imageDataUrl).catch(() => ({
-    dataUrl: imageDataUrl,
-    width: WEBSITE_PREVIEW_IMAGE_WIDTH,
-    height: WEBSITE_PREVIEW_IMAGE_HEIGHT,
-  }));
-  const previewWidth = Number(croppedPreview?.width || WEBSITE_PREVIEW_IMAGE_WIDTH);
-  const previewHeight = Number(croppedPreview?.height || WEBSITE_PREVIEW_IMAGE_HEIGHT);
-  const previewDataUrl = String(croppedPreview?.dataUrl || imageDataUrl);
-  const resolvedName = String(result?.image?.fileName || `${hostname}-preview.png`).trim();
-  mountScanPreviewUI(previewDataUrl, url, hostname, resolvedName, previewWidth, previewHeight);
-  await savePreviewToLibrary({
-    dataUrl: previewDataUrl,
-    url,
-    hostname,
-    fileName: resolvedName,
-    width: previewWidth,
-    height: previewHeight,
-  });
-}
-
 function downloadPreview() {
   if (!window._lastPreviewImageDataUrl) return;
   const a = document.createElement('a');
@@ -1262,8 +1296,6 @@ function downloadPreview() {
   a.click();
   showToast('Preview gedownload');
 }
-
-const delay = ms => new Promise(r => setTimeout(r, ms));
 
 function showToast(msg) {
   const t = document.getElementById('toast'); t.textContent = msg;

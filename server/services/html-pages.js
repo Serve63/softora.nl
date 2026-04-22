@@ -8,9 +8,8 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   `<link rel="preload" href="/assets/fonts/oswald-latin.woff2?v=${LOCAL_FONT_VERSION}" as="font" type="font/woff2" crossorigin>`,
   `<link rel="stylesheet" href="${LOCAL_FONT_STYLESHEET_HREF}">`,
 ].join('\n');
-const HOMEPAGE_HERO_IMAGE_URL =
-  'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=2000&q=85';
-const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}" crossorigin>`;
+const HOMEPAGE_HERO_IMAGE_URL = '/assets/home-hero-generated-v2.jpg';
+const HOMEPAGE_HERO_IMAGE_PRELOAD = `<link rel="preload" as="image" href="${HOMEPAGE_HERO_IMAGE_URL}">`;
 
 function createHtmlPageCoordinator(options = {}) {
   const {

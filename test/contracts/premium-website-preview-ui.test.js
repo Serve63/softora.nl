@@ -74,7 +74,8 @@ test('premium websitegenerator toont een login-fallback voor protected acties', 
   assert.match(source, /Log in met je premium account om scans te genereren en websitelinks te publiceren\./);
   assert.match(source, /Log eerst in om AI previews te genereren\./);
   assert.match(source, /Log eerst in om websitelinks aan te maken\./);
-  assert.match(source, /const errorParts = \[data\?\.detail, data\?\.upstreamDetail\]/);
+  assert.match(source, /\/api\/website-preview\/batch/);
+  assert.match(source, /BATCH_JOB_STORAGE_KEY/);
 });
 
 test('premium websitegenerator behoudt hoge full-page previews zonder portrait-crop', () => {
@@ -87,8 +88,8 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /if \(height > width\) \{\s*return \{ dataUrl: raw, width, height \};\s*\}/);
   assert.match(source, /getPreviewReferenceMatchRatio/);
   assert.match(source, /measurePreviewRightGutterWidth/);
-  assert.match(source, /const croppedPreview = await cropPreviewImageDataUrl\(imageDataUrl\)/);
-  assert.match(source, /const previewWidth = Number\(croppedPreview\?\.width \|\| WEBSITE_PREVIEW_IMAGE_WIDTH\)/);
+  assert.match(source, /async function cropPreviewImageDataUrl\(dataUrl\)/);
+  assert.match(source, /const previewWidth = Number\(entry\.width\) \|\| WEBSITE_PREVIEW_IMAGE_WIDTH/);
   assert.match(source, /const frameW = Math\.min\(window\.innerWidth - 100, previewWidth\)/);
   assert.match(source, /preview-media" style="max-width:\$\{frameW\}px;"/);
   assert.match(source, /id="preview-image" alt="Website preview \$\{safeHost\}" style="width:100%;height:auto;display:block;"/);
@@ -100,4 +101,32 @@ test('premium websitegenerator behoudt hoge full-page previews zonder portrait-c
   assert.match(source, /SCAN_URL_BATCH_MAX = 50/);
   assert.match(source, /function tokenizeScanUrlInput/);
   assert.match(source, /window\._lastPreviewImageDataUrl = previewDataUrl/);
+});
+
+test('website preview batch runs server-side and exposes poll route', () => {
+  const batchSvc = fs.readFileSync(
+    path.join(__dirname, '../../server/services/website-preview-batch.js'),
+    'utf8'
+  );
+  const batchRoutes = fs.readFileSync(
+    path.join(__dirname, '../../server/routes/website-preview-batch.js'),
+    'utf8'
+  );
+  const aiTools = fs.readFileSync(path.join(__dirname, '../../server/services/ai-tools.js'), 'utf8');
+  const featureRoutes = fs.readFileSync(
+    path.join(__dirname, '../../server/services/feature-routes-runtime.js'),
+    'utf8'
+  );
+  const library = fs.readFileSync(
+    path.join(__dirname, '../../server/services/website-preview-library.js'),
+    'utf8'
+  );
+
+  assert.match(batchSvc, /createWebsitePreviewBatchCoordinator/);
+  assert.match(batchSvc, /persistPreviewLibraryEntry/);
+  assert.match(batchRoutes, /app\.post\('\/api\/website-preview\/batch'/);
+  assert.match(batchRoutes, /app\.get\('\/api\/website-preview\/batch\/:jobId'/);
+  assert.match(aiTools, /runWebsitePreviewGeneratePipeline/);
+  assert.match(featureRoutes, /registerWebsitePreviewBatchRoutes/);
+  assert.match(library, /persistPreviewLibraryEntry/);
 });

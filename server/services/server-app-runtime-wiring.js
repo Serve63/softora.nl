@@ -2,6 +2,7 @@ const { createAiDashboardRuntime } = require('./ai-dashboard-runtime');
 const { createAgendaAppRuntime } = require('./agenda-app-runtime');
 const { createAppOpsRuntime } = require('./app-ops-runtime');
 const { registerFeatureRoutes } = require('./feature-routes-runtime');
+const { createWebsitePreviewBatchCoordinator } = require('./website-preview-batch');
 const {
   buildAgendaAppRuntimeOptions,
   buildAiDashboardRuntimeOptions,
@@ -19,6 +20,13 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
   const { activeOrdersCoordinator, aiDashboardCoordinator, aiToolsCoordinator } =
     createAiDashboardRuntimeImpl(buildAiDashboardRuntimeOptions(aiDashboardOptions));
 
+  const websitePreviewBatchCoordinator = createWebsitePreviewBatchCoordinator({
+    logger: aiDashboardOptions.logger || console,
+    normalizeString: aiDashboardOptions.normalizeString,
+    aiToolsCoordinator,
+    websitePreviewLibraryCoordinator: featureRouteOptions.websitePreviewLibraryCoordinator,
+  });
+
   registerFeatureRoutesImpl(
     app,
     buildFeatureRoutesOptions({
@@ -26,6 +34,7 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
       aiDashboardCoordinator,
       aiToolsCoordinator,
       activeOrdersCoordinator,
+      websitePreviewBatchCoordinator,
     })
   );
 

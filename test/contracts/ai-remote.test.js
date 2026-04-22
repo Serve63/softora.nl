@@ -44,6 +44,24 @@ function createService(overrides = {}) {
           text: '<html><body><h1>Softora</h1></body></html>',
         };
       }),
+    fetchBinaryWithTimeout:
+      overrides.fetchBinaryWithTimeout ||
+      (async (url, options, timeoutMs) => {
+        state.fetchBinaryCalls = state.fetchBinaryCalls || [];
+        state.fetchBinaryCalls.push({ url, options, timeoutMs });
+        return {
+          response: {
+            ok: true,
+            status: 200,
+            url,
+            headers: {
+              get: (name) =>
+                String(name || '').toLowerCase() === 'content-type' ? 'image/png' : '',
+            },
+          },
+          bytes: Buffer.from('png-image-bytes'),
+        };
+      }),
     extractOpenAiTextContent:
       overrides.extractOpenAiTextContent ||
       ((content) => {
@@ -185,6 +203,7 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.openai.test/v1/images/generations');
   assert.match(String(calls[0].options.body || ''), /gpt-image-2/);
+  assert.match(String(calls[0].options.body || ''), /"size":"1024x1536"/);
   assert.match(String(calls[0].options.body || ''), /"quality":"high"/);
   assert.doesNotMatch(String(calls[0].options.body || ''), /response_format/);
   assert.equal(result.model, 'gpt-image-2');
@@ -192,6 +211,54 @@ test('ai remote service generates website preview image payload from OpenAI imag
   assert.equal(result.fileName, 'softora.nl.png');
   assert.equal(result.dataUrl, 'data:image/png;base64,YWJjZA==');
   assert.equal(result.revisedPrompt, 'Verbeterde prompt');
+});
+
+test('ai remote service uses OpenAI image edits with fetched website reference images when available', async () => {
+  const calls = [];
+  let capturedPromptScan = null;
+  const { service } = createService({
+    buildWebsitePreviewPromptFromScan: (scan) => {
+      capturedPromptScan = scan;
+      return `Preview met ${scan.referenceImageCount || 0} referentie`;
+    },
+    sanitizeReferenceImages: (images) => images,
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          data: [{ b64_json: 'YWJjZA==' }],
+        },
+      };
+    },
+    fetchBinaryWithTimeout: async (url, options) => ({
+      response: {
+        ok: true,
+        status: 200,
+        url,
+        headers: {
+          get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'image/png' : ''),
+        },
+      },
+      bytes: Buffer.alloc(2048, 1),
+    }),
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({
+    host: 'softora.nl',
+    sourceUrl: 'https://softora.nl/',
+    referenceImageUrls: ['https://softora.nl/og-softora.png'],
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.openai.test/v1/images/edits');
+  assert.equal(capturedPromptScan.referenceImageCount, 1);
+  assert.equal(result.referenceImageCount, 1);
+  assert.equal(calls[0].options.body.get('model'), 'gpt-image-2');
+  assert.equal(calls[0].options.body.get('size'), '1024x1536');
+  assert.equal(calls[0].options.body.get('quality'), 'high');
+  assert.equal(calls[0].options.body.get('prompt'), 'Preview met 1 referentie');
+  assert.equal(calls[0].options.body.getAll('image[]').length, 1);
 });
 
 test('ai remote service keeps gpt-image-2 and surfaces verification errors without fallback', async () => {
@@ -245,6 +312,30 @@ test('ai remote service keeps b64_json response format for legacy dall-e image m
   assert.match(String(calls[0].options.body || ''), /"model":"dall-e-3"/);
   assert.match(String(calls[0].options.body || ''), /"response_format":"b64_json"/);
   assert.equal(result.model, 'dall-e-3');
+});
+
+test('ai remote service accepts chatgpt-image-latest without legacy response format', async () => {
+  const calls = [];
+  const { service } = createService({
+    openAiImageModel: 'chatgpt-image-latest',
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          data: [{ b64_json: 'YWJjZA==' }],
+        },
+      };
+    },
+  });
+
+  const result = await service.generateWebsitePreviewImageWithAi({ host: 'softora.nl' });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.openai.test/v1/images/generations');
+  assert.match(String(calls[0].options.body || ''), /"model":"chatgpt-image-latest"/);
+  assert.doesNotMatch(String(calls[0].options.body || ''), /response_format/);
+  assert.equal(result.model, 'chatgpt-image-latest');
 });
 
 test('ai remote service rejects non-image model configuration before calling OpenAI', async () => {
@@ -325,6 +416,110 @@ test('ai remote service fetches and normalizes website preview scan metadata inc
     'text-primary: #1a1a2e',
   ]);
   assert.deepEqual(result.scan.brandPalette, ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e', '#ffffff']);
+});
+
+test('ai remote service retries website preview fetch with a compat profile after a 403', async () => {
+  const calls = [];
+  const { service } = createService({
+    fetchTextWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      if (calls.length === 1) {
+        return {
+          response: {
+            ok: false,
+            status: 403,
+            url,
+            headers: { get: () => 'text/html; charset=utf-8' },
+          },
+          text: 'Forbidden',
+        };
+      }
+
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url: 'https://www.bol.com/nl/nl/',
+          headers: {
+            get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : ''),
+          },
+        },
+        text: '<html><head><title>bol</title></head><body><h1>bol</h1></body></html>',
+      };
+    },
+    extractWebsitePreviewScanFromHtml: (_html, pageUrl) => ({
+      title: 'bol',
+      h1: 'bol',
+      metaDescription: 'De winkel van ons allemaal',
+      bodyTextSample: 'Kies uit miljoenen artikelen.',
+      sourceUrl: pageUrl,
+    }),
+  });
+
+  const result = await service.fetchWebsitePreviewScanFromUrl('https://www.bol.com/nl/nl/');
+
+  assert.equal(calls.length, 2);
+  assert.match(String(calls[0].options?.headers?.['User-Agent'] || ''), /Chrome\/135/);
+  assert.match(String(calls[1].options?.headers?.['User-Agent'] || ''), /SoftoraWebsitePreview/);
+  assert.equal(result.finalUrl, 'https://www.bol.com/nl/nl/');
+  assert.equal(result.scan.title, 'bol');
+});
+
+test('ai remote service falls back to reader markdown when direct html is a block page', async () => {
+  const calls = [];
+  const { service } = createService({
+    fetchTextWithTimeout: async (url, options) => {
+      calls.push({ url, options });
+      if (String(url).startsWith('https://r.jina.ai/')) {
+        return {
+          response: {
+            ok: true,
+            status: 200,
+            url,
+            headers: {
+              get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/plain; charset=utf-8' : ''),
+            },
+          },
+          text: `Title: De winkel van ons allemaal | bol
+URL Source: https://www.bol.com/nl/nl/
+
+Markdown Content:
+# bol
+
+De winkel van ons allemaal.
+
+Kies uit miljoenen artikelen. Snel en veelal gratis verzonden!`,
+        };
+      }
+
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          url: 'https://www.bol.com/nl/nl/',
+          headers: {
+            get: (name) => (String(name || '').toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : ''),
+          },
+        },
+        text: `
+          <html>
+            <head><title>IP adres 34.34.225.234 is geblokkeerd</title></head>
+            <body>Je toegang tot bol is tijdelijk geblokkeerd vanwege mogelijk misbruik vanaf dit IP adres.</body>
+          </html>
+        `,
+      };
+    },
+  });
+
+  const result = await service.fetchWebsitePreviewScanFromUrl('https://www.bol.com/nl/nl/');
+
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].url, 'https://r.jina.ai/https://www.bol.com/nl/nl/');
+  assert.equal(result.finalUrl, 'https://www.bol.com/nl/nl/');
+  assert.equal(result.scan.fetchSource, 'reader-fallback');
+  assert.equal(result.scan.title, 'De winkel van ons allemaal | bol');
+  assert.equal(result.scan.h1, 'bol');
+  assert.match(String(result.scan.bodyTextSample || ''), /Kies uit miljoenen artikelen/);
 });
 
 test('ai remote service generates website html via OpenAI and preserves cost metadata', async () => {

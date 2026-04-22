@@ -72,8 +72,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
-  assert.match(themeJsSource, /key:\s*"websitegenerator_library"/);
-  assert.match(themeJsSource, /href:\s*"\/premium-websitegenerator#bibliotheek"/);
+  assert.doesNotMatch(themeJsSource, /getWebsiteGeneratorLibrarySidebarLink/);
+  assert.doesNotMatch(themeJsSource, /label:\s*"Bibliotheek"/);
   assert.match(
     themeJsSource,
     /window\.SoftoraPersonnelTheme\.refreshPremiumStaticSidebarActiveState\s*=\s*refreshPremiumStaticSidebarActiveState/
@@ -82,6 +82,11 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /buildSidebarProfileRenderKey/);
   assert.match(themeJsSource, /sidebar\.dataset\.sidebarProfileRenderKey === renderKey/);
   assert.match(themeSource, /\.sidebar-link \.sidebar-link-text[\s\S]*white-space:\s*nowrap !important;/);
+  assert.match(
+    themeSource,
+    /@media \(min-width: 901px\) \{[\s\S]*?\.sidebar-nav \{[\s\S]*?overflow-y:\s*hidden !important;/m
+  );
+  assert.match(themeJsSource, /const nav = sidebar\.querySelector\("\.sidebar-nav"\)/);
   assert.match(themeSource, /\.sidebar-user-name[\s\S]*text-overflow:\s*ellipsis !important;/);
   assert.match(prefillSource, /data-sidebar-profile-render-key/);
   assert.match(prefillSource, /getAttribute\("data-sidebar-profile-render-key"\)/);

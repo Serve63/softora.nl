@@ -515,7 +515,6 @@
         if (p.indexOf("/premium-database") === 0) return "database";
         if (p.indexOf("/premium-mailbox") === 0) return "mailbox";
         if (p.indexOf("/premium-websitegenerator") === 0) {
-            if (hashRaw === "bibliotheek" || hashRaw === "library") return "websitegenerator_library";
             return "websitegenerator";
         }
         if (p.indexOf("/premium-seo") === 0 || p.indexOf("/premium-seo-crm-system") === 0) return "seo";
@@ -562,15 +561,6 @@
             href: "/premium-websitegenerator",
             label: "Websitegenerator",
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg>',
-        };
-    }
-
-    function getWebsiteGeneratorLibrarySidebarLink() {
-        return {
-            key: "websitegenerator_library",
-            href: "/premium-websitegenerator#bibliotheek",
-            label: "Bibliotheek",
-            icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7.5" height="7.5" rx="1"></rect><rect x="13.5" y="3" width="7.5" height="7.5" rx="1"></rect><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1"></rect><rect x="3" y="13.5" width="7.5" height="7.5" rx="1"></rect></svg>',
         };
     }
 
@@ -659,11 +649,17 @@
         if (window.innerWidth <= 900) {
             return;
         }
-        if (sidebar.scrollHeight <= sidebar.clientHeight + 1) {
+        const nav = sidebar.querySelector(".sidebar-nav");
+        var measureEl = nav || sidebar;
+        function navOverflows() {
+            return measureEl.scrollHeight > measureEl.clientHeight + 1;
+        }
+        if (!navOverflows()) {
             return;
         }
         sidebar.classList.add("sidebar-fit-compact");
-        if (sidebar.scrollHeight <= sidebar.clientHeight + 1) {
+        void sidebar.offsetHeight;
+        if (!navOverflows()) {
             return;
         }
         sidebar.classList.add("sidebar-fit-tight");
@@ -735,7 +731,6 @@
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>',
             },
             getWebsitePreviewSidebarLink(),
-            getWebsiteGeneratorLibrarySidebarLink(),
             {
                 key: "seo",
                 href: "/premium-seo",
@@ -885,6 +880,11 @@
                 link.parentNode.removeChild(link);
             }
         });
+        sidebar.querySelectorAll('a[data-sidebar-key="websitegenerator_library"]').forEach(function (link) {
+            if (link && link.parentNode) {
+                link.parentNode.removeChild(link);
+            }
+        });
     }
 
     function ensureStaticSidebarLink(sidebar, sectionLabel, link, insertBeforeKeys) {
@@ -980,7 +980,7 @@
                 sidebar,
                 "beheer",
                 getCustomersSidebarLink(),
-                ["mailbox", "websitegenerator", "websitegenerator_library", "seo", "packages", "pdfs"]
+                ["mailbox", "websitegenerator", "seo", "packages", "pdfs"]
             );
         }
 

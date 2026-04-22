@@ -39,6 +39,7 @@ test('website generation helpers build preview prompt, brief and filename from s
     visualCues: ['licht design', 'grote hero'],
     brandColorHints: ['accent: #8b2252', 'accent-light: #a62d65'],
     brandPalette: ['#8b2252', '#a62d65', '#f8f7f4', '#1a1a2e'],
+    referenceImageCount: 2,
     bodyTextSample: 'Wij bouwen websites die converteren.',
   };
 
@@ -46,13 +47,16 @@ test('website generation helpers build preview prompt, brief and filename from s
   const brief = helpers.buildWebsitePreviewBriefFromScan(scan);
   const fileName = helpers.buildWebsitePreviewDownloadFileName(scan);
 
-  assert.match(prompt, /Brand or domain: softora\.nl\./);
-  assert.match(prompt, /preserve the same core brand colors, accent usage, contrast relationships/i);
-  assert.match(prompt, /Do not invent a new color palette/i);
-  assert.match(prompt, /fill the frame edge-to-edge with no empty white gutter/i);
-  assert.match(prompt, /Primary heading on current site: Meer klanten met een premium site\./);
-  assert.match(prompt, /Detected brand color variables: accent: #8b2252 \| accent-light: #a62d65\./);
-  assert.match(prompt, /Detected recurring brand colors: #8b2252 \| #a62d65 \| #f8f7f4 \| #1a1a2e\./);
+  assert.match(prompt, /Domein of merk: softora\.nl\./);
+  assert.match(prompt, /behoud exact dezelfde hoofdkleuren, accenten, contrastverhoudingen en visuele sfeer/i);
+  assert.match(prompt, /Gebruik de 2 meegeleverde referentiebeeld\(en\) als harde visuele bron/i);
+  assert.match(prompt, /Introduceer nadrukkelijk geen nieuw kleurenpalet/i);
+  assert.match(prompt, /edge-to-edge gevuld zijn zonder leeg wit canvas/i);
+  assert.match(prompt, /Belangrijkste huidige heading: Meer klanten met een premium site\./);
+  assert.match(prompt, /Gedetecteerde merkkleur-variabelen: accent: #8b2252 \| accent-light: #a62d65\./);
+  assert.match(prompt, /Gedetecteerde terugkerende merkkleuren: #8b2252 \| #a62d65 \| #f8f7f4 \| #1a1a2e\./);
+  assert.match(prompt, /hoge verticale full-page compositie/i);
+  assert.match(prompt, /exact 1 hoge portrait full-page desktop homepage screenshot/i);
   assert.equal(
     brief,
     'Titel: Softora · Hoofdboodschap: Meer klanten met een premium site · Omschrijving: Premium websites · Secties: Diensten, Cases · Beeldreferenties: licht design, grote hero · Kleuren: #8b2252, #a62d65, #f8f7f4, #1a1a2e'

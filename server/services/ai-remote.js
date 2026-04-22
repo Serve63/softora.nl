@@ -13,6 +13,15 @@ function createAiRemoteService(deps = {}) {
       response: { ok: true, status: 200 },
       data: {},
     }),
+    fetchBinaryWithTimeout = async () => ({
+      response: {
+        ok: false,
+        status: 501,
+        url: '',
+        headers: { get: () => '' },
+      },
+      bytes: Buffer.from(''),
+    }),
     fetchTextWithTimeout = async () => ({
       response: {
         ok: true,
@@ -128,6 +137,310 @@ function createAiRemoteService(deps = {}) {
       if (out.length >= 4) break;
     }
     return out;
+  }
+
+  function buildWebsitePreviewDocumentFetchProfiles() {
+    return [
+      {
+        id: 'browser-desktop',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+          DNT: '1',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+        },
+      },
+      {
+        id: 'softora-compat',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (compatible; SoftoraWebsitePreview/1.0; +https://softora.nl)',
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
+      },
+    ];
+  }
+
+  function buildWebsitePreviewStylesheetHeaders(pageUrlRaw) {
+    const pageUrl = normalizeString(pageUrlRaw || '');
+    const headers = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+      Accept: 'text/css,text/plain;q=0.9,*/*;q=0.1',
+      'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
+      Referer: pageUrl,
+      'Sec-Fetch-Dest': 'style',
+      'Sec-Fetch-Mode': 'no-cors',
+      'Sec-Fetch-Site': 'same-origin',
+    };
+    if (!pageUrl) delete headers.Referer;
+    return headers;
+  }
+
+  function buildWebsitePreviewImageHeaders(pageUrlRaw) {
+    const pageUrl = normalizeString(pageUrlRaw || '');
+    const headers = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+      Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
+      Referer: pageUrl,
+      'Sec-Fetch-Dest': 'image',
+      'Sec-Fetch-Mode': 'no-cors',
+      'Sec-Fetch-Site': 'same-origin',
+    };
+    if (!pageUrl) delete headers.Referer;
+    return headers;
+  }
+
+  function extractResponseHeader(response, name) {
+    if (!response || !response.headers || typeof response.headers.get !== 'function') return '';
+    return normalizeString(response.headers.get(name) || '');
+  }
+
+  function normalizeWebsitePreviewText(textRaw) {
+    return String(textRaw || '')
+      .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function isLikelyBlockedWebsiteContent(textRaw) {
+    const text = normalizeWebsitePreviewText(textRaw);
+    if (!text) return false;
+
+    const hardSignals = [
+      'verify you are human',
+      'unusual traffic',
+      'access denied',
+      'enable javascript',
+      'enable cookies',
+      'temporarily blocked',
+      'request blocked',
+      'forbidden',
+      'detected unusual activity',
+      'automatische scripts',
+      'toegang tot',
+      'toegang is tijdelijk geblokkeerd',
+      'ip adres',
+      'ip address',
+      'captcha',
+    ];
+    if (hardSignals.some((signal) => text.includes(signal))) {
+      return true;
+    }
+
+    const blockWords = ['blocked', 'geblokkeerd', 'forbidden', 'denied'];
+    const securityWords = ['ip adres', 'ip address', 'captcha', 'bot', 'misbruik', 'automation'];
+    return (
+      blockWords.some((word) => text.includes(word)) &&
+      securityWords.some((word) => text.includes(word))
+    );
+  }
+
+  function buildWebsitePreviewReaderUrl(pageUrlRaw) {
+    const pageUrl = normalizeString(pageUrlRaw || '');
+    if (!pageUrl) return '';
+    if (/^https?:\/\//i.test(pageUrl)) {
+      return `https://r.jina.ai/${pageUrl}`;
+    }
+    return `https://r.jina.ai/http://${pageUrl}`;
+  }
+
+  function extractReaderContentSection(markdownRaw) {
+    const markdown = String(markdownRaw || '');
+    const marker = /\nMarkdown Content:\n/i;
+    const match = marker.exec(markdown);
+    if (!match) return markdown.trim();
+    return markdown.slice(match.index + match[0].length).trim();
+  }
+
+  function stripMarkdownFormatting(markdownRaw) {
+    return String(markdownRaw || '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/^>\s*/gm, '')
+      .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+      .replace(/^\s*[-*+]\s+/gm, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function extractWebsitePreviewScanFromReaderMarkdown(markdownRaw, pageUrlRaw) {
+    const markdown = String(markdownRaw || '');
+    const normalizedPageUrl = normalizeWebsitePreviewTargetUrl(pageUrlRaw) || normalizeString(pageUrlRaw || '');
+    const sourceUrlMatch = markdown.match(/(?:^|\n)URL Source:\s*([^\n]+)/i);
+    const readerSourceUrl =
+      normalizeWebsitePreviewTargetUrl(sourceUrlMatch && sourceUrlMatch[1]) || normalizedPageUrl;
+    const titleMatch = markdown.match(/(?:^|\n)Title:\s*([^\n]+)/i);
+    const contentSection = extractReaderContentSection(markdown);
+    const headingMatches = Array.from(contentSection.matchAll(/^\s{0,3}#{1,6}\s+(.+)$/gm))
+      .map((match) => normalizeString(match[1] || ''))
+      .filter(Boolean);
+    const paragraphs = contentSection
+      .split(/\n\s*\n/g)
+      .map((entry) => stripMarkdownFormatting(entry))
+      .filter((entry) => entry.length >= 32)
+      .slice(0, 6);
+    const plainText = stripMarkdownFormatting(contentSection);
+    const title = normalizeString(titleMatch && titleMatch[1]);
+    const h1 = normalizeString(headingMatches[0] || title || '');
+    const metaDescription = truncateText(normalizeString(paragraphs[0] || plainText || ''), 280);
+    const bodyTextSample = truncateText(plainText, 3200);
+
+    return {
+      title,
+      h1,
+      metaDescription,
+      headings: headingMatches.slice(1, 7),
+      paragraphs,
+      visualCues: [],
+      imageCount: 0,
+      bodyTextSample,
+      sourceUrl: readerSourceUrl,
+      fetchSource: 'reader-fallback',
+    };
+  }
+
+  async function tryFetchWebsitePreviewDocument(normalizedUrl, timeoutMs = 25000) {
+    const attempts = [];
+    const profiles = buildWebsitePreviewDocumentFetchProfiles();
+
+    for (const profile of profiles) {
+      try {
+        const { response, text } = await fetchTextWithTimeout(
+          normalizedUrl,
+          {
+            method: 'GET',
+            redirect: 'follow',
+            headers: profile.headers,
+          },
+          timeoutMs
+        );
+        const contentType = extractResponseHeader(response, 'content-type').toLowerCase();
+        const bodyText = String(text || '');
+        const blocked = isLikelyBlockedWebsiteContent(bodyText);
+        attempts.push({
+          mode: profile.id,
+          status: Number(response?.status || 0) || 0,
+          contentType,
+          blocked,
+        });
+
+        if (!response.ok) continue;
+        if (
+          contentType &&
+          !contentType.includes('text/html') &&
+          !contentType.includes('application/xhtml+xml')
+        ) {
+          continue;
+        }
+        if (!bodyText) continue;
+        if (blocked) continue;
+
+        return {
+          ok: true,
+          response,
+          text: bodyText,
+          attempts,
+        };
+      } catch (error) {
+        attempts.push({
+          mode: profile.id,
+          status: 0,
+          error: truncateText(normalizeString(error?.message || 'Fetch mislukt'), 180),
+        });
+      }
+    }
+
+    return {
+      ok: false,
+      attempts,
+    };
+  }
+
+  async function tryFetchWebsitePreviewViaReader(normalizedUrl, timeoutMs = 25000) {
+    const readerUrl = buildWebsitePreviewReaderUrl(normalizedUrl);
+    if (!readerUrl) {
+      return { ok: false, reason: 'reader-url-leeg' };
+    }
+
+    try {
+      const { response, text } = await fetchTextWithTimeout(
+        readerUrl,
+        {
+          method: 'GET',
+          redirect: 'follow',
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (compatible; SoftoraWebsitePreview/1.0; +https://softora.nl)',
+            Accept: 'text/plain, text/markdown;q=0.9, */*;q=0.1',
+            'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
+          },
+        },
+        timeoutMs
+      );
+      const markdown = String(text || '').trim();
+      const blocked = isLikelyBlockedWebsiteContent(markdown);
+      if (!response.ok || !markdown || blocked) {
+        return {
+          ok: false,
+          status: Number(response?.status || 0) || 0,
+          blocked,
+        };
+      }
+
+      const scan = extractWebsitePreviewScanFromReaderMarkdown(markdown, normalizedUrl);
+      return {
+        ok: Boolean(scan.title || scan.h1 || scan.metaDescription || scan.bodyTextSample),
+        status: Number(response?.status || 0) || 200,
+        scan,
+        finalUrl: normalizeWebsitePreviewTargetUrl(scan.sourceUrl || normalizedUrl) || normalizedUrl,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        status: 0,
+        error: truncateText(normalizeString(error?.message || 'Reader fetch mislukt'), 180),
+      };
+    }
+  }
+
+  function buildWebsitePreviewFetchError(attempts = []) {
+    const lastAttemptWithStatus = [...attempts]
+      .reverse()
+      .find((attempt) => Number.isFinite(attempt?.status) && attempt.status > 0);
+    const status = lastAttemptWithStatus ? lastAttemptWithStatus.status : 502;
+    const blocked = attempts.some(
+      (attempt) => attempt?.blocked || [401, 403, 406, 409, 429, 451].includes(Number(attempt?.status || 0))
+    );
+    const err = new Error(
+      blocked
+        ? `Kon deze website niet ophalen (${status}). Deze site blokkeert geautomatiseerde serververzoeken.`
+        : `Kon deze website niet ophalen (${status}).`
+    );
+    err.status = status >= 400 && status < 600 ? status : 502;
+    return err;
   }
 
   function extractColorTokensFromCss(textRaw) {
@@ -270,11 +583,116 @@ function createAiRemoteService(deps = {}) {
 
   function isSupportedOpenAiImageModel(modelRaw) {
     const model = normalizeString(modelRaw || '').toLowerCase();
-    return /^gpt-image-(?:1(?:\.5)?|1-mini|2)$/.test(model) || /^dall-e-[23]$/.test(model);
+    return (
+      /^gpt-image-(?:1(?:\.5)?|1-mini|2)$/.test(model) ||
+      model === 'chatgpt-image-latest' ||
+      /^dall-e-[23]$/.test(model)
+    );
   }
 
   function isGptImageGenerationModel(modelRaw) {
-    return /^gpt-image-/i.test(normalizeString(modelRaw || ''));
+    const model = normalizeString(modelRaw || '').toLowerCase();
+    return /^gpt-image-/i.test(model) || model === 'chatgpt-image-latest';
+  }
+
+  function requiresLegacyOpenAiImageResponseFormat(modelRaw) {
+    return /^dall-e-[23]$/i.test(normalizeString(modelRaw || ''));
+  }
+
+  function supportsOpenAiReferenceImageEdits(modelRaw) {
+    return isGptImageGenerationModel(modelRaw);
+  }
+
+  function isSupportedWebsitePreviewReferenceMimeType(mimeTypeRaw) {
+    return /^image\/(?:png|jpeg|webp)$/i.test(normalizeString(mimeTypeRaw || '').split(';')[0]);
+  }
+
+  function guessImageMimeTypeFromUrl(urlRaw) {
+    const url = normalizeString(urlRaw || '').toLowerCase();
+    if (!url) return '';
+    if (/\.png(?:[?#].*)?$/.test(url)) return 'image/png';
+    if (/\.(?:jpe?g)(?:[?#].*)?$/.test(url)) return 'image/jpeg';
+    if (/\.webp(?:[?#].*)?$/.test(url)) return 'image/webp';
+    return '';
+  }
+
+  function isLikelyUsefulReferenceImageUrl(urlRaw) {
+    const url = normalizeString(urlRaw || '').toLowerCase();
+    if (!url) return false;
+    if (/^data:|^blob:|^javascript:/i.test(url)) return false;
+    if (/\.(?:svg|ico)(?:[?#].*)?$/i.test(url)) return false;
+    return /^https?:\/\//i.test(url);
+  }
+
+  function inferWebsitePreviewReferenceFileName(urlRaw, index, mimeTypeRaw) {
+    const mimeType = normalizeString(mimeTypeRaw || '').toLowerCase();
+    const extension =
+      mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+    let base = '';
+    try {
+      const parsed = new URL(String(urlRaw || ''));
+      base = normalizeString(parsed.pathname.split('/').filter(Boolean).pop() || '')
+        .replace(/\.[a-z0-9]+$/i, '')
+        .replace(/[^a-z0-9._-]+/gi, '-')
+        .replace(/-{2,}/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80);
+    } catch {
+      base = '';
+    }
+    return `${base || `website-reference-${index + 1}`}.${extension}`;
+  }
+
+  async function fetchWebsitePreviewReferenceImages(scan = {}) {
+    const candidates = Array.isArray(scan.referenceImageUrls)
+      ? scan.referenceImageUrls.map((item) => normalizeString(item || '')).filter(Boolean)
+      : [];
+    if (candidates.length === 0) return [];
+
+    const rawImages = [];
+    let totalBytes = 0;
+    const pageUrl = normalizeString(scan.sourceUrl || scan.url || '');
+
+    for (let index = 0; index < candidates.length; index += 1) {
+      if (rawImages.length >= 3) break;
+      const candidateUrl = candidates[index];
+      if (!isLikelyUsefulReferenceImageUrl(candidateUrl)) continue;
+
+      try {
+        const safeUrl = await assertWebsitePreviewUrlIsPublic(candidateUrl);
+        const { response, bytes } = await fetchBinaryWithTimeout(
+          safeUrl,
+          {
+            method: 'GET',
+            redirect: 'follow',
+            headers: buildWebsitePreviewImageHeaders(pageUrl),
+          },
+          15000
+        );
+        if (!response?.ok) continue;
+
+        const contentType =
+          normalizeString(extractResponseHeader(response, 'content-type') || '').split(';')[0] ||
+          guessImageMimeTypeFromUrl(response?.url || safeUrl);
+        if (!isSupportedWebsitePreviewReferenceMimeType(contentType)) continue;
+        if (!Buffer.isBuffer(bytes) || bytes.length < 1024 || bytes.length > 2 * 1024 * 1024) continue;
+        if (totalBytes + bytes.length > 4 * 1024 * 1024) continue;
+
+        rawImages.push({
+          name: inferWebsitePreviewReferenceFileName(response?.url || safeUrl, index, contentType),
+          dataUrl: `data:${contentType};base64,${bytes.toString('base64')}`,
+        });
+        totalBytes += bytes.length;
+      } catch (_) {
+        /* ignore reference-image fetch failures; prompt-only generation remains available */
+      }
+    }
+
+    return sanitizeReferenceImages(rawImages, {
+      maxItems: 3,
+      maxBytesPerImage: 2 * 1024 * 1024,
+      maxTotalBytes: 4 * 1024 * 1024,
+    });
   }
 
   async function fetchWebsitePreviewCssSources(htmlRaw, pageUrlRaw) {
@@ -289,11 +707,7 @@ function createAiRemoteService(deps = {}) {
           {
             method: 'GET',
             redirect: 'follow',
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (compatible; SoftoraWebsitePreview/1.0; +https://softora.nl)',
-              Accept: 'text/css,text/plain;q=0.9,*/*;q=0.1',
-            },
+            headers: buildWebsitePreviewStylesheetHeaders(pageUrlRaw),
           },
           12000
         );
@@ -309,41 +723,52 @@ function createAiRemoteService(deps = {}) {
     return inlineCssSources.slice(0, 8);
   }
 
-  async function generateWebsitePreviewImageWithAi(scan = {}) {
-    const apiKey = getOpenAiApiKey();
-    if (!apiKey) {
-      const err = new Error('OPENAI_API_KEY ontbreekt');
-      err.status = 503;
-      throw err;
-    }
+  async function requestOpenAiWebsitePreviewImageGeneration({
+    apiKey,
+    imageModel,
+    prompt,
+    referenceImages = [],
+  }) {
+    if (referenceImages.length > 0 && supportsOpenAiReferenceImageEdits(imageModel)) {
+      const body = new FormData();
+      body.set('model', imageModel);
+      body.set('prompt', prompt);
+      body.set('size', '1024x1536');
+      body.set('quality', 'high');
+      referenceImages.forEach((item) => {
+        const parsed = parseImageDataUrl(item?.dataUrl || '');
+        if (!parsed) return;
+        body.append(
+          'image[]',
+          new Blob([Buffer.from(parsed.base64Payload, 'base64')], { type: parsed.mimeType }),
+          item.name || 'reference.png'
+        );
+      });
 
-    const prompt = buildWebsitePreviewPromptFromScan(scan);
-    const imageModel = normalizeString(
-      openAiImageModel || env.WEBSITE_PREVIEW_IMAGE_MODEL || env.OPENAI_IMAGE_MODEL || 'gpt-image-2'
-    );
-    if (!isSupportedOpenAiImageModel(imageModel)) {
-      const err = new Error(`OpenAI image-model ongeldig geconfigureerd (${imageModel || 'leeg'})`);
-      err.status = 500;
-      err.data = {
-        error: {
-          detail:
-            'OPENAI_IMAGE_MODEL moet een ondersteund image-model zijn, bijvoorbeeld gpt-image-2, gpt-image-1.5 of gpt-image-1-mini.',
+      return fetchJsonWithTimeout(
+        `${openAiApiBaseUrl}/images/edits`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body,
         },
-      };
-      throw err;
+        180000
+      );
     }
 
     const requestBody = {
       model: imageModel,
       prompt,
-      size: '1536x1024',
+      size: '1024x1536',
       quality: 'high',
     };
-    if (!isGptImageGenerationModel(imageModel)) {
+    if (requiresLegacyOpenAiImageResponseFormat(imageModel)) {
       requestBody.response_format = 'b64_json';
     }
 
-    const { response, data } = await fetchJsonWithTimeout(
+    return fetchJsonWithTimeout(
       `${openAiApiBaseUrl}/images/generations`,
       {
         method: 'POST',
@@ -355,6 +780,42 @@ function createAiRemoteService(deps = {}) {
       },
       180000
     );
+  }
+
+  async function generateWebsitePreviewImageWithAi(scan = {}) {
+    const apiKey = getOpenAiApiKey();
+    if (!apiKey) {
+      const err = new Error('OPENAI_API_KEY ontbreekt');
+      err.status = 503;
+      throw err;
+    }
+    const imageModel = normalizeString(
+      openAiImageModel || env.WEBSITE_PREVIEW_IMAGE_MODEL || env.OPENAI_IMAGE_MODEL || 'gpt-image-2'
+    );
+    if (!isSupportedOpenAiImageModel(imageModel)) {
+      const err = new Error(`OpenAI image-model ongeldig geconfigureerd (${imageModel || 'leeg'})`);
+      err.status = 500;
+      err.data = {
+        error: {
+          detail:
+            'OPENAI_IMAGE_MODEL moet een ondersteund image-model zijn, bijvoorbeeld gpt-image-2, chatgpt-image-latest, gpt-image-1.5 of gpt-image-1-mini.',
+        },
+      };
+      throw err;
+    }
+
+    const referenceImages = await fetchWebsitePreviewReferenceImages(scan);
+    const prompt = buildWebsitePreviewPromptFromScan({
+      ...scan,
+      referenceImageCount: referenceImages.length,
+    });
+
+    const { response, data } = await requestOpenAiWebsitePreviewImageGeneration({
+      apiKey,
+      imageModel,
+      prompt,
+      referenceImages,
+    });
 
     if (!response.ok) {
       const err = new Error(`OpenAI websitegenerator mislukt (${response.status})`);
@@ -382,45 +843,66 @@ function createAiRemoteService(deps = {}) {
       dataUrl: `data:image/png;base64,${b64}`,
       fileName: buildWebsitePreviewDownloadFileName(scan),
       revisedPrompt: normalizeString(imageEntry?.revised_prompt || ''),
+      referenceImageCount: referenceImages.length,
       usage: data?.usage || null,
     };
   }
 
   async function fetchWebsitePreviewScanFromUrl(targetUrlRaw) {
     const normalizedUrl = await assertWebsitePreviewUrlIsPublic(targetUrlRaw);
-    const { response, text } = await fetchTextWithTimeout(
-      normalizedUrl,
-      {
-        method: 'GET',
-        redirect: 'follow',
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (compatible; SoftoraWebsitePreview/1.0; +https://softora.nl)',
-          Accept: 'text/html,application/xhtml+xml',
+    const directFetch = await tryFetchWebsitePreviewDocument(normalizedUrl, 25000);
+    if (!directFetch.ok) {
+      const readerFetch = await tryFetchWebsitePreviewViaReader(normalizedUrl, 25000);
+      if (readerFetch.ok) {
+        return {
+          normalizedUrl,
+          finalUrl: readerFetch.finalUrl,
+          scan: readerFetch.scan,
+        };
+      }
+      throw buildWebsitePreviewFetchError([
+        ...directFetch.attempts,
+        {
+          mode: 'reader-fallback',
+          status: Number(readerFetch.status || 0) || 0,
+          blocked: Boolean(readerFetch.blocked),
+          error: normalizeString(readerFetch.error || readerFetch.reason || ''),
         },
-      },
-      25000
-    );
-
-    if (!response.ok) {
-      const err = new Error(`Kon deze website niet ophalen (${response.status}).`);
-      err.status = response.status >= 400 && response.status < 600 ? response.status : 502;
-      throw err;
+      ]);
     }
 
-    const contentType = normalizeString(response.headers.get('content-type') || '').toLowerCase();
+    const response = directFetch.response;
+    const html = String(directFetch.text || '');
+    const contentType = extractResponseHeader(response, 'content-type').toLowerCase();
     if (
       contentType &&
       !contentType.includes('text/html') &&
       !contentType.includes('application/xhtml+xml')
     ) {
+      const readerFetch = await tryFetchWebsitePreviewViaReader(normalizedUrl, 25000);
+      if (readerFetch.ok) {
+        return {
+          normalizedUrl,
+          finalUrl: readerFetch.finalUrl,
+          scan: readerFetch.scan,
+        };
+      }
+
       const err = new Error('De opgegeven URL lijkt geen HTML-webpagina te zijn.');
       err.status = 400;
       throw err;
     }
 
-    const html = String(text || '');
     if (!html) {
+      const readerFetch = await tryFetchWebsitePreviewViaReader(normalizedUrl, 25000);
+      if (readerFetch.ok) {
+        return {
+          normalizedUrl,
+          finalUrl: readerFetch.finalUrl,
+          scan: readerFetch.scan,
+        };
+      }
+
       const err = new Error('Deze website gaf geen leesbare HTML terug.');
       err.status = 502;
       throw err;
@@ -444,6 +926,15 @@ function createAiRemoteService(deps = {}) {
     }
     scan.stylesheetCount = cssSources.length;
     if (!scan.title && !scan.h1 && !scan.metaDescription && !scan.bodyTextSample) {
+      const readerFetch = await tryFetchWebsitePreviewViaReader(normalizedUrl, 25000);
+      if (readerFetch.ok) {
+        return {
+          normalizedUrl,
+          finalUrl: readerFetch.finalUrl,
+          scan: readerFetch.scan,
+        };
+      }
+
       const err = new Error('Er kon te weinig bruikbare inhoud uit deze website worden gelezen.');
       err.status = 422;
       throw err;

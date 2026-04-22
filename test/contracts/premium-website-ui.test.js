@@ -111,7 +111,7 @@ test('premium website houdt footer-links direct klikbaar door footer buiten cont
   );
 });
 
-test('premium website hero is full-bleed workspace-foto met donkere overlay en leesbare tekst', () => {
+test('premium website hero gebruikt lokaal gegenereerde studiofotografie met donkere overlay en leesbare tekst', () => {
   const filePath = path.join(__dirname, '../../premium-website.html');
   const source = fs.readFileSync(filePath, 'utf8');
 
@@ -123,7 +123,7 @@ test('premium website hero is full-bleed workspace-foto met donkere overlay en l
   );
   assert.match(
     source,
-    /\.hero::before\s*\{[\s\S]*photo-1497366216548-37526070297c[\s\S]*cover no-repeat;/s
+    /\.hero::before\s*\{[\s\S]*\/assets\/home-hero-generated-v2\.jpg[\s\S]*cover no-repeat;/s
   );
   assert.match(
     source,
