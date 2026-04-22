@@ -1,6 +1,7 @@
 @import url('softora-dossier-loader.css');
 
 :root {
+    --premium-sidebar-width: 320px;
     --accent: #8b2252;
     --accent-dark: #6b1a3f;
     --accent-light: #a62d65;
@@ -809,7 +810,7 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
-        width: 280px !important;
+        width: var(--premium-sidebar-width) !important;
         height: 100vh !important;
         min-height: 100vh !important;
         padding-top: 1.05rem !important;
@@ -854,9 +855,19 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
         flex: 1 !important;
         min-height: 0 !important;
         overflow-x: hidden !important;
-        overflow-y: hidden !important;
+        overflow-y: auto !important;
         padding-bottom: 0.15rem !important;
-        scrollbar-width: none !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(26, 26, 46, 0.22) transparent !important;
+    }
+
+    .sidebar-nav::-webkit-scrollbar {
+        width: 6px !important;
+    }
+
+    .sidebar-nav::-webkit-scrollbar-thumb {
+        background: rgba(26, 26, 46, 0.2) !important;
+        border-radius: 999px !important;
     }
 
     .sidebar-footer {
@@ -904,7 +915,7 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
     .main,
     .page-shell,
     .main-content {
-        margin-left: 280px !important;
+        margin-left: var(--premium-sidebar-width) !important;
     }
 
     .main-content > .page-shell {
@@ -1135,14 +1146,14 @@ body[data-sidebar-nav-ready="1"] .sidebar-footer a.logout-btn {
 .dashboard-layout[data-sidebar-shell="canonical"] > main.main-content,
 .dashboard-layout[data-sidebar-shell="canonical"] > .main,
 .dashboard-layout[data-sidebar-shell="canonical"] > main.main {
-    width: calc(100% - 280px) !important;
+    width: calc(100% - var(--premium-sidebar-width)) !important;
     min-height: 100vh !important;
     padding: 3rem 3rem 1.8rem !important;
 }
 
 .dashboard-layout[data-sidebar-shell="canonical"] > .page-shell,
 .dashboard-layout[data-sidebar-shell="canonical"] > main.page-shell {
-    width: calc(100% - 280px) !important;
+    width: calc(100% - var(--premium-sidebar-width)) !important;
     min-height: 100vh !important;
     padding: 3rem 3rem 1.8rem !important;
 }
@@ -1265,7 +1276,7 @@ main.is-premium-boot-host {
     top: 0;
     right: 0;
     bottom: 0;
-    left: 280px;
+    left: var(--premium-sidebar-width);
     display: flex;
     align-items: center;
     justify-content: center;
