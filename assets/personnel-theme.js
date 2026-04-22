@@ -746,24 +746,6 @@
                 icon: adsPlatformIcon,
             },
             {
-                key: "ads_facebook",
-                href: "/premium-advertenties#facebook",
-                label: "Facebook",
-                icon: adsPlatformIcon,
-            },
-            {
-                key: "ads_pinterest",
-                href: "/premium-advertenties#pinterest",
-                label: "Pinterest",
-                icon: adsPlatformIcon,
-            },
-            {
-                key: "ads_linkedin",
-                href: "/premium-advertenties#linkedin",
-                label: "LinkedIn",
-                icon: adsPlatformIcon,
-            },
-            {
                 key: "ads_trustoo",
                 href: "/premium-advertenties#trustoo",
                 label: "Trustoo",
@@ -776,6 +758,24 @@
                 key: "social_instagram",
                 href: "/premium-advertenties#instagram",
                 label: "Instagram",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "social_linkedin",
+                href: "/premium-advertenties#linkedin",
+                label: "LinkedIn",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "social_facebook",
+                href: "/premium-advertenties#facebook",
+                label: "Facebook",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "social_pinterest",
+                href: "/premium-advertenties#pinterest",
+                label: "Pinterest",
                 icon: adsPlatformIcon,
             },
         ];
