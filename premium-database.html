@@ -125,8 +125,8 @@
         .ai-database-badge {
             display: inline-flex;
             flex-direction: column;
-            gap: 4px;
-            min-width: 220px;
+            gap: 0;
+            min-width: 0;
             padding: 10px 14px;
             border: 1px solid rgba(139, 34, 82, 0.14);
             border-radius: 10px;
@@ -144,8 +144,8 @@
             width: 9px;
             height: 9px;
             border-radius: 999px;
-            background: #16733c;
-            box-shadow: 0 0 0 4px rgba(22, 115, 60, 0.15);
+            background: #b0b4c0;
+            box-shadow: 0 0 0 4px rgba(96, 98, 114, 0.12);
             flex-shrink: 0;
         }
 
@@ -157,12 +157,6 @@
             text-transform: uppercase;
             color: var(--crimson);
             line-height: 1;
-        }
-
-        .ai-database-state {
-            font-size: 12px;
-            line-height: 1.35;
-            color: var(--mid);
         }
 
         .add-actions {
@@ -1038,12 +1032,11 @@
                             <div class="page-sub" id="top-sub"></div>
                         </div>
                         <div class="top-right">
-                            <div class="ai-database-badge" title="De AI-database koppelt databronnen en opvolgregels; dubbele of onnodige opvolging wordt automatisch voorkomen waar dit is ingeregeld.">
+                            <div class="ai-database-badge" title="Nog niet ingesteld. Zodra de AI-database live staat, worden databronnen en opvolgregels hier automatisch gekoppeld." role="status" aria-label="AI-database: nog niet ingesteld">
                                 <div class="ai-database-badge-head">
                                     <span class="ai-database-dot" aria-hidden="true"></span>
                                     <span class="ai-database-label">AI-database</span>
                                 </div>
-                                <div class="ai-database-state">Actief — slimme aansturing</div>
                             </div>
                             <div class="add-actions" id="addActions">
                                 <button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">
