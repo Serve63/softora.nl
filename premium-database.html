@@ -124,14 +124,14 @@
 
         .ai-database-badge {
             display: inline-flex;
-            flex-direction: column;
-            gap: 0;
+            align-items: center;
+            padding: 0;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            background: none;
+            box-shadow: none;
             min-width: 0;
-            padding: 10px 14px;
-            border: 1px solid rgba(139, 34, 82, 0.14);
-            border-radius: 10px;
-            background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,247,244,0.88));
-            box-shadow: 0 10px 24px rgba(26, 26, 46, 0.06);
         }
 
         .ai-database-badge-head {
@@ -144,8 +144,8 @@
             width: 9px;
             height: 9px;
             border-radius: 999px;
-            background: #b0b4c0;
-            box-shadow: 0 0 0 4px rgba(96, 98, 114, 0.12);
+            background: var(--red);
+            box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.2);
             flex-shrink: 0;
         }
 
@@ -926,7 +926,7 @@
             }
 
             .ai-database-badge {
-                width: 100%;
+                align-self: flex-start;
             }
 
             .f-count {
