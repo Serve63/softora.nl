@@ -751,31 +751,40 @@
                 label: "Trustoo",
                 icon: adsPlatformIcon,
             },
-        ];
-
-        const socialLinks = [
             {
-                key: "social_instagram",
+                key: "ads_instagram",
                 href: "/premium-advertenties#instagram",
                 label: "Instagram",
                 icon: adsPlatformIcon,
             },
             {
-                key: "social_linkedin",
+                key: "ads_linkedin",
                 href: "/premium-advertenties#linkedin",
                 label: "LinkedIn",
                 icon: adsPlatformIcon,
             },
             {
-                key: "social_facebook",
+                key: "ads_facebook",
                 href: "/premium-advertenties#facebook",
                 label: "Facebook",
                 icon: adsPlatformIcon,
             },
             {
-                key: "social_pinterest",
+                key: "ads_pinterest",
                 href: "/premium-advertenties#pinterest",
                 label: "Pinterest",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "ads_twitter",
+                href: "/premium-advertenties#twitter",
+                label: "X / Twitter",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "ads_snapchat",
+                href: "/premium-advertenties#snapchat",
+                label: "Snapchat",
                 icon: adsPlatformIcon,
             },
         ];
@@ -827,10 +836,6 @@
             '  <div class="sidebar-section">',
             '    <div class="sidebar-section-label">Advertenties</div>',
             adsLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
-            "  </div>",
-            '  <div class="sidebar-section">',
-            '    <div class="sidebar-section-label">Socialmedia</div>',
-            socialLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
             "  </div>",
             '  <div class="sidebar-section">',
             '    <div class="sidebar-section-label">Extra</div>',

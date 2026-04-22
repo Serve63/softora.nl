@@ -150,3 +150,18 @@ test('static premium sidebars ship the database link in html', () => {
     );
   }
 });
+
+test('unified premium sidebar groups all ad and social channels under Advertenties', () => {
+  const themeJsSource = readRepoFile('assets/personnel-theme.js');
+
+  assert.match(themeJsSource, /sidebar-section-label">Advertenties</);
+  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#google"[\s\S]*label:\s*"Google"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#trustoo"[\s\S]*label:\s*"Trustoo"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#instagram"[\s\S]*label:\s*"Instagram"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#linkedin"[\s\S]*label:\s*"LinkedIn"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#facebook"[\s\S]*label:\s*"Facebook"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#pinterest"[\s\S]*label:\s*"Pinterest"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#twitter"[\s\S]*label:\s*"X \/ Twitter"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#snapchat"[\s\S]*label:\s*"Snapchat"/);
+  assert.doesNotMatch(themeJsSource, /'    <div class="sidebar-section-label">Socialmedia<\/div>'/);
+});
