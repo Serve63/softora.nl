@@ -493,12 +493,14 @@
                 ? String(window.location.hash || "").replace(/^#/, "").toLowerCase()
                 : "";
         if (p.indexOf("/premium-advertenties") === 0) {
+            if (hashRaw === "google") return "social_google";
             if (hashRaw === "instagram") return "social_instagram";
             if (hashRaw === "facebook") return "social_facebook";
-            if (hashRaw === "pinterest") return "social_pinterest";
+            if (hashRaw === "pinterest") return "ads_pinterest";
             if (hashRaw === "linkedin") return "social_linkedin";
+            if (hashRaw === "twitter") return "social_twitter";
             if (hashRaw === "trustoo") return "ads_trustoo";
-            return "ads_google";
+            return "social_google";
         }
         if (
             p.indexOf("/premium-actieve-opdrachten") === 0 ||
@@ -576,12 +578,13 @@
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
         "seo",
-        "ads_google",
+        "ads_pinterest",
         "ads_trustoo",
+        "social_google",
         "social_instagram",
         "social_facebook",
-        "social_pinterest",
         "social_linkedin",
+        "social_twitter",
     ]);
 
     /* Klassiek hangslot: U-beugel + afgeronde kast (herkenbaar op klein formaat) */
@@ -740,33 +743,9 @@
 
         const adsLinks = [
             {
-                key: "ads_google",
-                href: "/premium-advertenties#google",
-                label: "Google",
-                icon: adsPlatformIcon,
-            },
-            {
                 key: "ads_trustoo",
                 href: "/premium-advertenties#trustoo",
                 label: "Trustoo",
-                icon: adsPlatformIcon,
-            },
-            {
-                key: "ads_instagram",
-                href: "/premium-advertenties#instagram",
-                label: "Instagram",
-                icon: adsPlatformIcon,
-            },
-            {
-                key: "ads_linkedin",
-                href: "/premium-advertenties#linkedin",
-                label: "LinkedIn",
-                icon: adsPlatformIcon,
-            },
-            {
-                key: "ads_facebook",
-                href: "/premium-advertenties#facebook",
-                label: "Facebook",
                 icon: adsPlatformIcon,
             },
             {
@@ -775,16 +754,37 @@
                 label: "Pinterest",
                 icon: adsPlatformIcon,
             },
+        ];
+
+        const socialLinks = [
             {
-                key: "ads_twitter",
+                key: "social_instagram",
+                href: "/premium-advertenties#instagram",
+                label: "Instagram",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "social_linkedin",
+                href: "/premium-advertenties#linkedin",
+                label: "LinkedIn",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "social_facebook",
+                href: "/premium-advertenties#facebook",
+                label: "Facebook",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "social_twitter",
                 href: "/premium-advertenties#twitter",
                 label: "X / Twitter",
                 icon: adsPlatformIcon,
             },
             {
-                key: "ads_snapchat",
-                href: "/premium-advertenties#snapchat",
-                label: "Snapchat",
+                key: "social_google",
+                href: "/premium-advertenties#google",
+                label: "Google",
                 icon: adsPlatformIcon,
             },
         ];
@@ -836,6 +836,10 @@
             '  <div class="sidebar-section">',
             '    <div class="sidebar-section-label">Advertenties</div>',
             adsLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
+            "  </div>",
+            '  <div class="sidebar-section">',
+            '    <div class="sidebar-section-label">Socialmedia</div>',
+            socialLinks.map(function (link) { return renderSidebarLink(link, activeKey); }).join(""),
             "  </div>",
             '  <div class="sidebar-section">',
             '    <div class="sidebar-section-label">Extra</div>',
