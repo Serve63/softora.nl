@@ -9,18 +9,34 @@
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
+<link rel="stylesheet" href="assets/premium-marketing-management.css?v=20260423a">
 <script>
   (function () {
     document.documentElement.setAttribute("data-personnel-loading", "true");
     try {
+      var isPremiumPersonnel = window.location.pathname.toLowerCase().indexOf("/premium-") !== -1;
+      var aiManagementStorageKey = isPremiumPersonnel
+        ? "softora_premium_ai_management_mode"
+        : "softora_software_ai_management_mode";
+      var aiManagementMode = "personnel";
+      try {
+        var storedAiManagementMode = localStorage.getItem(aiManagementStorageKey);
+        if (storedAiManagementMode === "software" || storedAiManagementMode === "personnel") {
+          aiManagementMode = storedAiManagementMode;
+        }
+      } catch (storageError) {
+        /* ignore storage errors */
+      }
       document.documentElement.setAttribute("data-theme-mode", "light");
       document.documentElement.setAttribute("data-theme", "light");
+      document.documentElement.setAttribute("data-ai-management-mode", aiManagementMode);
     } catch (_) {
       /* ignore */
     }
   })();
 </script>
 <script src="assets/personnel-theme.js?v=20260423b" defer></script>
+<script src="assets/ai-management-mode.js?v=20260423a" defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -205,6 +221,71 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
         </aside>
         <script src="assets/premium-sidebar-profile-prefill.js?v=20260417f"></script>
 <main class="main-content">
+<div class="ai-marketing-shell" id="aiMarketingShell" data-ai-tone="idle">
+  <div class="ai-marketing-topbar">
+    <div class="ai-marketing-topbar-copy">
+      <div class="ai-marketing-kicker" id="aiMarketingKicker">Advertenties</div>
+      <h1 class="ai-marketing-title" id="aiMarketingTitle">AI Beheer</h1>
+      <p class="ai-marketing-sub" id="aiMarketingSub">AI beslist hier zelf welk advertentiekanaal, budget en moment het meeste oplevert voor je doel.</p>
+    </div>
+    <div class="ai-marketing-status">
+      <div class="ai-marketing-status-dot" aria-hidden="true"></div>
+      <div>
+        <span class="ai-marketing-status-kicker">Live status</span>
+        <span class="ai-marketing-status-title" id="aiMarketingStatusTitle">AI bewaakt advertenties op de achtergrond</span>
+        <div class="ai-marketing-status-note" id="aiMarketingStatusNote">AI kiest zelf wanneer dit kanaal wel of niet moet meedoen.</div>
+      </div>
+    </div>
+  </div>
+
+  <section class="ai-marketing-hero">
+    <h2 class="ai-marketing-hero-title" id="aiMarketingHeroTitle">AI beslist zelf of dit advertentiekanaal nu nodig is</h2>
+    <p class="ai-marketing-hero-copy" id="aiMarketingSummary">AI gebruikt advertentiekanalen alleen als ze je doel sneller dichterbij brengen dan je andere Softora-tools.</p>
+  </section>
+
+  <section class="ai-marketing-grid">
+    <article class="ai-marketing-card">
+      <span class="ai-marketing-card-kicker">Actief doel</span>
+      <span class="ai-marketing-card-value" id="aiMarketingGoal">Meer gekwalificeerde aanvragen</span>
+      <div class="ai-marketing-card-note" id="aiMarketingGoalNote">Jij stuurt op uitkomst; de AI kiest zelf de route.</div>
+    </article>
+    <article class="ai-marketing-card">
+      <span class="ai-marketing-card-kicker">Nu bezig</span>
+      <span class="ai-marketing-card-value" id="aiMarketingCurrent">Kanaal beoordelen</span>
+      <div class="ai-marketing-card-note" id="aiMarketingCurrentNote">AI vergelijkt dit kanaal met andere acquisitieroutes.</div>
+    </article>
+    <article class="ai-marketing-card">
+      <span class="ai-marketing-card-kicker">Voortgang</span>
+      <span class="ai-marketing-card-value" id="aiMarketingProgress">Stand-by</span>
+      <div class="ai-marketing-card-note" id="aiMarketingProgressNote">Alleen live als het ook echt wat oplevert.</div>
+    </article>
+    <article class="ai-marketing-card">
+      <span class="ai-marketing-card-kicker">Volgende stap</span>
+      <span class="ai-marketing-card-value" id="aiMarketingNext">Beste kanaal kiezen</span>
+      <div class="ai-marketing-card-note" id="aiMarketingNextNote">De AI mag zelf doorschakelen naar andere Softora-tools.</div>
+    </article>
+  </section>
+
+  <section class="ai-marketing-footer">
+    <article class="ai-marketing-card">
+      <span class="ai-marketing-card-kicker">AI gebruikt hier</span>
+      <div class="ai-marketing-tools" id="aiMarketingTools">
+        <span class="ai-marketing-tool">Advertenties</span>
+        <span class="ai-marketing-tool">Leads</span>
+        <span class="ai-marketing-tool">Database</span>
+        <span class="ai-marketing-tool">Agenda</span>
+      </div>
+    </article>
+    <article class="ai-marketing-card">
+      <span class="ai-marketing-card-kicker">Autonomie</span>
+      <div class="ai-marketing-card-note">
+        In <strong>AI beheer</strong> beslist de AI zelf of dit kanaal nu aan moet, rustig moet blijven of moet doorschakelen naar coldcalling, coldmailing, database of agenda.
+      </div>
+    </article>
+  </section>
+</div>
+
+<div class="page-personnel-shell">
 <div class="page-shell">
 <div class="page-title">Advertenties</div>
 <div class="page-sub">Beheer advertentiecampagnes per kanaal. Campagne-instellingen en resultaten verschijnen hier zodra de koppelingen live zijn.</div>
@@ -270,6 +351,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 </div>
 
 </div>
+</div>
 </main>
 </div>
 
@@ -316,5 +398,6 @@ if (document.readyState === 'complete') {
   window.addEventListener('load', scrollToAdsHash, { once: true });
 }
 </script>
+<script src="assets/premium-marketing-management.js?v=20260423a" defer></script>
 </body>
 </html>
