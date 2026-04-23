@@ -40,6 +40,12 @@ test('loadRuntimeEnv derives Strato mail defaults from SMTP settings', () => {
   assert.equal(runtimeEnv.mail.imapPass, 'secret');
 });
 
+test('loadRuntimeEnv defaults dashboard Anthropic model to Claude Sonnet 4.6', () => {
+  const runtimeEnv = loadRuntimeEnv({});
+
+  assert.equal(runtimeEnv.ai.anthropicModel, 'claude-sonnet-4-6');
+});
+
 test('loadRuntimeEnv preserves legacy boolean and numeric fallback rules', () => {
   const runtimeEnv = loadRuntimeEnv({
     WEBSITE_GENERATION_TIMEOUT_MS: '99999999',

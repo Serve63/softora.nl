@@ -52,6 +52,8 @@ function buildServerAppFeatureWiringRuntimeContext({
       getAnthropicApiKey: platformRuntime.getAnthropicApiKey,
       getWebsiteGenerationProvider: platformRuntime.getWebsiteGenerationProvider,
       getWebsiteAnthropicModel: platformRuntime.getWebsiteAnthropicModel,
+      anthropicApiBaseUrl: envConfig.ANTHROPIC_API_BASE_URL,
+      anthropicModel: envConfig.ANTHROPIC_MODEL,
       openAiModel: envConfig.OPENAI_MODEL,
       websiteGenerationStrictAnthropic: envConfig.WEBSITE_GENERATION_STRICT_ANTHROPIC,
       websiteGenerationStrictHtml: envConfig.WEBSITE_GENERATION_STRICT_HTML,

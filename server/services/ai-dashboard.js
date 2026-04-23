@@ -28,12 +28,15 @@ function createAiDashboardCoordinator(deps = {}) {
     recentAiCallInsights = [],
     recentDashboardActivities = [],
     getOpenAiApiKey = () => '',
+    getAnthropicApiKey = () => '',
     fetchJsonWithTimeout = async () => ({
       response: { ok: false, status: 500 },
       data: null,
     }),
     openAiApiBaseUrl = 'https://api.openai.com/v1',
     openAiModel = '',
+    anthropicApiBaseUrl = 'https://api.anthropic.com/v1',
+    anthropicModel = 'claude-sonnet-4-6',
     extractOpenAiTextContent = (content) => String(content || ''),
     ensureDashboardChatRuntimeReady = async () => {},
     normalizeAiSummaryStyle = () => '',
@@ -52,6 +55,21 @@ function createAiDashboardCoordinator(deps = {}) {
     },
     rubenAssistant = null,
   } = deps;
+
+  function extractAnthropicTextContent(content) {
+    if (typeof content === 'string') return content;
+    if (!Array.isArray(content)) return '';
+    return content
+      .map((item) => {
+        if (!item || typeof item !== 'object') return '';
+        if (item.type === 'text' || Object.prototype.hasOwnProperty.call(item, 'text')) {
+          return normalizeString(item.text || '');
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n\n');
+  }
 
   function normalizeDashboardChatHistory(historyRaw) {
     if (!Array.isArray(historyRaw)) return [];
@@ -407,9 +425,9 @@ function createAiDashboardCoordinator(deps = {}) {
   }
 
   async function generatePremiumDashboardChatReplyWithAi(options = {}) {
-    const apiKey = getOpenAiApiKey();
+    const apiKey = getAnthropicApiKey();
     if (!apiKey) {
-      const err = new Error('OPENAI_API_KEY ontbreekt');
+      const err = new Error('ANTHROPIC_API_KEY ontbreekt');
       err.status = 503;
       throw err;
     }
@@ -446,27 +464,33 @@ function createAiDashboardCoordinator(deps = {}) {
             'Noem geen technische interne details (zoals API keys of serverconfiguratie).',
           ].join('\n');
 
+    const system = [
+      systemPrompt,
+      assistantContext ? `RUBEN_ASSISTANT_CONTEXT_JSON:\n${JSON.stringify(assistantContext)}` : '',
+      `DASHBOARD_CONTEXT_JSON:\n${contextJson}`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
     const messages = [
-      { role: 'system', content: systemPrompt },
-      ...(assistantContext
-        ? [{ role: 'system', content: `RUBEN_ASSISTANT_CONTEXT_JSON:\n${JSON.stringify(assistantContext)}` }]
-        : []),
-      { role: 'system', content: `DASHBOARD_CONTEXT_JSON:\n${contextJson}` },
       ...history,
       { role: 'user', content: question },
     ];
+    const model = normalizeString(options.model || anthropicModel) || 'claude-sonnet-4-6';
 
     const { response, data } = await fetchJsonWithTimeout(
-      `${openAiApiBaseUrl}/chat/completions`,
+      `${anthropicApiBaseUrl}/messages`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: openAiModel,
-          temperature: 0.15,
+          model,
+          max_tokens: 4096,
+          system,
           messages,
         }),
       },
@@ -474,14 +498,14 @@ function createAiDashboardCoordinator(deps = {}) {
     );
 
     if (!response.ok) {
-      const err = new Error(`OpenAI dashboard-chat mislukt (${response.status})`);
+      const err = new Error(`Anthropic dashboard-chat mislukt (${response.status})`);
       err.status = response.status;
       err.data = data;
       throw err;
     }
 
-    const content = data?.choices?.[0]?.message?.content;
-    const answer = truncateText(normalizeString(extractOpenAiTextContent(content)), 12000);
+    const content = data?.content;
+    const answer = truncateText(normalizeString(extractAnthropicTextContent(content)), 12000);
     if (!answer) {
       const err = new Error('AI gaf geen antwoord terug.');
       err.status = 502;
@@ -491,8 +515,9 @@ function createAiDashboardCoordinator(deps = {}) {
 
     return {
       answer,
-      model: openAiModel,
+      model: normalizeString(data?.model || model) || model,
       usage: data?.usage || null,
+      provider: 'anthropic',
     };
   }
 
@@ -533,6 +558,7 @@ function createAiDashboardCoordinator(deps = {}) {
         ok: true,
         answer: result.answer,
         model: result.model,
+        provider: result.provider,
         usage: result.usage,
         contextMeta: {
           generatedAt: context.generatedAt || null,
@@ -542,7 +568,8 @@ function createAiDashboardCoordinator(deps = {}) {
           rubenAssistant && typeof rubenAssistant.buildAssistantIdentity === 'function'
             ? rubenAssistant.buildAssistantIdentity()
             : null,
-        openAiEnabled: true,
+        anthropicEnabled: true,
+        openAiEnabled: Boolean(getOpenAiApiKey()),
       });
     } catch (error) {
       const status = Number(error?.status) || 500;
@@ -554,6 +581,7 @@ function createAiDashboardCoordinator(deps = {}) {
             ? 'AI dashboard assistent niet beschikbaar'
             : 'AI dashboard assistent mislukt',
         detail: String(error?.message || 'Onbekende fout'),
+        anthropicEnabled: Boolean(getAnthropicApiKey()),
         openAiEnabled: Boolean(getOpenAiApiKey()),
       });
     }
