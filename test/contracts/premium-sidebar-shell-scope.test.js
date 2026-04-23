@@ -118,13 +118,18 @@ test('custom premium layouts stay outside the shared sidebar shell', () => {
   }
 });
 
-test('static premium sidebars ship the websitegenerator link in html', () => {
+test('static premium sidebars ship the websitedesign link in html', () => {
   for (const relativePath of staticSidebarPages) {
     const pageSource = readRepoFile(relativePath);
     assert.match(
       pageSource,
       /data-sidebar-key="websitegenerator"/,
-      `${relativePath} hoort Websitegenerator direct in de sidebar html te hebben`
+      `${relativePath} hoort Websitedesign direct in de sidebar html te hebben`
+    );
+    assert.match(
+      pageSource,
+      /<span class="sidebar-link-text">Websitedesign<\/span>/,
+      `${relativePath} hoort de sidebarnaam Websitedesign te tonen`
     );
   }
 });

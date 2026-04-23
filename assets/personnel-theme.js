@@ -561,7 +561,7 @@
         return {
             key: "websitegenerator",
             href: "/premium-websitegenerator",
-            label: "Websitegenerator",
+            label: "Websitedesign",
             icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3.75" y="4.5" width="16.5" height="10.5" rx="1.5"></rect><path stroke-linecap="round" stroke-linejoin="round" d="M9 19.5h6"></path><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 12 2.5-2.5 2.5 2.5 2.75-3 1.75 2"></path></svg>',
         };
     }
