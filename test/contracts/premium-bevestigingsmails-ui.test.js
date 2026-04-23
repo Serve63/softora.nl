@@ -3,43 +3,34 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-test('premium bevestigingsmails mirrors lead-generator shell without coldcalling dashboard bootstrap', () => {
+test('premium bevestigingsmails renders the current coldmailing dashboard shell without coldcalling bootstrap', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
   assert.doesNotMatch(pageSource, /<script[^>]+src=["']assets\/coldcalling-dashboard\.js[^"']*["'][^>]*>/);
-  assert.match(pageSource, /Geen coldcalling-dashboard/);
   assert.match(
     pageSource,
     /<a href="\/premium-bevestigingsmails" class="sidebar-link magnetic active" data-sidebar-key="coldmailing"/
   );
-  assert.match(pageSource, /<div class="generator-grid">/);
-  assert.match(pageSource, /<span class="panel-title">Coldmailing Instellingen<\/span>/);
-  assert.match(pageSource, /<div class="panel-zone-label">Zone 1<\/div>/);
-  assert.match(pageSource, /<div class="panel-zone-title">Mail verstuurd<\/div>/);
-  assert.match(pageSource, /<div class="panel-zone-label">Zone 4<\/div>/);
-  assert.match(pageSource, /<div class="panel-zone-title">Afspraak ingepland<\/div>/);
-  assert.match(pageSource, /<div class="generator-grid">[\s\S]*?<div class="panel-zone-strip"[\s\S]*?<\/div>\s*<div class="panel"/);
-  assert.match(pageSource, /<button class="launch-btn magnetic" id="launchBtn" onclick="toggleCampaign\(\)">/);
-  assert.match(pageSource, /id="statSent"/);
-  assert.match(pageSource, /id="statOpened"/);
-  assert.match(pageSource, /id="statInterested"/);
-  assert.match(pageSource, /id="statLead"/);
-  assert.match(pageSource, /id="statConversion"/);
-  assert.match(pageSource, />Lead<\/div>/);
+  assert.match(pageSource, /<div class="page-section-inner">/);
+  assert.match(pageSource, /<div class="zones-row">/);
+  assert.match(pageSource, /id="z1-count"/);
+  assert.match(pageSource, /id="z2-count"/);
+  assert.match(pageSource, /id="z4-count"/);
+  assert.match(pageSource, /id="z5-count"/);
+  assert.match(pageSource, /id="conv-zone-pct"/);
+  assert.match(pageSource, /<div class="card-title">Prompt & AI instructies<\/div>/);
+  assert.match(pageSource, /<div class="campagne-title">Nieuwe Campagne<\/div>/);
+  assert.match(pageSource, /<button class="btn-start" onclick="startCampagne\(\)">/);
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
 });
 
-test('premium bevestigingsmails shows the shared Retell cost counter without loading the coldcalling dashboard asset', () => {
+test('premium bevestigingsmails keeps the campaign duration setting without a separate looptijd card', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /<span class="topbar-select-label">Geschatte coldcalling kosten<\/span>/);
-  assert.match(pageSource, /<div class="topbar-cost-group" data-retell-cost-root>/);
-  assert.match(pageSource, /<div class="topbar-cost-value" data-retell-cost-value>€0,00<\/div>/);
-  assert.match(pageSource, /<script src="assets\/retell-cost-widget\.js\?v=20260417a" defer><\/script>/);
-  assert.doesNotMatch(pageSource, /topbar-cost-dot/);
-  assert.doesNotMatch(pageSource, /data-retell-cost-meta/);
+  assert.doesNotMatch(pageSource, /<div class="topbar-note-label">Looptijd<\/div>/);
+  assert.doesNotMatch(pageSource, /campaign-duration-note/);
   assert.doesNotMatch(pageSource, /<script[^>]+src=["']assets\/coldcalling-dashboard\.js[^"']*["'][^>]*>/);
 });
 
@@ -60,13 +51,13 @@ test('premium bevestigingsmails is directly accessible without coming-soon lock 
   assert.match(themeSource, /key: "coldmailing"/);
 });
 
-test('premium bevestigingsmails renders the zone cards as a separate strip above the settings panel', () => {
+test('premium bevestigingsmails keeps the zone cards above the dashboard grid', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
-  assert.match(pageSource, /\.generator-grid\s*\{[\s\S]*gap:\s*1\.25rem;/);
-  assert.match(pageSource, /\.generator-grid > \.panel-zone-strip\s*\{[\s\S]*padding:\s*0;/);
-  assert.doesNotMatch(pageSource, /\.generator-grid > \.panel\s*\{[\s\S]*border-top:\s*none;/);
+  assert.match(pageSource, /\.zones-row \{ display: grid;[\s\S]*gap: 12px;/);
+  assert.match(pageSource, /\.bottom-grid \{ display: grid; grid-template-columns: 1fr 360px; gap: 20px;/);
+  assert.match(pageSource, /<div class="zones-row">[\s\S]*<\/div>\s*<div style="padding-top:20px" class="bottom-grid">/);
 });
 
 test('premium bevestigingsmails campaign finish uses Campagne afronden label and canonical URL for notifications', () => {
@@ -134,6 +125,20 @@ test('premium bevestigingsmails hides mail 1 and ai instructies tabs on lead-gen
   assert.match(pageSource, /function ensureLeadGeneratorSettingsBackRow/);
 });
 
+test('premium bevestigingsmails keeps the 10-workdays campaign toggle inside instellingen instead of mail 1', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.doesNotMatch(
+    pageSource,
+    /<div class="mail-panel active" id="mail-panel-1">[\s\S]*campaign-full-workdays[\s\S]*<!-- AI INSTRUCTIES -->/
+  );
+  assert.match(
+    pageSource,
+    /<div class="mail-panel" id="mail-panel-5">[\s\S]*<div class="mf-label">Agendalimiet<\/div>[\s\S]*<input type="checkbox" id="campaign-full-workdays">[\s\S]*Start campagne tot 10 werkdagen vol staan\./
+  );
+});
+
 test('premium bevestigingsmails exposes coldcalling provider choice inside lead-generator settings', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -149,7 +154,30 @@ test('premium bevestigingsmails exposes coldcalling provider choice inside lead-
   assert.match(pageSource, /function initLeadGeneratorProviderSetting\(\)/);
   assert.match(pageSource, /select\.value = normalizeColdcallingStack\(select\.value\);/);
   assert.doesNotMatch(pageSource, /localStorage/);
-  assert.match(pageSource, /initLeadGeneratorProviderSetting\(\);\s*initCampaignSelects\(\);/);
+  assert.match(
+    pageSource,
+    /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initCampaignSelects\(\);/
+  );
   assert.match(pageSource, /providerLabel \+ ' wordt klaargezet voor deze campagne/);
   assert.match(pageSource, /Provider: ' \+ getSelectedColdcallingStackLabel\(\) \+ '\.'/);
+});
+
+test('premium bevestigingsmails exposes campaign duration choices and uses them in the timeline copy', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /<select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">/);
+  assert.match(pageSource, /<option value="5">5 dagen<\/option>/);
+  assert.match(pageSource, /<option value="7">7 dagen<\/option>/);
+  assert.match(pageSource, /<option value="14" selected>14 dagen<\/option>/);
+  assert.match(pageSource, /function initCampaignDurationSetting\(\)/);
+  assert.doesNotMatch(pageSource, /function updateCampaignDurationUi\(\)/);
+  assert.match(pageSource, /showToast\('Campagne afgerond na ' \+ formatCampaignDurationLabel\(durationDays\)\);/);
+  assert.match(pageSource, /function buildCampaignTimeline\(total, durationDays\) \{/);
+  assert.match(pageSource, /const timelineDays = resolveCampaignTimelineDays\(durationDays\);/);
+  assert.match(pageSource, /const totalDurationDays = getCampaignTimelineTotalDays\(\);/);
+  assert.match(pageSource, /campaignTimeline = buildCampaignTimeline\(n, durationDays\);/);
+  assert.match(pageSource, /timelineTitle\.textContent = durationLabel \+ ' tijdlijn';/);
+  assert.match(pageSource, /`Dag \$\{step\.day\} van \$\{totalDurationDays\}`/);
+  assert.match(pageSource, /'✓ Dag ' \+ totalDurationDays \+ ' bereikt — campagne afgelopen'/);
 });

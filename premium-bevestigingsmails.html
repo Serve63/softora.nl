@@ -102,45 +102,6 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); co
   font-size: 0.9rem;
   font-weight: 300;
 }
-.topbar-right {
-  display: flex;
-  align-items: stretch;
-  gap: 1rem;
-  flex-shrink: 0;
-}
-.topbar-note {
-  min-width: 360px;
-  max-width: 420px;
-  padding: 14px 16px;
-  border: 1px solid rgba(155,35,85,.18);
-  border-radius: 12px;
-  background: rgba(255,255,255,.04);
-  box-shadow: 0 10px 24px rgba(26,26,46,.08);
-}
-.topbar-note-label {
-  font-family: 'Oswald', sans-serif;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-  color: var(--crimson);
-  margin-bottom: 6px;
-}
-.topbar-note-text {
-  color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-.topbar-note-text strong {
-  font-weight: 600;
-}
-.topbar-note-sub {
-  margin-top: 6px;
-  color: var(--text-tertiary);
-  font-size: 12px;
-  line-height: 1.45;
-}
 .page-section {
   background: var(--card);
   border: 1px solid var(--border);
@@ -252,38 +213,39 @@ html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setti
 .field.is-open { z-index: 25; }
 .field-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); margin-bottom: 8px; display: block; }
 .field-label-row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 4px;
   margin-bottom: 8px;
+  width: fit-content;
+  max-width: 100%;
 }
 .field-label-nav {
   flex-shrink: 0;
-  width: 26px;
-  height: 26px;
+  width: auto;
+  height: auto;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--field-bg);
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--mid);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: border-color .15s, color .15s, background .15s;
+  transition: color .15s;
 }
 .field-label-nav:hover {
-  border-color: rgba(155,35,85,.42);
   color: var(--crimson);
 }
 .field-label-nav:focus-visible {
   outline: none;
-  border-color: var(--crimson);
-  box-shadow: 0 0 0 3px rgba(155,35,85,.1);
+  color: var(--crimson);
 }
-.field-label-nav svg { width: 14px; height: 14px; }
+.field-label-nav svg { width: 18px; height: 18px; }
 .field-label--toggle {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   margin-bottom: 0;
   text-transform: none;
@@ -803,9 +765,6 @@ html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setti
 @media (max-width: 1024px) {
   .main-content { margin-left: 0; padding: 1.5rem; }
   .topbar { flex-direction: column; }
-  .topbar-right { width: 100%; }
-  .topbar-note { max-width: none; width: 100%; }
-  .topbar-note-text { white-space: normal; }
   .campaign-header { flex-direction: column; }
   .campaign-header-left { max-width: none; }
   .campaign-status-card { width: 100%; }
@@ -871,7 +830,6 @@ html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setti
               <a href="/premium-socialmedia#linkedin" class="sidebar-link magnetic sidebar-link--coming-soon" data-sidebar-key="social_linkedin" aria-disabled="true" tabindex="-1"><span class="sidebar-link-lock" aria-hidden="true"><svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span><span class="sidebar-link-text">LinkedIn</span></a>
               <a href="/premium-socialmedia#facebook" class="sidebar-link magnetic sidebar-link--coming-soon" data-sidebar-key="social_facebook" aria-disabled="true" tabindex="-1"><span class="sidebar-link-lock" aria-hidden="true"><svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span><span class="sidebar-link-text">Facebook</span></a>
               <a href="/premium-socialmedia#twitter" class="sidebar-link magnetic sidebar-link--coming-soon" data-sidebar-key="social_twitter" aria-disabled="true" tabindex="-1"><span class="sidebar-link-lock" aria-hidden="true"><svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span><span class="sidebar-link-text">X / Twitter</span></a>
-              <a href="/premium-socialmedia#google" class="sidebar-link magnetic sidebar-link--coming-soon" data-sidebar-key="social_google" aria-disabled="true" tabindex="-1"><span class="sidebar-link-lock" aria-hidden="true"><svg class="sidebar-link-lock-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/><rect x="5" y="11" width="14" height="11" rx="2" ry="2"/></svg></span><span class="sidebar-link-text">Google</span></a>
             </div>
             <div class="sidebar-section">
               <div class="sidebar-section-label">Extra</div>
@@ -916,12 +874,6 @@ html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setti
       } catch (e) {}
     })();
     </script>
-    </div>
-    <div class="topbar-right">
-      <div class="topbar-note">
-        <div class="topbar-note-label">Looptijd</div>
-        <div class="topbar-note-text">Een mailcampagne duurt 2 weken.</div>
-      </div>
     </div>
   </div>
   <div class="page-section">
@@ -1025,10 +977,6 @@ Softora.nl | +31 6 2991 7185</textarea>
               <option>2,5 uur</option>
               <option>5 uur</option>
             </select>
-            <label class="mf-check">
-              <input type="checkbox" id="campaign-full-workdays">
-              <span>Start campagne tot 10 werkdagen vol staan.</span>
-            </label>
           </div>
         </div>
       </div>
@@ -1076,6 +1024,22 @@ Softora.nl | +31 6 2991 7185</textarea>
               <option value="gemini_flash_3_1_live">Gemini 3.1 Live</option>
             </select>
             <div class="mf-help">Kies welke AI-stack de software gebruikt voor coldcalling.</div>
+          </div>
+          <div class="mf-row">
+            <div class="mf-label">Campagne afgerond na</div>
+            <select class="mf-sel" id="campaignDurationDays" aria-label="Campagneduur">
+              <option value="5">5 dagen</option>
+              <option value="7">7 dagen</option>
+              <option value="14" selected>14 dagen</option>
+            </select>
+            <div class="mf-help">Na deze looptijd ziet Softora de mailcampagne als afgerond en kan er weer een nieuwe starten.</div>
+          </div>
+          <div class="mf-row">
+            <div class="mf-label">Agendalimiet</div>
+            <label class="mf-check">
+              <input type="checkbox" id="campaign-full-workdays">
+              <span>Start campagne tot 10 werkdagen vol staan.</span>
+            </label>
           </div>
           <div class="settings-grid">
             <div class="mf-row">
@@ -1140,7 +1104,7 @@ info@softora.nl</textarea>
         <div class="field">
           <div class="field-label">Branche</div>
           <select class="sel" id="branche">
-            <option value="">Alle branches</option>
+            <option value="">Alles</option>
             <option>Horeca & Restaurants</option>
             <option>Retail & Winkels</option>
             <option>Zakelijke Dienstverlening</option>
@@ -1258,7 +1222,7 @@ info@softora.nl</textarea>
 
     <div class="campaign-layout">
       <div class="campaign-panel">
-        <div class="campaign-panel-title">14-dagen tijdlijn</div>
+        <div class="campaign-panel-title" id="campaign-timeline-title">14 dagen tijdlijn</div>
         <div class="campaign-timeline" id="campaign-timeline"></div>
       </div>
 
@@ -1344,6 +1308,34 @@ function getColdcallingStackLabel(value) {
 function getSelectedColdcallingStackLabel() {
   const select = document.getElementById('coldcallingStack');
   return getColdcallingStackLabel(select ? select.value : 'retell_ai');
+}
+
+function normalizeCampaignDurationDays(value) {
+  const raw = Number.parseInt(String(value || '').trim(), 10);
+  if (raw === 5 || raw === 7 || raw === 14) return raw;
+  return 14;
+}
+
+function formatCampaignDurationLabel(value) {
+  return normalizeCampaignDurationDays(value) + ' dagen';
+}
+
+function getSelectedCampaignDurationDays() {
+  const select = document.getElementById('campaignDurationDays');
+  return normalizeCampaignDurationDays(select ? select.value : 14);
+}
+
+function initCampaignDurationSetting() {
+  const select = document.getElementById('campaignDurationDays');
+  if (!select || select.dataset.durationSettingBound === '1') return;
+  select.dataset.durationSettingBound = '1';
+  select.value = String(normalizeCampaignDurationDays(select.value));
+
+  select.addEventListener('change', function () {
+    const durationDays = normalizeCampaignDurationDays(select.value);
+    if (select.value !== String(durationDays)) select.value = String(durationDays);
+    showToast('Campagne afgerond na ' + formatCampaignDurationLabel(durationDays));
+  });
 }
 
 function initLeadGeneratorProviderSetting() {
@@ -1561,55 +1553,69 @@ function buildCountPlan(total, ratios) {
   return counts;
 }
 
-function buildCampaignTimeline(total) {
+function resolveCampaignTimelineDays(durationDays) {
+  const normalizedDays = normalizeCampaignDurationDays(durationDays);
+  if (normalizedDays === 5) return [1, 2, 3, 4, 4, 5, 5];
+  if (normalizedDays === 7) return [1, 2, 3, 4, 5, 6, 7];
+  return [1, 3, 5, 8, 10, 12, 14];
+}
+
+function getCampaignTimelineTotalDays() {
+  const finalStep = campaignTimeline[campaignTimeline.length - 1];
+  return normalizeCampaignDurationDays(finalStep ? finalStep.day : 14);
+}
+
+function buildCampaignTimeline(total, durationDays) {
+  const timelineDays = resolveCampaignTimelineDays(durationDays);
+  const totalDurationDays = timelineDays[timelineDays.length - 1];
   return [
     {
-      day: 1,
+      day: timelineDays[0],
       title: 'Eerste mail verstuurd',
       detail: 'Alle geselecteerde bedrijven ontvangen direct de eerste mail. Daarna wacht de campagne op de eerste reacties.',
       liveText: 'Mail 1 is naar alle bedrijven verzonden. Het systeem wacht nu rustig op de eerste antwoorden.',
       counts: buildCountPlan(total, { 1: 1, 2: 0, 4: 0, 5: 0 })
     },
     {
-      day: 3,
+      day: timelineDays[1],
       title: 'Wachten op antwoorden',
       detail: 'De eerste reacties komen binnen. Bedrijven met interesse worden apart gezet en krijgen geen dubbele opvolging.',
       liveText: 'Nieuwe antwoorden worden verwerkt. Bedrijven met interesse schuiven automatisch door naar Interesse.',
       counts: buildCountPlan(total, { 1: 0.94, 2: 0, 4: 0, 5: 0.06 })
     },
     {
-      day: 5,
+      day: timelineDays[2],
       title: 'Tweede mail verstuurd',
       detail: 'Bedrijven zonder reactie ontvangen een tweede opvolgmail. Daarna wacht het systeem opnieuw op antwoorden.',
       liveText: 'Mail 2 is verstuurd naar alle niet-responders. Reagerende bedrijven blijven buiten de nieuwe batch.',
       counts: buildCountPlan(total, { 1: 0.42, 2: 0.50, 4: 0, 5: 0.08 })
     },
     {
-      day: 8,
+      day: timelineDays[3],
       title: 'Antwoorden na mail 2',
       detail: 'Het systeem controleert wie reageert na de tweede mail en voorkomt dubbele opvolging via andere kanalen.',
       liveText: 'De AI wacht op nieuwe reacties na mail 2 en filtert iedereen die al in gesprek is.',
       counts: buildCountPlan(total, { 1: 0.20, 2: 0.67, 4: 0.02, 5: 0.11 })
     },
     {
-      day: 10,
+      day: timelineDays[4],
       title: 'Laatste follow-up verstuurd',
       detail: 'De laatste follow-up gaat alleen naar bedrijven zonder antwoord. Contacten zonder interesse blijven buiten beeld.',
       liveText: 'De laatste follow-up is verzonden naar de resterende niet-responders.',
       counts: buildCountPlan(total, { 1: 0.06, 2: 0.58, 4: 0.23, 5: 0.13 })
     },
     {
-      day: 12,
+      day: timelineDays[5],
       title: 'Laatste checkpoint',
       detail: 'Nog openstaande reacties worden gecontroleerd. Stopverzoeken en bedrijven zonder interesse blijven uitgesloten.',
       liveText: 'Het systeem doet een laatste antwoordcheck en houdt de database schoon zonder dubbele acties.',
       counts: buildCountPlan(total, { 1: 0.02, 2: 0.46, 4: 0.37, 5: 0.15 })
     },
     {
-      day: 14,
+      day: timelineDays[6],
       title: 'Campagne afgelopen',
-      detail: 'Dag 14 is bereikt. De volledige mailcampagne is afgerond en alle uitkomsten zijn verwerkt.',
-      liveText: 'Dag 14 is bereikt. De campagne is klaar en de eindstatus staat nu vast.',
+      detail: `Dag ${totalDurationDays} is bereikt. De volledige mailcampagne is afgerond en alle uitkomsten zijn verwerkt.`,
+      liveText: `Dag ${totalDurationDays} is bereikt. De campagne is klaar en de eindstatus staat nu vast.`,
       counts: buildCountPlan(total, { 1: 0, 2: 0.38, 4: 0.44, 5: 0.18 }),
       complete: true
     }
@@ -1619,9 +1625,12 @@ function buildCampaignTimeline(total) {
 function applyCampaignCounts(step) {
   const ordered = [...bedrijven].sort((a, b) => a.id - b.id);
   const day = step.day;
-  const firstMailDate = formatCampaignDate(1);
-  const secondMailDate = formatCampaignDate(Math.min(day, 5));
-  const finalFollowupDate = formatCampaignDate(Math.min(day, 10));
+  const firstMailDay = campaignTimeline[0] ? campaignTimeline[0].day : 1;
+  const secondMailDay = campaignTimeline[2] ? campaignTimeline[2].day : day;
+  const finalFollowupDay = campaignTimeline[4] ? campaignTimeline[4].day : day;
+  const firstMailDate = formatCampaignDate(firstMailDay);
+  const secondMailDate = formatCampaignDate(Math.min(day, secondMailDay));
+  const finalFollowupDate = formatCampaignDate(Math.min(day, finalFollowupDay));
   const currentDate = formatCampaignDate(day);
   let cursor = 0;
 
@@ -1669,17 +1678,18 @@ function renderCampaignTimeline() {
 }
 
 function updateCampaignScreen(step) {
-  const progress = campTotal > 0 ? Math.round((step.day / 14) * 100) : 0;
+  const totalDurationDays = getCampaignTimelineTotalDays();
+  const progress = campTotal > 0 ? Math.round((step.day / totalDurationDays) * 100) : 0;
   const conversion = campTotal > 0 ? Math.round((step.counts[5] / campTotal) * 100) : 0;
 
   document.getElementById('campaign-status-day').textContent = `Dag ${step.day}`;
   document.getElementById('campaign-status-title').textContent = step.title;
   document.getElementById('campaign-progress-copy').textContent = step.detail;
   document.getElementById('campaign-progress-pill').textContent = step.complete
-    ? 'Dag 14 afgerond'
+    ? `Dag ${totalDurationDays} afgerond`
     : `Checkpoint ${campaignStepIndex + 1} / ${campaignTimeline.length}`;
   document.getElementById('campaign-progress-fill').style.width = `${progress}%`;
-  document.getElementById('campaign-progress-footer-left').textContent = `Dag ${step.day} van 14`;
+  document.getElementById('campaign-progress-footer-left').textContent = `Dag ${step.day} van ${totalDurationDays}`;
   document.getElementById('campaign-progress-footer-right').textContent = step.title;
   document.getElementById('campaign-metric-total').textContent = campTotal;
   document.getElementById('campaign-metric-zone1').textContent = step.counts[1];
@@ -1697,13 +1707,14 @@ function completeCampaign() {
   campaignFinished = true;
   clearInterval(campInterval);
   campInterval = null;
+  const totalDurationDays = getCampaignTimelineTotalDays();
   const finalStep = campaignTimeline[campaignTimeline.length - 1];
   if (finalStep) {
     applyCampaignCounts(finalStep);
     updateCampaignScreen(finalStep);
     renderCampaignTimeline();
   }
-  showToast('✓ Dag 14 bereikt — campagne afgelopen');
+  showToast('✓ Dag ' + totalDurationDays + ' bereikt — campagne afgelopen');
 }
 
 function advanceCampaignTimeline() {
@@ -1801,6 +1812,8 @@ async function startCampagneWithLeadGeneratorBoot() {
 function startCampagneImmediate() {
   if (running) return;
   const n = parseInt(document.getElementById('mail-slider').value, 10) || 100;
+  const durationDays = getSelectedCampaignDurationDays();
+  const durationLabel = formatCampaignDurationLabel(durationDays);
   const fillWorkdays = !!document.getElementById('campaign-full-workdays')?.checked;
   const providerSuffix = isPremiumAiLeadGeneratorPath()
     ? ' Provider: ' + getSelectedColdcallingStackLabel() + '.'
@@ -1808,19 +1821,21 @@ function startCampagneImmediate() {
 
   bedrijven = genBedrijven(n);
   campTotal = n;
-  campaignTimeline = buildCampaignTimeline(n);
+  campaignTimeline = buildCampaignTimeline(n, durationDays);
   campaignStepIndex = -1;
   campaignFinished = false;
   running = true;
 
   const countMode = getCampaignCountMode();
+  const timelineTitle = document.getElementById('campaign-timeline-title');
+  if (timelineTitle) timelineTitle.textContent = durationLabel + ' tijdlijn';
   document.getElementById('campaign-subtitle').textContent = fillWorkdays
     ? countMode === 'appointments'
-      ? `${n} afspraken inplannen binnen deze campagne van 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.${providerSuffix}`
-      : `${n} bedrijven doorlopen deze campagne in 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.${providerSuffix}`
+      ? `${n} afspraken inplannen binnen deze campagne van ${durationLabel}, tenzij de agenda eerder al 10 werkdagen vol staat.${providerSuffix}`
+      : `${n} bedrijven doorlopen deze campagne in ${durationLabel}, tenzij de agenda eerder al 10 werkdagen vol staat.${providerSuffix}`
     : countMode === 'appointments'
-      ? `${n} afspraken inplannen binnen deze campagne van 14 dagen, van eerste benadering tot laatste checkpoint.${providerSuffix}`
-      : `${n} bedrijven doorlopen deze campagne in 14 dagen, van eerste verzending tot laatste checkpoint.${providerSuffix}`;
+      ? `${n} afspraken inplannen binnen deze campagne van ${durationLabel}, van eerste benadering tot laatste checkpoint.${providerSuffix}`
+      : `${n} bedrijven doorlopen deze campagne in ${durationLabel}, van eerste verzending tot laatste checkpoint.${providerSuffix}`;
 
   showScreen('screen-campaign');
   document.getElementById('campaign-progress-fill').style.width = '0%';
@@ -2124,6 +2139,7 @@ document.addEventListener('keydown', event => {
 
 applyPremiumAiLeadGeneratorShell();
 applyPremiumAiLeadGeneratorBelmethodeRow();
+initCampaignDurationSetting();
 initLeadGeneratorProviderSetting();
 initCampaignSelects();
 </script>

@@ -502,7 +502,6 @@
             return "ads_trustoo";
         }
         if (p.indexOf("/premium-socialmedia") === 0) {
-            if (hashRaw === "google") return "social_google";
             if (hashRaw === "instagram") return "social_instagram";
             if (hashRaw === "facebook") return "social_facebook";
             if (hashRaw === "linkedin") return "social_linkedin";
@@ -596,7 +595,6 @@
         "ads_pinterest",
         "ads_trustoo",
         "ads_twitter",
-        "social_google",
         "social_instagram",
         "social_facebook",
         "social_linkedin",
@@ -819,12 +817,6 @@
                 key: "social_twitter",
                 href: "/premium-socialmedia#twitter",
                 label: "X / Twitter",
-                icon: adsPlatformIcon,
-            },
-            {
-                key: "social_google",
-                href: "/premium-socialmedia#google",
-                label: "Google",
                 icon: adsPlatformIcon,
             },
         ];

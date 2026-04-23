@@ -225,7 +225,6 @@ test('static premium sidebars share the same section order and public labels', (
         'social_linkedin:LinkedIn',
         'social_facebook:Facebook',
         'social_twitter:X / Twitter',
-        'social_google:Google',
       ],
     },
     {
@@ -254,7 +253,6 @@ test('static premium sidebars share the same section order and public labels', (
     assert.equal(linkTargets.ads_twitter, '/premium-advertenties#twitter');
     assert.equal(linkTargets.social_twitter, '/premium-socialmedia#twitter');
     assert.equal(linkTargets.ads_google, '/premium-advertenties#google');
-    assert.equal(linkTargets.social_google, '/premium-socialmedia#google');
     assert.equal(linkTargets.ads_linkedin, '/premium-advertenties#linkedin');
     assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
     for (const lockedKey of [
@@ -269,7 +267,6 @@ test('static premium sidebars share the same section order and public labels', (
       'social_linkedin',
       'social_facebook',
       'social_twitter',
-      'social_google',
     ]) {
       const lockedLink = pageSource.match(
         new RegExp(`<a [^>]*data-sidebar-key="${lockedKey}"[^>]*>[\\s\\S]*?<\\/a>`)
@@ -297,10 +294,10 @@ test('unified premium sidebar splits ad channels from social media channels', ()
   assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#linkedin"[\s\S]*label:\s*"LinkedIn"/);
   assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#facebook"[\s\S]*label:\s*"Facebook"/);
   assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#twitter"[\s\S]*label:\s*"X \/ Twitter"/);
-  assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#google"[\s\S]*label:\s*"Google"/);
   assert.match(themeJsSource, /if \(hashRaw === "google"\) return "ads_google";/);
   assert.match(themeJsSource, /if \(p\.indexOf\("\/premium-socialmedia"\) === 0\) \{/);
-  assert.match(themeJsSource, /if \(hashRaw === "google"\) return "social_google";/);
+  assert.doesNotMatch(themeJsSource, /social_google/);
+  assert.doesNotMatch(themeJsSource, /href:\s*"\/premium-socialmedia#google"/);
   assert.doesNotMatch(themeJsSource, /social_snapchat/);
   assert.doesNotMatch(themeJsSource, /href:\s*"\/premium-advertenties#snapchat"/);
   assert.doesNotMatch(themeJsSource, /href:\s*"\/premium-socialmedia#snapchat"/);
