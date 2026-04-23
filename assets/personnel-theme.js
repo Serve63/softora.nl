@@ -578,8 +578,12 @@
     /** Zijbalkitems die achter een toegangsslot / coming-soon scherm zitten */
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
         "seo",
+        "ads_google",
+        "ads_facebook",
+        "ads_linkedin",
         "ads_pinterest",
         "ads_trustoo",
+        "ads_twitter",
         "social_google",
         "social_instagram",
         "social_facebook",
@@ -754,6 +758,30 @@
                 label: "Pinterest",
                 icon: adsPlatformIcon,
             },
+            {
+                key: "ads_facebook",
+                href: "/premium-advertenties#facebook",
+                label: "Facebook",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "ads_twitter",
+                href: "/premium-advertenties#twitter",
+                label: "X / Twitter",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "ads_google",
+                href: "/premium-advertenties#google",
+                label: "Google",
+                icon: adsPlatformIcon,
+            },
+            {
+                key: "ads_linkedin",
+                href: "/premium-advertenties#linkedin",
+                label: "LinkedIn",
+                icon: adsPlatformIcon,
+            },
         ];
 
         const socialLinks = [
@@ -789,7 +817,7 @@
             },
         ];
 
-        const extraLinks = filterPremiumSidebarLinksForSession([
+        const extraLinks = filterPremiumSidebarLinksForSession(getPremiumSidebarAdminExtraLinks().concat([
             {
                 key: "monthly_costs",
                 href: "/premium-vaste-lasten",
@@ -820,7 +848,7 @@
                 icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h9m3 0h4M13 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 12h3m3 0h10M7 12a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM4 18h11m3 0h2M15 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z"></path></svg>',
                 label: "Instellingen",
             },
-        ].concat(getPremiumSidebarAdminExtraLinks()), premiumSessionSnapshot);
+        ]), premiumSessionSnapshot);
 
         return [
             '<a href="/premium-website" class="sidebar-logo magnetic">Softora.nl</a>',
