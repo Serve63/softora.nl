@@ -149,7 +149,7 @@ test('premium agenda shows klantwerk label on Saturdays', () => {
   assert.match(pageSource, /if \(isYmdCalendarSaturday\(picked\)\) return;/);
 });
 
-test('premium agenda falls back to visible demo appointments when bootstrap and api return nothing', () => {
+test('premium agenda falls back to visible Serve Creusen demo appointments when bootstrap and api return nothing', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
@@ -158,10 +158,11 @@ test('premium agenda falls back to visible demo appointments when bootstrap and 
   assert.match(pageSource, /function hasRealAgendaAppointments\(\) \{/);
   assert.match(pageSource, /function removeAgendaUiFallbackAppointments\(\) \{/);
   assert.match(pageSource, /function ensureAgendaUiFallbackAppointments\(\) \{/);
-  assert.match(pageSource, /uiFallback: true,[\s\S]*Jansen Installatietechniek/);
-  assert.match(pageSource, /uiFallback: true,[\s\S]*De Klerk CRM/);
-  assert.match(pageSource, /uiFallback: true,[\s\S]*Studio Hallo/);
-  assert.match(pageSource, /uiFallback: true,[\s\S]*Bistro De Markt/);
+  assert.match(pageSource, /uiFallback: true,[\s\S]*company: 'Servé Creusen'/);
+  assert.match(pageSource, /summary: 'Website meeting met Servé Creusen/);
+  assert.match(pageSource, /summary: 'Bedrijfssoftware meeting met Servé Creusen/);
+  assert.match(pageSource, /summary: 'Voicesoftware meeting met Servé Creusen/);
+  assert.match(pageSource, /summary: 'Chatbot meeting met Servé Creusen/);
   assert.match(pageSource, /changed = removeAgendaUiFallbackAppointments\(\) \|\| changed;/);
   assert.match(pageSource, /applyInitialAgendaBootstrap\(\) \{[\s\S]*ensureAgendaUiFallbackAppointments\(\);/);
   assert.match(pageSource, /const ensuredFallback = ensureAgendaUiFallbackAppointments\(\);/);
