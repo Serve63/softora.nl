@@ -493,14 +493,21 @@
                 ? String(window.location.hash || "").replace(/^#/, "").toLowerCase()
                 : "";
         if (p.indexOf("/premium-advertenties") === 0) {
+            if (hashRaw === "google") return "ads_google";
+            if (hashRaw === "facebook") return "ads_facebook";
+            if (hashRaw === "pinterest") return "ads_pinterest";
+            if (hashRaw === "linkedin") return "ads_linkedin";
+            if (hashRaw === "twitter") return "ads_twitter";
+            if (hashRaw === "trustoo") return "ads_trustoo";
+            return "ads_trustoo";
+        }
+        if (p.indexOf("/premium-socialmedia") === 0) {
             if (hashRaw === "google") return "social_google";
             if (hashRaw === "instagram") return "social_instagram";
             if (hashRaw === "facebook") return "social_facebook";
-            if (hashRaw === "pinterest") return "ads_pinterest";
             if (hashRaw === "linkedin") return "social_linkedin";
             if (hashRaw === "twitter") return "social_twitter";
-            if (hashRaw === "trustoo") return "ads_trustoo";
-            return "social_google";
+            return "social_instagram";
         }
         if (
             p.indexOf("/premium-actieve-opdrachten") === 0 ||
@@ -787,31 +794,31 @@
         const socialLinks = [
             {
                 key: "social_instagram",
-                href: "/premium-advertenties#instagram",
+                href: "/premium-socialmedia#instagram",
                 label: "Instagram",
                 icon: adsPlatformIcon,
             },
             {
                 key: "social_linkedin",
-                href: "/premium-advertenties#linkedin",
+                href: "/premium-socialmedia#linkedin",
                 label: "LinkedIn",
                 icon: adsPlatformIcon,
             },
             {
                 key: "social_facebook",
-                href: "/premium-advertenties#facebook",
+                href: "/premium-socialmedia#facebook",
                 label: "Facebook",
                 icon: adsPlatformIcon,
             },
             {
                 key: "social_twitter",
-                href: "/premium-advertenties#twitter",
+                href: "/premium-socialmedia#twitter",
                 label: "X / Twitter",
                 icon: adsPlatformIcon,
             },
             {
                 key: "social_google",
-                href: "/premium-advertenties#google",
+                href: "/premium-socialmedia#google",
                 label: "Google",
                 icon: adsPlatformIcon,
             },
@@ -1077,7 +1084,7 @@
             schedulePremiumSidebarFit(sidebar);
             return;
         }
-        if (path.indexOf("/premium-advertenties") === 0) {
+        if (path.indexOf("/premium-advertenties") === 0 || path.indexOf("/premium-socialmedia") === 0) {
             sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
             syncPremiumSidebarManagementLinks(sidebar, activeKey);
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);

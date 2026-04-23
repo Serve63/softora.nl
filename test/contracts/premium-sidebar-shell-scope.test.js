@@ -24,6 +24,17 @@ function extractSidebarSections(source) {
     .filter((section) => section.label);
 }
 
+function extractSidebarLinkTargets(source) {
+  const asideMatch = source.match(/<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*>([\s\S]*?)<\/aside>/);
+  assert.ok(asideMatch, 'pagina hoort een statische premium-sidebar te hebben');
+  return Object.fromEntries(
+    Array.from(
+      asideMatch[1].matchAll(/href="([^"]+)" class="sidebar-link magnetic(?: active)?" data-sidebar-key="([^"]+)"/g),
+      (match) => [match[2], match[1]]
+    )
+  );
+}
+
 const canonicalPages = [
   'premium-actieve-opdrachten.html',
   'premium-ai-coldmailing.html',
@@ -239,6 +250,15 @@ test('static premium sidebars share the same section order and public labels', (
       expectedSections,
       `${relativePath} hoort dezelfde premium-sidebar te hebben`
     );
+    const linkTargets = extractSidebarLinkTargets(pageSource);
+    assert.equal(linkTargets.ads_facebook, '/premium-advertenties#facebook');
+    assert.equal(linkTargets.social_facebook, '/premium-socialmedia#facebook');
+    assert.equal(linkTargets.ads_twitter, '/premium-advertenties#twitter');
+    assert.equal(linkTargets.social_twitter, '/premium-socialmedia#twitter');
+    assert.equal(linkTargets.ads_google, '/premium-advertenties#google');
+    assert.equal(linkTargets.social_google, '/premium-socialmedia#google');
+    assert.equal(linkTargets.ads_linkedin, '/premium-advertenties#linkedin');
+    assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
     assert.doesNotMatch(pageSource, /Snapchat/);
   }
 });
@@ -254,13 +274,16 @@ test('unified premium sidebar splits ad channels from social media channels', ()
   assert.match(themeJsSource, /key:\s*"ads_twitter"[\s\S]*href:\s*"\/premium-advertenties#twitter"[\s\S]*label:\s*"X \/ Twitter"/);
   assert.match(themeJsSource, /key:\s*"ads_google"[\s\S]*href:\s*"\/premium-advertenties#google"[\s\S]*label:\s*"Google"/);
   assert.match(themeJsSource, /key:\s*"ads_linkedin"[\s\S]*href:\s*"\/premium-advertenties#linkedin"[\s\S]*label:\s*"LinkedIn"/);
-  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#instagram"[\s\S]*label:\s*"Instagram"/);
-  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#linkedin"[\s\S]*label:\s*"LinkedIn"/);
-  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#facebook"[\s\S]*label:\s*"Facebook"/);
-  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#twitter"[\s\S]*label:\s*"X \/ Twitter"/);
-  assert.match(themeJsSource, /href:\s*"\/premium-advertenties#google"[\s\S]*label:\s*"Google"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#instagram"[\s\S]*label:\s*"Instagram"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#linkedin"[\s\S]*label:\s*"LinkedIn"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#facebook"[\s\S]*label:\s*"Facebook"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#twitter"[\s\S]*label:\s*"X \/ Twitter"/);
+  assert.match(themeJsSource, /href:\s*"\/premium-socialmedia#google"[\s\S]*label:\s*"Google"/);
+  assert.match(themeJsSource, /if \(hashRaw === "google"\) return "ads_google";/);
+  assert.match(themeJsSource, /if \(p\.indexOf\("\/premium-socialmedia"\) === 0\) \{/);
   assert.match(themeJsSource, /if \(hashRaw === "google"\) return "social_google";/);
   assert.doesNotMatch(themeJsSource, /social_snapchat/);
   assert.doesNotMatch(themeJsSource, /href:\s*"\/premium-advertenties#snapchat"/);
+  assert.doesNotMatch(themeJsSource, /href:\s*"\/premium-socialmedia#snapchat"/);
   assert.doesNotMatch(themeJsSource, /label:\s*"Snapchat"/);
 });

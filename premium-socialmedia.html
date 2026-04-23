@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f" sizes="any">
 <link rel="apple-touch-icon" href="/assets/D80D8A58-B985-491E-A39B-27879E4C593A.PNG?v=20260414f">
-<title>Advertenties – Softora.nl</title>
+<title>Socialmedia – Softora.nl</title>
 <link rel="stylesheet" href="/assets/iphone-optimizations.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/personnel-theme.css?v=20260420c">
@@ -35,7 +35,6 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 .main-content { margin-left: 280px; width: calc(100% - 280px); min-width: 0; padding: 40px 48px; }
 .page-shell { width: min(1380px, 100%); }
 
-/* Zelfde coming-soon slot als premium-websitegenerator */
 .content-lock-overlay {
   position: fixed;
   top: 0;
@@ -134,65 +133,25 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   <div class="content-lock-logo">Binnenkort beschikbaar</div>
   <div class="content-lock-box">
     <div class="content-lock-label">Toegangscode</div>
-    <input class="content-lock-input" type="password" id="contentLockInput" placeholder="••••••••••••" autocomplete="off" onkeydown="if(event.key==='Enter')unlockAdvertentiesArea()">
+    <input class="content-lock-input" type="password" id="contentLockInput" placeholder="••••••••••••" autocomplete="off" onkeydown="if(event.key==='Enter')unlockSocialmediaArea()">
     <div class="content-lock-error" id="contentLockError"></div>
-    <button type="button" class="content-lock-btn" onclick="unlockAdvertentiesArea()">Doorgaan</button>
+    <button type="button" class="content-lock-btn" onclick="unlockSocialmediaArea()">Doorgaan</button>
   </div>
 </div>
 <div class="dashboard-layout">
 <aside class="sidebar"></aside>
 <main class="main-content">
 <div class="page-shell">
-<div class="page-title">Advertenties</div>
-<div class="page-sub">Beheer advertentiecampagnes per kanaal. Campagne-instellingen en resultaten verschijnen hier zodra de koppelingen live zijn.</div>
+<div class="page-title">Socialmedia</div>
+<div class="page-sub">Beheer socialmedia-kanalen en organische prestaties per platform.</div>
 
-<div class="card" id="trustoo">
+<div class="card" id="instagram">
   <div class="card-head">
-    <div class="card-title">Trustoo</div>
+    <div class="card-title">Instagram</div>
     <div class="card-sub">Binnenkort beschikbaar.</div>
   </div>
   <div class="card-body">
-    Trustoo-campagnes, leads en rapportages voor advertenties verschijnen hier zodra de koppeling live is.
-  </div>
-</div>
-
-<div class="card" id="pinterest">
-  <div class="card-head">
-    <div class="card-title">Pinterest</div>
-    <div class="card-sub">Binnenkort beschikbaar.</div>
-  </div>
-  <div class="card-body">
-    Pinterest promoted pins en advertentierapportages komen hier te staan.
-  </div>
-</div>
-
-<div class="card" id="facebook">
-  <div class="card-head">
-    <div class="card-title">Facebook</div>
-    <div class="card-sub">Binnenkort beschikbaar.</div>
-  </div>
-  <div class="card-body">
-    Meta / Facebook advertenties worden hier geconfigureerd en gevolgd.
-  </div>
-</div>
-
-<div class="card" id="twitter">
-  <div class="card-head">
-    <div class="card-title">X / Twitter</div>
-    <div class="card-sub">Binnenkort beschikbaar.</div>
-  </div>
-  <div class="card-body">
-    X / Twitter advertentiecampagnes en resultaten krijgen hier hun eigen advertentiepagina.
-  </div>
-</div>
-
-<div class="card" id="google">
-  <div class="card-head">
-    <div class="card-title">Google</div>
-    <div class="card-sub">Binnenkort beschikbaar.</div>
-  </div>
-  <div class="card-body">
-    Google Ads en gerelateerde advertentiecampagnes verschijnen hier zodra de koppeling live is.
+    Instagram posts, profielbeheer en organische inzichten krijgen hier hun eigen socialmedia-pagina.
   </div>
 </div>
 
@@ -202,7 +161,37 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
     <div class="card-sub">Binnenkort beschikbaar.</div>
   </div>
   <div class="card-body">
-    LinkedIn Campaign Manager-integratie volgt in een latere release.
+    LinkedIn bedrijfsupdates en organische prestaties staan hier.
+  </div>
+</div>
+
+<div class="card" id="facebook">
+  <div class="card-head">
+    <div class="card-title">Facebook</div>
+    <div class="card-sub">Binnenkort beschikbaar.</div>
+  </div>
+  <div class="card-body">
+    Facebook pagina-inhoud en socialmedia-inzichten worden hier verzameld.
+  </div>
+</div>
+
+<div class="card" id="twitter">
+  <div class="card-head">
+    <div class="card-title">X / Twitter</div>
+    <div class="card-sub">Binnenkort beschikbaar.</div>
+  </div>
+  <div class="card-body">
+    X / Twitter posts en kanaalbeheer krijgen hier hun eigen socialmedia-pagina.
+  </div>
+</div>
+
+<div class="card" id="google">
+  <div class="card-head">
+    <div class="card-title">Google</div>
+    <div class="card-sub">Binnenkort beschikbaar.</div>
+  </div>
+  <div class="card-body">
+    Google Business-profielupdates en organische zichtbaarheid staan hier.
   </div>
 </div>
 
@@ -212,14 +201,14 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 
 <script>
 const CONTENT_LOCK_CODE = 'Andre2Fritz2!';
-const CONTENT_LOCK_STORAGE_KEY = 'cs-auth-premium-advertenties';
+const CONTENT_LOCK_STORAGE_KEY = 'cs-auth-premium-socialmedia';
 
 if (sessionStorage.getItem(CONTENT_LOCK_STORAGE_KEY) === '1') {
   var existingOverlay = document.getElementById('contentLockOverlay');
   if (existingOverlay) existingOverlay.style.display = 'none';
 }
 
-function unlockAdvertentiesArea() {
+function unlockSocialmediaArea() {
   var input = document.getElementById('contentLockInput');
   var error = document.getElementById('contentLockError');
   var overlay = document.getElementById('contentLockOverlay');
@@ -228,7 +217,7 @@ function unlockAdvertentiesArea() {
   if (input.value === CONTENT_LOCK_CODE) {
     sessionStorage.setItem(CONTENT_LOCK_STORAGE_KEY, '1');
     overlay.style.display = 'none';
-    scrollToAdsHash();
+    scrollToSocialmediaHash();
     return;
   }
 
@@ -237,7 +226,7 @@ function unlockAdvertentiesArea() {
   input.focus();
 }
 
-function scrollToAdsHash() {
+function scrollToSocialmediaHash() {
   var raw = (window.location.hash || '').replace(/^#/, '');
   if (!raw) return;
   var el = document.getElementById(raw);
@@ -246,11 +235,11 @@ function scrollToAdsHash() {
   }
 }
 
-window.addEventListener('hashchange', scrollToAdsHash);
+window.addEventListener('hashchange', scrollToSocialmediaHash);
 if (document.readyState === 'complete') {
-  scrollToAdsHash();
+  scrollToSocialmediaHash();
 } else {
-  window.addEventListener('load', scrollToAdsHash, { once: true });
+  window.addEventListener('load', scrollToSocialmediaHash, { once: true });
 }
 </script>
 </body>
