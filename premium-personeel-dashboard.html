@@ -1608,17 +1608,17 @@
                 <div class="topbar-right dashboard-topbar-right">
                     <div class="topbar-select-wrap ai-management-select-wrap magnetic" id="aiManagementDropdown">
                         <button type="button" class="topbar-select-button" id="aiManagementTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="aiManagementMenu">
-                            <span class="topbar-select-label" id="aiManagementLabel">AI-beheer: Software</span>
+                            <span class="topbar-select-label" id="aiManagementLabel">AI BEHEER</span>
                         </button>
                         <div class="topbar-select-menu" id="aiManagementMenu" role="menu" hidden>
                             <button type="button" class="topbar-select-option" data-ai-management-value="software" role="menuitemradio" aria-checked="true">
-                                <span>Software regelen</span>
+                                <span>AI BEHEER</span>
                                 <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
                                 </svg>
                             </button>
                             <button type="button" class="topbar-select-option" data-ai-management-value="personnel" role="menuitemradio" aria-checked="false">
-                                <span>Personeel regelen</span>
+                                <span>PERSONEEL BEHEER</span>
                                 <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
                                 </svg>
@@ -1839,8 +1839,8 @@
 
         function getAiManagementLabel(value) {
             return normalizeAiManagementMode(value) === 'personnel'
-                ? 'AI-beheer: Personeel'
-                : 'AI-beheer: Software';
+                ? 'PERSONEEL BEHEER'
+                : 'AI BEHEER';
         }
 
         function getAiManagementInstruction(value) {
@@ -3227,7 +3227,7 @@
             function getActiveAiManagementContext() {
                 const fallback = {
                     mode: 'software',
-                    label: 'AI-beheer: Software',
+                    label: 'AI BEHEER',
                     instruction: 'AI-beheermodus: software. Focus op klanten, opdrachten, websites, SEO, leads, calls, AI-insights en software-activiteit.',
                 };
                 const manager = window.SoftoraDashboardAiManagement;
