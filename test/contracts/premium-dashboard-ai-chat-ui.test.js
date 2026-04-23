@@ -31,8 +31,10 @@ test('premium dashboard toont AI beheer dropdown boven de datumfilters', () => {
 
   assert.match(
     pageSource,
-    /class="topbar-right dashboard-topbar-right"[\s\S]*id="aiManagementDropdown"[\s\S]*id="aiManagementLabel">AI BEHEER<\/span>[\s\S]*data-ai-management-value="software"[\s\S]*AI BEHEER[\s\S]*data-ai-management-value="personnel"[\s\S]*PERSONEEL BEHEER[\s\S]*class="dashboard-topbar-controls"[\s\S]*class="topbar-date"[\s\S]*id="dashboardPeriodDropdown"/
+    /class="topbar-right dashboard-topbar-right"[\s\S]*id="aiManagementDropdown"[\s\S]*id="aiManagementStatusDot"[\s\S]*id="aiManagementLabel">AI BEHEER<\/span>[\s\S]*data-ai-management-value="software"[\s\S]*ai-management-status-dot--green[\s\S]*AI BEHEER[\s\S]*data-ai-management-value="personnel"[\s\S]*ai-management-status-dot--orange[\s\S]*PERSONEEL BEHEER[\s\S]*class="dashboard-topbar-controls"[\s\S]*class="topbar-date"[\s\S]*id="dashboardPeriodDropdown"/
   );
+  assert.match(pageSource, /\.ai-management-status-dot--red \{/);
+  assert.match(pageSource, /const AI_MANAGEMENT_STATUS = \{/);
   assert.match(pageSource, /window\.SoftoraDashboardAiManagement = \{/);
   assert.match(pageSource, /aiManagementMode: managementContext\.mode/);
 });

@@ -425,6 +425,36 @@
             align-self: flex-end;
         }
 
+        .ai-management-trigger-label,
+        .ai-management-option-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            min-width: 0;
+        }
+
+        .ai-management-status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            flex-shrink: 0;
+        }
+
+        .ai-management-status-dot--green {
+            background: var(--green);
+            box-shadow: 0 0 0 4px rgba(46, 204, 113, 0.16);
+        }
+
+        .ai-management-status-dot--orange {
+            background: var(--yellow);
+            box-shadow: 0 0 0 4px rgba(243, 156, 18, 0.18);
+        }
+
+        .ai-management-status-dot--red {
+            background: var(--red);
+            box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.16);
+        }
+
         .topbar-select-button {
             width: auto;
             min-width: 0;
@@ -1608,17 +1638,26 @@
                 <div class="topbar-right dashboard-topbar-right">
                     <div class="topbar-select-wrap ai-management-select-wrap magnetic" id="aiManagementDropdown">
                         <button type="button" class="topbar-select-button" id="aiManagementTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="aiManagementMenu">
-                            <span class="topbar-select-label" id="aiManagementLabel">AI BEHEER</span>
+                            <span class="ai-management-trigger-label">
+                                <span class="ai-management-status-dot ai-management-status-dot--green" id="aiManagementStatusDot" aria-hidden="true"></span>
+                                <span class="topbar-select-label" id="aiManagementLabel">AI BEHEER</span>
+                            </span>
                         </button>
                         <div class="topbar-select-menu" id="aiManagementMenu" role="menu" hidden>
-                            <button type="button" class="topbar-select-option" data-ai-management-value="software" role="menuitemradio" aria-checked="true">
-                                <span>AI BEHEER</span>
+                            <button type="button" class="topbar-select-option" data-ai-management-value="software" role="menuitemradio" aria-checked="true" title="Groen: werkt perfect.">
+                                <span class="ai-management-option-label">
+                                    <span class="ai-management-status-dot ai-management-status-dot--green" aria-hidden="true"></span>
+                                    <span>AI BEHEER</span>
+                                </span>
                                 <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
                                 </svg>
                             </button>
-                            <button type="button" class="topbar-select-option" data-ai-management-value="personnel" role="menuitemradio" aria-checked="false">
-                                <span>PERSONEEL BEHEER</span>
+                            <button type="button" class="topbar-select-option" data-ai-management-value="personnel" role="menuitemradio" aria-checked="false" title="Oranje: werkt, maar er is iets aan de hand.">
+                                <span class="ai-management-option-label">
+                                    <span class="ai-management-status-dot ai-management-status-dot--orange" aria-hidden="true"></span>
+                                    <span>PERSONEEL BEHEER</span>
+                                </span>
                                 <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
                                 </svg>
@@ -1796,9 +1835,20 @@
         const aiManagementDropdown = document.getElementById('aiManagementDropdown');
         const aiManagementTrigger = document.getElementById('aiManagementTrigger');
         const aiManagementLabel = document.getElementById('aiManagementLabel');
+        const aiManagementStatusDot = document.getElementById('aiManagementStatusDot');
         const aiManagementMenu = document.getElementById('aiManagementMenu');
         const aiManagementOptions = Array.from(document.querySelectorAll('[data-ai-management-value]'));
         let aiManagementMode = 'software';
+        const AI_MANAGEMENT_STATUS = {
+            software: {
+                tone: 'green',
+                text: 'Groen: werkt perfect.',
+            },
+            personnel: {
+                tone: 'orange',
+                text: 'Oranje: werkt, maar er is iets aan de hand.',
+            },
+        };
 
         function escapeHtml(str) {
             return String(str || '')
@@ -1849,11 +1899,17 @@
                 : 'AI-beheermodus: software. Focus op klanten, opdrachten, websites, SEO, leads, calls, AI-insights en software-activiteit.';
         }
 
+        function getAiManagementStatus(value) {
+            return AI_MANAGEMENT_STATUS[normalizeAiManagementMode(value)] || AI_MANAGEMENT_STATUS.software;
+        }
+
         function getActiveAiManagementContext() {
+            const status = getAiManagementStatus(aiManagementMode);
             return {
                 mode: aiManagementMode,
                 label: getAiManagementLabel(aiManagementMode),
                 instruction: getAiManagementInstruction(aiManagementMode),
+                status,
             };
         }
 
@@ -1873,8 +1929,17 @@
         }
 
         function syncAiManagementUi() {
+            const status = getAiManagementStatus(aiManagementMode);
             if (aiManagementLabel) {
                 aiManagementLabel.textContent = getAiManagementLabel(aiManagementMode);
+            }
+            if (aiManagementStatusDot) {
+                aiManagementStatusDot.className = `ai-management-status-dot ai-management-status-dot--${status.tone}`;
+                aiManagementStatusDot.title = status.text;
+            }
+            if (aiManagementTrigger) {
+                aiManagementTrigger.setAttribute('aria-label', `${getAiManagementLabel(aiManagementMode)}. ${status.text}`);
+                aiManagementTrigger.title = status.text;
             }
             aiManagementOptions.forEach((option) => {
                 const isActive = option.getAttribute('data-ai-management-value') === aiManagementMode;
