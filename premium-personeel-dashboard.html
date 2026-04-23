@@ -373,6 +373,20 @@
             gap: 1rem;
         }
 
+        .dashboard-topbar-right {
+            flex-direction: column !important;
+            align-items: flex-end !important;
+            gap: 0.75rem !important;
+        }
+
+        .dashboard-topbar-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
         .topbar-action {
             font-family: 'Oswald', sans-serif;
             font-size: 0.8rem;
@@ -407,6 +421,10 @@
             flex: 0 0 auto;
         }
 
+        .ai-management-select-wrap {
+            align-self: flex-end;
+        }
+
         .topbar-select-button {
             width: auto;
             min-width: 0;
@@ -426,6 +444,12 @@
             cursor: pointer;
             outline: none;
             transition: border-color 0.2s var(--ease-out-expo), background 0.2s var(--ease-out-expo), color 0.2s var(--ease-out-expo);
+        }
+
+        .ai-management-select-wrap .topbar-select-button {
+            color: var(--accent);
+            border-color: rgba(139, 34, 82, 0.28);
+            background: rgba(139, 34, 82, 0.04);
         }
 
         .topbar-select-button:hover,
@@ -1482,6 +1506,9 @@
             .main-content { padding: 1.5rem; }
             .kpi-grid { grid-template-columns: 1fr; }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
+            .dashboard-topbar-right { align-items: flex-start !important; }
+            .ai-management-select-wrap { align-self: flex-start; }
+            .dashboard-topbar-controls { justify-content: flex-start; width: 100%; }
             .revenue-breakdown-grid { grid-template-columns: 1fr; }
             .confirm-task-top { flex-direction: column; }
             .confirm-task-side { align-items: flex-start; width: 100%; }
@@ -1578,35 +1605,20 @@
                     <h1>Dashboard</h1>
                     <p>Overzicht van je bedrijfsprestaties</p>
                 </div>
-                <div class="topbar-right">
-                    <div class="topbar-date">
-                        <span id="currentDate"></span>
-                    </div>
-                    <div class="topbar-select-wrap magnetic" id="dashboardPeriodDropdown">
-                        <button type="button" class="topbar-select-button" id="dashboardPeriodTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="dashboardPeriodMenu">
-                            <span class="topbar-select-label" id="dashboardPeriodLabel">All Time</span>
+                <div class="topbar-right dashboard-topbar-right">
+                    <div class="topbar-select-wrap ai-management-select-wrap magnetic" id="aiManagementDropdown">
+                        <button type="button" class="topbar-select-button" id="aiManagementTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="aiManagementMenu">
+                            <span class="topbar-select-label" id="aiManagementLabel">AI-beheer: Software</span>
                         </button>
-                        <div class="topbar-select-menu" id="dashboardPeriodMenu" role="menu" hidden>
-                            <button type="button" class="topbar-select-option" data-period-value="all" role="menuitemradio" aria-checked="false">
-                                <span>All Time</span>
+                        <div class="topbar-select-menu" id="aiManagementMenu" role="menu" hidden>
+                            <button type="button" class="topbar-select-option" data-ai-management-value="software" role="menuitemradio" aria-checked="true">
+                                <span>Software regelen</span>
                                 <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
                                 </svg>
                             </button>
-                            <button type="button" class="topbar-select-option" data-period-value="year" role="menuitemradio" aria-checked="false">
-                                <span>Dit Jaar</span>
-                                <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
-                                </svg>
-                            </button>
-                            <button type="button" class="topbar-select-option" data-period-value="month" role="menuitemradio" aria-checked="false">
-                                <span>Deze Maand</span>
-                                <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
-                                </svg>
-                            </button>
-                            <button type="button" class="topbar-select-option" data-period-value="quarter" role="menuitemradio" aria-checked="false">
-                                <span>Dit Kwartaal</span>
+                            <button type="button" class="topbar-select-option" data-ai-management-value="personnel" role="menuitemradio" aria-checked="false">
+                                <span>Personeel regelen</span>
                                 <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
                                 </svg>
@@ -1615,6 +1627,45 @@
                         <svg class="topbar-select-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"></path>
                         </svg>
+                    </div>
+                    <div class="dashboard-topbar-controls">
+                        <div class="topbar-date">
+                            <span id="currentDate"></span>
+                        </div>
+                        <div class="topbar-select-wrap magnetic" id="dashboardPeriodDropdown">
+                            <button type="button" class="topbar-select-button" id="dashboardPeriodTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="dashboardPeriodMenu">
+                                <span class="topbar-select-label" id="dashboardPeriodLabel">All Time</span>
+                            </button>
+                            <div class="topbar-select-menu" id="dashboardPeriodMenu" role="menu" hidden>
+                                <button type="button" class="topbar-select-option" data-period-value="all" role="menuitemradio" aria-checked="false">
+                                    <span>All Time</span>
+                                    <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
+                                    </svg>
+                                </button>
+                                <button type="button" class="topbar-select-option" data-period-value="year" role="menuitemradio" aria-checked="false">
+                                    <span>Dit Jaar</span>
+                                    <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
+                                    </svg>
+                                </button>
+                                <button type="button" class="topbar-select-option" data-period-value="month" role="menuitemradio" aria-checked="false">
+                                    <span>Deze Maand</span>
+                                    <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
+                                    </svg>
+                                </button>
+                                <button type="button" class="topbar-select-option" data-period-value="quarter" role="menuitemradio" aria-checked="false">
+                                    <span>Dit Kwartaal</span>
+                                    <svg class="topbar-select-option-check" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <svg class="topbar-select-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"></path>
+                            </svg>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1742,6 +1793,12 @@
         const dashboardPeriodLabel = document.getElementById('dashboardPeriodLabel');
         const dashboardPeriodMenu = document.getElementById('dashboardPeriodMenu');
         const dashboardPeriodOptions = Array.from(document.querySelectorAll('[data-period-value]'));
+        const aiManagementDropdown = document.getElementById('aiManagementDropdown');
+        const aiManagementTrigger = document.getElementById('aiManagementTrigger');
+        const aiManagementLabel = document.getElementById('aiManagementLabel');
+        const aiManagementMenu = document.getElementById('aiManagementMenu');
+        const aiManagementOptions = Array.from(document.querySelectorAll('[data-ai-management-value]'));
+        let aiManagementMode = 'software';
 
         function escapeHtml(str) {
             return String(str || '')
@@ -1776,12 +1833,51 @@
             return 'All Time';
         }
 
+        function normalizeAiManagementMode(value) {
+            return value === 'personnel' ? 'personnel' : 'software';
+        }
+
+        function getAiManagementLabel(value) {
+            return normalizeAiManagementMode(value) === 'personnel'
+                ? 'AI-beheer: Personeel'
+                : 'AI-beheer: Software';
+        }
+
+        function getAiManagementInstruction(value) {
+            return normalizeAiManagementMode(value) === 'personnel'
+                ? 'AI-beheermodus: personeel. Focus op medewerkers, planning, agenda, rollen, bevestigingsmails en personeelsprocessen.'
+                : 'AI-beheermodus: software. Focus op klanten, opdrachten, websites, SEO, leads, calls, AI-insights en software-activiteit.';
+        }
+
+        function getActiveAiManagementContext() {
+            return {
+                mode: aiManagementMode,
+                label: getAiManagementLabel(aiManagementMode),
+                instruction: getAiManagementInstruction(aiManagementMode),
+            };
+        }
+
+        window.SoftoraDashboardAiManagement = {
+            getContext: getActiveAiManagementContext,
+        };
+
         function syncDashboardPeriodUi() {
             if (dashboardPeriodLabel) {
                 dashboardPeriodLabel.textContent = getDashboardPeriodLabel(dashboardPeriodFilter);
             }
             dashboardPeriodOptions.forEach((option) => {
                 const isActive = option.getAttribute('data-period-value') === dashboardPeriodFilter;
+                option.classList.toggle('is-active', isActive);
+                option.setAttribute('aria-checked', isActive ? 'true' : 'false');
+            });
+        }
+
+        function syncAiManagementUi() {
+            if (aiManagementLabel) {
+                aiManagementLabel.textContent = getAiManagementLabel(aiManagementMode);
+            }
+            aiManagementOptions.forEach((option) => {
+                const isActive = option.getAttribute('data-ai-management-value') === aiManagementMode;
                 option.classList.toggle('is-active', isActive);
                 option.setAttribute('aria-checked', isActive ? 'true' : 'false');
             });
@@ -1794,11 +1890,25 @@
             dashboardPeriodMenu.hidden = true;
         }
 
+        function closeAiManagementMenu() {
+            if (!aiManagementDropdown || !aiManagementTrigger || !aiManagementMenu) return;
+            aiManagementDropdown.classList.remove('open');
+            aiManagementTrigger.setAttribute('aria-expanded', 'false');
+            aiManagementMenu.hidden = true;
+        }
+
         function openDashboardPeriodMenu() {
             if (!dashboardPeriodDropdown || !dashboardPeriodTrigger || !dashboardPeriodMenu) return;
             dashboardPeriodDropdown.classList.add('open');
             dashboardPeriodTrigger.setAttribute('aria-expanded', 'true');
             dashboardPeriodMenu.hidden = false;
+        }
+
+        function openAiManagementMenu() {
+            if (!aiManagementDropdown || !aiManagementTrigger || !aiManagementMenu) return;
+            aiManagementDropdown.classList.add('open');
+            aiManagementTrigger.setAttribute('aria-expanded', 'true');
+            aiManagementMenu.hidden = false;
         }
 
         function applyDashboardPeriodFilter(value) {
@@ -1807,11 +1917,52 @@
             renderPremiumDashboardOrders();
         }
 
+        function applyAiManagementMode(value) {
+            aiManagementMode = normalizeAiManagementMode(value);
+            syncAiManagementUi();
+            window.dispatchEvent(
+                new CustomEvent('softora-dashboard-ai-management-change', {
+                    detail: getActiveAiManagementContext(),
+                })
+            );
+        }
+
+        if (aiManagementDropdown && aiManagementTrigger && aiManagementMenu) {
+            syncAiManagementUi();
+
+            aiManagementTrigger.addEventListener('click', () => {
+                const isOpen = aiManagementDropdown.classList.contains('open');
+                closeDashboardPeriodMenu();
+                if (isOpen) closeAiManagementMenu();
+                else openAiManagementMenu();
+            });
+
+            aiManagementOptions.forEach((option) => {
+                option.addEventListener('click', () => {
+                    applyAiManagementMode(option.getAttribute('data-ai-management-value'));
+                    closeAiManagementMenu();
+                });
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!aiManagementDropdown.contains(event.target)) {
+                    closeAiManagementMenu();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeAiManagementMenu();
+                }
+            });
+        }
+
         if (dashboardPeriodDropdown && dashboardPeriodTrigger && dashboardPeriodMenu) {
             syncDashboardPeriodUi();
 
             dashboardPeriodTrigger.addEventListener('click', () => {
                 const isOpen = dashboardPeriodDropdown.classList.contains('open');
+                closeAiManagementMenu();
                 if (isOpen) closeDashboardPeriodMenu();
                 else openDashboardPeriodMenu();
             });
@@ -3073,6 +3224,31 @@
                 sendButton.disabled = state.sending || !String(input.value || '').trim();
             }
 
+            function getActiveAiManagementContext() {
+                const fallback = {
+                    mode: 'software',
+                    label: 'AI-beheer: Software',
+                    instruction: 'AI-beheermodus: software. Focus op klanten, opdrachten, websites, SEO, leads, calls, AI-insights en software-activiteit.',
+                };
+                const manager = window.SoftoraDashboardAiManagement;
+                if (!manager || typeof manager.getContext !== 'function') return fallback;
+                const context = manager.getContext();
+                if (!context || typeof context !== 'object') return fallback;
+                return {
+                    mode: context.mode === 'personnel' ? 'personnel' : 'software',
+                    label: String(context.label || fallback.label),
+                    instruction: String(context.instruction || fallback.instruction),
+                };
+            }
+
+            function syncAiManagementChatInput() {
+                const context = getActiveAiManagementContext();
+                input.placeholder =
+                    context.mode === 'personnel'
+                        ? 'Vraag Ruben om personeel te regelen...'
+                        : 'Vraag Ruben om software te regelen...';
+            }
+
             function appendMessage(role, content) {
                 const safeRole = role === 'assistant' ? 'assistant' : 'user';
                 const safeContent = String(content || '').trim();
@@ -3131,10 +3307,15 @@
                             role: item.role === 'assistant' ? 'assistant' : 'user',
                             content: item.content
                         }));
+                    const managementContext = getActiveAiManagementContext();
 
                     const data = await requestDashboardAi({
                         question,
-                        history
+                        history: [
+                            { role: 'user', content: managementContext.instruction },
+                            ...history,
+                        ],
+                        aiManagementMode: managementContext.mode
                     });
                     const answer = String(data?.answer || '').trim() || 'Geen antwoord ontvangen.';
                     appendMessage('assistant', answer);
@@ -3162,6 +3343,9 @@
             }
             renderMessages(false);
             setSending(false);
+            syncAiManagementChatInput();
+
+            window.addEventListener('softora-dashboard-ai-management-change', syncAiManagementChatInput);
 
             toggleButton.addEventListener('click', () => {
                 setOpen(!state.open);

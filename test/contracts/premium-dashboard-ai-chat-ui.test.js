@@ -24,3 +24,15 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
     /class="dashboard-lead-legend-strip"[\s\S]*class="lead-type-legend"[\s\S]*Bedrijfssoftware[\s\S]*Voicesoftware[\s\S]*Chatbots/s
   );
 });
+
+test('premium dashboard toont AI-beheer dropdown boven de datumfilters', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(
+    pageSource,
+    /class="topbar-right dashboard-topbar-right"[\s\S]*id="aiManagementDropdown"[\s\S]*id="aiManagementLabel">AI-beheer: Software<\/span>[\s\S]*data-ai-management-value="software"[\s\S]*Software regelen[\s\S]*data-ai-management-value="personnel"[\s\S]*Personeel regelen[\s\S]*class="dashboard-topbar-controls"[\s\S]*class="topbar-date"[\s\S]*id="dashboardPeriodDropdown"/
+  );
+  assert.match(pageSource, /window\.SoftoraDashboardAiManagement = \{/);
+  assert.match(pageSource, /aiManagementMode: managementContext\.mode/);
+});
