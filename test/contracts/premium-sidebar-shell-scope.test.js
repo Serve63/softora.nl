@@ -7,6 +7,23 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
+function extractSidebarSections(source) {
+  const asideMatch = source.match(/<aside class="sidebar"[^>]*data-static-sidebar="1"[^>]*>([\s\S]*?)<\/aside>/);
+  assert.ok(asideMatch, 'pagina hoort een statische premium-sidebar te hebben');
+  return asideMatch[1]
+    .split(/<div class="sidebar-section(?:\s[^"]*)?">/)
+    .slice(1)
+    .map((sectionSource) => {
+      const label = (sectionSource.match(/<div class="sidebar-section-label">([^<]+)<\/div>/) || [])[1];
+      const links = Array.from(
+        sectionSource.matchAll(/data-sidebar-key="([^"]+)"[\s\S]*?<span class="sidebar-link-text">([^<]+)<\/span>/g),
+        (match) => `${match[1]}:${match[2]}`
+      );
+      return { label, links };
+    })
+    .filter((section) => section.label);
+}
+
 const canonicalPages = [
   'premium-actieve-opdrachten.html',
   'premium-ai-coldmailing.html',
@@ -68,7 +85,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*none;/);
   assert.match(themeSource, /body\[data-sidebar-nav-ready="1"\] \.sidebar a\.sidebar-logo,[\s\S]*pointer-events:\s*auto;/);
   assert.match(themeSource, /\.sidebar a\.sidebar-logo,[\s\S]*transform:\s*none !important;/);
-  assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords", "settings"\]\);/);
+  assert.match(themeJsSource, /const PREMIUM_SIDEBAR_ADMIN_ONLY_KEYS = new Set\(\["passwords"\]\);/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
@@ -84,9 +101,9 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeSource, /\.sidebar-link \.sidebar-link-text[\s\S]*white-space:\s*nowrap !important;/);
   assert.match(
     themeSource,
-    /@media \(min-width: 901px\) \{[\s\S]*?\.sidebar-nav \{[\s\S]*?overflow-y:\s*hidden !important;/m
+    /@media \(min-width: 901px\) \{[\s\S]*?\.sidebar-nav \{[\s\S]*?overflow-y:\s*auto !important;/m
   );
-  assert.match(themeJsSource, /const nav = sidebar\.querySelector\("\.sidebar-nav"\)/);
+  assert.match(themeJsSource, /function schedulePremiumSidebarFit\(sidebar\) \{/);
   assert.match(themeSource, /\.sidebar-user-name[\s\S]*text-overflow:\s*ellipsis !important;/);
   assert.match(prefillSource, /data-sidebar-profile-render-key/);
   assert.match(prefillSource, /getAttribute\("data-sidebar-profile-render-key"\)/);
@@ -153,6 +170,75 @@ test('static premium sidebars ship the database link in html', () => {
       /href="\/premium-database"[\s\S]*<span class="sidebar-link-text">Database<\/span>/,
       `${relativePath} hoort Database direct in de sidebar html te hebben`
     );
+  }
+});
+
+test('static premium sidebars share the same section order and public labels', () => {
+  const expectedSections = [
+    {
+      label: 'Overzicht',
+      links: [
+        'dashboard:Dashboard',
+        'active_orders:Actieve Opdrachten',
+        'agenda:Agenda',
+        'leads:Leads',
+        'coldcalling:Coldcalling',
+        'coldmailing:Coldmailing',
+        'database:Database',
+      ],
+    },
+    {
+      label: 'Beheer',
+      links: [
+        'customers:Klanten',
+        'mailbox:Mailbox',
+        'websitegenerator:Websitedesign',
+        'seo:SEO',
+        'packages:Pakketten',
+        "pdfs:PDF'S",
+      ],
+    },
+    {
+      label: 'Advertenties',
+      links: [
+        'ads_trustoo:Trustoo',
+        'ads_pinterest:Pinterest',
+      ],
+    },
+    {
+      label: 'Socialmedia',
+      links: [
+        'social_instagram:Instagram',
+        'social_linkedin:LinkedIn',
+        'social_facebook:Facebook',
+        'social_twitter:X / Twitter',
+        'social_google:Google',
+      ],
+    },
+    {
+      label: 'Extra',
+      links: [
+        'passwords:Wachtwoordenregister',
+        'monthly_costs:Terugkerende kosten',
+        'bookkeeping:Boekhouding',
+        'notepad:Kladblok',
+        'word:Word',
+        'settings:Instellingen',
+      ],
+    },
+  ];
+
+  for (const relativePath of staticSidebarPages) {
+    const pageSource = readRepoFile(relativePath);
+    assert.deepEqual(
+      extractSidebarSections(pageSource),
+      expectedSections,
+      `${relativePath} hoort dezelfde premium-sidebar te hebben`
+    );
+    assert.doesNotMatch(pageSource, /data-sidebar-key="ads_google"/);
+    assert.doesNotMatch(pageSource, /data-sidebar-key="ads_facebook"/);
+    assert.doesNotMatch(pageSource, /data-sidebar-key="ads_linkedin"/);
+    assert.doesNotMatch(pageSource, /Snapchat/);
   }
 });
 

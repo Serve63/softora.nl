@@ -119,7 +119,7 @@ test('page smoke: assets/personnel-theme.js persists sidebar counts across premi
 
 test('page smoke: premium-bevestigingsmails.html shows the five coldmailing KPI labels', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-bevestigingsmails.html'), 'utf8');
-  assert.match(html, />Totaal verzonden<\/span>/, 'Totaal verzonden ontbreekt.');
+  assert.match(html, />Totaal verzonden<\/div>/, 'Totaal verzonden ontbreekt.');
   assert.match(html, />Geopend<\/div>/, 'Geopend ontbreekt.');
   assert.doesNotMatch(html, />Gereageerd<\/div>/, 'Gereageerd hoort niet meer zichtbaar te zijn.');
   assert.match(html, />Interesse<\/div>/, 'Interesse ontbreekt.');
