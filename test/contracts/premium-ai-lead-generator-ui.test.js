@@ -72,7 +72,7 @@ test('premium ai lead generator renders campaign controls before dashboard boots
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--branche\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*4;/);
   assert.match(pageSource, /\.generator-grid > \.panel:only-child \.form-group--regio\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*5;/);
   assert.match(dashboardSource, /function ensureStartCampaignConfirmModal\(\)/);
-  assert.match(dashboardSource, /startConfirmPin:\s*startConfirmPin/);
+  assert.match(dashboardSource, /confirmPin:\s*startConfirmPin/);
   assert.match(dashboardSource, /openStartCampaignConfirmModal\(\);/);
   assert.match(
     dashboardSource,
@@ -325,6 +325,27 @@ test('premium ai lead generator omits topbar Retell cost; widget asset stays for
     costWidgetSource,
     /window\.setInterval\(function \(\) \{[\s\S]*refreshRetellCostSummary\(\{ silent: true \}\);[\s\S]*\}, POLL_INTERVAL_MS\);/
   );
+});
+
+test('premium ai lead generator toont een aparte AI beheer workspace', () => {
+  const pagePath = path.join(__dirname, '../../premium-ai-lead-generator.html');
+  const managementUiPath = path.join(__dirname, '../../assets/premium-ai-lead-generator-management.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const managementUiSource = fs.readFileSync(managementUiPath, 'utf8');
+
+  assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
+  assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ai-lead-generator-management\.js\?v=20260423a" defer><\/script>/);
+  assert.match(pageSource, /id="aiManagementWorkspace"/);
+  assert.match(pageSource, /AI stuurt hier zelfstandig op nieuwe leads/);
+  assert.match(pageSource, /id="aiManagementSummary"/);
+  assert.match(pageSource, /id="aiManagementGoal"/);
+  assert.match(pageSource, /id="aiManagementCurrentAction"/);
+  assert.match(pageSource, /id="aiModeTopbarStatus"/);
+  assert.match(pageSource, /html\[data-ai-management-mode="software"\] \.management-mode-scope--personnel/);
+  assert.match(managementUiSource, /AI is actief bezig met leads verzamelen\./);
+  assert.match(managementUiSource, /topbarTitleEl\.textContent = 'AI Beheer';/);
+  assert.match(managementUiSource, /window\.addEventListener\('softora-ai-management-change'/);
 });
 
 test('premium ai lead generator persists dashboard config and stats through Supabase-only flows', () => {

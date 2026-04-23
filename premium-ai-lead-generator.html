@@ -20,14 +20,28 @@
                 var storageKey = isPremiumPersonnel
                     ? "softora_premium_personnel_theme_mode"
                     : "softora_software_personnel_theme_mode";
+                var aiManagementStorageKey = isPremiumPersonnel
+                    ? "softora_premium_ai_management_mode"
+                    : "softora_software_ai_management_mode";
+                var aiManagementMode = "personnel";
+                try {
+                    var storedAiManagementMode = localStorage.getItem(aiManagementStorageKey);
+                    if (storedAiManagementMode === "software" || storedAiManagementMode === "personnel") {
+                        aiManagementMode = storedAiManagementMode;
+                    }
+                } catch (storageError) {
+                    /* ignore storage errors */
+                }
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
+                document.documentElement.setAttribute("data-ai-management-mode", aiManagementMode);
             } catch (error) {
                 /* ignore storage errors */
             }
         })();
     </script>
     <script src="assets/personnel-theme.js?v=20260423b" defer></script>
+    <script src="assets/ai-management-mode.js?v=20260423a" defer></script>
     <script src="assets/custom-selects.js?v=20260421a" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -52,6 +66,7 @@
             --border: rgba(255, 255, 255, 0.06);
             --green: #2ecc71;
             --green-glow: rgba(46, 204, 113, 0.15);
+            --red: #e74c3c;
             --yellow: #f39c12;
 
             --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -343,6 +358,219 @@
             color: var(--text-tertiary);
             font-size: 0.9rem;
             font-weight: 300;
+        }
+
+        .management-mode-scope--software {
+            display: none;
+        }
+
+        html[data-ai-management-mode="software"] .management-mode-scope--personnel {
+            display: none !important;
+        }
+
+        html[data-ai-management-mode="software"] .management-mode-scope--software[data-management-display="block"] {
+            display: block !important;
+        }
+
+        html[data-ai-management-mode="software"] .management-mode-scope--software[data-management-display="flex"] {
+            display: flex !important;
+        }
+
+        html[data-ai-management-mode="software"] .management-mode-scope--software[data-management-display="grid"] {
+            display: grid !important;
+        }
+
+        .ai-mode-topbar-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.9rem;
+            padding: 0.85rem 1rem;
+            border: 1px solid rgba(231, 76, 60, 0.2);
+            background: rgba(231, 76, 60, 0.05);
+            min-width: min(100%, 24rem);
+        }
+
+        .ai-mode-topbar-status-dot {
+            width: 0.9rem;
+            height: 0.9rem;
+            border-radius: 999px;
+            background: var(--red);
+            box-shadow: 0 0 0 0.35rem rgba(231, 76, 60, 0.12);
+            flex-shrink: 0;
+        }
+
+        .ai-mode-topbar-status-copy {
+            display: grid;
+            gap: 0.18rem;
+        }
+
+        .ai-mode-topbar-status-kicker {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 500;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        .ai-mode-topbar-status-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            line-height: 1.1;
+        }
+
+        .ai-mode-topbar-status-note {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .ai-management-workspace {
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.012));
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ai-management-workspace::before {
+            content: '';
+            position: absolute;
+            inset: 0 auto auto 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, rgba(231, 76, 60, 0.88), rgba(139, 34, 82, 0.88));
+        }
+
+        .ai-management-workspace-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .ai-management-workspace-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 0.75rem;
+        }
+
+        .ai-management-workspace-kicker::before {
+            content: '';
+            width: 0.7rem;
+            height: 0.7rem;
+            border-radius: 999px;
+            background: var(--red);
+            box-shadow: 0 0 0 0.3rem rgba(231, 76, 60, 0.12);
+        }
+
+        .ai-management-workspace-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.65rem;
+        }
+
+        .ai-management-workspace-copy {
+            max-width: 52rem;
+            color: var(--text-secondary);
+            font-size: 0.98rem;
+            line-height: 1.65;
+        }
+
+        .ai-management-workspace-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .ai-management-card {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.02);
+            padding: 1rem;
+            min-height: 11rem;
+        }
+
+        .ai-management-card-kicker {
+            display: block;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 500;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 0.8rem;
+        }
+
+        .ai-management-card-value {
+            display: block;
+            font-size: 1.2rem;
+            font-weight: 600;
+            line-height: 1.35;
+            color: var(--text-primary);
+            margin-bottom: 0.55rem;
+        }
+
+        .ai-management-card-note {
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
+        .ai-management-workspace-footer {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+            gap: 1rem;
+            margin-top: 0.75rem;
+        }
+
+        .ai-management-footer-card {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.02);
+            padding: 1rem;
+        }
+
+        .ai-management-tools {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin-top: 0.85rem;
+        }
+
+        .ai-management-tool {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.5rem 0.8rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.02);
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .ai-management-tool::before {
+            content: '';
+            width: 0.52rem;
+            height: 0.52rem;
+            border-radius: 999px;
+            background: var(--accent-light);
         }
 
         /* Status indicator */
@@ -1843,6 +2071,8 @@
             .generator-grid { grid-template-columns: 1fr; }
             .generator-grid > .panel:only-child { display: block; }
             .stats-bar { grid-template-columns: repeat(2, 1fr); }
+            .ai-management-workspace-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .ai-management-workspace-footer { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 1024px) {
@@ -1857,6 +2087,9 @@
             .stats-bar { grid-template-columns: 1fr; }
             .topbar { flex-direction: column; align-items: flex-start; gap: 1rem; }
             .topbar-right { width: 100%; justify-content: flex-start; }
+            .ai-mode-topbar-status { min-width: 100%; }
+            .ai-management-workspace { padding: 1.35rem; }
+            .ai-management-workspace-grid { grid-template-columns: 1fr; }
             .topbar-right .site-select--pill .site-select-trigger {
                 width: min(100%, 16rem) !important;
                 min-width: min(100%, 16rem);
@@ -1958,7 +2191,7 @@
                     <h1>Coldcalling</h1>
                     <p>Coldcalling wordt automatisch geblokkeerd zodra de agenda voor<br>de komende 10 werkdagen vol zit of het gewenste aantal afspraken is ingepland.</p>
                 </div>
-                <div class="topbar-right">
+                <div class="topbar-right management-mode-scope management-mode-scope--personnel" data-management-display="flex">
                     <div class="topbar-select-group">
                         <span class="topbar-select-label">Service</span>
                         <select class="form-select magnetic" id="statusPill" data-select-variant="pill" data-dot-color="accent" aria-label="Business modus">
@@ -1977,9 +2210,67 @@
                         </select>
                     </div>
                 </div>
+                <div class="topbar-right management-mode-scope management-mode-scope--software" data-management-display="flex" id="aiModeTopbarStatus">
+                    <div class="ai-mode-topbar-status">
+                        <span class="ai-mode-topbar-status-dot" aria-hidden="true"></span>
+                        <div class="ai-mode-topbar-status-copy">
+                            <span class="ai-mode-topbar-status-kicker">AI Beheer</span>
+                            <strong class="ai-mode-topbar-status-title" id="aiModeTopbarStatusTitle">AI staat klaar voor autonome acquisitie</strong>
+                            <span class="ai-mode-topbar-status-note" id="aiModeTopbarStatusCopy">Wacht op doel, capaciteit en eerste batch</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="generator-grid">
+            <section class="ai-management-workspace management-mode-scope management-mode-scope--software" data-management-display="block" id="aiManagementWorkspace">
+                <div class="ai-management-workspace-header">
+                    <div>
+                        <span class="ai-management-workspace-kicker">Autonome modus</span>
+                        <h2 class="ai-management-workspace-title">AI stuurt hier zelfstandig op nieuwe leads</h2>
+                        <p class="ai-management-workspace-copy" id="aiManagementSummary">AI staat klaar om zelfstandig leads te verzamelen. Zodra je doel actief is, kiest hij zelf tussen database, coldcalling, coldmailing en advertenties om resultaat te halen.</p>
+                    </div>
+                </div>
+                <div class="ai-management-workspace-grid">
+                    <article class="ai-management-card">
+                        <span class="ai-management-card-kicker">Actief doel</span>
+                        <strong class="ai-management-card-value" id="aiManagementGoal">Meer afspraken uit 100 geselecteerde leads</strong>
+                        <p class="ai-management-card-note" id="aiManagementGoalNote">Jij stuurt op uitkomst; de AI bepaalt zelf via welke tool of software hij dat doel haalt.</p>
+                    </article>
+                    <article class="ai-management-card">
+                        <span class="ai-management-card-kicker">Nu bezig</span>
+                        <strong class="ai-management-card-value" id="aiManagementCurrentAction">100 leads klaarzetten voor eerste benadering</strong>
+                        <p class="ai-management-card-note" id="aiManagementCurrentActionNote">Branche nu: Alles. Regio nu: Geen limiet.</p>
+                    </article>
+                    <article class="ai-management-card">
+                        <span class="ai-management-card-kicker">Voortgang</span>
+                        <strong class="ai-management-card-value" id="aiManagementProgress">100 leads als huidig richtdoel</strong>
+                        <p class="ai-management-card-note" id="aiManagementProgressNote">De AI kiest zelf welk kanaal per lead de grootste kans op reactie geeft.</p>
+                    </article>
+                    <article class="ai-management-card">
+                        <span class="ai-management-card-kicker">Volgende stap</span>
+                        <strong class="ai-management-card-value" id="aiManagementNextStep">Database verrijken en eerste batch automatisch starten</strong>
+                        <p class="ai-management-card-note" id="aiManagementNextStepNote">Voorkeursstack op deze pagina: Retell AI. In AI-beheer mag hij alle tools op Softora combineren.</p>
+                    </article>
+                </div>
+                <div class="ai-management-workspace-footer">
+                    <div class="ai-management-footer-card">
+                        <span class="ai-management-card-kicker">Actieve tools</span>
+                        <div class="ai-management-tools">
+                            <span class="ai-management-tool">Database</span>
+                            <span class="ai-management-tool">Coldcalling</span>
+                            <span class="ai-management-tool">Coldmailing</span>
+                            <span class="ai-management-tool">Advertenties</span>
+                            <span class="ai-management-tool">Agenda</span>
+                        </div>
+                    </div>
+                    <div class="ai-management-footer-card">
+                        <span class="ai-management-card-kicker">Sturing</span>
+                        <p class="ai-management-card-note">In personeel-beheer stel jij alles handmatig in. In AI-beheer geef jij alleen het doel en de grenzen; daarna bepaalt de AI zelf de route, timing en vervolgstappen.</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="generator-grid management-mode-scope management-mode-scope--personnel" data-management-display="grid">
 
                 <div class="panel" style="animation-delay: 0.1s;">
                     <div class="panel-header">
@@ -2088,7 +2379,7 @@
 
             </div>
 
-            <div class="launch-section">
+            <div class="launch-section management-mode-scope management-mode-scope--personnel" data-management-display="block">
                 <button class="launch-btn magnetic" id="launchBtn" onclick="toggleCampaign()">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     Start Campagne
@@ -2778,5 +3069,6 @@
     </script>
     <!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->
     <script src="assets/coldcalling-dashboard.js?v=20260421d" defer></script>
+    <script src="assets/premium-ai-lead-generator-management.js?v=20260423a" defer></script>
 </body>
 </html>

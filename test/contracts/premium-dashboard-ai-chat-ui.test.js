@@ -29,12 +29,32 @@ test('premium dashboard toont AI beheer dropdown boven de datumfilters', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
 
+  assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
+  assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
+  assert.match(pageSource, /class="topbar-right dashboard-topbar-right"/);
+  assert.match(pageSource, /id="aiManagementDropdown"/);
   assert.match(
     pageSource,
-    /class="topbar-right dashboard-topbar-right"[\s\S]*id="aiManagementDropdown"[\s\S]*id="aiManagementStatusDot"[\s\S]*id="aiManagementLabel">AI BEHEER<\/span>[\s\S]*data-ai-management-value="software"[\s\S]*ai-management-status-dot--red[\s\S]*AI BEHEER[\s\S]*data-ai-management-value="personnel"[\s\S]*ai-management-status-dot--green[\s\S]*PERSONEEL BEHEER[\s\S]*class="dashboard-topbar-controls"[\s\S]*class="topbar-date"[\s\S]*id="dashboardPeriodDropdown"/
+    /<span class="ai-management-status-dot ai-management-status-dot--green" id="aiManagementStatusDot"[^>]*><\/span>/
   );
+  assert.match(pageSource, /id="aiManagementLabel">PERSONEEL BEHEER<\/span>/);
+  assert.match(
+    pageSource,
+    /data-ai-management-value="software"[\s\S]*aria-checked="false"[\s\S]*ai-management-status-dot--red[\s\S]*AI BEHEER/
+  );
+  assert.match(
+    pageSource,
+    /data-ai-management-value="personnel"[\s\S]*aria-checked="true"[\s\S]*ai-management-status-dot--green[\s\S]*PERSONEEL BEHEER/
+  );
+  assert.match(pageSource, /class="dashboard-topbar-controls"/);
+  assert.match(pageSource, /class="topbar-date"/);
+  assert.match(pageSource, /id="dashboardPeriodDropdown"/);
   assert.match(pageSource, /\.ai-management-status-dot--red \{/);
+  assert.match(pageSource, /const initialAiManagementMode =/);
   assert.match(pageSource, /const AI_MANAGEMENT_STATUS = \{/);
   assert.match(pageSource, /window\.SoftoraDashboardAiManagement = \{/);
+  assert.match(pageSource, /window\.SoftoraAiManagement &&/);
+  assert.match(pageSource, /let aiManagementMode = initialAiManagementMode === 'software' \? 'software' : 'personnel';/);
   assert.match(pageSource, /aiManagementMode: managementContext\.mode/);
+  assert.match(pageSource, /softora-ai-management-change/);
 });

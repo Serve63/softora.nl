@@ -19,14 +19,28 @@
                 var storageKey = isPremiumPersonnel
                     ? "softora_premium_personnel_theme_mode"
                     : "softora_software_personnel_theme_mode";
+                var aiManagementStorageKey = isPremiumPersonnel
+                    ? "softora_premium_ai_management_mode"
+                    : "softora_software_ai_management_mode";
+                var aiManagementMode = "personnel";
+                try {
+                    var storedAiManagementMode = localStorage.getItem(aiManagementStorageKey);
+                    if (storedAiManagementMode === "software" || storedAiManagementMode === "personnel") {
+                        aiManagementMode = storedAiManagementMode;
+                    }
+                } catch (storageError) {
+                    /* ignore storage errors */
+                }
                 document.documentElement.setAttribute("data-theme-mode", "light");
                 document.documentElement.setAttribute("data-theme", "light");
+                document.documentElement.setAttribute("data-ai-management-mode", aiManagementMode);
             } catch (error) {
                 /* ignore storage errors */
             }
         })();
     </script>
     <script src="assets/personnel-theme.js?v=20260423b" defer></script>
+    <script src="assets/ai-management-mode.js?v=20260423a" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -1646,12 +1660,12 @@
                     <div class="topbar-select-wrap ai-management-select-wrap magnetic" id="aiManagementDropdown">
                         <button type="button" class="topbar-select-button" id="aiManagementTrigger" aria-haspopup="menu" aria-expanded="false" aria-controls="aiManagementMenu">
                             <span class="ai-management-trigger-label">
-                                <span class="ai-management-status-dot ai-management-status-dot--red" id="aiManagementStatusDot" aria-hidden="true"></span>
-                                <span class="topbar-select-label" id="aiManagementLabel">AI BEHEER</span>
+                                <span class="ai-management-status-dot ai-management-status-dot--green" id="aiManagementStatusDot" aria-hidden="true"></span>
+                                <span class="topbar-select-label" id="aiManagementLabel">PERSONEEL BEHEER</span>
                             </span>
                         </button>
                         <div class="topbar-select-menu" id="aiManagementMenu" role="menu" hidden>
-                            <button type="button" class="topbar-select-option" data-ai-management-value="software" role="menuitemradio" aria-checked="true" title="Rood: werkt nog niet.">
+                            <button type="button" class="topbar-select-option" data-ai-management-value="software" role="menuitemradio" aria-checked="false" title="Rood: werkt nog niet.">
                                 <span class="ai-management-option-label">
                                     <span class="ai-management-status-dot ai-management-status-dot--red" aria-hidden="true"></span>
                                     <span>AI BEHEER</span>
@@ -1660,7 +1674,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4.2 4.2L19 6.5"></path>
                                 </svg>
                             </button>
-                            <button type="button" class="topbar-select-option" data-ai-management-value="personnel" role="menuitemradio" aria-checked="false" title="Groen: werkt perfect.">
+                            <button type="button" class="topbar-select-option" data-ai-management-value="personnel" role="menuitemradio" aria-checked="true" title="Groen: werkt perfect.">
                                 <span class="ai-management-option-label">
                                     <span class="ai-management-status-dot ai-management-status-dot--green" aria-hidden="true"></span>
                                     <span>PERSONEEL BEHEER</span>
@@ -1845,7 +1859,13 @@
         const aiManagementStatusDot = document.getElementById('aiManagementStatusDot');
         const aiManagementMenu = document.getElementById('aiManagementMenu');
         const aiManagementOptions = Array.from(document.querySelectorAll('[data-ai-management-value]'));
-        let aiManagementMode = 'software';
+        const initialAiManagementMode = (
+            window.SoftoraAiManagement &&
+            typeof window.SoftoraAiManagement.getMode === 'function'
+        )
+            ? window.SoftoraAiManagement.getMode()
+            : document.documentElement.getAttribute('data-ai-management-mode');
+        let aiManagementMode = initialAiManagementMode === 'software' ? 'software' : 'personnel';
         const AI_MANAGEMENT_STATUS = {
             software: {
                 tone: 'red',
@@ -1903,7 +1923,7 @@
         function getAiManagementInstruction(value) {
             return normalizeAiManagementMode(value) === 'personnel'
                 ? 'AI-beheermodus: personeel. Focus op medewerkers, planning, agenda, rollen, bevestigingsmails en personeelsprocessen.'
-                : 'AI-beheermodus: software. Focus op klanten, opdrachten, websites, SEO, leads, calls, AI-insights en software-activiteit.';
+                : 'AI-beheermodus: autonoom. Focus op het behalen van het doel via alle beschikbare tools, zoals coldcalling, coldmailing, advertenties, agenda, leads en software-acties. Laat de AI zelf bepalen welke route nodig is.';
         }
 
         function getAiManagementStatus(value) {
@@ -1922,7 +1942,21 @@
 
         window.SoftoraDashboardAiManagement = {
             getContext: getActiveAiManagementContext,
+            getMode() {
+                return aiManagementMode;
+            },
+            setMode(value) {
+                applyAiManagementMode(value);
+            },
         };
+
+        function emitAiManagementContextChange() {
+            window.dispatchEvent(
+                new CustomEvent('softora-dashboard-ai-management-change', {
+                    detail: getActiveAiManagementContext(),
+                })
+            );
+        }
 
         function syncDashboardPeriodUi() {
             if (dashboardPeriodLabel) {
@@ -1989,15 +2023,30 @@
             renderPremiumDashboardOrders();
         }
 
-        function applyAiManagementMode(value) {
+        function applyAiManagementMode(value, options = {}) {
             aiManagementMode = normalizeAiManagementMode(value);
             syncAiManagementUi();
-            window.dispatchEvent(
-                new CustomEvent('softora-dashboard-ai-management-change', {
-                    detail: getActiveAiManagementContext(),
-                })
-            );
+            if (
+                !options.skipPersist &&
+                window.SoftoraAiManagement &&
+                typeof window.SoftoraAiManagement.setMode === 'function'
+            ) {
+                window.SoftoraAiManagement.setMode(aiManagementMode);
+            }
+            if (!options.suppressEvent) {
+                emitAiManagementContextChange();
+            }
         }
+
+        window.addEventListener('softora-ai-management-change', (event) => {
+            const nextMode = normalizeAiManagementMode(event && event.detail ? event.detail.mode : '');
+            if (nextMode === aiManagementMode) {
+                return;
+            }
+            aiManagementMode = nextMode;
+            syncAiManagementUi();
+            emitAiManagementContextChange();
+        });
 
         if (aiManagementDropdown && aiManagementTrigger && aiManagementMenu) {
             syncAiManagementUi();
@@ -3298,9 +3347,9 @@
 
             function getActiveAiManagementContext() {
                 const fallback = {
-                    mode: 'software',
-                    label: 'AI BEHEER',
-                    instruction: 'AI-beheermodus: software. Focus op klanten, opdrachten, websites, SEO, leads, calls, AI-insights en software-activiteit.',
+                    mode: 'personnel',
+                    label: 'PERSONEEL BEHEER',
+                    instruction: 'AI-beheermodus: personeel. Focus op medewerkers, planning, agenda, rollen, bevestigingsmails en personeelsprocessen.',
                 };
                 const manager = window.SoftoraDashboardAiManagement;
                 if (!manager || typeof manager.getContext !== 'function') return fallback;
