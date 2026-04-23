@@ -25,6 +25,25 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
 });
 
+test('premium bevestigingsmails toont een aparte AI beheer pagina wanneer de modus op software staat', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const managementPath = path.join(__dirname, '../../assets/premium-bevestigingsmails-management.js');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+  const managementSource = fs.readFileSync(managementPath, 'utf8');
+
+  assert.match(pageSource, /document\.documentElement\.setAttribute\("data-ai-management-mode", aiManagementMode\);/);
+  assert.match(pageSource, /<script src="assets\/ai-management-mode\.js\?v=20260423a" defer><\/script>/);
+  assert.match(pageSource, /id="screen-ai-management"/);
+  assert.match(pageSource, /AI bepaalt zelf of coldmailing nu nodig is/);
+  assert.match(pageSource, /AI is momenteel hier niet mee bezig\./);
+  assert.match(pageSource, /html\[data-ai-management-mode="software"\] #screen-dashboard,/);
+  assert.match(pageSource, /html\[data-ai-management-mode="software"\] #screen-ai-management \{ display: block !important; \}/);
+  assert.match(pageSource, /<script src="assets\/premium-bevestigingsmails-management\.js\?v=20260423a" defer><\/script>/);
+  assert.match(managementSource, /AI is momenteel hier niet mee bezig\./);
+  assert.match(managementSource, /AI is hier actief bezig met coldmailing\./);
+  assert.match(managementSource, /window\.addEventListener\('softora-ai-management-change', updateAiColdmailingWorkspace\);/);
+});
+
 test('premium bevestigingsmails keeps the campaign duration setting without a separate looptijd card', () => {
   const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
@@ -153,7 +172,6 @@ test('premium bevestigingsmails exposes coldcalling provider choice inside lead-
   );
   assert.match(pageSource, /function initLeadGeneratorProviderSetting\(\)/);
   assert.match(pageSource, /select\.value = normalizeColdcallingStack\(select\.value\);/);
-  assert.doesNotMatch(pageSource, /localStorage/);
   assert.match(
     pageSource,
     /initCampaignDurationSetting\(\);\s*initLeadGeneratorProviderSetting\(\);\s*initCampaignSelects\(\);/
