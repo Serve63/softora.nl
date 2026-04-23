@@ -546,13 +546,18 @@
 
     function renderSidebarLink(link, activeKey) {
         const isActive = link.key === activeKey;
-        const classes = `sidebar-link magnetic${isActive ? " active" : ""}`;
+        const isComingSoon = PREMIUM_SIDEBAR_COMING_SOON_KEYS.has(String(link.key || "").trim());
+        const classes = `sidebar-link magnetic${isActive ? " active" : ""}${isComingSoon ? " sidebar-link--coming-soon" : ""}`;
         const labelHtml = `<span class="sidebar-link-text">${link.label}</span>`;
+        const iconHtml = isComingSoon
+            ? `<span class="sidebar-link-lock" aria-hidden="true">${COMING_SOON_LOCK_SVG}</span>`
+            : link.icon;
         const hasCountBadge = link.key === "leads";
         const countBadgeHtml = hasCountBadge
             ? `<span class="sidebar-notification-badge" data-sidebar-count-key="${link.key}" hidden>0</span>`
             : "";
-        return `<a href="${link.href}" class="${classes}" data-sidebar-key="${link.key}">${link.icon}${labelHtml}${countBadgeHtml}</a>`;
+        const comingSoonAttrs = isComingSoon ? ' aria-disabled="true" tabindex="-1"' : "";
+        return `<a href="${link.href}" class="${classes}" data-sidebar-key="${link.key}"${comingSoonAttrs}>${iconHtml}${labelHtml}${countBadgeHtml}</a>`;
     }
 
     function getCustomersSidebarLink() {
@@ -1068,6 +1073,14 @@
         schedulePremiumSidebarFit(sidebar);
     }
 
+    function stabilizePremiumStaticSidebar(sidebar, activeKey) {
+        if (!sidebar) return;
+        syncStaticSidebarActiveState(sidebar, activeKey);
+        decorateComingSoonSidebarLinks();
+        neutralizeSidebarAnchors();
+        sidebar.dataset.sidebarReady = "true";
+    }
+
     function refreshPremiumStaticSidebarActiveState() {
         if (!isPremiumPersonnelContext) return;
         const sidebar = document.querySelector(".sidebar");
@@ -1075,13 +1088,7 @@
         const path = String(window.location.pathname || "").toLowerCase();
         const activeKey = getSidebarActiveKey(path);
         if (sidebar.dataset.staticSidebar === "1") {
-            sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
-            syncPremiumSidebarManagementLinks(sidebar, activeKey);
-            syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
-            pruneDeprecatedSidebarLinks(sidebar);
-            decorateComingSoonSidebarLinks();
-            neutralizeSidebarAnchors();
-            schedulePremiumSidebarFit(sidebar);
+            stabilizePremiumStaticSidebar(sidebar, activeKey);
             return;
         }
         if (path.indexOf("/premium-advertenties") === 0 || path.indexOf("/premium-socialmedia") === 0) {
@@ -1106,14 +1113,7 @@
         if (!sidebar) return;
         const activeKey = getSidebarActiveKey(pathname);
         if (sidebar.dataset.staticSidebar === "1") {
-            sidebar.innerHTML = buildUnifiedPremiumSidebarHtml(activeKey);
-            syncPremiumSidebarManagementLinks(sidebar, activeKey);
-            syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
-            pruneDeprecatedSidebarLinks(sidebar);
-            decorateComingSoonSidebarLinks();
-            neutralizeSidebarAnchors();
-            sidebar.dataset.sidebarReady = "true";
-            schedulePremiumSidebarFit(sidebar);
+            stabilizePremiumStaticSidebar(sidebar, activeKey);
             return;
         }
         sidebar.classList.remove("sidebar-fit-compact", "sidebar-fit-tight");
@@ -1318,14 +1318,18 @@
         const activeKey = getSidebarActiveKey(pathname);
 
         if (sidebar) {
-            syncPremiumSidebarManagementLinks(sidebar, activeKey);
-            syncPremiumSidebarAdminLinks(
-                sidebar,
-                session && session.authenticated ? session : null,
-                activeKey
-            );
-            decorateComingSoonSidebarLinks();
-            neutralizeSidebarAnchors();
+            if (sidebar.dataset.staticSidebar === "1") {
+                stabilizePremiumStaticSidebar(sidebar, activeKey);
+            } else {
+                syncPremiumSidebarManagementLinks(sidebar, activeKey);
+                syncPremiumSidebarAdminLinks(
+                    sidebar,
+                    session && session.authenticated ? session : null,
+                    activeKey
+                );
+                decorateComingSoonSidebarLinks();
+                neutralizeSidebarAnchors();
+            }
         }
 
         if (!nameEl || !roleEl || !avatarEl) {

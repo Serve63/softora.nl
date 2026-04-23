@@ -86,7 +86,7 @@ test('page smoke: premium sidebar pages pin the refreshed personnel theme script
     const html = fs.readFileSync(path.join(repoRoot, filePath), 'utf8');
     assert.match(
       html,
-      /assets\/personnel-theme\.js\?v=20260423a/,
+      /assets\/personnel-theme\.js\?v=20260423b/,
       `Nieuwe sidebar scriptversie ontbreekt voor ${filePath}`
     );
   }

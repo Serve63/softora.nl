@@ -29,7 +29,7 @@ function extractSidebarLinkTargets(source) {
   assert.ok(asideMatch, 'pagina hoort een statische premium-sidebar te hebben');
   return Object.fromEntries(
     Array.from(
-      asideMatch[1].matchAll(/href="([^"]+)" class="sidebar-link magnetic(?: active)?" data-sidebar-key="([^"]+)"/g),
+      asideMatch[1].matchAll(/href="([^"]+)" class="[^"]*\bsidebar-link\b[^"]*" data-sidebar-key="([^"]+)"/g),
       (match) => [match[2], match[1]]
     )
   );
@@ -67,13 +67,9 @@ const customLayoutPages = [
 
 const staticSidebarPages = [
   ...canonicalPages,
-  'premium-analytics.html',
-  'premium-database.html',
-  'premium-instellingen-personeel.html',
-  'premium-klanten.html',
-  'premium-mailbox.html',
-  'premium-opdracht-dossier.html',
-  'premium-vaste-lasten.html',
+  ...customLayoutPages,
+  'premium-advertenties.html',
+  'premium-socialmedia.html',
 ];
 
 test('personnel theme canonical shell is explicitly opt-in', () => {
@@ -100,6 +96,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
   assert.match(themeJsSource, /syncPremiumSidebarAdminLinks\(/);
   assert.match(themeJsSource, /premiumInitialSessionFetched/);
+  assert.match(themeJsSource, /function stabilizePremiumStaticSidebar\(sidebar, activeKey\) \{/);
+  assert.doesNotMatch(themeJsSource, /sidebar\.dataset\.staticSidebar === "1"\) \{\s*sidebar\.innerHTML/);
   assert.doesNotMatch(themeJsSource, /getWebsiteGeneratorLibrarySidebarLink/);
   assert.doesNotMatch(themeJsSource, /label:\s*"Bibliotheek"/);
   assert.match(
@@ -259,6 +257,27 @@ test('static premium sidebars share the same section order and public labels', (
     assert.equal(linkTargets.social_google, '/premium-socialmedia#google');
     assert.equal(linkTargets.ads_linkedin, '/premium-advertenties#linkedin');
     assert.equal(linkTargets.social_linkedin, '/premium-socialmedia#linkedin');
+    for (const lockedKey of [
+      'seo',
+      'ads_trustoo',
+      'ads_pinterest',
+      'ads_facebook',
+      'ads_twitter',
+      'ads_google',
+      'ads_linkedin',
+      'social_instagram',
+      'social_linkedin',
+      'social_facebook',
+      'social_twitter',
+      'social_google',
+    ]) {
+      const lockedLink = pageSource.match(
+        new RegExp(`<a [^>]*data-sidebar-key="${lockedKey}"[^>]*>[\\s\\S]*?<\\/a>`)
+      );
+      assert.ok(lockedLink, `${relativePath} mist locked sidebar-link ${lockedKey}`);
+      assert.match(lockedLink[0], /sidebar-link--coming-soon/);
+      assert.match(lockedLink[0], /sidebar-link-lock/);
+    }
     assert.doesNotMatch(pageSource, /Snapchat/);
   }
 });
