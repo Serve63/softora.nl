@@ -1462,6 +1462,110 @@
     const agendaBootstrapPayload = readAgendaBootstrapPayload();
     const appointments = [];
 
+    function formatAgendaFallbackYmd(date) {
+        return [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, '0'),
+            String(date.getDate()).padStart(2, '0')
+        ].join('-');
+    }
+
+    function shiftAgendaFallbackToWorkday(baseDate, dayOffset) {
+        const next = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + dayOffset);
+        while (next.getDay() === 0 || next.getDay() === 6) {
+            next.setDate(next.getDate() + 1);
+        }
+        return formatAgendaFallbackYmd(next);
+    }
+
+    function buildAgendaUiFallbackAppointments() {
+        const base = new Date();
+        return [
+            {
+                id: 970001,
+                uiFallback: true,
+                company: 'Jansen Installatietechniek',
+                contact: 'Pieter Jansen',
+                phone: '+31 6 2244 1188',
+                type: 'meeting',
+                date: shiftAgendaFallbackToWorkday(base, 0),
+                time: '10:00',
+                value: '€1.950',
+                branche: 'Website',
+                source: 'AI Lead Generator',
+                providerLabel: 'AI Lead Generator',
+                summary: 'Website meeting ingepland om de huidige site te vernieuwen en sneller meer offerteaanvragen te krijgen.',
+                location: 'Oisterwijk',
+            },
+            {
+                id: 970002,
+                uiFallback: true,
+                company: 'De Klerk CRM',
+                contact: 'Sophie de Klerk',
+                phone: '+31 6 1133 5577',
+                type: 'meeting',
+                date: shiftAgendaFallbackToWorkday(base, 1),
+                time: '13:30',
+                value: '€3.600',
+                branche: 'Bedrijfssoftware',
+                source: 'AI Lead Generator',
+                providerLabel: 'AI Lead Generator',
+                summary: 'Bedrijfssoftware meeting voor CRM-automatisering en koppelingen tussen leads, agenda en opvolging.',
+                location: 'Tilburg',
+            },
+            {
+                id: 970003,
+                uiFallback: true,
+                company: 'Studio Hallo',
+                contact: 'Marit van Dijk',
+                phone: '+31 6 7788 9911',
+                type: 'meeting',
+                date: shiftAgendaFallbackToWorkday(base, 4),
+                time: '09:30',
+                value: '€2.450',
+                branche: 'Voicesoftware',
+                source: 'AI Lead Generator',
+                providerLabel: 'AI Lead Generator',
+                summary: 'Voicesoftware meeting over een AI belassistent en slim terugbelverkeer voor inkomende leads.',
+                location: 'Boxtel',
+            },
+            {
+                id: 970004,
+                uiFallback: true,
+                company: 'Bistro De Markt',
+                contact: 'Sanne Verbeek',
+                phone: '+31 6 4411 2233',
+                type: 'meeting',
+                date: shiftAgendaFallbackToWorkday(base, 6),
+                time: '15:00',
+                value: '€1.850',
+                branche: 'Chatbot',
+                source: 'AI Lead Generator',
+                providerLabel: 'AI Lead Generator',
+                summary: 'Chatbot meeting om reserveringen, FAQ en WhatsApp-opvolging op de website slimmer te laten lopen.',
+                location: 'Den Bosch',
+            },
+        ];
+    }
+
+    const AGENDA_UI_FALLBACK_APPOINTMENTS = buildAgendaUiFallbackAppointments();
+
+    function hasRealAgendaAppointments() {
+        return appointments.some((item) => !item?.uiFallback);
+    }
+
+    function removeAgendaUiFallbackAppointments() {
+        const withoutFallback = appointments.filter((item) => !item?.uiFallback);
+        if (withoutFallback.length === appointments.length) return false;
+        appointments.splice(0, appointments.length, ...withoutFallback);
+        return true;
+    }
+
+    function ensureAgendaUiFallbackAppointments() {
+        if (hasRealAgendaAppointments()) return false;
+        return mergeServerAppointments(AGENDA_UI_FALLBACK_APPOINTMENTS);
+    }
+
     // State
     let currentDate = new Date();
     const today = new Date();
@@ -1922,6 +2026,7 @@
             referenceImages: normalizeReferenceImageList(item.referenceImages || item.attachments || []),
             manualPlannerWho: String(item.manualPlannerWho || ''),
             manualAllDayUnavailable: Boolean(item.manualAllDayUnavailable),
+            uiFallback: Boolean(item.uiFallback),
         };
     }
 
@@ -1929,6 +2034,11 @@
         let changed = false;
 
         if (Array.isArray(items) && items.length) {
+            const hasIncomingRealAppointments = items.some((item) => item && !item.uiFallback);
+            if (hasIncomingRealAppointments) {
+                changed = removeAgendaUiFallbackAppointments() || changed;
+            }
+
             const existingFingerprints = new Set(appointments.map(appointmentFingerprint));
             const indexById = new Map(
                 appointments
@@ -2346,6 +2456,7 @@
 
     function applyInitialAgendaBootstrap() {
         mergeServerAppointments(agendaBootstrapPayload?.appointments);
+        ensureAgendaUiFallbackAppointments();
     }
 
     function setWorkspaceStatus(message, variant = '') {
@@ -3107,12 +3218,21 @@
             try {
                 const response = await fetch(url, { cache: 'no-store' });
                 const data = await response.json();
-                if (!response.ok || !data?.ok || !Array.isArray(data.appointments)) return;
-                if (mergeServerAppointments(data.appointments)) {
+                if (!response.ok || !data?.ok || !Array.isArray(data.appointments)) {
+                    if (ensureAgendaUiFallbackAppointments()) {
+                        renderCalendar();
+                    }
+                    return;
+                }
+                const merged = mergeServerAppointments(data.appointments);
+                const ensuredFallback = ensureAgendaUiFallbackAppointments();
+                if (merged || ensuredFallback) {
                     renderCalendar();
                 }
             } catch {
-                // Zonder backend blijft de agenda leeg tot echte afspraken binnenkomen.
+                if (ensureAgendaUiFallbackAppointments()) {
+                    renderCalendar();
+                }
             } finally {
                 loadServerAppointmentsPromise = null;
             }

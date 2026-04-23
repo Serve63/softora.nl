@@ -148,3 +148,21 @@ test('premium agenda shows klantwerk label on Saturdays', () => {
   assert.match(pageSource, /if \(cell\.classList\.contains\('calendar-day--klantwerk'\)\) return;/);
   assert.match(pageSource, /if \(isYmdCalendarSaturday\(picked\)\) return;/);
 });
+
+test('premium agenda falls back to visible demo appointments when bootstrap and api return nothing', () => {
+  const pagePath = path.join(__dirname, '../../premium-personeel-agenda.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /function buildAgendaUiFallbackAppointments\(\)/);
+  assert.match(pageSource, /const AGENDA_UI_FALLBACK_APPOINTMENTS = buildAgendaUiFallbackAppointments\(\);/);
+  assert.match(pageSource, /function hasRealAgendaAppointments\(\) \{/);
+  assert.match(pageSource, /function removeAgendaUiFallbackAppointments\(\) \{/);
+  assert.match(pageSource, /function ensureAgendaUiFallbackAppointments\(\) \{/);
+  assert.match(pageSource, /uiFallback: true,[\s\S]*Jansen Installatietechniek/);
+  assert.match(pageSource, /uiFallback: true,[\s\S]*De Klerk CRM/);
+  assert.match(pageSource, /uiFallback: true,[\s\S]*Studio Hallo/);
+  assert.match(pageSource, /uiFallback: true,[\s\S]*Bistro De Markt/);
+  assert.match(pageSource, /changed = removeAgendaUiFallbackAppointments\(\) \|\| changed;/);
+  assert.match(pageSource, /applyInitialAgendaBootstrap\(\) \{[\s\S]*ensureAgendaUiFallbackAppointments\(\);/);
+  assert.match(pageSource, /const ensuredFallback = ensureAgendaUiFallbackAppointments\(\);/);
+});

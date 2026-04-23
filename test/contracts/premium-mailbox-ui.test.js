@@ -15,7 +15,10 @@ test('premium mailbox uses a mailbox account dropdown in the topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-light\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /const MAILBOX_ACCOUNT_DEFAULT = 'info@softora\.nl';/);
-  assert.match(pageSource, /'software@softora\.nl': \[/);
+  assert.match(pageSource, /'zakelijk@softora\.nl': \[/);
+  assert.match(pageSource, /'ruben@softora\.nl': \[/);
+  assert.match(pageSource, /'info@softora\.nl': \[/);
+  assert.doesNotMatch(pageSource, /'software@softora\.nl': \[/);
   assert.match(pageSource, /function getMailboxAccounts\(\) \{\s*return Object\.keys\(MAILBOX_DEMO_BY_ACCOUNT\);\s*\}/);
   assert.match(pageSource, /function getMailboxAccount\(\) \{\s*return activeMailboxAccount;\s*\}/);
   assert.match(pageSource, /function renderMailboxAccountMenu\(\) \{[\s\S]*data-mailbox-email="\$\{email\}"/);
