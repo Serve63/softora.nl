@@ -133,3 +133,23 @@ test('premium bevestigingsmails hides mail 1 and ai instructies tabs on lead-gen
   );
   assert.match(pageSource, /function ensureLeadGeneratorSettingsBackRow/);
 });
+
+test('premium bevestigingsmails exposes coldcalling provider choice inside lead-generator settings', () => {
+  const pagePath = path.join(__dirname, '../../premium-bevestigingsmails.html');
+  const pageSource = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(pageSource, /<div class="mf-row lead-generator-provider-setting">/);
+  assert.match(pageSource, /<select class="mf-sel" id="coldcallingStack" aria-label="Coldcalling provider">/);
+  assert.match(pageSource, /<option value="retell_ai" selected>Retell AI<\/option>/);
+  assert.match(pageSource, /<option value="gemini_flash_3_1_live">Gemini 3\.1 Live<\/option>/);
+  assert.match(
+    pageSource,
+    /html:not\(\[data-softora-lead-generator-alias="1"\]\) \.lead-generator-provider-setting \{ display: none !important; \}/
+  );
+  assert.match(pageSource, /function initLeadGeneratorProviderSetting\(\)/);
+  assert.match(pageSource, /select\.value = normalizeColdcallingStack\(select\.value\);/);
+  assert.doesNotMatch(pageSource, /localStorage/);
+  assert.match(pageSource, /initLeadGeneratorProviderSetting\(\);\s*initCampaignSelects\(\);/);
+  assert.match(pageSource, /providerLabel \+ ' wordt klaargezet voor deze campagne/);
+  assert.match(pageSource, /Provider: ' \+ getSelectedColdcallingStackLabel\(\) \+ '\.'/);
+});

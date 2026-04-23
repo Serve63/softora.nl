@@ -158,6 +158,7 @@ html[data-softora-lead-generator-alias="1"] .campaign-metric-zone4 { display: no
 html[data-softora-lead-generator-alias="1"] #screen-dashboard .topbar-right { display: none !important; }
 html[data-softora-lead-generator-alias="1"] #mail-subj-row { display: none !important; }
 html[data-softora-lead-generator-alias="1"] .mail-tab-group > .mail-tab:not(.mail-icon-tab) { display: none !important; }
+html:not([data-softora-lead-generator-alias="1"]) .lead-generator-provider-setting { display: none !important; }
 .zone-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -702,6 +703,7 @@ html[data-softora-lead-generator-alias="1"] .mail-tab-group > .mail-tab:not(.mai
 .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .settings-grid .mf-row { margin-bottom: 0; }
 .settings-intro { margin-bottom: 2px; font-size: 13px; color: var(--mid); line-height: 1.6; }
+.lead-generator-provider-setting { margin-top: 14px; }
 .mf-row { margin-bottom: 14px; }
 .mf-row:last-child { margin-bottom: 0; }
 .mf-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--light); margin-bottom: 6px; }
@@ -1050,6 +1052,14 @@ Softora.nl | +31 6 2991 7185</textarea>
       <div class="mail-panel" id="mail-panel-5">
         <div class="mail-fields">
           <div class="settings-intro">Stel hier in vanaf welk e-mailadres de coldmails worden verzonden en welke afzenderinformatie meegaat.</div>
+          <div class="mf-row lead-generator-provider-setting">
+            <div class="mf-label">AI-provider</div>
+            <select class="mf-sel" id="coldcallingStack" aria-label="Coldcalling provider">
+              <option value="retell_ai" selected>Retell AI</option>
+              <option value="gemini_flash_3_1_live">Gemini 3.1 Live</option>
+            </select>
+            <div class="mf-help">Kies welke AI-stack de software gebruikt voor coldcalling.</div>
+          </div>
           <div class="settings-grid">
             <div class="mf-row">
               <div class="mf-label">Afzender naam</div>
@@ -1298,6 +1308,39 @@ function isPremiumAiLeadGeneratorPath() {
   } catch (e) {
     return false;
   }
+}
+
+function normalizeColdcallingStack(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'gemini' || raw === 'gemini_3_1_live' || raw === 'gemini_flash_3_1_live') {
+    return 'gemini_flash_3_1_live';
+  }
+  return 'retell_ai';
+}
+
+function getColdcallingStackLabel(value) {
+  const normalized = normalizeColdcallingStack(value);
+  if (normalized === 'gemini_flash_3_1_live') return 'Gemini 3.1 Live';
+  return 'Retell AI';
+}
+
+function getSelectedColdcallingStackLabel() {
+  const select = document.getElementById('coldcallingStack');
+  return getColdcallingStackLabel(select ? select.value : 'retell_ai');
+}
+
+function initLeadGeneratorProviderSetting() {
+  if (!isPremiumAiLeadGeneratorPath()) return;
+  const select = document.getElementById('coldcallingStack');
+  if (!select || select.dataset.providerSettingBound === '1') return;
+  select.dataset.providerSettingBound = '1';
+  select.value = normalizeColdcallingStack(select.value);
+
+  select.addEventListener('change', function () {
+    const normalizedStack = normalizeColdcallingStack(select.value);
+    if (select.value !== normalizedStack) select.value = normalizedStack;
+    showToast('Provider ingesteld op ' + getColdcallingStackLabel(normalizedStack));
+  });
 }
 
 function applyPremiumAiLeadGeneratorShell() {
@@ -1692,11 +1735,12 @@ async function startCampagneWithLeadGeneratorBoot() {
     if (barFill) barFill.style.width = '0%';
 
     const totalMs = 4000;
+    const providerLabel = getSelectedColdcallingStackLabel();
     const messages = [
       { at: 0, text: 'Campagne-instellingen worden gelezen…' },
       { at: 800, text: 'Leads worden voorbereid op basis van je filters…' },
       { at: 1600, text: 'Bellijst en belmethode worden gecontroleerd…' },
-      { at: 2400, text: 'Scenario en AI-scripts worden klaargezet…' },
+      { at: 2400, text: providerLabel + ' wordt klaargezet voor deze campagne…' },
       { at: 3200, text: 'Campagne-overzicht wordt geopend…' },
     ];
 
@@ -1741,6 +1785,9 @@ function startCampagneImmediate() {
   if (running) return;
   const n = parseInt(document.getElementById('mail-slider').value, 10) || 100;
   const fillWorkdays = !!document.getElementById('campaign-full-workdays')?.checked;
+  const providerSuffix = isPremiumAiLeadGeneratorPath()
+    ? ' Provider: ' + getSelectedColdcallingStackLabel() + '.'
+    : '';
 
   bedrijven = genBedrijven(n);
   campTotal = n;
@@ -1752,11 +1799,11 @@ function startCampagneImmediate() {
   const countMode = getCampaignCountMode();
   document.getElementById('campaign-subtitle').textContent = fillWorkdays
     ? countMode === 'appointments'
-      ? `${n} afspraken inplannen binnen deze campagne van 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.`
-      : `${n} bedrijven doorlopen deze campagne in 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.`
+      ? `${n} afspraken inplannen binnen deze campagne van 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.${providerSuffix}`
+      : `${n} bedrijven doorlopen deze campagne in 14 dagen, tenzij de agenda eerder al 10 werkdagen vol staat.${providerSuffix}`
     : countMode === 'appointments'
-      ? `${n} afspraken inplannen binnen deze campagne van 14 dagen, van eerste benadering tot laatste checkpoint.`
-      : `${n} bedrijven doorlopen deze campagne in 14 dagen, van eerste verzending tot laatste checkpoint.`;
+      ? `${n} afspraken inplannen binnen deze campagne van 14 dagen, van eerste benadering tot laatste checkpoint.${providerSuffix}`
+      : `${n} bedrijven doorlopen deze campagne in 14 dagen, van eerste verzending tot laatste checkpoint.${providerSuffix}`;
 
   showScreen('screen-campaign');
   document.getElementById('campaign-progress-fill').style.width = '0%';
@@ -2060,6 +2107,7 @@ document.addEventListener('keydown', event => {
 
 applyPremiumAiLeadGeneratorShell();
 applyPremiumAiLeadGeneratorBelmethodeRow();
+initLeadGeneratorProviderSetting();
 initCampaignSelects();
 </script>
 
