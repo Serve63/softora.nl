@@ -39,13 +39,13 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
   assert.match(pageSource, /id="photoCostLabel" aria-label="Kosten voor AI-foto's"/);
   assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = 0\.21;/);
-  assert.match(pageSource, /± €0,21\/foto/);
-  assert.match(pageSource, /Totaal nu: €0,00/);
+  assert.match(pageSource, /<strong>€0,00<\/strong>/);
   assert.match(pageSource, /\.photo-cost-label/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
   assert.match(pageSource, /function formatEuroCost\(value\)/);
   assert.match(pageSource, /function renderPhotoCostLabel\(customers\)/);
   assert.match(pageSource, /eligibleCount \* WEBSITE_PHOTO_COST_EUR/);
+  assert.match(pageSource, /nodes\.photoCostLabel\.innerHTML = "<strong>" \+ formatEuroCost\(totalCost\) \+ "<\/strong>";/);
   assert.match(pageSource, /URL-scan kost €0,00/);
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="result-count-icon"/);

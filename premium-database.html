@@ -1352,8 +1352,7 @@
                         </div>
                         <div class="result-count-stack" aria-label="Aantal resultaten">
                             <div class="photo-cost-label" id="photoCostLabel" aria-label="Kosten voor AI-foto's">
-                                <strong>± €0,21/foto</strong><br>
-                                Totaal nu: €0,00
+                                <strong>€0,00</strong>
                             </div>
                             <button class="result-count-button" id="generatePhotosButton" type="button" aria-label="Genereer AI-foto's voor bedrijven zonder foto">
                                 <svg class="result-count-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -2257,7 +2256,7 @@
         function renderPhotoCostLabel(customers) {
             const eligibleCount = (customers || []).filter(isWebdesignPhotoEligible).length;
             const totalCost = eligibleCount * WEBSITE_PHOTO_COST_EUR;
-            nodes.photoCostLabel.innerHTML = "<strong>± " + formatEuroCost(WEBSITE_PHOTO_COST_EUR) + "/foto</strong><br>Totaal nu: " + formatEuroCost(totalCost);
+            nodes.photoCostLabel.innerHTML = "<strong>" + formatEuroCost(totalCost) + "</strong>";
             nodes.photoCostLabel.title = eligibleCount + " " + (eligibleCount === 1 ? "bedrijf komt" : "bedrijven komen") + " nu in aanmerking voor een AI-foto. URL-scan kost €0,00.";
         }
 
