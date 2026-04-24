@@ -53,6 +53,12 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /function exportCSV\(\)/);
+  assert.match(pageSource, /function renderUsedChannelTags\(customer\)/);
+  assert.match(pageSource, /Cold calling/);
+  assert.match(pageSource, /Cold mailing/);
+  assert.match(pageSource, /Nog geen acties/);
+  assert.doesNotMatch(pageSource, />Bellen<\/span>/);
+  assert.doesNotMatch(pageSource, />Mailen<\/span>/);
   assert.match(pageSource, /fetchUiStateSetWithFallback\(CUSTOMER_DB_SCOPE/);
   assert.match(pageSource, /source: "premium-database"/);
   assert.match(pageSource, /actor: "Premium database"/);

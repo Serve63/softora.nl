@@ -646,6 +646,7 @@
         .k-call { background: rgba(180,90,0,.1); color: var(--orange); }
         .k-mail { background: rgba(155,35,85,.1); color: var(--crimson); }
         .k-off { background: rgba(255,255,255,.05); color: var(--light); text-decoration: line-through; }
+        .k-empty { color: var(--light); font-size: 12px; }
 
         .tbl-empty {
             text-align: center;
@@ -1790,6 +1791,49 @@
             return labels[status] || "Prospect";
         }
 
+        function hasHistorySignal(customer, matcher) {
+            const history = Array.isArray(customer && customer.hist) ? customer.hist : [];
+            return history.some(function (item) {
+                const text = normalizeSearchValue([
+                    item && item.type,
+                    item && item.status,
+                    item && item.label,
+                    item && item.message,
+                    item && item.title
+                ].join(" "));
+                return matcher(text);
+            });
+        }
+
+        function hasUsedColdCalling(customer) {
+            const status = normalizeDatabaseStatus(customer && customer.status, customer);
+            if (status === "gebeld" || status === "geengehoor") return true;
+            if (normalizeString(customer && (customer.lastColdcallAt || customer.lastCallAt || customer.lastCalledAt))) return true;
+            return hasHistorySignal(customer, function (text) {
+                return /\b(gebeld|belpoging|coldcall|cold calling|call)\b/.test(text);
+            });
+        }
+
+        function hasUsedColdMailing(customer) {
+            const status = normalizeDatabaseStatus(customer && customer.status, customer);
+            if (status === "gemaild") return true;
+            if (normalizeString(customer && (customer.lastColdmailSentAt || customer.lastMailSentAt || customer.lastMailedAt))) return true;
+            return hasHistorySignal(customer, function (text) {
+                return /\b(gemaild|mail verstuurd|mailcontact|coldmail|cold mailing|email)\b/.test(text);
+            });
+        }
+
+        function renderUsedChannelTags(customer) {
+            const tags = [];
+            if (hasUsedColdCalling(customer)) {
+                tags.push("<span class=\"k-tag k-call\">Cold calling</span>");
+            }
+            if (hasUsedColdMailing(customer)) {
+                tags.push("<span class=\"k-tag k-mail\">Cold mailing</span>");
+            }
+            return tags.length ? tags.join("") : "<span class=\"k-empty\">Nog geen acties</span>";
+        }
+
         function renderTable() {
             const filtered = getSortedCustomers(getFilteredCustomers());
 
@@ -1808,8 +1852,7 @@
                         "<td><span class=\"c-mid\">" + escapeHtml(customer.branche) + "</span></td>",
                         "<td class=\"c-mid\">" + escapeHtml(customer.stad) + "</td>",
                         "<td><div class=\"kanalen\">",
-                            "<span class=\"k-tag " + (customer.call ? "k-call" : "k-off") + "\">Bellen</span>",
-                            "<span class=\"k-tag " + (customer.mail ? "k-mail" : "k-off") + "\">Mailen</span>",
+                            renderUsedChannelTags(customer),
                         "</div></td>",
                         "<td><div class=\"s-wrap s-" + escapeHtml(customer.status) + "\"><div class=\"s-dot\"></div><div class=\"s-label\">" + escapeHtml(getStatusLabel(customer.status)) + "</div></div></td>",
                         "<td class=\"c-light\">" + escapeHtml(formatDisplayDate(customer.updatedAt)) + "</td>",
