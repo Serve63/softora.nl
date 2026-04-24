@@ -124,6 +124,10 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /bedrijf: "LinsZorgt"/);
   assert.match(pageSource, /bedrijf: "Growingbyknowing"[\s\S]*status: "klant"/);
   assert.match(pageSource, /function restoreKnownCustomers\(\)/);
+  assert.match(pageSource, /function syncKnownCustomerStatuses\(customers\)/);
+  assert.match(pageSource, /const statusSync = syncKnownCustomerStatuses\(customersWithPhotos\);/);
+  assert.match(pageSource, /const finalCustomers = sortCustomers\(statusSync\.customers\);/);
+  assert.match(pageSource, /if \(statusSync\.syncedCount\) \{/);
   assert.match(pageSource, /let syncedCount = 0;/);
   assert.match(pageSource, /label: "Status hersteld"/);
   assert.match(pageSource, /function isKnownBadOrderFallbackCustomer\(customer\)/);

@@ -2828,17 +2828,12 @@
                 || email.indexOf("info@websiteopdracht") === 0;
         }
 
-        function restoreKnownCustomers() {
-            closeAddActions();
-            const cleanedCustomers = state.klanten.filter(function (customer) {
-                return !isKnownBadOrderFallbackCustomer(customer);
-            });
-            const removedCount = state.klanten.length - cleanedCustomers.length;
+        function syncKnownCustomerStatuses(customers) {
             const seedByKey = new Map(KNOWN_CUSTOMER_SEEDS.map(function (seed) {
                 return [normalizeString(seed.bedrijf).toLowerCase(), seed];
             }));
             let syncedCount = 0;
-            const syncedCustomers = cleanedCustomers.map(function (customer) {
+            const syncedCustomers = (customers || []).map(function (customer) {
                 const key = normalizeString(customer && customer.bedrijf).toLowerCase();
                 const seed = seedByKey.get(key);
                 if (!seed || normalizeDatabaseStatus(customer && customer.status, customer) === seed.status) {
@@ -2858,6 +2853,22 @@
                     updatedAt: formatDateForStorage(new Date())
                 }, customer && customer.id);
             });
+
+            return {
+                customers: syncedCustomers,
+                syncedCount: syncedCount
+            };
+        }
+
+        function restoreKnownCustomers() {
+            closeAddActions();
+            const cleanedCustomers = state.klanten.filter(function (customer) {
+                return !isKnownBadOrderFallbackCustomer(customer);
+            });
+            const removedCount = state.klanten.length - cleanedCustomers.length;
+            const statusSync = syncKnownCustomerStatuses(cleanedCustomers);
+            const syncedCustomers = statusSync.customers;
+            const syncedCount = statusSync.syncedCount;
             const existingKeys = new Set(cleanedCustomers.map(function (customer) {
                 return normalizeString(customer && customer.bedrijf).toLowerCase();
             }));
@@ -3005,12 +3016,20 @@
 
                     const photoMap = await loadCustomerPhotoMap();
                     const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap);
+                    const statusSync = syncKnownCustomerStatuses(customersWithPhotos);
+                    const finalCustomers = sortCustomers(statusSync.customers);
 
-                    if (customerListsDiffer(customersWithPhotos) || !hadBootstrapCustomers) {
-                        state.klanten = customersWithPhotos;
+                    if (customerListsDiffer(finalCustomers) || !hadBootstrapCustomers) {
+                        state.klanten = finalCustomers;
                         renderPage();
                     } else {
-                        state.klanten = customersWithPhotos;
+                        state.klanten = finalCustomers;
+                    }
+
+                    if (statusSync.syncedCount) {
+                        persistCustomerList(finalCustomers).catch(function (error) {
+                            console.error("Bekende klantstatussen opslaan mislukt:", error);
+                        });
                     }
 
                     setStatusMessage("");
