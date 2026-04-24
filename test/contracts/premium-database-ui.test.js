@@ -30,6 +30,9 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /--card: #0d0d0d;/);
   assert.match(pageSource, /font-family: 'Inter', sans-serif;/);
   assert.match(pageSource, /\.page-title \{[\s\S]*font-family: 'Oswald', sans-serif;/);
+  assert.match(pageSource, /table-layout: fixed;/);
+  assert.match(pageSource, /thead th:nth-child\(10\), tbody td:nth-child\(10\) \{[\s\S]*width: 70px;/);
+  assert.match(pageSource, /text-overflow: ellipsis;/);
   assert.match(pageSource, /<div class="page-title">Database<\/div>/);
   assert.match(pageSource, /<button class="btn prim has-caret" id="addButton" type="button" aria-haspopup="menu" aria-expanded="false">[\s\S]*Acties/);
   assert.match(pageSource, /<div class="add-actions-menu" id="addActionsMenu" role="menu">[\s\S]*Webdesign[\s\S]*Uploaden[\s\S]*Handmatig toevoegen/);
