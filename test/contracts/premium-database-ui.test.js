@@ -34,6 +34,7 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /thead th:nth-child\(10\), tbody td:nth-child\(10\) \{[\s\S]*width: 70px;/);
   assert.match(pageSource, /text-overflow: ellipsis;/);
   assert.match(pageSource, /\.company-edit/);
+  assert.match(pageSource, /\.photo-remove/);
   assert.match(pageSource, /class="result-count-stack" aria-label="Aantal resultaten"/);
   assert.match(pageSource, /id="generatePhotosButton"/);
   assert.match(pageSource, /class="result-count-icon"/);
@@ -62,9 +63,14 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
   assert.match(pageSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
   assert.match(pageSource, /class=\\"photo-drop\\"/);
+  assert.match(pageSource, /class=\\"photo-remove\\"/);
+  assert.match(pageSource, /data-remove-photo-id=\\"/);
   assert.match(pageSource, /data-has-photo=\\"/);
   assert.match(pageSource, /function openWebsitePhotoPreview\(customerId\)/);
   assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
+  assert.match(pageSource, /function removeWebsitePhotoForCustomer\(customerId\)/);
+  assert.match(pageSource, /websitePhoto: ""/);
+  assert.match(pageSource, /await persistCustomerPhotos\(state\.klanten\)/);
   assert.match(pageSource, /function persistCustomerPhotos\(customers\)/);
   assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap\)/);
   assert.match(pageSource, /function loadCustomerPhotoMap\(\)/);
@@ -95,6 +101,7 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /nodes\.modalTitle\.textContent = "Bedrijf aanpassen"/);
   assert.match(pageSource, /nodes\.saveModalButton\.textContent = "Opslaan"/);
   assert.match(pageSource, /openEditCustomerModal\(editButton\.getAttribute\("data-edit-id"\)\)/);
+  assert.match(pageSource, /removeWebsitePhotoForCustomer\(removePhotoButton\.getAttribute\("data-remove-photo-id"\)\)/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
   assert.match(pageSource, /<tbody id="tbody"><\/tbody>/);
   assert.match(pageSource, /<div class="panel" id="panel" aria-hidden="true">/);

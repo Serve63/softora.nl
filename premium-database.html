@@ -720,6 +720,34 @@
             cursor: zoom-in;
         }
 
+        .photo-cell {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .photo-remove {
+            width: 20px;
+            height: 20px;
+            border: 1px solid rgba(155,35,85,.18);
+            border-radius: 999px;
+            background: rgba(155,35,85,.05);
+            color: var(--crimson);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            font-weight: 700;
+            flex: 0 0 auto;
+        }
+
+        .photo-remove:hover {
+            background: rgba(155,35,85,.12);
+            border-color: rgba(155,35,85,.36);
+        }
+
         .photo-preview {
             position: fixed;
             inset: 0;
@@ -2168,7 +2196,11 @@
             const inner = isValidWebsitePhotoDataUrl(photo)
                 ? "<img src=\"" + escapeHtml(photo) + "\" alt=\"" + escapeHtml(label) + "\">"
                 : "<span>Sleep</span>";
-            return "<div class=\"photo-drop\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" aria-label=\"" + (hasPhoto ? "Websitefoto bekijken" : "Websitefoto toevoegen") + "\">" + inner + "</div>";
+            const drop = "<div class=\"photo-drop\" role=\"button\" tabindex=\"0\" data-photo-id=\"" + escapeHtml(customer.id) + "\" data-has-photo=\"" + (hasPhoto ? "true" : "false") + "\" aria-label=\"" + (hasPhoto ? "Websitefoto bekijken" : "Websitefoto toevoegen") + "\">" + inner + "</div>";
+            const remove = hasPhoto
+                ? "<button class=\"photo-remove\" type=\"button\" data-remove-photo-id=\"" + escapeHtml(customer.id) + "\" aria-label=\"Websitefoto verwijderen\">&times;</button>"
+                : "";
+            return "<div class=\"photo-cell\">" + drop + remove + "</div>";
         }
 
         function renderTable() {
@@ -2438,6 +2470,33 @@
             } catch (error) {
                 setStatusMessage(String(error && error.message || "Foto opslaan is mislukt."), "error");
             }
+        }
+
+        async function removeWebsitePhotoForCustomer(customerId) {
+            const customerIndex = state.klanten.findIndex(function (item) {
+                return item.id === customerId;
+            });
+            if (customerIndex === -1) return;
+
+            const nextCustomer = normalizeCustomer({
+                ...state.klanten[customerIndex],
+                websitePhoto: "",
+                websitePhotoName: "",
+                updatedAt: formatDateForStorage(new Date())
+            }, customerId);
+            state.klanten = sortCustomers(state.klanten.map(function (item) {
+                return item.id === customerId ? nextCustomer : item;
+            }));
+            renderPage();
+            closeWebsitePhotoPreview();
+
+            const photoResult = await persistCustomerPhotos(state.klanten);
+            if (photoResult.ok) {
+                toast("Foto verwijderd");
+                setStatusMessage("Foto verwijderd.", "success", true);
+                return;
+            }
+            setStatusMessage("Foto is lokaal verwijderd, maar opslaan in Supabase mislukte.", "error");
         }
 
         function normalizeWebsiteCandidateUrl(value) {
@@ -3218,6 +3277,13 @@
                 event.preventDefault();
                 event.stopPropagation();
                 openEditCustomerModal(editButton.getAttribute("data-edit-id"));
+                return;
+            }
+            const removePhotoButton = event.target.closest(".photo-remove");
+            if (removePhotoButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                void removeWebsitePhotoForCustomer(removePhotoButton.getAttribute("data-remove-photo-id"));
                 return;
             }
             const photoDrop = event.target.closest(".photo-drop");
