@@ -50,7 +50,10 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /colspan=\\"10\\"/);
   assert.match(pageSource, /<input type="file" id="photoFileInput" accept="image\/\*" hidden>/);
   assert.match(pageSource, /websitePhoto: normalizeString\(raw && \(raw\.websitePhoto \|\| raw\.photo \|\| raw\.websiteImage\)\)/);
+  assert.match(pageSource, /function shouldShowWebsitePhoto\(customer\)/);
+  assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
+  assert.match(pageSource, /if \(!shouldShowWebsitePhoto\(customer\)\) return "";/);
   assert.match(pageSource, /class=\\"photo-drop\\"/);
   assert.match(pageSource, /data-has-photo=\\"/);
   assert.match(pageSource, /function openWebsitePhotoPreview\(customerId\)/);
@@ -60,6 +63,7 @@ test('premium database page renders the dedicated database UI while preserving p
   assert.match(pageSource, /function readImageFileAsDataUrl\(file\)/);
   assert.match(pageSource, /function saveWebsitePhotoForCustomer\(customerId, file\)/);
   assert.match(pageSource, /function generateWebdesignPhotos\(\)/);
+  assert.match(pageSource, /shouldShowWebsitePhoto\(customer\) && !isValidWebsitePhotoDataUrl\(customer\.websitePhoto\)/);
   assert.match(pageSource, /fetch\("\/api\/website-preview\/generate"/);
   assert.match(pageSource, /nodes\.addWebdesignButton\.addEventListener\("click"/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);

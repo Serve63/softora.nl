@@ -2009,7 +2009,12 @@
             return /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(normalizeString(value));
         }
 
+        function shouldShowWebsitePhoto(customer) {
+            return normalizeDatabaseStatus(customer && customer.status, customer) !== "klant";
+        }
+
         function renderWebsitePhotoDrop(customer) {
+            if (!shouldShowWebsitePhoto(customer)) return "";
             const photo = normalizeString(customer && customer.websitePhoto);
             const label = normalizeString(customer && customer.websitePhotoName) || "Websitefoto";
             const hasPhoto = isValidWebsitePhotoDataUrl(photo);
@@ -2303,7 +2308,7 @@
 
         function getWebdesignPhotoTargets() {
             return getSortedCustomers(getFilteredCustomers()).filter(function (customer) {
-                return !isValidWebsitePhotoDataUrl(customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
+                return shouldShowWebsitePhoto(customer) && !isValidWebsitePhotoDataUrl(customer.websitePhoto) && Boolean(resolveCustomerWebsiteUrl(customer));
             }).slice(0, 10);
         }
 
